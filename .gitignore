@@ -1,0 +1,10 @@
+.claude/
+.DS_Store
+*.swp
+*.swo
+node_modules/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/

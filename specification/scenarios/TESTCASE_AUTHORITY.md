@@ -1,0 +1,12 @@
+# Testcase Authority Matrix
+
+This matrix records the current written testcase authority for the live `odd_method`
+requirement families.
+
+| Requirement family | Authority surface | Notes |
+| --- | --- | --- |
+| `REQ-F-UPSTREAM-*` | `01-upstream-adoption-boundary.md` | proves the migration/adoption boundary and fail-closed non-inheritance |
+| `REQ-F-GFUNC-*` | `02-graph-function-carrier.md` | proves graph-function-first publication, composition, and recursion intent |
+| `REQ-F-RUNTIME-*` | `03-first-constructive-edge-runtime-facts.md` | proves ABG-owned fact truth and no shadow-runtime seam |
+| `REQ-F-VERIFY-*` | `03-first-constructive-edge-runtime-facts.md` | proves significant paths and installed-dev proving direction |
+| `REQ-F-REALIZATION-*` | `04-tenant-realization-topology.md` | proves the standard tenant topology and explicit realization-law boundaries |
