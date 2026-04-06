@@ -12,4 +12,5 @@ Start with these surfaces:
 - `specification/GOALS.md`
 - `specification/requirements/`
 - `build_tenants/odd_method/python/`
+- `build_tenants/odd_sdlc/python/`
 - `.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`

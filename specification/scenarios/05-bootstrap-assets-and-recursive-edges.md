@@ -9,9 +9,10 @@ are explicit.
 
 Declare one bounded bootstrap `input_set`, publish one graph function
 `{input_set} -> {specification/INTENT.md}`, publish one graph function
-`{input_set} -> {specification/PRODUCT.md}`, then publish the downstream
-requirements boundary
-`{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/requirements/}`.
+`{input_set} -> {specification/PRODUCT.md}`, publish one graph function
+`{input_set} -> {specification/GOALS.md}`, then publish the downstream
+requirements boundary `{input_set, specification/INTENT.md,
+specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`.
 
 ## Significant Paths
 
@@ -20,8 +21,10 @@ requirements boundary
   `{input_set} -> {specification/INTENT.md}`
 - product path: one graph-function boundary publishes
   `{input_set} -> {specification/PRODUCT.md}`
+- goals path: one graph-function boundary publishes
+  `{input_set} -> {specification/GOALS.md}`
 - requirements path: one downstream graph-function boundary publishes
-  `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/requirements/}`
+  `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
 - decomposition path: requirements output is expressed as family files rather
   than one monolithic artifact
 - recursive path: intent and product remain independently derivable upstream
@@ -32,7 +35,9 @@ requirements boundary
 1. the bootstrap asset set is named explicitly
 2. the intent and product graph-function contracts are inspectable at the outer
    boundary
-3. the downstream requirements contract is inspectable at the outer boundary
+3. the goals graph-function contract is inspectable at the outer boundary
+4. the downstream requirements contract is inspectable at the outer boundary
 4. requirements output is rooted at `specification/requirements/` and
    folderized as requirement families
-5. intent, product, and requirements remain one coherent downstream span
+5. intent, product, goals, and requirements remain one coherent downstream
+   span

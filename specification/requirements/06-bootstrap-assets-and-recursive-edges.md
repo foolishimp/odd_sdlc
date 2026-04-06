@@ -15,8 +15,9 @@ bootstrap graph to ambient folder conventions.
 **Acceptance Criteria**:
 - AC-1: the bootstrap input asset set includes one bounded `input_set`
 - AC-2: the bootstrap graph names `specification/INTENT.md`,
-  `specification/PRODUCT.md`, and the requirement-family surface rooted at
-  `specification/requirements/` as explicit assets
+  `specification/PRODUCT.md`, `specification/GOALS.md`, and the
+  requirement-family surface rooted at `specification/requirements/` as
+  explicit assets
 - AC-3: the bootstrap requirements output is carried as separate
   requirement-family files inside that rooted surface
 
@@ -35,12 +36,13 @@ The bootstrap graph includes independent graph-function boundaries from
 ### REQ-F-ASSET-003 — Requirements are derived downstream from inputs, intent, and product
 
 The downstream requirements boundary consumes `input_set`,
-`specification/INTENT.md`, and `specification/PRODUCT.md`, then writes the
-requirement-family surface rooted at `specification/requirements/`.
+`specification/INTENT.md`, `specification/PRODUCT.md`, and
+`specification/GOALS.md`, then writes the requirement-family surface rooted at
+`specification/requirements/`.
 
 **Acceptance Criteria**:
 - AC-1: one published contract carries
-  `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/requirements/}`
+  `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
 - AC-2: the output requirements surface is folderized and carried as separate
   `*.md` family files
 - AC-3: output structure remains compatible with the singleton
@@ -48,14 +50,14 @@ requirement-family surface rooted at `specification/requirements/`.
 
 ### REQ-F-ASSET-004 — The bootstrap graph is recursive and decomposable
 
-The bootstrap graph treats intent and product as independently derivable
-upstream assets rather than as one fused precondition blob.
+The bootstrap graph treats intent, product, and goals as independently
+derivable upstream assets rather than as one fused precondition blob.
 
 **Acceptance Criteria**:
-- AC-1: `specification/INTENT.md` and `specification/PRODUCT.md` may be
-  derived or revised through their own graph-function boundaries before
-  requirements derivation
+- AC-1: `specification/INTENT.md`, `specification/PRODUCT.md`, and
+  `specification/GOALS.md` may be derived or revised through their own
+  graph-function boundaries before requirements derivation
 - AC-2: resulting requirement families remain derivable from the resulting
-  intent and product surfaces plus the governing `input_set`
+  intent, product, and goals surfaces plus the governing `input_set`
 - AC-3: the published outer contracts remain stable even if inner realization
   later refines how those surfaces are updated

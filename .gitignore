@@ -8,3 +8,11 @@ __pycache__/
 .env
 .venv/
 venv/
+
+# ABG runtime state
+.ai-workspace/events/events.jsonl
+.ai-workspace/fp_manifests/
+.ai-workspace/fp_results/
+
+# Sandbox historical run archives
+build_tenants/*/python/test_runs/

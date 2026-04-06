@@ -21,9 +21,11 @@ The constitutional `specification/` surface is singleton project truth.
 | Entry | Kind | Path | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `common` | shared root | `build_tenants/common/` | Active | Current bootstrap realization root for `odd_method` |
+| `odd_sdlc` | tenant package | `build_tenants/odd_sdlc/python/` | Active | First live ODD domain tenant and first executable slice |
+| `odd_method` | scaffold tenant | `build_tenants/odd_method/python/` | Deferred | Installer scaffold/example surface retained as bootstrap reference |
 
 ## Active Focus
 
-`common` is the only active realization root at the current bootstrap stage.
+`common` remains the shared realization root.
 
-No tenant-local variant is adopted yet.
+`odd_sdlc` is the first active tenant package.

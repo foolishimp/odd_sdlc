@@ -14,12 +14,15 @@
 It provides an outcome-driven development domain expressed through GTL and
 executed through ABG.
 
+`odd_sdlc` is the first live domain package on that line.
+
 It gives a project a lawful way to declare:
 
-- outcomes
-- outcome transitions
-- graph functions
-- policy over evaluation and escalation
+- assets addressed by URI
+- asset types with explicit semantic role
+- asset collections and typed asset nodes
+- named functions over asset graphs
+- policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
 
 It adopts a singleton constitutional specification together with a standard
@@ -41,6 +44,68 @@ expectations.
 
 A named durable surface of product truth or produced delivery state.
 
+An asset is not governed correctly as an isolated payload.
+
+An asset carries:
+
+- URI identity
+- semantic type
+- provenance
+- current convergence context
+
+The current materialized form of an asset may be mutable, but mutable assets are
+treated as current checkpoints over a constructive history rather than as
+context-free blobs.
+
+### Asset Type
+
+The semantic role an asset fulfills in the domain.
+
+An asset type may carry deterministic evaluation, probabilistic gap
+evaluation, probabilistic descriptive framing, and proof or closure hints.
+
+Asset types are semantic library surfaces, not flat labels.
+
+### Asset Collection
+
+A named working set of assets treated as one bound scope.
+
+### Asset Node
+
+A typed locus in the domain topology that receives one asset or one asset
+collection binding.
+
+### Asset Graph
+
+The dependency topology over typed asset nodes.
+
+### Asset Binding
+
+The mapping from one concrete asset or asset collection into one typed asset
+node at function-call time.
+
+### Mutable Asset
+
+An asset whose current materialized form may be rewritten as work converges.
+
+Mutable assets are governed through provenance and constructive history.
+
+### Immutable Asset
+
+An asset whose content is treated as fixed once adopted, imported, or published.
+
+Immutable assets serve as stable references, evidence, or snapshots.
+
+### Asset Projection
+
+The current visible checkpoint of an asset derived from its governing history.
+
+ODD may borrow from CQRS here:
+
+- runtime and constructive history are authoritative for governance
+- the current materialized asset surface is the projected checkpoint operators
+  usually edit or inspect
+
 ### Requirement Family Surface
 
 The folderized asset surface rooted at `specification/requirements/` that
@@ -50,18 +115,16 @@ carries live requirement truth as separate family files.
 
 The executable constructive carrier over declared graph contracts.
 
+### Function
+
+The domain-level named callable transformation over typed asset nodes.
+
+A domain function is realized as a GTL `GraphFunction`.
+
 ### Input Set
 
 A bounded set of imported or authored source surfaces supplied to a graph
 function boundary.
-
-### Work Vector
-
-A named productized work capability over one graph function or one lawful graph
-function composition.
-
-A work vector is not a second executor. It is the product/method view over the
-same underlying graph-function carrier.
 
 ### Runtime Fact
 
@@ -72,6 +135,16 @@ execution.
 
 A declarative configuration surface that constrains evaluation, escalation,
 worker/backend selection, or closure expectations without redefining graph law.
+
+### Gap
+
+The projected delta from convergence for one asset, asset collection, or
+function boundary.
+
+### Convergence Target
+
+The declared condition under which one asset or asset collection counts as
+converged.
 
 ## Goal Model
 
@@ -110,17 +183,23 @@ The current product definition of `odd_method` is:
 - an outcome-driven development product
 - lightweight by design
 - graph-function-first in execution
+- centered on assets, asset types, asset graphs, and named functions
 - beginning from an explicit bootstrap asset set and recursive edge contracts
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
-- currently using `build_tenants/common/` as the only active realization root
+- carrying `odd_sdlc` as the first live tenant package
 - explicit in adoption of any carried-forward truth
 
-The current bootstrap asset graph is:
+The current bootstrap asset graph for `odd_sdlc` is:
 
 - `{input_set} -> {specification/INTENT.md}`
 - `{input_set} -> {specification/PRODUCT.md}`
-- `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/requirements/}`
+- `{input_set} -> {specification/GOALS.md}`
+- `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
 
-The current bootstrap focus is to establish the live constitutional and
-realization topology before deriving code.
+The current build focus is to establish the first real `odd_sdlc` tenant slice:
+
+- publish the first asset-typed function catalog
+- bind workspace assets by URI
+- execute the first graph-function call through ABG
+- prove the resulting runtime facts by post-mortem audit

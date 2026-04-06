@@ -37,6 +37,8 @@ surfaces the real product uses.
 - AC-1: decisive proof prefers an isolated environment
 - AC-2: proof runs through the declared entry, control, and runtime surfaces
 - AC-3: direct source-level checks do not replace installed-dev proof
+- AC-4: where a proving lane resets and reruns an installed sandbox, per-run
+  post-mortem artifacts are retained for later comparison
 
 ### REQ-F-VERIFY-004 — The first proving lane exercises the first constructive edge under substrate fact truth
 

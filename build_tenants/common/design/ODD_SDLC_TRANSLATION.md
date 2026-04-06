@@ -85,6 +85,82 @@ Each type may carry:
 This gives the type system domain meaning without moving semantics into one
 global controller prompt or one hidden runtime layer.
 
+### AssetType Semantics
+
+`AssetType` is ratified here as a semantic library surface rather than a flat
+label.
+
+That means an asset type may carry reusable domain semantics for:
+
+- deterministic evaluation
+- probabilistic gap evaluation
+- probabilistic descriptive framing
+- proof and closure expectations
+- compatibility with producing and consuming functions
+
+This library direction is intentionally bounded to ODD.
+
+GTL changes remain out of scope until ODD proves which type semantics are truly
+universal and load-bearing.
+
+The first live library should stay small and use a few composed domain types
+rather than a large flat register.
+
+### Asset Provenance And State Model
+
+An instantiated asset without provenance and the repeated constructive events
+that evolved it is not governed correctly.
+
+`odd_sdlc` therefore adopts this state model:
+
+- asset identity is durable
+- provenance is part of the asset model
+- the current visible asset surface may be mutable
+- mutable assets are treated as projected checkpoints over constructive history
+- immutable assets are allowed as stable imported, adopted, or published
+  surfaces
+
+This borrows the useful compromise behind CQRS without copying CQRS wholesale:
+
+- governing history and runtime fact truth remain authoritative
+- the operator usually works against the current projected checkpoint
+
+The design implication is:
+
+- ODD should never treat the current file contents alone as the whole truth of
+  an asset
+- repeated turns over one asset must remain attributable by provenance and
+  runtime fact history
+- mutation is allowed, but mutation without attributable history is not
+
+### First AssetType Library
+
+The first ODD asset-type library should begin with a few reusable composed
+types.
+
+Foundational semantic types:
+
+- `structured_document`
+- `spec_surface`
+- `verification_surface`
+- `authority_surface`
+- `argument_surface`
+
+First concrete `odd_sdlc` types:
+
+- `intent_doc = structured_document + spec_surface`
+- `product_doc = structured_document + spec_surface`
+- `goal_surface = structured_document + spec_surface`
+- `requirement_family = structured_document + spec_surface`
+- `design_surface = structured_document + spec_surface`
+- `scenario_bundle = structured_document + verification_surface`
+- `testcase_authority_surface = structured_document + authority_surface + verification_surface`
+- `proof_surface = structured_document + verification_surface`
+- `release_surface = structured_document + authority_surface`
+
+This is enough structure to prove composition without overbuilding taxonomy too
+early.
+
 ## genesis_sdlc Surface Translation
 
 The first `odd_sdlc` translation adopts this asset-type mapping.

@@ -1,0 +1,61 @@
+# odd_sdlc First Slice Requirements
+
+**Family**: REQ-F-ODDSDLC-*
+**Status**: Active
+**Category**: Capability
+
+This family defines the first real `odd_sdlc` tenant slice.
+
+### REQ-F-ODDSDLC-001 — odd_sdlc is the first live tenant package
+
+`odd_sdlc` is the first live tenant package on the `odd_method` line.
+
+**Acceptance Criteria**:
+- AC-1: `build_tenants/odd_sdlc/` exists as an active tenant root
+- AC-2: the tenant publishes its own code, design, and proving surfaces
+- AC-3: the tenant is recorded explicitly in `build_tenants/TENANT_REGISTRY.md`
+
+### REQ-F-ODDSDLC-002 — odd_sdlc publishes the first asset-function catalog
+
+The first `odd_sdlc` slice publishes a machine-readable catalog of named
+functions over the bootstrap asset graph.
+
+**Acceptance Criteria**:
+- AC-1: the catalog names the first bootstrap functions
+- AC-2: each function records its typed inputs and outputs
+- AC-3: the published GTL module records the same function catalog
+
+### REQ-F-ODDSDLC-003 — odd_sdlc exposes an app-owned bootstrap and initialization surface
+
+The first `odd_sdlc` slice provides app-owned bootstrap and initialization
+surfaces above GTL and ABG.
+
+**Acceptance Criteria**:
+- AC-1: bootstrap creates or resolves the app configuration boundary
+- AC-2: initialization binds the published GTL module to ABG runtime
+- AC-3: the tenant does not implement a post-dispatch shadow runtime
+
+### REQ-F-ODDSDLC-004 — The first proving lane exercises one real graph-function call
+
+The first proving lane runs one real `odd_sdlc` graph-function path through
+ABG and audits the emitted runtime facts.
+
+**Acceptance Criteria**:
+- AC-1: the proving lane runs through the tenant’s declared entry surface
+- AC-2: the proving lane records ABG event truth such as graph-call and run
+  lifecycle
+- AC-3: proof is based on post-mortem event audit rather than only on direct
+  return values
+
+### REQ-F-ODDSDLC-005 — odd_sdlc provides a domain query library for UI composition
+
+The first `odd_sdlc` slice provides a Python query library that expresses ODD
+domain understanding without duplicating the ABG runtime model.
+
+**Acceptance Criteria**:
+- AC-1: the query library exposes domain views such as assets, functions,
+  bindings, and gap semantics
+- AC-2: runtime truth such as run, graph-call, continuation, and frame state
+  remains ABG-native rather than being redefined by ODD
+- AC-3: the same query library can later be wrapped by a microservice or MCP
+  surface without changing its core query logic

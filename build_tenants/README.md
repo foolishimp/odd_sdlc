@@ -6,5 +6,10 @@ shared `specification/` surface.
 Use [TENANT_REGISTRY.md](./TENANT_REGISTRY.md) as the canonical registry of
 realization roots, tenant families, variants, and lifecycle status.
 
-At the current bootstrap stage, `odd_method` uses the shared `common/` realization
-root only. No tenant-local variant is active yet.
+The current active tenant line is:
+
+- shared realization law in `common/`
+- the first live tenant package in `odd_sdlc/python/`
+
+The generated `odd_method/python/` scaffold remains deferred bootstrap
+reference only.
