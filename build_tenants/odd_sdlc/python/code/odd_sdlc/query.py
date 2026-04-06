@@ -60,6 +60,10 @@ def query_functions(app: OddSdlcApp) -> list[dict[str, Any]]:
     return catalog(app)["functions"]
 
 
+def query_jobs(app: OddSdlcApp) -> list[dict[str, Any]]:
+    return catalog(app)["jobs"]
+
+
 def query_bindings(app: OddSdlcApp) -> list[dict[str, Any]]:
     return catalog(app)["bindings"]
 
@@ -73,6 +77,7 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
         "asset_types": catalog_payload["asset_types"],
         "assets": query_assets(app),
         "functions": catalog_payload["functions"],
+        "jobs": catalog_payload["jobs"],
         "graph_functions": catalog_payload["graph_functions"],
         "bindings": catalog_payload["bindings"],
         "gaps": gaps(app),
