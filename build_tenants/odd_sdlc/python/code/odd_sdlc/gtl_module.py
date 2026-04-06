@@ -9,7 +9,7 @@
 """Published GTL module for the first odd_sdlc slice."""
 from __future__ import annotations
 
-from gtl.function_model import GraphFunction, RefinementBoundary, TemplateRef
+from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Graph, GraphVector, Node
 from gtl.module_model import Module
 from gtl.operator_model import Evaluator, F_D, F_P, Operator
@@ -228,11 +228,13 @@ def _graph_function(
         nodes=tuple((*source_nodes, target)),
         vectors=(vector,),
     )
-    return GraphFunction(
+    return GraphFunction.from_graph(
         name=name,
-        inputs=graph.inputs,
-        outputs=graph.outputs,
-        template=TemplateRef.inline_graph(graph, ref=f"inline:{name}"),
+        graph=graph,
+        environment=EnvRef.from_contract(
+            requires=graph.inputs,
+            provides=graph.outputs,
+        ),
         declarations=Attrs(
             entries=(
                 ("function_kind", "odd_asset_function"),
