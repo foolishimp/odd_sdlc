@@ -21,6 +21,10 @@ installed development environment:
 - `derive_uat_testcases_surface`
 - `derive_design_surface`
 - `derive_scenario_surface`
+- `derive_implementation_design_surface`
+- `select_implementation_stack_profile`
+- `derive_implementation_module_surface`
+- `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`
@@ -44,11 +48,16 @@ installed development environment:
   surfaces become lawful sources for design, then design becomes a lawful
   source for scenarios, and UAT plus scenarios become lawful sources for
   testcase-authority output
+- recursive-implementation path: the generated design and scenario surfaces
+  open a bounded recursive implementation SDLC that yields implementation
+  design, explicit stack choice, generated module structure, and executable
+  code under `build_tenants/odd_method/python/code`
 - recursive-test path: the generated design and scenario surfaces open a
   bounded recursive test SDLC that yields test design, explicit stack choice,
   generated test module structure, and archived test-run evidence
-- release path: the generated design, scenarios, testcase authority, and test
-  archive evidence become lawful inputs to release together with requirements
+- release path: the generated design, scenarios, executable code, testcase
+  authority, and test archive evidence become lawful inputs to release
+  together with requirements
 - query path: the tenant exposes a domain query library that a UI can compose
   with ABG runtime projections
 - executive path: the tenant exposes one public GTL executive graph function
@@ -65,8 +74,9 @@ installed development environment:
 3. `odd_sdlc` executes through GTL and ABG rather than a product-local
    imperative controller
 4. the proving lane explains the bootstrap chain, the first requirements
-   fan-out, the deeper scenario/authority branch, and the recursive
-   test-SDLC-to-release branch from emitted runtime facts
+   fan-out, the deeper scenario/authority branch, the recursive
+   implementation-SDLC branch, and the recursive test-SDLC-to-release branch
+   from emitted runtime facts
 5. the tenant exposes domain query logic without duplicating the ABG runtime
    model that the UI should already understand directly
 6. the tenant exposes one executive GTL graph function that can drive the

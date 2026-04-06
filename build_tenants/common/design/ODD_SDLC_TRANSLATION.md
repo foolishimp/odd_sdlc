@@ -235,6 +235,10 @@ The first translation should use nodes equivalent to:
 - `requirement_surface`
 - `design_surface`
 - `scenario_surface`
+- `implementation_design_surface`
+- `implementation_stack_profile`
+- `implementation_module_surface`
+- `code_surface`
 - `test_design_surface`
 - `test_stack_profile`
 - `test_module_surface`
@@ -256,6 +260,10 @@ The first catalog should include:
 - `derive_uat_testcases_surface`
 - `derive_design_surface`
 - `derive_scenario_surface`
+- `derive_implementation_design_surface`
+- `select_implementation_stack_profile`
+- `derive_implementation_module_surface`
+- `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`
@@ -290,12 +298,16 @@ The first live downstream translation adds:
 - `{requirement_surface} -> {uat_testcases_surface}`
 - `{requirement_surface, feature_decomp_surface} -> {design_surface}`
 - `{requirement_surface, design_surface} -> {scenario_surface}`
+- `{design_surface, scenario_surface} -> {implementation_design_surface}`
+- `{implementation_design_surface} -> {implementation_stack_profile}`
+- `{implementation_design_surface, implementation_stack_profile} -> {implementation_module_surface}`
+- `{implementation_module_surface, implementation_stack_profile} -> {code_surface}`
 - `{design_surface, scenario_surface} -> {test_design_surface}`
 - `{test_design_surface} -> {test_stack_profile}`
 - `{test_design_surface, test_stack_profile} -> {test_module_surface}`
 - `{test_module_surface, test_stack_profile} -> {test_run_archive_surface}`
 - `{uat_testcases_surface, scenario_surface} -> {testcase_authority_surface}`
-- `{requirement_surface, design_surface, scenario_surface, testcase_authority_surface, test_run_archive_surface} -> {release_surface}`
+- `{requirement_surface, design_surface, scenario_surface, code_surface, testcase_authority_surface, test_run_archive_surface} -> {release_surface}`
 
 Later downstream translation can refine:
 
@@ -326,6 +338,14 @@ The first graph shape is:
 
 `requirement_surface + design_surface -> scenario_surface`
 
+`design_surface + scenario_surface -> implementation_design_surface`
+
+`implementation_design_surface -> implementation_stack_profile`
+
+`implementation_design_surface + implementation_stack_profile -> implementation_module_surface`
+
+`implementation_module_surface + implementation_stack_profile -> code_surface`
+
 `design_surface + scenario_surface -> test_design_surface`
 
 `test_design_surface -> test_stack_profile`
@@ -336,7 +356,7 @@ The first graph shape is:
 
 `uat_testcases_surface + scenario_surface -> testcase_authority_surface`
 
-`requirement_surface + design_surface + scenario_surface + testcase_authority_surface + test_run_archive_surface -> release_surface`
+`requirement_surface + design_surface + scenario_surface + code_surface + testcase_authority_surface + test_run_archive_surface -> release_surface`
 
 This graph is decomposable. Each boundary may later refine internally while
 preserving the outer contract.
@@ -435,8 +455,9 @@ The first concrete tenant-local root should be:
 Expected tenant-local surfaces:
 
 - `build_tenants/odd_sdlc/design/`
-- `build_tenants/odd_sdlc/code/`
 - `build_tenants/odd_sdlc/test_env/`
+- `build_tenants/odd_method/python/design/`
+- `build_tenants/odd_method/python/code/`
 
 Promote content out of common design only when `odd_sdlc` carries real local
 realization law.

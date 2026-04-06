@@ -46,7 +46,9 @@ dependency chain through ABG and audits the emitted runtime facts.
   lifecycle across at least the `INTENT -> PRODUCT -> GOALS -> requirements`
   bootstrap subgraph together with the first downstream fan-out to feature
   decomposition and UAT testcase surfaces, the deeper design/scenario/authority
-  branch, and the first recursive test-SDLC branch to generated test design,
+  branch, the first recursive implementation-SDLC branch to implementation
+  design, implementation stack profile, implementation modules, and code
+  surfaces, and the first recursive test-SDLC branch to generated test design,
   test stack profile, test modules, test run archive, and release surfaces
 - AC-3: proof is based on post-mortem event audit rather than only on direct
   return values
@@ -78,8 +80,8 @@ graph function rather than acting as an app-owned shadow runtime above ABG.
 
 **Acceptance Criteria**:
 - AC-1: the tenant publishes one public executive graph function whose
-  materialized vectors name the current bootstrap, recursive test, authority,
-  and release steps in dependency order
+  materialized vectors name the current bootstrap, recursive implementation,
+  recursive test, authority, and release steps in dependency order
 - AC-2: the tenant binds one explicit job to that executive graph function and
   exposes an app command that executes the resulting chain end to end from an
   installed workspace

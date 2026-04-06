@@ -216,12 +216,16 @@ The current asset graph proven in the toy sandbox for `odd_sdlc` is:
 - `{specification/requirements/} -> {specification/scenarios/20-generated-uat-testcases.md}`
 - `{specification/requirements/, build_tenants/common/design/20-generated-feature-decomp.md} -> {build_tenants/common/design/30-generated-odd-design.md}`
 - `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md} -> {specification/scenarios/40-generated-scenarios.md}`
+- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-design.md}`
+- `{build_tenants/odd_method/python/design/40-generated-implementation-design.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-stack.md}`
+- `{build_tenants/odd_method/python/design/40-generated-implementation-design.md, build_tenants/odd_method/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-modules.md}`
+- `{build_tenants/odd_method/python/design/40-generated-implementation-modules.md, build_tenants/odd_method/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_method/python/code/odd_generated_impl/}`
 - `{specification/scenarios/20-generated-uat-testcases.md, specification/scenarios/40-generated-scenarios.md} -> {specification/scenarios/30-generated-testcase-authority.md}`
 - `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-test-design.md}`
 - `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md} -> {build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md}`
 - `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md}`
 - `{build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md}`
-- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
+- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, build_tenants/odd_method/python/code/odd_generated_impl/, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
 
 The current top-level executive graph function over that subgraph is:
 
@@ -232,7 +236,7 @@ It acts as the current runtime authority above the leaf asset functions:
 - it carries cumulative environment truth from `input_set` through
   `release_surface`
 - it materializes the current ordered internal vectors for bootstrap, recursive
-  test, authority, and release work
+  implementation, recursive test, authority, and release work
 - one explicit job binds to that executive carrier and drives the bounded
   constructor turn for each open call
 - it ingests the resulting F_P assessment back through ABG
@@ -259,6 +263,10 @@ The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox i
 - `derive_uat_testcases_surface`
 - `derive_design_surface`
 - `derive_scenario_surface`
+- `derive_implementation_design_surface`
+- `select_implementation_stack_profile`
+- `derive_implementation_module_surface`
+- `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`

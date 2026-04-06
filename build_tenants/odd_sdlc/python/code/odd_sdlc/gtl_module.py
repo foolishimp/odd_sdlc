@@ -29,6 +29,10 @@ _uat_testcases_surface = Node("uat_testcases_surface", schema="odd.asset.uat_tes
 _design_surface = Node("design_surface", schema="odd.asset.design_surface")
 _testcase_authority_surface = Node("testcase_authority_surface", schema="odd.asset.testcase_authority_surface")
 _scenario_surface = Node("scenario_surface", schema="odd.asset.scenario_surface")
+_implementation_design_surface = Node("implementation_design_surface", schema="odd.asset.implementation_design_surface")
+_implementation_stack_profile = Node("implementation_stack_profile", schema="odd.asset.implementation_stack_profile")
+_implementation_module_surface = Node("implementation_module_surface", schema="odd.asset.implementation_module_surface")
+_code_surface = Node("code_surface", schema="odd.asset.code_surface")
 _test_design_surface = Node("test_design_surface", schema="odd.asset.test_design_surface")
 _test_stack_profile = Node("test_stack_profile", schema="odd.asset.test_stack_profile")
 _test_module_surface = Node("test_module_surface", schema="odd.asset.test_module_surface")
@@ -95,10 +99,34 @@ _scenario_fd = Evaluator(
     description="The scenario derivation depends on regenerated requirement and design surfaces.",
     binding="exec://python -m odd_sdlc.fd_checks scenario-dependency-surfaces-present --workspace .",
 )
+_implementation_design_fd = Evaluator(
+    name="implementation_design_dependency_surfaces_present",
+    regime=F_D,
+    description="The implementation design derivation depends on regenerated design and scenario surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks implementation-design-dependency-surfaces-present --workspace .",
+)
+_implementation_stack_profile_fd = Evaluator(
+    name="implementation_stack_profile_dependency_surfaces_present",
+    regime=F_D,
+    description="The implementation stack profile derivation depends on a regenerated implementation design surface.",
+    binding="exec://python -m odd_sdlc.fd_checks implementation-stack-profile-dependency-surfaces-present --workspace .",
+)
+_implementation_module_fd = Evaluator(
+    name="implementation_module_dependency_surfaces_present",
+    regime=F_D,
+    description="The implementation module derivation depends on regenerated implementation design and implementation stack profile surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks implementation-module-dependency-surfaces-present --workspace .",
+)
+_code_fd = Evaluator(
+    name="code_dependency_surfaces_present",
+    regime=F_D,
+    description="The code derivation depends on regenerated implementation module and implementation stack profile surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks code-dependency-surfaces-present --workspace .",
+)
 _release_fd = Evaluator(
     name="release_dependency_surfaces_present",
     regime=F_D,
-    description="The release derivation depends on regenerated requirement, design, scenario, testcase authority, and archived test-evidence surfaces.",
+    description="The release derivation depends on regenerated requirement, design, scenario, code, testcase authority, and archived test-evidence surfaces.",
     binding="exec://python -m odd_sdlc.fd_checks release-dependency-surfaces-present --workspace .",
 )
 _test_design_fd = Evaluator(
@@ -170,10 +198,30 @@ _scenario_fp = Evaluator(
     regime=F_P,
     description="The scenario surface is semantically converged for the current workspace requirements and design.",
 )
+_implementation_design_fp = Evaluator(
+    name="implementation_design_surface_semantically_converged",
+    regime=F_P,
+    description="The implementation design surface is semantically converged for the current design and scenario set.",
+)
+_implementation_stack_profile_fp = Evaluator(
+    name="implementation_stack_profile_semantically_converged",
+    regime=F_P,
+    description="The implementation stack profile is semantically converged for the current generated implementation design.",
+)
+_implementation_module_fp = Evaluator(
+    name="implementation_module_surface_semantically_converged",
+    regime=F_P,
+    description="The implementation module surface is semantically converged for the current generated implementation design and stack profile.",
+)
+_code_fp = Evaluator(
+    name="code_surface_semantically_converged",
+    regime=F_P,
+    description="The code surface is semantically converged for the current generated implementation module and stack profile.",
+)
 _release_fp = Evaluator(
     name="release_surface_semantically_converged",
     regime=F_P,
-    description="The release surface is semantically converged for the current requirement, design, scenario, testcase authority, and archived test-evidence state.",
+    description="The release surface is semantically converged for the current requirement, design, scenario, code, testcase authority, and archived test-evidence state.",
 )
 _test_design_fp = Evaluator(
     name="test_design_surface_semantically_converged",
@@ -316,6 +364,38 @@ GF_DERIVE_SCENARIOS = _graph_function(
     fp_evaluator=_scenario_fp,
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
+GF_DERIVE_IMPLEMENTATION_DESIGN = _graph_function(
+    name="derive_implementation_design_surface",
+    source=(_design_surface, _scenario_surface),
+    target=_implementation_design_surface,
+    fd_evaluator=_implementation_design_fd,
+    fp_evaluator=_implementation_design_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_SELECT_IMPLEMENTATION_STACK_PROFILE = _graph_function(
+    name="select_implementation_stack_profile",
+    source=_implementation_design_surface,
+    target=_implementation_stack_profile,
+    fd_evaluator=_implementation_stack_profile_fd,
+    fp_evaluator=_implementation_stack_profile_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
+    name="derive_implementation_module_surface",
+    source=(_implementation_design_surface, _implementation_stack_profile),
+    target=_implementation_module_surface,
+    fd_evaluator=_implementation_module_fd,
+    fp_evaluator=_implementation_module_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_CODE = _graph_function(
+    name="derive_code_surface",
+    source=(_implementation_module_surface, _implementation_stack_profile),
+    target=_code_surface,
+    fd_evaluator=_code_fd,
+    fp_evaluator=_code_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
 GF_DERIVE_TEST_DESIGN = _graph_function(
     name="derive_test_design_surface",
     source=(_design_surface, _scenario_surface),
@@ -354,6 +434,7 @@ GF_PREPARE_RELEASE = _graph_function(
         _requirement_surface,
         _design_surface,
         _scenario_surface,
+        _code_surface,
         _testcase_authority_surface,
         _test_run_archive_surface,
     ),
@@ -372,6 +453,10 @@ LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
     GF_DERIVE_UAT_TESTCASES,
     GF_DERIVE_DESIGN,
     GF_DERIVE_SCENARIOS,
+    GF_DERIVE_IMPLEMENTATION_DESIGN,
+    GF_SELECT_IMPLEMENTATION_STACK_PROFILE,
+    GF_DERIVE_IMPLEMENTATION_MODULE,
+    GF_DERIVE_CODE,
     GF_DERIVE_TEST_DESIGN,
     GF_SELECT_TEST_STACK_PROFILE,
     GF_DERIVE_TEST_MODULE,
@@ -382,7 +467,7 @@ LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
 
 BOOTSTRAP_RELEASE_SELF_TEST_INTENT = (
     "Act as the current top-level GTL executive over the odd_sdlc bootstrap, "
-    "recursive test branch, authority qualification, and release preparation "
+    "recursive implementation branch, recursive test branch, authority qualification, and release preparation "
     "asset functions."
 )
 
@@ -478,6 +563,10 @@ MODULE = Module(
         _design_fd,
         _testcase_authority_fd,
         _scenario_fd,
+        _implementation_design_fd,
+        _implementation_stack_profile_fd,
+        _implementation_module_fd,
+        _code_fd,
         _release_fd,
         _test_design_fd,
         _test_stack_profile_fd,
@@ -492,6 +581,10 @@ MODULE = Module(
         _design_fp,
         _testcase_authority_fp,
         _scenario_fp,
+        _implementation_design_fp,
+        _implementation_stack_profile_fp,
+        _implementation_module_fp,
+        _code_fp,
         _release_fp,
         _test_design_fp,
         _test_stack_profile_fp,

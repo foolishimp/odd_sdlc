@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +14,12 @@ from genesis.events import EventContext, EventStream, emit
 from .asset_types import ASSET_TYPES
 from .fd_checks import (
     DESIGN_MARKER,
+    CODE_MARKER,
     FEATURE_DECOMP_MARKER,
     GOALS_MARKER,
+    IMPLEMENTATION_DESIGN_MARKER,
+    IMPLEMENTATION_MODULE_MARKER,
+    IMPLEMENTATION_STACK_PROFILE_MARKER,
     INTENT_MARKER,
     PRODUCT_MARKER,
     REQUIREMENTS_MARKER,
@@ -48,6 +53,10 @@ def _workspace_asset_path(workspace_root: Path, target_asset: str) -> Path:
         "design_surface": workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md",
         "testcase_authority_surface": workspace_root / "specification" / "scenarios" / "30-generated-testcase-authority.md",
         "scenario_surface": workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md",
+        "implementation_design_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md",
+        "implementation_stack_profile": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md",
+        "implementation_module_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-modules.md",
+        "code_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl",
         "test_design_surface": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-test-design.md",
         "test_stack_profile": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "40-generated-test-stack.md",
         "test_module_surface": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md",
@@ -289,6 +298,142 @@ def _construct_scenarios(workspace_root: Path) -> str:
     )
 
 
+def _construct_implementation_design(workspace_root: Path) -> str:
+    design = (
+        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
+    ).read_text(encoding="utf-8").strip()
+    scenarios = (
+        workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Generated Implementation Design",
+            "",
+            IMPLEMENTATION_DESIGN_MARKER,
+            "",
+            "## Recursive Implementation SDLC",
+            "- implementation work is modeled as its own bounded SDLC branch under build_tenants/odd_method/python",
+            "- stack choice, module decomposition, and executable code are explicit generated assets",
+            "- the implementation branch mirrors the test branch but emits code rather than archive evidence",
+            "",
+            "## Source Design Snapshot",
+            design,
+            "",
+            "## Source Scenario Snapshot",
+            scenarios,
+            "",
+        )
+    )
+
+
+def _construct_implementation_stack_profile(workspace_root: Path) -> str:
+    implementation_design = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Generated Implementation Stack Profile",
+            "",
+            IMPLEMENTATION_STACK_PROFILE_MARKER,
+            "",
+            "## Selected Stack",
+            "- primary language: python",
+            "- package model: directory-backed generated package under build_tenants/odd_method/python/code",
+            "- runtime boundary: importable implementation package with explicit public summary function",
+            "- proof posture: code generation is still audited through odd_sdlc event history and downstream tests",
+            "",
+            "## Source Implementation Design Snapshot",
+            implementation_design,
+            "",
+        )
+    )
+
+
+def _construct_implementation_module_surface(workspace_root: Path) -> str:
+    implementation_design = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md"
+    ).read_text(encoding="utf-8").strip()
+    implementation_stack = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Generated Implementation Modules",
+            "",
+            IMPLEMENTATION_MODULE_MARKER,
+            "",
+            "## Module Layout",
+            "- odd_generated_impl/__init__.py: package marker and public export surface",
+            "- odd_generated_impl/workflow.py: generated implementation summary and executable entry helpers",
+            "",
+            "## Source Implementation Design Snapshot",
+            implementation_design,
+            "",
+            "## Source Implementation Stack Snapshot",
+            implementation_stack,
+            "",
+        )
+    )
+
+
+def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
+    implementation_modules = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-modules.md"
+    ).read_text(encoding="utf-8").strip()
+    implementation_stack = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md"
+    ).read_text(encoding="utf-8").strip()
+    init_text = "\n".join(
+        (
+            '"""Generated odd_method implementation package."""',
+            "",
+            f"# {CODE_MARKER}",
+            "",
+            "from .workflow import implementation_summary",
+            "",
+            "__all__ = [\"implementation_summary\"]",
+            "",
+        )
+    )
+    workflow_text = "\n".join(
+        (
+            '"""Generated implementation workflow helpers for the odd_sdlc toy branch."""',
+            "",
+            f"CODE_MARKER = {CODE_MARKER!r}",
+            "",
+            "def implementation_summary() -> dict[str, object]:",
+            '    """Return the generated implementation branch summary."""',
+            "    return {",
+            '        "package": "odd_generated_impl",',
+            '        "graph_function": "bootstrap_release_self_test",',
+            '        "implementation_branch": [',
+            '            "derive_implementation_design_surface",',
+            '            "select_implementation_stack_profile",',
+            '            "derive_implementation_module_surface",',
+            '            "derive_code_surface",',
+            "        ],",
+            '        "artifacts": [',
+            '            "implementation_design_surface",',
+            '            "implementation_stack_profile",',
+            '            "implementation_module_surface",',
+            '            "code_surface",',
+            "        ],",
+            '        "module_surface_heading": '
+            + repr(implementation_modules.splitlines()[0] if implementation_modules else ""),
+            ",",
+            '        "stack_surface_heading": '
+            + repr(implementation_stack.splitlines()[0] if implementation_stack else ""),
+            ",",
+            "    }",
+            "",
+        )
+    )
+    return {
+        "__init__.py": init_text,
+        "workflow.py": workflow_text,
+    }
+
+
 def _construct_release(workspace_root: Path) -> str:
     requirements = (
         workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
@@ -298,6 +443,9 @@ def _construct_release(workspace_root: Path) -> str:
     ).read_text(encoding="utf-8").strip()
     scenarios = (
         workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
+    ).read_text(encoding="utf-8").strip()
+    code_surface = (
+        workspace_root / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl" / "workflow.py"
     ).read_text(encoding="utf-8").strip()
     testcase_authority = (
         workspace_root / "specification" / "scenarios" / "30-generated-testcase-authority.md"
@@ -315,6 +463,7 @@ def _construct_release(workspace_root: Path) -> str:
             "- requirements are present and regenerated",
             "- design is present and regenerated",
             "- scenarios are present and regenerated",
+            "- implementation code is present and regenerated",
             "- testcase authority is present and regenerated",
             "- archived test evidence is present and regenerated",
             "- the current toy line is ready for downstream release-oriented review",
@@ -327,6 +476,9 @@ def _construct_release(workspace_root: Path) -> str:
             "",
             "## Source Scenario Snapshot",
             scenarios,
+            "",
+            "## Source Code Snapshot",
+            code_surface,
             "",
             "## Source Testcase Authority Snapshot",
             testcase_authority,
@@ -463,6 +615,14 @@ def _constructed_content(target_asset: str, workspace_root: Path) -> str:
         return _construct_testcase_authority(workspace_root)
     if target_asset == "scenario_surface":
         return _construct_scenarios(workspace_root)
+    if target_asset == "implementation_design_surface":
+        return _construct_implementation_design(workspace_root)
+    if target_asset == "implementation_stack_profile":
+        return _construct_implementation_stack_profile(workspace_root)
+    if target_asset == "implementation_module_surface":
+        return _construct_implementation_module_surface(workspace_root)
+    if target_asset == "code_surface":
+        return _construct_code_surface(workspace_root)
     if target_asset == "test_design_surface":
         return _construct_test_design(workspace_root)
     if target_asset == "test_stack_profile":
@@ -495,7 +655,16 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     previous_checkpoint = checkpoint_for_path(target_path)
     content = _constructed_content(target_asset, workspace)
-    target_path.write_text(content, encoding="utf-8")
+    if target_asset == "code_surface":
+        if target_path.exists():
+            shutil.rmtree(target_path)
+        target_path.mkdir(parents=True, exist_ok=True)
+        for relative_path, file_content in content.items():
+            file_path = target_path / relative_path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(file_content, encoding="utf-8")
+    else:
+        target_path.write_text(content, encoding="utf-8")
     current_checkpoint = checkpoint_for_path(target_path)
 
     declared_asset_type = {
@@ -508,6 +677,10 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         "design_surface": "design_surface",
         "testcase_authority_surface": "testcase_authority_surface",
         "scenario_surface": "scenario_surface",
+        "implementation_design_surface": "implementation_design_surface",
+        "implementation_stack_profile": "implementation_stack_profile",
+        "implementation_module_surface": "implementation_module_surface",
+        "code_surface": "code_surface",
         "test_design_surface": "test_design_surface",
         "test_stack_profile": "test_stack_profile",
         "test_module_surface": "test_module_surface",
