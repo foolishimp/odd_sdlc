@@ -36,6 +36,7 @@ def _report_outcome(node: pytest.Item) -> tuple[bool, str, str | None, str | Non
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "usecase_id(name): stable run-archive grouping for postmortem")
+    config.addinivalue_line("markers", "live_fp: live F_P qualification tests (requires codex CLI)")
 
 
 @pytest.fixture
