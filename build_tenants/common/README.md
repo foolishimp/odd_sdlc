@@ -5,3 +5,5 @@ tenant.
 
 Do not place tenant-specific implementation detail here unless it is explicitly
 promoted to common.
+
+## Active Shared Surfaces

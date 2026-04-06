@@ -10,3 +10,4 @@ requirement families.
 | `REQ-F-RUNTIME-*` | `03-first-constructive-edge-runtime-facts.md` | proves ABG-owned fact truth and no shadow-runtime seam |
 | `REQ-F-VERIFY-*` | `03-first-constructive-edge-runtime-facts.md` | proves significant paths and installed-dev proving direction |
 | `REQ-F-REALIZATION-*` | `04-tenant-realization-topology.md` | proves the standard tenant topology and explicit realization-law boundaries |
+| `REQ-F-ASSET-*` | `05-bootstrap-assets-and-recursive-edges.md` | proves the bootstrap asset graph and recursive upstream/downstream contracts |

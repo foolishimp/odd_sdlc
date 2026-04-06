@@ -24,12 +24,11 @@ The structural split is:
 - `build_tenants/` is the project-owned realization root beneath that shared
   specification
 - `build_tenants/common/` carries the active bootstrap realization law
+- `build_tenants/common/design/` carries shared design law that is not yet
+  tenant-local
 - tenant-local roots are added only when they carry real local realization or
   design law that should not remain common
 - `docs/` is the non-constitutional root for supporting project documentation
-
-The existing shared design surface under `specification/design/` remains the
-project-wide design layer.
 
 Tenant-local realization or design detail belongs under a tenant-local root in
 `build_tenants/` only once such a root is justified by real divergence.
@@ -38,6 +37,8 @@ Tenant-local realization or design detail belongs under a tenant-local root in
 
 - `odd_method` no longer implies that tenant structure is optional or deferred
 - `odd_method` also does not invent a nominal tenant before tenant-local law exists
+- shared design law lives with shared realization law rather than under
+  `specification/`
 - later domain-specific realizations can add tenant-local roots without
   repricing the singleton constitutional surface
 - supporting documentation has an explicit home that does not compete with live

@@ -2,7 +2,7 @@
 
 Project-specific requirement families live in this folder.
 
-Use `specification/standards/` as the governing method reference when writing
+Use `.genesis/docs/standards/` as the governing method reference when writing
 or revising these files.
 
 ## Rules
@@ -10,5 +10,5 @@ or revising these files.
 - Write requirement families as separate `*.md` files.
 - Use deterministic REQ headers in the form `### REQ-...`.
 - Make lifecycle status and category explicit in each family header.
-- Treat imported `genesis_sdlc` material as source input only until it is
-  explicitly re-adopted here.
+- Treat carried-forward material as non-authoritative until it is explicitly
+  re-adopted here.

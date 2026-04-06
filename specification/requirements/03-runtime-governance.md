@@ -42,15 +42,15 @@ trustworthy checks and `F_H` used for governance escalation.
 - AC-2: ambiguous or constructive work escalates to `F_P` by default
 - AC-3: policy or risk boundaries may escalate work to `F_H`
 
-### REQ-F-RUNTIME-004 — Runtime topology is GTL/ABG-native rather than inherited from `genesis_sdlc`
+### REQ-F-RUNTIME-004 — Runtime topology is GTL/ABG-native and project-owned
 
 `odd_method` defines runtime behavior through GTL and ABG-native configuration and
-publication surfaces rather than by inheriting `.gsdlc` topology or
-`genesis_sdlc` control-plane artifacts by default.
+publication surfaces rather than by inheriting foreign control-plane artifacts
+by default.
 
 **Acceptance Criteria**:
 - AC-1: `odd_method` runtime behavior is explainable from `odd_method` and substrate
   surfaces alone
-- AC-2: inherited `genesis_sdlc` control-plane artifacts are not presumed live
+- AC-2: inherited control-plane artifacts are not presumed live
   unless explicitly retained as compatibility features
 - AC-3: any retained compatibility surface is named, justified, and tested

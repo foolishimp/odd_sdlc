@@ -3,7 +3,7 @@
 **Status**: Active
 **Derived From**: [GOALS.md](./GOALS.md),
 [INTENT.md](./INTENT.md),
-`specification/standards/SPEC_METHOD.md`
+`.genesis/docs/standards/SPEC_METHOD.md`
 **Purpose**: Define the current product realization and product terms for
 `odd_method`
 
@@ -13,8 +13,6 @@
 
 It provides an outcome-driven development domain expressed through GTL and
 executed through ABG.
-
-It is not a target application and not a renamed `genesis_sdlc` carrier.
 
 It gives a project a lawful way to declare:
 
@@ -39,9 +37,23 @@ govern delivery, evidence, and repricing.
 A declared product state that has explicit meaning and explicit closure
 expectations.
 
+### Asset
+
+A named durable surface of product truth or produced delivery state.
+
+### Requirement Family Surface
+
+The folderized asset surface rooted at `specification/requirements/` that
+carries live requirement truth as separate family files.
+
 ### Graph Function
 
 The executable constructive carrier over declared graph contracts.
+
+### Input Set
+
+A bounded set of imported or authored source surfaces supplied to a graph
+function boundary.
 
 ### Work Vector
 
@@ -78,14 +90,16 @@ Requirements then decompose that product realization into constitutional truth.
 The intended end-state product shape is:
 
 1. install `odd_method` clean as a GTL/ABG-native product
-2. author project-owned intent, product, requirements, and design surfaces
+2. author project-owned intent, product, and requirements surfaces
 3. maintain project-owned realization structure beneath `build_tenants/`
-4. keep shared bootstrap realization law in `build_tenants/common/` until real
+4. keep design under `build_tenants/common/design/` or a tenant-local
+   `build_tenants/<tenant>/design/` root rather than under `specification/`
+5. keep shared bootstrap realization law in `build_tenants/common/` until real
    tenant-local divergence appears
-5. publish graph functions and lawful higher-order compositions directly over
+6. publish graph functions and lawful higher-order compositions directly over
    GTL
-6. execute through ABG without a product-local shadow runtime
-7. prove capability claims through written scenario bundles and installed-dev
+7. execute through ABG without a product-local shadow runtime
+8. prove capability claims through written scenario bundles and installed-dev
    qualification
 
 ## Current Product Definition
@@ -96,10 +110,17 @@ The current product definition of `odd_method` is:
 - an outcome-driven development product
 - lightweight by design
 - graph-function-first in execution
+- beginning from an explicit bootstrap asset set and recursive edge contracts
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
 - currently using `build_tenants/common/` as the only active realization root
-- selective in adoption from `genesis_sdlc`
+- explicit in adoption of any carried-forward truth
+
+The current bootstrap asset graph is:
+
+- `{input_set} -> {specification/INTENT.md}`
+- `{input_set} -> {specification/PRODUCT.md}`
+- `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/requirements/}`
 
 The current bootstrap focus is to establish the live constitutional and
 realization topology before deriving code.

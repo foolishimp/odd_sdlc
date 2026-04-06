@@ -13,8 +13,7 @@ what counts as sufficiency, drift, proof, and repricing.
 It is intentionally general.
 
 Where a product is realized as a graph-native system, this baseline is refined
-by a stronger constitutional method such as
-`specification/standards/GRAPH_METHOD.md`.
+by a stronger constitutional method such as `GRAPH_METHOD.md`.
 
 ---
 
@@ -187,9 +186,8 @@ Active constitutional and shared realization surfaces should therefore describe
 current truth by role, boundary, and status rather than by release-line version
 labels.
 
-Release criteria, release taps, and the process for cutting a release belong to a
-separate release process surface such as
-`specification/standards/RELEASE_METHOD.md`.
+Release criteria, release taps, and the process for cutting a release belong to
+a separate release process surface such as `RELEASE_METHOD.md`.
 
 ---
 
@@ -527,7 +525,7 @@ In project documents, this classification shall be explicit in requirement heade
 
 The target constitutional shape for a project is:
 
-- `specification/standards/SPEC_METHOD.md` as process constitution
+- `.genesis/docs/standards/SPEC_METHOD.md` as process constitution
 - `specification/INTENT.md` as domain direction
 - `specification/requirements/` as the live requirement surface
 - a live shared design surface
@@ -570,7 +568,7 @@ Most projects begin by deriving the first requirement surface from `INTENT.md`, 
 
 The bootstrap sequence is:
 
-1. Establish or import `standards/SPEC_METHOD.md`.
+1. Establish or install `.genesis/docs/standards/SPEC_METHOD.md`.
 2. Write or confirm `INTENT.md`.
 3. Gather the requirement source material relevant to the project.
 4. Run the `intent → requirements` step and write the resulting live surface under `requirements/`.
@@ -599,7 +597,7 @@ When a feature is introduced or changed:
 
 When bootstrapping a project or repricing a requirement surface:
 
-1. Start from `standards/SPEC_METHOD.md` and `INTENT.md`.
+1. Start from `.genesis/docs/standards/SPEC_METHOD.md` and `INTENT.md`.
 2. Gather requirement source material from the relevant constitutional inputs.
 3. Perform the `intent → requirements` step and write the resulting live surface under `requirements/`.
 4. Store requirements as individual files or grouped requirement families, whichever best preserves clarity and avoids monolithic sprawl.

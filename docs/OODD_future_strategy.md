@@ -4,7 +4,6 @@
 **Authority**: Supporting documentation only; not constitutional authority
 **Scope**: Organisational operating model built on Outcome Driven Development
 **Relation**: Extends the current `odd_method` outcome-driven development line
-**Imported From**: `/Users/jim/src/apps/genesis_sdlc/.ai-workspace/comments/codex/20260403T053037Z_STRATEGY_OODD_electronic_organisation.md`
 
 ---
 
@@ -102,7 +101,6 @@ The current conceptual stack is:
 - `OODD` — organisational operating model built on that work method
 - `GTL` — language expression of graph-native method
 - `ABG` — execution and binding runtime
-- `genesis_sdlc` — one domain application running inside that system
 
 `OODD` sits above the language and runtime.
 
@@ -456,7 +454,7 @@ If `OODD` is the right direction, several things become important:
 - explicit proving surfaces for self-host separation
 - stronger runtime support for replayable closure evidence
 
-This pushes on `GTL`, `ABG`, and `genesis_sdlc`.
+This pushes on `GTL`, `ABG`, and the concrete domain applications built on them.
 
 The method pressure is not accidental.
 

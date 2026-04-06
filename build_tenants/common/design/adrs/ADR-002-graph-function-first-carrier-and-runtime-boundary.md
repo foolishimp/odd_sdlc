@@ -8,8 +8,8 @@
 
 The product direction for `odd_method` is lightweight and GTL/ABG-native.
 
-The recent `genesis_sdlc` pressure case showed a bad boundary where product
-code can become a shadow runtime after ABG dispatch.
+A common failure mode in graph-native product lines is a bad boundary where
+product code becomes a shadow runtime after ABG dispatch.
 
 At the same time, GTL already provides graph-function composition and recursion,
 so a second execution primitive is unnecessary.
@@ -40,6 +40,8 @@ The default constructive stance favors `F_P`.
 
 ## Consequences
 
+- this is shared realization/design law under `build_tenants/common/design/`
+  until a tenant needs a local variant
 - graph functions remain the load-bearing carrier for execution investment
 - composition and recursion stay first-class without inventing a rival runtime
 - runtime failure and success facts stay attributable to ABG
