@@ -30,6 +30,10 @@ The project must deliver:
 - an explicit graph-function catalog as the operative constructive carrier
 - a lawful product layer for outcome-driven work that remains subordinate to the
   GTL/ABG carrier
+- an on-demand application lane where a bounded request can be gated, carried
+  through the full ODD SDLC, and closed as a deployed release
+- a dedicated-release model for existing applications so one operator,
+  customer, or team can derive a tuned variant from the shared product line
 - explicit adoption rules for any carried-forward truth
 
 ## Constraints

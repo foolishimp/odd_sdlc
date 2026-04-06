@@ -45,7 +45,9 @@ dependency chain through ABG and audits the emitted runtime facts.
 - AC-2: the proving lane records ABG event truth such as graph-call and run
   lifecycle across at least the `INTENT -> PRODUCT -> GOALS -> requirements`
   bootstrap subgraph together with the first downstream fan-out to feature
-  decomposition and UAT testcase surfaces
+  decomposition and UAT testcase surfaces, the deeper design/scenario/authority
+  branch, and the first recursive test-SDLC branch to generated test design,
+  test stack profile, test modules, test run archive, and release surfaces
 - AC-3: proof is based on post-mortem event audit rather than only on direct
   return values
 
@@ -61,3 +63,18 @@ domain understanding without duplicating the ABG runtime model.
   remains ABG-native rather than being redefined by ODD
 - AC-3: the same query library can later be wrapped by a microservice or MCP
   surface without changing its core query logic
+
+### REQ-F-ODDSDLC-006 — odd_sdlc provides a top-level executive odd_program over the current graph-function catalog
+
+The first `odd_sdlc` slice provides an app-owned executive program above ABG
+that drives the current published graph-function catalog through the bounded
+constructor and assessed-result loop.
+
+**Acceptance Criteria**:
+- AC-1: the tenant publishes a machine-readable executive program that names
+  the current bootstrap, recursive test, authority, and release steps in
+  dependency order
+- AC-2: the tenant exposes an app command that executes that executive program
+  end to end from an installed workspace
+- AC-3: successful execution converges the current toy subgraph to the release
+  surface without introducing a product-local shadow runtime beneath ABG

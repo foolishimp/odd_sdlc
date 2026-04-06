@@ -9,6 +9,7 @@ from .app import bootstrap, catalog, gaps, initialize, iterate, start
 from .constructor import construct_manifest
 from .observer import observe
 from .query import query_domain
+from .self_test import programs, self_test
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,10 +20,12 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--workspace", default=".")
 
     subparsers.add_parser("catalog", parents=[common])
+    subparsers.add_parser("programs", parents=[common])
     subparsers.add_parser("observe", parents=[common])
     subparsers.add_parser("query-domain", parents=[common])
     subparsers.add_parser("gaps", parents=[common])
     subparsers.add_parser("iterate", parents=[common])
+    subparsers.add_parser("self-test", parents=[common])
     construct_parser = subparsers.add_parser("construct", parents=[common])
     construct_parser.add_argument("--manifest", required=True)
     start_parser = subparsers.add_parser("start", parents=[common])
@@ -34,6 +37,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "catalog":
         result = catalog(app)
+    elif args.command == "programs":
+        result = {
+            "workspace_root": str(app.config.workspace_root),
+            "programs": programs(),
+        }
     elif args.command == "observe":
         result = observe(app)
     elif args.command == "query-domain":
@@ -42,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
         result = gaps(app)
     elif args.command == "iterate":
         result = iterate(app)
+    elif args.command == "self-test":
+        result = self_test(app)
     elif args.command == "construct":
         result = construct_manifest(args.manifest, workspace_root=args.workspace)
     else:

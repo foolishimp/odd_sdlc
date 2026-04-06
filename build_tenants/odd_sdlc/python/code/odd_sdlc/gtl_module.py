@@ -25,6 +25,14 @@ _goal_surface = Node("goal_surface", schema="odd.asset.goal_surface")
 _requirement_surface = Node("requirement_surface", schema="odd.asset.requirement_surface")
 _feature_decomp_surface = Node("feature_decomp_surface", schema="odd.asset.feature_decomp_surface")
 _uat_testcases_surface = Node("uat_testcases_surface", schema="odd.asset.uat_testcases_surface")
+_design_surface = Node("design_surface", schema="odd.asset.design_surface")
+_testcase_authority_surface = Node("testcase_authority_surface", schema="odd.asset.testcase_authority_surface")
+_scenario_surface = Node("scenario_surface", schema="odd.asset.scenario_surface")
+_test_design_surface = Node("test_design_surface", schema="odd.asset.test_design_surface")
+_test_stack_profile = Node("test_stack_profile", schema="odd.asset.test_stack_profile")
+_test_module_surface = Node("test_module_surface", schema="odd.asset.test_module_surface")
+_test_run_archive_surface = Node("test_run_archive_surface", schema="odd.asset.test_run_archive_surface")
+_release_surface = Node("release_surface", schema="odd.asset.release_surface")
 
 _builder = Operator(
     name="odd_sdlc_builder",
@@ -68,6 +76,54 @@ _uat_testcases_fd = Evaluator(
     description="The UAT testcase derivation depends on a regenerated requirement surface.",
     binding="exec://python -m odd_sdlc.fd_checks uat-testcases-dependency-surfaces-present --workspace .",
 )
+_design_fd = Evaluator(
+    name="design_dependency_surfaces_present",
+    regime=F_D,
+    description="The design derivation depends on regenerated requirement and feature decomposition surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks design-dependency-surfaces-present --workspace .",
+)
+_testcase_authority_fd = Evaluator(
+    name="testcase_authority_dependency_surfaces_present",
+    regime=F_D,
+    description="The testcase authority qualification depends on regenerated UAT testcase and scenario surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks testcase-authority-dependency-surfaces-present --workspace .",
+)
+_scenario_fd = Evaluator(
+    name="scenario_dependency_surfaces_present",
+    regime=F_D,
+    description="The scenario derivation depends on regenerated requirement and design surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks scenario-dependency-surfaces-present --workspace .",
+)
+_release_fd = Evaluator(
+    name="release_dependency_surfaces_present",
+    regime=F_D,
+    description="The release derivation depends on regenerated requirement, design, scenario, testcase authority, and archived test-evidence surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks release-dependency-surfaces-present --workspace .",
+)
+_test_design_fd = Evaluator(
+    name="test_design_dependency_surfaces_present",
+    regime=F_D,
+    description="The test design derivation depends on regenerated design and scenario surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks test-design-dependency-surfaces-present --workspace .",
+)
+_test_stack_profile_fd = Evaluator(
+    name="test_stack_profile_dependency_surfaces_present",
+    regime=F_D,
+    description="The test stack profile derivation depends on a regenerated test design surface.",
+    binding="exec://python -m odd_sdlc.fd_checks test-stack-profile-dependency-surfaces-present --workspace .",
+)
+_test_module_fd = Evaluator(
+    name="test_module_dependency_surfaces_present",
+    regime=F_D,
+    description="The test module derivation depends on regenerated test design and test stack profile surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks test-module-dependency-surfaces-present --workspace .",
+)
+_test_run_archive_fd = Evaluator(
+    name="test_run_archive_dependency_surfaces_present",
+    regime=F_D,
+    description="The archive-evidence derivation depends on regenerated test module and test stack profile surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks test-run-archive-dependency-surfaces-present --workspace .",
+)
 _intent_fp = Evaluator(
     name="intent_surface_semantically_converged",
     regime=F_P,
@@ -97,6 +153,46 @@ _uat_testcases_fp = Evaluator(
     name="uat_testcases_surface_semantically_converged",
     regime=F_P,
     description="The UAT testcase surface is semantically converged for the current workspace requirements.",
+)
+_design_fp = Evaluator(
+    name="design_surface_semantically_converged",
+    regime=F_P,
+    description="The design surface is semantically converged for the current workspace requirements and feature decomposition.",
+)
+_testcase_authority_fp = Evaluator(
+    name="testcase_authority_surface_semantically_converged",
+    regime=F_P,
+    description="The testcase authority surface is semantically converged for the current generated UAT testcase and scenario surfaces.",
+)
+_scenario_fp = Evaluator(
+    name="scenario_surface_semantically_converged",
+    regime=F_P,
+    description="The scenario surface is semantically converged for the current workspace requirements and design.",
+)
+_release_fp = Evaluator(
+    name="release_surface_semantically_converged",
+    regime=F_P,
+    description="The release surface is semantically converged for the current requirement, design, scenario, testcase authority, and archived test-evidence state.",
+)
+_test_design_fp = Evaluator(
+    name="test_design_surface_semantically_converged",
+    regime=F_P,
+    description="The test design surface is semantically converged for the current design and scenario set.",
+)
+_test_stack_profile_fp = Evaluator(
+    name="test_stack_profile_semantically_converged",
+    regime=F_P,
+    description="The test stack profile is semantically converged for the current generated test design.",
+)
+_test_module_fp = Evaluator(
+    name="test_module_surface_semantically_converged",
+    regime=F_P,
+    description="The test module surface is semantically converged for the current generated test design and stack profile.",
+)
+_test_run_archive_fp = Evaluator(
+    name="test_run_archive_surface_semantically_converged",
+    regime=F_P,
+    description="The test run archive surface is semantically converged for the current generated test module and stack profile.",
 )
 
 
@@ -194,6 +290,76 @@ GF_DERIVE_UAT_TESTCASES = _graph_function(
     fp_evaluator=_uat_testcases_fp,
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
+GF_DERIVE_DESIGN = _graph_function(
+    name="derive_design_surface",
+    source=(_requirement_surface, _feature_decomp_surface),
+    target=_design_surface,
+    fd_evaluator=_design_fd,
+    fp_evaluator=_design_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_QUALIFY_TESTCASE_AUTHORITY = _graph_function(
+    name="qualify_testcase_authority",
+    source=(_uat_testcases_surface, _scenario_surface),
+    target=_testcase_authority_surface,
+    fd_evaluator=_testcase_authority_fd,
+    fp_evaluator=_testcase_authority_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_SCENARIOS = _graph_function(
+    name="derive_scenario_surface",
+    source=(_requirement_surface, _design_surface),
+    target=_scenario_surface,
+    fd_evaluator=_scenario_fd,
+    fp_evaluator=_scenario_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_TEST_DESIGN = _graph_function(
+    name="derive_test_design_surface",
+    source=(_design_surface, _scenario_surface),
+    target=_test_design_surface,
+    fd_evaluator=_test_design_fd,
+    fp_evaluator=_test_design_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_SELECT_TEST_STACK_PROFILE = _graph_function(
+    name="select_test_stack_profile",
+    source=_test_design_surface,
+    target=_test_stack_profile,
+    fd_evaluator=_test_stack_profile_fd,
+    fp_evaluator=_test_stack_profile_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_TEST_MODULE = _graph_function(
+    name="derive_test_module_surface",
+    source=(_test_design_surface, _test_stack_profile),
+    target=_test_module_surface,
+    fd_evaluator=_test_module_fd,
+    fp_evaluator=_test_module_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
+    name="derive_test_run_archive_surface",
+    source=(_test_module_surface, _test_stack_profile),
+    target=_test_run_archive_surface,
+    fd_evaluator=_test_run_archive_fd,
+    fp_evaluator=_test_run_archive_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_PREPARE_RELEASE = _graph_function(
+    name="prepare_release_surface",
+    source=(
+        _requirement_surface,
+        _design_surface,
+        _scenario_surface,
+        _testcase_authority_surface,
+        _test_run_archive_surface,
+    ),
+    target=_release_surface,
+    fd_evaluator=_release_fd,
+    fp_evaluator=_release_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
 
 _ROLE_CONSTRUCTOR = Role(name="constructor", tags=("f_p",))
 
@@ -217,6 +383,14 @@ MODULE = Module(
             GF_DERIVE_REQUIREMENTS,
             GF_DERIVE_FEATURE_DECOMP,
             GF_DERIVE_UAT_TESTCASES,
+            GF_DERIVE_DESIGN,
+            GF_DERIVE_SCENARIOS,
+            GF_DERIVE_TEST_DESIGN,
+            GF_SELECT_TEST_STACK_PROFILE,
+            GF_DERIVE_TEST_MODULE,
+            GF_DERIVE_TEST_RUN_ARCHIVE,
+            GF_QUALIFY_TESTCASE_AUTHORITY,
+            GF_PREPARE_RELEASE,
         )
         if function.template.graph is not None
     ),
@@ -227,6 +401,14 @@ MODULE = Module(
         GF_DERIVE_REQUIREMENTS,
         GF_DERIVE_FEATURE_DECOMP,
         GF_DERIVE_UAT_TESTCASES,
+        GF_DERIVE_DESIGN,
+        GF_DERIVE_SCENARIOS,
+        GF_DERIVE_TEST_DESIGN,
+        GF_SELECT_TEST_STACK_PROFILE,
+        GF_DERIVE_TEST_MODULE,
+        GF_DERIVE_TEST_RUN_ARCHIVE,
+        GF_QUALIFY_TESTCASE_AUTHORITY,
+        GF_PREPARE_RELEASE,
     ),
     refinement_boundaries=tuple(
         RefinementBoundary(
@@ -242,6 +424,14 @@ MODULE = Module(
             GF_DERIVE_REQUIREMENTS,
             GF_DERIVE_FEATURE_DECOMP,
             GF_DERIVE_UAT_TESTCASES,
+            GF_DERIVE_DESIGN,
+            GF_DERIVE_SCENARIOS,
+            GF_DERIVE_TEST_DESIGN,
+            GF_SELECT_TEST_STACK_PROFILE,
+            GF_DERIVE_TEST_MODULE,
+            GF_DERIVE_TEST_RUN_ARCHIVE,
+            GF_QUALIFY_TESTCASE_AUTHORITY,
+            GF_PREPARE_RELEASE,
         )
     ),
     jobs=(
@@ -251,6 +441,14 @@ MODULE = Module(
         _job("derive_requirement_surface_job", GF_DERIVE_REQUIREMENTS),
         _job("derive_feature_decomp_surface_job", GF_DERIVE_FEATURE_DECOMP),
         _job("derive_uat_testcases_surface_job", GF_DERIVE_UAT_TESTCASES),
+        _job("derive_design_surface_job", GF_DERIVE_DESIGN),
+        _job("derive_scenario_surface_job", GF_DERIVE_SCENARIOS),
+        _job("derive_test_design_surface_job", GF_DERIVE_TEST_DESIGN),
+        _job("select_test_stack_profile_job", GF_SELECT_TEST_STACK_PROFILE),
+        _job("derive_test_module_surface_job", GF_DERIVE_TEST_MODULE),
+        _job("derive_test_run_archive_surface_job", GF_DERIVE_TEST_RUN_ARCHIVE),
+        _job("qualify_testcase_authority_job", GF_QUALIFY_TESTCASE_AUTHORITY),
+        _job("prepare_release_surface_job", GF_PREPARE_RELEASE),
     ),
     roles=(_ROLE_CONSTRUCTOR,),
     operators=(_builder,),
@@ -261,12 +459,28 @@ MODULE = Module(
         _requirements_fd,
         _feature_decomp_fd,
         _uat_testcases_fd,
+        _design_fd,
+        _testcase_authority_fd,
+        _scenario_fd,
+        _release_fd,
+        _test_design_fd,
+        _test_stack_profile_fd,
+        _test_module_fd,
+        _test_run_archive_fd,
         _intent_fp,
         _product_fp,
         _goal_fp,
         _requirements_fp,
         _feature_decomp_fp,
         _uat_testcases_fp,
+        _design_fp,
+        _testcase_authority_fp,
+        _scenario_fp,
+        _release_fp,
+        _test_design_fp,
+        _test_stack_profile_fp,
+        _test_module_fp,
+        _test_run_archive_fp,
     ),
     metadata=Attrs(
         entries=(

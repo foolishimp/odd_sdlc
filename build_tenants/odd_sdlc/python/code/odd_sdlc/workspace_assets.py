@@ -25,6 +25,14 @@ ASSET_PATHS: tuple[tuple[str, str], ...] = (
     ("requirement_surface", "specification/requirements"),
     ("feature_decomp_surface", "build_tenants/common/design/20-generated-feature-decomp.md"),
     ("uat_testcases_surface", "specification/scenarios/20-generated-uat-testcases.md"),
+    ("design_surface", "build_tenants/common/design/30-generated-odd-design.md"),
+    ("testcase_authority_surface", "specification/scenarios/30-generated-testcase-authority.md"),
+    ("scenario_surface", "specification/scenarios/40-generated-scenarios.md"),
+    ("test_design_surface", "build_tenants/odd_sdlc/python/design/40-generated-test-design.md"),
+    ("test_stack_profile", "build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md"),
+    ("test_module_surface", "build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md"),
+    ("test_run_archive_surface", "build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md"),
+    ("release_surface", "docs/40-generated-release.md"),
 )
 
 INPUT_SET_ASSET_IDS: tuple[str, ...] = (
@@ -40,6 +48,14 @@ NODE_ASSET_TYPES = {
     "requirement_surface": "requirement_surface",
     "feature_decomp_surface": "feature_decomp_surface",
     "uat_testcases_surface": "uat_testcases_surface",
+    "design_surface": "design_surface",
+    "testcase_authority_surface": "testcase_authority_surface",
+    "scenario_surface": "scenario_surface",
+    "test_design_surface": "test_design_surface",
+    "test_stack_profile": "test_stack_profile",
+    "test_module_surface": "test_module_surface",
+    "test_run_archive_surface": "test_run_archive_surface",
+    "release_surface": "release_surface",
 }
 
 

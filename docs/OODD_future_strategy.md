@@ -271,6 +271,39 @@ The stable thing is the outcome boundary.
 
 ---
 
+## On-Demand Applications And Dedicated Releases
+
+One useful consequence of `OODD` is that an application can be operated as an
+on-demand bounded delivery path.
+
+A request enters as a candidate outcome contract.
+
+The organisation can then:
+
+- gate the request
+- determine whether it targets a new application or an existing one
+- bind the lawful input assets and constraints
+- spin up the needed execution cell
+- run the SDLC to release closure
+- deploy the resulting release
+
+The same pattern works for existing applications when the requester wants a
+version tuned to local preference.
+
+In that case the organisation can derive a dedicated release for one operator,
+customer, team, or environment while preserving provenance to the shared base
+line.
+
+That makes tuning a governed release activity rather than an informal fork.
+
+The requester receives a release line shaped to local taste, workflow, policy,
+or interface preference.
+
+The governing product line keeps boundary clarity and can choose what, if
+anything, is later adopted back.
+
+---
+
 ## Delegation
 
 Delegation in `OODD` should be contractual.

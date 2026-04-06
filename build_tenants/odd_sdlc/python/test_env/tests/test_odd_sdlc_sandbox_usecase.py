@@ -1,6 +1,7 @@
 # Validates: REQ-F-VERIFY-003
 # Validates: REQ-F-VERIFY-004
 # Validates: REQ-F-ODDSDLC-004
+# Validates: REQ-F-ODDSDLC-006
 from __future__ import annotations
 
 import json
@@ -16,6 +17,7 @@ from sandbox_runtime import (
     run_constructor_for_start,
     run_installed_genesis,
     run_installed_odd_sdlc,
+    run_installed_self_test,
     seed_canonical_spec_surface,
     seed_odd_sdlc_package,
 )
@@ -39,7 +41,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 6
+    assert len(catalog["assets"]) == 14
     assert [item["name"] for item in catalog["functions"]] == [
         "derive_intent_surface",
         "derive_product_surface",
@@ -47,6 +49,14 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
 
     gaps = json.loads(
@@ -54,7 +64,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     )
     run_archive.capture_json("gaps.json", gaps)
     assert gaps["converged"] is False
-    assert len(gaps["gaps"]) == 6
+    assert len(gaps["gaps"]) == 14
 
     chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
     run_archive.capture_json("chain.json", chain)
@@ -65,6 +75,14 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
     assert chain[0]["start"]["blocking_reason"] == "fp_dispatch"
     assert chain[1]["start"]["blocking_reason"] == "fp_dispatch"
@@ -72,12 +90,28 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert chain[3]["start"]["blocking_reason"] == "fp_dispatch"
     assert chain[4]["start"]["blocking_reason"] == "fp_dispatch"
     assert chain[5]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[6]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[7]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[8]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[9]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[10]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[11]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[12]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[13]["start"]["blocking_reason"] == "fp_dispatch"
     assert Path(chain[0]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Intent")
     assert Path(chain[1]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Product")
     assert Path(chain[2]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Goals")
     assert Path(chain[3]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Bootstrap Requirements")
     assert Path(chain[4]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Feature Decomposition")
     assert Path(chain[5]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated UAT Testcases")
+    assert Path(chain[6]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated odd_sdlc Design")
+    assert Path(chain[7]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Scenarios")
+    assert Path(chain[8]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Design")
+    assert Path(chain[9]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Stack Profile")
+    assert Path(chain[10]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Modules")
+    assert Path(chain[11]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Run Archive")
+    assert Path(chain[12]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Testcase Authority")
+    assert Path(chain[13]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Release Surface")
     assert all(step["assessed"]["status"] == "ok" for step in chain)
 
     events = read_events(workspace)
@@ -90,6 +124,14 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
     asset_updates = [event for event in events if event["event_type"] == "asset_checkpoint_updated"]
     assert [event["data"]["asset_id"] for event in asset_updates] == [
@@ -99,6 +141,14 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "requirement_surface",
         "feature_decomp_surface",
         "uat_testcases_surface",
+        "design_surface",
+        "scenario_surface",
+        "test_design_surface",
+        "test_stack_profile",
+        "test_module_surface",
+        "test_run_archive_surface",
+        "testcase_authority_surface",
+        "release_surface",
     ]
     assert [event["aggregate_id"] for event in asset_updates] == [step["start"]["call_id"] for step in chain]
     assert all(event["data"]["current_checkpoint"]["exists"] is True for event in asset_updates)
@@ -141,7 +191,22 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     run_archive.capture_json("observe.json", observed)
     observed_assets = {asset["asset_id"]: asset for asset in observed["assets"]}
     for asset_id, event in zip(
-        ("intent_surface", "product_surface", "goal_surface", "requirement_surface", "feature_decomp_surface", "uat_testcases_surface"),
+        (
+            "intent_surface",
+            "product_surface",
+            "goal_surface",
+            "requirement_surface",
+            "feature_decomp_surface",
+            "uat_testcases_surface",
+            "design_surface",
+            "scenario_surface",
+            "test_design_surface",
+            "test_stack_profile",
+            "test_module_surface",
+            "test_run_archive_surface",
+            "testcase_authority_surface",
+            "release_surface",
+        ),
         asset_updates,
         strict=True,
     ):
@@ -151,8 +216,8 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         assert observed_asset["provenance"]["source"] == "asset_checkpoint_events"
         assert observed_asset["provenance"]["last_event_id"] == event["event_id"]
         assert observed_asset["checkpoint"] == event["data"]["current_checkpoint"]
-    assert [run["status"] for run in observed["runs"]] == ["completed"] * 6
-    assert [call["status"] for call in observed["graph_calls"]] == ["closed"] * 6
+    assert [run["status"] for run in observed["runs"]] == ["completed"] * 14
+    assert [call["status"] for call in observed["graph_calls"]] == ["closed"] * 14
     assert observed["continuations"] == []
     recent_event_types = [event["event_type"] for event in observed["recent_events"]]
     assert "run_completed" in recent_event_types
@@ -164,6 +229,39 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         final_call_id=chain[-1]["start"]["call_id"],
         query_contract=domain_query["query_contract"],
     )
+
+
+def test_installed_self_test_command_drives_the_current_executive_program(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+
+    payload = run_installed_self_test(workspace, archive=run_archive)
+
+    assert payload["status"] == "ok"
+    assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["completed_edges"] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
+    ]
+    assert payload["final_state"]["status"] == "converged"
+    assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
+    assert all(step["assessed"]["status"] == "ok" for step in payload["steps"])
+
+    events = read_events(workspace)
+    assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 14
+    assert (workspace / "docs" / "40-generated-release.md").exists()
 
 
 def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive) -> None:
@@ -180,6 +278,14 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
     assert [event["data"]["asset_id"] for event in first_events if event["event_type"] == "asset_checkpoint_updated"] == [
         "intent_surface",
@@ -188,6 +294,14 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         "requirement_surface",
         "feature_decomp_surface",
         "uat_testcases_surface",
+        "design_surface",
+        "scenario_surface",
+        "test_design_surface",
+        "test_stack_profile",
+        "test_module_surface",
+        "test_run_archive_surface",
+        "testcase_authority_surface",
+        "release_surface",
     ]
 
     reset_sandbox_runtime_state(
@@ -221,6 +335,14 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
     second_event_types = [event["event_type"] for event in second_events]
     expected_step = [
@@ -236,7 +358,7 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         "graph_call_closed",
         "run_completed",
     ]
-    assert second_event_types == expected_step * 6
+    assert second_event_types == expected_step * 14
     assert first_chain[0]["start"]["run_id"] != second_chain[0]["start"]["run_id"]
     assert first_chain[0]["start"]["call_id"] != second_chain[0]["start"]["call_id"]
     run_archive.capture_json(

@@ -135,6 +135,24 @@ class FunctionCatalogEntry:
         }
 
 
+@dataclass(frozen=True)
+class ExecutiveProgramEntry:
+    name: str
+    intent: str
+    steps: tuple[str, ...]
+    outputs: tuple[str, ...]
+    kind: str = "executive_program"
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "intent": self.intent,
+            "steps": list(self.steps),
+            "outputs": list(self.outputs),
+            "kind": self.kind,
+        }
+
+
 def relative_file_uri(path: Path, *, workspace_root: Path) -> str:
     relative = path.resolve().relative_to(workspace_root.resolve())
     return f"file://{relative.as_posix()}"

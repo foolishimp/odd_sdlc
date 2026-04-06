@@ -22,6 +22,7 @@ It gives a project a lawful way to declare:
 - asset types with explicit semantic role
 - asset collections and typed asset nodes
 - named functions over asset graphs
+- executive odd_programs over the function catalog
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
 
@@ -146,6 +147,14 @@ function boundary.
 The declared condition under which one asset or asset collection counts as
 converged.
 
+### Dedicated Release
+
+A release cut derived for one bounded operator, customer, team, or context from
+an existing application line.
+
+A dedicated release preserves provenance to the governing product line while
+opening a lawful surface for local tuning, repricing, and deployment.
+
 ## Goal Model
 
 `GOALS.md` focuses one bounded wave of work.
@@ -174,6 +183,12 @@ The intended end-state product shape is:
 7. execute through ABG without a product-local shadow runtime
 8. prove capability claims through written scenario bundles and installed-dev
    qualification
+9. accept a bounded request against a new or existing application and gate it
+   before execution work opens
+10. run the full ODD SDLC from the gated request through release preparation
+    and deployment
+11. derive dedicated releases from existing application lines so one operator,
+    customer, or team can tune the resulting application to local taste
 
 ## Current Product Definition
 
@@ -188,6 +203,7 @@ The current product definition of `odd_method` is:
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
 - carrying `odd_sdlc` as the first live tenant package
+- publishing a top-level executive program over the current toy subgraph
 - explicit in adoption of any carried-forward truth
 
 The current asset graph proven in the toy sandbox for `odd_sdlc` is:
@@ -198,6 +214,25 @@ The current asset graph proven in the toy sandbox for `odd_sdlc` is:
 - `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
 - `{specification/requirements/} -> {build_tenants/common/design/20-generated-feature-decomp.md}`
 - `{specification/requirements/} -> {specification/scenarios/20-generated-uat-testcases.md}`
+- `{specification/requirements/, build_tenants/common/design/20-generated-feature-decomp.md} -> {build_tenants/common/design/30-generated-odd-design.md}`
+- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md} -> {specification/scenarios/40-generated-scenarios.md}`
+- `{specification/scenarios/20-generated-uat-testcases.md, specification/scenarios/40-generated-scenarios.md} -> {specification/scenarios/30-generated-testcase-authority.md}`
+- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-test-design.md}`
+- `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md} -> {build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md}`
+- `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md}`
+- `{build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md}`
+- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
+
+The current top-level executive program over that subgraph is:
+
+- `bootstrap_release_self_test`
+
+It acts as the current app-owned executive above ABG:
+
+- it selects the current ordered graph-function steps
+- it drives the bounded constructor turn for each open call
+- it ingests the resulting F_P assessment back through ABG
+- it stops only when the current toy subgraph converges at `release_surface`
 
 The current build focus is to establish the first real `odd_sdlc` tenant slice:
 
@@ -214,3 +249,11 @@ The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox i
 - `derive_requirement_surface`
 - `derive_feature_decomp_surface`
 - `derive_uat_testcases_surface`
+- `derive_design_surface`
+- `derive_scenario_surface`
+- `derive_test_design_surface`
+- `select_test_stack_profile`
+- `derive_test_module_surface`
+- `derive_test_run_archive_surface`
+- `qualify_testcase_authority`
+- `prepare_release_surface`

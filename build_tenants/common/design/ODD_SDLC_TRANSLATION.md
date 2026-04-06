@@ -22,6 +22,10 @@ re-expresses them as:
 - GTL graph functions
 - ABG graph calls over bound asset scope
 
+The current toy also introduces one app-owned executive program above those
+graph functions so the product can drive the published subgraph without
+collapsing back into a hidden controller beneath ABG.
+
 ## Translation Boundary
 
 The translation carries forward method surfaces. It does not carry forward
@@ -200,6 +204,20 @@ The first `odd_sdlc` translation should use these named collections:
 
 These collections are the working scopes bound into functions.
 
+## Executive Program Boundary
+
+`odd_sdlc` now carries one explicit executive program:
+
+- `bootstrap_release_self_test`
+
+This is not a replacement for GTL graph functions. It is the current
+ODD-level executive surface above them. Its job is to:
+
+- choose the current ordered graph-function steps
+- drive the bounded constructor turn for each open call
+- ingest the resulting F_P assessment back through ABG
+- stop only when the current toy subgraph converges at `release_surface`
+
 ## Asset Nodes
 
 Typed asset nodes give the structural loci used in functions and graphs.
@@ -213,6 +231,10 @@ The first translation should use nodes equivalent to:
 - `requirement_surface`
 - `design_surface`
 - `scenario_surface`
+- `test_design_surface`
+- `test_stack_profile`
+- `test_module_surface`
+- `test_run_archive_surface`
 - `testcase_authority_surface`
 - `release_surface`
 
@@ -230,6 +252,10 @@ The first catalog should include:
 - `derive_uat_testcases_surface`
 - `derive_design_surface`
 - `derive_scenario_surface`
+- `derive_test_design_surface`
+- `select_test_stack_profile`
+- `derive_test_module_surface`
+- `derive_test_run_archive_surface`
 - `qualify_testcase_authority`
 - `prepare_release_surface`
 
@@ -258,13 +284,18 @@ The first live downstream translation adds:
 
 - `{requirement_surface} -> {feature_decomp_surface}`
 - `{requirement_surface} -> {uat_testcases_surface}`
-
-Later downstream translation can add:
-
-- `{requirement_surface} -> {design_surface}`
+- `{requirement_surface, feature_decomp_surface} -> {design_surface}`
 - `{requirement_surface, design_surface} -> {scenario_surface}`
+- `{design_surface, scenario_surface} -> {test_design_surface}`
+- `{test_design_surface} -> {test_stack_profile}`
+- `{test_design_surface, test_stack_profile} -> {test_module_surface}`
+- `{test_module_surface, test_stack_profile} -> {test_run_archive_surface}`
+- `{uat_testcases_surface, scenario_surface} -> {testcase_authority_surface}`
+- `{requirement_surface, design_surface, scenario_surface, testcase_authority_surface, test_run_archive_surface} -> {release_surface}`
+
+Later downstream translation can refine:
+
 - `{scenario_surface} -> {testcase_authority_surface}`
-- `{requirement_surface, design_surface, testcase_authority_surface} -> {release_surface}`
 
 These are translation targets for `odd_sdlc`. They are not yet executable
 claims.
@@ -283,13 +314,25 @@ The first graph shape is:
 
 `input_set + intent_surface + product_surface + goal_surface -> requirement_surface`
 
-`requirement_surface -> design_surface`
+`requirement_surface -> feature_decomp_surface`
+
+`requirement_surface -> uat_testcases_surface`
+
+`requirement_surface + feature_decomp_surface -> design_surface`
 
 `requirement_surface + design_surface -> scenario_surface`
 
-`scenario_surface -> testcase_authority_surface`
+`design_surface + scenario_surface -> test_design_surface`
 
-`requirement_surface + design_surface + testcase_authority_surface -> release_surface`
+`test_design_surface -> test_stack_profile`
+
+`test_design_surface + test_stack_profile -> test_module_surface`
+
+`test_module_surface + test_stack_profile -> test_run_archive_surface`
+
+`uat_testcases_surface + scenario_surface -> testcase_authority_surface`
+
+`requirement_surface + design_surface + scenario_surface + testcase_authority_surface + test_run_archive_surface -> release_surface`
 
 This graph is decomposable. Each boundary may later refine internally while
 preserving the outer contract.

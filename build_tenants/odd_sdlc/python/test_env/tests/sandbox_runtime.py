@@ -129,6 +129,24 @@ def run_installed_genesis(
     return result
 
 
+def run_installed_self_test(
+    workspace: Path,
+    *,
+    archive: "RunArchive | None" = None,
+    label: str = "odd_sdlc self-test",
+) -> dict[str, Any]:
+    result = run_installed_odd_sdlc(
+        workspace,
+        "self-test",
+        archive=archive,
+        label=label,
+    )
+    payload = json.loads(result.stdout)
+    if archive is not None:
+        archive.capture_json("self-test.result.json", payload)
+    return payload
+
+
 def run_constructor_for_start(
     workspace: Path,
     *,
@@ -200,6 +218,14 @@ def complete_bootstrap_chain(
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ),
 ) -> list[dict[str, Any]]:
     completed: list[dict[str, Any]] = []

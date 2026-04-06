@@ -7,6 +7,7 @@
 # Validates: REQ-F-ODDSDLC-002
 # Validates: REQ-F-ODDSDLC-003
 # Validates: REQ-F-ODDSDLC-004
+# Validates: REQ-F-ODDSDLC-006
 from __future__ import annotations
 
 import json
@@ -27,6 +28,7 @@ if str(CODE_PATH) not in sys.path:
 
 from odd_sdlc.app import bootstrap, catalog, initialize  # noqa: E402
 from odd_sdlc.gtl_module import module as odd_sdlc_module  # noqa: E402
+from odd_sdlc.self_test import self_test  # noqa: E402
 
 
 def _seed_workspace(path: Path) -> None:
@@ -59,6 +61,14 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         "derive_requirement_surface",
         "derive_feature_decomp_surface",
         "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
     ]
     input_signatures = {
         graph_function.name: [node.name for node in graph_function.inputs]
@@ -76,6 +86,14 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         ],
         "derive_feature_decomp_surface": ["requirement_surface"],
         "derive_uat_testcases_surface": ["requirement_surface"],
+        "derive_design_surface": ["requirement_surface", "feature_decomp_surface"],
+        "derive_scenario_surface": ["requirement_surface", "design_surface"],
+        "derive_test_design_surface": ["design_surface", "scenario_surface"],
+        "select_test_stack_profile": ["test_design_surface"],
+        "derive_test_module_surface": ["test_design_surface", "test_stack_profile"],
+        "derive_test_run_archive_surface": ["test_module_surface", "test_stack_profile"],
+        "qualify_testcase_authority": ["uat_testcases_surface", "scenario_surface"],
+        "prepare_release_surface": ["requirement_surface", "design_surface", "scenario_surface", "testcase_authority_surface", "test_run_archive_surface"],
     }
     assert [job.name for job in module.jobs] == [
         "derive_intent_surface_job",
@@ -84,6 +102,14 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         "derive_requirement_surface_job",
         "derive_feature_decomp_surface_job",
         "derive_uat_testcases_surface_job",
+        "derive_design_surface_job",
+        "derive_scenario_surface_job",
+        "derive_test_design_surface_job",
+        "select_test_stack_profile_job",
+        "derive_test_module_surface_job",
+        "derive_test_run_archive_surface_job",
+        "qualify_testcase_authority_job",
+        "prepare_release_surface_job",
     ]
 
 
@@ -109,6 +135,13 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["requirement_collection_surface"]["library_level"] == "generic"
     assert asset_types["derived_structure_surface"]["library_level"] == "generic"
     assert asset_types["verification_collection_surface"]["library_level"] == "generic"
+    assert asset_types["design_document_surface"]["library_level"] == "generic"
+    assert asset_types["authority_document_surface"]["library_level"] == "generic"
+    assert asset_types["scenario_collection_surface"]["library_level"] == "generic"
+    assert asset_types["release_document_surface"]["library_level"] == "generic"
+    assert asset_types["stack_profile_surface"]["library_level"] == "generic"
+    assert asset_types["module_structure_surface"]["library_level"] == "generic"
+    assert asset_types["archive_evidence_surface"]["library_level"] == "generic"
     assert asset_types["intent_doc"]["semantic_facets"] == [
         "structured_document",
         "spec_surface",
@@ -121,6 +154,14 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["requirement_surface"]["specializes"] == ["requirement_collection_surface"]
     assert asset_types["feature_decomp_surface"]["specializes"] == ["derived_structure_surface"]
     assert asset_types["uat_testcases_surface"]["specializes"] == ["verification_collection_surface"]
+    assert asset_types["design_surface"]["specializes"] == ["design_document_surface"]
+    assert asset_types["testcase_authority_surface"]["specializes"] == ["authority_document_surface"]
+    assert asset_types["scenario_surface"]["specializes"] == ["scenario_collection_surface"]
+    assert asset_types["release_surface"]["specializes"] == ["release_document_surface"]
+    assert asset_types["test_design_surface"]["specializes"] == ["design_document_surface"]
+    assert asset_types["test_stack_profile"]["specializes"] == ["stack_profile_surface"]
+    assert asset_types["test_module_surface"]["specializes"] == ["module_structure_surface"]
+    assert asset_types["test_run_archive_surface"]["specializes"] == ["archive_evidence_surface"]
     assert asset_types["proof_surface"]["mutable_default"] is False
 
     asset_uris = {asset["uri"] for asset in result["assets"]}
@@ -130,6 +171,14 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert "file://specification/requirements" in asset_uris
     assert "file://build_tenants/common/design/20-generated-feature-decomp.md" in asset_uris
     assert "file://specification/scenarios/20-generated-uat-testcases.md" in asset_uris
+    assert "file://build_tenants/common/design/30-generated-odd-design.md" in asset_uris
+    assert "file://specification/scenarios/30-generated-testcase-authority.md" in asset_uris
+    assert "file://specification/scenarios/40-generated-scenarios.md" in asset_uris
+    assert "file://build_tenants/odd_sdlc/python/design/40-generated-test-design.md" in asset_uris
+    assert "file://build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md" in asset_uris
+    assert "file://build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md" in asset_uris
+    assert "file://build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md" in asset_uris
+    assert "file://docs/40-generated-release.md" in asset_uris
 
     intent_asset = next(asset for asset in result["assets"] if asset["asset_id"] == "intent_surface")
     assert intent_asset["provenance"] == {
@@ -153,6 +202,38 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["requirement_surface"] == ("requirement_surface",)
     assert bindings["feature_decomp_surface"] == ("feature_decomp_surface",)
     assert bindings["uat_testcases_surface"] == ("uat_testcases_surface",)
+    assert bindings["design_surface"] == ("design_surface",)
+    assert bindings["testcase_authority_surface"] == ("testcase_authority_surface",)
+    assert bindings["scenario_surface"] == ("scenario_surface",)
+    assert bindings["test_design_surface"] == ("test_design_surface",)
+    assert bindings["test_stack_profile"] == ("test_stack_profile",)
+    assert bindings["test_module_surface"] == ("test_module_surface",)
+    assert bindings["test_run_archive_surface"] == ("test_run_archive_surface",)
+    assert bindings["release_surface"] == ("release_surface",)
+    assert result["programs"] == [
+        {
+            "name": "bootstrap_release_self_test",
+            "intent": "Act as the current top-level executive over the odd_sdlc bootstrap, recursive test branch, authority qualification, and release preparation graph functions.",
+            "steps": [
+                "derive_intent_surface",
+                "derive_product_surface",
+                "derive_goal_surface",
+                "derive_requirement_surface",
+                "derive_feature_decomp_surface",
+                "derive_uat_testcases_surface",
+                "derive_design_surface",
+                "derive_scenario_surface",
+                "derive_test_design_surface",
+                "select_test_stack_profile",
+                "derive_test_module_surface",
+                "derive_test_run_archive_surface",
+                "qualify_testcase_authority",
+                "prepare_release_surface",
+            ],
+            "outputs": ["release_surface"],
+            "kind": "executive_program",
+        }
+    ]
 
 
 def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
@@ -192,8 +273,8 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "semantic_facets",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 6
-    assert len(payload["functions"]) == 6
+    assert len(payload["assets"]) == 14
+    assert len(payload["functions"]) == 14
     assert payload["gaps"]["converged"] is False
     assert payload["runs"] == []
     assert payload["graph_calls"] == []
@@ -254,8 +335,8 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 6
-    assert len(payload["functions"]) == 6
+    assert len(payload["assets"]) == 14
+    assert len(payload["functions"]) == 14
     assert payload["gaps"]["converged"] is False
     functions = {entry["name"]: entry for entry in payload["functions"]}
     assert functions["derive_product_surface"]["inputs"] == ["input_set", "intent_surface"]
@@ -266,6 +347,20 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     ]
     assert functions["derive_feature_decomp_surface"]["inputs"] == ["requirement_surface"]
     assert functions["derive_uat_testcases_surface"]["inputs"] == ["requirement_surface"]
+    assert functions["derive_design_surface"]["inputs"] == ["requirement_surface", "feature_decomp_surface"]
+    assert functions["derive_scenario_surface"]["inputs"] == ["requirement_surface", "design_surface"]
+    assert functions["derive_test_design_surface"]["inputs"] == ["design_surface", "scenario_surface"]
+    assert functions["select_test_stack_profile"]["inputs"] == ["test_design_surface"]
+    assert functions["derive_test_module_surface"]["inputs"] == ["test_design_surface", "test_stack_profile"]
+    assert functions["derive_test_run_archive_surface"]["inputs"] == ["test_module_surface", "test_stack_profile"]
+    assert functions["qualify_testcase_authority"]["inputs"] == ["uat_testcases_surface", "scenario_surface"]
+    assert functions["prepare_release_surface"]["inputs"] == [
+        "requirement_surface",
+        "design_surface",
+        "scenario_surface",
+        "testcase_authority_surface",
+        "test_run_archive_surface",
+    ]
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:
@@ -305,3 +400,36 @@ def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -
     graph_call_event = next(event for event in events if event["event_type"] == "graph_call_opened")
     assert graph_call_event["aggregate_type"] == "graph_call"
     assert graph_call_event["aggregate_id"] == payload["call_id"]
+
+
+def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    result = self_test(app)
+
+    assert result["status"] == "ok"
+    assert result["program"]["name"] == "bootstrap_release_self_test"
+    assert result["completed_edges"] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+        "derive_test_run_archive_surface",
+        "qualify_testcase_authority",
+        "prepare_release_surface",
+    ]
+    assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in result["steps"])
+    assert all(step["assessed"]["status"] == "ok" for step in result["steps"])
+    assert result["final_state"]["status"] == "converged"
+
+    events = _read_events(tmp_path)
+    assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 14
+    assert (tmp_path / "docs" / "40-generated-release.md").exists()

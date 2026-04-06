@@ -1,6 +1,6 @@
 # Scenario Bundle - First odd_sdlc Asset Function Call
 
-**Validates**: REQ-F-ASSETMODEL-001, REQ-F-ASSETMODEL-002, REQ-F-ASSETMODEL-003, REQ-F-ASSETMODEL-004, REQ-F-ASSETMODEL-005, REQ-F-ODDSDLC-001, REQ-F-ODDSDLC-002, REQ-F-ODDSDLC-003, REQ-F-ODDSDLC-004, REQ-F-ODDSDLC-005
+**Validates**: REQ-F-ASSETMODEL-001, REQ-F-ASSETMODEL-002, REQ-F-ASSETMODEL-003, REQ-F-ASSETMODEL-004, REQ-F-ASSETMODEL-005, REQ-F-ODDSDLC-001, REQ-F-ODDSDLC-002, REQ-F-ODDSDLC-003, REQ-F-ODDSDLC-004, REQ-F-ODDSDLC-005, REQ-F-ODDSDLC-006
 
 **Purpose**: Prove that `odd_sdlc` can bind workspace assets by URI, publish
 the first asset-function catalog, run the first bootstrap-plus-fanout
@@ -19,6 +19,14 @@ installed development environment:
 - `derive_requirement_surface`
 - `derive_feature_decomp_surface`
 - `derive_uat_testcases_surface`
+- `derive_design_surface`
+- `derive_scenario_surface`
+- `derive_test_design_surface`
+- `select_test_stack_profile`
+- `derive_test_module_surface`
+- `derive_test_run_archive_surface`
+- `qualify_testcase_authority`
+- `prepare_release_surface`
 
 ## Significant Paths
 
@@ -32,8 +40,20 @@ installed development environment:
   declared order
 - fan-out path: the generated requirement surface becomes the lawful source for
   both feature decomposition and UAT testcase outputs
+- downstream path: the generated feature decomposition and UAT testcase
+  surfaces become lawful sources for design, then design becomes a lawful
+  source for scenarios, and UAT plus scenarios become lawful sources for
+  testcase-authority output
+- recursive-test path: the generated design and scenario surfaces open a
+  bounded recursive test SDLC that yields test design, explicit stack choice,
+  generated test module structure, and archived test-run evidence
+- release path: the generated design, scenarios, testcase authority, and test
+  archive evidence become lawful inputs to release together with requirements
 - query path: the tenant exposes a domain query library that a UI can compose
   with ABG runtime projections
+- executive path: the tenant exposes a top-level odd_program that drives the
+  current published graph-function catalog through the bounded constructor and
+  assessed-result loop
 - audit path: the proving lane reads the resulting event log and verifies the
   graph-call and run lifecycle from substrate facts
 
@@ -44,7 +64,10 @@ installed development environment:
    project graph
 3. `odd_sdlc` executes through GTL and ABG rather than a product-local
    imperative controller
-4. the proving lane explains both the bootstrap chain and the first
-   requirements fan-out from emitted runtime facts
+4. the proving lane explains the bootstrap chain, the first requirements
+   fan-out, the deeper scenario/authority branch, and the recursive
+   test-SDLC-to-release branch from emitted runtime facts
 5. the tenant exposes domain query logic without duplicating the ABG runtime
    model that the UI should already understand directly
+6. the tenant exposes one executive odd_program that can drive the current toy
+   subgraph to `release_surface` without redefining ABG runtime semantics

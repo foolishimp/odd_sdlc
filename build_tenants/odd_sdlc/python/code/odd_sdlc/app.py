@@ -15,6 +15,7 @@ from genesis.services import Scope, gen_gaps, gen_iterate, gen_start
 from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
 from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
+from .program_catalog import PROGRAM_CATALOG
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
 
@@ -73,6 +74,7 @@ def catalog(app: OddSdlcApp) -> dict:
         "collections": [bootstrap_input_collection(workspace_root).to_dict()],
         "bindings": [binding.to_dict() for binding in bootstrap_bindings(workspace_root)],
         "functions": [entry.to_dict() for entry in FUNCTION_CATALOG],
+        "programs": [entry.to_dict() for entry in PROGRAM_CATALOG],
         "graph_functions": [
             {
                 "name": function.name,
