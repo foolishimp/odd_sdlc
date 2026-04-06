@@ -25,6 +25,23 @@ from sandbox_runtime import (
 
 pytestmark = pytest.mark.usecase_id("canonical_sandbox_repeatability")
 
+EXPECTED_BOOTSTRAP_STEPS = (
+    "derive_intent_surface",
+    "derive_product_surface",
+    "derive_goal_surface",
+    "derive_requirement_surface",
+    "derive_feature_decomp_surface",
+    "derive_uat_testcases_surface",
+    "derive_design_surface",
+    "derive_scenario_surface",
+    "derive_test_design_surface",
+    "select_test_stack_profile",
+    "derive_test_module_surface",
+    "derive_test_run_archive_surface",
+    "qualify_testcase_authority",
+    "prepare_release_surface",
+)
+
 
 def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
@@ -58,6 +75,10 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "qualify_testcase_authority",
         "prepare_release_surface",
     ]
+    assert [item["name"] for item in catalog["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert [item["name"] for item in catalog["jobs"]] == ["bootstrap_release_self_test_job"]
+    assert catalog["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
+    assert [vector["name"] for vector in catalog["graph_functions"][0]["vectors"]] == list(EXPECTED_BOOTSTRAP_STEPS)
 
     gaps = json.loads(
         run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps").stdout
@@ -68,22 +89,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
 
     chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
     run_archive.capture_json("chain.json", chain)
-    assert [step["start"]["edge"] for step in chain] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert [step["start"]["edge"] for step in chain] == list(EXPECTED_BOOTSTRAP_STEPS)
     assert chain[0]["start"]["blocking_reason"] == "fp_dispatch"
     assert chain[1]["start"]["blocking_reason"] == "fp_dispatch"
     assert chain[2]["start"]["blocking_reason"] == "fp_dispatch"
@@ -117,22 +123,10 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
     graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
-    assert [event["data"]["graph_function"] for event in graph_call_events] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert [event["data"]["graph_function"] for event in graph_call_events] == ["bootstrap_release_self_test"] * len(
+        EXPECTED_BOOTSTRAP_STEPS
+    )
+    assert [event["data"]["edge"] for event in graph_call_events] == list(EXPECTED_BOOTSTRAP_STEPS)
     asset_updates = [event for event in events if event["event_type"] == "asset_checkpoint_updated"]
     assert [event["data"]["asset_id"] for event in asset_updates] == [
         "intent_surface",
@@ -173,12 +167,24 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "bindings",
         "functions",
         "gaps",
+        "graph_functions",
         "query_contract",
         "semantic_facets",
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v1"
+    assert domain_query["query_contract"]["version"] == "v2"
+    assert domain_query["query_contract"]["top_level_keys"] == [
+        "query_contract",
+        "workspace_root",
+        "semantic_facets",
+        "asset_types",
+        "assets",
+        "functions",
+        "graph_functions",
+        "bindings",
+        "gaps",
+    ]
     assert domain_query["query_contract"]["runtime_model"] == "abg-native"
     assert domain_query["query_contract"]["query_model"] == "odd-domain-plugin"
     assert "runs" not in domain_query
@@ -239,27 +245,16 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
 
     assert payload["status"] == "ok"
     assert payload["program"]["name"] == "bootstrap_release_self_test"
-    assert payload["completed_edges"] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS)
     assert payload["final_state"]["status"] == "converged"
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
     assert all(step["assessed"]["status"] == "ok" for step in payload["steps"])
 
     events = read_events(workspace)
+    graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
+    assert [event["data"]["graph_function"] for event in graph_call_events] == ["bootstrap_release_self_test"] * len(
+        EXPECTED_BOOTSTRAP_STEPS
+    )
     assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 14
     assert (workspace / "docs" / "40-generated-release.md").exists()
 
@@ -271,22 +266,7 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     first_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="first")
     first_events = read_events(workspace)
     run_archive.capture_json("events.first_run.json", first_events)
-    assert [step["start"]["edge"] for step in first_chain] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert [step["start"]["edge"] for step in first_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
     assert [event["data"]["asset_id"] for event in first_events if event["event_type"] == "asset_checkpoint_updated"] == [
         "intent_surface",
         "product_surface",
@@ -328,22 +308,7 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     second_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="second")
     second_events = read_events(workspace)
     run_archive.capture_json("events.second_run.json", second_events)
-    assert [step["start"]["edge"] for step in second_chain] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert [step["start"]["edge"] for step in second_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
     second_event_types = [event["event_type"] for event in second_events]
     expected_step = [
         "run_bound",

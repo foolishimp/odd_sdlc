@@ -10,7 +10,7 @@ post-mortem runtime audit shape.
 
 Install a clean sandbox workspace, seed the first `odd_sdlc` tenant package and
 its canonical bootstrap specification surfaces, then run the current executive
-odd_program over the first bootstrap dependency chain:
+graph function over the first bootstrap dependency chain:
 
 - `derive_intent_surface`
 - `derive_product_surface`
@@ -36,8 +36,8 @@ runtime facts, wipe runtime state, and then rerun the same use case.
 - install path: the sandbox installs the GTL/ABG runtime cleanly
 - seed path: the toy app package and canonical specification surfaces are
   materialized into the sandbox
-- executive path: the installed app runs the current top-level odd_program
-  rather than relying only on test-only orchestration
+- executive path: the installed app runs the current top-level executive graph
+  function rather than relying only on test-only orchestration
 - first-run path: the sandbox opens the bootstrap chain and first downstream
   fan-out graph calls in dependency order and emits runtime facts
 - constructor path: a bounded constructor turn writes the target surface and
@@ -60,7 +60,7 @@ runtime facts, wipe runtime state, and then rerun the same use case.
 1. the sandbox runs from the installed runtime rather than from source-tree
    imports
 2. the installed toy app can drive the current subgraph through its own
-   executive odd_program surface
+   executive graph-function surface
 3. the dependency chain advances in the order
    `INTENT -> PRODUCT -> GOALS -> requirements`, then fans out from
    `requirements` to feature decomposition and UAT testcase surfaces, then

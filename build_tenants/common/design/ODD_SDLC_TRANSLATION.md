@@ -22,8 +22,8 @@ re-expresses them as:
 - GTL graph functions
 - ABG graph calls over bound asset scope
 
-The current toy also introduces one app-owned executive program above those
-graph functions so the product can drive the published subgraph without
+The current toy also introduces one public executive GTL graph function above
+those asset functions so the product can drive the published subgraph without
 collapsing back into a hidden controller beneath ABG.
 
 ## Translation Boundary
@@ -204,19 +204,23 @@ The first `odd_sdlc` translation should use these named collections:
 
 These collections are the working scopes bound into functions.
 
-## Executive Program Boundary
+## Executive Carrier Boundary
 
-`odd_sdlc` now carries one explicit executive program:
+`odd_sdlc` now carries one explicit executive graph function:
 
 - `bootstrap_release_self_test`
 
-This is not a replacement for GTL graph functions. It is the current
-ODD-level executive surface above them. Its job is to:
+This is not a replacement for GTL graph functions. It is the current public
+carrier over the internal vector chain. Its job is to:
 
-- choose the current ordered graph-function steps
-- drive the bounded constructor turn for each open call
+- carry cumulative environment truth across the current toy subgraph
+- publish the current ordered vector chain from bootstrap to release
+- bind one explicit job for the bounded constructor turn at each open call
 - ingest the resulting F_P assessment back through ABG
 - stop only when the current toy subgraph converges at `release_surface`
+
+The tenant may still project a machine-readable executive program read model
+over that carrier, but the read model does not own runtime authority.
 
 ## Asset Nodes
 

@@ -9,6 +9,7 @@
 """Published GTL module for the first odd_sdlc slice."""
 from __future__ import annotations
 
+from gtl.algebra import compose
 from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Graph, GraphVector, Node
 from gtl.module_model import Module
@@ -238,7 +239,6 @@ def _graph_function(
         declarations=Attrs(
             entries=(
                 ("function_kind", "odd_asset_function"),
-                ("intent", next(entry.intent for entry in FUNCTION_CATALOG if entry.name == name)),
             )
         ),
     )
@@ -363,6 +363,78 @@ GF_PREPARE_RELEASE = _graph_function(
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 
+LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
+    GF_DERIVE_INTENT,
+    GF_DERIVE_PRODUCT,
+    GF_DERIVE_GOALS,
+    GF_DERIVE_REQUIREMENTS,
+    GF_DERIVE_FEATURE_DECOMP,
+    GF_DERIVE_UAT_TESTCASES,
+    GF_DERIVE_DESIGN,
+    GF_DERIVE_SCENARIOS,
+    GF_DERIVE_TEST_DESIGN,
+    GF_SELECT_TEST_STACK_PROFILE,
+    GF_DERIVE_TEST_MODULE,
+    GF_DERIVE_TEST_RUN_ARCHIVE,
+    GF_QUALIFY_TESTCASE_AUTHORITY,
+    GF_PREPARE_RELEASE,
+)
+
+BOOTSTRAP_RELEASE_SELF_TEST_INTENT = (
+    "Act as the current top-level GTL executive over the odd_sdlc bootstrap, "
+    "recursive test branch, authority qualification, and release preparation "
+    "asset functions."
+)
+
+
+def _rename_graph(graph: Graph, *, name: str) -> Graph:
+    return Graph(
+        name=name,
+        inputs=graph.inputs,
+        outputs=graph.outputs,
+        nodes=graph.nodes,
+        vectors=graph.vectors,
+        contexts=graph.contexts,
+        rules=graph.rules,
+        tags=graph.tags,
+    )
+
+
+def _executive_graph_function(
+    *,
+    name: str,
+    intent: str,
+    functions: tuple[GraphFunction, ...],
+) -> GraphFunction:
+    composed = compose(*functions)
+    executive_graph = _rename_graph(composed.materialize(), name=f"{name}_graph")
+    return GraphFunction.from_graph(
+        name=name,
+        graph=executive_graph,
+        environment=composed.environment,
+        effects=composed.effects,
+        declarations=Attrs(
+            entries=(
+                ("function_kind", "odd_executive_graph_function"),
+                ("intent", intent),
+                ("entrypoint", True),
+            )
+        ),
+        tags=("executive",),
+    )
+
+
+GF_BOOTSTRAP_RELEASE_SELF_TEST = _executive_graph_function(
+    name="bootstrap_release_self_test",
+    intent=BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+    functions=LEAF_GRAPH_FUNCTIONS,
+)
+
+BOOTSTRAP_RELEASE_SELF_TEST_STEPS: tuple[str, ...] = tuple(
+    vector.name
+    for vector in GF_BOOTSTRAP_RELEASE_SELF_TEST.materialize().vectors
+)
+
 _ROLE_CONSTRUCTOR = Role(name="constructor", tags=("f_p",))
 
 
@@ -378,79 +450,21 @@ MODULE = Module(
     name="odd_sdlc",
     graphs=tuple(
         function.template.graph
-        for function in (
-            GF_DERIVE_INTENT,
-            GF_DERIVE_PRODUCT,
-            GF_DERIVE_GOALS,
-            GF_DERIVE_REQUIREMENTS,
-            GF_DERIVE_FEATURE_DECOMP,
-            GF_DERIVE_UAT_TESTCASES,
-            GF_DERIVE_DESIGN,
-            GF_DERIVE_SCENARIOS,
-            GF_DERIVE_TEST_DESIGN,
-            GF_SELECT_TEST_STACK_PROFILE,
-            GF_DERIVE_TEST_MODULE,
-            GF_DERIVE_TEST_RUN_ARCHIVE,
-            GF_QUALIFY_TESTCASE_AUTHORITY,
-            GF_PREPARE_RELEASE,
-        )
+        for function in (GF_BOOTSTRAP_RELEASE_SELF_TEST,)
         if function.template.graph is not None
     ),
-    graph_functions=(
-        GF_DERIVE_INTENT,
-        GF_DERIVE_PRODUCT,
-        GF_DERIVE_GOALS,
-        GF_DERIVE_REQUIREMENTS,
-        GF_DERIVE_FEATURE_DECOMP,
-        GF_DERIVE_UAT_TESTCASES,
-        GF_DERIVE_DESIGN,
-        GF_DERIVE_SCENARIOS,
-        GF_DERIVE_TEST_DESIGN,
-        GF_SELECT_TEST_STACK_PROFILE,
-        GF_DERIVE_TEST_MODULE,
-        GF_DERIVE_TEST_RUN_ARCHIVE,
-        GF_QUALIFY_TESTCASE_AUTHORITY,
-        GF_PREPARE_RELEASE,
-    ),
+    graph_functions=(GF_BOOTSTRAP_RELEASE_SELF_TEST,),
     refinement_boundaries=tuple(
         RefinementBoundary(
-            name=function.name,
-            inputs=function.inputs,
-            outputs=function.outputs,
+            name=vector.name,
+            inputs=vector.source if isinstance(vector.source, tuple) else (vector.source,),
+            outputs=(vector.target,),
             hints=Attrs(entries=(("terminal", True),)),
         )
-        for function in (
-            GF_DERIVE_INTENT,
-            GF_DERIVE_PRODUCT,
-            GF_DERIVE_GOALS,
-            GF_DERIVE_REQUIREMENTS,
-            GF_DERIVE_FEATURE_DECOMP,
-            GF_DERIVE_UAT_TESTCASES,
-            GF_DERIVE_DESIGN,
-            GF_DERIVE_SCENARIOS,
-            GF_DERIVE_TEST_DESIGN,
-            GF_SELECT_TEST_STACK_PROFILE,
-            GF_DERIVE_TEST_MODULE,
-            GF_DERIVE_TEST_RUN_ARCHIVE,
-            GF_QUALIFY_TESTCASE_AUTHORITY,
-            GF_PREPARE_RELEASE,
-        )
+        for vector in GF_BOOTSTRAP_RELEASE_SELF_TEST.materialize().vectors
     ),
     jobs=(
-        _job("derive_intent_surface_job", GF_DERIVE_INTENT),
-        _job("derive_product_surface_job", GF_DERIVE_PRODUCT),
-        _job("derive_goal_surface_job", GF_DERIVE_GOALS),
-        _job("derive_requirement_surface_job", GF_DERIVE_REQUIREMENTS),
-        _job("derive_feature_decomp_surface_job", GF_DERIVE_FEATURE_DECOMP),
-        _job("derive_uat_testcases_surface_job", GF_DERIVE_UAT_TESTCASES),
-        _job("derive_design_surface_job", GF_DERIVE_DESIGN),
-        _job("derive_scenario_surface_job", GF_DERIVE_SCENARIOS),
-        _job("derive_test_design_surface_job", GF_DERIVE_TEST_DESIGN),
-        _job("select_test_stack_profile_job", GF_SELECT_TEST_STACK_PROFILE),
-        _job("derive_test_module_surface_job", GF_DERIVE_TEST_MODULE),
-        _job("derive_test_run_archive_surface_job", GF_DERIVE_TEST_RUN_ARCHIVE),
-        _job("qualify_testcase_authority_job", GF_QUALIFY_TESTCASE_AUTHORITY),
-        _job("prepare_release_surface_job", GF_PREPARE_RELEASE),
+        _job("bootstrap_release_self_test_job", GF_BOOTSTRAP_RELEASE_SELF_TEST),
     ),
     roles=(_ROLE_CONSTRUCTOR,),
     operators=(_builder,),
@@ -505,8 +519,10 @@ MODULE = Module(
                 "REQ-F-ODDSDLC-002",
                 "REQ-F-ODDSDLC-003",
                 "REQ-F-ODDSDLC-004",
+                "REQ-F-ODDSDLC-006",
             )),
             ("function_catalog", tuple(entry.to_dict() for entry in FUNCTION_CATALOG)),
+            ("executive_graph_function", GF_BOOTSTRAP_RELEASE_SELF_TEST.name),
             ("domain_package", "odd_sdlc"),
         )
     ),

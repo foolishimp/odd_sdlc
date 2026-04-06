@@ -66,6 +66,16 @@ def initialize(config: AppConfig, *, worker: Worker | None = None) -> OddSdlcApp
 def catalog(app: OddSdlcApp) -> dict:
     module = odd_sdlc_module()
     workspace_root = app.config.workspace_root
+    function_intent_by_name = {
+        entry.name: entry.intent
+        for entry in FUNCTION_CATALOG
+    }
+    job_names_by_function_id: dict[str, list[str]] = {}
+    for job in module.jobs:
+        for contract in job.contracts:
+            if contract.kind != "graph_function":
+                continue
+            job_names_by_function_id.setdefault(contract.target_id, []).append(job.name)
     return {
         "workspace_root": str(workspace_root),
         "semantic_facets": [facet.to_dict() for facet in SEMANTIC_FACETS.values()],
@@ -77,9 +87,37 @@ def catalog(app: OddSdlcApp) -> dict:
         "programs": [entry.to_dict() for entry in PROGRAM_CATALOG],
         "graph_functions": [
             {
+                "id": function.id,
                 "name": function.name,
+                "intent": function_intent_by_name.get(function.name, function.declarations.get("intent", "")),
+                "function_kind": function.declarations.get("function_kind"),
                 "inputs": [node.name for node in function.inputs],
                 "outputs": [node.name for node in function.outputs],
+                "environment": {
+                    "requires": [node.name for node in function.environment.requires],
+                    "provides": [node.name for node in function.environment.provides],
+                    "carries": [node.name for node in function.environment.carries],
+                },
+                "vectors": [
+                    {
+                        "name": vector.name,
+                        "source": [
+                            node.name
+                            for node in (
+                                vector.source
+                                if isinstance(vector.source, tuple)
+                                else (vector.source,)
+                            )
+                        ],
+                        "target": vector.target.name,
+                    }
+                    for vector in (
+                        function.template.graph.vectors
+                        if function.template.graph is not None
+                        else ()
+                    )
+                ],
+                "job_names": job_names_by_function_id.get(function.id, []),
             }
             for function in module.graph_functions
         ],

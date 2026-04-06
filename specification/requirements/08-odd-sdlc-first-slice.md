@@ -64,17 +64,24 @@ domain understanding without duplicating the ABG runtime model.
 - AC-3: the same query library can later be wrapped by a microservice or MCP
   surface without changing its core query logic
 
-### REQ-F-ODDSDLC-006 — odd_sdlc provides a top-level executive odd_program over the current graph-function catalog
+### REQ-F-ODDSDLC-006 — odd_sdlc provides a top-level executive GTL graph function over the current asset-function catalog
 
-The first `odd_sdlc` slice provides an app-owned executive program above ABG
-that drives the current published graph-function catalog through the bounded
-constructor and assessed-result loop.
+The first `odd_sdlc` slice provides one public executive GTL graph function
+above the current asset-function catalog. That executive is the runtime
+authority: it carries cumulative environment truth, materializes the current
+bootstrap-to-release chain as internal vectors, and is the single job-bound
+entry point driven through the bounded constructor and assessed-result loop.
+
+The tenant may additionally expose a machine-readable executive program read
+model for UI or operator use, but that surface is derived from the executive
+graph function rather than acting as an app-owned shadow runtime above ABG.
 
 **Acceptance Criteria**:
-- AC-1: the tenant publishes a machine-readable executive program that names
-  the current bootstrap, recursive test, authority, and release steps in
-  dependency order
-- AC-2: the tenant exposes an app command that executes that executive program
-  end to end from an installed workspace
+- AC-1: the tenant publishes one public executive graph function whose
+  materialized vectors name the current bootstrap, recursive test, authority,
+  and release steps in dependency order
+- AC-2: the tenant binds one explicit job to that executive graph function and
+  exposes an app command that executes the resulting chain end to end from an
+  installed workspace
 - AC-3: successful execution converges the current toy subgraph to the release
   surface without introducing a product-local shadow runtime beneath ABG

@@ -27,8 +27,13 @@ if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
 
 from odd_sdlc.app import bootstrap, catalog, initialize  # noqa: E402
-from odd_sdlc.gtl_module import module as odd_sdlc_module  # noqa: E402
+from odd_sdlc.gtl_module import (  # noqa: E402
+    BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+    BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
+    module as odd_sdlc_module,
+)
 from odd_sdlc.self_test import self_test  # noqa: E402
+from genesis.binding import module_to_executable_jobs  # noqa: E402
 
 
 def _seed_workspace(path: Path) -> None:
@@ -54,63 +59,61 @@ def _read_events(workspace_root: Path) -> list[dict]:
 def test_module_publishes_first_asset_function_catalog() -> None:
     module = odd_sdlc_module()
     graph_function_names = [graph_function.name for graph_function in module.graph_functions]
-    assert graph_function_names == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert graph_function_names == ["bootstrap_release_self_test"]
     input_signatures = {
         graph_function.name: [node.name for node in graph_function.inputs]
         for graph_function in module.graph_functions
     }
     assert input_signatures == {
-        "derive_intent_surface": ["input_set"],
-        "derive_product_surface": ["input_set", "intent_surface"],
-        "derive_goal_surface": ["input_set", "intent_surface", "product_surface"],
-        "derive_requirement_surface": [
-            "input_set",
-            "intent_surface",
-            "product_surface",
-            "goal_surface",
-        ],
-        "derive_feature_decomp_surface": ["requirement_surface"],
-        "derive_uat_testcases_surface": ["requirement_surface"],
-        "derive_design_surface": ["requirement_surface", "feature_decomp_surface"],
-        "derive_scenario_surface": ["requirement_surface", "design_surface"],
-        "derive_test_design_surface": ["design_surface", "scenario_surface"],
-        "select_test_stack_profile": ["test_design_surface"],
-        "derive_test_module_surface": ["test_design_surface", "test_stack_profile"],
-        "derive_test_run_archive_surface": ["test_module_surface", "test_stack_profile"],
-        "qualify_testcase_authority": ["uat_testcases_surface", "scenario_surface"],
-        "prepare_release_surface": ["requirement_surface", "design_surface", "scenario_surface", "testcase_authority_surface", "test_run_archive_surface"],
+        "bootstrap_release_self_test": ["input_set"],
     }
-    assert [job.name for job in module.jobs] == [
-        "derive_intent_surface_job",
-        "derive_product_surface_job",
-        "derive_goal_surface_job",
-        "derive_requirement_surface_job",
-        "derive_feature_decomp_surface_job",
-        "derive_uat_testcases_surface_job",
-        "derive_design_surface_job",
-        "derive_scenario_surface_job",
-        "derive_test_design_surface_job",
-        "select_test_stack_profile_job",
-        "derive_test_module_surface_job",
-        "derive_test_run_archive_surface_job",
-        "qualify_testcase_authority_job",
-        "prepare_release_surface_job",
+    executive = module.graph_functions[0]
+    assert executive.declarations.get("function_kind") == "odd_executive_graph_function"
+    assert executive.declarations.get("intent") == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
+    assert [node.name for node in executive.inputs] == ["input_set"]
+    assert [node.name for node in executive.outputs] == ["release_surface"]
+    assert [node.name for node in executive.environment.requires] == ["input_set"]
+    assert [node.name for node in executive.environment.provides] == [
+        "intent_surface",
+        "product_surface",
+        "goal_surface",
+        "requirement_surface",
+        "feature_decomp_surface",
+        "uat_testcases_surface",
+        "design_surface",
+        "scenario_surface",
+        "test_design_surface",
+        "test_stack_profile",
+        "test_module_surface",
+        "test_run_archive_surface",
+        "testcase_authority_surface",
+        "release_surface",
     ]
+    assert [node.name for node in executive.environment.carries] == [
+        "input_set",
+        "intent_surface",
+        "product_surface",
+        "goal_surface",
+        "requirement_surface",
+        "feature_decomp_surface",
+        "uat_testcases_surface",
+        "design_surface",
+        "scenario_surface",
+        "test_design_surface",
+        "test_stack_profile",
+        "test_module_surface",
+        "test_run_archive_surface",
+        "testcase_authority_surface",
+        "release_surface",
+    ]
+    assert [vector.name for vector in executive.materialize().vectors] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
+    assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job"]
+
+    executable_jobs = module_to_executable_jobs(module)
+    assert len(executable_jobs) == 14
+    assert [job.vector.name for job in executable_jobs] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
+    assert {job.job.name for job in executable_jobs} == {"bootstrap_release_self_test_job"}
+    assert {job.graph_function.name for job in executable_jobs} == {"bootstrap_release_self_test"}
 
 
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
@@ -210,26 +213,55 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["test_module_surface"] == ("test_module_surface",)
     assert bindings["test_run_archive_surface"] == ("test_run_archive_surface",)
     assert bindings["release_surface"] == ("release_surface",)
+    assert [entry["name"] for entry in result["graph_functions"]] == ["bootstrap_release_self_test"]
+    executive = result["graph_functions"][0]
+    assert executive["intent"] == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
+    assert executive["function_kind"] == "odd_executive_graph_function"
+    assert executive["inputs"] == ["input_set"]
+    assert executive["outputs"] == ["release_surface"]
+    assert executive["environment"] == {
+        "requires": ["input_set"],
+        "provides": [
+            "intent_surface",
+            "product_surface",
+            "goal_surface",
+            "requirement_surface",
+            "feature_decomp_surface",
+            "uat_testcases_surface",
+            "design_surface",
+            "scenario_surface",
+            "test_design_surface",
+            "test_stack_profile",
+            "test_module_surface",
+            "test_run_archive_surface",
+            "testcase_authority_surface",
+            "release_surface",
+        ],
+        "carries": [
+            "input_set",
+            "intent_surface",
+            "product_surface",
+            "goal_surface",
+            "requirement_surface",
+            "feature_decomp_surface",
+            "uat_testcases_surface",
+            "design_surface",
+            "scenario_surface",
+            "test_design_surface",
+            "test_stack_profile",
+            "test_module_surface",
+            "test_run_archive_surface",
+            "testcase_authority_surface",
+            "release_surface",
+        ],
+    }
+    assert [vector["name"] for vector in executive["vectors"]] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
+    assert executive["job_names"] == ["bootstrap_release_self_test_job"]
     assert result["programs"] == [
         {
             "name": "bootstrap_release_self_test",
-            "intent": "Act as the current top-level executive over the odd_sdlc bootstrap, recursive test branch, authority qualification, and release preparation graph functions.",
-            "steps": [
-                "derive_intent_surface",
-                "derive_product_surface",
-                "derive_goal_surface",
-                "derive_requirement_surface",
-                "derive_feature_decomp_surface",
-                "derive_uat_testcases_surface",
-                "derive_design_surface",
-                "derive_scenario_surface",
-                "derive_test_design_surface",
-                "select_test_stack_profile",
-                "derive_test_module_surface",
-                "derive_test_run_archive_surface",
-                "qualify_testcase_authority",
-                "prepare_release_surface",
-            ],
+            "intent": BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+            "steps": list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS),
             "outputs": ["release_surface"],
             "kind": "executive_program",
         }
@@ -267,6 +299,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "functions",
         "gaps",
         "graph_calls",
+        "graph_functions",
         "query_contract",
         "recent_events",
         "runs",
@@ -280,6 +313,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
     assert payload["graph_calls"] == []
     assert payload["continuations"] == []
     assert payload["recent_events"] == []
+    assert [entry["name"] for entry in payload["graph_functions"]] == ["bootstrap_release_self_test"]
     assert all(asset["projection_source"] == "workspace_scan" for asset in payload["assets"])
 
 
@@ -312,13 +346,14 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "bindings",
         "functions",
         "gaps",
+        "graph_functions",
         "query_contract",
         "semantic_facets",
         "workspace_root",
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v1",
+        "version": "v2",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
@@ -326,6 +361,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
             "asset_types",
             "assets",
             "functions",
+            "graph_functions",
             "bindings",
             "gaps",
         ],
@@ -361,6 +397,11 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "testcase_authority_surface",
         "test_run_archive_surface",
     ]
+    assert [entry["name"] for entry in payload["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert payload["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
+    assert [vector["name"] for vector in payload["graph_functions"][0]["vectors"]] == list(
+        BOOTSTRAP_RELEASE_SELF_TEST_STEPS
+    )
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:
@@ -410,22 +451,7 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
 
     assert result["status"] == "ok"
     assert result["program"]["name"] == "bootstrap_release_self_test"
-    assert result["completed_edges"] == [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_feature_decomp_surface",
-        "derive_uat_testcases_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_test_design_surface",
-        "select_test_stack_profile",
-        "derive_test_module_surface",
-        "derive_test_run_archive_surface",
-        "qualify_testcase_authority",
-        "prepare_release_surface",
-    ]
+    assert result["completed_edges"] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in result["steps"])
     assert all(step["assessed"]["status"] == "ok" for step in result["steps"])
     assert result["final_state"]["status"] == "converged"

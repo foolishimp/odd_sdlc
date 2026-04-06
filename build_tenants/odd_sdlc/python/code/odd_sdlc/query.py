@@ -73,6 +73,7 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
         "asset_types": catalog_payload["asset_types"],
         "assets": query_assets(app),
         "functions": catalog_payload["functions"],
+        "graph_functions": catalog_payload["graph_functions"],
         "bindings": catalog_payload["bindings"],
         "gaps": gaps(app),
     }

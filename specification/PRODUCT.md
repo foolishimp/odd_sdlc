@@ -22,7 +22,7 @@ It gives a project a lawful way to declare:
 - asset types with explicit semantic role
 - asset collections and typed asset nodes
 - named functions over asset graphs
-- executive odd_programs over the function catalog
+- executive GTL graph functions over the function catalog
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
 
@@ -203,7 +203,7 @@ The current product definition of `odd_method` is:
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
 - carrying `odd_sdlc` as the first live tenant package
-- publishing a top-level executive program over the current toy subgraph
+- publishing a top-level executive GTL graph function over the current toy subgraph
 - explicit in adoption of any carried-forward truth
 
 The current asset graph proven in the toy sandbox for `odd_sdlc` is:
@@ -223,16 +223,24 @@ The current asset graph proven in the toy sandbox for `odd_sdlc` is:
 - `{build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md}`
 - `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
 
-The current top-level executive program over that subgraph is:
+The current top-level executive graph function over that subgraph is:
 
 - `bootstrap_release_self_test`
 
-It acts as the current app-owned executive above ABG:
+It acts as the current runtime authority above the leaf asset functions:
 
-- it selects the current ordered graph-function steps
-- it drives the bounded constructor turn for each open call
+- it carries cumulative environment truth from `input_set` through
+  `release_surface`
+- it materializes the current ordered internal vectors for bootstrap, recursive
+  test, authority, and release work
+- one explicit job binds to that executive carrier and drives the bounded
+  constructor turn for each open call
 - it ingests the resulting F_P assessment back through ABG
 - it stops only when the current toy subgraph converges at `release_surface`
+
+The tenant still exposes a machine-readable `bootstrap_release_self_test`
+program surface, but that surface is a projection of the executive graph
+function rather than an app-owned controller with independent authority.
 
 The current build focus is to establish the first real `odd_sdlc` tenant slice:
 

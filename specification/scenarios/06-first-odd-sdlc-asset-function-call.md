@@ -51,9 +51,9 @@ installed development environment:
   archive evidence become lawful inputs to release together with requirements
 - query path: the tenant exposes a domain query library that a UI can compose
   with ABG runtime projections
-- executive path: the tenant exposes a top-level odd_program that drives the
-  current published graph-function catalog through the bounded constructor and
-  assessed-result loop
+- executive path: the tenant exposes one public GTL executive graph function
+  whose materialized vectors drive the current published asset-function chain
+  through the bounded constructor and assessed-result loop
 - audit path: the proving lane reads the resulting event log and verifies the
   graph-call and run lifecycle from substrate facts
 
@@ -69,5 +69,6 @@ installed development environment:
    test-SDLC-to-release branch from emitted runtime facts
 5. the tenant exposes domain query logic without duplicating the ABG runtime
    model that the UI should already understand directly
-6. the tenant exposes one executive odd_program that can drive the current toy
-   subgraph to `release_surface` without redefining ABG runtime semantics
+6. the tenant exposes one executive GTL graph function that can drive the
+   current toy subgraph to `release_surface` without redefining ABG runtime
+   semantics

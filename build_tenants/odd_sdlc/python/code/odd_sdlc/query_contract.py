@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 QUERY_DOMAIN_CONTRACT_NAME = "odd_sdlc.query-domain"
-QUERY_DOMAIN_CONTRACT_VERSION = "v1"
+QUERY_DOMAIN_CONTRACT_VERSION = "v2"
 QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "query_contract",
     "workspace_root",
@@ -12,6 +12,7 @@ QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "asset_types",
     "assets",
     "functions",
+    "graph_functions",
     "bindings",
     "gaps",
 )
@@ -25,4 +26,3 @@ def query_domain_contract() -> dict[str, object]:
         "runtime_model": "abg-native",
         "query_model": "odd-domain-plugin",
     }
-

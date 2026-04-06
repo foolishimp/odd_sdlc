@@ -1,5 +1,5 @@
 # Implements: REQ-F-ODDSDLC-006
-"""Executive odd_program runner for the current odd_sdlc steel thread."""
+"""Executive program runner derived from the current GTL carrier."""
 from __future__ import annotations
 
 from typing import Any
@@ -25,19 +25,19 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
         status = start_result.get("status")
         if status != "iterated":
             raise RuntimeError(
-                f"odd_program {program.name!r} expected {expected_edge!r} "
+                f"executive program {program.name!r} expected {expected_edge!r} "
                 f"but start returned non-iterated status {status!r}"
             )
         actual_edge = start_result.get("edge")
         if actual_edge != expected_edge:
             raise RuntimeError(
-                f"odd_program {program.name!r} expected {expected_edge!r} "
+                f"executive program {program.name!r} expected {expected_edge!r} "
                 f"but start selected {actual_edge!r}"
             )
         manifest_path = start_result.get("fp_manifest_path")
         if not isinstance(manifest_path, str) or not manifest_path:
             raise RuntimeError(
-                f"odd_program {program.name!r} step {expected_edge!r} "
+                f"executive program {program.name!r} step {expected_edge!r} "
                 "did not produce fp_manifest_path"
             )
         constructor_result = construct_manifest(manifest_path, workspace_root=workspace_root)
