@@ -28,6 +28,8 @@ meaning.
 - AC-3: type meaning does not depend on one hidden global controller prompt
 - AC-4: asset types are designed as reusable semantic library surfaces rather
   than as one flat project-local enum
+- AC-5: the live library may expose generic reusable asset definitions together
+  with sharper local specializations for one concrete toy or domain slice
 
 ### REQ-F-ASSETMODEL-003 — Concrete assets bind into typed asset nodes
 

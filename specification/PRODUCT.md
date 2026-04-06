@@ -190,16 +190,27 @@ The current product definition of `odd_method` is:
 - carrying `odd_sdlc` as the first live tenant package
 - explicit in adoption of any carried-forward truth
 
-The current bootstrap asset graph for `odd_sdlc` is:
+The current asset graph proven in the toy sandbox for `odd_sdlc` is:
 
 - `{input_set} -> {specification/INTENT.md}`
-- `{input_set} -> {specification/PRODUCT.md}`
-- `{input_set} -> {specification/GOALS.md}`
+- `{input_set, specification/INTENT.md} -> {specification/PRODUCT.md}`
+- `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/GOALS.md}`
 - `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
+- `{specification/requirements/} -> {build_tenants/common/design/20-generated-feature-decomp.md}`
+- `{specification/requirements/} -> {specification/scenarios/20-generated-uat-testcases.md}`
 
 The current build focus is to establish the first real `odd_sdlc` tenant slice:
 
 - publish the first asset-typed function catalog
 - bind workspace assets by URI
-- execute the first graph-function call through ABG
+- execute the first bootstrap-plus-fanout dependency chain through ABG
 - prove the resulting runtime facts by post-mortem audit
+
+The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox is:
+
+- `derive_intent_surface`
+- `derive_product_surface`
+- `derive_goal_surface`
+- `derive_requirement_surface`
+- `derive_feature_decomp_surface`
+- `derive_uat_testcases_surface`

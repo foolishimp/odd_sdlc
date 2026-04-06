@@ -135,8 +135,8 @@ The design implication is:
 
 ### First AssetType Library
 
-The first ODD asset-type library should begin with a few reusable composed
-types.
+The first ODD asset-type library should begin with a small generic layer and a
+small sharpened layer for the current toy.
 
 Foundational semantic types:
 
@@ -145,17 +145,27 @@ Foundational semantic types:
 - `verification_surface`
 - `authority_surface`
 - `argument_surface`
+- `singleton_surface`
+- `collection_surface`
+- `generated_surface`
 
-First concrete `odd_sdlc` types:
+Generic `odd_sdlc` library types:
 
-- `intent_doc = structured_document + spec_surface`
-- `product_doc = structured_document + spec_surface`
-- `goal_surface = structured_document + spec_surface`
-- `requirement_family = structured_document + spec_surface`
-- `design_surface = structured_document + spec_surface`
+- `spec_document`
+- `singleton_spec_document = spec_document + singleton_surface`
+- `requirement_collection_surface = spec_surface + collection_surface`
+- `proof_artifact = verification_surface + authority_surface`
+
+Current toy sharpenings:
+
+- `intent_doc = singleton_spec_document + argument_surface + generated_surface`
+- `product_doc = singleton_spec_document + generated_surface`
+- `goal_surface = singleton_spec_document + generated_surface`
+- `requirement_surface = requirement_collection_surface + generated_surface`
+- `design_surface = spec_document`
 - `scenario_bundle = structured_document + verification_surface`
 - `testcase_authority_surface = structured_document + authority_surface + verification_surface`
-- `proof_surface = structured_document + verification_surface`
+- `proof_surface = proof_artifact`
 - `release_surface = structured_document + authority_surface`
 
 This is enough structure to prove composition without overbuilding taxonomy too
@@ -216,6 +226,8 @@ The first catalog should include:
 - `derive_product_surface`
 - `derive_goal_surface`
 - `derive_requirement_surface`
+- `derive_feature_decomp_surface`
+- `derive_uat_testcases_surface`
 - `derive_design_surface`
 - `derive_scenario_surface`
 - `qualify_testcase_authority`
@@ -233,8 +245,8 @@ required on the `odd_method` line.
 The first explicit bootstrap contracts are:
 
 - `{input_set} -> {intent_surface}`
-- `{input_set} -> {product_surface}`
-- `{input_set} -> {goal_surface}`
+- `{input_set, intent_surface} -> {product_surface}`
+- `{input_set, intent_surface, product_surface} -> {goal_surface}`
 - `{input_set, intent_surface, product_surface, goal_surface} -> {requirement_surface}`
 
 The goal surface is included in the translation because `genesis_sdlc`
@@ -242,7 +254,12 @@ already treats goals as a first-class method surface.
 
 ### Downstream Functions
 
-The first downstream translation adds:
+The first live downstream translation adds:
+
+- `{requirement_surface} -> {feature_decomp_surface}`
+- `{requirement_surface} -> {uat_testcases_surface}`
+
+Later downstream translation can add:
 
 - `{requirement_surface} -> {design_surface}`
 - `{requirement_surface, design_surface} -> {scenario_surface}`

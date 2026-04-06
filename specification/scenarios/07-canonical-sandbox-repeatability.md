@@ -9,8 +9,17 @@ post-mortem runtime audit shape.
 ## Scenario
 
 Install a clean sandbox workspace, seed the first `odd_sdlc` tenant package and
-its canonical bootstrap specification surfaces, run the first graph-function
-call, execute one bounded constructor turn for that call, ingest the resulting
+its canonical bootstrap specification surfaces, run the first bootstrap
+dependency chain:
+
+- `derive_intent_surface`
+- `derive_product_surface`
+- `derive_goal_surface`
+- `derive_requirement_surface`
+- `derive_feature_decomp_surface`
+- `derive_uat_testcases_surface`
+
+For each call, execute one bounded constructor turn, ingest the resulting
 successful `F_P` result through `genesis assess-result`, audit the resulting
 runtime facts, wipe runtime state, and then rerun the same use case.
 
@@ -19,8 +28,8 @@ runtime facts, wipe runtime state, and then rerun the same use case.
 - install path: the sandbox installs the GTL/ABG runtime cleanly
 - seed path: the toy app package and canonical specification surfaces are
   materialized into the sandbox
-- first-run path: the sandbox opens the first `odd_sdlc` graph call and emits
-  runtime facts
+- first-run path: the sandbox opens the bootstrap chain and first downstream
+  fan-out graph calls in dependency order and emits runtime facts
 - constructor path: a bounded constructor turn writes the target surface and
   emits a result file for the open call
 - asset path: the constructor records attributable asset checkpoint mutation in
@@ -40,8 +49,10 @@ runtime facts, wipe runtime state, and then rerun the same use case.
 
 1. the sandbox runs from the installed runtime rather than from source-tree
    imports
-2. the first graph-function call opens lawful ABG runtime facts
-3. one bounded constructor turn records attributable asset checkpoint mutation
+2. the dependency chain advances in the order
+   `INTENT -> PRODUCT -> GOALS -> requirements`, then fans out from
+   `requirements` to feature decomposition and UAT testcase surfaces
+3. each bounded constructor turn records attributable asset checkpoint mutation
    and then successful result ingestion produces lawful `assessed`,
    `proof_passed`, `closure_passed`, `graph_call_closed`, and `run_completed`
    truth

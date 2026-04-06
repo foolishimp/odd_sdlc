@@ -18,11 +18,19 @@ from .domain_model import (
 )
 
 
-BOOTSTRAP_PATHS: tuple[tuple[str, str], ...] = (
+ASSET_PATHS: tuple[tuple[str, str], ...] = (
     ("intent_surface", "specification/INTENT.md"),
     ("product_surface", "specification/PRODUCT.md"),
     ("goal_surface", "specification/GOALS.md"),
     ("requirement_surface", "specification/requirements"),
+    ("feature_decomp_surface", "build_tenants/common/design/20-generated-feature-decomp.md"),
+    ("uat_testcases_surface", "specification/scenarios/20-generated-uat-testcases.md"),
+)
+
+INPUT_SET_ASSET_IDS: tuple[str, ...] = (
+    "intent_surface",
+    "product_surface",
+    "goal_surface",
 )
 
 NODE_ASSET_TYPES = {
@@ -30,6 +38,8 @@ NODE_ASSET_TYPES = {
     "product_surface": "product_doc",
     "goal_surface": "goal_surface",
     "requirement_surface": "requirement_surface",
+    "feature_decomp_surface": "feature_decomp_surface",
+    "uat_testcases_surface": "uat_testcases_surface",
 }
 
 
@@ -71,7 +81,7 @@ def checkpoint_for_path(path: Path) -> AssetCheckpoint:
 
 def bootstrap_assets(workspace_root: Path) -> tuple[Asset, ...]:
     assets: list[Asset] = []
-    for node_name, rel_path in BOOTSTRAP_PATHS:
+    for node_name, rel_path in ASSET_PATHS:
         path = workspace_root / rel_path
         asset_type = NODE_ASSET_TYPES[node_name]
         type_profile = ASSET_TYPES[asset_type]
@@ -105,8 +115,8 @@ def bootstrap_input_collection(workspace_root: Path) -> AssetCollection:
 def bootstrap_bindings(workspace_root: Path) -> tuple[AssetNodeBinding, ...]:
     assets = {asset.asset_id: asset for asset in bootstrap_assets(workspace_root)}
     bindings = [
-        AssetNodeBinding(node="input_set", asset_ids=tuple(assets)),
+        AssetNodeBinding(node="input_set", asset_ids=INPUT_SET_ASSET_IDS),
     ]
-    for node_name, _ in BOOTSTRAP_PATHS:
+    for node_name, _ in ASSET_PATHS:
         bindings.append(AssetNodeBinding(node=node_name, asset_ids=(node_name,)))
     return tuple(bindings)

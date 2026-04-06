@@ -27,6 +27,8 @@ class AssetTypeProfile:
     fd_evaluator: str
     fp_gap_description: str
     fp_descriptive_framing: str
+    specializes: tuple[str, ...] = ()
+    library_level: str = "generic"
     mutable_default: bool = True
     proof_hints: tuple[str, ...] = ()
     closure_hints: tuple[str, ...] = ()
@@ -39,6 +41,8 @@ class AssetTypeProfile:
             "fd_evaluator": self.fd_evaluator,
             "fp_gap_description": self.fp_gap_description,
             "fp_descriptive_framing": self.fp_descriptive_framing,
+            "specializes": list(self.specializes),
+            "library_level": self.library_level,
             "mutable_default": self.mutable_default,
             "proof_hints": list(self.proof_hints),
             "closure_hints": list(self.closure_hints),

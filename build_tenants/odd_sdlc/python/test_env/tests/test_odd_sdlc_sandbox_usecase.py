@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from sandbox_runtime import (
+    complete_bootstrap_chain,
     install_kernel_sandbox,
     read_events,
     reset_sandbox_runtime_state,
@@ -38,12 +39,14 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 4
+    assert len(catalog["assets"]) == 6
     assert [item["name"] for item in catalog["functions"]] == [
         "derive_intent_surface",
         "derive_product_surface",
         "derive_goal_surface",
         "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
     ]
 
     gaps = json.loads(
@@ -51,68 +54,59 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     )
     run_archive.capture_json("gaps.json", gaps)
     assert gaps["converged"] is False
-    assert len(gaps["gaps"]) == 4
+    assert len(gaps["gaps"]) == 6
 
-    start = json.loads(
-        run_installed_odd_sdlc(workspace, "start", archive=run_archive, label="odd_sdlc start").stdout
-    )
-    run_archive.capture_json("start.json", start)
-    assert start["status"] == "iterated"
-    assert start["edge"] == "derive_intent_surface"
-    assert start["blocking_reason"] == "fp_dispatch"
-
-    pre_assess_events = read_events(workspace)
-    pre_assess_types = [event["event_type"] for event in pre_assess_events]
-    assert pre_assess_types[-5:] == [
-        "run_bound",
-        "run_started",
-        "graph_call_opened",
-        "vector_started",
-        "fp_dispatched",
+    chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
+    run_archive.capture_json("chain.json", chain)
+    assert [step["start"]["edge"] for step in chain] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
     ]
-    run_archive.capture_json("events.pre_assess.json", pre_assess_events)
-
-    constructor, result_path = run_constructor_for_start(
-        workspace,
-        start_payload=start,
-        archive=run_archive,
-        label="odd_sdlc construct",
-    )
-    assert constructor["status"] == "constructed"
-    assert Path(constructor["target_path"]).read_text(encoding="utf-8").startswith("# Intent")
-    assessed = json.loads(
-        run_installed_genesis(
-            workspace,
-            "assess-result",
-            "--result",
-            str(result_path),
-            archive=run_archive,
-            label="genesis assess-result",
-        ).stdout
-    )
-    run_archive.capture_json("assessed.json", assessed)
-    assert assessed["status"] == "ok"
+    assert chain[0]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[1]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[2]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[3]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[4]["start"]["blocking_reason"] == "fp_dispatch"
+    assert chain[5]["start"]["blocking_reason"] == "fp_dispatch"
+    assert Path(chain[0]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Intent")
+    assert Path(chain[1]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Product")
+    assert Path(chain[2]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Goals")
+    assert Path(chain[3]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Bootstrap Requirements")
+    assert Path(chain[4]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Feature Decomposition")
+    assert Path(chain[5]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated UAT Testcases")
+    assert all(step["assessed"]["status"] == "ok" for step in chain)
 
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
-    event_types = [event["event_type"] for event in events]
-    assert event_types[-7:] == [
-        "fp_dispatched",
-        "asset_checkpoint_updated",
-        "assessed",
-        "proof_passed",
-        "closure_passed",
-        "graph_call_closed",
-        "run_completed",
+    graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
+    assert [event["data"]["graph_function"] for event in graph_call_events] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
     ]
-    asset_update = next(event for event in events if event["event_type"] == "asset_checkpoint_updated")
-    assert asset_update["aggregate_type"] == "graph_call"
-    assert asset_update["aggregate_id"] == start["call_id"]
-    assert asset_update["data"]["asset_id"] == "intent_surface"
-    assert asset_update["data"]["declared_asset_type"] == "intent_doc"
-    assert asset_update["data"]["current_checkpoint"]["exists"] is True
-    assert asset_update["data"]["current_checkpoint"]["path_kind"] == "file"
-    assert asset_update["data"]["previous_checkpoint"]["content_digest"] != asset_update["data"]["current_checkpoint"]["content_digest"]
+    asset_updates = [event for event in events if event["event_type"] == "asset_checkpoint_updated"]
+    assert [event["data"]["asset_id"] for event in asset_updates] == [
+        "intent_surface",
+        "product_surface",
+        "goal_surface",
+        "requirement_surface",
+        "feature_decomp_surface",
+        "uat_testcases_surface",
+    ]
+    assert [event["aggregate_id"] for event in asset_updates] == [step["start"]["call_id"] for step in chain]
+    assert all(event["data"]["current_checkpoint"]["exists"] is True for event in asset_updates)
+    assert all(event["data"]["current_checkpoint"]["path_kind"] == "file" for event in asset_updates)
+    assert all(
+        event["data"]["previous_checkpoint"]["content_digest"] != event["data"]["current_checkpoint"]["content_digest"]
+        for event in asset_updates
+    )
 
     domain_query = json.loads(
         run_installed_odd_sdlc(
@@ -145,22 +139,29 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "observe", archive=run_archive, label="odd_sdlc observe").stdout
     )
     run_archive.capture_json("observe.json", observed)
-    intent_asset = next(asset for asset in observed["assets"] if asset["asset_id"] == "intent_surface")
-    assert intent_asset["projection_source"] == "event_history"
-    assert intent_asset["update_count"] == 1
-    assert intent_asset["provenance"]["source"] == "asset_checkpoint_events"
-    assert intent_asset["provenance"]["last_event_id"] == asset_update["event_id"]
-    assert intent_asset["checkpoint"] == asset_update["data"]["current_checkpoint"]
-    assert observed["runs"][-1]["status"] == "completed"
-    assert observed["graph_calls"][-1]["status"] == "closed"
+    observed_assets = {asset["asset_id"]: asset for asset in observed["assets"]}
+    for asset_id, event in zip(
+        ("intent_surface", "product_surface", "goal_surface", "requirement_surface", "feature_decomp_surface", "uat_testcases_surface"),
+        asset_updates,
+        strict=True,
+    ):
+        observed_asset = observed_assets[asset_id]
+        assert observed_asset["projection_source"] == "event_history"
+        assert observed_asset["update_count"] == 1
+        assert observed_asset["provenance"]["source"] == "asset_checkpoint_events"
+        assert observed_asset["provenance"]["last_event_id"] == event["event_id"]
+        assert observed_asset["checkpoint"] == event["data"]["current_checkpoint"]
+    assert [run["status"] for run in observed["runs"]] == ["completed"] * 6
+    assert [call["status"] for call in observed["graph_calls"]] == ["closed"] * 6
     assert observed["continuations"] == []
     recent_event_types = [event["event_type"] for event in observed["recent_events"]]
     assert "run_completed" in recent_event_types
     assert recent_event_types[-1] == "edge_converged"
     run_archive.snapshot_runtime("completed_run", workspace=workspace)
     run_archive.update_summary(
-        final_run_id=start["run_id"],
-        final_call_id=start["call_id"],
+        completed_edges=[step["start"]["edge"] for step in chain],
+        final_run_id=chain[-1]["start"]["run_id"],
+        final_call_id=chain[-1]["start"]["call_id"],
         query_contract=domain_query["query_contract"],
     )
 
@@ -169,26 +170,25 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     workspace = run_archive.workspace
     _prepare_sandbox(workspace, run_archive=run_archive)
 
-    first = json.loads(
-        run_installed_odd_sdlc(workspace, "start", archive=run_archive, label="odd_sdlc start first").stdout
-    )
-    _, first_result = run_constructor_for_start(
-        workspace,
-        start_payload=first,
-        archive=run_archive,
-        label="odd_sdlc construct first",
-    )
-    run_installed_genesis(
-        workspace,
-        "assess-result",
-        "--result",
-        str(first_result),
-        archive=run_archive,
-        label="genesis assess-result first",
-    )
+    first_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="first")
     first_events = read_events(workspace)
     run_archive.capture_json("events.first_run.json", first_events)
-    assert any(event["event_type"] == "run_completed" for event in first_events)
+    assert [step["start"]["edge"] for step in first_chain] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+    ]
+    assert [event["data"]["asset_id"] for event in first_events if event["event_type"] == "asset_checkpoint_updated"] == [
+        "intent_surface",
+        "product_surface",
+        "goal_surface",
+        "requirement_surface",
+        "feature_decomp_surface",
+        "uat_testcases_surface",
+    ]
 
     reset_sandbox_runtime_state(
         workspace,
@@ -211,27 +211,19 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     )
     assert second_gaps["converged"] is False
 
-    second = json.loads(
-        run_installed_odd_sdlc(workspace, "start", archive=run_archive, label="odd_sdlc start second").stdout
-    )
-    _, second_result = run_constructor_for_start(
-        workspace,
-        start_payload=second,
-        archive=run_archive,
-        label="odd_sdlc construct second",
-    )
-    run_installed_genesis(
-        workspace,
-        "assess-result",
-        "--result",
-        str(second_result),
-        archive=run_archive,
-        label="genesis assess-result second",
-    )
+    second_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="second")
     second_events = read_events(workspace)
     run_archive.capture_json("events.second_run.json", second_events)
+    assert [step["start"]["edge"] for step in second_chain] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+    ]
     second_event_types = [event["event_type"] for event in second_events]
-    assert second_event_types == [
+    expected_step = [
         "run_bound",
         "run_started",
         "graph_call_opened",
@@ -244,25 +236,27 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         "graph_call_closed",
         "run_completed",
     ]
-    assert first["run_id"] != second["run_id"]
-    assert first["call_id"] != second["call_id"]
+    assert second_event_types == expected_step * 6
+    assert first_chain[0]["start"]["run_id"] != second_chain[0]["start"]["run_id"]
+    assert first_chain[0]["start"]["call_id"] != second_chain[0]["start"]["call_id"]
     run_archive.capture_json(
         "comparative_analysis.json",
         {
-            "first_run_id": first["run_id"],
-            "second_run_id": second["run_id"],
-            "first_call_id": first["call_id"],
-            "second_call_id": second["call_id"],
-            "event_types_match": [event["event_type"] for event in first_events] == second_event_types,
+            "first_run_ids": [step["start"]["run_id"] for step in first_chain],
+            "second_run_ids": [step["start"]["run_id"] for step in second_chain],
+            "first_call_ids": [step["start"]["call_id"] for step in first_chain],
+            "second_call_ids": [step["start"]["call_id"] for step in second_chain],
+            "first_edges": [step["start"]["edge"] for step in first_chain],
+            "second_edges": [step["start"]["edge"] for step in second_chain],
+            "event_types_match": [event["event_type"] for event in first_events if event["event_type"] != "genesis_installed"] == second_event_types,
             "first_event_types": [event["event_type"] for event in first_events],
             "second_event_types": second_event_types,
         },
     )
     run_archive.snapshot_runtime("second_run_completed", workspace=workspace)
     run_archive.update_summary(
-        first_run_id=first["run_id"],
-        second_run_id=second["run_id"],
-        first_call_id=first["call_id"],
-        second_call_id=second["call_id"],
-        comparative_analysis="first and second installed sandbox runs archived for post-mortem comparison",
+        first_run_ids=[step["start"]["run_id"] for step in first_chain],
+        second_run_ids=[step["start"]["run_id"] for step in second_chain],
+        completed_edges=[step["start"]["edge"] for step in second_chain],
+        comparative_analysis="first and second installed sandbox bootstrap-subgraph runs archived for post-mortem comparison",
     )

@@ -151,6 +151,71 @@ def run_constructor_for_start(
     return payload, Path(payload["result_path"])
 
 
+def complete_current_call(
+    workspace: Path,
+    *,
+    archive: "RunArchive | None" = None,
+    label_prefix: str,
+) -> dict[str, Any]:
+    start = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            archive=archive,
+            label=f"{label_prefix} start",
+        ).stdout
+    )
+    constructor, result_path = run_constructor_for_start(
+        workspace,
+        start_payload=start,
+        archive=archive,
+        label=f"{label_prefix} construct",
+    )
+    assessed = json.loads(
+        run_installed_genesis(
+            workspace,
+            "assess-result",
+            "--result",
+            str(result_path),
+            archive=archive,
+            label=f"{label_prefix} assess-result",
+        ).stdout
+    )
+    return {
+        "start": start,
+        "constructor": constructor,
+        "assessed": assessed,
+    }
+
+
+def complete_bootstrap_chain(
+    workspace: Path,
+    *,
+    archive: "RunArchive | None" = None,
+    label_prefix: str,
+    steps: tuple[str, ...] = (
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+    ),
+) -> list[dict[str, Any]]:
+    completed: list[dict[str, Any]] = []
+    for edge in steps:
+        step_label = edge.removeprefix("derive_").removesuffix("_surface")
+        result = complete_current_call(
+            workspace,
+            archive=archive,
+            label_prefix=f"{label_prefix}_{step_label}",
+        )
+        if result["start"]["edge"] != edge:
+            raise AssertionError(f"Expected edge {edge!r}, got {result['start']['edge']!r}")
+        completed.append(result)
+    return completed
+
+
 def reset_sandbox_runtime_state(
     workspace: Path,
     *,

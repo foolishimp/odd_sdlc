@@ -35,15 +35,17 @@ surfaces above GTL and ABG.
 - AC-2: initialization binds the published GTL module to ABG runtime
 - AC-3: the tenant does not implement a post-dispatch shadow runtime
 
-### REQ-F-ODDSDLC-004 — The first proving lane exercises one real graph-function call
+### REQ-F-ODDSDLC-004 — The first proving lane exercises a real bootstrap-plus-fanout dependency chain
 
-The first proving lane runs one real `odd_sdlc` graph-function path through
-ABG and audits the emitted runtime facts.
+The first proving lane runs a real `odd_sdlc` bootstrap-plus-fanout
+dependency chain through ABG and audits the emitted runtime facts.
 
 **Acceptance Criteria**:
 - AC-1: the proving lane runs through the tenant’s declared entry surface
 - AC-2: the proving lane records ABG event truth such as graph-call and run
-  lifecycle
+  lifecycle across at least the `INTENT -> PRODUCT -> GOALS -> requirements`
+  bootstrap subgraph together with the first downstream fan-out to feature
+  decomposition and UAT testcase surfaces
 - AC-3: proof is based on post-mortem event audit rather than only on direct
   return values
 
