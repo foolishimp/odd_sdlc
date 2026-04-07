@@ -316,6 +316,11 @@ def _construct_implementation_design(workspace_root: Path) -> str:
             "- stack choice, module decomposition, and executable code are explicit generated assets",
             "- the implementation branch mirrors the test branch but emits code rather than archive evidence",
             "",
+            "## Minimal Toy Requirements",
+            "- the generated package exports a stable hello-world greeting helper",
+            "- the generated package exposes a runnable main() entry point",
+            "- the runnable entry point prints the same greeting and exits cleanly",
+            "",
             "## Source Design Snapshot",
             design,
             "",
@@ -383,15 +388,48 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
     implementation_stack = (
         workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md"
     ).read_text(encoding="utf-8").strip()
+    hello_message = "Hello from odd_method."
     init_text = "\n".join(
         (
             '"""Generated odd_method implementation package."""',
             "",
             f"# {CODE_MARKER}",
             "",
+            "from .app import hello_message, main",
             "from .workflow import implementation_summary",
             "",
-            "__all__ = [\"implementation_summary\"]",
+            "__all__ = [\"hello_message\", \"implementation_summary\", \"main\"]",
+            "",
+        )
+    )
+    app_text = "\n".join(
+        (
+            '"""Generated hello-world application for odd_method."""',
+            "",
+            f"HELLO_MESSAGE = {hello_message!r}",
+            "",
+            "def hello_message() -> str:",
+            '    """Return the generated greeting for the toy implementation branch."""',
+            "    return HELLO_MESSAGE",
+            "",
+            "def main() -> int:",
+            '    """Run the minimal generated application."""',
+            "    print(HELLO_MESSAGE)",
+            "    return 0",
+            "",
+            'if __name__ == "__main__":',
+            "    raise SystemExit(main())",
+            "",
+        )
+    )
+    main_text = "\n".join(
+        (
+            '"""Package entry point for the generated odd_method application."""',
+            "",
+            "from .app import main",
+            "",
+            'if __name__ == "__main__":',
+            "    raise SystemExit(main())",
             "",
         )
     )
@@ -406,6 +444,9 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
             "    return {",
             '        "package": "odd_generated_impl",',
             '        "graph_function": "bootstrap_release_self_test",',
+            '        "hello_message": ' + repr(hello_message) + ",",
+            '        "entry_module": "odd_generated_impl.app",',
+            '        "entrypoint": "main",',
             '        "implementation_branch": [',
             '            "derive_implementation_design_surface",',
             '            "select_implementation_stack_profile",',
@@ -430,6 +471,8 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
     )
     return {
         "__init__.py": init_text,
+        "__main__.py": main_text,
+        "app.py": app_text,
         "workflow.py": workflow_text,
     }
 

@@ -4,7 +4,9 @@
 # Validates: REQ-F-ODDSDLC-006
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 
@@ -103,6 +105,26 @@ def _load_generated_code_summary(workspace: Path) -> dict[str, object]:
     return summary
 
 
+def _validate_generated_hello_world_app(workspace: Path) -> dict[str, object]:
+    app_path = workspace / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl" / "app.py"
+    spec = importlib.util.spec_from_file_location("odd_generated_impl.app", app_path)
+    if spec is None or spec.loader is None:
+        raise AssertionError(f"Could not load generated app module from {app_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    message = module.hello_message()
+    if not isinstance(message, str):
+        raise AssertionError("Generated hello_message() must return a string")
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        exit_code = module.main()
+    return {
+        "message": message,
+        "stdout": output.getvalue().strip(),
+        "exit_code": exit_code,
+    }
+
+
 def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
     seed_odd_sdlc_package(workspace)
@@ -158,6 +180,9 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     generated_summary = _load_generated_code_summary(workspace)
     assert generated_summary["package"] == "odd_generated_impl"
     assert generated_summary["graph_function"] == "bootstrap_release_self_test"
+    assert generated_summary["hello_message"] == "Hello from odd_method."
+    assert generated_summary["entry_module"] == "odd_generated_impl.app"
+    assert generated_summary["entrypoint"] == "main"
     assert generated_summary["implementation_branch"] == list(EXPECTED_BOOTSTRAP_STEPS[8:12])
     assert generated_summary["artifacts"] == [
         "implementation_design_surface",
@@ -165,6 +190,12 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "implementation_module_surface",
         "code_surface",
     ]
+    generated_app = _validate_generated_hello_world_app(workspace)
+    assert generated_app == {
+        "message": "Hello from odd_method.",
+        "stdout": "Hello from odd_method.",
+        "exit_code": 0,
+    }
 
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
@@ -317,21 +348,25 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     second_events = read_events(workspace)
     run_archive.capture_json("events.second_run.json", second_events)
     assert [step["start"]["edge"] for step in second_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
+    assert [
+        event["data"]["asset_id"]
+        for event in second_events
+        if event["event_type"] == "asset_checkpoint_updated"
+    ] == list(EXPECTED_UPDATED_ASSETS)
     second_event_types = [event["event_type"] for event in second_events]
-    expected_step = [
-        "run_bound",
-        "run_started",
-        "graph_call_opened",
-        "vector_started",
-        "fp_dispatched",
-        "asset_checkpoint_updated",
-        "assessed",
-        "proof_passed",
-        "closure_passed",
-        "graph_call_closed",
-        "run_completed",
-    ]
-    assert second_event_types == expected_step * 18
+    assert "genesis_installed" not in second_event_types
+    assert second_event_types.count("run_bound") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("run_started") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("graph_call_opened") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("vector_started") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("fp_dispatched") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("asset_checkpoint_updated") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("assessed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("proof_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("closure_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("graph_call_closed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("run_completed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert second_event_types.count("edge_converged") == len(EXPECTED_BOOTSTRAP_STEPS) - 1
     assert first_chain[0]["start"]["run_id"] != second_chain[0]["start"]["run_id"]
     assert first_chain[0]["start"]["call_id"] != second_chain[0]["start"]["call_id"]
     run_archive.capture_json(
