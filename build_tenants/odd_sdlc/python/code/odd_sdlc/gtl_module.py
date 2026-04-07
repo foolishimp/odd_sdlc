@@ -9,7 +9,7 @@
 """Published GTL module for the first odd_sdlc slice."""
 from __future__ import annotations
 
-from gtl.algebra import compose, fan_in, fan_out, gate, promote, recurse
+from gtl.algebra import compose, recurse
 from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Graph, GraphVector, Node
 from gtl.module_model import Module
@@ -807,30 +807,100 @@ GF_REVIEW_DESIGN_CONSENSUS_ROUND = _annotate_graph_function(
     tags=("consensus", "round"),
 )
 
+GF_REVIEW_DESIGN_ASSESSMENT_ROUND = GraphFunction(
+    name="review_design_assessment_round",
+    inputs=_design_surface if isinstance(_design_surface, tuple) else (_design_surface,),
+    outputs=(_review_assessment_surface,),
+    environment=EnvRef.from_contract(requires=(_design_surface,), provides=(_review_assessment_surface,)),
+    template=_graph_function(
+        name="review_design_assessment_round",
+        source=_design_surface,
+        target=_review_assessment_surface,
+        fd_evaluator=_review_assessment_fd,
+        fp_evaluator=_review_assessment_fp,
+        req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-004"),
+    ).template,
+    declarations=Attrs.coerce(
+        {
+            "function_kind": "odd_consensus_injected_graph_function",
+            "selection_visible": False,
+        }
+    ),
+    tags=("consensus", "review_round"),
+)
+
+GF_REDUCE_DESIGN_CONSENSUS_DECISION = GraphFunction(
+    name="reduce_design_consensus_decision",
+    inputs=(_review_assessment_surface,),
+    outputs=(_consensus_decision_surface,),
+    environment=EnvRef.from_contract(requires=(_review_assessment_surface,), provides=(_consensus_decision_surface,)),
+    template=_graph_function(
+        name="reduce_design_consensus_decision",
+        source=_review_assessment_surface,
+        target=_consensus_decision_surface,
+        fd_evaluator=_consensus_decision_fd,
+        fp_evaluator=_consensus_decision_fp,
+        req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-004"),
+    ).template,
+    declarations=Attrs.coerce(
+        {
+            "function_kind": "odd_consensus_injected_graph_function",
+            "selection_visible": False,
+        }
+    ),
+    tags=("consensus", "reduce"),
+)
+
+GF_APPLY_DESIGN_CONSENSUS_DECISION = GraphFunction(
+    name="apply_design_consensus_decision",
+    inputs=(_design_surface, _consensus_decision_surface),
+    outputs=(_reviewed_design_surface,),
+    environment=EnvRef.from_contract(
+        requires=(_design_surface, _consensus_decision_surface),
+        provides=(_reviewed_design_surface,),
+    ),
+    template=_graph_function(
+        name="apply_design_consensus_decision",
+        source=(_design_surface, _consensus_decision_surface),
+        target=_reviewed_design_surface,
+        fd_evaluator=_reviewed_design_fd,
+        fp_evaluator=_reviewed_design_fp,
+        req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-004"),
+    ).template,
+    declarations=Attrs.coerce(
+        {
+            "function_kind": "odd_consensus_injected_graph_function",
+            "selection_visible": False,
+        }
+    ),
+    tags=("consensus", "apply"),
+)
+
 _design_review_worker_round = _symbolic_graph_function(
     name="review_design_assessment_round",
-    ref="odd_sdlc.review_design_assessment_round",
-    inputs=(_review_assessment_vector,),
-    outputs=(_review_assessment_vector,),
+    ref="review_design_assessment_round",
+    inputs=(_design_surface,),
+    outputs=(_review_assessment_surface,),
     declarations=Attrs(),
     tags=("consensus", "review_round"),
 )
 _design_consensus_reducer = _symbolic_graph_function(
     name="reduce_design_consensus_decision",
-    ref="odd_sdlc.reduce_design_consensus_decision",
-    inputs=(_review_assessment_vector,),
+    ref="reduce_design_consensus_decision",
+    inputs=(_review_assessment_surface,),
     outputs=(_consensus_decision_surface,),
     declarations=Attrs(),
     tags=("consensus", "reduce"),
 )
 _design_consensus_applier = _symbolic_graph_function(
     name="apply_design_consensus_decision",
-    ref="odd_sdlc.apply_design_consensus_decision",
+    ref="apply_design_consensus_decision",
     inputs=(_design_surface, _consensus_decision_surface),
     outputs=(_reviewed_design_surface,),
     declarations=Attrs(),
     tags=("consensus", "apply"),
 )
+
 _design_consensus_rule = Rule(
     name="design_consensus_rule",
     kind="consensus",
@@ -846,13 +916,8 @@ _design_consensus_rule = Rule(
 GF_REVIEW_DESIGN_BY_CONSENSUS = _annotate_graph_function(
     recurse(
         compose(
-            promote(source=_design_surface, to=_review_assessment_vector),
-            fan_out(_design_review_worker_round, over=_review_assessment_vector),
-            gate(
-                fan_in(_design_consensus_reducer, over=_review_assessment_vector),
-                rule=_design_consensus_rule,
-                evaluators=(_design_consensus_gate_fp,),
-            ),
+            _design_review_worker_round,
+            _design_consensus_reducer,
             _design_consensus_applier,
         ),
         _design_consensus_termination,
@@ -872,6 +937,14 @@ GF_REVIEW_DESIGN_BY_CONSENSUS = _annotate_graph_function(
     extra_declarations={
         "harness_kind": "consensus_harness",
         "harness_contract": DESIGN_CONSENSUS_HARNESS_CONTRACT,
+        "harness_implementation": {
+            "custom_functions": (
+                GF_REVIEW_DESIGN_ASSESSMENT_ROUND.name,
+                GF_REDUCE_DESIGN_CONSENSUS_DECISION.name,
+                GF_APPLY_DESIGN_CONSENSUS_DECISION.name,
+            ),
+            "policy_rule": _design_consensus_rule.name,
+        },
     },
     tags=("consensus", "library"),
 )
@@ -933,7 +1006,6 @@ MODULE = Module(
         for function in (
             GF_BOOTSTRAP_RELEASE_SELF_TEST,
             GF_REVIEW_DESIGN_CONSENSUS_ROUND,
-            GF_REVIEW_DESIGN_BY_CONSENSUS,
         )
         if function.template.graph is not None
     ),

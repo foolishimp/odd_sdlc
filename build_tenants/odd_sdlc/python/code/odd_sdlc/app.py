@@ -103,6 +103,7 @@ def catalog(app: OddSdlcApp) -> dict:
                 "function_kind": function.declarations.get("function_kind"),
                 "harness_kind": function.declarations.get("harness_kind"),
                 "harness_contract": _decl_value(function.declarations.get("harness_contract")),
+                "harness_implementation": _decl_value(function.declarations.get("harness_implementation")),
                 "template_kind": function.template.kind,
                 "tags": list(function.tags),
                 "inputs": [node.name for node in function.inputs],

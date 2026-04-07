@@ -146,8 +146,15 @@ def test_module_publishes_first_asset_function_catalog() -> None:
     assert [node.name for node in consensus_library.outputs] == ["reviewed_design_surface"]
     assert "consensus" in consensus_library.tags
     assert "library" in consensus_library.tags
-    assert consensus_library.declarations.get("gate") is not None
     assert consensus_library.declarations.get("recursion") is not None
+    assert consensus_library.declarations.get("harness_implementation") == {
+        "custom_functions": (
+            "review_design_assessment_round",
+            "reduce_design_consensus_decision",
+            "apply_design_consensus_decision",
+        ),
+        "policy_rule": "design_consensus_rule",
+    }
     assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job"]
 
     executable_jobs = module_to_executable_jobs(module)
@@ -373,6 +380,14 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert consensus_library["vectors"] == []
     assert consensus_library["job_names"] == []
     assert consensus_library["harness_contract"] == consensus_round["harness_contract"]
+    assert consensus_library["harness_implementation"] == {
+        "custom_functions": (
+            "review_design_assessment_round",
+            "reduce_design_consensus_decision",
+            "apply_design_consensus_decision",
+        ),
+        "policy_rule": "design_consensus_rule",
+    }
     assert result["programs"] == [
         {
             "name": "bootstrap_release_self_test",

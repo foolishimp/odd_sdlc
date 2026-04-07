@@ -81,12 +81,20 @@ EXPECTED_CONSENSUS_STEPS = (
     "derive_consensus_decision_surface",
     "derive_reviewed_design_surface",
 )
+EXPECTED_CONSENSUS_HARNESS_STEPS = (
+    "review_design_assessment_round",
+    "reduce_design_consensus_decision",
+    "apply_design_consensus_decision",
+)
 
 EXPECTED_CONSENSUS_UPDATED_ASSETS = (
     "review_assessment_surface",
     "consensus_decision_surface",
     "reviewed_design_surface",
 )
+
+CONSENSUS_ROUND_MODULE_REF = "odd_sdlc.consensus_module:MODULE"
+CONSENSUS_HARNESS_MODULE_REF = "odd_sdlc.consensus_harness_module:MODULE"
 
 EXPECTED_UPDATED_ASSETS = (
     "intent_surface",
@@ -325,7 +333,7 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
     )
     assert bootstrap_prefix[-1]["start"]["edge"] == "derive_design_surface"
 
-    module_ref = "odd_sdlc.consensus_module:MODULE"
+    module_ref = CONSENSUS_ROUND_MODULE_REF
     completed_round: list[dict[str, object]] = []
     for edge in EXPECTED_CONSENSUS_STEPS:
         start = json.loads(
@@ -398,6 +406,92 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
         and event["data"]["graph_function"] == "review_design_consensus_round"
     ]
     assert [event["data"]["edge"] for event in consensus_graph_calls] == list(EXPECTED_CONSENSUS_STEPS)
+
+    consensus_asset_updates = [
+        event
+        for event in events
+        if event["event_type"] == "asset_checkpoint_updated"
+        and event["data"]["asset_id"] in EXPECTED_CONSENSUS_UPDATED_ASSETS
+    ]
+    assert [event["data"]["asset_id"] for event in consensus_asset_updates] == list(EXPECTED_CONSENSUS_UPDATED_ASSETS)
+    assert all(event["data"]["current_checkpoint"]["exists"] is True for event in consensus_asset_updates)
+
+
+def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+
+    bootstrap_prefix = complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="consensus_harness_bootstrap_prefix",
+        steps=EXPECTED_BOOTSTRAP_STEPS[:7],
+    )
+    assert bootstrap_prefix[-1]["start"]["edge"] == "derive_design_surface"
+
+    completed_round: list[dict[str, object]] = []
+    for edge in EXPECTED_CONSENSUS_HARNESS_STEPS:
+        start = json.loads(
+            run_installed_genesis(
+                workspace,
+                "start",
+                "--module",
+                CONSENSUS_HARNESS_MODULE_REF,
+                archive=run_archive,
+                label=f"{edge} harness start",
+            ).stdout
+        )
+        assert start["edge"] == edge
+        assert start["blocking_reason"] == "fp_dispatch"
+        constructor, result_path = run_constructor_for_start(
+            workspace,
+            start_payload=start,
+            archive=run_archive,
+            label=f"{edge} harness construct",
+        )
+        assessed = json.loads(
+            run_installed_genesis(
+                workspace,
+                "assess-result",
+                "--result",
+                str(result_path),
+                archive=run_archive,
+                label=f"{edge} harness assess-result",
+            ).stdout
+        )
+        completed_round.append(
+            {
+                "start": start,
+                "constructor": constructor,
+                "assessed": assessed,
+            }
+        )
+
+    assert [step["start"]["edge"] for step in completed_round] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
+    assert all(step["assessed"]["status"] == "ok" for step in completed_round)
+
+    consensus_gaps = json.loads(
+        run_installed_genesis(
+            workspace,
+            "gaps",
+            "--module",
+            CONSENSUS_HARNESS_MODULE_REF,
+            archive=run_archive,
+            label="consensus harness gaps",
+        ).stdout
+    )
+    assert consensus_gaps["converged"] is True
+    assert [entry["edge"] for entry in consensus_gaps["gaps"]] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
+    assert all(entry["delta"] == 0 for entry in consensus_gaps["gaps"])
+
+    events = read_events(workspace)
+    consensus_graph_calls = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"]["graph_function"] == "review_design_by_consensus"
+    ]
+    assert [event["data"]["edge"] for event in consensus_graph_calls] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
 
     consensus_asset_updates = [
         event

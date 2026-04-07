@@ -71,7 +71,9 @@ PRE_CODE_STEPS = (
 )
 PRE_CONSENSUS_STEPS = PRE_CODE_STEPS[:7]
 CONSENSUS_MODULE_REF = "odd_sdlc.consensus_module:MODULE"
+CONSENSUS_HARNESS_MODULE_REF = "odd_sdlc.consensus_harness_module:MODULE"
 CONSENSUS_GRAPH_FUNCTION_NAME = "review_design_consensus_round"
+CONSENSUS_HARNESS_GRAPH_FUNCTION_NAME = "review_design_by_consensus"
 CONSENSUS_REVIEW_EDGE = "derive_review_assessment_surface"
 CONSENSUS_REVIEW_EVALUATOR = "review_assessment_surface_semantically_converged"
 CONSENSUS_REVIEW_ASSET = "review_assessment_surface"
@@ -81,6 +83,14 @@ CONSENSUS_STEPS = (
     CONSENSUS_REVIEW_EDGE,
     CONSENSUS_DECISION_EDGE,
     CONSENSUS_REVIEWED_EDGE,
+)
+CONSENSUS_HARNESS_REVIEW_EDGE = "review_design_assessment_round"
+CONSENSUS_HARNESS_DECISION_EDGE = "reduce_design_consensus_decision"
+CONSENSUS_HARNESS_REVIEWED_EDGE = "apply_design_consensus_decision"
+CONSENSUS_HARNESS_STEPS = (
+    CONSENSUS_HARNESS_REVIEW_EDGE,
+    CONSENSUS_HARNESS_DECISION_EDGE,
+    CONSENSUS_HARNESS_REVIEWED_EDGE,
 )
 CONSENSUS_REVIEWERS = (
     {
@@ -530,10 +540,11 @@ def _write_consensus_result_payload(
     *,
     manifest: dict[str, object],
     reviews: list[dict[str, Any]],
+    edge_name: str,
 ) -> Path:
     result_path = Path(str(manifest["result_path"]))
     result_payload = {
-        "edge": CONSENSUS_REVIEW_EDGE,
+        "edge": edge_name,
         "actor": "codex.consensus_harness",
         "assessments": [
             {
@@ -551,13 +562,13 @@ def _write_consensus_result_payload(
     return result_path
 
 
-def _start_consensus_edge(workspace: Path, *, edge: str, run_archive) -> dict[str, Any]:
+def _start_consensus_edge(workspace: Path, *, edge: str, module_ref: str, run_archive) -> dict[str, Any]:
     start = json.loads(
         run_installed_genesis(
             workspace,
             "start",
             "--module",
-            CONSENSUS_MODULE_REF,
+            module_ref,
             archive=run_archive,
             label=f"consensus start {edge}",
         ).stdout
@@ -566,6 +577,145 @@ def _start_consensus_edge(workspace: Path, *, edge: str, run_archive) -> dict[st
     assert start["blocking_reason"] == "fp_dispatch"
     assert start["edge"] == edge
     return start
+
+
+def _run_consensus_live_lane(
+    *,
+    module_ref: str,
+    graph_function_name: str,
+    summary_lane: str,
+    review_edge: str,
+    decision_edge: str,
+    reviewed_edge: str,
+    expected_steps: tuple[str, ...],
+    run_archive,
+) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    _advance_to_edge(workspace, run_archive=run_archive, expected_steps=PRE_CONSENSUS_STEPS)
+
+    start_result = _start_consensus_edge(
+        workspace,
+        edge=review_edge,
+        module_ref=module_ref,
+        run_archive=run_archive,
+    )
+    manifest_path = Path(start_result["fp_manifest_path"])
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest["edge"] == review_edge
+    assert manifest["graph_function_id"]
+    assert manifest["target_asset"] == CONSENSUS_REVIEW_ASSET
+    run_archive.update_summary(
+        lane=summary_lane,
+        edge=review_edge,
+        graph_function=graph_function_name,
+        manifest_id=manifest["manifest_id"],
+        transport_method="subprocess",
+        transport_agent=CONSENSUS_LIVE_AGENT,
+        worker_ids=[reviewer["id"] for reviewer in CONSENSUS_REVIEWERS],
+        model_id=f"agent-default:{CONSENSUS_LIVE_AGENT}",
+    )
+
+    reviews = [
+        _call_consensus_reviewer(
+            reviewer_id=reviewer["id"],
+            focus=reviewer["focus"],
+            manifest=manifest,
+            workspace=workspace,
+            run_archive=run_archive,
+        )
+        for reviewer in CONSENSUS_REVIEWERS
+    ]
+    assert all(review["verdict"] == "pass" for review in reviews), reviews
+
+    assessment_path = _write_consensus_assessment_surface(workspace=workspace, reviews=reviews)
+    result_path = _write_consensus_result_payload(manifest=manifest, reviews=reviews, edge_name=review_edge)
+    review_content = assessment_path.read_text(encoding="utf-8")
+    assert REVIEW_ASSESSMENT_MARKER in review_content
+    assert "### reviewer.traceability" in review_content
+    assert "### reviewer.delivery" in review_content
+    assert consensus_decision_dependency_surfaces_present(workspace) == 0
+
+    assessed = json.loads(
+        run_installed_genesis(
+            workspace,
+            "assess-result",
+            "--result",
+            str(result_path),
+            archive=run_archive,
+            label="genesis assess-result live consensus review",
+        ).stdout
+    )
+    assert assessed["status"] == "ok"
+    assert len(assessed["assessments"]) == 2
+
+    for edge in (decision_edge, reviewed_edge):
+        start = _start_consensus_edge(workspace, edge=edge, module_ref=module_ref, run_archive=run_archive)
+        constructor, constructor_result_path = run_constructor_for_start(
+            workspace,
+            start_payload=start,
+            archive=run_archive,
+            label=f"consensus construct {edge}",
+        )
+        assert constructor["status"] == "constructed"
+        assessed_step = json.loads(
+            run_installed_genesis(
+                workspace,
+                "assess-result",
+                "--result",
+                str(constructor_result_path),
+                archive=run_archive,
+                label=f"genesis assess-result {edge}",
+            ).stdout
+        )
+        assert assessed_step["status"] == "ok"
+
+    decision_path = workspace / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md"
+    reviewed_design_path = workspace / "build_tenants" / "common" / "design" / "35-reviewed-odd-design.md"
+    assert CONSENSUS_DECISION_MARKER in decision_path.read_text(encoding="utf-8")
+    assert REVIEWED_DESIGN_MARKER in reviewed_design_path.read_text(encoding="utf-8")
+    assert reviewed_design_dependency_surfaces_present(workspace) == 0
+
+    final_gaps = json.loads(
+        run_installed_genesis(
+            workspace,
+            "gaps",
+            "--module",
+            module_ref,
+            archive=run_archive,
+            label="consensus gaps live",
+        ).stdout
+    )
+    assert final_gaps["converged"] is True
+    assert [entry["edge"] for entry in final_gaps["gaps"]] == list(expected_steps)
+    assert all(entry["delta"] == 0 for entry in final_gaps["gaps"])
+
+    events = read_events(workspace)
+    graph_call_events = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"]["graph_function"] == graph_function_name
+    ]
+    assert [event["data"]["edge"] for event in graph_call_events] == list(expected_steps)
+    assessed_events = [
+        event
+        for event in events
+        if event["event_type"] == "assessed"
+        and event["data"]["edge"] == review_edge
+    ]
+    assert len(assessed_events) == 2
+    assert sorted(event["data"]["evidence"] for event in assessed_events) == sorted(
+        f"{review['reviewer_id']}: {review['summary']} | " + "; ".join(review["proposed_deltas"])
+        for review in reviews
+    )
+    run_archive.update_summary(
+        converged_consensus=True,
+        consensus_graph_function=graph_function_name,
+        reviewer_count=len(reviews),
+        reviewed_design="build_tenants/common/design/35-reviewed-odd-design.md",
+    )
 
 
 def _advance_to_edge(workspace: Path, *, run_archive, expected_steps: tuple[str, ...]) -> None:
@@ -773,126 +923,31 @@ def test_installed_executive_code_edge_live_codex_qualification(run_archive) -> 
     reason="set CLAUDE_LIVE_FP=1 (or ODD_SDLC_CONSENSUS_LIVE=1) and ensure the configured consensus agent is available",
 )
 def test_consensus_round_live_codex_two_worker_assessments(run_archive) -> None:
-    workspace = run_archive.workspace
-    _prepare_sandbox(workspace, run_archive=run_archive)
-    _advance_to_edge(workspace, run_archive=run_archive, expected_steps=PRE_CONSENSUS_STEPS)
-
-    start_result = _start_consensus_edge(
-        workspace,
-        edge=CONSENSUS_REVIEW_EDGE,
+    _run_consensus_live_lane(
+        module_ref=CONSENSUS_MODULE_REF,
+        graph_function_name=CONSENSUS_GRAPH_FUNCTION_NAME,
+        summary_lane="live",
+        review_edge=CONSENSUS_REVIEW_EDGE,
+        decision_edge=CONSENSUS_DECISION_EDGE,
+        reviewed_edge=CONSENSUS_REVIEWED_EDGE,
+        expected_steps=CONSENSUS_STEPS,
         run_archive=run_archive,
     )
-    manifest_path = Path(start_result["fp_manifest_path"])
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["edge"] == CONSENSUS_REVIEW_EDGE
-    assert manifest["graph_function_id"]
-    assert manifest["target_asset"] == CONSENSUS_REVIEW_ASSET
-    run_archive.update_summary(
-        lane="live",
-        edge=CONSENSUS_REVIEW_EDGE,
-        graph_function=CONSENSUS_GRAPH_FUNCTION_NAME,
-        manifest_id=manifest["manifest_id"],
-        transport_method="subprocess",
-        transport_agent=CONSENSUS_LIVE_AGENT,
-        worker_ids=[reviewer["id"] for reviewer in CONSENSUS_REVIEWERS],
-        model_id=f"agent-default:{CONSENSUS_LIVE_AGENT}",
-    )
 
-    reviews = [
-        _call_consensus_reviewer(
-            reviewer_id=reviewer["id"],
-            focus=reviewer["focus"],
-            manifest=manifest,
-            workspace=workspace,
-            run_archive=run_archive,
-        )
-        for reviewer in CONSENSUS_REVIEWERS
-    ]
-    assert all(review["verdict"] == "pass" for review in reviews), reviews
-
-    assessment_path = _write_consensus_assessment_surface(workspace=workspace, reviews=reviews)
-    result_path = _write_consensus_result_payload(manifest=manifest, reviews=reviews)
-    review_content = assessment_path.read_text(encoding="utf-8")
-    assert REVIEW_ASSESSMENT_MARKER in review_content
-    assert "### reviewer.traceability" in review_content
-    assert "### reviewer.delivery" in review_content
-    assert consensus_decision_dependency_surfaces_present(workspace) == 0
-
-    assessed = json.loads(
-        run_installed_genesis(
-            workspace,
-            "assess-result",
-            "--result",
-            str(result_path),
-            archive=run_archive,
-            label="genesis assess-result live consensus review",
-        ).stdout
-    )
-    assert assessed["status"] == "ok"
-    assert len(assessed["assessments"]) == 2
-
-    for edge in (CONSENSUS_DECISION_EDGE, CONSENSUS_REVIEWED_EDGE):
-        start = _start_consensus_edge(workspace, edge=edge, run_archive=run_archive)
-        constructor, constructor_result_path = run_constructor_for_start(
-            workspace,
-            start_payload=start,
-            archive=run_archive,
-            label=f"consensus construct {edge}",
-        )
-        assert constructor["status"] == "constructed"
-        assessed_step = json.loads(
-            run_installed_genesis(
-                workspace,
-                "assess-result",
-                "--result",
-                str(constructor_result_path),
-                archive=run_archive,
-                label=f"genesis assess-result {edge}",
-            ).stdout
-        )
-        assert assessed_step["status"] == "ok"
-
-    decision_path = workspace / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md"
-    reviewed_design_path = workspace / "build_tenants" / "common" / "design" / "35-reviewed-odd-design.md"
-    assert CONSENSUS_DECISION_MARKER in decision_path.read_text(encoding="utf-8")
-    assert REVIEWED_DESIGN_MARKER in reviewed_design_path.read_text(encoding="utf-8")
-    assert reviewed_design_dependency_surfaces_present(workspace) == 0
-
-    final_gaps = json.loads(
-        run_installed_genesis(
-            workspace,
-            "gaps",
-            "--module",
-            CONSENSUS_MODULE_REF,
-            archive=run_archive,
-            label="consensus gaps live",
-        ).stdout
-    )
-    assert final_gaps["converged"] is True
-    assert [entry["edge"] for entry in final_gaps["gaps"]] == list(CONSENSUS_STEPS)
-    assert all(entry["delta"] == 0 for entry in final_gaps["gaps"])
-
-    events = read_events(workspace)
-    graph_call_events = [
-        event
-        for event in events
-        if event["event_type"] == "graph_call_opened"
-        and event["data"]["graph_function"] == CONSENSUS_GRAPH_FUNCTION_NAME
-    ]
-    assert [event["data"]["edge"] for event in graph_call_events] == list(CONSENSUS_STEPS)
-    review_assessed_events = [
-        event
-        for event in events
-        if event["event_type"] == "assessed"
-        and event["data"]["edge"] == CONSENSUS_REVIEW_EDGE
-    ]
-    assert len(review_assessed_events) == 2
-    evidences = {event["data"]["evidence"] for event in review_assessed_events}
-    assert any("reviewer.traceability" in evidence for evidence in evidences)
-    assert any("reviewer.delivery" in evidence for evidence in evidences)
-    run_archive.update_summary(
-        converged_consensus_round=True,
-        reviewed_design=str(reviewed_design_path.relative_to(workspace)),
-        assessment_count=len(review_assessed_events),
+@pytest.mark.usecase_id("live_consensus_harness_two_worker_round")
+@pytest.mark.skipif(
+    not _consensus_live_enabled(),
+    reason="set CLAUDE_LIVE_FP=1 (or ODD_SDLC_CONSENSUS_LIVE=1) and ensure the configured consensus agent is available",
+)
+def test_consensus_harness_live_two_worker_assessments(run_archive) -> None:
+    _run_consensus_live_lane(
+        module_ref=CONSENSUS_HARNESS_MODULE_REF,
+        graph_function_name=CONSENSUS_HARNESS_GRAPH_FUNCTION_NAME,
+        summary_lane="live_harness",
+        review_edge=CONSENSUS_HARNESS_REVIEW_EDGE,
+        decision_edge=CONSENSUS_HARNESS_DECISION_EDGE,
+        reviewed_edge=CONSENSUS_HARNESS_REVIEWED_EDGE,
+        expected_steps=CONSENSUS_HARNESS_STEPS,
+        run_archive=run_archive,
     )
