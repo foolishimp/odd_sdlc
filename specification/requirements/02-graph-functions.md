@@ -56,3 +56,21 @@ inspectable machine-readable surface.
 - AC-2: catalog publication does not require prompt text or discussion history
 - AC-3: the catalog distinguishes edge-realization graph functions from
   reusable higher-order or library graph functions
+
+### REQ-F-GFUNC-005 — Higher-order graph-function harnesses remain ordinary GTL carriers
+
+`odd_method` may publish reusable higher-order harnesses, but a higher-order
+graph function remains an ordinary GTL carrier with an explicit outer contract.
+Its internal topology may inject domain-specific review, reduction, promotion,
+or apply stages, yet the caller consumes only the declared input/output asset
+contract and the published higher-order policy/binding surface.
+
+**Acceptance Criteria**:
+- AC-1: a published higher-order graph function records its stable outer
+  subject/review/decision/reviewed contract without requiring the caller to
+  inspect its internal vectors
+- AC-2: injected stage functions and policy are published as graph-function
+  declarations or catalog-visible metadata rather than hidden in engine code or
+  prompt folklore
+- AC-3: a higher-order harness may itself be composed or recursively chained as
+  one graph function inside larger GTL carriers

@@ -1,9 +1,9 @@
 # ODD SDLC Translation
 
 **Status**: Active
-**Date**: 2026-04-06
-**Implements**: REQ-F-UPSTREAM-001, REQ-F-UPSTREAM-002, REQ-F-UPSTREAM-003, REQ-F-GFUNC-001, REQ-F-GFUNC-002, REQ-F-GFUNC-003, REQ-F-GFUNC-004, REQ-F-RUNTIME-001, REQ-F-RUNTIME-002, REQ-F-RUNTIME-004, REQ-F-ASSET-001, REQ-F-ASSET-002, REQ-F-ASSET-003, REQ-F-ASSET-004
-**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/requirements/01-upstream-adoption.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/06-bootstrap-assets-and-recursive-edges.md`
+**Date**: 2026-04-07
+**Implements**: REQ-F-UPSTREAM-001, REQ-F-UPSTREAM-002, REQ-F-UPSTREAM-003, REQ-F-GFUNC-001, REQ-F-GFUNC-002, REQ-F-GFUNC-003, REQ-F-GFUNC-004, REQ-F-GFUNC-005, REQ-F-RUNTIME-001, REQ-F-RUNTIME-002, REQ-F-RUNTIME-004, REQ-F-ASSET-001, REQ-F-ASSET-002, REQ-F-ASSET-003, REQ-F-ASSET-004
+**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/requirements/01-upstream-adoption.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/06-bootstrap-assets-and-recursive-edges.md`, `specification/requirements/08-odd-sdlc-first-slice.md`
 
 ## Position
 
@@ -25,6 +25,11 @@ re-expresses them as:
 The current toy also introduces one public executive GTL graph function above
 those asset functions so the product can drive the published subgraph without
 collapsing back into a hidden controller beneath ABG.
+
+The current toy now also introduces one reusable higher-order consensus
+harness. That harness is still an ordinary GTL graph function. It is not a
+special engine path. Its job is to prove the precedent for reusable review and
+decision loops over typed subject assets.
 
 ## Translation Boundary
 
@@ -234,6 +239,9 @@ The first translation should use nodes equivalent to:
 - `goal_surface`
 - `requirement_surface`
 - `design_surface`
+- `review_assessment_surface`
+- `consensus_decision_surface`
+- `reviewed_design_surface`
 - `scenario_surface`
 - `implementation_design_surface`
 - `implementation_stack_profile`
@@ -259,6 +267,9 @@ The first catalog should include:
 - `derive_feature_decomp_surface`
 - `derive_uat_testcases_surface`
 - `derive_design_surface`
+- `derive_review_assessment_surface`
+- `derive_consensus_decision_surface`
+- `derive_reviewed_design_surface`
 - `derive_scenario_surface`
 - `derive_implementation_design_surface`
 - `select_implementation_stack_profile`
@@ -270,6 +281,19 @@ The first catalog should include:
 - `derive_test_run_archive_surface`
 - `qualify_testcase_authority`
 - `prepare_release_surface`
+
+The first higher-order harness surfaces should include:
+
+- `review_design_consensus_round`
+- `review_design_by_consensus`
+
+`review_design_consensus_round` is the isolated executable round. It proves the
+typed `design -> review_assessment -> consensus_decision -> reviewed_design`
+contract in one bounded lane.
+
+`review_design_by_consensus` is the reusable higher-order carrier. It is built
+from GTL `promote`, `fan_out`, `fan_in`, `gate`, and `recurse`, together with
+injected review, reduction, and apply stages and explicit consensus policy.
 
 These are domain functions.
 

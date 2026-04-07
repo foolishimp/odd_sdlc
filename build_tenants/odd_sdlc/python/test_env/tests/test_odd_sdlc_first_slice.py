@@ -21,6 +21,12 @@ ROOT = Path(__file__).resolve().parents[5]
 GENESIS_PATH = ROOT / ".genesis"
 CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
 
+GRAPH_FUNCTION_NAMES = [
+    "bootstrap_release_self_test",
+    "review_design_consensus_round",
+    "review_design_by_consensus",
+]
+
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))
 if str(CODE_PATH) not in sys.path:
@@ -59,13 +65,19 @@ def _read_events(workspace_root: Path) -> list[dict]:
 def test_module_publishes_first_asset_function_catalog() -> None:
     module = odd_sdlc_module()
     graph_function_names = [graph_function.name for graph_function in module.graph_functions]
-    assert graph_function_names == ["bootstrap_release_self_test"]
+    assert graph_function_names == [
+        "bootstrap_release_self_test",
+        "review_design_consensus_round",
+        "review_design_by_consensus",
+    ]
     input_signatures = {
         graph_function.name: [node.name for node in graph_function.inputs]
         for graph_function in module.graph_functions
     }
     assert input_signatures == {
         "bootstrap_release_self_test": ["input_set"],
+        "review_design_consensus_round": ["design_surface"],
+        "review_design_by_consensus": ["design_surface"],
     }
     executive = module.graph_functions[0]
     assert executive.declarations.get("function_kind") == "odd_executive_graph_function"
@@ -115,6 +127,27 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         "release_surface",
     ]
     assert [vector.name for vector in executive.materialize().vectors] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
+    consensus_round = module.graph_functions[1]
+    assert consensus_round.declarations.get("function_kind") == "odd_consensus_round_graph_function"
+    assert consensus_round.template.kind == "inline_graph"
+    assert [node.name for node in consensus_round.inputs] == ["design_surface"]
+    assert [node.name for node in consensus_round.outputs] == ["reviewed_design_surface"]
+    assert consensus_round.inputs[0].asset_surface.kind == "design_surface"
+    assert consensus_round.outputs[0].asset_surface.kind == "reviewed_design_surface"
+    assert [vector.name for vector in consensus_round.materialize().vectors] == [
+        "derive_review_assessment_surface",
+        "derive_consensus_decision_surface",
+        "derive_reviewed_design_surface",
+    ]
+    consensus_library = module.graph_functions[2]
+    assert consensus_library.declarations.get("function_kind") == "odd_consensus_library_graph_function"
+    assert consensus_library.template.kind == "symbolic"
+    assert [node.name for node in consensus_library.inputs] == ["design_surface"]
+    assert [node.name for node in consensus_library.outputs] == ["reviewed_design_surface"]
+    assert "consensus" in consensus_library.tags
+    assert "library" in consensus_library.tags
+    assert consensus_library.declarations.get("gate") is not None
+    assert consensus_library.declarations.get("recursion") is not None
     assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job"]
 
     executable_jobs = module_to_executable_jobs(module)
@@ -168,6 +201,9 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["feature_decomp_surface"]["specializes"] == ["derived_structure_surface"]
     assert asset_types["uat_testcases_surface"]["specializes"] == ["verification_collection_surface"]
     assert asset_types["design_surface"]["specializes"] == ["design_document_surface"]
+    assert asset_types["review_assessment_surface"]["specializes"] == ["authority_document_surface"]
+    assert asset_types["consensus_decision_surface"]["specializes"] == ["authority_document_surface"]
+    assert asset_types["reviewed_design_surface"]["specializes"] == ["design_document_surface"]
     assert asset_types["testcase_authority_surface"]["specializes"] == ["authority_document_surface"]
     assert asset_types["scenario_surface"]["specializes"] == ["scenario_collection_surface"]
     assert asset_types["release_surface"]["specializes"] == ["release_document_surface"]
@@ -189,6 +225,9 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert "file://build_tenants/common/design/20-generated-feature-decomp.md" in asset_uris
     assert "file://specification/scenarios/20-generated-uat-testcases.md" in asset_uris
     assert "file://build_tenants/common/design/30-generated-odd-design.md" in asset_uris
+    assert "file://build_tenants/common/design/35-generated-review-assessments.md" in asset_uris
+    assert "file://build_tenants/common/design/35-generated-consensus-decision.md" in asset_uris
+    assert "file://build_tenants/common/design/35-reviewed-odd-design.md" in asset_uris
     assert "file://specification/scenarios/30-generated-testcase-authority.md" in asset_uris
     assert "file://specification/scenarios/40-generated-scenarios.md" in asset_uris
     assert "file://build_tenants/odd_method/python/design/40-generated-implementation-design.md" in asset_uris
@@ -224,6 +263,9 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["feature_decomp_surface"] == ("feature_decomp_surface",)
     assert bindings["uat_testcases_surface"] == ("uat_testcases_surface",)
     assert bindings["design_surface"] == ("design_surface",)
+    assert bindings["review_assessment_surface"] == ("review_assessment_surface",)
+    assert bindings["consensus_decision_surface"] == ("consensus_decision_surface",)
+    assert bindings["reviewed_design_surface"] == ("reviewed_design_surface",)
     assert bindings["testcase_authority_surface"] == ("testcase_authority_surface",)
     assert bindings["scenario_surface"] == ("scenario_surface",)
     assert bindings["implementation_design_surface"] == ("implementation_design_surface",)
@@ -235,12 +277,16 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["test_module_surface"] == ("test_module_surface",)
     assert bindings["test_run_archive_surface"] == ("test_run_archive_surface",)
     assert bindings["release_surface"] == ("release_surface",)
-    assert [entry["name"] for entry in result["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert [entry["name"] for entry in result["graph_functions"]] == GRAPH_FUNCTION_NAMES
     executive = result["graph_functions"][0]
     assert executive["intent"] == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
     assert executive["function_kind"] == "odd_executive_graph_function"
+    assert executive["template_kind"] == "inline_graph"
+    assert "executive" in executive["tags"]
     assert executive["inputs"] == ["input_set"]
     assert executive["outputs"] == ["release_surface"]
+    assert executive["input_contracts"][0]["asset_surface"]["kind"] == "bootstrap_input_set"
+    assert executive["output_contracts"][0]["asset_surface"]["kind"] == "release_surface"
     assert executive["environment"] == {
         "requires": ["input_set"],
         "provides": [
@@ -287,6 +333,46 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     }
     assert [vector["name"] for vector in executive["vectors"]] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert executive["job_names"] == ["bootstrap_release_self_test_job"]
+    consensus_round = result["graph_functions"][1]
+    assert consensus_round["function_kind"] == "odd_consensus_round_graph_function"
+    assert consensus_round["harness_kind"] == "consensus_round"
+    assert consensus_round["template_kind"] == "inline_graph"
+    assert consensus_round["inputs"] == ["design_surface"]
+    assert consensus_round["outputs"] == ["reviewed_design_surface"]
+    assert consensus_round["input_contracts"][0]["asset_surface"]["kind"] == "design_surface"
+    assert consensus_round["output_contracts"][0]["asset_surface"]["kind"] == "reviewed_design_surface"
+    assert consensus_round["harness_contract"] == {
+        "subject_asset": "design_surface",
+        "assessment_asset": "review_assessment_surface",
+        "decision_asset": "consensus_decision_surface",
+        "reviewed_asset": "reviewed_design_surface",
+        "assessment_vector_asset": "review_assessment_vector",
+        "injected_functions": {
+            "review_round": "review_design_assessment_round",
+            "reduce": "reduce_design_consensus_decision",
+            "apply": "apply_design_consensus_decision",
+        },
+        "policy_rule": "design_consensus_rule",
+        "composable": True,
+        "recursive": True,
+    }
+    assert consensus_round["vectors"] == [
+        {"name": "derive_review_assessment_surface", "source": ["design_surface"], "target": "review_assessment_surface"},
+        {"name": "derive_consensus_decision_surface", "source": ["review_assessment_surface"], "target": "consensus_decision_surface"},
+        {"name": "derive_reviewed_design_surface", "source": ["design_surface", "consensus_decision_surface"], "target": "reviewed_design_surface"},
+    ]
+    assert consensus_round["job_names"] == []
+    consensus_library = result["graph_functions"][2]
+    assert consensus_library["function_kind"] == "odd_consensus_library_graph_function"
+    assert consensus_library["harness_kind"] == "consensus_harness"
+    assert consensus_library["template_kind"] == "symbolic"
+    assert consensus_library["inputs"] == ["design_surface"]
+    assert consensus_library["outputs"] == ["reviewed_design_surface"]
+    assert "consensus" in consensus_library["tags"]
+    assert "library" in consensus_library["tags"]
+    assert consensus_library["vectors"] == []
+    assert consensus_library["job_names"] == []
+    assert consensus_library["harness_contract"] == consensus_round["harness_contract"]
     assert result["programs"] == [
         {
             "name": "bootstrap_release_self_test",
@@ -337,14 +423,14 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "semantic_facets",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 18
+    assert len(payload["assets"]) == 21
     assert len(payload["functions"]) == 18
     assert payload["gaps"]["converged"] is False
     assert payload["runs"] == []
     assert payload["graph_calls"] == []
     assert payload["continuations"] == []
     assert payload["recent_events"] == []
-    assert [entry["name"] for entry in payload["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert all(asset["projection_source"] == "workspace_scan" for asset in payload["assets"])
 
 
@@ -404,7 +490,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 18
+    assert len(payload["assets"]) == 21
     assert len(payload["functions"]) == 18
     assert payload["gaps"]["converged"] is False
     functions = {entry["name"]: entry for entry in payload["functions"]}
@@ -441,11 +527,20 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "testcase_authority_surface",
         "test_run_archive_surface",
     ]
-    assert [entry["name"] for entry in payload["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert payload["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
+    assert payload["graph_functions"][1]["job_names"] == []
+    assert payload["graph_functions"][2]["job_names"] == []
     assert [vector["name"] for vector in payload["graph_functions"][0]["vectors"]] == list(
         BOOTSTRAP_RELEASE_SELF_TEST_STEPS
     )
+    assert [vector["name"] for vector in payload["graph_functions"][1]["vectors"]] == [
+        "derive_review_assessment_surface",
+        "derive_consensus_decision_surface",
+        "derive_reviewed_design_surface",
+    ]
+    assert payload["graph_functions"][2]["template_kind"] == "symbolic"
+    assert payload["graph_functions"][2]["vectors"] == []
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:

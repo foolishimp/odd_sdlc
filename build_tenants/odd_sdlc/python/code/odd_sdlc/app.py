@@ -70,6 +70,16 @@ def catalog(app: OddSdlcApp) -> dict:
         entry.name: entry.intent
         for entry in FUNCTION_CATALOG
     }
+
+    def _decl_value(value: Any) -> Any:
+        return value.to_dict() if hasattr(value, "to_dict") else value
+
+    def _node_contract(node) -> dict[str, Any]:
+        return {
+            "name": node.name,
+            "schema": node.schema if isinstance(node.schema, str) else getattr(node.schema, "__name__", repr(node.schema)),
+            "asset_surface": node.asset_surface.to_dict(),
+        }
     job_names_by_function_id: dict[str, list[str]] = {}
     for job in module.jobs:
         for contract in job.contracts:
@@ -91,8 +101,14 @@ def catalog(app: OddSdlcApp) -> dict:
                 "name": function.name,
                 "intent": function_intent_by_name.get(function.name, function.declarations.get("intent", "")),
                 "function_kind": function.declarations.get("function_kind"),
+                "harness_kind": function.declarations.get("harness_kind"),
+                "harness_contract": _decl_value(function.declarations.get("harness_contract")),
+                "template_kind": function.template.kind,
+                "tags": list(function.tags),
                 "inputs": [node.name for node in function.inputs],
                 "outputs": [node.name for node in function.outputs],
+                "input_contracts": [_node_contract(node) for node in function.inputs],
+                "output_contracts": [_node_contract(node) for node in function.outputs],
                 "environment": {
                     "requires": [node.name for node in function.environment.requires],
                     "provides": [node.name for node in function.environment.provides],

@@ -23,6 +23,7 @@ It gives a project a lawful way to declare:
 - asset collections and typed asset nodes
 - named functions over asset graphs
 - executive GTL graph functions over the function catalog
+- deterministic install-and-normalize behavior over imported or stale workspaces
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
 
@@ -204,6 +205,10 @@ The current product definition of `odd_method` is:
 - standardized on the `build_tenants/` realization model from bootstrap
 - carrying `odd_sdlc` as the first live tenant package
 - publishing a top-level executive GTL graph function over the current toy subgraph
+- publishing reusable higher-order graph-function harnesses as ordinary GTL
+  carriers rather than as hidden product-local engines
+- able to install itself into an imported workspace and normalize the canonical
+  bootstrap surfaces it needs for operation
 - explicit in adoption of any carried-forward truth
 
 The current asset graph proven in the toy sandbox for `odd_sdlc` is:
@@ -231,6 +236,11 @@ The current top-level executive graph function over that subgraph is:
 
 - `bootstrap_release_self_test`
 
+The current reusable consensus graph-function surfaces are:
+
+- `review_design_consensus_round`
+- `review_design_by_consensus`
+
 It acts as the current runtime authority above the leaf asset functions:
 
 - it carries cumulative environment truth from `input_set` through
@@ -245,6 +255,17 @@ It acts as the current runtime authority above the leaf asset functions:
 The tenant still exposes a machine-readable `bootstrap_release_self_test`
 program surface, but that surface is a projection of the executive graph
 function rather than an app-owned controller with independent authority.
+
+The consensus surfaces establish the first higher-order harness pattern:
+
+- `review_design_consensus_round` is the isolated executable round over
+  `design_surface -> review_assessment_surface -> consensus_decision_surface -> reviewed_design_surface`
+- `review_design_by_consensus` is the reusable higher-order carrier over GTL
+  `promote`, `fan_out`, `fan_in`, `gate`, and `recurse`
+- the harness publishes its outer contract and injected review/reduce/apply
+  stages as graph-function declaration truth
+- the same higher-order shape is intended to be reusable later for schema,
+  DQ-rules, release, and other review-governed subject assets
 
 The current build focus is to establish the first real `odd_sdlc` tenant slice:
 

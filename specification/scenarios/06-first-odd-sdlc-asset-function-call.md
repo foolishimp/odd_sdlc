@@ -1,6 +1,6 @@
 # Scenario Bundle - First odd_sdlc Asset Function Call
 
-**Validates**: REQ-F-ASSETMODEL-001, REQ-F-ASSETMODEL-002, REQ-F-ASSETMODEL-003, REQ-F-ASSETMODEL-004, REQ-F-ASSETMODEL-005, REQ-F-ODDSDLC-001, REQ-F-ODDSDLC-002, REQ-F-ODDSDLC-003, REQ-F-ODDSDLC-004, REQ-F-ODDSDLC-005, REQ-F-ODDSDLC-006
+**Validates**: REQ-F-ASSETMODEL-001, REQ-F-ASSETMODEL-002, REQ-F-ASSETMODEL-003, REQ-F-ASSETMODEL-004, REQ-F-ASSETMODEL-005, REQ-F-ODDSDLC-001, REQ-F-ODDSDLC-002, REQ-F-ODDSDLC-003, REQ-F-ODDSDLC-004, REQ-F-ODDSDLC-005, REQ-F-ODDSDLC-006, REQ-F-ODDSDLC-008
 
 **Purpose**: Prove that `odd_sdlc` can bind workspace assets by URI, publish
 the first asset-function catalog, run the first bootstrap-plus-fanout
@@ -8,10 +8,12 @@ dependency chain through ABG, and audit the result from substrate fact truth.
 
 ## Scenario
 
-Create or use a bounded workspace with the bootstrap specification surfaces,
-bind those surfaces into the first `odd_sdlc` asset nodes, then run the first
-declared dependency chain through the tenant’s app-owned entry surface in an
-installed development environment:
+Create or use a bounded workspace with either the canonical bootstrap
+specification surfaces already present or an imported project shape that
+`odd_sdlc` can deterministically normalize for its own operation, then bind
+those surfaces into the first `odd_sdlc` asset nodes and run the first declared
+dependency chain through the tenant’s app-owned entry surface in an installed
+development environment:
 
 - `derive_intent_surface`
 - `derive_product_surface`
@@ -36,6 +38,9 @@ installed development environment:
 
 - publication path: the tenant publishes a GTL module with the first
   `odd_sdlc` function catalog
+- install-and-normalize path: the tenant can install itself into an imported or
+  stale workspace, write the runtime contract, and standardize the canonical
+  bootstrap surfaces required for operation
 - binding path: workspace assets are inventoried and classified by URI and
   asset type
 - gaps path: the tenant can project the first runtime gaps over the published
@@ -65,6 +70,11 @@ installed development environment:
   through the bounded constructor and assessed-result loop
 - audit path: the proving lane reads the resulting event log and verifies the
   graph-call and run lifecycle from substrate facts
+- consensus path: the tenant also publishes one isolated consensus round and
+  one reusable higher-order consensus harness over typed
+  `design -> review_assessment -> consensus_decision -> reviewed_design`
+  assets, with live proof that two reviewer identities can assess the same
+  design surface through ordinary ABG ingest
 
 ## Expected Outcomes
 
@@ -82,3 +92,8 @@ installed development environment:
 6. the tenant exposes one executive GTL graph function that can drive the
    current toy subgraph to `release_surface` without redefining ABG runtime
    semantics
+7. imported or stale workspaces can be normalized into the canonical odd_sdlc
+   runtime shape without manual bootstrap surgery
+8. the tenant exposes one reusable higher-order consensus harness whose outer
+   contract and injected stage functions are machine-readable and whose live
+   proof remains attributable through ordinary ABG event and provenance flow

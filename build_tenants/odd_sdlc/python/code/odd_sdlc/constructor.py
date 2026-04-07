@@ -13,6 +13,7 @@ from genesis.events import EventContext, EventStream, emit
 
 from .asset_types import ASSET_TYPES
 from .fd_checks import (
+    CONSENSUS_DECISION_MARKER,
     DESIGN_MARKER,
     CODE_MARKER,
     FEATURE_DECOMP_MARKER,
@@ -24,6 +25,8 @@ from .fd_checks import (
     PRODUCT_MARKER,
     REQUIREMENTS_MARKER,
     RELEASE_MARKER,
+    REVIEW_ASSESSMENT_MARKER,
+    REVIEWED_DESIGN_MARKER,
     SCENARIO_MARKER,
     TEST_DESIGN_MARKER,
     TEST_MODULE_MARKER,
@@ -51,6 +54,9 @@ def _workspace_asset_path(workspace_root: Path, target_asset: str) -> Path:
         "feature_decomp_surface": workspace_root / "build_tenants" / "common" / "design" / "20-generated-feature-decomp.md",
         "uat_testcases_surface": workspace_root / "specification" / "scenarios" / "20-generated-uat-testcases.md",
         "design_surface": workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md",
+        "review_assessment_surface": workspace_root / "build_tenants" / "common" / "design" / "35-generated-review-assessments.md",
+        "consensus_decision_surface": workspace_root / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md",
+        "reviewed_design_surface": workspace_root / "build_tenants" / "common" / "design" / "35-reviewed-odd-design.md",
         "testcase_authority_surface": workspace_root / "specification" / "scenarios" / "30-generated-testcase-authority.md",
         "scenario_surface": workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md",
         "implementation_design_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md",
@@ -238,6 +244,80 @@ def _construct_design(workspace_root: Path) -> str:
             "",
             "## Source Feature Decomposition Snapshot",
             feature_decomp,
+            "",
+        )
+    )
+
+
+def _construct_review_assessment(workspace_root: Path) -> str:
+    design = (
+        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Generated Review Assessments",
+            "",
+            REVIEW_ASSESSMENT_MARKER,
+            "",
+            "## Reviewers",
+            "- reviewer.codex: confirms the design remains traceable to generated requirements and decomposition surfaces",
+            "- reviewer.claude: confirms the design is explainable, inspectable, and ready for downstream implementation and test branches",
+            "",
+            "## Proposed Deltas",
+            "- preserve design-to-module and design-to-test branch symmetry",
+            "- require consensus reduction before a reviewed design is treated as downstream authority",
+            "",
+            "## Source Design Snapshot",
+            design,
+            "",
+        )
+    )
+
+
+def _construct_consensus_decision(workspace_root: Path) -> str:
+    review_assessments = (
+        workspace_root / "build_tenants" / "common" / "design" / "35-generated-review-assessments.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Generated Consensus Decision",
+            "",
+            CONSENSUS_DECISION_MARKER,
+            "",
+            "## Decision",
+            "- quorum reached: yes",
+            "- next action: apply reviewed design surface",
+            "- escalation required: no",
+            "",
+            "## Assessment Reduction Snapshot",
+            review_assessments,
+            "",
+        )
+    )
+
+
+def _construct_reviewed_design(workspace_root: Path) -> str:
+    design = (
+        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
+    ).read_text(encoding="utf-8").strip()
+    consensus_decision = (
+        workspace_root / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md"
+    ).read_text(encoding="utf-8").strip()
+    return "\n".join(
+        (
+            "# Reviewed odd_sdlc Design",
+            "",
+            REVIEWED_DESIGN_MARKER,
+            "",
+            "## Reviewed Design Boundary",
+            "- this surface is the reviewed derivative of the generated odd_sdlc design surface",
+            "- downstream consumers may prefer this reviewed form when explicit consensus is required",
+            "",
+            "## Source Design Snapshot",
+            design,
+            "",
+            "## Source Consensus Decision Snapshot",
+            consensus_decision,
             "",
         )
     )
@@ -654,6 +734,12 @@ def _constructed_content(target_asset: str, workspace_root: Path) -> str:
         return _construct_uat_testcases(workspace_root)
     if target_asset == "design_surface":
         return _construct_design(workspace_root)
+    if target_asset == "review_assessment_surface":
+        return _construct_review_assessment(workspace_root)
+    if target_asset == "consensus_decision_surface":
+        return _construct_consensus_decision(workspace_root)
+    if target_asset == "reviewed_design_surface":
+        return _construct_reviewed_design(workspace_root)
     if target_asset == "testcase_authority_surface":
         return _construct_testcase_authority(workspace_root)
     if target_asset == "scenario_surface":
@@ -718,6 +804,9 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         "feature_decomp_surface": "feature_decomp_surface",
         "uat_testcases_surface": "uat_testcases_surface",
         "design_surface": "design_surface",
+        "review_assessment_surface": "review_assessment_surface",
+        "consensus_decision_surface": "consensus_decision_surface",
+        "reviewed_design_surface": "reviewed_design_surface",
         "testcase_authority_surface": "testcase_authority_surface",
         "scenario_surface": "scenario_surface",
         "implementation_design_surface": "implementation_design_surface",

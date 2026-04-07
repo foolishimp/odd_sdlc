@@ -9,35 +9,204 @@
 """Published GTL module for the first odd_sdlc slice."""
 from __future__ import annotations
 
-from gtl.algebra import compose
+from gtl.algebra import compose, fan_in, fan_out, gate, promote, recurse
 from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Graph, GraphVector, Node
 from gtl.module_model import Module
-from gtl.operator_model import Evaluator, F_D, F_P, Operator
+from gtl.operator_model import Evaluator, Rule, F_D, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
 
 from .function_catalog import FUNCTION_CATALOG
 
 
-_input_set = Node("input_set", schema="odd.asset_collection.bootstrap_input_set")
-_intent_surface = Node("intent_surface", schema="odd.asset.intent_doc")
-_product_surface = Node("product_surface", schema="odd.asset.product_doc")
-_goal_surface = Node("goal_surface", schema="odd.asset.goal_surface")
-_requirement_surface = Node("requirement_surface", schema="odd.asset.requirement_surface")
-_feature_decomp_surface = Node("feature_decomp_surface", schema="odd.asset.feature_decomp_surface")
-_uat_testcases_surface = Node("uat_testcases_surface", schema="odd.asset.uat_testcases_surface")
-_design_surface = Node("design_surface", schema="odd.asset.design_surface")
-_testcase_authority_surface = Node("testcase_authority_surface", schema="odd.asset.testcase_authority_surface")
-_scenario_surface = Node("scenario_surface", schema="odd.asset.scenario_surface")
-_implementation_design_surface = Node("implementation_design_surface", schema="odd.asset.implementation_design_surface")
-_implementation_stack_profile = Node("implementation_stack_profile", schema="odd.asset.implementation_stack_profile")
-_implementation_module_surface = Node("implementation_module_surface", schema="odd.asset.implementation_module_surface")
-_code_surface = Node("code_surface", schema="odd.asset.code_surface")
-_test_design_surface = Node("test_design_surface", schema="odd.asset.test_design_surface")
-_test_stack_profile = Node("test_stack_profile", schema="odd.asset.test_stack_profile")
-_test_module_surface = Node("test_module_surface", schema="odd.asset.test_module_surface")
-_test_run_archive_surface = Node("test_run_archive_surface", schema="odd.asset.test_run_archive_surface")
-_release_surface = Node("release_surface", schema="odd.asset.release_surface")
+def _asset_node(
+    name: str,
+    schema: str,
+    *,
+    kind: str,
+    required_contexts: tuple[str, ...] = (),
+    output_contract_refs: tuple[str, ...] = (),
+) -> Node:
+    return Node(
+        name,
+        schema=schema,
+        asset_surface={
+            "kind": kind,
+            "required_contexts": required_contexts,
+            "output_contract_refs": output_contract_refs,
+        },
+    )
+
+
+_input_set = _asset_node(
+    "input_set",
+    schema="odd.asset_collection.bootstrap_input_set",
+    kind="bootstrap_input_set",
+    output_contract_refs=("bootstrap_input_set_present",),
+)
+_intent_surface = _asset_node(
+    "intent_surface",
+    schema="odd.asset.intent_doc",
+    kind="intent_doc",
+    required_contexts=("input_set",),
+    output_contract_refs=("single_authoritative_intent_surface",),
+)
+_product_surface = _asset_node(
+    "product_surface",
+    schema="odd.asset.product_doc",
+    kind="product_doc",
+    required_contexts=("input_set", "intent_surface"),
+    output_contract_refs=("single_authoritative_product_surface",),
+)
+_goal_surface = _asset_node(
+    "goal_surface",
+    schema="odd.asset.goal_surface",
+    kind="goal_surface",
+    required_contexts=("input_set", "intent_surface", "product_surface"),
+    output_contract_refs=("single_authoritative_goal_surface",),
+)
+_requirement_surface = _asset_node(
+    "requirement_surface",
+    schema="odd.asset.requirement_surface",
+    kind="requirement_surface",
+    required_contexts=("input_set", "intent_surface", "product_surface", "goal_surface"),
+    output_contract_refs=("requirement_family_surface_present",),
+)
+_feature_decomp_surface = _asset_node(
+    "feature_decomp_surface",
+    schema="odd.asset.feature_decomp_surface",
+    kind="feature_decomp_surface",
+    required_contexts=("requirement_surface",),
+    output_contract_refs=("feature_decomposition_surface_present",),
+)
+_uat_testcases_surface = _asset_node(
+    "uat_testcases_surface",
+    schema="odd.asset.uat_testcases_surface",
+    kind="uat_testcases_surface",
+    required_contexts=("requirement_surface",),
+    output_contract_refs=("uat_testcase_surface_present",),
+)
+_design_surface = _asset_node(
+    "design_surface",
+    schema="odd.asset.design_surface",
+    kind="design_surface",
+    required_contexts=("requirement_surface", "feature_decomp_surface"),
+    output_contract_refs=("design_surface_present",),
+)
+_review_assessment_surface = _asset_node(
+    "review_assessment_surface",
+    schema="odd.asset.review_assessment_surface",
+    kind="review_assessment_surface",
+    required_contexts=("design_surface",),
+    output_contract_refs=("review_assessment_surface_present",),
+)
+_consensus_decision_surface = _asset_node(
+    "consensus_decision_surface",
+    schema="odd.asset.consensus_decision_surface",
+    kind="consensus_decision_surface",
+    required_contexts=("review_assessment_surface",),
+    output_contract_refs=("consensus_decision_surface_present",),
+)
+_reviewed_design_surface = _asset_node(
+    "reviewed_design_surface",
+    schema="odd.asset.reviewed_design_surface",
+    kind="reviewed_design_surface",
+    required_contexts=("design_surface", "consensus_decision_surface"),
+    output_contract_refs=("reviewed_design_surface_present",),
+)
+_testcase_authority_surface = _asset_node(
+    "testcase_authority_surface",
+    schema="odd.asset.testcase_authority_surface",
+    kind="testcase_authority_surface",
+    required_contexts=("uat_testcases_surface", "scenario_surface"),
+    output_contract_refs=("testcase_authority_surface_present",),
+)
+_scenario_surface = _asset_node(
+    "scenario_surface",
+    schema="odd.asset.scenario_surface",
+    kind="scenario_surface",
+    required_contexts=("requirement_surface", "design_surface"),
+    output_contract_refs=("scenario_surface_present",),
+)
+_implementation_design_surface = _asset_node(
+    "implementation_design_surface",
+    schema="odd.asset.implementation_design_surface",
+    kind="implementation_design_surface",
+    required_contexts=("design_surface", "scenario_surface"),
+    output_contract_refs=("implementation_design_surface_present",),
+)
+_implementation_stack_profile = _asset_node(
+    "implementation_stack_profile",
+    schema="odd.asset.implementation_stack_profile",
+    kind="implementation_stack_profile",
+    required_contexts=("implementation_design_surface",),
+    output_contract_refs=("implementation_stack_profile_present",),
+)
+_implementation_module_surface = _asset_node(
+    "implementation_module_surface",
+    schema="odd.asset.implementation_module_surface",
+    kind="implementation_module_surface",
+    required_contexts=("implementation_design_surface", "implementation_stack_profile"),
+    output_contract_refs=("implementation_module_surface_present",),
+)
+_code_surface = _asset_node(
+    "code_surface",
+    schema="odd.asset.code_surface",
+    kind="code_surface",
+    required_contexts=("implementation_module_surface", "implementation_stack_profile"),
+    output_contract_refs=("published_source_code_surface",),
+)
+_test_design_surface = _asset_node(
+    "test_design_surface",
+    schema="odd.asset.test_design_surface",
+    kind="test_design_surface",
+    required_contexts=("design_surface", "scenario_surface"),
+    output_contract_refs=("test_design_surface_present",),
+)
+_test_stack_profile = _asset_node(
+    "test_stack_profile",
+    schema="odd.asset.test_stack_profile",
+    kind="test_stack_profile",
+    required_contexts=("test_design_surface",),
+    output_contract_refs=("test_stack_profile_present",),
+)
+_test_module_surface = _asset_node(
+    "test_module_surface",
+    schema="odd.asset.test_module_surface",
+    kind="test_module_surface",
+    required_contexts=("test_design_surface", "test_stack_profile"),
+    output_contract_refs=("test_module_surface_present",),
+)
+_test_run_archive_surface = _asset_node(
+    "test_run_archive_surface",
+    schema="odd.asset.test_run_archive_surface",
+    kind="test_run_archive_surface",
+    required_contexts=("test_module_surface", "test_stack_profile"),
+    output_contract_refs=("test_run_archive_surface_present",),
+)
+_release_surface = _asset_node(
+    "release_surface",
+    schema="odd.asset.release_surface",
+    kind="release_surface",
+    required_contexts=(
+        "requirement_surface",
+        "design_surface",
+        "scenario_surface",
+        "code_surface",
+        "testcase_authority_surface",
+        "test_run_archive_surface",
+    ),
+    output_contract_refs=("release_surface_present",),
+)
+
+_design_review_request_vector = Node(
+    "design_review_request_vector",
+    schema="Vector[odd.asset.review_request]",
+)
+_review_assessment_vector = Node(
+    "review_assessment_vector",
+    schema="Vector[odd.asset.review_assessment_surface]",
+)
 
 _builder = Operator(
     name="odd_sdlc_builder",
@@ -86,6 +255,24 @@ _design_fd = Evaluator(
     regime=F_D,
     description="The design derivation depends on regenerated requirement and feature decomposition surfaces.",
     binding="exec://python -m odd_sdlc.fd_checks design-dependency-surfaces-present --workspace .",
+)
+_review_assessment_fd = Evaluator(
+    name="review_assessment_dependency_surfaces_present",
+    regime=F_D,
+    description="The review assessment derivation depends on a regenerated design surface.",
+    binding="exec://python -m odd_sdlc.fd_checks review-assessment-dependency-surfaces-present --workspace .",
+)
+_consensus_decision_fd = Evaluator(
+    name="consensus_decision_dependency_surfaces_present",
+    regime=F_D,
+    description="The consensus decision derivation depends on a regenerated review assessment surface.",
+    binding="exec://python -m odd_sdlc.fd_checks consensus-decision-dependency-surfaces-present --workspace .",
+)
+_reviewed_design_fd = Evaluator(
+    name="reviewed_design_dependency_surfaces_present",
+    regime=F_D,
+    description="The reviewed design derivation depends on regenerated design and consensus decision surfaces.",
+    binding="exec://python -m odd_sdlc.fd_checks reviewed-design-dependency-surfaces-present --workspace .",
 )
 _testcase_authority_fd = Evaluator(
     name="testcase_authority_dependency_surfaces_present",
@@ -188,10 +375,35 @@ _design_fp = Evaluator(
     regime=F_P,
     description="The design surface is semantically converged for the current workspace requirements and feature decomposition.",
 )
+_review_assessment_fp = Evaluator(
+    name="review_assessment_surface_semantically_converged",
+    regime=F_P,
+    description="The review assessment surface is semantically converged for the current design under review.",
+)
+_consensus_decision_fp = Evaluator(
+    name="consensus_decision_surface_semantically_converged",
+    regime=F_P,
+    description="The consensus decision surface is semantically converged for the current review assessment round.",
+)
+_reviewed_design_fp = Evaluator(
+    name="reviewed_design_surface_semantically_converged",
+    regime=F_P,
+    description="The reviewed design surface is semantically converged for the current design and consensus decision state.",
+)
 _testcase_authority_fp = Evaluator(
     name="testcase_authority_surface_semantically_converged",
     regime=F_P,
     description="The testcase authority surface is semantically converged for the current generated UAT testcase and scenario surfaces.",
+)
+_design_consensus_gate_fp = Evaluator(
+    name="design_consensus_gate_satisfied",
+    regime=F_P,
+    description="The current review assessment vector satisfies the declared consensus rule for design review.",
+)
+_design_consensus_termination = Evaluator(
+    name="design_consensus_terminated",
+    regime=F_P,
+    description="The current design consensus carrier has either converged or lawfully exhausted its declared review rounds.",
 )
 _scenario_fp = Evaluator(
     name="scenario_surface_semantically_converged",
@@ -292,6 +504,93 @@ def _graph_function(
     )
 
 
+def _symbolic_graph_function(
+    *,
+    name: str,
+    ref: str,
+    inputs: tuple[Node, ...],
+    outputs: tuple[Node, ...],
+    declarations: Attrs,
+    tags: tuple[str, ...] = (),
+) -> GraphFunction:
+    return GraphFunction.symbolic(
+        name=name,
+        ref=ref,
+        inputs=inputs,
+        outputs=outputs,
+        environment=EnvRef.from_contract(
+            requires=inputs,
+            provides=outputs,
+        ),
+        declarations=declarations,
+        tags=tags,
+    )
+
+
+def _annotate_graph_function(
+    graph_function: GraphFunction,
+    *,
+    name: str | None = None,
+    function_kind: str,
+    intent: str,
+    extra_declarations: dict[str, object] | None = None,
+    tags: tuple[str, ...] = (),
+) -> GraphFunction:
+    merged_declarations = {
+        **graph_function.declarations.to_dict(),
+        "function_kind": function_kind,
+        "intent": intent,
+        **dict(extra_declarations or {}),
+    }
+    return GraphFunction(
+        name=name or graph_function.name,
+        inputs=graph_function.inputs,
+        outputs=graph_function.outputs,
+        environment=graph_function.environment,
+        template=graph_function.template,
+        effects=graph_function.effects,
+        declarations=Attrs.coerce(merged_declarations),
+        tags=tuple((*graph_function.tags, *tags)),
+    )
+
+
+def _rename_graph(graph: Graph, *, name: str) -> Graph:
+    return Graph(
+        name=name,
+        inputs=graph.inputs,
+        outputs=graph.outputs,
+        nodes=graph.nodes,
+        vectors=graph.vectors,
+        contexts=graph.contexts,
+        rules=graph.rules,
+        tags=graph.tags,
+    )
+
+
+def _executive_graph_function(
+    *,
+    name: str,
+    intent: str,
+    functions: tuple[GraphFunction, ...],
+) -> GraphFunction:
+    composed = compose(*functions)
+    executive_graph = _rename_graph(composed.materialize(), name=f"{name}_graph")
+    return GraphFunction.from_graph(
+        name=name,
+        graph=executive_graph,
+        environment=composed.environment,
+        effects=composed.effects,
+        declarations=Attrs(
+            entries=(
+                ("function_kind", "odd_executive_graph_function"),
+                ("intent", intent),
+                ("entrypoint", True),
+            )
+        ),
+        tags=("executive",),
+    )
+
+
 GF_DERIVE_INTENT = _graph_function(
     name="derive_intent_surface",
     source=_input_set,
@@ -347,6 +646,30 @@ GF_DERIVE_DESIGN = _graph_function(
     fd_evaluator=_design_fd,
     fp_evaluator=_design_fp,
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_REVIEW_ASSESSMENT = _graph_function(
+    name="derive_review_assessment_surface",
+    source=_design_surface,
+    target=_review_assessment_surface,
+    fd_evaluator=_review_assessment_fd,
+    fp_evaluator=_review_assessment_fp,
+    req_refs=("REQ-F-GFUNC-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_CONSENSUS_DECISION = _graph_function(
+    name="derive_consensus_decision_surface",
+    source=_review_assessment_surface,
+    target=_consensus_decision_surface,
+    fd_evaluator=_consensus_decision_fd,
+    fp_evaluator=_consensus_decision_fp,
+    req_refs=("REQ-F-GFUNC-004", "REQ-F-ODDSDLC-002"),
+)
+GF_DERIVE_REVIEWED_DESIGN = _graph_function(
+    name="derive_reviewed_design_surface",
+    source=(_design_surface, _consensus_decision_surface),
+    target=_reviewed_design_surface,
+    fd_evaluator=_reviewed_design_fd,
+    fp_evaluator=_reviewed_design_fp,
+    req_refs=("REQ-F-GFUNC-004", "REQ-F-ODDSDLC-002"),
 )
 GF_QUALIFY_TESTCASE_AUTHORITY = _graph_function(
     name="qualify_testcase_authority",
@@ -444,6 +767,115 @@ GF_PREPARE_RELEASE = _graph_function(
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 
+REVIEW_DESIGN_CONSENSUS_ROUND_INTENT = (
+    "Run one explicit design-review consensus round: derive review assessments, "
+    "reduce them into a consensus decision, and apply the reviewed design result."
+)
+DESIGN_CONSENSUS_HARNESS_CONTRACT = {
+    "subject_asset": "design_surface",
+    "assessment_asset": "review_assessment_surface",
+    "decision_asset": "consensus_decision_surface",
+    "reviewed_asset": "reviewed_design_surface",
+    "assessment_vector_asset": "review_assessment_vector",
+    "injected_functions": {
+        "review_round": "review_design_assessment_round",
+        "reduce": "reduce_design_consensus_decision",
+        "apply": "apply_design_consensus_decision",
+    },
+    "policy_rule": "design_consensus_rule",
+    "composable": True,
+    "recursive": True,
+}
+
+
+GF_REVIEW_DESIGN_CONSENSUS_ROUND = _annotate_graph_function(
+    _executive_graph_function(
+        name="review_design_consensus_round",
+        intent=REVIEW_DESIGN_CONSENSUS_ROUND_INTENT,
+        functions=(
+            GF_DERIVE_REVIEW_ASSESSMENT,
+            GF_DERIVE_CONSENSUS_DECISION,
+            GF_DERIVE_REVIEWED_DESIGN,
+        ),
+    ),
+    function_kind="odd_consensus_round_graph_function",
+    intent=REVIEW_DESIGN_CONSENSUS_ROUND_INTENT,
+    extra_declarations={
+        "harness_kind": "consensus_round",
+        "harness_contract": DESIGN_CONSENSUS_HARNESS_CONTRACT,
+    },
+    tags=("consensus", "round"),
+)
+
+_design_review_worker_round = _symbolic_graph_function(
+    name="review_design_assessment_round",
+    ref="odd_sdlc.review_design_assessment_round",
+    inputs=(_review_assessment_vector,),
+    outputs=(_review_assessment_vector,),
+    declarations=Attrs(),
+    tags=("consensus", "review_round"),
+)
+_design_consensus_reducer = _symbolic_graph_function(
+    name="reduce_design_consensus_decision",
+    ref="odd_sdlc.reduce_design_consensus_decision",
+    inputs=(_review_assessment_vector,),
+    outputs=(_consensus_decision_surface,),
+    declarations=Attrs(),
+    tags=("consensus", "reduce"),
+)
+_design_consensus_applier = _symbolic_graph_function(
+    name="apply_design_consensus_decision",
+    ref="odd_sdlc.apply_design_consensus_decision",
+    inputs=(_design_surface, _consensus_decision_surface),
+    outputs=(_reviewed_design_surface,),
+    declarations=Attrs(),
+    tags=("consensus", "apply"),
+)
+_design_consensus_rule = Rule(
+    name="design_consensus_rule",
+    kind="consensus",
+    config={
+        "quorum": 2,
+        "max_rounds": 3,
+        "on_open": "repeat_round",
+        "on_exhaust": "escalate_f_h",
+        "assessment_shape": "review_assessment_surface",
+    },
+)
+
+GF_REVIEW_DESIGN_BY_CONSENSUS = _annotate_graph_function(
+    recurse(
+        compose(
+            promote(source=_design_surface, to=_review_assessment_vector),
+            fan_out(_design_review_worker_round, over=_review_assessment_vector),
+            gate(
+                fan_in(_design_consensus_reducer, over=_review_assessment_vector),
+                rule=_design_consensus_rule,
+                evaluators=(_design_consensus_gate_fp,),
+            ),
+            _design_consensus_applier,
+        ),
+        _design_consensus_termination,
+        foldback={
+            "mode": "rebind",
+            "binding": "reviewed_design_surface",
+            "requires_parent_evaluation": True,
+        },
+    ),
+    name="review_design_by_consensus",
+    function_kind="odd_consensus_library_graph_function",
+    intent=(
+        "Run explicit design consensus over GTL higher-order operators: "
+        "promote design into review requests, fan out review work, gate the "
+        "reduced consensus decision, apply it back to the design, and recurse until termination."
+    ),
+    extra_declarations={
+        "harness_kind": "consensus_harness",
+        "harness_contract": DESIGN_CONSENSUS_HARNESS_CONTRACT,
+    },
+    tags=("consensus", "library"),
+)
+
 LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
     GF_DERIVE_INTENT,
     GF_DERIVE_PRODUCT,
@@ -472,43 +904,6 @@ BOOTSTRAP_RELEASE_SELF_TEST_INTENT = (
 )
 
 
-def _rename_graph(graph: Graph, *, name: str) -> Graph:
-    return Graph(
-        name=name,
-        inputs=graph.inputs,
-        outputs=graph.outputs,
-        nodes=graph.nodes,
-        vectors=graph.vectors,
-        contexts=graph.contexts,
-        rules=graph.rules,
-        tags=graph.tags,
-    )
-
-
-def _executive_graph_function(
-    *,
-    name: str,
-    intent: str,
-    functions: tuple[GraphFunction, ...],
-) -> GraphFunction:
-    composed = compose(*functions)
-    executive_graph = _rename_graph(composed.materialize(), name=f"{name}_graph")
-    return GraphFunction.from_graph(
-        name=name,
-        graph=executive_graph,
-        environment=composed.environment,
-        effects=composed.effects,
-        declarations=Attrs(
-            entries=(
-                ("function_kind", "odd_executive_graph_function"),
-                ("intent", intent),
-                ("entrypoint", True),
-            )
-        ),
-        tags=("executive",),
-    )
-
-
 GF_BOOTSTRAP_RELEASE_SELF_TEST = _executive_graph_function(
     name="bootstrap_release_self_test",
     intent=BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
@@ -535,10 +930,18 @@ MODULE = Module(
     name="odd_sdlc",
     graphs=tuple(
         function.template.graph
-        for function in (GF_BOOTSTRAP_RELEASE_SELF_TEST,)
+        for function in (
+            GF_BOOTSTRAP_RELEASE_SELF_TEST,
+            GF_REVIEW_DESIGN_CONSENSUS_ROUND,
+            GF_REVIEW_DESIGN_BY_CONSENSUS,
+        )
         if function.template.graph is not None
     ),
-    graph_functions=(GF_BOOTSTRAP_RELEASE_SELF_TEST,),
+    graph_functions=(
+        GF_BOOTSTRAP_RELEASE_SELF_TEST,
+        GF_REVIEW_DESIGN_CONSENSUS_ROUND,
+        GF_REVIEW_DESIGN_BY_CONSENSUS,
+    ),
     refinement_boundaries=tuple(
         RefinementBoundary(
             name=vector.name,
@@ -546,7 +949,10 @@ MODULE = Module(
             outputs=(vector.target,),
             hints=Attrs(entries=(("terminal", True),)),
         )
-        for vector in GF_BOOTSTRAP_RELEASE_SELF_TEST.materialize().vectors
+        for vector in (
+            *GF_BOOTSTRAP_RELEASE_SELF_TEST.materialize().vectors,
+            *GF_REVIEW_DESIGN_CONSENSUS_ROUND.materialize().vectors,
+        )
     ),
     jobs=(
         _job("bootstrap_release_self_test_job", GF_BOOTSTRAP_RELEASE_SELF_TEST),
@@ -561,6 +967,9 @@ MODULE = Module(
         _feature_decomp_fd,
         _uat_testcases_fd,
         _design_fd,
+        _review_assessment_fd,
+        _consensus_decision_fd,
+        _reviewed_design_fd,
         _testcase_authority_fd,
         _scenario_fd,
         _implementation_design_fd,
@@ -579,7 +988,12 @@ MODULE = Module(
         _feature_decomp_fp,
         _uat_testcases_fp,
         _design_fp,
+        _review_assessment_fp,
+        _consensus_decision_fp,
+        _reviewed_design_fp,
         _testcase_authority_fp,
+        _design_consensus_gate_fp,
+        _design_consensus_termination,
         _scenario_fp,
         _implementation_design_fp,
         _implementation_stack_profile_fp,
@@ -590,6 +1004,9 @@ MODULE = Module(
         _test_stack_profile_fp,
         _test_module_fp,
         _test_run_archive_fp,
+    ),
+    rules=(
+        _design_consensus_rule,
     ),
     metadata=Attrs(
         entries=(
@@ -616,6 +1033,10 @@ MODULE = Module(
             )),
             ("function_catalog", tuple(entry.to_dict() for entry in FUNCTION_CATALOG)),
             ("executive_graph_function", GF_BOOTSTRAP_RELEASE_SELF_TEST.name),
+            ("library_graph_functions", (
+                GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
+                GF_REVIEW_DESIGN_BY_CONSENSUS.name,
+            )),
             ("domain_package", "odd_sdlc"),
         )
     ),

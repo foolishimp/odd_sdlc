@@ -70,6 +70,24 @@ EXPECTED_FUNCTIONS = (
     "prepare_release_surface",
 )
 
+EXPECTED_GRAPH_FUNCTIONS = (
+    "bootstrap_release_self_test",
+    "review_design_consensus_round",
+    "review_design_by_consensus",
+)
+
+EXPECTED_CONSENSUS_STEPS = (
+    "derive_review_assessment_surface",
+    "derive_consensus_decision_surface",
+    "derive_reviewed_design_surface",
+)
+
+EXPECTED_CONSENSUS_UPDATED_ASSETS = (
+    "review_assessment_surface",
+    "consensus_decision_surface",
+    "reviewed_design_surface",
+)
+
 EXPECTED_UPDATED_ASSETS = (
     "intent_surface",
     "product_surface",
@@ -140,12 +158,16 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 18
+    assert len(catalog["assets"]) == 21
     assert [item["name"] for item in catalog["functions"]] == list(EXPECTED_FUNCTIONS)
-    assert [item["name"] for item in catalog["graph_functions"]] == ["bootstrap_release_self_test"]
+    assert [item["name"] for item in catalog["graph_functions"]] == list(EXPECTED_GRAPH_FUNCTIONS)
     assert [item["name"] for item in catalog["jobs"]] == ["bootstrap_release_self_test_job"]
     assert catalog["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
     assert [vector["name"] for vector in catalog["graph_functions"][0]["vectors"]] == list(EXPECTED_BOOTSTRAP_STEPS)
+    assert catalog["graph_functions"][1]["job_names"] == []
+    assert [vector["name"] for vector in catalog["graph_functions"][1]["vectors"]] == list(EXPECTED_CONSENSUS_STEPS)
+    assert catalog["graph_functions"][2]["template_kind"] == "symbolic"
+    assert catalog["graph_functions"][2]["vectors"] == []
 
     gaps = json.loads(
         run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps").stdout
@@ -289,6 +311,102 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         final_call_id=chain[-1]["start"]["call_id"],
         query_contract=domain_query["query_contract"],
     )
+
+
+def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+
+    bootstrap_prefix = complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="consensus_bootstrap_prefix",
+        steps=EXPECTED_BOOTSTRAP_STEPS[:7],
+    )
+    assert bootstrap_prefix[-1]["start"]["edge"] == "derive_design_surface"
+
+    module_ref = "odd_sdlc.consensus_module:MODULE"
+    completed_round: list[dict[str, object]] = []
+    for edge in EXPECTED_CONSENSUS_STEPS:
+        start = json.loads(
+            run_installed_genesis(
+                workspace,
+                "start",
+                "--module",
+                module_ref,
+                archive=run_archive,
+                label=f"{edge} start",
+            ).stdout
+        )
+        assert start["edge"] == edge
+        assert start["blocking_reason"] == "fp_dispatch"
+        constructor, result_path = run_constructor_for_start(
+            workspace,
+            start_payload=start,
+            archive=run_archive,
+            label=f"{edge} construct",
+        )
+        assessed = json.loads(
+            run_installed_genesis(
+                workspace,
+                "assess-result",
+                "--result",
+                str(result_path),
+                archive=run_archive,
+                label=f"{edge} assess-result",
+            ).stdout
+        )
+        completed_round.append(
+            {
+                "start": start,
+                "constructor": constructor,
+                "assessed": assessed,
+            }
+        )
+
+    assert [step["start"]["edge"] for step in completed_round] == list(EXPECTED_CONSENSUS_STEPS)
+    assert all(step["assessed"]["status"] == "ok" for step in completed_round)
+    assert Path(completed_round[0]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
+        "# Generated Review Assessments"
+    )
+    assert Path(completed_round[1]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
+        "# Generated Consensus Decision"
+    )
+    assert Path(completed_round[2]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
+        "# Reviewed odd_sdlc Design"
+    )
+
+    consensus_gaps = json.loads(
+        run_installed_genesis(
+            workspace,
+            "gaps",
+            "--module",
+            module_ref,
+            archive=run_archive,
+            label="consensus gaps",
+        ).stdout
+    )
+    assert consensus_gaps["converged"] is True
+    assert [entry["edge"] for entry in consensus_gaps["gaps"]] == list(EXPECTED_CONSENSUS_STEPS)
+    assert all(entry["delta"] == 0 for entry in consensus_gaps["gaps"])
+
+    events = read_events(workspace)
+    consensus_graph_calls = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"]["graph_function"] == "review_design_consensus_round"
+    ]
+    assert [event["data"]["edge"] for event in consensus_graph_calls] == list(EXPECTED_CONSENSUS_STEPS)
+
+    consensus_asset_updates = [
+        event
+        for event in events
+        if event["event_type"] == "asset_checkpoint_updated"
+        and event["data"]["asset_id"] in EXPECTED_CONSENSUS_UPDATED_ASSETS
+    ]
+    assert [event["data"]["asset_id"] for event in consensus_asset_updates] == list(EXPECTED_CONSENSUS_UPDATED_ASSETS)
+    assert all(event["data"]["current_checkpoint"]["exists"] is True for event in consensus_asset_updates)
 
 
 def test_installed_self_test_command_drives_the_current_executive_program(run_archive) -> None:

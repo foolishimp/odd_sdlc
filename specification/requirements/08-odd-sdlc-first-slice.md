@@ -34,6 +34,9 @@ surfaces above GTL and ABG.
 - AC-1: bootstrap creates or resolves the app configuration boundary
 - AC-2: initialization binds the published GTL module to ABG runtime
 - AC-3: the tenant does not implement a post-dispatch shadow runtime
+- AC-4: `odd_sdlc` exposes an explicit deterministic workspace-normalization
+  behavior that can standardize imported or stale project surfaces for its own
+  operation without discarding the imported authority
 
 ### REQ-F-ODDSDLC-004 — The first proving lane exercises a real bootstrap-plus-fanout dependency chain
 
@@ -87,3 +90,44 @@ graph function rather than acting as an app-owned shadow runtime above ABG.
   installed workspace
 - AC-3: successful execution converges the current toy subgraph to the release
   surface without introducing a product-local shadow runtime beneath ABG
+
+### REQ-F-ODDSDLC-007 — odd_sdlc can install and normalize an imported workspace into its canonical runtime shape
+
+The first `odd_sdlc` slice provides a deterministic install-and-normalize
+behavior for imported or stale workspaces. That behavior installs the current
+ABG kernel, deploys the `odd_sdlc` domain package, writes the runtime contract,
+and standardizes the minimal canonical surfaces required for odd_sdlc
+operation.
+
+**Acceptance Criteria**:
+- AC-1: a target workspace can be installed for `odd_sdlc` operation from the
+  current source checkout through one deterministic command
+- AC-2: the install path writes a runtime contract so `genesis` can resolve the
+  `odd_sdlc` module without a manual `--module` flag
+- AC-3: normalization creates or updates the canonical odd_sdlc bootstrap
+  surfaces when an imported workspace is missing `PRODUCT.md`, `GOALS.md`, the
+  canonical `specification/requirements/` root, or current build-tenant
+  constraint wiring
+- AC-4: normalization is idempotent and leaves imported authority surfaces in
+  place rather than rewriting them into a different project truth
+
+### REQ-F-ODDSDLC-008 — odd_sdlc publishes the first reusable higher-order consensus harness
+
+The first `odd_sdlc` slice publishes one explicit reusable higher-order graph
+function for consensus. The harness is not a hidden review engine. It remains a
+GTL graph function over typed subject, assessment, decision, and reviewed
+output assets, with injected review, reduction, and apply stages and explicit
+consensus policy.
+
+**Acceptance Criteria**:
+- AC-1: the tenant publishes one isolated round graph function together with
+  one reusable higher-order library graph function for the same consensus
+  contract
+- AC-2: the published graph-function catalog records the consensus harness as a
+  library carrier together with its subject asset, assessment asset, decision
+  asset, reviewed output asset, injected stage functions, and declared policy
+- AC-3: sandbox proof closes one full consensus round through ordinary ABG
+  events and provenance
+- AC-4: one live proof lane records two distinct reviewer identities producing
+  structured assessments against the same subject asset and ingests them
+  through ordinary `assess-result` flow
