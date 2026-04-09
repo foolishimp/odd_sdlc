@@ -3,12 +3,12 @@
 **Status**: Active
 **Date**: 2026-04-07
 **Implements**: REQ-F-UPSTREAM-001, REQ-F-UPSTREAM-002, REQ-F-UPSTREAM-003, REQ-F-GFUNC-001, REQ-F-GFUNC-002, REQ-F-GFUNC-003, REQ-F-GFUNC-004, REQ-F-GFUNC-005, REQ-F-RUNTIME-001, REQ-F-RUNTIME-002, REQ-F-RUNTIME-004, REQ-F-ASSET-001, REQ-F-ASSET-002, REQ-F-ASSET-003, REQ-F-ASSET-004
-**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/requirements/01-upstream-adoption.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/06-bootstrap-assets-and-recursive-edges.md`, `specification/requirements/08-odd-sdlc-first-slice.md`
+**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/requirements/01-upstream-adoption.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/06-bootstrap-assets-and-recursive-edges.md`
 
 ## Position
 
-`odd_sdlc` is the first concrete ODD domain translation of the
-`genesis_sdlc` method line.
+This document records the shared ODD SDLC translation law adopted beneath the
+current tenant line.
 
 `genesis_sdlc` is source material for this translation. It is not hidden live
 authority for `odd_method`.
@@ -22,14 +22,13 @@ re-expresses them as:
 - GTL graph functions
 - ABG graph calls over bound asset scope
 
-The current toy also introduces one public executive GTL graph function above
-those asset functions so the product can drive the published subgraph without
-collapsing back into a hidden controller beneath ABG.
+This shared translation document does not define the current tenant-local
+software-domain package shape. The active `odd_sdlc` package surface lives
+under `build_tenants/odd_sdlc/python/design/`.
 
-The current toy now also introduces one reusable higher-order consensus
-harness. That harness is still an ordinary GTL graph function. It is not a
-special engine path. Its job is to prove the precedent for reusable review and
-decision loops over typed subject assets.
+The active tenant may prove these shared patterns through a bounded proving
+subset, but that proving shape is tenant-local design law rather than common
+present truth.
 
 ## Translation Boundary
 
@@ -211,21 +210,18 @@ These collections are the working scopes bound into functions.
 
 ## Executive Carrier Boundary
 
-`odd_sdlc` now carries one explicit executive graph function:
+A tenant may publish an explicit executive graph function above internal
+vectors when it needs one public carrier over a bounded subgraph.
 
-- `bootstrap_release_self_test`
+This is not a replacement for GTL graph functions. It is one lawful way to:
 
-This is not a replacement for GTL graph functions. It is the current public
-carrier over the internal vector chain. Its job is to:
+- carry cumulative environment truth across a bounded subgraph
+- publish an ordered vector chain for operator or service use
+- bind one explicit job for a bounded constructive turn at each open call
+- ingest the resulting `F_P` assessment back through ABG
 
-- carry cumulative environment truth across the current toy subgraph
-- publish the current ordered vector chain from bootstrap to release
-- bind one explicit job for the bounded constructor turn at each open call
-- ingest the resulting F_P assessment back through ABG
-- stop only when the current toy subgraph converges at `release_surface`
-
-The tenant may still project a machine-readable executive program read model
-over that carrier, but the read model does not own runtime authority.
+The active executive carrier chosen by `odd_sdlc` is tenant-local design law,
+not common present truth in this document.
 
 ## Asset Nodes
 
@@ -470,27 +466,28 @@ Audit shows event-derived post-mortem truth.
 ## Realization Topology
 
 This translation document remains shared design law under
-`build_tenants/common/design/` until a concrete `odd_sdlc` tenant exists.
+`build_tenants/common/design/` for cross-tenant translation concerns.
 
-The first concrete tenant-local root should be:
+The current tenant-local root is:
 
-`build_tenants/odd_sdlc/`
+`build_tenants/odd_sdlc/python/`
 
 Expected tenant-local surfaces:
 
 - `build_tenants/odd_sdlc/design/`
 - `build_tenants/odd_sdlc/test_env/`
-- `build_tenants/odd_method/python/design/`
-- `build_tenants/odd_method/python/code/`
+- `build_tenants/odd_sdlc/python/design/`
+- `build_tenants/odd_sdlc/python/code/`
 
-Promote content out of common design only when `odd_sdlc` carries real local
-realization law.
+Tenant-local package shape, proving-lane shape, and software-domain expansion
+belong in tenant-local design once they stop being common translation law.
 
 ## Consequences
 
 - `genesis_sdlc` becomes migration source material and comparison pressure, not
   hidden live authority
-- `odd_sdlc` becomes the first concrete ODD domain package
+- `odd_sdlc` becomes the current concrete ODD software-domain package built on
+  these shared rules
 - method surfaces become typed assets rather than ambient project files
 - execution moves to named graph-function calls over bound asset scope
 - runtime truth remains attributable to ABG

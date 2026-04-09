@@ -84,6 +84,7 @@ def run_installed_odd_sdlc(
     *args: str,
     archive: "RunArchive | None" = None,
     label: str | None = None,
+    timeout: int = 60,
 ) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
@@ -92,7 +93,7 @@ def run_installed_odd_sdlc(
             env=sandbox_env(workspace),
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
             check=True,
         )
     except subprocess.CalledProcessError as error:
@@ -109,6 +110,7 @@ def run_installed_genesis(
     *args: str,
     archive: "RunArchive | None" = None,
     label: str | None = None,
+    timeout: int = 60,
 ) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
@@ -117,7 +119,7 @@ def run_installed_genesis(
             env=sandbox_env(workspace),
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
             check=True,
         )
     except subprocess.CalledProcessError as error:

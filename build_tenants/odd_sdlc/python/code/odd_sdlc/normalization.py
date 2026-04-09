@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 
 NORMALIZATION_REPORT_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-normalization.json")
 IMPORTED_REQUIREMENTS_PATH = Path("specification/requirements/00-imported-sources.md")
+PROJECT_BOOTSTRAP_PATH = Path(".ai-workspace/context/project_bootstrap.md")
 
 
 def default_project_slug(workspace_root: Path) -> str:
@@ -65,6 +67,156 @@ def _imported_sources_markdown(workspace_root: Path) -> str:
     )
 
 
+def _markdown_headings(path: Path) -> list[str]:
+    headings: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            headings.append(stripped)
+    return headings
+
+
+def _first_heading(path: Path) -> str | None:
+    for heading in _markdown_headings(path):
+        return heading.lstrip("#").strip()
+    return None
+
+
+def _project_title_from_intent(path: Path) -> str | None:
+    pattern = re.compile(r"^\*\*Project\*\*:\s*(.+?)\s*$")
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = pattern.match(line.strip())
+        if match:
+            title = match.group(1).strip()
+            if title:
+                return title
+    return None
+
+
+def _project_identity(workspace_root: Path) -> tuple[str | None, str | None]:
+    intent_path = workspace_root / "specification" / "INTENT.md"
+    if intent_path.exists():
+        title = _project_title_from_intent(intent_path)
+        if title:
+            return title, intent_path.relative_to(workspace_root).as_posix()
+    for source in _imported_requirement_sources(workspace_root):
+        title = _first_heading(source)
+        if title:
+            return title, source.relative_to(workspace_root).as_posix()
+    return None, None
+
+
+def _ontology_anchor_headings(path: Path) -> list[str]:
+    keywords = (
+        "ontology",
+        "axiom",
+        "executive summary",
+        "intent",
+        "object",
+        "morphism",
+        "terminology",
+        "architecture",
+        "domain",
+        "philosophy",
+    )
+    anchors: list[str] = []
+    for heading in _markdown_headings(path):
+        normalized = heading.lower()
+        if any(keyword in normalized for keyword in keywords):
+            anchors.append(heading.lstrip("#").strip())
+    return anchors
+
+
+def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, platform: str) -> str:
+    imported = _imported_requirement_sources(workspace_root)
+    intent_path = workspace_root / "specification" / "INTENT.md"
+    readme = workspace_root / "README.md"
+    identity_title, identity_source = _project_identity(workspace_root)
+    candidate_titles = []
+    if intent_path.exists():
+        title = _project_title_from_intent(intent_path) or _first_heading(intent_path)
+        if title:
+            candidate_titles.append((intent_path.relative_to(workspace_root).as_posix(), title))
+    for source in imported:
+        title = _first_heading(source)
+        if title:
+            candidate_titles.append((source.relative_to(workspace_root).as_posix(), title))
+    if readme.exists():
+        title = _first_heading(readme)
+        if title:
+            candidate_titles.append(("README.md", f"{title} [provenance/context]"))
+
+    title_lines = (
+        [f"- `{source}`: {title}" for source, title in candidate_titles]
+        or ["- no source title detected"]
+    )
+
+    ontology_lines: list[str] = []
+    seen_anchors: set[tuple[str, str]] = set()
+    candidate_sources = tuple(path for path in (readme, *imported) if path.exists())
+    for source in candidate_sources:
+        rel = source.relative_to(workspace_root).as_posix()
+        for anchor in _ontology_anchor_headings(source):
+            key = (rel, anchor)
+            if key in seen_anchors:
+                continue
+            seen_anchors.add(key)
+            ontology_lines.append(f"- `{rel}` → {anchor}")
+
+    if not ontology_lines:
+        ontology_lines.append("- no explicit ontology anchors detected in imported authority")
+
+    return "\n".join(
+        (
+            "# Project Bootstrap",
+            "",
+            "This generated surface is a deterministic read model over imported project authority.",
+            "It is not a replacement for project-owned specification truth.",
+            "",
+            "## Workspace Identity",
+            f"- workspace: `{workspace_root.name}`",
+            f"- project slug: `{project_slug}`",
+            f"- platform: `{platform}`",
+            "",
+            "## Project Identity",
+            (
+                f"- authoritative project title: `{identity_title}`"
+                if identity_title
+                else "- authoritative project title: not confidently determined from imported authority"
+            ),
+            (
+                f"- identity source: `{identity_source}`"
+                if identity_source
+                else "- identity source: no explicit imported identity surface detected"
+            ),
+            "- workspace/template/bootstrap provenance does not change project identity",
+            "",
+            "## Source Titles",
+            *title_lines,
+            "",
+            "## Ontology Anchors",
+            *ontology_lines,
+            "",
+            "## Read Order",
+            "- `specification/INTENT.md` when present",
+            "- `specification/requirements/00-imported-sources.md`",
+            "- imported requirement-like sources listed there",
+            "- `README.md` only as provenance/context after the imported authority",
+            "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
+            "",
+            "## Installed Runtime Start Surface",
+            "- inspect current gaps with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
+            "- trigger full odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`",
+            "- treat legacy bootstrap instructions in imported project docs that mention `genesis_sdlc`, `.gsdlc`, or older scaffolds as provenance only, not active runtime guidance for this installed workspace",
+            "",
+            "## Interpretation Rule",
+            "- use this surface to orient quickly",
+            "- use imported project sources as authority",
+            "- treat README/bootstrap history and template language as provenance unless an imported authority surface makes it project-defining",
+            "- if ontology remains incomplete, say so explicitly rather than inferring it from repository context",
+            "",
+        )
+    )
 def _default_product_surface(workspace_root: Path) -> str:
     imported = _imported_requirement_sources(workspace_root)
     bullets = (
@@ -186,14 +338,12 @@ def _normalize_project_constraints(
             indent = line[: len(line) - len(line.lstrip())]
             updated.append(f'{indent}name: "{workspace_root.name}"')
             continue
-        if in_design_tenants and stripped.startswith("- name:") and not design_tenant_seen:
-            indent = line[: len(line) - len(line.lstrip())]
-            updated.append(f'{indent}- name: "{platform}"')
+        if in_design_tenants and stripped.startswith("- name:"):
             design_tenant_seen = True
+            updated.append(line)
             continue
         if in_design_tenants and stripped.startswith("output_dir:") and design_tenant_seen:
-            indent = line[: len(line) - len(line.lstrip())]
-            updated.append(f'{indent}output_dir: "build_tenants/{project_slug}/{platform}/"')
+            updated.append(line)
             continue
         updated.append(line)
 
@@ -203,7 +353,7 @@ def _normalize_project_constraints(
             path,
             normalized,
             kind="normalize_project_constraints",
-            detail="updated workspace identity and tenant output_dir to the current build_tenants layout",
+            detail="updated workspace identity while preserving the declared realization root and tenant selection",
             actions=actions,
         )
 
@@ -261,6 +411,27 @@ def normalize_workspace(
             detail="captured imported requirement-like sources under the canonical requirements root",
             actions=actions,
         )
+
+    project_bootstrap = root / PROJECT_BOOTSTRAP_PATH
+    bootstrap_content = _project_bootstrap_markdown(root, project_slug=slug, platform=platform)
+    if not project_bootstrap.exists():
+        _write_text(
+            project_bootstrap,
+            bootstrap_content,
+            kind="create_project_bootstrap",
+            detail="created deterministic project bootstrap read model from imported authority",
+            actions=actions,
+        )
+    else:
+        original_bootstrap = project_bootstrap.read_text(encoding="utf-8")
+        if original_bootstrap != bootstrap_content:
+            _write_text(
+                project_bootstrap,
+                bootstrap_content,
+                kind="update_project_bootstrap",
+                detail="updated deterministic project bootstrap read model from imported authority",
+                actions=actions,
+            )
 
     _normalize_project_constraints(
         root,

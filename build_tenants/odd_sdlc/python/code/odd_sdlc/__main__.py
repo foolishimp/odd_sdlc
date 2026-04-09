@@ -1,5 +1,5 @@
 # Implements: REQ-F-ODDSDLC-003
-"""CLI entry for the first odd_sdlc slice."""
+"""CLI entry for the active odd_sdlc software-domain package."""
 from __future__ import annotations
 
 import argparse

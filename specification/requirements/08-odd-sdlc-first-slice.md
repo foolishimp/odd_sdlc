@@ -1,10 +1,18 @@
 # odd_sdlc First Slice Requirements
 
 **Family**: REQ-F-ODDSDLC-*
-**Status**: Active
+**Status**: Superseded
 **Category**: Capability
+**Superseded By**: `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 
-This family defines the first real `odd_sdlc` tenant slice.
+This family records the original first real `odd_sdlc` tenant slice.
+
+It is retained as superseded source material for the transformation into the
+full software-domain package.
+
+Its retained capability content must be re-adopted explicitly into the active
+software-domain surface. Nothing in this file remains current operative law by
+inertia.
 
 ### REQ-F-ODDSDLC-001 — odd_sdlc is the first live tenant package
 
@@ -110,6 +118,16 @@ operation.
   constraint wiring
 - AC-4: normalization is idempotent and leaves imported authority surfaces in
   place rather than rewriting them into a different project truth
+- AC-5: the install path writes a domain-governance instruction section into
+  `CLAUDE.md` and `AGENTS.md` that frames the workspace as a target project
+  governed by `odd_sdlc`, while preserving the generic GTL bootloader section
+  installed by `abiogenesis`
+- AC-6: the ownership boundary over installed surfaces is explicit:
+  - imported `specification/*` remains project-owned authority
+  - `.genesis/*` and the GTL bootloader section remain `abiogenesis`-owned
+  - the `odd_sdlc` instruction section, runtime contract, normalization report,
+    and generated project bootstrap read model remain installer-owned domain
+    surfaces
 
 ### REQ-F-ODDSDLC-008 — odd_sdlc publishes the first reusable higher-order consensus harness
 

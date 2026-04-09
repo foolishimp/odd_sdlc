@@ -71,6 +71,7 @@ from .frames import (
 from .identity import RuntimeIdentity
 from .materialization import MaterializationRequest, derive_bundle, materialize_graph_function
 from .policy import materialize_policy_concern, resolve_policy_bundle
+from .policy_defaults import execute_closure_policy, execute_proof_policy
 from .provenance import spec_hash_for
 from .selection import (
     SelectionDecision,
@@ -1670,26 +1671,45 @@ def _iterated_outcome(
         result["work_key"] = runtime.work_key
 
     if not (fd_failing or fp_failing or fh_failing):
+        proof_policy = materialize_policy_concern(runtime.resolved_policy, "proof")
+        closure_policy = materialize_policy_concern(runtime.resolved_policy, "closure")
+        synthetic_assessments = tuple(
+            {
+                "evaluator": evaluator.name,
+                "result": "pass",
+            }
+            for evaluator in vector.evaluators
+        )
+        proof_decision = execute_proof_policy(proof_policy, assessments=synthetic_assessments)
+        proof_event_type = "proof_passed" if proof_decision["passed"] else "proof_failed"
         proof_event = _emit_event(
             runtime.stream,
-            "proof_passed",
+            proof_event_type,
             {
                 "call_id": call_id,
                 "edge": vector.name,
-                "policy_mode": materialize_policy_concern(runtime.resolved_policy, "proof").get("mode"),
+                "policy_mode": proof_policy.get("mode"),
+                "policy_reason": proof_decision.get("reason"),
             },
             context=event_context,
         )
+        if not proof_decision["passed"]:
+            return result
+        closure_decision = execute_closure_policy(closure_policy, proof_decision=proof_decision)
+        closure_event_type = "closure_passed" if closure_decision["passed"] else "closure_failed"
         closure_event = _emit_event(
             runtime.stream,
-            "closure_passed",
+            closure_event_type,
             {
                 "call_id": call_id,
                 "edge": vector.name,
-                "policy_mode": materialize_policy_concern(runtime.resolved_policy, "closure").get("mode"),
+                "policy_mode": closure_policy.get("mode"),
+                "policy_reason": closure_decision.get("reason"),
             },
             context=event_context,
         )
+        if not closure_decision["passed"]:
+            return result
         if active_frame is None and call_id:
             _emit_event(
                 runtime.stream,

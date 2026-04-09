@@ -17,8 +17,5 @@ venv/
 .ai-workspace/reviews/pending/
 .ai-workspace/reviews/proxy-log/
 
-# Local assistant scratch comments
-.ai-workspace/comments/claude/
-
 # Sandbox historical run archives
 build_tenants/*/python/test_runs/

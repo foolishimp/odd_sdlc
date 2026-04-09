@@ -1,6 +1,6 @@
 # Implements: REQ-F-ASSETMODEL-004
 # Implements: REQ-F-ODDSDLC-002
-"""Named function catalog for the first odd_sdlc slice."""
+"""Named function catalog for the retained odd_sdlc proving subset."""
 from __future__ import annotations
 
 from .domain_model import FunctionCatalogEntry
@@ -132,5 +132,26 @@ FUNCTION_CATALOG: tuple[FunctionCatalogEntry, ...] = (
         inputs=("requirement_surface", "design_surface", "scenario_surface", "code_surface", "testcase_authority_surface", "test_run_archive_surface"),
         outputs=("release_surface",),
         backing_graph_function="prepare_release_surface",
+    ),
+    FunctionCatalogEntry(
+        name="prepare_deployment_surface",
+        intent="Project the current qualified release position into a governed deployment record for the active software branch.",
+        inputs=("release_surface",),
+        outputs=("deployment_surface",),
+        backing_graph_function="prepare_deployment_surface",
+    ),
+    FunctionCatalogEntry(
+        name="derive_runtime_observation_surface",
+        intent="Bind returned runtime or execution evidence back into the worksite as a governed observation surface.",
+        inputs=("deployment_surface", "test_run_archive_surface"),
+        outputs=("runtime_observation_surface",),
+        backing_graph_function="derive_runtime_observation_surface",
+    ),
+    FunctionCatalogEntry(
+        name="derive_retrofit_plan_surface",
+        intent="Plan the next bounded retrofit wave from returned runtime observation and the current release position.",
+        inputs=("runtime_observation_surface", "release_surface"),
+        outputs=("retrofit_plan_surface",),
+        backing_graph_function="derive_retrofit_plan_surface",
     ),
 )

@@ -9,6 +9,7 @@ from typing import Any
 
 from genesis.binding import Worker
 from genesis.events import EventStream
+from genesis.identity import RuntimeIdentity
 from genesis.install import workspace_bootstrap
 from genesis.services import Scope, gen_gaps, gen_iterate, gen_start
 
@@ -16,6 +17,7 @@ from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
 from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
+from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
 
@@ -24,6 +26,7 @@ class AppConfig:
     workspace_root: Path
     runtime_config: dict[str, Any] = field(default_factory=dict)
     build: str | None = None
+    runtime_identity: RuntimeIdentity | None = None
 
 
 @dataclass
@@ -38,6 +41,7 @@ class OddSdlcApp:
             workspace_root=self.config.workspace_root,
             build=self.config.build,
             worker=self.worker,
+            runtime_identity=self.config.runtime_identity,
             runtime_config=self.config.runtime_config,
         )
 
@@ -47,6 +51,7 @@ def bootstrap(
     workspace_root: str | Path = ".",
     runtime_config: dict[str, Any] | None = None,
     build: str | None = None,
+    runtime_identity: RuntimeIdentity | None = None,
 ) -> AppConfig:
     return AppConfig(
         workspace_root=Path(workspace_root).resolve(),
@@ -55,6 +60,7 @@ def bootstrap(
             **dict(runtime_config or {}),
         },
         build=build,
+        runtime_identity=runtime_identity,
     )
 
 
@@ -90,10 +96,13 @@ def catalog(app: OddSdlcApp) -> dict:
         "workspace_root": str(workspace_root),
         "semantic_facets": [facet.to_dict() for facet in SEMANTIC_FACETS.values()],
         "asset_types": [profile.to_dict() for profile in ASSET_TYPES.values()],
+        "asset_families": [descriptor.to_dict() for descriptor in ASSET_FAMILIES],
+        "work_act_types": [descriptor.to_dict() for descriptor in WORK_ACT_TYPES],
         "assets": [asset.to_dict() for asset in bootstrap_assets(workspace_root)],
         "collections": [bootstrap_input_collection(workspace_root).to_dict()],
         "bindings": [binding.to_dict() for binding in bootstrap_bindings(workspace_root)],
         "functions": [entry.to_dict() for entry in FUNCTION_CATALOG],
+        "edge_contracts": [descriptor.to_dict() for descriptor in EDGE_CONTRACTS],
         "programs": [entry.to_dict() for entry in PROGRAM_CATALOG],
         "graph_functions": [
             {

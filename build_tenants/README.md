@@ -10,6 +10,7 @@ The current active tenant line is:
 
 - shared realization law in `common/`
 - the first live tenant package in `odd_sdlc/python/`
+- the incubating service tenant in `odd_service/python/`
 
 The generated `odd_method/python/` scaffold remains deferred bootstrap
 reference only.

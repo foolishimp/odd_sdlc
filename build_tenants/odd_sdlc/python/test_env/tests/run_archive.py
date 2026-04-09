@@ -18,6 +18,12 @@ from typing import Any
 TESTS_DIR = Path(__file__).resolve().parent
 VARIANT_ROOT = TESTS_DIR.parents[1]
 ODD_ROOT = TESTS_DIR.parents[4]
+CODE_PATH = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+
+if str(CODE_PATH) not in sys.path:
+    sys.path.insert(0, str(CODE_PATH))
+
+from odd_sdlc.workspace_assets import asset_path  # noqa: E402
 
 
 def _safe_name(value: str) -> str:
@@ -134,12 +140,15 @@ class RunArchive:
         snapshot_root.mkdir(parents=True, exist_ok=True)
 
         captured: list[str] = []
+        governed_surfaces = (
+            asset_path(workspace_root, "intent_surface").relative_to(workspace_root),
+            asset_path(workspace_root, "product_surface").relative_to(workspace_root),
+            asset_path(workspace_root, "goal_surface").relative_to(workspace_root),
+            asset_path(workspace_root, "requirement_surface").relative_to(workspace_root),
+        )
         for relative in (
             Path(".ai-workspace"),
-            Path("specification/INTENT.md"),
-            Path("specification/PRODUCT.md"),
-            Path("specification/GOALS.md"),
-            Path("specification/requirements"),
+            *governed_surfaces,
         ):
             source = workspace_root / relative
             if source.is_dir():

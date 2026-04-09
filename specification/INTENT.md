@@ -34,6 +34,9 @@ The project must deliver:
   through the full ODD SDLC, and closed as a deployed release
 - a dedicated-release model for existing applications so one operator,
   customer, or team can derive a tuned variant from the shared product line
+- an enduring orchestration plane for ODD work that can wrap the direct local
+  engine path with reconnectable sessions, named workers, async dispatch, and
+  browser-safe observation without creating a rival runtime truth
 - explicit adoption rules for any carried-forward truth
 
 ## Constraints
@@ -45,6 +48,8 @@ The project is constrained by these rules:
 - ABG owns traversal, execution, and raw runtime fact truth
 - `odd_method` must not create a product-local shadow-runtime seam after ABG
   dispatch
+- any orchestration or service layer incubated inside `odd_method` must remain
+  subordinate to ABG for runs, events, convergence, lineage, and provenance
 - capability claims require written testcase authority and scenario proof
 - lightweight means smaller and cleaner constitutional and runtime surfaces, not
   hidden behavior

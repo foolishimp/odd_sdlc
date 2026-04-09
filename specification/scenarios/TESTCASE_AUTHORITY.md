@@ -12,4 +12,5 @@ requirement families.
 | `REQ-F-REALIZATION-*` | `04-tenant-realization-topology.md` | proves the standard tenant topology and explicit realization-law boundaries |
 | `REQ-F-ASSET-*` | `05-bootstrap-assets-and-recursive-edges.md` | proves the bootstrap asset graph and recursive upstream/downstream contracts |
 | `REQ-F-ASSETMODEL-*` | `06-first-odd-sdlc-asset-function-call.md` | proves URI-addressed asset typing, binding, and callable asset graphs |
-| `REQ-F-ODDSDLC-*` | `06-first-odd-sdlc-asset-function-call.md`, `07-canonical-sandbox-repeatability.md` | proves the first live odd_sdlc tenant slice, its first runtime call, repeatable sandbox execution, and the first reusable consensus harness plus its isolated live proof lane |
+| `REQ-F-ODDSDLC-*` | `06-first-odd-sdlc-asset-function-call.md`, `07-canonical-sandbox-repeatability.md`, `09-odd-sdlc-software-domain-worksite-lifecycle.md` | proves the active odd_sdlc software-domain package, its retained proving subset runtime call, repeatable sandbox execution, the software-domain buildout and worksite lifecycle, and the reusable consensus harness plus its isolated live proof lane |
+| `REQ-F-ODDSVC-*` | `08-odd-service-orchestration-plane.md` | proves the service carve-out, orchestration/runtime boundary, peer client surface, worker routing, and remote snapshot-verification contract |

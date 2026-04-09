@@ -41,6 +41,11 @@ development environment:
 - install-and-normalize path: the tenant can install itself into an imported or
   stale workspace, write the runtime contract, and standardize the canonical
   bootstrap surfaces required for operation
+- instruction/provenance path: the installed workspace carries mixed-provenance
+  orientation surfaces where imported `specification/*` remains project truth,
+  the GTL bootloader remains kernel-owned, and the `odd_sdlc` governance
+  preamble plus generated bootstrap and normalization read models remain
+  installer-owned domain surfaces
 - binding path: workspace assets are inventoried and classified by URI and
   asset type
 - gaps path: the tenant can project the first runtime gaps over the published
@@ -56,7 +61,7 @@ development environment:
 - recursive-implementation path: the generated design and scenario surfaces
   open a bounded recursive implementation SDLC that yields implementation
   design, explicit stack choice, generated module structure, and executable
-  code under `build_tenants/odd_method/python/code`
+  code under `build_tenants/odd_sdlc/python/code`
 - recursive-test path: the generated design and scenario surfaces open a
   bounded recursive test SDLC that yields test design, explicit stack choice,
   generated test module structure, and archived test-run evidence
@@ -97,3 +102,6 @@ development environment:
 8. the tenant exposes one reusable higher-order consensus harness whose outer
    contract and injected stage functions are machine-readable and whose live
    proof remains attributable through ordinary ABG event and provenance flow
+9. a fresh agent in the installed workspace can distinguish project-owned
+   authority from installer-owned read models and instruction sections without
+   treating the imported project as a GTL/ABG app in identity terms

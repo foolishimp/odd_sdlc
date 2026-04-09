@@ -30,14 +30,11 @@ if str(TESTS_DIR) not in sys.path:
 
 from genesis.transport import agent_ready, call_agent  # noqa: E402
 from odd_sdlc.fd_checks import (  # noqa: E402
-    CONSENSUS_DECISION_MARKER,
-    INTENT_MARKER,
-    REVIEW_ASSESSMENT_MARKER,
-    REVIEWED_DESIGN_MARKER,
     consensus_decision_dependency_surfaces_present,
     product_dependency_surfaces_present,
     reviewed_design_dependency_surfaces_present,
 )
+from odd_sdlc.workspace_assets import assess_generated_asset_contract, asset_path, asset_relative_path  # noqa: E402
 from sandbox_runtime import (  # noqa: E402
     run_constructor_for_start,
     install_kernel_sandbox,
@@ -176,15 +173,9 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
 
 def _validate_intent_delivery(workspace: Path, *, manifest: dict[str, object]) -> list[str]:
     failures: list[str] = []
-    intent_path = workspace / "specification" / "INTENT.md"
-    if not intent_path.exists():
-        failures.append("INTENT.md was not created or updated")
-    else:
-        content = intent_path.read_text(encoding="utf-8")
-        if not content.startswith("# Intent"):
-            failures.append("INTENT.md must retain the '# Intent' heading")
-        if INTENT_MARKER not in content:
-            failures.append("INTENT.md is missing the required bounded-constructor marker text")
+    intent_attestation = assess_generated_asset_contract(workspace, "intent_surface")
+    if intent_attestation["contract_satisfied"] is not True:
+        failures.append("INTENT.md must satisfy the generated intent_surface contract")
     if product_dependency_surfaces_present(workspace) != 0:
         failures.append("product_dependency_surfaces_present must pass after the intent update")
 
@@ -203,6 +194,14 @@ def _validate_intent_delivery(workspace: Path, *, manifest: dict[str, object]) -
         failures.append("assessment result JSON does not target derive_intent_surface")
     if not result_payload.get("actor"):
         failures.append("assessment result JSON must record a non-empty actor")
+    attestation = result_payload.get("attestation")
+    if not isinstance(attestation, dict):
+        failures.append("assessment result JSON must include a constructor attestation object")
+    else:
+        if attestation.get("asset_id") != "intent_surface":
+            failures.append("constructor attestation must target intent_surface")
+        if attestation.get("contract_satisfied") is not True:
+            failures.append("constructor attestation must mark the intent surface contract as satisfied")
     assessments = result_payload.get("assessments")
     if not isinstance(assessments, list) or not assessments:
         failures.append("assessment result JSON must contain at least one assessment")
@@ -245,7 +244,9 @@ def _call_codex_with_single_repair(
         + "\n\n[REPAIR REQUIRED]\n"
         + "The workspace artifact and/or assessment JSON still fail deterministic checks.\n"
         + "\n".join(f"- {failure}" for failure in failures)
-        + "\nRevise specification/INTENT.md and the assessment JSON at "
+        + "\nRevise "
+        + asset_relative_path("intent_surface")
+        + " and the assessment JSON at "
         + str(manifest["result_path"])
         + ". Update the files directly; do not answer with commentary only."
     )
@@ -262,49 +263,42 @@ def _call_codex_with_single_repair(
 
 def _validate_code_delivery(workspace: Path, *, manifest: dict[str, object]) -> list[str]:
     failures: list[str] = []
-    package_root = workspace / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl"
-    expected_files = (
-        package_root / "__init__.py",
-        package_root / "__main__.py",
-        package_root / "app.py",
-        package_root / "workflow.py",
-    )
-    for path in expected_files:
-        if not path.exists():
-            failures.append(f"generated code file missing: {path.relative_to(workspace)}")
-    if failures:
+    package_root = asset_path(workspace, "code_surface")
+    code_attestation = assess_generated_asset_contract(workspace, "code_surface")
+    if code_attestation["contract_satisfied"] is not True:
+        failures.append("code_surface must satisfy the generated code_surface contract")
         return failures
 
-    app_spec = importlib.util.spec_from_file_location("odd_generated_impl.app", package_root / "app.py")
+    app_spec = importlib.util.spec_from_file_location("odd_sdlc_proving_impl.app", package_root / "app.py")
     if app_spec is None or app_spec.loader is None:
         failures.append("generated app module could not be loaded")
         return failures
     app_module = importlib.util.module_from_spec(app_spec)
     app_spec.loader.exec_module(app_module)
     greeting = app_module.hello_message()
-    if greeting != "Hello from odd_method.":
-        failures.append("generated hello_message() must return 'Hello from odd_method.'")
+    if greeting != "Hello from odd_sdlc proving subset.":
+        failures.append("generated hello_message() must return 'Hello from odd_sdlc proving subset.'")
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         exit_code = app_module.main()
-    if output.getvalue().strip() != "Hello from odd_method.":
-        failures.append("generated main() must print 'Hello from odd_method.'")
+    if output.getvalue().strip() != "Hello from odd_sdlc proving subset.":
+        failures.append("generated main() must print 'Hello from odd_sdlc proving subset.'")
     if exit_code != 0:
         failures.append("generated main() must return 0")
 
-    workflow_spec = importlib.util.spec_from_file_location("odd_generated_impl.workflow", package_root / "workflow.py")
+    workflow_spec = importlib.util.spec_from_file_location("odd_sdlc_proving_impl.workflow", package_root / "workflow.py")
     if workflow_spec is None or workflow_spec.loader is None:
         failures.append("generated workflow module could not be loaded")
         return failures
     workflow_module = importlib.util.module_from_spec(workflow_spec)
     workflow_spec.loader.exec_module(workflow_module)
     summary = workflow_module.implementation_summary()
-    if summary.get("entry_module") != "odd_generated_impl.app":
-        failures.append("generated implementation summary must expose odd_generated_impl.app as entry_module")
+    if summary.get("entry_module") != "odd_sdlc_proving_impl.app":
+        failures.append("generated implementation summary must expose odd_sdlc_proving_impl.app as entry_module")
     if summary.get("entrypoint") != "main":
         failures.append("generated implementation summary must expose main as entrypoint")
-    if summary.get("hello_message") != "Hello from odd_method.":
-        failures.append("generated implementation summary must expose the hello-world message")
+    if summary.get("hello_message") != "Hello from odd_sdlc proving subset.":
+        failures.append("generated implementation summary must expose the current proving-subset message")
 
     result_path = Path(str(manifest["result_path"]))
     if not result_path.exists():
@@ -319,6 +313,14 @@ def _validate_code_delivery(workspace: Path, *, manifest: dict[str, object]) -> 
         failures.append("assessment result JSON does not target derive_code_surface")
     if not result_payload.get("actor"):
         failures.append("assessment result JSON must record a non-empty actor")
+    attestation = result_payload.get("attestation")
+    if not isinstance(attestation, dict):
+        failures.append("assessment result JSON must include a constructor attestation object")
+    else:
+        if attestation.get("asset_id") != "code_surface":
+            failures.append("constructor attestation must target code_surface")
+        if attestation.get("contract_satisfied") is not True:
+            failures.append("constructor attestation must mark the code surface contract as satisfied")
     assessments = result_payload.get("assessments")
     if not isinstance(assessments, list) or not assessments:
         failures.append("assessment result JSON must contain at least one assessment")
@@ -361,7 +363,9 @@ def _call_codex_for_code_with_single_repair(
         + "\n\n[REPAIR REQUIRED]\n"
         + "The generated code package and/or assessment JSON still fail deterministic checks.\n"
         + "\n".join(f"- {failure}" for failure in failures)
-        + "\nRevise the generated code files under build_tenants/odd_method/python/code/odd_generated_impl "
+        + "\nRevise the generated code files under "
+        + asset_relative_path("code_surface")
+        + " "
         + "and the assessment JSON at "
         + str(manifest["result_path"])
         + ". Update the files directly; do not answer with commentary only."
@@ -490,13 +494,13 @@ def _write_consensus_assessment_surface(
     workspace: Path,
     reviews: list[dict[str, Any]],
 ) -> Path:
-    design_path = workspace / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    target_path = workspace / "build_tenants" / "common" / "design" / "35-generated-review-assessments.md"
+    design_path = asset_path(workspace, "design_surface")
+    target_path = asset_path(workspace, "review_assessment_surface")
     design_snapshot = design_path.read_text(encoding="utf-8").strip()
     sections: list[str] = [
         "# Generated Review Assessments",
         "",
-        REVIEW_ASSESSMENT_MARKER,
+        asset_marker("review_assessment_surface"),
         "",
         "## Reviewers",
     ]
@@ -632,7 +636,7 @@ def _run_consensus_live_lane(
     assessment_path = _write_consensus_assessment_surface(workspace=workspace, reviews=reviews)
     result_path = _write_consensus_result_payload(manifest=manifest, reviews=reviews, edge_name=review_edge)
     review_content = assessment_path.read_text(encoding="utf-8")
-    assert REVIEW_ASSESSMENT_MARKER in review_content
+    assert asset_marker("review_assessment_surface") in review_content
     assert "### reviewer.traceability" in review_content
     assert "### reviewer.delivery" in review_content
     assert consensus_decision_dependency_surfaces_present(workspace) == 0
@@ -671,10 +675,10 @@ def _run_consensus_live_lane(
         )
         assert assessed_step["status"] == "ok"
 
-    decision_path = workspace / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md"
-    reviewed_design_path = workspace / "build_tenants" / "common" / "design" / "35-reviewed-odd-design.md"
-    assert CONSENSUS_DECISION_MARKER in decision_path.read_text(encoding="utf-8")
-    assert REVIEWED_DESIGN_MARKER in reviewed_design_path.read_text(encoding="utf-8")
+    decision_path = asset_path(workspace, "consensus_decision_surface")
+    reviewed_design_path = asset_path(workspace, "reviewed_design_surface")
+    assert asset_marker("consensus_decision_surface") in decision_path.read_text(encoding="utf-8")
+    assert asset_marker("reviewed_design_surface") in reviewed_design_path.read_text(encoding="utf-8")
     assert reviewed_design_dependency_surfaces_present(workspace) == 0
 
     final_gaps = json.loads(
@@ -714,7 +718,7 @@ def _run_consensus_live_lane(
         converged_consensus=True,
         consensus_graph_function=graph_function_name,
         reviewer_count=len(reviews),
-        reviewed_design="build_tenants/common/design/35-reviewed-odd-design.md",
+        reviewed_design=asset_relative_path("reviewed_design_surface"),
     )
 
 
@@ -913,7 +917,7 @@ def test_installed_executive_code_edge_live_codex_qualification(run_archive) -> 
     run_archive.update_summary(
         converged_code_edge=True,
         next_edge=next_start["edge"],
-        generated_package="build_tenants/odd_method/python/code/odd_generated_impl",
+        generated_package=asset_relative_path("code_surface"),
     )
 
 

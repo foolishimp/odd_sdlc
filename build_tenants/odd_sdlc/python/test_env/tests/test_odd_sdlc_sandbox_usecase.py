@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from odd_sdlc.workspace_assets import asset_path
 from sandbox_runtime import (
     complete_bootstrap_chain,
     install_kernel_sandbox,
@@ -68,12 +69,21 @@ EXPECTED_FUNCTIONS = (
     "derive_test_run_archive_surface",
     "qualify_testcase_authority",
     "prepare_release_surface",
+    "prepare_deployment_surface",
+    "derive_runtime_observation_surface",
+    "derive_retrofit_plan_surface",
 )
 
 EXPECTED_GRAPH_FUNCTIONS = (
     "bootstrap_release_self_test",
+    "release_operational_cycle",
     "review_design_consensus_round",
     "review_design_by_consensus",
+)
+EXPECTED_OPERATIONAL_STEPS = (
+    "prepare_deployment_surface",
+    "derive_runtime_observation_surface",
+    "derive_retrofit_plan_surface",
 )
 
 EXPECTED_CONSENSUS_STEPS = (
@@ -116,11 +126,25 @@ EXPECTED_UPDATED_ASSETS = (
     "testcase_authority_surface",
     "release_surface",
 )
+EXPECTED_OPERATIONAL_UPDATED_ASSETS = (
+    "deployment_surface",
+    "runtime_observation_surface",
+    "retrofit_plan_surface",
+)
+
+
+def _assert_constructor_attestation(constructor: dict[str, object]) -> None:
+    attestation = constructor.get("attestation")
+    assert isinstance(attestation, dict)
+    assert attestation["asset_id"] == constructor["target_asset"]
+    assert attestation["contract_satisfied"] is True
+    assert attestation["missing_files"] == []
+    assert attestation["member_prefix_failures"] == []
 
 
 def _load_generated_code_summary(workspace: Path) -> dict[str, object]:
-    workflow_path = workspace / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl" / "workflow.py"
-    spec = importlib.util.spec_from_file_location("odd_generated_impl.workflow", workflow_path)
+    workflow_path = asset_path(workspace, "code_surface") / "workflow.py"
+    spec = importlib.util.spec_from_file_location("odd_sdlc_proving_impl.workflow", workflow_path)
     if spec is None or spec.loader is None:
         raise AssertionError(f"Could not load generated workflow module from {workflow_path}")
     module = importlib.util.module_from_spec(spec)
@@ -132,8 +156,8 @@ def _load_generated_code_summary(workspace: Path) -> dict[str, object]:
 
 
 def _validate_generated_hello_world_app(workspace: Path) -> dict[str, object]:
-    app_path = workspace / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl" / "app.py"
-    spec = importlib.util.spec_from_file_location("odd_generated_impl.app", app_path)
+    app_path = asset_path(workspace, "code_surface") / "app.py"
+    spec = importlib.util.spec_from_file_location("odd_sdlc_proving_impl.app", app_path)
     if spec is None or spec.loader is None:
         raise AssertionError(f"Could not load generated app module from {app_path}")
     module = importlib.util.module_from_spec(spec)
@@ -166,52 +190,67 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 21
+    assert len(catalog["assets"]) == 24
+    assert [item["name"] for item in catalog["asset_families"]] == [
+        "worksite_inputs",
+        "solution_design",
+        "implementation_branch",
+        "qualification_branch",
+        "release_readiness",
+        "deployment_records",
+        "runtime_evidence",
+        "retrofit_plans",
+    ]
+    assert [item["name"] for item in catalog["work_act_types"]] == [
+        "generate",
+        "adopt",
+        "import",
+        "qualify",
+        "release",
+        "deploy",
+        "observe",
+        "retrofit",
+    ]
+    assert [item["name"] for item in catalog["edge_contracts"]] == [
+        "bootstrap_spec_foundation",
+        "materialize_implementation_branch",
+        "materialize_qualification_branch",
+        "prepare_release_readiness",
+        "publish_deployment_record",
+        "return_runtime_evidence",
+        "retrofit_and_relaunch",
+    ]
     assert [item["name"] for item in catalog["functions"]] == list(EXPECTED_FUNCTIONS)
     assert [item["name"] for item in catalog["graph_functions"]] == list(EXPECTED_GRAPH_FUNCTIONS)
-    assert [item["name"] for item in catalog["jobs"]] == ["bootstrap_release_self_test_job"]
+    assert [item["name"] for item in catalog["jobs"]] == ["bootstrap_release_self_test_job", "release_operational_cycle_job"]
     assert catalog["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
     assert [vector["name"] for vector in catalog["graph_functions"][0]["vectors"]] == list(EXPECTED_BOOTSTRAP_STEPS)
-    assert catalog["graph_functions"][1]["job_names"] == []
-    assert [vector["name"] for vector in catalog["graph_functions"][1]["vectors"]] == list(EXPECTED_CONSENSUS_STEPS)
-    assert catalog["graph_functions"][2]["template_kind"] == "symbolic"
-    assert catalog["graph_functions"][2]["vectors"] == []
+    assert catalog["graph_functions"][1]["job_names"] == ["release_operational_cycle_job"]
+    assert [vector["name"] for vector in catalog["graph_functions"][1]["vectors"]] == list(EXPECTED_OPERATIONAL_STEPS)
+    assert catalog["graph_functions"][2]["job_names"] == []
+    assert [vector["name"] for vector in catalog["graph_functions"][2]["vectors"]] == list(EXPECTED_CONSENSUS_STEPS)
+    assert catalog["graph_functions"][3]["template_kind"] == "symbolic"
+    assert catalog["graph_functions"][3]["vectors"] == []
 
     gaps = json.loads(
         run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps").stdout
     )
     run_archive.capture_json("gaps.json", gaps)
     assert gaps["converged"] is False
-    assert len(gaps["gaps"]) == 18
+    assert len(gaps["gaps"]) == 21
 
     chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
     run_archive.capture_json("chain.json", chain)
     assert [step["start"]["edge"] for step in chain] == list(EXPECTED_BOOTSTRAP_STEPS)
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in chain)
-    assert Path(chain[0]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Intent")
-    assert Path(chain[1]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Product")
-    assert Path(chain[2]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Goals")
-    assert Path(chain[3]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Bootstrap Requirements")
-    assert Path(chain[4]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Feature Decomposition")
-    assert Path(chain[5]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated UAT Testcases")
-    assert Path(chain[6]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated odd_sdlc Design")
-    assert Path(chain[7]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Scenarios")
-    assert Path(chain[8]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Implementation Design")
-    assert Path(chain[9]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Implementation Stack Profile")
-    assert Path(chain[10]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Implementation Modules")
-    assert (Path(chain[11]["constructor"]["target_path"]) / "__init__.py").read_text(encoding="utf-8").startswith('"""Generated odd_method implementation package."""')
-    assert Path(chain[12]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Design")
-    assert Path(chain[13]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Stack Profile")
-    assert Path(chain[14]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Modules")
-    assert Path(chain[15]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Test Run Archive")
-    assert Path(chain[16]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Testcase Authority")
-    assert Path(chain[17]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith("# Generated Release Surface")
+    for step in chain:
+        _assert_constructor_attestation(step["constructor"])
     assert all(step["assessed"]["status"] == "ok" for step in chain)
     generated_summary = _load_generated_code_summary(workspace)
-    assert generated_summary["package"] == "odd_generated_impl"
+    assert generated_summary["package"] == "odd_sdlc_proving_impl"
     assert generated_summary["graph_function"] == "bootstrap_release_self_test"
-    assert generated_summary["hello_message"] == "Hello from odd_method."
-    assert generated_summary["entry_module"] == "odd_generated_impl.app"
+    assert generated_summary["hello_message"] == "Hello from odd_sdlc proving subset."
+    assert generated_summary["entry_module"] == "odd_sdlc_proving_impl.app"
     assert generated_summary["entrypoint"] == "main"
     assert generated_summary["implementation_branch"] == list(EXPECTED_BOOTSTRAP_STEPS[8:12])
     assert generated_summary["artifacts"] == [
@@ -222,8 +261,8 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     ]
     generated_app = _validate_generated_hello_world_app(workspace)
     assert generated_app == {
-        "message": "Hello from odd_method.",
-        "stdout": "Hello from odd_method.",
+        "message": "Hello from odd_sdlc proving subset.",
+        "stdout": "Hello from odd_sdlc proving subset.",
         "exit_code": 0,
     }
 
@@ -263,26 +302,36 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     )
     run_archive.capture_json("query-domain.json", domain_query)
     assert sorted(domain_query.keys()) == [
+        "asset_families",
         "asset_types",
         "assets",
         "bindings",
+        "collections",
+        "edge_contracts",
         "functions",
         "gaps",
         "graph_functions",
         "jobs",
+        "programs",
         "query_contract",
         "semantic_facets",
+        "work_act_types",
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v3"
+    assert domain_query["query_contract"]["version"] == "v5"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
         "semantic_facets",
         "asset_types",
+        "asset_families",
         "assets",
+        "collections",
         "functions",
+        "edge_contracts",
+        "programs",
+        "work_act_types",
         "jobs",
         "graph_functions",
         "bindings",
@@ -293,6 +342,9 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert "runs" not in domain_query
     assert "graph_calls" not in domain_query
     assert "continuations" not in domain_query
+    assert domain_query["asset_families"][0]["name"] == "worksite_inputs"
+    assert domain_query["work_act_types"][0]["name"] == "generate"
+    assert domain_query["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"
 
     observed = json.loads(
         run_installed_odd_sdlc(workspace, "observe", archive=run_archive, label="odd_sdlc observe").stdout
@@ -374,15 +426,8 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
 
     assert [step["start"]["edge"] for step in completed_round] == list(EXPECTED_CONSENSUS_STEPS)
     assert all(step["assessed"]["status"] == "ok" for step in completed_round)
-    assert Path(completed_round[0]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
-        "# Generated Review Assessments"
-    )
-    assert Path(completed_round[1]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
-        "# Generated Consensus Decision"
-    )
-    assert Path(completed_round[2]["constructor"]["target_path"]).read_text(encoding="utf-8").startswith(
-        "# Reviewed odd_sdlc Design"
-    )
+    for step in completed_round:
+        _assert_constructor_attestation(step["constructor"])
 
     consensus_gaps = json.loads(
         run_installed_genesis(
@@ -469,6 +514,8 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
 
     assert [step["start"]["edge"] for step in completed_round] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
     assert all(step["assessed"]["status"] == "ok" for step in completed_round)
+    for step in completed_round:
+        _assert_constructor_attestation(step["constructor"])
 
     consensus_gaps = json.loads(
         run_installed_genesis(
@@ -512,17 +559,65 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
     assert payload["status"] == "ok"
     assert payload["program"]["name"] == "bootstrap_release_self_test"
     assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS)
-    assert payload["final_state"]["status"] == "converged"
+    assert payload["final_state"]["status"] == "iterated"
+    assert payload["final_state"]["edge"] == "prepare_deployment_surface"
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
     assert all(step["assessed"]["status"] == "ok" for step in payload["steps"])
 
     events = read_events(workspace)
     graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
-    assert [event["data"]["graph_function"] for event in graph_call_events] == ["bootstrap_release_self_test"] * len(
-        EXPECTED_BOOTSTRAP_STEPS
+    assert [event["data"]["graph_function"] for event in graph_call_events] == (
+        ["bootstrap_release_self_test"] * len(EXPECTED_BOOTSTRAP_STEPS)
+        + ["release_operational_cycle"]
     )
     assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 18
-    assert (workspace / "docs" / "40-generated-release.md").exists()
+    assert asset_path(workspace, "release_surface").exists()
+
+
+def test_operational_cycle_projects_deployment_runtime_and_retrofit_surfaces(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+
+    bootstrap_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap")
+    assert [step["start"]["edge"] for step in bootstrap_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
+
+    operational_chain = complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="operational",
+        steps=EXPECTED_OPERATIONAL_STEPS,
+    )
+    run_archive.capture_json("operational_chain.json", operational_chain)
+    assert [step["start"]["edge"] for step in operational_chain] == list(EXPECTED_OPERATIONAL_STEPS)
+    assert all(step["assessed"]["status"] == "ok" for step in operational_chain)
+
+    deployment_text = asset_path(workspace, "deployment_surface").read_text(encoding="utf-8")
+    runtime_text = asset_path(workspace, "runtime_observation_surface").read_text(encoding="utf-8")
+    retrofit_text = asset_path(workspace, "retrofit_plan_surface").read_text(encoding="utf-8")
+    assert "## Governed Deployment Record" in deployment_text
+    assert "- tests carried into deployment record:" in deployment_text
+    assert "## Returned Runtime Position" in runtime_text
+    assert "- report files returned:" in runtime_text
+    assert "## Retrofit Boundary" in retrofit_text
+    assert "## Planned Next Actions" in retrofit_text
+
+    events = read_events(workspace)
+    operational_graph_calls = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"]["edge"] in EXPECTED_OPERATIONAL_STEPS
+    ]
+    assert [event["data"]["graph_function"] for event in operational_graph_calls] == [
+        "release_operational_cycle"
+    ] * len(EXPECTED_OPERATIONAL_STEPS)
+    operational_updates = [
+        event
+        for event in events
+        if event["event_type"] == "asset_checkpoint_updated"
+        and event["data"]["asset_id"] in EXPECTED_OPERATIONAL_UPDATED_ASSETS
+    ]
+    assert [event["data"]["asset_id"] for event in operational_updates] == list(EXPECTED_OPERATIONAL_UPDATED_ASSETS)
 
 
 def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive) -> None:

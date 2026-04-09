@@ -14,7 +14,12 @@
 It provides an outcome-driven development domain expressed through GTL and
 executed through ABG.
 
-`odd_sdlc` is the first live domain package on that line.
+`odd_sdlc` is the first live domain package on that line and the current
+software-domain package under build-out.
+
+`odd_service` is the next incubating product line on that same method line.
+It is not a second runtime. It is the proposed enduring orchestration plane
+above `odd_sdlc` and below peer clients such as CLI agents and `odd_manager`.
 
 It gives a project a lawful way to declare:
 
@@ -23,9 +28,17 @@ It gives a project a lawful way to declare:
 - asset collections and typed asset nodes
 - named functions over asset graphs
 - executive GTL graph functions over the function catalog
+- a governed SDLC worksite lifecycle over request, specification, design,
+  implementation, qualification, release, deployment, runtime return, and
+  retrofit work
+- explicit software work acts and operational-return evidence with attributable
+  provenance
 - deterministic install-and-normalize behavior over imported or stale workspaces
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
+- an orchestration/service boundary for session lifecycle, worker registry,
+  dispatch routing, and client-safe observation that remains subordinate to ABG
+  runtime truth
 
 It adopts a singleton constitutional specification together with a standard
 project-owned realization topology rooted in `build_tenants/`.
@@ -138,6 +151,34 @@ execution.
 A declarative configuration surface that constrains evaluation, escalation,
 worker/backend selection, or closure expectations without redefining graph law.
 
+### Orchestration Plane
+
+A service-owned coordination layer above domain graph functions and below
+clients.
+
+An orchestration plane may own:
+
+- session lifecycle
+- worker registry
+- transport execution
+- async dispatch routing
+- observation-friendly client APIs
+
+It does not own run truth, convergence, or provenance.
+
+### Service Session
+
+A reconnectable service-owned coordination record around one workspace and one
+ABG run.
+
+A service session may track worker assignments, client subscriptions, and
+dispatch state, but it does not replace ABG runtime facts.
+
+### Worker Registry
+
+A service-owned directory of named local or remote workers that can satisfy
+declared dispatch contracts.
+
 ### Gap
 
 The projected delta from convergence for one asset, asset collection, or
@@ -155,6 +196,33 @@ an existing application line.
 
 A dedicated release preserves provenance to the governing product line while
 opening a lawful surface for local tuning, repricing, and deployment.
+
+### Software-Domain Package
+
+A tenant package that governs software-delivery work over explicit SDLC assets,
+typed graph edges, and runtime-returned operational evidence.
+
+### Worksite Lifecycle
+
+The governed software-domain cycle of request, gate, specify, design,
+implement, qualify, release, deploy, observe, return, retrofit, and relaunch.
+
+The project is therefore treated as an active worksite rather than as a
+generate-once surface tree.
+
+### Software Work Act
+
+A provenance-bearing constructive act over software-domain assets.
+
+The first lawful act classes include generated, adopted, imported, repaired,
+retrofitted, released, deployed, and returned work.
+
+### Runtime Return
+
+Operational evidence that comes back from execution, qualification, deployment,
+or live use into the governed SDLC line.
+
+Runtime return is a first-class domain input, not commentary outside the graph.
 
 ## Goal Model
 
@@ -190,6 +258,13 @@ The intended end-state product shape is:
     and deployment
 11. derive dedicated releases from existing application lines so one operator,
     customer, or team can tune the resulting application to local taste
+12. support an enduring orchestration plane that can coordinate named workers,
+    browser observation, and reconnectable sessions over the same GTL/ABG and
+    `odd_sdlc` execution law used by direct local CLI execution
+13. bring runtime-returned evidence back into the governed SDLC line as lawful
+    input to repair, retrofit, repricing, and maintenance-release work
+14. relaunch through the same governed line rather than treating release as the
+    end of the project
 
 ## Current Product Definition
 
@@ -204,11 +279,23 @@ The current product definition of `odd_method` is:
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
 - carrying `odd_sdlc` as the first live tenant package
+- repricing `odd_sdlc` from the current first-slice bootstrap toy into the
+  generic software-domain package on the line
+- treating an ODD project as an active SDLC worksite with build, qualify,
+  launch, return, retrofit, and relaunch acts
+- expanding the first-slice asset model toward request, implementation,
+  qualification, release, deployment, runtime-return, and maintenance assets
+- moving toward explicit per-edge transform dependency, configured `F_P`, and
+  layered `F_D` as domain law
+- keeping the current bootstrap-to-release toy subgraph as a proving subset
+  rather than the whole software-domain definition
 - publishing a top-level executive GTL graph function over the current toy subgraph
 - publishing reusable higher-order graph-function harnesses as ordinary GTL
   carriers rather than as hidden product-local engines
 - able to install itself into an imported workspace and normalize the canonical
   bootstrap surfaces it needs for operation
+- incubating `odd_service` as the next product line for orchestration,
+  session, worker, and client coordination above `odd_sdlc`
 - explicit in adoption of any carried-forward truth
 
 The current asset graph proven in the toy sandbox for `odd_sdlc` is:
@@ -221,16 +308,16 @@ The current asset graph proven in the toy sandbox for `odd_sdlc` is:
 - `{specification/requirements/} -> {specification/scenarios/20-generated-uat-testcases.md}`
 - `{specification/requirements/, build_tenants/common/design/20-generated-feature-decomp.md} -> {build_tenants/common/design/30-generated-odd-design.md}`
 - `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md} -> {specification/scenarios/40-generated-scenarios.md}`
-- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-design.md}`
-- `{build_tenants/odd_method/python/design/40-generated-implementation-design.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-stack.md}`
-- `{build_tenants/odd_method/python/design/40-generated-implementation-design.md, build_tenants/odd_method/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_method/python/design/40-generated-implementation-modules.md}`
-- `{build_tenants/odd_method/python/design/40-generated-implementation-modules.md, build_tenants/odd_method/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_method/python/code/odd_generated_impl/}`
+- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md}`
+- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md}`
+- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md, build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md}`
+- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md, build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl/}`
 - `{specification/scenarios/20-generated-uat-testcases.md, specification/scenarios/40-generated-scenarios.md} -> {specification/scenarios/30-generated-testcase-authority.md}`
 - `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-test-design.md}`
 - `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md} -> {build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md}`
 - `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md}`
 - `{build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md}`
-- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, build_tenants/odd_method/python/code/odd_generated_impl/, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
+- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl/, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
 
 The current top-level executive graph function over that subgraph is:
 
@@ -267,12 +354,15 @@ The consensus surfaces establish the first higher-order harness pattern:
 - the same higher-order shape is intended to be reusable later for schema,
   DQ-rules, release, and other review-governed subject assets
 
-The current build focus is to establish the first real `odd_sdlc` tenant slice:
+The current build focus is to reprice the first real `odd_sdlc` tenant slice
+into the generic software-domain package:
 
-- publish the first asset-typed function catalog
-- bind workspace assets by URI
-- execute the first bootstrap-plus-fanout dependency chain through ABG
-- prove the resulting runtime facts by post-mortem audit
+- ratify the software-domain doctrine and worksite lifecycle
+- expand the asset and provenance model beyond the bootstrap toy
+- replace placeholder implementation, release, and archive assumptions with
+  governed target binding and evidence truth
+- keep the proven bootstrap-plus-fanout chain as the first bounded proving
+  subset while the fuller domain is built out
 
 The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox is:
 

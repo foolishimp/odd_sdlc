@@ -21,11 +21,14 @@ The constitutional `specification/` surface is singleton project truth.
 | Entry | Kind | Path | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `common` | shared root | `build_tenants/common/` | Active | Current bootstrap realization root for `odd_method` |
-| `odd_sdlc` | tenant package | `build_tenants/odd_sdlc/python/` | Active | First live ODD domain tenant and first executable slice |
+| `odd_service` | service tenant | `build_tenants/odd_service/python/` | Incubating | Proposed enduring orchestration plane above `odd_sdlc`, still subordinate to ABG runtime truth |
+| `odd_sdlc` | tenant package | `build_tenants/odd_sdlc/python/` | Active | Current software-domain package; retained first slice is only a bounded proving subset |
 | `odd_method` | scaffold tenant | `build_tenants/odd_method/python/` | Deferred | Installer scaffold/example surface retained as bootstrap reference |
 
 ## Active Focus
 
 `common` remains the shared realization root.
 
-`odd_sdlc` is the first active tenant package.
+`odd_sdlc` is the current active software-domain tenant package.
+
+`odd_service` is the current incubating service line.

@@ -3,7 +3,7 @@
 `odd_sdlc` uses `F_P` for constructive semantic closure after cheap
 deterministic asset checks pass.
 
-The first slice keeps this narrow:
+The current retained proving subset keeps this narrow:
 
 - deterministic checks verify source-surface presence and rooted structure
 - probabilistic evaluation represents the unresolved semantic construction gap

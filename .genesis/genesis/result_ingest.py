@@ -15,6 +15,7 @@ from typing import Any
 from .events import EventContext, EventStream, emit
 from .continuation import continuation_state
 from .policy import materialize_policy_concern, resolve_policy_bundle
+from .policy_defaults import execute_closure_policy, execute_proof_policy
 from .provenance import _read_workflow_version
 
 
@@ -317,8 +318,8 @@ def ingest_fp_result(
             }
         )
 
-    proof_passed = all(assessment["result"] == "pass" for assessment in result_data["assessments"])
-    if proof_passed:
+    proof_decision = execute_proof_policy(proof_policy, assessments=result_data["assessments"])
+    if proof_decision["passed"]:
         proof_event = _event_writer(
             workspace,
             emit_event,
@@ -328,6 +329,7 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": proof_policy.get("mode"),
+                "policy_reason": proof_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,
@@ -345,9 +347,8 @@ def ingest_fp_result(
         emitted_count += 1
         latest_event_id = proof_event.get("event_id")
 
-        closure_config = closure_policy.get("config", {})
-        closure_passed = not (isinstance(closure_config, Mapping) and bool(closure_config.get("force_fail")))
-        if not closure_passed:
+        closure_decision = execute_closure_policy(closure_policy, proof_decision=proof_decision)
+        if not closure_decision["passed"]:
             closure_event = _event_writer(
                 workspace,
                 emit_event,
@@ -357,6 +358,7 @@ def ingest_fp_result(
                     "edge": result_data["edge"],
                     "manifest_id": manifest_id,
                     "policy_mode": closure_policy.get("mode"),
+                    "policy_reason": closure_decision.get("reason"),
                 },
                 workflow_version=workflow_version,
                 work_key=manifest_work_key or None,
@@ -468,6 +470,7 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": closure_policy.get("mode"),
+                "policy_reason": closure_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,
@@ -569,6 +572,7 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": proof_policy.get("mode"),
+                "policy_reason": proof_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,

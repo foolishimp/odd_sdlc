@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from .domain_model import ExecutiveProgramEntry
-from .gtl_module import BOOTSTRAP_RELEASE_SELF_TEST_INTENT, BOOTSTRAP_RELEASE_SELF_TEST_STEPS
+from .gtl_module import (
+    BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+    BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
+    RELEASE_OPERATIONAL_CYCLE_INTENT,
+    RELEASE_OPERATIONAL_CYCLE_STEPS,
+)
 
 
 BOOTSTRAP_RELEASE_SELF_TEST = ExecutiveProgramEntry(
@@ -13,8 +18,18 @@ BOOTSTRAP_RELEASE_SELF_TEST = ExecutiveProgramEntry(
     outputs=("release_surface",),
 )
 
+RELEASE_OPERATIONAL_CYCLE = ExecutiveProgramEntry(
+    name="release_operational_cycle",
+    intent=RELEASE_OPERATIONAL_CYCLE_INTENT,
+    steps=RELEASE_OPERATIONAL_CYCLE_STEPS,
+    outputs=("retrofit_plan_surface",),
+)
 
-PROGRAM_CATALOG: tuple[ExecutiveProgramEntry, ...] = (BOOTSTRAP_RELEASE_SELF_TEST,)
+
+PROGRAM_CATALOG: tuple[ExecutiveProgramEntry, ...] = (
+    BOOTSTRAP_RELEASE_SELF_TEST,
+    RELEASE_OPERATIONAL_CYCLE,
+)
 
 
 def program_by_name(name: str) -> ExecutiveProgramEntry:

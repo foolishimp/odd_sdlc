@@ -3,7 +3,7 @@
 # Implements: REQ-F-ASSETMODEL-003
 # Implements: REQ-F-ASSETMODEL-004
 # Implements: REQ-F-ASSETMODEL-005
-"""Domain model for the first odd_sdlc asset/function slice."""
+"""Domain model for odd_sdlc asset, function, and software-domain descriptors."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -106,6 +106,24 @@ class AssetCollection:
 
 
 @dataclass(frozen=True)
+class AssetFamilyDescriptor:
+    name: str
+    description: str
+    lifecycle_role: str
+    representative_asset_types: tuple[str, ...]
+    realization_status: str
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "lifecycle_role": self.lifecycle_role,
+            "representative_asset_types": list(self.representative_asset_types),
+            "realization_status": self.realization_status,
+        }
+
+
+@dataclass(frozen=True)
 class AssetNodeBinding:
     node: str
     asset_ids: tuple[str, ...]
@@ -114,6 +132,26 @@ class AssetNodeBinding:
         return {
             "node": self.node,
             "asset_ids": list(self.asset_ids),
+        }
+
+
+@dataclass(frozen=True)
+class WorkActDescriptor:
+    name: str
+    description: str
+    mutates_workspace: bool
+    produces_governed_evidence: bool
+    typical_asset_families: tuple[str, ...]
+    realization_status: str
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "mutates_workspace": self.mutates_workspace,
+            "produces_governed_evidence": self.produces_governed_evidence,
+            "typical_asset_families": list(self.typical_asset_families),
+            "realization_status": self.realization_status,
         }
 
 
@@ -132,6 +170,34 @@ class FunctionCatalogEntry:
             "inputs": list(self.inputs),
             "outputs": list(self.outputs),
             "backing_graph_function": self.backing_graph_function,
+        }
+
+
+@dataclass(frozen=True)
+class EdgeContractDescriptor:
+    name: str
+    description: str
+    source_asset_families: tuple[str, ...]
+    target_asset_family: str
+    configured_fp_role: str
+    preflight_fd_layers: tuple[str, ...]
+    postflight_fd_layers: tuple[str, ...]
+    work_report_contract: str
+    representative_functions: tuple[str, ...]
+    realization_status: str
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "source_asset_families": list(self.source_asset_families),
+            "target_asset_family": self.target_asset_family,
+            "configured_fp_role": self.configured_fp_role,
+            "preflight_fd_layers": list(self.preflight_fd_layers),
+            "postflight_fd_layers": list(self.postflight_fd_layers),
+            "work_report_contract": self.work_report_contract,
+            "representative_functions": list(self.representative_functions),
+            "realization_status": self.realization_status,
         }
 
 

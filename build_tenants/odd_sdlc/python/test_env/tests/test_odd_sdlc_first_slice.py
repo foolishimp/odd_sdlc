@@ -23,6 +23,7 @@ CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
 
 GRAPH_FUNCTION_NAMES = [
     "bootstrap_release_self_test",
+    "release_operational_cycle",
     "review_design_consensus_round",
     "review_design_by_consensus",
 ]
@@ -36,9 +37,20 @@ from odd_sdlc.app import bootstrap, catalog, initialize  # noqa: E402
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
     BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
+    RELEASE_OPERATIONAL_CYCLE_INTENT,
+    RELEASE_OPERATIONAL_CYCLE_STEPS,
     module as odd_sdlc_module,
 )
 from odd_sdlc.self_test import self_test  # noqa: E402
+from odd_sdlc.workspace_assets import (  # noqa: E402
+    ASSET_PATHS,
+    CODE_SURFACE_PREFIXES,
+    assess_generated_asset_contract,
+    asset_marker,
+    asset_marker_path,
+    asset_materialization_path,
+    asset_path,
+)
 from genesis.binding import module_to_executable_jobs  # noqa: E402
 
 
@@ -62,11 +74,100 @@ def _read_events(workspace_root: Path) -> list[dict]:
     ]
 
 
+def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    assert asset_path(tmp_path, "intent_surface") == tmp_path / "specification" / "INTENT.md"
+    assert asset_path(tmp_path, "requirement_surface") == tmp_path / "specification" / "requirements"
+    assert asset_path(tmp_path, "code_surface") == (
+        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
+    )
+    assert asset_path(tmp_path, "release_surface") == tmp_path / "docs" / "40-generated-release.md"
+    assert asset_path(tmp_path, "deployment_surface") == tmp_path / "docs" / "50-generated-deployment.md"
+    assert asset_path(tmp_path, "runtime_observation_surface") == tmp_path / "docs" / "60-generated-runtime-observation.md"
+    assert asset_path(tmp_path, "retrofit_plan_surface") == (
+        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "design" / "60-generated-retrofit-plan.md"
+    )
+    assert asset_materialization_path(tmp_path, "requirement_surface") == (
+        tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
+    )
+    assert asset_marker_path(tmp_path, "code_surface") == (
+        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl" / "__init__.py"
+    )
+
+
+def test_generated_asset_contract_assessment_for_file_surface(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    intent_path = asset_path(tmp_path, "intent_surface")
+    intent_path.write_text(
+        "\n".join(
+            (
+                "# Intent",
+                "",
+                asset_marker("intent_surface"),
+                "",
+                "Generated file-surface proof.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    attestation = assess_generated_asset_contract(tmp_path, "intent_surface")
+    assert attestation["asset_id"] == "intent_surface"
+    assert attestation["materialization_kind_expected"] == "file"
+    assert attestation["materialization_kind_actual"] == "file"
+    assert attestation["heading_matches"] is True
+    assert attestation["marker_present"] is True
+    assert attestation["contract_satisfied"] is True
+
+
+def test_generated_asset_contract_assessment_for_code_surface(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    package_root = asset_path(tmp_path, "code_surface")
+    package_root.mkdir(parents=True, exist_ok=True)
+    code_marker = asset_marker("code_surface")
+    file_contents = {
+        "__init__.py": "\n".join(
+            (
+                CODE_SURFACE_PREFIXES[0][1],
+                "",
+                f"# {code_marker}",
+                "",
+                "from .app import hello_message, main",
+                "",
+            )
+        ),
+        "__main__.py": "\n".join((CODE_SURFACE_PREFIXES[1][1], "", "from .app import main", "")),
+        "app.py": "\n".join((CODE_SURFACE_PREFIXES[2][1], "", "def hello_message() -> str:", "    return 'hi'", "")),
+        "workflow.py": "\n".join(
+            (
+                CODE_SURFACE_PREFIXES[3][1],
+                "",
+                "def implementation_summary() -> dict[str, object]:",
+                "    return {}",
+                "",
+            )
+        ),
+    }
+    for relative_path, content in file_contents.items():
+        (package_root / relative_path).write_text(content, encoding="utf-8")
+
+    attestation = assess_generated_asset_contract(tmp_path, "code_surface")
+    assert attestation["asset_id"] == "code_surface"
+    assert attestation["materialization_kind_expected"] == "directory"
+    assert attestation["materialization_kind_actual"] == "directory"
+    assert attestation["missing_files"] == []
+    assert attestation["member_prefix_failures"] == []
+    assert attestation["marker_present"] is True
+    assert attestation["contract_satisfied"] is True
+
+
 def test_module_publishes_first_asset_function_catalog() -> None:
     module = odd_sdlc_module()
     graph_function_names = [graph_function.name for graph_function in module.graph_functions]
     assert graph_function_names == [
         "bootstrap_release_self_test",
+        "release_operational_cycle",
         "review_design_consensus_round",
         "review_design_by_consensus",
     ]
@@ -76,6 +177,7 @@ def test_module_publishes_first_asset_function_catalog() -> None:
     }
     assert input_signatures == {
         "bootstrap_release_self_test": ["input_set"],
+        "release_operational_cycle": ["release_surface", "test_run_archive_surface"],
         "review_design_consensus_round": ["design_surface"],
         "review_design_by_consensus": ["design_surface"],
     }
@@ -127,7 +229,13 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         "release_surface",
     ]
     assert [vector.name for vector in executive.materialize().vectors] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
-    consensus_round = module.graph_functions[1]
+    operational = module.graph_functions[1]
+    assert operational.declarations.get("function_kind") == "odd_executive_graph_function"
+    assert operational.declarations.get("intent") == RELEASE_OPERATIONAL_CYCLE_INTENT
+    assert [node.name for node in operational.inputs] == ["release_surface", "test_run_archive_surface"]
+    assert [node.name for node in operational.outputs] == ["retrofit_plan_surface"]
+    assert [vector.name for vector in operational.materialize().vectors] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+    consensus_round = module.graph_functions[2]
     assert consensus_round.declarations.get("function_kind") == "odd_consensus_round_graph_function"
     assert consensus_round.template.kind == "inline_graph"
     assert [node.name for node in consensus_round.inputs] == ["design_surface"]
@@ -139,7 +247,7 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
-    consensus_library = module.graph_functions[2]
+    consensus_library = module.graph_functions[3]
     assert consensus_library.declarations.get("function_kind") == "odd_consensus_library_graph_function"
     assert consensus_library.template.kind == "symbolic"
     assert [node.name for node in consensus_library.inputs] == ["design_surface"]
@@ -155,13 +263,18 @@ def test_module_publishes_first_asset_function_catalog() -> None:
         ),
         "policy_rule": "design_consensus_rule",
     }
-    assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job"]
+    assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job", "release_operational_cycle_job"]
 
     executable_jobs = module_to_executable_jobs(module)
-    assert len(executable_jobs) == 18
-    assert [job.vector.name for job in executable_jobs] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
-    assert {job.job.name for job in executable_jobs} == {"bootstrap_release_self_test_job"}
-    assert {job.graph_function.name for job in executable_jobs} == {"bootstrap_release_self_test"}
+    assert len(executable_jobs) == 21
+    assert [job.vector.name for job in executable_jobs] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS) + list(
+        RELEASE_OPERATIONAL_CYCLE_STEPS
+    )
+    assert {job.job.name for job in executable_jobs} == {"bootstrap_release_self_test_job", "release_operational_cycle_job"}
+    assert {job.graph_function.name for job in executable_jobs} == {
+        "bootstrap_release_self_test",
+        "release_operational_cycle",
+    }
 
 
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
@@ -180,6 +293,10 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         "collection_surface",
         "generated_surface",
         "source_surface",
+        "lifecycle_surface",
+        "deployment_surface",
+        "runtime_observation_surface",
+        "worksite_surface",
     } <= semantic_facets
 
     asset_types = {asset_type["name"]: asset_type for asset_type in result["asset_types"]}
@@ -223,29 +340,52 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["test_module_surface"]["specializes"] == ["module_structure_surface"]
     assert asset_types["test_run_archive_surface"]["specializes"] == ["archive_evidence_surface"]
     assert asset_types["proof_surface"]["mutable_default"] is False
+    assert asset_types["deployment_record_surface"]["library_level"] == "generic"
+    assert asset_types["runtime_observation_surface"]["library_level"] == "generic"
+    assert asset_types["operational_evidence_surface"]["library_level"] == "generic"
+    assert asset_types["maintenance_plan_surface"]["library_level"] == "generic"
+    assert asset_types["retrofit_design_surface"]["library_level"] == "generic"
+
+    asset_families = {family["name"]: family for family in result["asset_families"]}
+    assert asset_families["worksite_inputs"]["realization_status"] == "active_first_slice"
+    assert asset_families["implementation_branch"]["representative_asset_types"] == [
+        "implementation_design_surface",
+        "implementation_stack_profile",
+        "implementation_module_surface",
+        "code_surface",
+    ]
+    assert asset_families["deployment_records"]["realization_status"] == "active_first_slice"
+    assert asset_families["runtime_evidence"]["realization_status"] == "active_first_slice"
+    assert asset_families["retrofit_plans"]["realization_status"] == "active_first_slice"
+
+    work_act_types = {act["name"]: act for act in result["work_act_types"]}
+    assert work_act_types["generate"]["realization_status"] == "active_first_slice"
+    assert work_act_types["adopt"]["realization_status"] == "declared_domain_contract"
+    assert work_act_types["deploy"]["realization_status"] == "active_first_slice"
+    assert work_act_types["observe"]["realization_status"] == "active_first_slice"
+    assert work_act_types["retrofit"]["typical_asset_families"] == [
+        "retrofit_plans",
+        "implementation_branch",
+        "qualification_branch",
+    ]
+    assert work_act_types["retrofit"]["realization_status"] == "active_first_slice"
+
+    edge_contracts = {contract["name"]: contract for contract in result["edge_contracts"]}
+    assert edge_contracts["bootstrap_spec_foundation"]["realization_status"] == "active_first_slice"
+    assert edge_contracts["prepare_release_readiness"]["representative_functions"] == [
+        "prepare_release_surface",
+    ]
+    assert edge_contracts["publish_deployment_record"]["representative_functions"] == [
+        "prepare_deployment_surface",
+    ]
+    assert edge_contracts["return_runtime_evidence"]["representative_functions"] == [
+        "derive_runtime_observation_surface",
+    ]
+    assert edge_contracts["retrofit_and_relaunch"]["realization_status"] == "active_first_slice"
 
     asset_uris = {asset["uri"] for asset in result["assets"]}
-    assert "file://specification/INTENT.md" in asset_uris
-    assert "file://specification/PRODUCT.md" in asset_uris
-    assert "file://specification/GOALS.md" in asset_uris
-    assert "file://specification/requirements" in asset_uris
-    assert "file://build_tenants/common/design/20-generated-feature-decomp.md" in asset_uris
-    assert "file://specification/scenarios/20-generated-uat-testcases.md" in asset_uris
-    assert "file://build_tenants/common/design/30-generated-odd-design.md" in asset_uris
-    assert "file://build_tenants/common/design/35-generated-review-assessments.md" in asset_uris
-    assert "file://build_tenants/common/design/35-generated-consensus-decision.md" in asset_uris
-    assert "file://build_tenants/common/design/35-reviewed-odd-design.md" in asset_uris
-    assert "file://specification/scenarios/30-generated-testcase-authority.md" in asset_uris
-    assert "file://specification/scenarios/40-generated-scenarios.md" in asset_uris
-    assert "file://build_tenants/odd_method/python/design/40-generated-implementation-design.md" in asset_uris
-    assert "file://build_tenants/odd_method/python/design/40-generated-implementation-stack.md" in asset_uris
-    assert "file://build_tenants/odd_method/python/design/40-generated-implementation-modules.md" in asset_uris
-    assert "file://build_tenants/odd_method/python/code/odd_generated_impl" in asset_uris
-    assert "file://build_tenants/odd_sdlc/python/design/40-generated-test-design.md" in asset_uris
-    assert "file://build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md" in asset_uris
-    assert "file://build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md" in asset_uris
-    assert "file://build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md" in asset_uris
-    assert "file://docs/40-generated-release.md" in asset_uris
+    expected_asset_uris = {f"file://{relative_path}" for _, relative_path in ASSET_PATHS}
+    assert asset_uris == expected_asset_uris
 
     intent_asset = next(asset for asset in result["assets"] if asset["asset_id"] == "intent_surface")
     assert intent_asset["provenance"] == {
@@ -284,6 +424,9 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["test_module_surface"] == ("test_module_surface",)
     assert bindings["test_run_archive_surface"] == ("test_run_archive_surface",)
     assert bindings["release_surface"] == ("release_surface",)
+    assert bindings["deployment_surface"] == ("deployment_surface",)
+    assert bindings["runtime_observation_surface"] == ("runtime_observation_surface",)
+    assert bindings["retrofit_plan_surface"] == ("retrofit_plan_surface",)
     assert [entry["name"] for entry in result["graph_functions"]] == GRAPH_FUNCTION_NAMES
     executive = result["graph_functions"][0]
     assert executive["intent"] == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
@@ -340,7 +483,15 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     }
     assert [vector["name"] for vector in executive["vectors"]] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert executive["job_names"] == ["bootstrap_release_self_test_job"]
-    consensus_round = result["graph_functions"][1]
+    operational = result["graph_functions"][1]
+    assert operational["intent"] == RELEASE_OPERATIONAL_CYCLE_INTENT
+    assert operational["function_kind"] == "odd_executive_graph_function"
+    assert operational["template_kind"] == "inline_graph"
+    assert operational["inputs"] == ["release_surface", "test_run_archive_surface"]
+    assert operational["outputs"] == ["retrofit_plan_surface"]
+    assert [vector["name"] for vector in operational["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+    assert operational["job_names"] == ["release_operational_cycle_job"]
+    consensus_round = result["graph_functions"][2]
     assert consensus_round["function_kind"] == "odd_consensus_round_graph_function"
     assert consensus_round["harness_kind"] == "consensus_round"
     assert consensus_round["template_kind"] == "inline_graph"
@@ -369,7 +520,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         {"name": "derive_reviewed_design_surface", "source": ["design_surface", "consensus_decision_surface"], "target": "reviewed_design_surface"},
     ]
     assert consensus_round["job_names"] == []
-    consensus_library = result["graph_functions"][2]
+    consensus_library = result["graph_functions"][3]
     assert consensus_library["function_kind"] == "odd_consensus_library_graph_function"
     assert consensus_library["harness_kind"] == "consensus_harness"
     assert consensus_library["template_kind"] == "symbolic"
@@ -395,7 +546,14 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
             "steps": list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS),
             "outputs": ["release_surface"],
             "kind": "executive_program",
-        }
+        },
+        {
+            "name": "release_operational_cycle",
+            "intent": RELEASE_OPERATIONAL_CYCLE_INTENT,
+            "steps": list(RELEASE_OPERATIONAL_CYCLE_STEPS),
+            "outputs": ["retrofit_plan_surface"],
+            "kind": "executive_program",
+        },
     ]
 
 
@@ -423,23 +581,33 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
 
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
+        "asset_families",
         "asset_types",
         "assets",
         "bindings",
+        "collections",
         "continuations",
+        "edge_contracts",
         "functions",
         "gaps",
         "graph_calls",
         "graph_functions",
         "jobs",
+        "programs",
         "query_contract",
         "recent_events",
         "runs",
         "semantic_facets",
+        "work_act_types",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 21
-    assert len(payload["functions"]) == 18
+    assert len(payload["assets"]) == 24
+    assert len(payload["functions"]) == 21
+    assert len(payload["asset_families"]) == 8
+    assert len(payload["work_act_types"]) == 8
+    assert len(payload["edge_contracts"]) == 7
+    assert len(payload["collections"]) == 1
+    assert len(payload["programs"]) == 2
     assert payload["gaps"]["converged"] is False
     assert payload["runs"] == []
     assert payload["graph_calls"] == []
@@ -473,27 +641,37 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
 
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
+        "asset_families",
         "asset_types",
         "assets",
         "bindings",
+        "collections",
+        "edge_contracts",
         "functions",
         "gaps",
         "graph_functions",
         "jobs",
+        "programs",
         "query_contract",
         "semantic_facets",
+        "work_act_types",
         "workspace_root",
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v3",
+        "version": "v5",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
             "semantic_facets",
             "asset_types",
+            "asset_families",
             "assets",
+            "collections",
             "functions",
+            "edge_contracts",
+            "programs",
+            "work_act_types",
             "jobs",
             "graph_functions",
             "bindings",
@@ -505,9 +683,17 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 21
-    assert len(payload["functions"]) == 18
+    assert len(payload["assets"]) == 24
+    assert len(payload["functions"]) == 21
+    assert len(payload["asset_families"]) == 8
+    assert len(payload["work_act_types"]) == 8
+    assert len(payload["edge_contracts"]) == 7
+    assert len(payload["collections"]) == 1
+    assert len(payload["programs"]) == 2
     assert payload["gaps"]["converged"] is False
+    assert payload["asset_families"][0]["name"] == "worksite_inputs"
+    assert payload["work_act_types"][0]["name"] == "generate"
+    assert payload["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"
     functions = {entry["name"]: entry for entry in payload["functions"]}
     assert functions["derive_product_surface"]["inputs"] == ["input_set", "intent_surface"]
     assert functions["derive_goal_surface"]["inputs"] == [
@@ -542,20 +728,25 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "testcase_authority_surface",
         "test_run_archive_surface",
     ]
+    assert functions["prepare_deployment_surface"]["inputs"] == ["release_surface"]
+    assert functions["derive_runtime_observation_surface"]["inputs"] == ["deployment_surface", "test_run_archive_surface"]
+    assert functions["derive_retrofit_plan_surface"]["inputs"] == ["runtime_observation_surface", "release_surface"]
     assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert payload["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
-    assert payload["graph_functions"][1]["job_names"] == []
+    assert payload["graph_functions"][1]["job_names"] == ["release_operational_cycle_job"]
     assert payload["graph_functions"][2]["job_names"] == []
+    assert payload["graph_functions"][3]["job_names"] == []
     assert [vector["name"] for vector in payload["graph_functions"][0]["vectors"]] == list(
         BOOTSTRAP_RELEASE_SELF_TEST_STEPS
     )
-    assert [vector["name"] for vector in payload["graph_functions"][1]["vectors"]] == [
+    assert [vector["name"] for vector in payload["graph_functions"][1]["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+    assert [vector["name"] for vector in payload["graph_functions"][2]["vectors"]] == [
         "derive_review_assessment_surface",
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
-    assert payload["graph_functions"][2]["template_kind"] == "symbolic"
-    assert payload["graph_functions"][2]["vectors"] == []
+    assert payload["graph_functions"][3]["template_kind"] == "symbolic"
+    assert payload["graph_functions"][3]["vectors"] == []
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:
@@ -608,8 +799,8 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert result["completed_edges"] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in result["steps"])
     assert all(step["assessed"]["status"] == "ok" for step in result["steps"])
-    assert result["final_state"]["status"] == "converged"
+    assert result["final_state"]["status"] == "iterated"
 
     events = _read_events(tmp_path)
     assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 18
-    assert (tmp_path / "docs" / "40-generated-release.md").exists()
+    assert asset_path(tmp_path, "release_surface").exists()

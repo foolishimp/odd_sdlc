@@ -1,10 +1,11 @@
 # Implements: REQ-F-ODDSDLC-003
 # Implements: REQ-F-ODDSDLC-004
 # Implements: REQ-F-ASSETMODEL-005
-"""Bounded constructor turn for the first odd_sdlc slice."""
+"""Bounded constructor turn for odd_sdlc software-domain workspaces."""
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -12,30 +13,27 @@ from typing import Any
 from genesis.events import EventContext, EventStream, emit
 
 from .asset_types import ASSET_TYPES
-from .fd_checks import (
-    CONSENSUS_DECISION_MARKER,
-    DESIGN_MARKER,
-    CODE_MARKER,
-    FEATURE_DECOMP_MARKER,
-    GOALS_MARKER,
-    IMPLEMENTATION_DESIGN_MARKER,
-    IMPLEMENTATION_MODULE_MARKER,
-    IMPLEMENTATION_STACK_PROFILE_MARKER,
-    INTENT_MARKER,
-    PRODUCT_MARKER,
-    REQUIREMENTS_MARKER,
-    RELEASE_MARKER,
-    REVIEW_ASSESSMENT_MARKER,
-    REVIEWED_DESIGN_MARKER,
-    SCENARIO_MARKER,
-    TEST_DESIGN_MARKER,
-    TEST_MODULE_MARKER,
-    TEST_RUN_ARCHIVE_MARKER,
-    TEST_STACK_PROFILE_MARKER,
-    TESTCASE_AUTHORITY_MARKER,
-    UAT_TESTCASES_MARKER,
+from .project_profile import load_project_profile
+from .workspace_assets import (
+    assess_generated_asset_contract,
+    asset_declared_type,
+    asset_marker,
+    asset_materialization_path,
+    asset_path,
+    checkpoint_for_path,
+    relative_file_uri,
+    summarize_code_surface,
+    summarize_test_evidence,
 )
-from .workspace_assets import checkpoint_for_path, relative_file_uri
+
+
+IMPORTED_AUTHORITY_CANDIDATES: tuple[Path, ...] = (
+    Path("README.md"),
+    Path("specification/INTENT.md"),
+    Path("specification/REQUIREMENTS.md"),
+    Path("specification/mapper_requirements.md"),
+)
+PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface"}
 
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -46,43 +44,336 @@ def _read_json(path: Path, *, label: str) -> dict[str, Any]:
 
 
 def _workspace_asset_path(workspace_root: Path, target_asset: str) -> Path:
-    mapping = {
-        "intent_surface": workspace_root / "specification" / "INTENT.md",
-        "product_surface": workspace_root / "specification" / "PRODUCT.md",
-        "goal_surface": workspace_root / "specification" / "GOALS.md",
-        "requirement_surface": workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md",
-        "feature_decomp_surface": workspace_root / "build_tenants" / "common" / "design" / "20-generated-feature-decomp.md",
-        "uat_testcases_surface": workspace_root / "specification" / "scenarios" / "20-generated-uat-testcases.md",
-        "design_surface": workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md",
-        "review_assessment_surface": workspace_root / "build_tenants" / "common" / "design" / "35-generated-review-assessments.md",
-        "consensus_decision_surface": workspace_root / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md",
-        "reviewed_design_surface": workspace_root / "build_tenants" / "common" / "design" / "35-reviewed-odd-design.md",
-        "testcase_authority_surface": workspace_root / "specification" / "scenarios" / "30-generated-testcase-authority.md",
-        "scenario_surface": workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md",
-        "implementation_design_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md",
-        "implementation_stack_profile": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md",
-        "implementation_module_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-modules.md",
-        "code_surface": workspace_root / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl",
-        "test_design_surface": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-test-design.md",
-        "test_stack_profile": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "40-generated-test-stack.md",
-        "test_module_surface": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md",
-        "test_run_archive_surface": workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "50-generated-run-archive.md",
-        "release_surface": workspace_root / "docs" / "40-generated-release.md",
+    return asset_materialization_path(workspace_root, target_asset)
+
+
+def _asset_text(workspace_root: Path, asset_id: str, *parts: str) -> str:
+    path = asset_materialization_path(workspace_root, asset_id)
+    if parts:
+        path = asset_path(workspace_root, asset_id).joinpath(*parts)
+    return path.read_text(encoding="utf-8").strip()
+
+
+def _code_surface_root(workspace_root: Path) -> Path:
+    return asset_path(workspace_root, "code_surface")
+
+
+def _strip_quotes(value: str) -> str:
+    stripped = value.strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
+        return stripped[1:-1]
+    return stripped
+
+
+def _project_constraints_path(workspace_root: Path) -> Path:
+    return workspace_root / ".ai-workspace" / "context" / "project_constraints.yml"
+
+
+def _project_constraint_scalar(workspace_root: Path, key: str) -> str:
+    path = _project_constraints_path(workspace_root)
+    if not path.exists():
+        return ""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith(f"{key}:"):
+            return _strip_quotes(stripped.partition(":")[2])
+    return ""
+
+
+def _imported_authority_paths(workspace_root: Path) -> tuple[Path, ...]:
+    return tuple(
+        path
+        for relative in IMPORTED_AUTHORITY_CANDIDATES
+        for path in (workspace_root / relative,)
+        if path.exists()
+    )
+
+
+def _imported_authority_lines(workspace_root: Path) -> tuple[str, ...]:
+    sources = _imported_authority_paths(workspace_root)
+    if not sources:
+        return ("- no imported authority source detected",)
+    return tuple(f"- `{path.relative_to(workspace_root).as_posix()}`" for path in sources)
+
+
+def _file_heading(path: Path) -> str:
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip()
+    return path.stem
+
+
+def _project_title(workspace_root: Path) -> str:
+    intent_path = workspace_root / "specification" / "INTENT.md"
+    if intent_path.exists():
+        for line in intent_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.lower().startswith("**project**:"):
+                return _strip_quotes(stripped.partition(":")[2]).strip()
+        heading = _file_heading(intent_path)
+        if heading:
+            return heading
+    readme_path = workspace_root / "README.md"
+    if readme_path.exists():
+        heading = _file_heading(readme_path)
+        if heading:
+            return heading
+    return load_project_profile(workspace_root).project_slug
+
+
+def _module_names(workspace_root: Path) -> tuple[str, ...]:
+    raw = _project_constraint_scalar(workspace_root, "module_structure")
+    if "(" in raw and ")" in raw:
+        inner = raw[raw.find("(") + 1 : raw.rfind(")")]
+        modules = tuple(part.strip() for part in inner.split(",") if part.strip())
+        if modules:
+            return modules
+    return ("app-core",)
+
+
+def _software_project_mode(workspace_root: Path) -> bool:
+    return bool(load_project_profile(workspace_root).declared_output_dir)
+
+
+def _should_preserve_authoritative_surface(workspace_root: Path, target_asset: str) -> bool:
+    if target_asset not in PRESERVED_AUTHORITY_ASSETS or not _software_project_mode(workspace_root):
+        return False
+    path = asset_materialization_path(workspace_root, target_asset)
+    if not path.exists() or not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        return False
+    marker = asset_marker(target_asset)
+    if marker in text:
+        return False
+    if target_asset == "intent_surface":
+        return text.startswith("# Intent") or text.startswith("# Project Intent")
+    expected_heading = "# Product" if target_asset == "product_surface" else "# Goals"
+    if not text.startswith(expected_heading):
+        return False
+    return "normalized by odd_sdlc" not in text and "generated by odd_sdlc" not in text.lower()
+
+
+def _package_segments_for_module(module_name: str) -> tuple[str, ...]:
+    slug = module_name.replace("-", "_")
+    return ("cdme", slug)
+
+
+def _package_name_for_module(module_name: str) -> str:
+    return ".".join(_package_segments_for_module(module_name))
+
+
+def _scala_identifier(module_name: str) -> str:
+    parts = [part for part in re.split(r"[^A-Za-z0-9]+", module_name) if part]
+    if not parts:
+        return "GeneratedModule"
+    return "".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
+    profile = load_project_profile(workspace_root)
+    build_tool = _project_constraint_scalar(workspace_root, "tool") or "unspecified"
+    module_names = ", ".join(_module_names(workspace_root))
+    return (
+        f"- project: `{_project_title(workspace_root)}`",
+        f"- workspace: `{workspace_root.name}`",
+        f"- language: `{profile.language or 'unspecified'}`",
+        f"- test runner: `{profile.test_runner or 'unspecified'}`",
+        f"- tenant: `{profile.tenant_name or 'default'}`",
+        f"- governed code root: `{profile.code_relative_path()}`",
+        f"- realization mode: `{profile.realization_mode}`",
+        f"- build tool: `{build_tool}`",
+        f"- declared modules: {module_names}",
+    )
+
+
+def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
+    profile = load_project_profile(workspace_root)
+    project_title = _project_title(workspace_root)
+    scala_version = _project_constraint_scalar(workspace_root, "version") or "2.13.12"
+    modules = _module_names(workspace_root)
+    root_name = profile.project_slug.replace("_", "-")
+
+    def module_project_block(module_name: str) -> str:
+        identifier = _scala_identifier(module_name)
+        return "\n".join(
+            (
+                f"lazy val {identifier[:1].lower() + identifier[1:]} = (project in file({module_name!r}))",
+                "  .settings(commonSettings)",
+                f"  .settings(name := {module_name!r})",
+                "",
+            )
+        )
+
+    build_lines = [
+        f'ThisBuild / organization := "odd.generated"',
+        f'ThisBuild / version := "0.1.0-SNAPSHOT"',
+        f'ThisBuild / scalaVersion := "{scala_version}"',
+        "",
+        "lazy val commonSettings = Seq(",
+        '  scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked")',
+        ")",
+        "",
+        "lazy val root = (project in file(\".\"))",
+        "  .aggregate(" + ", ".join(_scala_identifier(name)[:1].lower() + _scala_identifier(name)[1:] for name in modules) + ")",
+        "  .settings(commonSettings)",
+        f"  .settings(name := {root_name!r})",
+        "  .settings(publish / skip := true)",
+        "",
+    ]
+    for module_name in modules:
+        build_lines.append(module_project_block(module_name).rstrip())
+
+    files: dict[str, str] = {
+        "build.sbt": "\n".join(build_lines).rstrip() + "\n",
+        "project/build.properties": "sbt.version=1.11.7\n",
+        "README.md": "\n".join(
+            (
+                f"# {project_title}",
+                "",
+                "Generated governed implementation branch for the odd_sdlc software-domain package.",
+                "",
+                "## Governed Summary",
+                *_governed_summary_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+            )
+        ),
     }
-    try:
-        return mapping[target_asset]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported target_asset {target_asset!r}") from exc
+
+    for module_name in modules:
+        identifier = _scala_identifier(module_name)
+        package_segments = _package_segments_for_module(module_name)
+        package_name = ".".join(package_segments)
+        package_path = "/".join(package_segments)
+        main_rel = f"{module_name}/src/main/scala/{package_path}/{identifier}Module.scala"
+        test_rel = f"{module_name}/src/test/scala/{package_path}/{identifier}ModuleSpec.scala"
+        files[main_rel] = "\n".join(
+            (
+                f"package {package_name}",
+                "",
+                f"object {identifier}Module {{",
+                f'  val moduleName: String = "{module_name}"',
+                f'  val projectName: String = "{project_title}"',
+                f'  val governedCodeRoot: String = "{profile.code_relative_path()}"',
+                "  def summary: String = s\"$projectName::$moduleName\"",
+                "}",
+                "",
+            )
+        )
+        files[test_rel] = "\n".join(
+            (
+                f"package {package_name}",
+                "",
+                f"object {identifier}ModuleSpec {{",
+                f"  val preservedIdentity: Boolean = {identifier}Module.projectName.nonEmpty",
+                f"  val governedBranch: Boolean = {identifier}Module.governedCodeRoot.nonEmpty",
+                "}",
+                "",
+            )
+        )
+    return files
+
+
+def _work_act_for_target_asset(target_asset: str, *, operation: str) -> str:
+    if operation in {"adopt", "import", "repair", "return", "deploy", "retrofit"}:
+        return operation
+    if target_asset == "release_surface":
+        return "release"
+    if target_asset == "deployment_surface":
+        return "deploy"
+    if target_asset == "runtime_observation_surface":
+        return "return"
+    if target_asset == "retrofit_plan_surface":
+        return "retrofit"
+    if target_asset in {"test_run_archive_surface", "testcase_authority_surface"}:
+        return "qualify"
+    return "generate"
+
+
+def _operation_verb(operation: str) -> str:
+    return {
+        "generate": "generated",
+        "adopt": "adopted",
+        "import": "imported",
+        "repair": "repaired",
+        "return": "returned",
+        "release": "released",
+        "qualify": "qualified",
+        "deploy": "deployed",
+        "retrofit": "retrofitted",
+    }.get(operation, operation)
+
+
+def _build_work_report(
+    *,
+    workspace_root: Path,
+    target_asset: str,
+    target_path: Path,
+    previous_checkpoint,
+    current_checkpoint,
+    attestation: dict[str, Any],
+    operation: str,
+) -> dict[str, Any]:
+    project_profile = load_project_profile(workspace_root)
+    report = {
+        "target_asset": target_asset,
+        "target_relative_path": str(target_path.relative_to(workspace_root)),
+        "work_act": _work_act_for_target_asset(target_asset, operation=operation),
+        "operation": operation,
+        "project_profile": project_profile.to_dict(),
+        "previous_checkpoint": previous_checkpoint.to_dict(),
+        "current_checkpoint": current_checkpoint.to_dict(),
+        "contract_satisfied": attestation["contract_satisfied"],
+        "evidence_refs": [str(target_path.relative_to(workspace_root))],
+    }
+    if target_asset == "code_surface":
+        report["governed_code_summary"] = summarize_code_surface(workspace_root)
+    if target_asset in {
+        "test_run_archive_surface",
+        "release_surface",
+        "deployment_surface",
+        "runtime_observation_surface",
+        "retrofit_plan_surface",
+    }:
+        report["test_evidence_summary"] = summarize_test_evidence(workspace_root)
+    return report
 
 
 def _construct_intent(workspace_root: Path) -> str:
-    product = (workspace_root / "specification" / "PRODUCT.md").read_text(encoding="utf-8").strip()
-    goals = (workspace_root / "specification" / "GOALS.md").read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Intent",
+                "",
+                asset_marker("intent_surface"),
+                "",
+                "## Governing Project Position",
+                *_governed_summary_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Mission",
+                "- preserve imported project identity and intent authority as the governing semantic source",
+                "- materialize and maintain software under the declared governed implementation branch",
+                "- keep release, deployment, runtime-return, and retrofit surfaces projected over governed evidence",
+                "",
+            )
+        )
+    product = _asset_text(workspace_root, "product_surface")
+    goals = _asset_text(workspace_root, "goal_surface")
     return "\n".join(
         (
             "# Intent",
             "",
-            INTENT_MARKER,
+            asset_marker("intent_surface"),
             "",
             "## Purpose",
             "`odd_sdlc` exists to prove that asset-typed GTL/ABG apps can be built, run, audited, reset, and rerun.",
@@ -101,13 +392,35 @@ def _construct_intent(workspace_root: Path) -> str:
 
 
 def _construct_product(workspace_root: Path) -> str:
-    intent = (workspace_root / "specification" / "INTENT.md").read_text(encoding="utf-8").strip()
-    goals = (workspace_root / "specification" / "GOALS.md").read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Product",
+                "",
+                asset_marker("product_surface"),
+                "",
+                "This product surface is a generated software-domain read model over the imported project authority.",
+                "",
+                "## Project Identity",
+                *_governed_summary_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Product Position",
+                "- the workspace defines and governs a real software product, not a proving toy",
+                "- odd_sdlc must preserve imported project truth while materializing the active implementation branch",
+                "- the declared tenant root is the operative software branch for implementation, qualification, and release projection",
+                "",
+            )
+        )
+    intent = _asset_text(workspace_root, "intent_surface")
+    goals = _asset_text(workspace_root, "goal_surface")
     return "\n".join(
         (
             "# Product",
             "",
-            PRODUCT_MARKER,
+            asset_marker("product_surface"),
             "",
             "The current product is a toy app with one real canonical use case:",
             "- derive intent from the bootstrap input set",
@@ -127,13 +440,31 @@ def _construct_product(workspace_root: Path) -> str:
 
 
 def _construct_goals(workspace_root: Path) -> str:
-    intent = (workspace_root / "specification" / "INTENT.md").read_text(encoding="utf-8").strip()
-    product = (workspace_root / "specification" / "PRODUCT.md").read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Goals",
+                "",
+                asset_marker("goal_surface"),
+                "",
+                "## Active Wave",
+                "- preserve imported project authority while making the workspace operable under odd_sdlc",
+                f"- materialize governed software under `{load_project_profile(workspace_root).code_relative_path()}`",
+                "- align generated design, implementation, test, and release surfaces to the governed branch",
+                "- keep returned runtime evidence and retrofit planning within the same worksite lifecycle",
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+            )
+        )
+    intent = _asset_text(workspace_root, "intent_surface")
+    product = _asset_text(workspace_root, "product_surface")
     return "\n".join(
         (
             "# Goals",
             "",
-            GOALS_MARKER,
+            asset_marker("goal_surface"),
             "",
             "## Current Wave",
             "- keep the `INTENT -> PRODUCT -> GOALS` dependency chain canonical",
@@ -150,16 +481,39 @@ def _construct_goals(workspace_root: Path) -> str:
 
 
 def _construct_requirements(workspace_root: Path) -> str:
-    intent = (workspace_root / "specification" / "INTENT.md").read_text(encoding="utf-8").strip()
-    product = (workspace_root / "specification" / "PRODUCT.md").read_text(encoding="utf-8").strip()
-    goals = (workspace_root / "specification" / "GOALS.md").read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        profile = load_project_profile(workspace_root)
+        return "\n".join(
+            (
+                "# Generated Bootstrap Requirements",
+                "",
+                asset_marker("requirement_surface"),
+                "",
+                "## Active Software-Domain Requirements",
+                "- imported project authority must remain the semantic source of truth",
+                f"- the governed implementation branch must be materialized at `{profile.code_relative_path()}`",
+                "- implementation outputs must be attributable through governed work reports and checkpoints",
+                f"- qualification must project over the governed branch and declared test runner `{profile.test_runner or 'unspecified'}`",
+                "- release, deployment, runtime observation, and retrofit surfaces must remain projections over governed assets and evidence",
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Governing Project Position",
+                *_governed_summary_lines(workspace_root),
+                "",
+            )
+        )
+    intent = _asset_text(workspace_root, "intent_surface")
+    product = _asset_text(workspace_root, "product_surface")
+    goals = _asset_text(workspace_root, "goal_surface")
     return "\n".join(
         (
             "# Generated Bootstrap Requirements",
             "",
-            REQUIREMENTS_MARKER,
+            asset_marker("requirement_surface"),
             "",
-            "The first odd_sdlc slice must remain installable, runnable, auditable, and resettable.",
+            "The retained odd_sdlc proving subset must remain installable, runnable, auditable, and resettable.",
             "",
             "## Generated Expectations",
             "- the installed sandbox opens the intent, product, and goal graph calls in dependency order",
@@ -179,14 +533,30 @@ def _construct_requirements(workspace_root: Path) -> str:
 
 
 def _construct_feature_decomp(workspace_root: Path) -> str:
-    requirements = (
-        workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        module_lines = tuple(f"- `{module_name}`" for module_name in _module_names(workspace_root))
+        return "\n".join(
+            (
+                "# Generated Feature Decomposition",
+                "",
+                asset_marker("feature_decomp_surface"),
+                "",
+                "## Software-Domain Feature Families",
+                "- imported authority preservation and normalization",
+                "- governed implementation branch materialization",
+                "- qualification, release, deployment, runtime-return, and retrofit projection",
+                "",
+                "## Declared Module Branches",
+                *module_lines,
+                "",
+            )
+        )
+    requirements = _asset_text(workspace_root, "requirement_surface", "10-generated-bootstrap.md")
     return "\n".join(
         (
             "# Generated Feature Decomposition",
             "",
-            FEATURE_DECOMP_MARKER,
+            asset_marker("feature_decomp_surface"),
             "",
             "## Candidate Features",
             "- bootstrap_chain: derive intent, product, goals, and requirements in lawful dependency order",
@@ -200,14 +570,28 @@ def _construct_feature_decomp(workspace_root: Path) -> str:
 
 
 def _construct_uat_testcases(workspace_root: Path) -> str:
-    requirements = (
-        workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        profile = load_project_profile(workspace_root)
+        return "\n".join(
+            (
+                "# Generated UAT Testcases",
+                "",
+                asset_marker("uat_testcases_surface"),
+                "",
+                "## Canonical Software-Domain Acceptance Cases",
+                "1. preserve imported project identity and authority after install and traversal",
+                f"2. materialize the governed implementation branch at `{profile.code_relative_path()}`",
+                f"3. keep qualification aligned to the declared test runner `{profile.test_runner or 'unspecified'}`",
+                "4. project release and downstream lifecycle surfaces over the governed branch",
+                "",
+            )
+        )
+    requirements = _asset_text(workspace_root, "requirement_surface", "10-generated-bootstrap.md")
     return "\n".join(
         (
             "# Generated UAT Testcases",
             "",
-            UAT_TESTCASES_MARKER,
+            asset_marker("uat_testcases_surface"),
             "",
             "## Canonical Acceptance Cases",
             "1. install a clean sandbox workspace",
@@ -223,17 +607,30 @@ def _construct_uat_testcases(workspace_root: Path) -> str:
 
 
 def _construct_design(workspace_root: Path) -> str:
-    requirements = (
-        workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
-    ).read_text(encoding="utf-8").strip()
-    feature_decomp = (
-        workspace_root / "build_tenants" / "common" / "design" / "20-generated-feature-decomp.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Generated odd_sdlc Design",
+                "",
+                asset_marker("design_surface"),
+                "",
+                "## Design Boundary",
+                "- odd_sdlc acts as the software-domain worksite supervisor over imported project authority",
+                "- GTL/ABG remains the execution substrate while odd_sdlc owns the SDLC asset graph and branch bindings",
+                "- the declared tenant root is the active implementation branch, not ambient repository context",
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
+                "",
+            )
+        )
+    requirements = _asset_text(workspace_root, "requirement_surface", "10-generated-bootstrap.md")
+    feature_decomp = _asset_text(workspace_root, "feature_decomp_surface")
     return "\n".join(
         (
             "# Generated odd_sdlc Design",
             "",
-            DESIGN_MARKER,
+            asset_marker("design_surface"),
             "",
             "## Design Boundary",
             "- odd_sdlc keeps ABG as runtime truth and exposes domain query logic as a plugin boundary",
@@ -250,14 +647,12 @@ def _construct_design(workspace_root: Path) -> str:
 
 
 def _construct_review_assessment(workspace_root: Path) -> str:
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
+    design = _asset_text(workspace_root, "design_surface")
     return "\n".join(
         (
             "# Generated Review Assessments",
             "",
-            REVIEW_ASSESSMENT_MARKER,
+            asset_marker("review_assessment_surface"),
             "",
             "## Reviewers",
             "- reviewer.codex: confirms the design remains traceable to generated requirements and decomposition surfaces",
@@ -275,14 +670,12 @@ def _construct_review_assessment(workspace_root: Path) -> str:
 
 
 def _construct_consensus_decision(workspace_root: Path) -> str:
-    review_assessments = (
-        workspace_root / "build_tenants" / "common" / "design" / "35-generated-review-assessments.md"
-    ).read_text(encoding="utf-8").strip()
+    review_assessments = _asset_text(workspace_root, "review_assessment_surface")
     return "\n".join(
         (
             "# Generated Consensus Decision",
             "",
-            CONSENSUS_DECISION_MARKER,
+            asset_marker("consensus_decision_surface"),
             "",
             "## Decision",
             "- quorum reached: yes",
@@ -297,17 +690,13 @@ def _construct_consensus_decision(workspace_root: Path) -> str:
 
 
 def _construct_reviewed_design(workspace_root: Path) -> str:
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
-    consensus_decision = (
-        workspace_root / "build_tenants" / "common" / "design" / "35-generated-consensus-decision.md"
-    ).read_text(encoding="utf-8").strip()
+    design = _asset_text(workspace_root, "design_surface")
+    consensus_decision = _asset_text(workspace_root, "consensus_decision_surface")
     return "\n".join(
         (
             "# Reviewed odd_sdlc Design",
             "",
-            REVIEWED_DESIGN_MARKER,
+            asset_marker("reviewed_design_surface"),
             "",
             "## Reviewed Design Boundary",
             "- this surface is the reviewed derivative of the generated odd_sdlc design surface",
@@ -324,17 +713,13 @@ def _construct_reviewed_design(workspace_root: Path) -> str:
 
 
 def _construct_testcase_authority(workspace_root: Path) -> str:
-    uat_testcases = (
-        workspace_root / "specification" / "scenarios" / "20-generated-uat-testcases.md"
-    ).read_text(encoding="utf-8").strip()
-    scenarios = (
-        workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
-    ).read_text(encoding="utf-8").strip()
+    uat_testcases = _asset_text(workspace_root, "uat_testcases_surface")
+    scenarios = _asset_text(workspace_root, "scenario_surface")
     return "\n".join(
         (
             "# Generated Testcase Authority",
             "",
-            TESTCASE_AUTHORITY_MARKER,
+            asset_marker("testcase_authority_surface"),
             "",
             "## Current Authority Position",
             "- the generated UAT testcase collection together with the generated scenario set is the active authoritative verification surface for the current odd_sdlc sandbox slice",
@@ -351,17 +736,27 @@ def _construct_testcase_authority(workspace_root: Path) -> str:
 
 
 def _construct_scenarios(workspace_root: Path) -> str:
-    requirements = (
-        workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
-    ).read_text(encoding="utf-8").strip()
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Generated Scenarios",
+                "",
+                asset_marker("scenario_surface"),
+                "",
+                "## Canonical Scenario Bundles",
+                "1. adopt imported authority and derive the active software-domain surfaces without collapsing project identity",
+                "2. materialize the governed implementation branch and align qualification to it",
+                "3. project release, deployment, runtime-return, and retrofit over the governed branch",
+                "",
+            )
+        )
+    requirements = _asset_text(workspace_root, "requirement_surface", "10-generated-bootstrap.md")
+    design = _asset_text(workspace_root, "design_surface")
     return "\n".join(
         (
             "# Generated Scenarios",
             "",
-            SCENARIO_MARKER,
+            asset_marker("scenario_surface"),
             "",
             "## Canonical Scenario Bundles",
             "1. bootstrap the odd_sdlc sandbox and derive the current asset graph to release readiness",
@@ -379,27 +774,25 @@ def _construct_scenarios(workspace_root: Path) -> str:
 
 
 def _construct_implementation_design(workspace_root: Path) -> str:
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
-    scenarios = (
-        workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
-    ).read_text(encoding="utf-8").strip()
+    design = _asset_text(workspace_root, "design_surface")
+    scenarios = _asset_text(workspace_root, "scenario_surface")
+    profile = load_project_profile(workspace_root)
     return "\n".join(
         (
             "# Generated Implementation Design",
             "",
-            IMPLEMENTATION_DESIGN_MARKER,
+            asset_marker("implementation_design_surface"),
             "",
-            "## Recursive Implementation SDLC",
-            "- implementation work is modeled as its own bounded SDLC branch under build_tenants/odd_method/python",
-            "- stack choice, module decomposition, and executable code are explicit generated assets",
-            "- the implementation branch mirrors the test branch but emits code rather than archive evidence",
+            "## Selected Implementation Branch",
+            f"- tenant: `{profile.tenant_name or 'default'}`",
+            f"- realization mode: `{profile.realization_mode}`",
+            f"- governed code root: `{profile.code_relative_path()}`",
+            "- implementation work is governed as the active software-domain branch selected by project constraints and realization profile",
             "",
-            "## Minimal Toy Requirements",
-            "- the generated package exports a stable hello-world greeting helper",
-            "- the generated package exposes a runnable main() entry point",
-            "- the runnable entry point prints the same greeting and exits cleanly",
+            "## Current Expectations",
+            "- generated or adopted implementation must remain bound to the governed code root",
+            "- downstream release and qualification surfaces must project over that governed branch",
+            "- carried-forward implementation must be represented as governed provenance rather than ambient file state",
             "",
             "## Source Design Snapshot",
             design,
@@ -412,20 +805,20 @@ def _construct_implementation_design(workspace_root: Path) -> str:
 
 
 def _construct_implementation_stack_profile(workspace_root: Path) -> str:
-    implementation_design = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md"
-    ).read_text(encoding="utf-8").strip()
+    implementation_design = _asset_text(workspace_root, "implementation_design_surface")
+    profile = load_project_profile(workspace_root)
     return "\n".join(
         (
             "# Generated Implementation Stack Profile",
             "",
-            IMPLEMENTATION_STACK_PROFILE_MARKER,
+            asset_marker("implementation_stack_profile"),
             "",
             "## Selected Stack",
-            "- primary language: python",
-            "- package model: directory-backed generated package under build_tenants/odd_method/python/code",
-            "- runtime boundary: importable implementation package with explicit public summary function",
-            "- proof posture: code generation is still audited through odd_sdlc event history and downstream tests",
+            f"- primary language: {profile.language or 'python'}",
+            f"- tenant: {profile.tenant_name or 'default'}",
+            f"- governed code root: {profile.code_relative_path()}",
+            f"- realization mode: {profile.realization_mode}",
+            f"- declared test runner: {profile.test_runner or 'not declared'}",
             "",
             "## Source Implementation Design Snapshot",
             implementation_design,
@@ -435,21 +828,20 @@ def _construct_implementation_stack_profile(workspace_root: Path) -> str:
 
 
 def _construct_implementation_module_surface(workspace_root: Path) -> str:
-    implementation_design = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-design.md"
-    ).read_text(encoding="utf-8").strip()
-    implementation_stack = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md"
-    ).read_text(encoding="utf-8").strip()
+    implementation_design = _asset_text(workspace_root, "implementation_design_surface")
+    implementation_stack = _asset_text(workspace_root, "implementation_stack_profile")
+    code_summary = summarize_code_surface(workspace_root)
     return "\n".join(
         (
             "# Generated Implementation Modules",
             "",
-            IMPLEMENTATION_MODULE_MARKER,
+            asset_marker("implementation_module_surface"),
             "",
             "## Module Layout",
-            "- odd_generated_impl/__init__.py: package marker and public export surface",
-            "- odd_generated_impl/workflow.py: generated implementation summary and executable entry helpers",
+            f"- governed code root: `{code_summary['relative_path']}`",
+            f"- build markers detected: {', '.join(code_summary['build_markers']) or 'none'}",
+            f"- source files detected: {code_summary['source_file_count']}",
+            f"- test-source files detected: {code_summary['test_source_file_count']}",
             "",
             "## Source Implementation Design Snapshot",
             implementation_design,
@@ -462,18 +854,23 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
 
 
 def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
-    implementation_modules = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-modules.md"
-    ).read_text(encoding="utf-8").strip()
-    implementation_stack = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "design" / "40-generated-implementation-stack.md"
-    ).read_text(encoding="utf-8").strip()
-    hello_message = "Hello from odd_method."
+    profile = load_project_profile(workspace_root)
+    implementation_modules = _asset_text(workspace_root, "implementation_module_surface")
+    implementation_stack = _asset_text(workspace_root, "implementation_stack_profile")
+    if profile.realization_mode == "selected_output_tree":
+        raise RuntimeError(
+            "selected_output_tree code surfaces are adopted from the governed realization root and "
+            "must not be regenerated as the proving package"
+        )
+    if profile.realization_mode == "planned_output_tree":
+        return _construct_planned_software_tree(workspace_root)
+    code_marker = asset_marker("code_surface")
+    hello_message = "Hello from odd_sdlc proving subset."
     init_text = "\n".join(
         (
-            '"""Generated odd_method implementation package."""',
+            '"""Generated odd_sdlc proving-subset implementation package."""',
             "",
-            f"# {CODE_MARKER}",
+            f"# {code_marker}",
             "",
             "from .app import hello_message, main",
             "from .workflow import implementation_summary",
@@ -484,16 +881,16 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
     )
     app_text = "\n".join(
         (
-            '"""Generated hello-world application for odd_method."""',
+            '"""Generated hello-world application for the odd_sdlc proving subset."""',
             "",
             f"HELLO_MESSAGE = {hello_message!r}",
             "",
             "def hello_message() -> str:",
-            '    """Return the generated greeting for the toy implementation branch."""',
+            '    """Return the generated greeting for the retained odd_sdlc proving subset."""',
             "    return HELLO_MESSAGE",
             "",
             "def main() -> int:",
-            '    """Run the minimal generated application."""',
+            '    """Run the retained proving-subset generated application."""',
             "    print(HELLO_MESSAGE)",
             "    return 0",
             "",
@@ -504,7 +901,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
     )
     main_text = "\n".join(
         (
-            '"""Package entry point for the generated odd_method application."""',
+            '"""Package entry point for the generated odd_sdlc proving application."""',
             "",
             "from .app import main",
             "",
@@ -515,17 +912,17 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
     )
     workflow_text = "\n".join(
         (
-            '"""Generated implementation workflow helpers for the odd_sdlc toy branch."""',
+            '"""Generated implementation workflow helpers for the odd_sdlc proving subset."""',
             "",
-            f"CODE_MARKER = {CODE_MARKER!r}",
+            f"CODE_MARKER = {code_marker!r}",
             "",
             "def implementation_summary() -> dict[str, object]:",
-            '    """Return the generated implementation branch summary."""',
+            '    """Return the retained proving-subset implementation branch summary."""',
             "    return {",
-            '        "package": "odd_generated_impl",',
+            '        "package": "odd_sdlc_proving_impl",',
             '        "graph_function": "bootstrap_release_self_test",',
             '        "hello_message": ' + repr(hello_message) + ",",
-            '        "entry_module": "odd_generated_impl.app",',
+            '        "entry_module": "odd_sdlc_proving_impl.app",',
             '        "entrypoint": "main",',
             '        "implementation_branch": [',
             '            "derive_implementation_design_surface",',
@@ -558,38 +955,35 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
 
 
 def _construct_release(workspace_root: Path) -> str:
-    requirements = (
-        workspace_root / "specification" / "requirements" / "10-generated-bootstrap.md"
-    ).read_text(encoding="utf-8").strip()
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
-    scenarios = (
-        workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
-    ).read_text(encoding="utf-8").strip()
-    code_surface = (
-        workspace_root / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl" / "workflow.py"
-    ).read_text(encoding="utf-8").strip()
-    testcase_authority = (
-        workspace_root / "specification" / "scenarios" / "30-generated-testcase-authority.md"
-    ).read_text(encoding="utf-8").strip()
-    test_run_archive = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "50-generated-run-archive.md"
-    ).read_text(encoding="utf-8").strip()
+    requirements = _asset_text(workspace_root, "requirement_surface", "10-generated-bootstrap.md")
+    design = _asset_text(workspace_root, "design_surface")
+    scenarios = _asset_text(workspace_root, "scenario_surface")
+    testcase_authority = _asset_text(workspace_root, "testcase_authority_surface")
+    test_run_archive = _asset_text(workspace_root, "test_run_archive_surface")
+    code_summary = summarize_code_surface(workspace_root)
+    test_summary = summarize_test_evidence(workspace_root)
+    if test_summary["parsed_report_count"] == 0:
+        release_status = "pending_evidence"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        release_status = "qualified"
+    else:
+        release_status = "blocked"
     return "\n".join(
         (
             "# Generated Release Surface",
             "",
-            RELEASE_MARKER,
+            asset_marker("release_surface"),
             "",
-            "## Current Release Position",
-            "- requirements are present and regenerated",
-            "- design is present and regenerated",
-            "- scenarios are present and regenerated",
-            "- implementation code is present and regenerated",
-            "- testcase authority is present and regenerated",
-            "- archived test evidence is present and regenerated",
-            "- the current toy line is ready for downstream release-oriented review",
+            "## Governed Release Position",
+            f"- status: {release_status}",
+            f"- governed code root: `{code_summary['relative_path']}`",
+            f"- source files observed: {code_summary['source_file_count']}",
+            f"- build markers observed: {', '.join(code_summary['build_markers']) or 'none'}",
+            f"- report files observed: {test_summary['report_file_count']}",
+            f"- parsed reports: {test_summary['parsed_report_count']}",
+            f"- tests observed: {test_summary['tests']}",
+            f"- failures observed: {test_summary['failures']}",
+            f"- errors observed: {test_summary['errors']}",
             "",
             "## Source Requirements Snapshot",
             requirements,
@@ -600,8 +994,8 @@ def _construct_release(workspace_root: Path) -> str:
             "## Source Scenario Snapshot",
             scenarios,
             "",
-            "## Source Code Snapshot",
-            code_surface,
+            "## Governed Code Summary",
+            json.dumps(code_summary, indent=2, sort_keys=True),
             "",
             "## Source Testcase Authority Snapshot",
             testcase_authority,
@@ -613,22 +1007,146 @@ def _construct_release(workspace_root: Path) -> str:
     )
 
 
+def _construct_deployment_surface(workspace_root: Path) -> str:
+    release_surface = _asset_text(workspace_root, "release_surface")
+    code_summary = summarize_code_surface(workspace_root)
+    test_summary = summarize_test_evidence(workspace_root)
+    project_profile = load_project_profile(workspace_root)
+    if test_summary["parsed_report_count"] == 0:
+        deployment_status = "pending_evidence"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        deployment_status = "deployed"
+    else:
+        deployment_status = "blocked"
+    return "\n".join(
+        (
+            "# Generated Deployment Surface",
+            "",
+            asset_marker("deployment_surface"),
+            "",
+            "## Governed Deployment Record",
+            f"- status: {deployment_status}",
+            f"- governed code root: `{code_summary['relative_path']}`",
+            f"- realization mode: `{project_profile.realization_mode}`",
+            f"- resolution reason: `{project_profile.resolution_reason}`",
+            f"- build markers observed: {', '.join(code_summary['build_markers']) or 'none'}",
+            f"- tests carried into deployment record: {test_summary['tests']}",
+            f"- failures carried into deployment record: {test_summary['failures']}",
+            "",
+            "## Release Readiness Snapshot",
+            release_surface,
+            "",
+            "## Governed Code Summary",
+            json.dumps(code_summary, indent=2, sort_keys=True),
+            "",
+            "## Governed Evidence Projection",
+            json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_runtime_observation_surface(workspace_root: Path) -> str:
+    deployment_surface = _asset_text(workspace_root, "deployment_surface")
+    code_summary = summarize_code_surface(workspace_root)
+    test_summary = summarize_test_evidence(workspace_root)
+    observed_status = "returned" if test_summary["report_file_count"] else "no_evidence"
+    return "\n".join(
+        (
+            "# Generated Runtime Observation Surface",
+            "",
+            asset_marker("runtime_observation_surface"),
+            "",
+            "## Returned Runtime Position",
+            f"- status: {observed_status}",
+            f"- governed code root: `{code_summary['relative_path']}`",
+            f"- report files returned: {test_summary['report_file_count']}",
+            f"- parsed reports: {test_summary['parsed_report_count']}",
+            f"- tests observed: {test_summary['tests']}",
+            f"- failures observed: {test_summary['failures']}",
+            f"- errors observed: {test_summary['errors']}",
+            "",
+            "## Source Deployment Snapshot",
+            deployment_surface,
+            "",
+            "## Returned Evidence Projection",
+            json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_retrofit_plan_surface(workspace_root: Path) -> str:
+    runtime_observation = _asset_text(workspace_root, "runtime_observation_surface")
+    release_surface = _asset_text(workspace_root, "release_surface")
+    code_summary = summarize_code_surface(workspace_root)
+    test_summary = summarize_test_evidence(workspace_root)
+    next_actions = [
+        "- preserve the current governed code root and provenance chain",
+        "- regenerate release, deployment, and runtime-return surfaces after any bounded branch change",
+    ]
+    if test_summary["failures"] or test_summary["errors"]:
+        next_actions.insert(0, "- repair the failing implementation branch before relaunch")
+    else:
+        next_actions.insert(0, "- continue bounded retrofit work from the current qualified branch and returned evidence")
+    return "\n".join(
+        (
+            "# Generated Retrofit Plan",
+            "",
+            asset_marker("retrofit_plan_surface"),
+            "",
+            "## Retrofit Boundary",
+            f"- governed code root: `{code_summary['relative_path']}`",
+            f"- source files observed: {code_summary['source_file_count']}",
+            f"- returned evidence files: {test_summary['report_file_count']}",
+            f"- tests observed: {test_summary['tests']}",
+            f"- failures observed: {test_summary['failures']}",
+            f"- errors observed: {test_summary['errors']}",
+            "",
+            "## Planned Next Actions",
+            *next_actions,
+            "",
+            "## Source Runtime Observation Snapshot",
+            runtime_observation,
+            "",
+            "## Source Release Snapshot",
+            release_surface,
+            "",
+            "## Governing Evidence Projection",
+            json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
 def _construct_test_design(workspace_root: Path) -> str:
-    design = (
-        workspace_root / "build_tenants" / "common" / "design" / "30-generated-odd-design.md"
-    ).read_text(encoding="utf-8").strip()
-    scenarios = (
-        workspace_root / "specification" / "scenarios" / "40-generated-scenarios.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        return "\n".join(
+            (
+                "# Generated Test Design",
+                "",
+                asset_marker("test_design_surface"),
+                "",
+                "## Governed Qualification Boundary",
+                "- qualification work is tied to the governed implementation branch, not a shadow proving subset",
+                "- archive and release projection must summarize evidence discovered under the active code root",
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
+                "",
+            )
+        )
+    design = _asset_text(workspace_root, "design_surface")
+    scenarios = _asset_text(workspace_root, "scenario_surface")
     return "\n".join(
         (
             "# Generated Test Design",
             "",
-            TEST_DESIGN_MARKER,
+            asset_marker("test_design_surface"),
             "",
-            "## Recursive Test SDLC",
-            "- test work is modeled as its own bounded SDLC branch under build_tenants/odd_sdlc/python/test_env",
-            "- sandbox design, stack choice, module structure, and archived run evidence are explicit generated assets",
+            "## Retained Proving-Subset Test Branch",
+            "- test work is modeled as one bounded proving-subset SDLC branch under build_tenants/odd_sdlc/python/test_env",
+            "- sandbox design, stack choice, module structure, and archived run evidence are explicit generated proving-subset assets",
             "",
             "## Source Design Snapshot",
             design,
@@ -641,14 +1159,27 @@ def _construct_test_design(workspace_root: Path) -> str:
 
 
 def _construct_test_stack_profile(workspace_root: Path) -> str:
-    test_design = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-test-design.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        profile = load_project_profile(workspace_root)
+        return "\n".join(
+            (
+                "# Generated Test Stack Profile",
+                "",
+                asset_marker("test_stack_profile"),
+                "",
+                "## Selected Stack",
+                f"- declared test runner: {profile.test_runner or 'unspecified'}",
+                f"- governed code root: {profile.code_relative_path()}",
+                "- evidence projection is rooted in discovered reports under the governed implementation branch",
+                "",
+            )
+        )
+    test_design = _asset_text(workspace_root, "test_design_surface")
     return "\n".join(
         (
             "# Generated Test Stack Profile",
             "",
-            TEST_STACK_PROFILE_MARKER,
+            asset_marker("test_stack_profile"),
             "",
             "## Selected Stack",
             "- primary harness: pytest",
@@ -664,17 +1195,26 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
 
 
 def _construct_test_module_surface(workspace_root: Path) -> str:
-    test_design = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-test-design.md"
-    ).read_text(encoding="utf-8").strip()
-    test_stack = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "40-generated-test-stack.md"
-    ).read_text(encoding="utf-8").strip()
+    if _software_project_mode(workspace_root):
+        module_lines = tuple(f"- `{module_name}` test sources under the governed implementation branch" for module_name in _module_names(workspace_root))
+        return "\n".join(
+            (
+                "# Generated Test Modules",
+                "",
+                asset_marker("test_module_surface"),
+                "",
+                "## Module Layout",
+                *module_lines,
+                "",
+            )
+        )
+    test_design = _asset_text(workspace_root, "test_design_surface")
+    test_stack = _asset_text(workspace_root, "test_stack_profile")
     return "\n".join(
         (
             "# Generated Test Modules",
             "",
-            TEST_MODULE_MARKER,
+            asset_marker("test_module_surface"),
             "",
             "## Module Layout",
             "- sandbox_runtime.py: installed sandbox orchestration helpers",
@@ -692,28 +1232,55 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
 
 
 def _construct_test_run_archive(workspace_root: Path) -> str:
-    test_modules = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md"
-    ).read_text(encoding="utf-8").strip()
-    test_stack = (
-        workspace_root / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "40-generated-test-stack.md"
-    ).read_text(encoding="utf-8").strip()
+    test_summary = summarize_test_evidence(workspace_root)
+    if _software_project_mode(workspace_root):
+        report_lines = tuple(f"- `{path}`" for path in test_summary["report_paths"]) or (
+            "- no report files observed yet",
+        )
+        return "\n".join(
+            (
+                "# Generated Test Run Archive",
+                "",
+                asset_marker("test_run_archive_surface"),
+                "",
+                "## Governed Evidence Projection",
+                f"- report files observed: {test_summary['report_file_count']}",
+                f"- parsed reports: {test_summary['parsed_report_count']}",
+                f"- tests observed: {test_summary['tests']}",
+                f"- failures observed: {test_summary['failures']}",
+                f"- errors observed: {test_summary['errors']}",
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
+                "",
+                "## Observed Report Paths",
+                *report_lines,
+                "",
+            )
+        )
+    test_modules = _asset_text(workspace_root, "test_module_surface")
+    test_stack = _asset_text(workspace_root, "test_stack_profile")
     return "\n".join(
         (
             "# Generated Test Run Archive",
             "",
-            TEST_RUN_ARCHIVE_MARKER,
+            asset_marker("test_run_archive_surface"),
             "",
-            "## Archive Policy",
-            "- retain first-run and rerun runtime snapshots",
-            "- retain summary.json and comparative_analysis.json artifacts",
-            "- preserve archived workspaces as observable surfaces for odd_manager",
+            "## Proving-Subset Archive Policy",
+            f"- report files observed: {test_summary['report_file_count']}",
+            f"- parsed reports: {test_summary['parsed_report_count']}",
+            f"- tests observed: {test_summary['tests']}",
+            f"- failures observed: {test_summary['failures']}",
+            f"- errors observed: {test_summary['errors']}",
             "",
             "## Source Test Module Snapshot",
             test_modules,
             "",
             "## Source Test Stack Snapshot",
             test_stack,
+            "",
+            "## Governed Evidence Projection",
+            json.dumps(test_summary, indent=2, sort_keys=True),
             "",
         )
     )
@@ -762,6 +1329,12 @@ def _constructed_content(target_asset: str, workspace_root: Path) -> str:
         return _construct_test_run_archive(workspace_root)
     if target_asset == "release_surface":
         return _construct_release(workspace_root)
+    if target_asset == "deployment_surface":
+        return _construct_deployment_surface(workspace_root)
+    if target_asset == "runtime_observation_surface":
+        return _construct_runtime_observation_surface(workspace_root)
+    if target_asset == "retrofit_plan_surface":
+        return _construct_retrofit_plan_surface(workspace_root)
     raise ValueError(f"Unsupported target_asset {target_asset!r}")
 
 
@@ -769,6 +1342,7 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     workspace = Path(workspace_root).resolve()
     manifest_file = Path(manifest_path).resolve()
     manifest = _read_json(manifest_file, label=f"manifest file {manifest_file}")
+    project_profile = load_project_profile(workspace)
 
     target_asset = manifest.get("target_asset")
     result_path = manifest.get("result_path")
@@ -783,42 +1357,60 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     target_path = _workspace_asset_path(workspace, target_asset)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     previous_checkpoint = checkpoint_for_path(target_path)
-    content = _constructed_content(target_asset, workspace)
-    if target_asset == "code_surface":
-        if target_path.exists():
-            shutil.rmtree(target_path)
-        target_path.mkdir(parents=True, exist_ok=True)
-        for relative_path, file_content in content.items():
-            file_path = target_path / relative_path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(file_content, encoding="utf-8")
-    else:
-        target_path.write_text(content, encoding="utf-8")
+    operation = {
+        "deployment_surface": "deploy",
+        "runtime_observation_surface": "return",
+        "retrofit_plan_surface": "retrofit",
+    }.get(target_asset, "generate")
+    preserve_authority = _should_preserve_authoritative_surface(workspace, target_asset)
+    if preserve_authority:
+        operation = "adopt"
+    if target_asset == "code_surface" and project_profile.realization_mode == "selected_output_tree":
+        if not target_path.exists():
+            raise RuntimeError(
+                f"governed code surface target {target_path.relative_to(workspace)!s} does not exist for adopted realization"
+            )
+        operation = "adopt"
+    elif not preserve_authority:
+        content = _constructed_content(target_asset, workspace)
+        if target_asset == "code_surface":
+            if target_path.exists():
+                shutil.rmtree(target_path)
+            target_path.mkdir(parents=True, exist_ok=True)
+            for relative_path, file_content in content.items():
+                file_path = target_path / relative_path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(file_content, encoding="utf-8")
+        else:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(content, encoding="utf-8")
+            if previous_checkpoint.exists and operation == "generate":
+                operation = "repair"
     current_checkpoint = checkpoint_for_path(target_path)
+    attestation = assess_generated_asset_contract(workspace, target_asset)
+    if not attestation["contract_satisfied"]:
+        foreign_candidates = ", ".join(
+            candidate["relative_path"]
+            for candidate in attestation.get("foreign_realization_candidates", [])
+            if isinstance(candidate, dict) and isinstance(candidate.get("relative_path"), str)
+        )
+        if foreign_candidates:
+            raise RuntimeError(
+                f"constructed asset {target_asset!r} failed its generated-asset contract; "
+                f"foreign realization candidates detected: {foreign_candidates}"
+            )
+        raise RuntimeError(f"constructed asset {target_asset!r} failed its generated-asset contract")
+    work_report = _build_work_report(
+        workspace_root=workspace,
+        target_asset=target_asset,
+        target_path=target_path,
+        previous_checkpoint=previous_checkpoint,
+        current_checkpoint=current_checkpoint,
+        attestation=attestation,
+        operation=operation,
+    )
 
-    declared_asset_type = {
-        "intent_surface": "intent_doc",
-        "product_surface": "product_doc",
-        "goal_surface": "goal_surface",
-        "requirement_surface": "requirement_surface",
-        "feature_decomp_surface": "feature_decomp_surface",
-        "uat_testcases_surface": "uat_testcases_surface",
-        "design_surface": "design_surface",
-        "review_assessment_surface": "review_assessment_surface",
-        "consensus_decision_surface": "consensus_decision_surface",
-        "reviewed_design_surface": "reviewed_design_surface",
-        "testcase_authority_surface": "testcase_authority_surface",
-        "scenario_surface": "scenario_surface",
-        "implementation_design_surface": "implementation_design_surface",
-        "implementation_stack_profile": "implementation_stack_profile",
-        "implementation_module_surface": "implementation_module_surface",
-        "code_surface": "code_surface",
-        "test_design_surface": "test_design_surface",
-        "test_stack_profile": "test_stack_profile",
-        "test_module_surface": "test_module_surface",
-        "test_run_archive_surface": "test_run_archive_surface",
-        "release_surface": "release_surface",
-    }[target_asset]
+    declared_asset_type = asset_declared_type(target_asset)
     asset_profile = ASSET_TYPES[declared_asset_type]
 
     emit(
@@ -853,11 +1445,16 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     payload = {
         "edge": manifest["edge"],
         "actor": "odd_sdlc_constructor",
+        "attestation": attestation,
+        "work_report": work_report,
         "assessments": [
             {
                 "evaluator": primary_evaluator,
                 "result": "pass",
-                "evidence": f"updated {target_path.relative_to(workspace)} via bounded constructor turn",
+                "evidence": (
+                    f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
+                    "and satisfied the generated-asset contract"
+                ),
             }
         ],
     }
@@ -873,4 +1470,6 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         "result_path": str(result_file),
         "actor": payload["actor"],
         "evaluator": primary_evaluator,
+        "attestation": attestation,
+        "work_report": work_report,
     }
