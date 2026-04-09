@@ -1,8 +1,12 @@
-# odd_service Tenant Root
+# odd_service Realization Root
 
-`odd_service` is the incubating service tenant on the `odd_method` line.
+`odd_service` is the incubating service realization on the `odd_method` line.
 
-This tenant exists to keep the enduring orchestration-plane work separate from:
+Its `WHAT` is defined under `specification/`.
+
+This root is one current `HOW` for that governed service line.
+
+This realization exists to keep the enduring orchestration-plane work separate from:
 
 - `odd_sdlc` as domain substance
 - ABG as runtime truth

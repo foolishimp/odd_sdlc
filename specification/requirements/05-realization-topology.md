@@ -24,6 +24,11 @@ The constitutional `specification/` surface remains singleton project truth,
 while `build_tenants/` carries project-owned realization structure beneath that
 truth.
 
+In short:
+
+- `specification/` defines `WHAT`
+- `build_tenants/` realizes `HOW`
+
 **Acceptance Criteria**:
 - AC-1: `specification/` remains the sole live constitutional specification
   root
@@ -31,6 +36,8 @@ truth.
   any adopted tenant families or variants
 - AC-3: the shared realization root exists even before tenant-local variants
   are introduced
+- AC-4: no build-tenant surface claims co-equal authority over domain meaning
+  defined in `specification/`
 
 ### REQ-F-REALIZATION-003 — Shared and tenant-local realization law are explicit
 
@@ -43,6 +50,8 @@ separate surfaces.
   realization law that should not remain common
 - AC-3: tenant-local design can evolve without collapsing into shared law by
   default
+- AC-4: each tenant root is understood as one instance of `HOW`, not as a
+  second constitutional `WHAT`
 
 ### REQ-F-REALIZATION-004 — Supporting documentation has a non-constitutional home
 

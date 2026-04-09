@@ -2,6 +2,10 @@
 
 This is a GTL/ABG project scaffold.
 
+`specification/` is the authoritative `WHAT`.
+
+`build_tenants/` contains realization `HOW`.
+
 Start with these surfaces:
 
 - `AGENTS.md`
@@ -11,6 +15,6 @@ Start with these surfaces:
 - `specification/PRODUCT.md`
 - `specification/GOALS.md`
 - `specification/requirements/`
-- `build_tenants/odd_method/python/`
-- `build_tenants/odd_sdlc/python/`
+- `build_tenants/README.md`
+- `build_tenants/TENANT_REGISTRY.md`
 - `.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`

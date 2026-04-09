@@ -8,7 +8,7 @@ post-mortem runtime audit shape.
 
 ## Scenario
 
-Install a clean sandbox workspace, seed the first `odd_sdlc` tenant package and
+Install a clean sandbox workspace, seed the first `odd_sdlc` realization and
 its canonical bootstrap specification surfaces, then run the current executive
 graph function over the first bootstrap dependency chain:
 

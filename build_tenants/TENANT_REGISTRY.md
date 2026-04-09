@@ -8,7 +8,10 @@ tenant families, variants, and activity state.
 
 The constitutional `specification/` surface is singleton project truth.
 
-`build_tenants/` is realization structure beneath that truth.
+`specification/` defines `WHAT`.
+
+`build_tenants/` records the multiple instances of `HOW` that realize that
+truth.
 
 ## Structure
 
@@ -21,14 +24,13 @@ The constitutional `specification/` surface is singleton project truth.
 | Entry | Kind | Path | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `common` | shared root | `build_tenants/common/` | Active | Current bootstrap realization root for `odd_method` |
-| `odd_service` | service tenant | `build_tenants/odd_service/python/` | Incubating | Proposed enduring orchestration plane above `odd_sdlc`, still subordinate to ABG runtime truth |
-| `odd_sdlc` | tenant package | `build_tenants/odd_sdlc/python/` | Active | Current software-domain package; retained first slice is only a bounded proving subset |
-| `odd_method` | scaffold tenant | `build_tenants/odd_method/python/` | Deferred | Installer scaffold/example surface retained as bootstrap reference |
+| `odd_service` | service realization | `build_tenants/odd_service/python/` | Incubating | Proposed enduring orchestration plane above `odd_sdlc`, still subordinate to ABG runtime truth |
+| `odd_sdlc` | software-domain realization | `build_tenants/odd_sdlc/python/` | Active | Current software-domain package; retained first slice is only a bounded proving subset |
 
 ## Active Focus
 
 `common` remains the shared realization root.
 
-`odd_sdlc` is the current active software-domain tenant package.
+`odd_sdlc` is the current active software-domain realization.
 
 `odd_service` is the current incubating service line.

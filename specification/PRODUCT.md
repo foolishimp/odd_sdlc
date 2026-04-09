@@ -43,6 +43,10 @@ It gives a project a lawful way to declare:
 It adopts a singleton constitutional specification together with a standard
 project-owned realization topology rooted in `build_tenants/`.
 
+`specification/` defines the governing `WHAT`.
+
+`build_tenants/` carries one or more realization instances of `HOW`.
+
 ## Product Terms
 
 ### Outcome-Driven Development
@@ -199,7 +203,7 @@ opening a lawful surface for local tuning, repricing, and deployment.
 
 ### Software-Domain Package
 
-A tenant package that governs software-delivery work over explicit SDLC assets,
+A realization that governs software-delivery work over explicit SDLC assets,
 typed graph edges, and runtime-returned operational evidence.
 
 ### Worksite Lifecycle
@@ -278,7 +282,7 @@ The current product definition of `odd_method` is:
 - beginning from an explicit bootstrap asset set and recursive edge contracts
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
-- carrying `odd_sdlc` as the first live tenant package
+- carrying `odd_sdlc` as the first live software-domain realization
 - repricing `odd_sdlc` from the current first-slice bootstrap toy into the
   generic software-domain package on the line
 - treating an ODD project as an active SDLC worksite with build, qualify,
@@ -298,26 +302,22 @@ The current product definition of `odd_method` is:
   session, worker, and client coordination above `odd_sdlc`
 - explicit in adoption of any carried-forward truth
 
-The current asset graph proven in the toy sandbox for `odd_sdlc` is:
+The currently proven bounded subset for `odd_sdlc` is the bootstrap-to-release
+chain over:
 
-- `{input_set} -> {specification/INTENT.md}`
-- `{input_set, specification/INTENT.md} -> {specification/PRODUCT.md}`
-- `{input_set, specification/INTENT.md, specification/PRODUCT.md} -> {specification/GOALS.md}`
-- `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
-- `{specification/requirements/} -> {build_tenants/common/design/20-generated-feature-decomp.md}`
-- `{specification/requirements/} -> {specification/scenarios/20-generated-uat-testcases.md}`
-- `{specification/requirements/, build_tenants/common/design/20-generated-feature-decomp.md} -> {build_tenants/common/design/30-generated-odd-design.md}`
-- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md} -> {specification/scenarios/40-generated-scenarios.md}`
-- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md}`
-- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md}`
-- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md, build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md}`
-- `{build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md, build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md} -> {build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl/}`
-- `{specification/scenarios/20-generated-uat-testcases.md, specification/scenarios/40-generated-scenarios.md} -> {specification/scenarios/30-generated-testcase-authority.md}`
-- `{build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md} -> {build_tenants/odd_sdlc/python/design/40-generated-test-design.md}`
-- `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md} -> {build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md}`
-- `{build_tenants/odd_sdlc/python/design/40-generated-test-design.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md}`
-- `{build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md, build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md} -> {build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md}`
-- `{specification/requirements/, build_tenants/common/design/30-generated-odd-design.md, specification/scenarios/40-generated-scenarios.md, build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl/, specification/scenarios/30-generated-testcase-authority.md, build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md} -> {docs/40-generated-release.md}`
+- intent
+- product
+- goals
+- requirements
+- feature decomposition and UAT testcase fan-out
+- design and scenario fan-out
+- bounded implementation recursion
+- bounded test recursion
+- testcase authority
+- release preparation
+
+The exact tenant-local file layout, proving paths, and package names for that
+subset are realization `HOW` and belong under `build_tenants/`.
 
 The current top-level executive graph function over that subgraph is:
 
@@ -354,7 +354,7 @@ The consensus surfaces establish the first higher-order harness pattern:
 - the same higher-order shape is intended to be reusable later for schema,
   DQ-rules, release, and other review-governed subject assets
 
-The current build focus is to reprice the first real `odd_sdlc` tenant slice
+The current build focus is to reprice the first real `odd_sdlc` realization slice
 into the generic software-domain package:
 
 - ratify the software-domain doctrine and worksite lifecycle

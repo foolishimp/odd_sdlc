@@ -1,6 +1,11 @@
-# odd_sdlc Tenant Root
+# odd_sdlc Realization Root
 
-`odd_sdlc` is the first live tenant package on the `odd_method` line.
+`odd_sdlc` is the first live software-domain realization on the `odd_method`
+line.
+
+Its `WHAT` is defined under `specification/`.
+
+This root is one current `HOW` for that governed domain.
 
 This root holds the first executable asset/function slice:
 

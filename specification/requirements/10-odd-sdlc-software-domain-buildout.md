@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Capability
 
-This family defines the build-out of `odd_sdlc` from the first tenant slice
+This family defines the build-out of `odd_sdlc` from the first realization slice
 into the generic software-domain package on the `odd_method` line.
 
 This build-out is a transformation wave over mutable realization surfaces, not

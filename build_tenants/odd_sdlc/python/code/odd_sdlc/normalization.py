@@ -207,7 +207,7 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "## Installed Runtime Start Surface",
             "- inspect current gaps with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
             "- trigger full odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`",
-            "- treat legacy bootstrap instructions in imported project docs that mention `genesis_sdlc`, `.gsdlc`, or older scaffolds as provenance only, not active runtime guidance for this installed workspace",
+            "- treat legacy bootstrap instructions or older scaffold references in imported project docs as provenance only, not active runtime guidance for this installed workspace",
             "",
             "## Interpretation Rule",
             "- use this surface to orient quickly",

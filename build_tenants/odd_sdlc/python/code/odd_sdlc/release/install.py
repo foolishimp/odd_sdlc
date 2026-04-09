@@ -156,7 +156,7 @@ def _workspace_instruction_bootloader(
             "## 4. Start Here",
             "- inspect the current pipeline state with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
             "- trigger full odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`",
-            "- if imported project docs contain historical bootstrap or install commands for `genesis_sdlc`, `.gsdlc`, or older scaffolds, treat them as provenance only; the installed runtime contract above is authoritative for this workspace",
+            "- if imported project docs contain historical bootstrap or install commands from older scaffolds, treat them as provenance only; the installed runtime contract above is authoritative for this workspace",
             "",
             "## 5. Interpretation Rule",
             "- substrate truth explains how work is executed",

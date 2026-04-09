@@ -61,7 +61,7 @@ development environment:
 - recursive-implementation path: the generated design and scenario surfaces
   open a bounded recursive implementation SDLC that yields implementation
   design, explicit stack choice, generated module structure, and executable
-  code under `build_tenants/odd_sdlc/python/code`
+  code under the active tenant-local realization root
 - recursive-test path: the generated design and scenario surfaces open a
   bounded recursive test SDLC that yields test design, explicit stack choice,
   generated test module structure, and archived test-run evidence

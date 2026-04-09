@@ -7,7 +7,7 @@
 
 ## Position
 
-`odd_sdlc` is no longer treated only as the first executable tenant slice.
+`odd_sdlc` is no longer treated only as the first executable realization slice.
 
 It is built out as the generic software-domain package on the `odd_method`
 line.

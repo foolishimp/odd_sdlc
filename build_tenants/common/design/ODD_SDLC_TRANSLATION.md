@@ -10,11 +10,7 @@
 This document records the shared ODD SDLC translation law adopted beneath the
 current tenant line.
 
-`genesis_sdlc` is source material for this translation. It is not hidden live
-authority for `odd_method`.
-
-The translation keeps the useful method surfaces from `genesis_sdlc` and
-re-expresses them as:
+The translation re-expresses the active ODD SDLC domain as:
 
 - URI-addressed assets
 - typed asset nodes
@@ -44,8 +40,6 @@ The translation therefore preserves:
 
 The translation does not presume:
 
-- `.gsdlc` install topology
-- `genesis_sdlc` control-plane artifacts
 - a project-global hidden runtime graph
 - post-dispatch shadow runtime logic
 
@@ -179,7 +173,7 @@ Current toy sharpenings:
 This is enough structure to prove composition without overbuilding taxonomy too
 early.
 
-## genesis_sdlc Surface Translation
+## Surface Translation
 
 The first `odd_sdlc` translation adopts this asset-type mapping.
 
@@ -307,8 +301,8 @@ The first explicit bootstrap contracts are:
 - `{input_set, intent_surface, product_surface} -> {goal_surface}`
 - `{input_set, intent_surface, product_surface, goal_surface} -> {requirement_surface}`
 
-The goal surface is included in the translation because `genesis_sdlc`
-already treats goals as a first-class method surface.
+The goal surface is included in the translation because goals are a first-class
+method surface on the active line.
 
 ### Downstream Functions
 
@@ -484,8 +478,6 @@ belong in tenant-local design once they stop being common translation law.
 
 ## Consequences
 
-- `genesis_sdlc` becomes migration source material and comparison pressure, not
-  hidden live authority
 - `odd_sdlc` becomes the current concrete ODD software-domain package built on
   these shared rules
 - method surfaces become typed assets rather than ambient project files
