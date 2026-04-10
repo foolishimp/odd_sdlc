@@ -42,3 +42,91 @@ temporary focus into accidental constitutional law.
   anti-regression boundary for the domain package
 - keep `odd_service` subordinate to ABG runtime truth and `odd_sdlc` domain law
   as the orchestration line continues to incubate
+
+## Current Goal Focus
+
+### Make odd_sdlc a governed disambiguation pipeline
+
+Build out `odd_sdlc` so the SDLC is explicitly treated as a governed
+disambiguation pipeline rather than only as an asset-generation pipeline.
+
+The active wave should make ambiguity first-class domain truth.
+
+That means `odd_sdlc` should:
+- identify ambiguity during deterministic normalization rather than leaving it
+  implicit in operator memory
+- distinguish major ambiguity from micro implementation ambiguity
+- reduce major ambiguity at explicit SDLC gates such as imported authority,
+  requirements, build-tenant and capability selection, design, implementation
+  structure, qualification structure, and release readiness
+- govern downstream traversal explicitly when a required major ambiguity remains
+  open: record it, classify it, decide whether it is carried, decided by `F_P`,
+  escalated to `F_H`, or hard-blocked
+- preserve a machine-readable record of what was ambiguous, what resolved it,
+  what was lawfully carried, what was decided, what was escalated, and what
+  still blocks progress
+
+This goal is not a cosmetic refactor.
+
+It is a new software-domain capability that makes the current `odd_sdlc`
+package more honest and more inspectable.
+
+The resulting package should be able to answer, at any major boundary:
+- what remains ambiguous
+- which invariant or contract that ambiguity threatens
+- which edge is expected to resolve it
+- whether downstream traversal is lawful under the declared risk appetite
+- whether a decision was taken by `F_P` or escalated to `F_H`
+- whether the correct stop state is `construction_complete_pending_execution`
+  rather than false end-to-end convergence
+
+### Disambiguation goal success conditions
+
+This goal is satisfied when:
+- normalization publishes an initial governed ambiguity register for imported or
+  stale workspaces
+- the active domain model distinguishes major ambiguity from micro ambiguity
+- major traversal boundaries explicitly reduce, carry, or resolve ambiguity
+- convergence semantics become ambiguity-aware for major lifecycle gates
+- ambiguity handling becomes policy-aware through declared risk appetite rather
+  than an unconditional blocker model
+- the register records the decision taken for major ambiguity when `F_P`
+  proceeds, including what was carried and what was escalated
+- hard-stop prerequisite classes remain fail-closed regardless of risk appetite
+- capability-gated execution and operational stages report `pending_capability`
+  or `pending_execution` rather than pretending to converge
+- query and catalog surfaces expose the ambiguity state as ordinary current
+  domain truth
+- qualification proves the behavior through complete use cases, with
+  `data_mapper` remaining the critical inherited-project corpus
+
+### Test23 completion target
+
+`test23` is the bounded proving lane for completing the ambiguity-governance
+capability.
+
+For this wave, `test23` should prove that:
+- ambiguity is detected and recorded at the relevant major gates
+- major ambiguity is not silently swallowed by runtime convenience
+- risk appetite governs whether `F_P` may decide or must escalate to `F_H`
+- hard-stop prerequisite failures remain blocked regardless of appetite
+- the resulting workspace can explain not only what was built, but what was
+  ambiguous, what decision was taken, and under what policy that decision was
+  lawful
+
+### Disambiguation goal boundaries
+
+This wave should not attempt to record every local implementation choice as a
+top-level ambiguity.
+
+The register should focus on major ambiguity such as:
+- project identity conflicts
+- missing canonical surfaces
+- competing realization roots
+- declared topology versus realized topology mismatch
+- governance surface truth drifting from artifact truth
+- absent executional capability for stages that imply side effects
+
+Micro ambiguity such as variable naming, helper extraction, or small local code
+choices should remain local to the work report unless it escapes its boundary
+and threatens a declared invariant.

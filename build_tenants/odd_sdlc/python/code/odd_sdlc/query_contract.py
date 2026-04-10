@@ -1,10 +1,11 @@
 # Implements: REQ-F-ODDSDLC-005
+# Implements: REQ-F-ODDSDLC-020
 """Stable query-contract descriptors for odd_sdlc plugins."""
 from __future__ import annotations
 
 
 QUERY_DOMAIN_CONTRACT_NAME = "odd_sdlc.query-domain"
-QUERY_DOMAIN_CONTRACT_VERSION = "v5"
+QUERY_DOMAIN_CONTRACT_VERSION = "v6"
 QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "query_contract",
     "workspace_root",
@@ -12,6 +13,7 @@ QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "asset_types",
     "asset_families",
     "assets",
+    "ambiguity_register",
     "collections",
     "functions",
     "edge_contracts",

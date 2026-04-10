@@ -60,6 +60,10 @@ SEMANTIC_FACETS: dict[str, AssetSemanticFacet] = {
         name="worksite_surface",
         description="A surface that governs or records active construction, repair, or retrofit work inside the software worksite.",
     ),
+    "machine_readable_surface": AssetSemanticFacet(
+        name="machine_readable_surface",
+        description="A surface whose primary payload is machine-readable structured data used by runtime, query, or auditing tools.",
+    ),
 }
 
 
@@ -282,6 +286,16 @@ ASSET_TYPES: dict[str, AssetTypeProfile] = {
         fp_gap_description="The retrofit design surface is not yet semantically converged.",
         fp_descriptive_framing="A retrofit design surface explains how returned operational evidence changes the design, implementation, qualification, or release posture of the active software branch.",
         library_level="generic",
+        proof_hints=("post_mortem_event_audit",),
+    ),
+    "ambiguity_register_surface": AssetTypeProfile(
+        name="ambiguity_register_surface",
+        description="Machine-readable register of major ambiguity, its current status, and expected resolution boundary for the active workspace.",
+        semantic_facets=("authority_surface", "worksite_surface", "generated_surface", "singleton_surface", "machine_readable_surface"),
+        fd_evaluator="generic.ambiguity-register-present",
+        fp_gap_description="The ambiguity register is not yet current for the workspace state.",
+        fp_descriptive_framing="An ambiguity register surface records major ambiguity, affected assets, current status, and expected resolution boundary for the active workspace.",
+        library_level="specialized",
         proof_hints=("post_mortem_event_audit",),
     ),
     "intent_doc": AssetTypeProfile(

@@ -1,5 +1,7 @@
 # Implements: REQ-F-ODDSDLC-003
 # Implements: REQ-F-ODDSDLC-007
+# Implements: REQ-F-ODDSDLC-022
+# Implements: REQ-F-ODDSDLC-027
 """Deterministic workspace normalization for odd_sdlc operation."""
 from __future__ import annotations
 
@@ -8,10 +10,19 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
 
 NORMALIZATION_REPORT_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-normalization.json")
 IMPORTED_REQUIREMENTS_PATH = Path("specification/requirements/00-imported-sources.md")
 PROJECT_BOOTSTRAP_PATH = Path(".ai-workspace/context/project_bootstrap.md")
+PROJECT_POLICY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("ambiguity_risk_appetite", '"medium"'),
+)
+TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("test_execution_contract", '""'),
+    ("deployment_contract", '""'),
+    ("runtime_observation_contract", '""'),
+)
 
 
 def default_project_slug(workspace_root: Path) -> str:
@@ -201,12 +212,17 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "- `specification/INTENT.md` when present",
             "- `specification/requirements/00-imported-sources.md`",
             "- imported requirement-like sources listed there",
+            "- `.ai-workspace/runtime/odd_sdlc-ambiguity-register.json` for current major ambiguity state",
             "- `README.md` only as provenance/context after the imported authority",
             "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
             "",
             "## Installed Runtime Start Surface",
             "- inspect current gaps with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
-            "- trigger full odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`",
+            "- trigger bounded odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --workspace .`",
+            "- add `--human-proxy` only when you expect an explicit F_H approval lane; it does not proxy F_P transport failures",
+            "- deployment, runtime-return, and similar side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
+            "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
+            "- when release/deployment/runtime remain at `pending_evidence` with no returned execution data, treat the converged boundary as `construction_complete_pending_execution`",
             "- treat legacy bootstrap instructions or older scaffold references in imported project docs as provenance only, not active runtime guidance for this installed workspace",
             "",
             "## Interpretation Rule",
@@ -284,6 +300,7 @@ def _normalize_project_constraints(
                 '  kind: "software-project"',
                 '  language: ""',
                 '  test_runner: ""',
+                '  ambiguity_risk_appetite: "medium"',
                 "",
                 "constraints: {}",
                 "",
@@ -292,6 +309,9 @@ def _normalize_project_constraints(
                 f'    - name: "{platform}"',
                 f'      output_dir: "build_tenants/{project_slug}/{platform}/"',
                 '      description: "Normalized tenant target for odd_sdlc operation"',
+                '      test_execution_contract: ""',
+                '      deployment_contract: ""',
+                '      runtime_observation_contract: ""',
                 "  root_code_policy: reject",
                 "",
             )
@@ -312,19 +332,48 @@ def _normalize_project_constraints(
     in_structure = False
     in_design_tenants = False
     design_tenant_seen = False
+    project_policy_seen: set[str] = set()
+    first_design_tenant_scope = False
+    tenant_field_indent = "      "
+    tenant_fields_seen: set[str] = set()
+    tenant_capabilities_flushed = False
 
-    for line in lines:
+    def _flush_missing_tenant_capabilities() -> None:
+        nonlocal tenant_capabilities_flushed
+        if tenant_capabilities_flushed or not design_tenant_seen:
+            return
+        for field_name, default_value in TENANT_CAPABILITY_FIELDS:
+            if field_name in tenant_fields_seen:
+                continue
+            updated.append(f"{tenant_field_indent}{field_name}: {default_value}")
+        tenant_capabilities_flushed = True
+
+    for index, line in enumerate(lines):
         stripped = line.strip()
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        next_stripped = next_line.strip()
+        next_indent = len(next_line) - len(next_line.lstrip()) if next_line else 0
         if line.startswith("# Project Constraints"):
             updated.append(f"# Project Constraints — {workspace_root.name}")
             continue
         if stripped == "project:":
+            if first_design_tenant_scope:
+                _flush_missing_tenant_capabilities()
+                first_design_tenant_scope = False
             in_project = True
             in_structure = False
             in_design_tenants = False
             updated.append(line)
             continue
         if stripped == "structure:":
+            if first_design_tenant_scope:
+                _flush_missing_tenant_capabilities()
+                first_design_tenant_scope = False
+            if in_project:
+                for field_name, default_value in PROJECT_POLICY_FIELDS:
+                    if field_name in project_policy_seen:
+                        continue
+                    updated.append(f"  {field_name}: {default_value}")
             in_project = False
             in_structure = True
             in_design_tenants = False
@@ -338,14 +387,36 @@ def _normalize_project_constraints(
             indent = line[: len(line) - len(line.lstrip())]
             updated.append(f'{indent}name: "{workspace_root.name}"')
             continue
+        if in_project and ":" in stripped:
+            field_name = stripped.partition(":")[0].strip()
+            project_policy_seen.add(field_name)
         if in_design_tenants and stripped.startswith("- name:"):
-            design_tenant_seen = True
+            if first_design_tenant_scope:
+                _flush_missing_tenant_capabilities()
+                first_design_tenant_scope = False
+            if not design_tenant_seen:
+                design_tenant_seen = True
+                first_design_tenant_scope = True
+                tenant_fields_seen = set()
+                tenant_capabilities_flushed = False
             updated.append(line)
             continue
+        if first_design_tenant_scope and ":" in stripped and not stripped.startswith("- name:"):
+            field_name = stripped.partition(":")[0].strip()
+            tenant_fields_seen.add(field_name)
+            tenant_field_indent = line[: len(line) - len(line.lstrip())]
         if in_design_tenants and stripped.startswith("output_dir:") and design_tenant_seen:
             updated.append(line)
-            continue
-        updated.append(line)
+        else:
+            updated.append(line)
+
+        if first_design_tenant_scope and (
+            not next_line
+            or next_stripped.startswith("- name:")
+            or (next_stripped and next_indent <= 4)
+        ):
+            _flush_missing_tenant_capabilities()
+            first_design_tenant_scope = False
 
     normalized = "\n".join(updated) + ("\n" if original.endswith("\n") else "")
     if normalized != original:
@@ -439,6 +510,28 @@ def normalize_workspace(
         platform=platform,
         actions=actions,
     )
+
+    ambiguity_path = root / AMBIGUITY_REGISTER_PATH
+    ambiguity_payload = build_ambiguity_register(root, stage="normalize_workspace")
+    ambiguity_content = json.dumps(ambiguity_payload, indent=2, sort_keys=True)
+    if not ambiguity_path.exists():
+        _write_text(
+            ambiguity_path,
+            ambiguity_content,
+            kind="create_ambiguity_register",
+            detail="created initial ambiguity register from deterministic normalization and topology inspection",
+            actions=actions,
+        )
+    else:
+        existing_ambiguity = ambiguity_path.read_text(encoding="utf-8")
+        if existing_ambiguity != ambiguity_content:
+            _write_text(
+                ambiguity_path,
+                ambiguity_content,
+                kind="update_ambiguity_register",
+                detail="updated ambiguity register from deterministic normalization and topology inspection",
+                actions=actions,
+            )
 
     report = {
         "workspace_root": str(root),

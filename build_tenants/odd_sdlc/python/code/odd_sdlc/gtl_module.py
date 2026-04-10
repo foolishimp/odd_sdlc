@@ -6,18 +6,25 @@
 # Implements: REQ-F-ASSET-004
 # Implements: REQ-F-ASSETMODEL-004
 # Implements: REQ-F-ODDSDLC-002
+# Implements: REQ-F-ODDSDLC-025
+# Implements: REQ-F-ODDSDLC-026
 """Published GTL module for the active odd_sdlc proving subset."""
 from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
 
 from gtl.algebra import compose, recurse
 from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Graph, GraphVector, Node
 from gtl.module_model import Module
-from gtl.operator_model import Evaluator, Rule, F_D, F_P, Operator
+from gtl.operator_model import Evaluator, Rule, F_D, F_H, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
 
 from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
+from .ambiguity import refresh_ambiguity_register
+from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
 
 
 def _asset_node(
@@ -401,6 +408,8 @@ _retrofit_plan_fp = Evaluator(
     description="The retrofit plan surface is semantically converged for the current returned runtime evidence and release position.",
 )
 
+_FP_DISPATCH_TIMEOUT_SECONDS = 1800
+
 
 def _graph_function(
     *,
@@ -419,7 +428,15 @@ def _graph_function(
         evaluators=(fd_evaluator, fp_evaluator),
         declarations=Attrs(
             entries=(
-                ("dispatch", Attrs(entries=(("ref", "genesis.dispatch_runtime:dispatch_bound_manifest_via_transport"),))),
+                (
+                    "dispatch",
+                    Attrs(
+                        entries=(
+                            ("ref", "genesis.dispatch_runtime:dispatch_bound_manifest_via_transport"),
+                            ("config", Attrs(entries=(("timeout", _FP_DISPATCH_TIMEOUT_SECONDS),))),
+                        )
+                    ),
+                ),
                 ("proof", Attrs(entries=(("ref", "genesis.policy_defaults:proof_recheck_after_fp"),))),
                 ("closure", Attrs(entries=(("ref", "genesis.policy_defaults:closure_require_resolution_or_fh"),))),
                 ("implements", tuple(req_refs)),
@@ -967,48 +984,62 @@ RELEASE_OPERATIONAL_CYCLE_INTENT = (
     "runtime-return, and retrofit-planning asset functions."
 )
 
-_release_operational_graph = Graph(
-    name="release_operational_cycle_graph",
-    inputs=(_release_surface, _test_run_archive_surface),
-    outputs=(_retrofit_plan_surface,),
-    nodes=(
-        _release_surface,
-        _test_run_archive_surface,
-        _deployment_surface,
-        _runtime_observation_surface,
-        _retrofit_plan_surface,
-    ),
-    vectors=(
-        GF_PREPARE_DEPLOYMENT.materialize().vectors[0],
-        GF_DERIVE_RUNTIME_OBSERVATION.materialize().vectors[0],
-        GF_DERIVE_RETROFIT_PLAN.materialize().vectors[0],
-    ),
-)
+def _build_release_operational_cycle(functions: tuple[GraphFunction, ...]) -> GraphFunction | None:
+    if not functions:
+        return None
+    function_names = {function.name for function in functions}
+    graph_inputs: tuple[Node, ...] = (_release_surface,)
+    graph_nodes: list[Node] = [_release_surface]
+    graph_outputs: tuple[Node, ...] = (_deployment_surface,)
+    environment_provides: tuple[Node, ...] = (_deployment_surface,)
 
-GF_RELEASE_OPERATIONAL_CYCLE = GraphFunction.from_graph(
-    name="release_operational_cycle",
-    graph=_release_operational_graph,
-    environment=EnvRef.from_contract(
-        requires=_release_operational_graph.inputs,
-        provides=(
+    if "derive_runtime_observation_surface" in function_names:
+        graph_inputs = (_release_surface, _test_run_archive_surface)
+        graph_nodes.append(_test_run_archive_surface)
+        graph_outputs = (_runtime_observation_surface,)
+        environment_provides = (_deployment_surface, _runtime_observation_surface)
+    if "prepare_deployment_surface" in function_names:
+        graph_nodes.append(_deployment_surface)
+    if "derive_runtime_observation_surface" in function_names:
+        graph_nodes.append(_runtime_observation_surface)
+    if "derive_retrofit_plan_surface" in function_names:
+        graph_nodes.append(_retrofit_plan_surface)
+        graph_outputs = (_retrofit_plan_surface,)
+        environment_provides = (
             _deployment_surface,
             _runtime_observation_surface,
             _retrofit_plan_surface,
-        ),
-    ),
-    declarations=Attrs(
-        entries=(
-            ("function_kind", "odd_executive_graph_function"),
-            ("intent", RELEASE_OPERATIONAL_CYCLE_INTENT),
-            ("entrypoint", True),
         )
-    ),
-    tags=("executive",),
-)
+
+    graph = Graph(
+        name="release_operational_cycle_graph",
+        inputs=graph_inputs,
+        outputs=graph_outputs,
+        nodes=tuple(dict.fromkeys(graph_nodes)),
+        vectors=tuple(function.materialize().vectors[0] for function in functions),
+    )
+    return GraphFunction.from_graph(
+        name="release_operational_cycle",
+        graph=graph,
+        environment=EnvRef.from_contract(
+            requires=graph.inputs,
+            provides=environment_provides,
+        ),
+        declarations=Attrs(
+            entries=(
+                ("function_kind", "odd_executive_graph_function"),
+                ("intent", RELEASE_OPERATIONAL_CYCLE_INTENT),
+                ("entrypoint", True),
+            )
+        ),
+        tags=("executive",),
+    )
+
+
+GF_RELEASE_OPERATIONAL_CYCLE = _build_release_operational_cycle(OPERATIONAL_LEAF_GRAPH_FUNCTIONS)
 
 RELEASE_OPERATIONAL_CYCLE_STEPS: tuple[str, ...] = tuple(
-    vector.name
-    for vector in GF_RELEASE_OPERATIONAL_CYCLE.materialize().vectors
+    vector.name for vector in GF_RELEASE_OPERATIONAL_CYCLE.materialize().vectors
 )
 
 _ROLE_CONSTRUCTOR = Role(name="constructor", tags=("f_p",))
@@ -1022,135 +1053,314 @@ def _job(name: str, graph_function: GraphFunction) -> Job:
     )
 
 
-MODULE = Module(
-    name="odd_sdlc",
-    graphs=tuple(
-        function.template.graph
-        for function in (
-            GF_BOOTSTRAP_RELEASE_SELF_TEST,
-            GF_RELEASE_OPERATIONAL_CYCLE,
-            GF_REVIEW_DESIGN_CONSENSUS_ROUND,
+def _active_workspace_root(start: Path | None = None) -> Path:
+    current = (start or Path.cwd()).resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / PROJECT_CONSTRAINTS_PATH).exists():
+            return candidate
+    return current
+
+
+def _module_workspace_root() -> Path:
+    package_root = Path(__file__).resolve().parents[5]
+    return _active_workspace_root(package_root)
+
+
+def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
+    return (workspace_root / PROJECT_CONSTRAINTS_PATH).exists()
+
+
+def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[GraphFunction, ...]:
+    if not _workspace_declares_project_constraints(workspace_root):
+        return ()
+    profile = load_project_profile(workspace_root)
+    active: list[GraphFunction] = []
+    if profile.has_deployment_capability():
+        active.append(GF_PREPARE_DEPLOYMENT)
+    if profile.has_deployment_capability() and profile.has_runtime_observation_capability():
+        active.append(GF_DERIVE_RUNTIME_OBSERVATION)
+        active.append(GF_DERIVE_RETROFIT_PLAN)
+    return tuple(active)
+
+
+def _active_function_catalog(active_operational_functions: tuple[GraphFunction, ...]) -> tuple[dict[str, object], ...]:
+    active_names = {function.name for function in LEAF_GRAPH_FUNCTIONS}
+    active_names.update(function.name for function in active_operational_functions)
+    return tuple(
+        entry.to_dict()
+        for entry in FUNCTION_CATALOG
+        if entry.backing_graph_function in active_names
+    )
+
+
+def _clone_leaf_graph_function(
+    graph_function: GraphFunction,
+    *,
+    extra_evaluators: tuple[Evaluator, ...] = (),
+    extra_vector_declarations: dict[str, object] | None = None,
+) -> GraphFunction:
+    if not extra_evaluators:
+        return graph_function
+    graph = graph_function.template.graph
+    if graph is None or len(graph.vectors) != 1:
+        return graph_function
+    vector = graph.vectors[0]
+    declarations = vector.declarations.to_dict()
+    declarations.update(dict(extra_vector_declarations or {}))
+    cloned_vector = GraphVector(
+        name=vector.name,
+        source=vector.source,
+        target=vector.target,
+        operators=vector.operators,
+        evaluators=tuple((*vector.evaluators, *extra_evaluators)),
+        contexts=vector.contexts,
+        rule=vector.rule,
+        allows_subwork=vector.allows_subwork,
+        declarations=Attrs.coerce(declarations),
+        tags=vector.tags,
+    )
+    cloned_graph = Graph(
+        name=graph.name,
+        inputs=graph.inputs,
+        outputs=graph.outputs,
+        nodes=graph.nodes,
+        vectors=(cloned_vector,),
+        contexts=graph.contexts,
+        rules=graph.rules,
+        effects=graph.effects,
+        tags=graph.tags,
+    )
+    return GraphFunction.from_graph(
+        name=graph_function.name,
+        graph=cloned_graph,
+        environment=graph_function.environment,
+        effects=graph_function.effects,
+        declarations=graph_function.declarations,
+        tags=graph_function.tags,
+    )
+
+
+def _ambiguity_fh_evaluator(edge_name: str, entries: tuple[dict[str, Any], ...]) -> Evaluator:
+    ambiguity_titles = ", ".join(sorted(str(entry.get("title") or entry.get("ambiguity_id") or "") for entry in entries))
+    return Evaluator(
+        name=f"{edge_name}_ambiguity_review_approved",
+        regime=F_H,
+        description=(
+            "Human approval is required under the current ambiguity risk appetite "
+            f"before closing `{edge_name}`. Active ambiguity: {ambiguity_titles}."
+        ),
+    )
+
+
+def _configured_leaf_graph_functions(
+    workspace_root: Path,
+) -> tuple[tuple[GraphFunction, ...], tuple[Evaluator, ...], dict[str, list[dict[str, Any]]], dict[str, Any]]:
+    ambiguity_register = refresh_ambiguity_register(workspace_root, stage="module_build")
+    fh_required_by_edge: dict[str, list[dict[str, Any]]] = {}
+    for entry in ambiguity_register.get("ambiguities", []):
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("status") or "") in {"resolved", "superseded"}:
+            continue
+        if str(entry.get("policy_action") or "") != "escalate_fh":
+            continue
+        edge = str(entry.get("expected_resolving_edge") or "")
+        if not edge:
+            continue
+        fh_required_by_edge.setdefault(edge, []).append(entry)
+    configured: list[GraphFunction] = []
+    dynamic_fh_evaluators: list[Evaluator] = []
+
+    for graph_function in LEAF_GRAPH_FUNCTIONS:
+        edge_entries = tuple(fh_required_by_edge.get(graph_function.name, ()))
+        if not edge_entries:
+            configured.append(graph_function)
+            continue
+        fh_evaluator = _ambiguity_fh_evaluator(graph_function.name, edge_entries)
+        dynamic_fh_evaluators.append(fh_evaluator)
+        configured.append(
+            _clone_leaf_graph_function(
+                graph_function,
+                extra_evaluators=(fh_evaluator,),
+                extra_vector_declarations={
+                    "ambiguity_policy": Attrs.coerce(
+                        {
+                            "review_required": True,
+                            "ambiguity_ids": tuple(
+                                str(entry.get("ambiguity_id") or "")
+                                for entry in edge_entries
+                            ),
+                            "policy_actions": tuple(
+                                (
+                                    str(entry.get("ambiguity_id") or ""),
+                                    str(entry.get("policy_action") or ""),
+                                )
+                                for entry in edge_entries
+                            ),
+                        }
+                    ),
+                },
+            )
         )
-        if function.template.graph is not None
-    ),
-    graph_functions=(
-        GF_BOOTSTRAP_RELEASE_SELF_TEST,
-        GF_RELEASE_OPERATIONAL_CYCLE,
+
+    return tuple(configured), tuple(dynamic_fh_evaluators), fh_required_by_edge, ambiguity_register
+
+
+def _build_module(workspace_root: Path) -> Module:
+    active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
+    active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
+    active_operational_executive = _build_release_operational_cycle(active_operational_functions)
+    bootstrap_executive = _executive_graph_function(
+        name="bootstrap_release_self_test",
+        intent=BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+        functions=active_leaf_functions,
+    )
+    executive_graph_functions = [bootstrap_executive]
+    if active_operational_executive is not None:
+        executive_graph_functions.append(active_operational_executive)
+
+    graph_functions = [
+        *executive_graph_functions,
         GF_REVIEW_DESIGN_CONSENSUS_ROUND,
         GF_REVIEW_DESIGN_BY_CONSENSUS,
-    ),
-    refinement_boundaries=tuple(
-        RefinementBoundary(
-            name=vector.name,
-            inputs=vector.source if isinstance(vector.source, tuple) else (vector.source,),
-            outputs=(vector.target,),
-            hints=Attrs(entries=(("terminal", True),)),
-        )
-        for vector in (
-            *GF_BOOTSTRAP_RELEASE_SELF_TEST.materialize().vectors,
-            *GF_RELEASE_OPERATIONAL_CYCLE.materialize().vectors,
-            *GF_REVIEW_DESIGN_CONSENSUS_ROUND.materialize().vectors,
-        )
-    ),
-    jobs=(
-        _job("bootstrap_release_self_test_job", GF_BOOTSTRAP_RELEASE_SELF_TEST),
-        _job("release_operational_cycle_job", GF_RELEASE_OPERATIONAL_CYCLE),
-    ),
-    roles=(_ROLE_CONSTRUCTOR,),
-    operators=(_builder,),
-    evaluators=(
-        _bootstrap_fd,
-        _product_fd,
-        _goal_fd,
-        _requirements_fd,
-        _feature_decomp_fd,
-        _uat_testcases_fd,
-        _design_fd,
-        _review_assessment_fd,
-        _consensus_decision_fd,
-        _reviewed_design_fd,
-        _testcase_authority_fd,
-        _scenario_fd,
-        _implementation_design_fd,
-        _implementation_stack_profile_fd,
-        _implementation_module_fd,
-        _code_fd,
-        _release_fd,
-        _deployment_fd,
-        _runtime_observation_fd,
-        _retrofit_plan_fd,
-        _test_design_fd,
-        _test_stack_profile_fd,
-        _test_module_fd,
-        _test_run_archive_fd,
-        _intent_fp,
-        _product_fp,
-        _goal_fp,
-        _requirements_fp,
-        _feature_decomp_fp,
-        _uat_testcases_fp,
-        _design_fp,
-        _review_assessment_fp,
-        _consensus_decision_fp,
-        _reviewed_design_fp,
-        _testcase_authority_fp,
-        _design_consensus_gate_fp,
-        _design_consensus_termination,
-        _scenario_fp,
-        _implementation_design_fp,
-        _implementation_stack_profile_fp,
-        _implementation_module_fp,
-        _code_fp,
-        _release_fp,
-        _deployment_fp,
-        _runtime_observation_fp,
-        _retrofit_plan_fp,
-        _test_design_fp,
-        _test_stack_profile_fp,
-        _test_module_fp,
-        _test_run_archive_fp,
-    ),
-    rules=(
-        _design_consensus_rule,
-    ),
-    metadata=Attrs(
-        entries=(
-            ("requirements", (
-                "REQ-F-GFUNC-001",
-                "REQ-F-GFUNC-004",
-                "REQ-F-RUNTIME-001",
-                "REQ-F-RUNTIME-002",
-                "REQ-F-RUNTIME-003",
-                "REQ-F-RUNTIME-004",
-                "REQ-F-ASSET-001",
-                "REQ-F-ASSET-002",
-                "REQ-F-ASSET-003",
-                "REQ-F-ASSET-004",
-                "REQ-F-ASSETMODEL-001",
-                "REQ-F-ASSETMODEL-002",
-                "REQ-F-ASSETMODEL-003",
-                "REQ-F-ASSETMODEL-004",
-                "REQ-F-ODDSDLC-001",
-                "REQ-F-ODDSDLC-002",
-                "REQ-F-ODDSDLC-003",
-                "REQ-F-ODDSDLC-004",
-                "REQ-F-ODDSDLC-006",
-            )),
-            ("function_catalog", tuple(entry.to_dict() for entry in FUNCTION_CATALOG)),
-            ("executive_graph_function", GF_BOOTSTRAP_RELEASE_SELF_TEST.name),
-            ("executive_graph_functions", (
-                GF_BOOTSTRAP_RELEASE_SELF_TEST.name,
-                GF_RELEASE_OPERATIONAL_CYCLE.name,
-            )),
-            ("library_graph_functions", (
-                GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
-                GF_REVIEW_DESIGN_BY_CONSENSUS.name,
-            )),
-            ("domain_package", "odd_sdlc"),
-        )
-    ),
-)
+    ]
+    refinement_vectors = [
+        *bootstrap_executive.materialize().vectors,
+    ]
+    if active_operational_executive is not None:
+        refinement_vectors.extend(active_operational_executive.materialize().vectors)
+    refinement_vectors.extend(GF_REVIEW_DESIGN_CONSENSUS_ROUND.materialize().vectors)
+
+    jobs = [
+        _job("bootstrap_release_self_test_job", bootstrap_executive),
+    ]
+    if active_operational_executive is not None:
+        jobs.append(_job("release_operational_cycle_job", active_operational_executive))
+
+    return Module(
+        name="odd_sdlc",
+        graphs=tuple(
+            function.template.graph
+            for function in graph_functions
+            if function.template.graph is not None
+        ),
+        graph_functions=tuple(graph_functions),
+        refinement_boundaries=tuple(
+            RefinementBoundary(
+                name=vector.name,
+                inputs=vector.source if isinstance(vector.source, tuple) else (vector.source,),
+                outputs=(vector.target,),
+                hints=Attrs(entries=(("terminal", True),)),
+            )
+            for vector in refinement_vectors
+        ),
+        jobs=tuple(jobs),
+        roles=(_ROLE_CONSTRUCTOR,),
+        operators=(_builder,),
+        evaluators=(
+            _bootstrap_fd,
+            _product_fd,
+            _goal_fd,
+            _requirements_fd,
+            _feature_decomp_fd,
+            _uat_testcases_fd,
+            _design_fd,
+            _review_assessment_fd,
+            _consensus_decision_fd,
+            _reviewed_design_fd,
+            _testcase_authority_fd,
+            _scenario_fd,
+            _implementation_design_fd,
+            _implementation_stack_profile_fd,
+            _implementation_module_fd,
+            _code_fd,
+            _release_fd,
+            _deployment_fd,
+            _runtime_observation_fd,
+            _retrofit_plan_fd,
+            _test_design_fd,
+            _test_stack_profile_fd,
+            _test_module_fd,
+            _test_run_archive_fd,
+            _intent_fp,
+            _product_fp,
+            _goal_fp,
+            _requirements_fp,
+            _feature_decomp_fp,
+            _uat_testcases_fp,
+            _design_fp,
+            _review_assessment_fp,
+            _consensus_decision_fp,
+            _reviewed_design_fp,
+            _testcase_authority_fp,
+            _design_consensus_gate_fp,
+            _design_consensus_termination,
+            _scenario_fp,
+            _implementation_design_fp,
+            _implementation_stack_profile_fp,
+            _implementation_module_fp,
+            _code_fp,
+            _release_fp,
+            _deployment_fp,
+            _runtime_observation_fp,
+            _retrofit_plan_fp,
+            _test_design_fp,
+            _test_stack_profile_fp,
+            _test_module_fp,
+            _test_run_archive_fp,
+            *dynamic_fh_evaluators,
+        ),
+        rules=(
+            _design_consensus_rule,
+        ),
+        metadata=Attrs(
+            entries=(
+                ("requirements", (
+                    "REQ-F-GFUNC-001",
+                    "REQ-F-GFUNC-004",
+                    "REQ-F-RUNTIME-001",
+                    "REQ-F-RUNTIME-002",
+                    "REQ-F-RUNTIME-003",
+                    "REQ-F-RUNTIME-004",
+                    "REQ-F-ASSET-001",
+                    "REQ-F-ASSET-002",
+                    "REQ-F-ASSET-003",
+                    "REQ-F-ASSET-004",
+                    "REQ-F-ASSETMODEL-001",
+                    "REQ-F-ASSETMODEL-002",
+                    "REQ-F-ASSETMODEL-003",
+                    "REQ-F-ASSETMODEL-004",
+                    "REQ-F-ODDSDLC-001",
+                    "REQ-F-ODDSDLC-002",
+                    "REQ-F-ODDSDLC-003",
+                    "REQ-F-ODDSDLC-004",
+                    "REQ-F-ODDSDLC-006",
+                    "REQ-F-ODDSDLC-025",
+                    "REQ-F-ODDSDLC-026",
+                    "REQ-F-ODDSDLC-027",
+                    "REQ-F-ODDSDLC-028",
+                )),
+                ("function_catalog", _active_function_catalog(active_operational_functions)),
+                ("executive_graph_function", bootstrap_executive.name),
+                ("executive_graph_functions", tuple(function.name for function in executive_graph_functions)),
+                ("library_graph_functions", (
+                    GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
+                    GF_REVIEW_DESIGN_BY_CONSENSUS.name,
+                )),
+                ("operational_capability_gated", True),
+                ("ambiguity_risk_appetite", ambiguity_register.get("project_profile", {}).get("ambiguity_risk_appetite", "")),
+                ("ambiguity_fh_required_edges", tuple(sorted(fh_required_by_edge))),
+                ("active_operational_steps", tuple(function.name for function in active_operational_functions)),
+                ("domain_package", "odd_sdlc"),
+            )
+        ),
+    )
 
 
-def module() -> Module:
-    return MODULE
+MODULE = _build_module(_module_workspace_root())
+
+
+def module(workspace_root: Path | str | None = None) -> Module:
+    if workspace_root is None:
+        return _build_module(_module_workspace_root())
+    return _build_module(Path(workspace_root).resolve())

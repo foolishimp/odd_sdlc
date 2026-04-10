@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Date**: 2026-04-08
-**Implements**: REQ-F-ODDSDLC-009, REQ-F-ODDSDLC-010, REQ-F-ODDSDLC-011, REQ-F-ODDSDLC-012, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-016, REQ-F-ODDSDLC-017, REQ-F-ODDSDLC-018, REQ-F-ODDSDLC-019, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-022, REQ-F-ODDSDLC-023, REQ-F-ODDSDLC-024
+**Implements**: REQ-F-ODDSDLC-009, REQ-F-ODDSDLC-010, REQ-F-ODDSDLC-011, REQ-F-ODDSDLC-012, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-016, REQ-F-ODDSDLC-017, REQ-F-ODDSDLC-018, REQ-F-ODDSDLC-019, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-022, REQ-F-ODDSDLC-023, REQ-F-ODDSDLC-024, REQ-F-ODDSDLC-025, REQ-F-ODDSDLC-026
 **Derives From**: `specification/PRODUCT.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/07-asset-typing-and-binding.md`, `specification/requirements/08-odd-sdlc-first-slice.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `build_tenants/common/design/ODD_SDLC_TRANSLATION.md`
 
 ## Position
@@ -104,6 +104,10 @@ This means:
 - release is not terminal project completion
 - runtime-returned evidence is a first-class governed input
 - maintenance work remains inside the same constitutional and runtime line
+- executional and operational stages are capability-gated rather than assumed
+- when execution capability is absent, lawful closure occurs at the last
+  satisfied construction boundary rather than through false operational
+  convergence
 
 ## Asset Families
 
@@ -116,6 +120,7 @@ The software-domain build-out expands that into these minimum family groups:
 - specification and design assets
 - implementation profile and implementation asset surfaces
 - build and packaging artifacts
+- technology-capability and execution-contract assets
 - qualification design, testcase-authority, run, and report assets
 - release and deployment assets
 - runtime observation and incident or gap assets
@@ -133,6 +138,9 @@ Representative live asset families for the build-out are:
 - `review_surface`
 - `implementation_design_surface`
 - `implementation_profile_surface`
+- `execution_capability_surface`
+- `deployment_contract_surface`
+- `runtime_return_contract_surface`
 - `implementation_module_surface`
 - `implementation_asset_surface`
 - `build_artifact_surface`
@@ -150,6 +158,28 @@ Representative live asset families for the build-out are:
 
 The exact file layout for those surfaces remains tenant-local realization law.
 Their existence and graph role is the design commitment.
+
+## Reusable Workflow Forms Over Typed Asset Lanes
+
+`odd_sdlc` keeps graph-function workflow forms reusable while preserving typed
+asset distinction.
+
+This means structurally similar workflow forms may be instantiated over
+different software-domain lanes, for example:
+
+- implementation design -> implementation module -> code
+- test design -> test module -> test code or archive
+- release -> deployment -> runtime observation
+
+The reusable form is not the asset identity.
+
+Each instantiated lane still carries its own:
+
+- typed assets
+- evaluator contracts
+- output contracts
+- stack profile or transform profile
+- technology capability dependencies where side effects are involved
 
 ## Work Acts And Provenance
 
@@ -194,6 +224,8 @@ The minimum contract surface is:
 - source asset set
 - target asset
 - transform dependency or transform profile
+- technology capability dependency where execution, deployment, or runtime
+  interaction is implied
 - preflight `F_D`
 - configured `F_P`
 - postflight `F_D`
@@ -206,6 +238,115 @@ The minimum contract surface is:
 This design keeps the graph explicit while allowing generic software-domain
 traversal to stay mostly constructive rather than overfitted to deterministic
 checks.
+
+## Capability-Gated Operational Convergence
+
+Construction and operational convergence are not the same thing.
+
+Constructional lanes may converge over specification, design, implementation,
+test design, testcase authority, and release-readiness assets without implying
+that executable technology capability is present.
+
+Executional or operational lanes such as:
+
+- test execution
+- deployment
+- runtime observation
+- CI/CD or packaging enactment
+- runtime-return ingestion
+
+may converge only when the governing build tenant declares the corresponding
+technology capability dependency explicitly.
+
+Representative capabilities include:
+
+- build tool or runner contracts such as `sbt`, `pytest`, or equivalent
+- deployment contracts such as cluster submission or service rollout documents
+- runtime-return channels and report contracts
+
+Configured `F_P` may interpret and exercise a declared capability.
+
+Configured `F_P` may not invent a missing capability.
+
+If a required operational capability is absent:
+
+- the operational edge does not converge
+- traversal stops at the last lawful construction boundary
+- the visible state is an honest bounded state such as
+  `construction_complete_pending_execution`
+- release readiness may still be published as a projection over the completed
+  construction wave, but deployment/runtime closure may not be claimed
+
+## Ambiguity Register And Disambiguation Boundaries
+
+`odd_sdlc` should treat the SDLC as a disambiguation pipeline, not merely as an
+asset-generation chain.
+
+That means major ambiguity is governed domain truth.
+
+The package should therefore publish an `ambiguity_register_surface` as a
+machine-readable worksite asset.
+
+Its role is to record major ambiguity such as:
+
+- project identity conflict
+- missing canonical surfaces
+- competing realization roots
+- declared root versus realized root mismatch
+- declared topology versus realized topology mismatch
+- governance-surface truth drifting from artifact truth
+- absent execution capability for a stage that implies side effects
+
+This register is not meant to capture every local build decision.
+
+The design distinction is:
+
+- major ambiguity changes the meaning, topology, lifecycle, or admissibility of
+  later traversal
+- micro ambiguity remains local to bounded implementation work unless it
+  escapes its boundary and threatens a declared invariant
+
+The first active publication point is deterministic normalization.
+
+That seeded register may then be updated at major graph boundaries such as:
+
+- imported authority and bootstrap foundation
+- implementation branch materialization
+- qualification branch materialization
+- release readiness
+- deployment
+- runtime return
+- retrofit planning
+
+At those boundaries the register should show whether ambiguity was:
+
+- introduced
+- reduced
+- resolved
+- carried
+- decided by `F_P`
+- escalated to `F_H`
+- blocked
+- pending capability
+
+This makes disambiguation explicit and prevents silent topology recovery or
+silent capability assumptions from hiding important project-state truth.
+
+Ambiguity detection is mandatory. Blocking is policy.
+
+That means the register must also carry, for each major ambiguity:
+
+- the active risk appetite
+- the policy action chosen for that ambiguity class at the current boundary
+- the decision owner when work has proceeded, such as deterministic policy,
+  `F_P`, or `F_H`
+- the decision basis or selected interpretation when a lawful choice was made
+
+The governing rule is:
+
+- lower risk appetite escalates more major ambiguity to `F_H`
+- higher risk appetite permits more bounded `F_P` decision-making
+- hard-stop prerequisite classes remain fail-closed regardless of appetite
 
 ## Generic Software Traversal
 

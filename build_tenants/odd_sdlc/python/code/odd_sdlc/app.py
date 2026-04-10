@@ -1,5 +1,7 @@
 # Implements: REQ-F-ODDSDLC-003
 # Implements: REQ-F-ODDSDLC-004
+# Implements: REQ-F-ODDSDLC-020
+# Implements: REQ-F-ODDSDLC-027
 """App-owned bootstrap and runtime surface for odd_sdlc."""
 from __future__ import annotations
 
@@ -14,6 +16,7 @@ from genesis.install import workspace_bootstrap
 from genesis.services import Scope, gen_gaps, gen_iterate, gen_start
 
 from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
+from .ambiguity import load_or_build_ambiguity_register
 from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
@@ -37,7 +40,7 @@ class OddSdlcApp:
 
     def scope(self) -> Scope:
         return Scope(
-            module=odd_sdlc_module(),
+            module=odd_sdlc_module(self.config.workspace_root),
             workspace_root=self.config.workspace_root,
             build=self.config.build,
             worker=self.worker,
@@ -70,12 +73,20 @@ def initialize(config: AppConfig, *, worker: Worker | None = None) -> OddSdlcApp
 
 
 def catalog(app: OddSdlcApp) -> dict:
-    module = odd_sdlc_module()
+    module = odd_sdlc_module(app.config.workspace_root)
     workspace_root = app.config.workspace_root
-    function_intent_by_name = {
-        entry.name: entry.intent
-        for entry in FUNCTION_CATALOG
-    }
+    active_function_catalog = list(module.metadata.get("function_catalog", FUNCTION_CATALOG))
+    active_executive_programs = set(module.metadata.get("executive_graph_functions", ()))
+    function_intent_by_name = {}
+    for entry in active_function_catalog:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+            intent = entry.get("intent")
+        else:
+            name = getattr(entry, "name", None)
+            intent = getattr(entry, "intent", None)
+        if isinstance(name, str):
+            function_intent_by_name[name] = intent or ""
 
     def _decl_value(value: Any) -> Any:
         return value.to_dict() if hasattr(value, "to_dict") else value
@@ -99,11 +110,19 @@ def catalog(app: OddSdlcApp) -> dict:
         "asset_families": [descriptor.to_dict() for descriptor in ASSET_FAMILIES],
         "work_act_types": [descriptor.to_dict() for descriptor in WORK_ACT_TYPES],
         "assets": [asset.to_dict() for asset in bootstrap_assets(workspace_root)],
+        "ambiguity_register": load_or_build_ambiguity_register(workspace_root),
         "collections": [bootstrap_input_collection(workspace_root).to_dict()],
         "bindings": [binding.to_dict() for binding in bootstrap_bindings(workspace_root)],
-        "functions": [entry.to_dict() for entry in FUNCTION_CATALOG],
+        "functions": [
+            entry.to_dict() if hasattr(entry, "to_dict") else entry
+            for entry in active_function_catalog
+        ],
         "edge_contracts": [descriptor.to_dict() for descriptor in EDGE_CONTRACTS],
-        "programs": [entry.to_dict() for entry in PROGRAM_CATALOG],
+        "programs": [
+            entry.to_dict()
+            for entry in PROGRAM_CATALOG
+            if entry.name in active_executive_programs
+        ],
         "graph_functions": [
             {
                 "id": function.id,

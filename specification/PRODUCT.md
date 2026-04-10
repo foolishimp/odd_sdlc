@@ -31,6 +31,8 @@ It gives a project a lawful way to declare:
 - a governed SDLC worksite lifecycle over request, specification, design,
   implementation, qualification, release, deployment, runtime return, and
   retrofit work
+- explicit technology capability and execution contracts for test execution,
+  deployment, CI/CD, and runtime return where those stages are in scope
 - explicit software work acts and operational-return evidence with attributable
   provenance
 - deterministic install-and-normalize behavior over imported or stale workspaces
@@ -125,6 +127,21 @@ ODD may borrow from CQRS here:
 - the current materialized asset surface is the projected checkpoint operators
   usually edit or inspect
 
+### Technology Capability Asset
+
+A tenant-local realization asset that declares the executable technology
+dependency required for a side-effecting edge.
+
+Examples include:
+
+- build tools and test runners
+- deployment contracts
+- environment contracts
+- runtime-return channels
+
+Without the required capability asset, an executional or operational edge may
+not converge.
+
 ### Requirement Family Surface
 
 The folderized asset surface rooted at `specification/requirements/` that
@@ -213,6 +230,9 @@ implement, qualify, release, deploy, observe, return, retrofit, and relaunch.
 
 The project is therefore treated as an active worksite rather than as a
 generate-once surface tree.
+
+Executional or operational stages inside that lifecycle are conditional on the
+declared technology capability of the active build-tenant realization.
 
 ### Software Work Act
 

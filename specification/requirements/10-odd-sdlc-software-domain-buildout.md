@@ -231,3 +231,78 @@ behavior rather than preserving first-slice precedent by inertia.
 - AC-3: retained subset proof, install proof, and reusable harness proof all
   trace to the active software-domain requirements and design surfaces rather
   than to superseded first-slice law
+
+### REQ-F-ODDSDLC-025 — odd_sdlc reuses workflow forms across distinct typed asset lanes
+
+`odd_sdlc` reuses graph-function workflow forms across distinct typed asset
+lanes without collapsing their asset semantics.
+
+**Acceptance Criteria**:
+- AC-1: structurally similar software-domain workflows may be published over
+  distinct typed assets such as implementation design/module/code and test
+  design/module/code or archive
+- AC-2: reuse of workflow form does not erase the distinct asset identities,
+  output contracts, or evaluator contracts of the participating lanes
+- AC-3: tenant-local stack selection remains lane-specific where the
+  implementation stack and the test or operational stack are materially
+  different
+
+### REQ-F-ODDSDLC-026 — executional and operational convergence is gated by declared technology capability
+
+Edges that imply execution, deployment, runtime interaction, or other side
+effects may converge only when the required technology capability is declared in
+the governing build-tenant realization.
+
+**Acceptance Criteria**:
+- AC-1: executional or operational edges declare the required technology
+  capability dependency explicitly, such as build tool, test runner,
+  deployment contract, environment contract, or runtime-return channel
+- AC-2: when the required capability dependency is absent, the edge does not
+  converge and `F_P` is not allowed to invent or guess the missing capability
+- AC-3: when capability is absent, traversal stops lawfully at the last
+  satisfied non-execution boundary and reports an honest bounded state such as
+  `construction_complete_pending_execution` or equivalent pending-capability
+  status
+- AC-4: deployment, runtime observation, and retrofit traversal are conditional
+  on declared tenant capability and returned evidence contracts rather than
+  being treated as unconditional generic closure
+
+### REQ-F-ODDSDLC-027 — odd_sdlc publishes a governed ambiguity register across the active SDLC wave
+
+`odd_sdlc` publishes a governed ambiguity register that records major ambiguity
+in the active workspace and makes disambiguation explicit rather than implicit.
+
+**Acceptance Criteria**:
+- AC-1: deterministic normalization publishes an initial machine-readable
+  ambiguity register for imported or stale workspaces
+- AC-2: ambiguity entries record at least their class, affected assets, current
+  status, threatened invariant or requirement refs, expected resolving boundary,
+  declared risk appetite, policy action, and the current resolution or decision
+  basis
+- AC-3: the ambiguity register distinguishes major ambiguity from local
+  implementation detail and does not collapse all micro build choices into one
+  top-level governance surface
+- AC-4: the ambiguity register is exposed as current domain truth through the
+  active query or catalog surfaces
+
+### REQ-F-ODDSDLC-028 — major odd_sdlc convergence is ambiguity-aware
+
+`odd_sdlc` treats the SDLC as a disambiguation pipeline in which major
+ambiguity must always be surfaced and governed explicitly at the relevant
+lifecycle boundary.
+
+**Acceptance Criteria**:
+- AC-1: major SDLC gates such as imported authority, build-tenant selection,
+  design, implementation structure, qualification structure, and release
+  readiness may reduce, carry, or resolve major ambiguity explicitly
+- AC-2: declared risk appetite governs whether an open major ambiguity is
+  carried by `F_P`, escalated to `F_H`, or treated as a hard stop
+- AC-3: lawful bounded stop states such as
+  `construction_complete_pending_execution` remain available when ambiguity or
+  missing capability prevents downstream operational closure
+- AC-4: hard-stop prerequisite classes such as missing declared capability,
+  absent authority, or undeclared irreversible side effects remain fail-closed
+  regardless of risk appetite
+- AC-5: qualification proves at least one real inherited-project use case where
+  ambiguity is first recorded and later reduced or resolved without losing the
+  earlier evidence, and one use case where policy causes `F_H` escalation

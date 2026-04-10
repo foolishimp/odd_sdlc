@@ -1,5 +1,6 @@
 # Implements: REQ-F-RUNTIME-003
 # Implements: REQ-F-ODDSDLC-004
+# Implements: REQ-F-ODDSDLC-026
 """Deterministic checks for the retained odd_sdlc proving subset."""
 from __future__ import annotations
 
@@ -8,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fd_contracts import FD_EVALUATOR_CONTRACTS_BY_CLI_NAME
+from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
 from .workspace_assets import assess_generated_asset_contract, asset_materialization_path, asset_path
 
 
@@ -16,6 +18,7 @@ class CheckRule:
     required_root_assets: tuple[str, ...] = ()
     required_materialization_assets: tuple[str, ...] = ()
     required_generated_assets: tuple[str, ...] = ()
+    required_profile_fields: tuple[str, ...] = ()
 
 
 CHECK_RULES: dict[str, CheckRule] = {
@@ -95,12 +98,15 @@ CHECK_RULES: dict[str, CheckRule] = {
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("release_surface",),
+        required_profile_fields=("deployment_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["runtime-observation-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("deployment_surface", "test_run_archive_surface"),
+        required_profile_fields=("deployment_contract", "runtime_observation_contract"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["retrofit-plan-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("runtime_observation_surface", "release_surface"),
+        required_profile_fields=("deployment_contract", "runtime_observation_contract"),
     ),
 }
 
@@ -111,6 +117,8 @@ def _require_exists(path: Path) -> bool:
 
 def _run_check(check_name: str, workspace_root: Path) -> int:
     rule = CHECK_RULES[check_name]
+    profile = load_project_profile(workspace_root)
+    enforce_declared_capabilities = (workspace_root / PROJECT_CONSTRAINTS_PATH).exists()
     if not all(_require_exists(asset_path(workspace_root, asset_id)) for asset_id in rule.required_root_assets):
         return 1
     if not all(
@@ -121,6 +129,10 @@ def _run_check(check_name: str, workspace_root: Path) -> int:
     if not all(
         assess_generated_asset_contract(workspace_root, asset_id)["contract_satisfied"]
         for asset_id in rule.required_generated_assets
+    ):
+        return 1
+    if enforce_declared_capabilities and not all(
+        getattr(profile, field_name, "").strip() for field_name in rule.required_profile_fields
     ):
         return 1
     return 0

@@ -963,6 +963,12 @@ def _construct_release(workspace_root: Path) -> str:
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
     if test_summary["parsed_report_count"] == 0:
+        completion_state = "construction_complete_pending_execution"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        completion_state = "execution_evidence_recorded"
+    else:
+        completion_state = "execution_evidence_recorded_with_failures"
+    if test_summary["parsed_report_count"] == 0:
         release_status = "pending_evidence"
     elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
         release_status = "qualified"
@@ -976,6 +982,7 @@ def _construct_release(workspace_root: Path) -> str:
             "",
             "## Governed Release Position",
             f"- status: {release_status}",
+            f"- completion_state: {completion_state}",
             f"- governed code root: `{code_summary['relative_path']}`",
             f"- source files observed: {code_summary['source_file_count']}",
             f"- build markers observed: {', '.join(code_summary['build_markers']) or 'none'}",
@@ -984,6 +991,7 @@ def _construct_release(workspace_root: Path) -> str:
             f"- tests observed: {test_summary['tests']}",
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
+            f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
             "",
             "## Source Requirements Snapshot",
             requirements,
@@ -1003,6 +1011,13 @@ def _construct_release(workspace_root: Path) -> str:
             "## Source Test Run Archive Snapshot",
             test_run_archive,
             "",
+            "## Ungoverned Execution Observations",
+            (
+                "- no undeclared execution reports observed"
+                if not test_summary["ungoverned_report_paths"]
+                else "\n".join(f"- `{path}`" for path in test_summary["ungoverned_report_paths"])
+            ),
+            "",
         )
     )
 
@@ -1012,6 +1027,12 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
     project_profile = load_project_profile(workspace_root)
+    if test_summary["parsed_report_count"] == 0:
+        completion_state = "construction_complete_pending_execution"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        completion_state = "execution_evidence_recorded"
+    else:
+        completion_state = "execution_evidence_recorded_with_failures"
     if test_summary["parsed_report_count"] == 0:
         deployment_status = "pending_evidence"
     elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
@@ -1026,12 +1047,14 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
             "",
             "## Governed Deployment Record",
             f"- status: {deployment_status}",
+            f"- completion_state: {completion_state}",
             f"- governed code root: `{code_summary['relative_path']}`",
             f"- realization mode: `{project_profile.realization_mode}`",
             f"- resolution reason: `{project_profile.resolution_reason}`",
             f"- build markers observed: {', '.join(code_summary['build_markers']) or 'none'}",
             f"- tests carried into deployment record: {test_summary['tests']}",
             f"- failures carried into deployment record: {test_summary['failures']}",
+            f"- ungoverned report files excluded from deployment record: {test_summary['ungoverned_report_file_count']}",
             "",
             "## Release Readiness Snapshot",
             release_surface,
@@ -1050,6 +1073,12 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
     deployment_surface = _asset_text(workspace_root, "deployment_surface")
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
+    if test_summary["parsed_report_count"] == 0:
+        completion_state = "construction_complete_pending_execution"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        completion_state = "execution_evidence_recorded"
+    else:
+        completion_state = "execution_evidence_recorded_with_failures"
     observed_status = "returned" if test_summary["report_file_count"] else "no_evidence"
     return "\n".join(
         (
@@ -1059,12 +1088,14 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
             "",
             "## Returned Runtime Position",
             f"- status: {observed_status}",
+            f"- completion_state: {completion_state}",
             f"- governed code root: `{code_summary['relative_path']}`",
             f"- report files returned: {test_summary['report_file_count']}",
             f"- parsed reports: {test_summary['parsed_report_count']}",
             f"- tests observed: {test_summary['tests']}",
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
+            f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
             "",
             "## Source Deployment Snapshot",
             deployment_surface,
@@ -1233,6 +1264,9 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
 
 def _construct_test_run_archive(workspace_root: Path) -> str:
     test_summary = summarize_test_evidence(workspace_root)
+    ungoverned_report_lines = tuple(
+        f"- `{path}`" for path in test_summary["ungoverned_report_paths"]
+    ) or ("- no undeclared execution reports observed",)
     if _software_project_mode(workspace_root):
         report_lines = tuple(f"- `{path}`" for path in test_summary["report_paths"]) or (
             "- no report files observed yet",
@@ -1249,12 +1283,16 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
                 f"- tests observed: {test_summary['tests']}",
                 f"- failures observed: {test_summary['failures']}",
                 f"- errors observed: {test_summary['errors']}",
+                f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
                 "",
                 "## Observed Report Paths",
                 *report_lines,
+                "",
+                "## Ungoverned Report Paths",
+                *ungoverned_report_lines,
                 "",
             )
         )
@@ -1272,6 +1310,7 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
             f"- tests observed: {test_summary['tests']}",
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
+            f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
             "",
             "## Source Test Module Snapshot",
             test_modules,
@@ -1281,6 +1320,9 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
             "",
             "## Governed Evidence Projection",
             json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+            "## Ungoverned Report Paths",
+            *ungoverned_report_lines,
             "",
         )
     )

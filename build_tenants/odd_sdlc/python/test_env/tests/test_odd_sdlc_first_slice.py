@@ -7,6 +7,7 @@
 # Validates: REQ-F-ODDSDLC-002
 # Validates: REQ-F-ODDSDLC-003
 # Validates: REQ-F-ODDSDLC-004
+# Validates: REQ-F-ODDSDLC-020
 # Validates: REQ-F-ODDSDLC-006
 from __future__ import annotations
 
@@ -56,11 +57,40 @@ from genesis.binding import module_to_executable_jobs  # noqa: E402
 
 def _seed_workspace(path: Path) -> None:
     (path / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
+    (path / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
     (path / "specification" / "INTENT.md").write_text("# Intent\n", encoding="utf-8")
     (path / "specification" / "PRODUCT.md").write_text("# Product\n", encoding="utf-8")
     (path / "specification" / "GOALS.md").write_text("# Goals\n", encoding="utf-8")
     (path / "specification" / "requirements" / "10-bootstrap.md").write_text(
         "# Bootstrap Requirements\n",
+        encoding="utf-8",
+    )
+    (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "# Project Constraints — first-slice test",
+                "",
+                "project:",
+                '  name: "first-slice-test"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python_default"',
+                '      output_dir: "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"',
+                '      description: "First-slice proving layout"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: "docs/deployment-contract.md"',
+                '      runtime_observation_contract: "docs/runtime-observation-contract.md"',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
         encoding="utf-8",
     )
 
@@ -78,6 +108,9 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
     _seed_workspace(tmp_path)
     assert asset_path(tmp_path, "intent_surface") == tmp_path / "specification" / "INTENT.md"
     assert asset_path(tmp_path, "requirement_surface") == tmp_path / "specification" / "requirements"
+    assert asset_path(tmp_path, "ambiguity_register_surface") == (
+        tmp_path / ".ai-workspace" / "runtime" / "odd_sdlc-ambiguity-register.json"
+    )
     assert asset_path(tmp_path, "code_surface") == (
         tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
     )
@@ -162,8 +195,9 @@ def test_generated_asset_contract_assessment_for_code_surface(tmp_path: Path) ->
     assert attestation["contract_satisfied"] is True
 
 
-def test_module_publishes_first_asset_function_catalog() -> None:
-    module = odd_sdlc_module()
+def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    module = odd_sdlc_module(tmp_path)
     graph_function_names = [graph_function.name for graph_function in module.graph_functions]
     assert graph_function_names == [
         "bootstrap_release_self_test",
@@ -331,6 +365,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["testcase_authority_surface"]["specializes"] == ["authority_document_surface"]
     assert asset_types["scenario_surface"]["specializes"] == ["scenario_collection_surface"]
     assert asset_types["release_surface"]["specializes"] == ["release_document_surface"]
+    assert asset_types["ambiguity_register_surface"]["library_level"] == "specialized"
     assert asset_types["implementation_design_surface"]["specializes"] == ["design_document_surface"]
     assert asset_types["implementation_stack_profile"]["specializes"] == ["stack_profile_surface"]
     assert asset_types["implementation_module_surface"]["specializes"] == ["module_structure_surface"]
@@ -581,6 +616,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
 
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
+        "ambiguity_register",
         "asset_families",
         "asset_types",
         "assets",
@@ -601,7 +637,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "work_act_types",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 24
+    assert len(payload["assets"]) == 25
     assert len(payload["functions"]) == 21
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
@@ -613,6 +649,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
     assert payload["graph_calls"] == []
     assert payload["continuations"] == []
     assert payload["recent_events"] == []
+    assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert all(asset["projection_source"] == "workspace_scan" for asset in payload["assets"])
 
@@ -641,6 +678,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
 
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
+        "ambiguity_register",
         "asset_families",
         "asset_types",
         "assets",
@@ -659,7 +697,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v5",
+        "version": "v6",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
@@ -667,6 +705,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
             "asset_types",
             "asset_families",
             "assets",
+            "ambiguity_register",
             "collections",
             "functions",
             "edge_contracts",
@@ -683,7 +722,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 24
+    assert len(payload["assets"]) == 25
     assert len(payload["functions"]) == 21
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
@@ -691,6 +730,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert len(payload["collections"]) == 1
     assert len(payload["programs"]) == 2
     assert payload["gaps"]["converged"] is False
+    assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["asset_families"][0]["name"] == "worksite_inputs"
     assert payload["work_act_types"][0]["name"] == "generate"
     assert payload["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"

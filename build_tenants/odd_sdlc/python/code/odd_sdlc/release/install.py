@@ -1,4 +1,5 @@
 # Implements: REQ-F-ODDSDLC-007
+# Implements: REQ-F-ODDSDLC-022
 """Deploy odd_sdlc into a target workspace and normalize it for operation."""
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from odd_sdlc.ambiguity import AMBIGUITY_REGISTER_PATH
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
 
 
@@ -100,6 +102,7 @@ def _workspace_instruction_bootloader(
     workspace_name = target_root.name
     imported_summary = "workspace://specification/requirements/00-imported-sources.md"
     normalization_report = "workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json"
+    ambiguity_register = f"workspace://{AMBIGUITY_REGISTER_PATH.as_posix()}"
     project_bootstrap = "workspace://.ai-workspace/context/project_bootstrap.md"
     runtime_contract = f"workspace://{RUNTIME_CONTRACT_RELATIVE.as_posix()}"
     authority_candidates = (
@@ -133,6 +136,7 @@ def _workspace_instruction_bootloader(
             f"- platform: `{platform}`",
             f"- active runtime contract: `{runtime_contract}`",
             f"- normalization report: `{normalization_report}`",
+            f"- ambiguity register: `{ambiguity_register}`",
             f"- project bootstrap: `{project_bootstrap}`",
             f"- imported authority summary: `{imported_summary}`",
             "",
@@ -150,12 +154,17 @@ def _workspace_instruction_bootloader(
             f"- `{imported_summary}`",
             *provenance_lines,
             f"- `{normalization_report}`",
+            f"- `{ambiguity_register}`",
             f"- `{runtime_contract}`",
             "- `workspace://.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`",
             "",
             "## 4. Start Here",
             "- inspect the current pipeline state with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
-            "- trigger full odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`",
+            "- trigger bounded odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --workspace .`",
+            "- add `--human-proxy` only when you expect an explicit F_H approval lane; it does not proxy F_P transport failures",
+            "- deployment, runtime-return, and other side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
+            "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
+            "- if release/deployment/runtime settle at `pending_evidence` with no returned execution data, treat the run as `construction_complete_pending_execution`, not as fully qualified delivery",
             "- if imported project docs contain historical bootstrap or install commands from older scaffolds, treat them as provenance only; the installed runtime contract above is authoritative for this workspace",
             "",
             "## 5. Interpretation Rule",

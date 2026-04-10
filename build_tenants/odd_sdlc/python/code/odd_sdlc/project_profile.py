@@ -1,5 +1,8 @@
 # Implements: REQ-F-ODDSDLC-009
 # Implements: REQ-F-ODDSDLC-013
+# Implements: REQ-F-ODDSDLC-026
+# Implements: REQ-F-ODDSDLC-027
+# Implements: REQ-F-ODDSDLC-028
 """Project-profile resolution for the active odd_sdlc software-domain package."""
 from __future__ import annotations
 
@@ -9,6 +12,8 @@ from pathlib import Path
 
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
 DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"
+DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
+AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
 BUILD_MARKERS = (
     "build.sbt",
     "pom.xml",
@@ -64,15 +69,32 @@ class ProjectProfile:
     project_kind: str
     language: str
     test_runner: str
+    ambiguity_risk_appetite: str
     tenant_name: str
     output_dir: str
     declared_output_dir: str
+    test_execution_contract: str
+    deployment_contract: str
+    runtime_observation_contract: str
     root_code_policy: str
     realization_mode: str
     resolution_reason: str
 
     def code_relative_path(self) -> str:
         return self.output_dir if self.output_dir else DEFAULT_PROVING_CODE_RELATIVE_PATH
+
+    def normalized_risk_appetite(self) -> str:
+        appetite = self.ambiguity_risk_appetite.strip().lower()
+        return appetite if appetite in AMBIGUITY_RISK_APPETITES else DEFAULT_AMBIGUITY_RISK_APPETITE
+
+    def has_test_execution_capability(self) -> bool:
+        return bool(self.test_execution_contract.strip())
+
+    def has_deployment_capability(self) -> bool:
+        return bool(self.deployment_contract.strip())
+
+    def has_runtime_observation_capability(self) -> bool:
+        return bool(self.runtime_observation_contract.strip())
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -81,13 +103,182 @@ class ProjectProfile:
             "project_kind": self.project_kind,
             "language": self.language,
             "test_runner": self.test_runner,
+            "ambiguity_risk_appetite": self.normalized_risk_appetite(),
             "tenant_name": self.tenant_name,
             "output_dir": self.output_dir,
             "declared_output_dir": self.declared_output_dir,
+            "test_execution_contract": self.test_execution_contract,
+            "deployment_contract": self.deployment_contract,
+            "runtime_observation_contract": self.runtime_observation_contract,
             "root_code_policy": self.root_code_policy,
             "realization_mode": self.realization_mode,
             "resolution_reason": self.resolution_reason,
         }
+
+
+def realization_candidates_for_declared_root(workspace_root: Path) -> list[dict[str, object]]:
+    profile = load_project_profile(workspace_root)
+    declared_top_level = Path(profile.declared_output_dir).parts[0] if profile.declared_output_dir else None
+    return _top_level_realization_candidates(workspace_root, selected_top_level=declared_top_level)
+
+
+def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> list[dict[str, object]]:
+    profile = load_project_profile(workspace_root)
+    selected_root = workspace_root / profile.output_dir if profile.output_dir else workspace_root / DEFAULT_PROVING_CODE_RELATIVE_PATH
+    selected_summary = _code_root_summary(selected_root)
+    candidates = realization_candidates_for_declared_root(workspace_root)
+    entries: list[dict[str, object]] = []
+
+    if profile.declared_output_dir and candidates:
+        competing = [profile.declared_output_dir, *[str(candidate["relative_path"]) for candidate in candidates]]
+        entries.append(
+            {
+                "ambiguity_id": "multiple-realization-roots",
+                "class": "multiple_realization_roots",
+                "title": "Multiple plausible realization roots are present",
+                "description": "The workspace declares one realization root while other top-level trees also appear to contain governed product realization.",
+                "severity": "major",
+                "status": "open",
+                "hard_stop": False,
+                "invariant_refs": ["REQ-F-ODDSDLC-022", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
+                "affected_assets": ["code_surface", "ambiguity_register_surface"],
+                "introduced_by": stage,
+                "expected_resolving_edge": "select_implementation_stack_profile",
+                "current_resolution": "Select one authoritative realization root and remove or explicitly subordinate competing roots.",
+                "observed_state": {
+                    "declared_output_dir": profile.declared_output_dir,
+                    "resolved_output_dir": profile.output_dir,
+                    "candidate_count": len(candidates),
+                    "candidates": candidates,
+                },
+                "competing_interpretations": competing,
+                "evidence_refs": [
+                    ".ai-workspace/context/project_constraints.yml",
+                    *competing,
+                ],
+            }
+        )
+
+    if profile.declared_output_dir and profile.output_dir != profile.declared_output_dir:
+        entries.append(
+            {
+                "ambiguity_id": "declared-root-vs-realized-root-mismatch",
+                "class": "declared_root_vs_realized_root_mismatch",
+                "title": "Declared realization root and selected realization root differ",
+                "description": "Deterministic profile resolution chose a different realization root than the one declared in project constraints.",
+                "severity": "major",
+                "status": "open",
+                "hard_stop": False,
+                "invariant_refs": ["REQ-F-ODDSDLC-022", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
+                "affected_assets": ["code_surface", "ambiguity_register_surface"],
+                "introduced_by": stage,
+                "expected_resolving_edge": "select_implementation_stack_profile",
+                "current_resolution": "Align the declared output root with the realized root or remove the conflicting realized tree.",
+                "observed_state": {
+                    "declared_output_dir": profile.declared_output_dir,
+                    "resolved_output_dir": profile.output_dir,
+                    "resolution_reason": profile.resolution_reason,
+                },
+                "competing_interpretations": [profile.declared_output_dir, profile.output_dir],
+                "evidence_refs": [
+                    ".ai-workspace/context/project_constraints.yml",
+                    profile.declared_output_dir,
+                    profile.output_dir,
+                ],
+            }
+        )
+
+    capability_specs = (
+        (
+            "missing-test-execution-capability",
+            profile.test_runner.strip(),
+            profile.has_test_execution_capability(),
+            "test_execution_contract",
+            "test_run_archive_surface",
+            "Declare the test execution contract before treating test execution as governed evidence.",
+        ),
+        (
+            "missing-deployment-capability",
+            "deployment",
+            profile.has_deployment_capability(),
+            "deployment_contract",
+            "deployment_surface",
+            "Declare the deployment contract before treating deployment as an admissible governed stage.",
+        ),
+        (
+            "missing-runtime-observation-capability",
+            "runtime_observation",
+            profile.has_runtime_observation_capability(),
+            "runtime_observation_contract",
+            "runtime_observation_surface",
+            "Declare the runtime observation contract before treating runtime return as governed evidence.",
+        ),
+    )
+    for ambiguity_id, cue, declared, field_name, affected_asset, resolution_text in capability_specs:
+        if not cue or declared:
+            continue
+        entries.append(
+            {
+                "ambiguity_id": ambiguity_id,
+                "class": "execution_stage_without_declared_capability",
+                "title": f"Required capability `{field_name}` is not declared",
+                "description": "A later executional or operational stage is in the domain model but its governing technology capability is not declared in the active build tenant.",
+                "severity": "major",
+                "status": "pending_capability",
+                "hard_stop": True,
+                "invariant_refs": ["REQ-F-ODDSDLC-026", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
+                "affected_assets": [affected_asset, "ambiguity_register_surface"],
+                "introduced_by": stage,
+                "expected_resolving_edge": {
+                    "test_execution_contract": "derive_test_run_archive_surface",
+                    "deployment_contract": "prepare_deployment_surface",
+                    "runtime_observation_contract": "derive_runtime_observation_surface",
+                }.get(field_name),
+                "current_resolution": resolution_text,
+                "observed_state": {
+                    "field_name": field_name,
+                    "declared_value": getattr(profile, field_name, ""),
+                    "tenant_name": profile.tenant_name,
+                },
+                "competing_interpretations": [
+                    f"construction-only lane with no declared {field_name}",
+                    f"capability-declared lane for {field_name}",
+                ],
+                "evidence_refs": [".ai-workspace/context/project_constraints.yml"],
+            }
+        )
+
+    if selected_summary["test_report_file_count"] and not profile.has_test_execution_capability():
+        entries.append(
+            {
+                "ambiguity_id": "execution-evidence-without-declared-capability",
+                "class": "declared_capability_absent_but_side_effect_observed",
+                "title": "Test execution evidence exists without a declared execution contract",
+                "description": "The workspace contains test reports even though the governing build tenant does not declare a test execution capability contract.",
+                "severity": "major",
+                "status": "open",
+                "hard_stop": True,
+                "invariant_refs": ["REQ-F-ODDSDLC-026", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
+                "affected_assets": ["test_run_archive_surface", "release_surface", "ambiguity_register_surface"],
+                "introduced_by": stage,
+                "expected_resolving_edge": "derive_test_run_archive_surface",
+                "current_resolution": "Either declare the test execution contract or classify the observed reports as imported/adopted external evidence.",
+                "observed_state": {
+                    "resolved_output_dir": profile.output_dir,
+                    "test_report_file_count": int(selected_summary["test_report_file_count"]),
+                },
+                "competing_interpretations": [
+                    "ungoverned side-effect execution happened outside declared tenant capability",
+                    "test execution is a governed stage and the tenant contract is incomplete",
+                ],
+                "evidence_refs": [
+                    ".ai-workspace/context/project_constraints.yml",
+                    profile.output_dir,
+                ],
+            }
+        )
+
+    return entries
 
 
 def _code_root_summary(path: Path) -> dict[str, int | list[str] | bool]:
@@ -276,9 +467,13 @@ def load_project_profile(workspace_root: Path) -> ProjectProfile:
         project_kind=constraints.get("kind", ""),
         language=constraints.get("language", ""),
         test_runner=constraints.get("test_runner", ""),
+        ambiguity_risk_appetite=constraints.get("ambiguity_risk_appetite", DEFAULT_AMBIGUITY_RISK_APPETITE),
         tenant_name=tenant_name,
         output_dir=output_dir,
         declared_output_dir=declared_output_dir,
+        test_execution_contract=constraints.get("tenant_test_execution_contract", ""),
+        deployment_contract=constraints.get("tenant_deployment_contract", ""),
+        runtime_observation_contract=constraints.get("tenant_runtime_observation_contract", ""),
         root_code_policy=constraints.get("root_code_policy", ""),
         realization_mode=realization_mode,
         resolution_reason=resolution_reason,

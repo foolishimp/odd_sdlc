@@ -48,7 +48,9 @@ def seed_odd_sdlc_package(target: Path) -> None:
 
 def seed_canonical_spec_surface(target: Path) -> None:
     spec_root = target / "specification"
+    context_root = target / ".ai-workspace" / "context"
     (spec_root / "requirements").mkdir(parents=True, exist_ok=True)
+    context_root.mkdir(parents=True, exist_ok=True)
     (spec_root / "INTENT.md").write_text(
         "# Intent\n\n`odd_sdlc` exists to prove asset-typed GTL/ABG app execution.\n",
         encoding="utf-8",
@@ -63,6 +65,34 @@ def seed_canonical_spec_surface(target: Path) -> None:
     )
     (spec_root / "requirements" / "10-canonical-sandbox.md").write_text(
         "# Canonical Sandbox Requirements\n\nThe sandbox lane must be repeatable.\n",
+        encoding="utf-8",
+    )
+    (context_root / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "# Project Constraints — odd_sdlc_sandbox",
+                "",
+                "project:",
+                '  name: "odd_sdlc_sandbox"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python_default"',
+                '      output_dir: ""',
+                '      description: "Sandbox proving layout"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: "docs/deployment-contract.md"',
+                '      runtime_observation_contract: "docs/runtime-observation-contract.md"',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
         encoding="utf-8",
     )
 
@@ -111,23 +141,26 @@ def run_installed_genesis(
     archive: "RunArchive | None" = None,
     label: str | None = None,
     timeout: int = 60,
+    check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "genesis", *args, "--workspace", str(workspace)],
-            cwd=str(workspace),
-            env=sandbox_env(workspace),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=True,
-        )
-    except subprocess.CalledProcessError as error:
-        if archive is not None:
-            archive.log_subprocess(label or f"genesis {' '.join(args)}", error)
-        raise
+    result = subprocess.run(
+        [sys.executable, "-m", "genesis", *args, "--workspace", str(workspace)],
+        cwd=str(workspace),
+        env=sandbox_env(workspace),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
     if archive is not None:
         archive.log_subprocess(label or f"genesis {' '.join(args)}", result)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
     return result
 
 
