@@ -38,6 +38,20 @@ It proves:
 It does not claim governed executed-test truth unless the synthetic fixture
 declares test-execution capability.
 
+### Requirement Authority Carry-Forward on Installed Workspaces
+
+The current RC now binds the live requirement-closure register into
+`derive_requirement_surface` prompt construction and refreshes that register at
+module-build time.
+
+This closes the installed-workspace regression where imported authority IDs
+could be semantically covered but omitted literally from
+`specification/requirements/10-generated-bootstrap.md`, causing
+`requirement_scope_complete` to fail closed.
+
+The fix preserves deterministic requirement-ID carry-forward for clean
+installed runs without weakening the deterministic F_D gate.
+
 ## Current Known Limitations
 
 ### Traceability Path Resolution Is Still Self-Hosting-Oriented
@@ -70,6 +84,7 @@ The current release-candidate proving footer is:
 
 - `36 passed`
 - `4 skipped`
+- `520.28s`
 
 from:
 

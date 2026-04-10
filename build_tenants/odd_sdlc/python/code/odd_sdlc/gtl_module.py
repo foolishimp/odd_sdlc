@@ -17,7 +17,7 @@ from typing import Any
 
 from gtl.algebra import compose, recurse
 from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
-from gtl.graph import Attrs, Graph, GraphVector, Node
+from gtl.graph import Attrs, Context, Graph, GraphVector, Node
 from gtl.module_model import Module
 from gtl.operator_model import Evaluator, Rule, F_D, F_H, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
@@ -26,6 +26,7 @@ from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
 from .ambiguity import refresh_ambiguity_register
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
+from .traceability import REQUIREMENT_CLOSURE_REGISTER_PATH, refresh_requirement_closure_register
 
 
 def _asset_node(
@@ -244,6 +245,22 @@ _builder = Operator(
     binding="agent://odd_sdlc/builder",
 )
 
+_PENDING_CONTEXT_DIGEST = "sha256:" + ("0" * 64)
+
+
+def _workspace_context(name: str, relative_path: Path) -> Context:
+    return Context(
+        name=name,
+        locator=f"workspace://{relative_path.as_posix()}",
+        digest=_PENDING_CONTEXT_DIGEST,
+    )
+
+
+_requirement_closure_context = _workspace_context(
+    "requirement_closure_register",
+    REQUIREMENT_CLOSURE_REGISTER_PATH,
+)
+
 def _fd_evaluator(name: str) -> Evaluator:
     contract = fd_contract(name)
     return Evaluator(
@@ -425,6 +442,7 @@ def _graph_function(
     fp_evaluator: Evaluator,
     req_refs: tuple[str, ...],
     extra_fd_evaluators: tuple[Evaluator, ...] = (),
+    contexts: tuple[Context, ...] = (),
 ) -> GraphFunction:
     vector = GraphVector(
         name=name,
@@ -432,6 +450,7 @@ def _graph_function(
         target=target,
         operators=(_builder,),
         evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
+        contexts=contexts,
         declarations=Attrs(
             entries=(
                 (
@@ -591,6 +610,7 @@ GF_DERIVE_REQUIREMENTS = _graph_function(
     fd_evaluator=_requirements_fd,
     fp_evaluator=_requirements_fp,
     extra_fd_evaluators=(_requirement_scope_fd,),
+    contexts=(_requirement_closure_context,),
     req_refs=("REQ-F-ASSET-003", "REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_FEATURE_DECOMP = _graph_function(
@@ -1217,6 +1237,7 @@ def _configured_leaf_graph_functions(
 
 
 def _build_module(workspace_root: Path) -> Module:
+    refresh_requirement_closure_register(workspace_root, stage="module_build")
     active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
     active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
     active_operational_executive = _build_release_operational_cycle(active_operational_functions)

@@ -2,7 +2,8 @@
 
 This release candidate closes the current `odd_sdlc` framework-strengthening
 wave around capability governance, ambiguity governance, iterative requirement
-closure, and generated traceability.
+closure, generated traceability, and installed-workspace requirement
+carry-forward.
 
 ## What Shipped
 
@@ -15,6 +16,9 @@ closure, and generated traceability.
   - `requirement_scope_complete`
   - `code_traceability_present`
   - `test_traceability_present`
+- requirement-authority carry-forward on installed workspaces:
+  `derive_requirement_surface` now carries the live requirement-closure
+  register so imported REQ IDs remain literal downstream pressure
 - generated source and test trace authority through `Implements:` and
   `Validates:` markers
 - workspace-root and catalog honesty fixes for installed workspaces
@@ -46,7 +50,13 @@ Targeted red-lane recovery:
 Framework suite:
 
 - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
-- result: `36 passed, 4 skipped`
+- result: `36 passed, 4 skipped in 520.28s`
+
+Installed-workspace recovery:
+
+- clean install proof on `data_mapper.test25`
+- `derive_requirement_surface` retained `REQ-ACC-01..05`
+- requirement closure reported `missing_from_current_requirement_surface = 0`
 
 ## Known RC Limitation
 
