@@ -8,6 +8,7 @@
 # Implements: REQ-F-ODDSDLC-002
 # Implements: REQ-F-ODDSDLC-025
 # Implements: REQ-F-ODDSDLC-026
+# Implements: REQ-F-ODDSDLC-031
 """Published GTL module for the active odd_sdlc proving subset."""
 from __future__ import annotations
 
@@ -256,7 +257,9 @@ def _fd_evaluator(name: str) -> Evaluator:
 _bootstrap_fd = _fd_evaluator("bootstrap_input_set_present")
 _product_fd = _fd_evaluator("product_dependency_surfaces_present")
 _goal_fd = _fd_evaluator("goal_dependency_surfaces_present")
+_goal_authority_fd = _fd_evaluator("goal_surface_authority_validated")
 _requirements_fd = _fd_evaluator("requirements_boundary_sources_present")
+_requirement_scope_fd = _fd_evaluator("requirement_scope_complete")
 _feature_decomp_fd = _fd_evaluator("feature_decomp_dependency_surfaces_present")
 _uat_testcases_fd = _fd_evaluator("uat_testcases_dependency_surfaces_present")
 _design_fd = _fd_evaluator("design_dependency_surfaces_present")
@@ -269,11 +272,13 @@ _implementation_design_fd = _fd_evaluator("implementation_design_dependency_surf
 _implementation_stack_profile_fd = _fd_evaluator("implementation_stack_profile_dependency_surfaces_present")
 _implementation_module_fd = _fd_evaluator("implementation_module_dependency_surfaces_present")
 _code_fd = _fd_evaluator("code_dependency_surfaces_present")
+_code_traceability_fd = _fd_evaluator("code_traceability_present")
 _release_fd = _fd_evaluator("release_dependency_surfaces_present")
 _test_design_fd = _fd_evaluator("test_design_dependency_surfaces_present")
 _test_stack_profile_fd = _fd_evaluator("test_stack_profile_dependency_surfaces_present")
 _test_module_fd = _fd_evaluator("test_module_dependency_surfaces_present")
 _test_run_archive_fd = _fd_evaluator("test_run_archive_dependency_surfaces_present")
+_test_traceability_fd = _fd_evaluator("test_traceability_present")
 _deployment_fd = _fd_evaluator("deployment_dependency_surfaces_present")
 _runtime_observation_fd = _fd_evaluator("runtime_observation_dependency_surfaces_present")
 _retrofit_plan_fd = _fd_evaluator("retrofit_plan_dependency_surfaces_present")
@@ -419,13 +424,14 @@ def _graph_function(
     fd_evaluator: Evaluator,
     fp_evaluator: Evaluator,
     req_refs: tuple[str, ...],
+    extra_fd_evaluators: tuple[Evaluator, ...] = (),
 ) -> GraphFunction:
     vector = GraphVector(
         name=name,
         source=source,
         target=target,
         operators=(_builder,),
-        evaluators=(fd_evaluator, fp_evaluator),
+        evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
         declarations=Attrs(
             entries=(
                 (
@@ -575,6 +581,7 @@ GF_DERIVE_GOALS = _graph_function(
     target=_goal_surface,
     fd_evaluator=_goal_fd,
     fp_evaluator=_goal_fp,
+    extra_fd_evaluators=(_goal_authority_fd,),
     req_refs=("REQ-F-ASSET-001", "REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_REQUIREMENTS = _graph_function(
@@ -583,6 +590,7 @@ GF_DERIVE_REQUIREMENTS = _graph_function(
     target=_requirement_surface,
     fd_evaluator=_requirements_fd,
     fp_evaluator=_requirements_fp,
+    extra_fd_evaluators=(_requirement_scope_fd,),
     req_refs=("REQ-F-ASSET-003", "REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_FEATURE_DECOMP = _graph_function(
@@ -679,6 +687,7 @@ GF_DERIVE_CODE = _graph_function(
     target=_code_surface,
     fd_evaluator=_code_fd,
     fp_evaluator=_code_fp,
+    extra_fd_evaluators=(_code_traceability_fd,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_DESIGN = _graph_function(
@@ -711,6 +720,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     target=_test_run_archive_surface,
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
+    extra_fd_evaluators=(_test_traceability_fd,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_PREPARE_RELEASE = _graph_function(

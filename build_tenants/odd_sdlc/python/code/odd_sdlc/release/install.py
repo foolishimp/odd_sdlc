@@ -1,5 +1,6 @@
 # Implements: REQ-F-ODDSDLC-007
 # Implements: REQ-F-ODDSDLC-022
+# Implements: REQ-F-ODDSDLC-029
 """Deploy odd_sdlc into a target workspace and normalize it for operation."""
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from typing import Any
 
 from odd_sdlc.ambiguity import AMBIGUITY_REGISTER_PATH
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
+from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
 
 
 SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
@@ -103,6 +105,7 @@ def _workspace_instruction_bootloader(
     imported_summary = "workspace://specification/requirements/00-imported-sources.md"
     normalization_report = "workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json"
     ambiguity_register = f"workspace://{AMBIGUITY_REGISTER_PATH.as_posix()}"
+    requirement_closure_register = f"workspace://{REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix()}"
     project_bootstrap = "workspace://.ai-workspace/context/project_bootstrap.md"
     runtime_contract = f"workspace://{RUNTIME_CONTRACT_RELATIVE.as_posix()}"
     authority_candidates = (
@@ -137,6 +140,7 @@ def _workspace_instruction_bootloader(
             f"- active runtime contract: `{runtime_contract}`",
             f"- normalization report: `{normalization_report}`",
             f"- ambiguity register: `{ambiguity_register}`",
+            f"- requirement closure register: `{requirement_closure_register}`",
             f"- project bootstrap: `{project_bootstrap}`",
             f"- imported authority summary: `{imported_summary}`",
             "",
@@ -155,6 +159,7 @@ def _workspace_instruction_bootloader(
             *provenance_lines,
             f"- `{normalization_report}`",
             f"- `{ambiguity_register}`",
+            f"- `{requirement_closure_register}`",
             f"- `{runtime_contract}`",
             "- `workspace://.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`",
             "",
@@ -164,6 +169,7 @@ def _workspace_instruction_bootloader(
             "- add `--human-proxy` only when you expect an explicit F_H approval lane; it does not proxy F_P transport failures",
             "- deployment, runtime-return, and other side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
             "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
+            "- unresolved live requirements remain active future pressure across iterations; inspect the requirement closure register before claiming completion on a partial wave",
             "- if release/deployment/runtime settle at `pending_evidence` with no returned execution data, treat the run as `construction_complete_pending_execution`, not as fully qualified delivery",
             "- if imported project docs contain historical bootstrap or install commands from older scaffolds, treat them as provenance only; the installed runtime contract above is authoritative for this workspace",
             "",

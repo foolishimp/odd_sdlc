@@ -190,8 +190,9 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 25
+    assert len(catalog["assets"]) == 26
     assert any(asset["asset_id"] == "ambiguity_register_surface" for asset in catalog["assets"])
+    assert any(asset["asset_id"] == "requirement_closure_register_surface" for asset in catalog["assets"])
     assert [item["name"] for item in catalog["asset_families"]] == [
         "worksite_inputs",
         "solution_design",
@@ -316,12 +317,13 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "jobs",
         "programs",
         "query_contract",
+        "requirement_closure_register",
         "semantic_facets",
         "work_act_types",
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v6"
+    assert domain_query["query_contract"]["version"] == "v7"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
@@ -330,6 +332,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "asset_families",
         "assets",
         "ambiguity_register",
+        "requirement_closure_register",
         "collections",
         "functions",
         "edge_contracts",
@@ -346,6 +349,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert "graph_calls" not in domain_query
     assert "continuations" not in domain_query
     assert domain_query["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
+    assert domain_query["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert domain_query["asset_families"][0]["name"] == "worksite_inputs"
     assert domain_query["work_act_types"][0]["name"] == "generate"
     assert domain_query["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"

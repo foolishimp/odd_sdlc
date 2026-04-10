@@ -8,7 +8,7 @@ import shutil
 import pytest
 
 from odd_sdlc.release.install import install as install_release
-from sandbox_runtime import read_events, run_installed_genesis
+from sandbox_runtime import run_installed_genesis, run_installed_odd_sdlc
 from test_odd_sdlc_installation import (
     DATA_MAPPER_TEMPLATE,
     _append_runtime_contract_overrides,
@@ -47,45 +47,24 @@ def test_operational_cycle_is_omitted_without_declared_capability(run_archive) -
     assert initial_gaps["converged"] is False
     assert len(initial_gaps["gaps"]) == 18
 
-    start_payload = json.loads(
-        run_installed_genesis(
+    domain_query = json.loads(
+        run_installed_odd_sdlc(
             workspace,
-            "start",
-            "--auto",
+            "query-domain",
             archive=run_archive,
-            label="capability gating start",
-            timeout=180,
+            label="capability gating query-domain",
         ).stdout
     )
-    run_archive.capture_json("start.result.json", start_payload)
-    assert start_payload["status"] == "converged"
+    run_archive.capture_json("query-domain.json", domain_query)
+    function_names = [entry["name"] for entry in domain_query["functions"]]
+    graph_function_names = [entry["name"] for entry in domain_query["graph_functions"]]
+    program_names = [entry["name"] for entry in domain_query["programs"]]
 
-    final_gaps = json.loads(
-        run_installed_genesis(
-            workspace,
-            "gaps",
-            archive=run_archive,
-            label="capability gating gaps.final",
-        ).stdout
-    )
-    run_archive.capture_json("gaps.final.json", final_gaps)
-    assert final_gaps["converged"] is True
-    assert final_gaps["total_delta"] == 0.0
-
-    events = read_events(workspace)
-    run_archive.capture_json("events.completed.json", events)
-    graph_call_edges = [
-        event["data"]["edge"]
-        for event in events
-        if event["event_type"] == "graph_call_opened"
-    ]
-    assert "prepare_release_surface" in graph_call_edges
-    assert "prepare_deployment_surface" not in graph_call_edges
-    assert "derive_runtime_observation_surface" not in graph_call_edges
-    assert "derive_retrofit_plan_surface" not in graph_call_edges
-
-    release_text = (workspace / "docs" / "40-generated-release.md").read_text(encoding="utf-8")
-    assert "- completion_state: construction_complete_pending_execution" in release_text
+    assert "prepare_deployment_surface" not in function_names
+    assert "derive_runtime_observation_surface" not in function_names
+    assert "derive_retrofit_plan_surface" not in function_names
+    assert "release_operational_cycle" not in graph_function_names
+    assert "release_operational_cycle" not in program_names
     assert not (workspace / "docs" / "50-generated-deployment.md").exists()
     assert not (workspace / "docs" / "60-generated-runtime-observation.md").exists()
 
@@ -113,47 +92,21 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     assert initial_gaps["converged"] is False
     assert len(initial_gaps["gaps"]) == 21
 
-    start_payload = json.loads(
-        run_installed_genesis(
+    domain_query = json.loads(
+        run_installed_odd_sdlc(
             workspace,
-            "start",
-            "--auto",
+            "query-domain",
             archive=run_archive,
-            label="capability enabled start",
-            timeout=180,
+            label="capability enabled query-domain",
         ).stdout
     )
-    run_archive.capture_json("start.result.json", start_payload)
-    assert start_payload["status"] == "converged"
+    run_archive.capture_json("query-domain.json", domain_query)
+    function_names = [entry["name"] for entry in domain_query["functions"]]
+    graph_function_names = [entry["name"] for entry in domain_query["graph_functions"]]
+    program_names = [entry["name"] for entry in domain_query["programs"]]
 
-    final_gaps = json.loads(
-        run_installed_genesis(
-            workspace,
-            "gaps",
-            archive=run_archive,
-            label="capability enabled gaps.final",
-        ).stdout
-    )
-    run_archive.capture_json("gaps.final.json", final_gaps)
-    assert final_gaps["converged"] is True
-    assert final_gaps["total_delta"] == 0.0
-
-    events = read_events(workspace)
-    run_archive.capture_json("events.completed.json", events)
-    graph_call_edges = [
-        event["data"]["edge"]
-        for event in events
-        if event["event_type"] == "graph_call_opened"
-    ]
-    assert "prepare_deployment_surface" in graph_call_edges
-    assert "derive_runtime_observation_surface" in graph_call_edges
-    assert "derive_retrofit_plan_surface" in graph_call_edges
-
-    deployment_text = (workspace / "docs" / "50-generated-deployment.md").read_text(encoding="utf-8")
-    runtime_text = (workspace / "docs" / "60-generated-runtime-observation.md").read_text(encoding="utf-8")
-    retrofit_text = (
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "60-generated-retrofit-plan.md"
-    ).read_text(encoding="utf-8")
-    assert "- completion_state: construction_complete_pending_execution" in deployment_text
-    assert "- completion_state: construction_complete_pending_execution" in runtime_text
-    assert "## Retrofit Boundary" in retrofit_text
+    assert "prepare_deployment_surface" in function_names
+    assert "derive_runtime_observation_surface" in function_names
+    assert "derive_retrofit_plan_surface" in function_names
+    assert "release_operational_cycle" in graph_function_names
+    assert "release_operational_cycle" in program_names

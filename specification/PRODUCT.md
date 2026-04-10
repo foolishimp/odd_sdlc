@@ -142,6 +142,29 @@ Examples include:
 Without the required capability asset, an executional or operational edge may
 not converge.
 
+### Requirement Closure Register
+
+A machine-readable governed asset that records the live requirement inventory,
+its current closure state, and the current code and test evidence that justifies
+that state.
+
+The requirement closure register exists so unresolved constitutional work
+remains active future pressure across iterations rather than disappearing after
+one bounded wave.
+
+### Trace Authority
+
+The explicit requirement and design references carried by generated source files
+and generated test files.
+
+At minimum this includes:
+
+- `Implements:` tags for generated source files
+- `Validates:` tags for generated test files
+
+Where file-level ownership is too coarse, the active build tenant may extend
+this to finer-grained function or symbol-level trace anchors.
+
 ### Requirement Family Surface
 
 The folderized asset surface rooted at `specification/requirements/` that

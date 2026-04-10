@@ -2,6 +2,7 @@
 # Implements: REQ-F-ODDSDLC-005
 # Implements: REQ-F-ODDSDLC-020
 # Implements: REQ-F-ODDSDLC-027
+# Implements: REQ-F-ODDSDLC-029
 """ODD domain query library for odd_sdlc."""
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from typing import Any
 from .app import OddSdlcApp, catalog, gaps
 from .ambiguity import load_or_build_ambiguity_register
 from .query_contract import query_domain_contract
+from .traceability import load_or_build_requirement_closure_register
 from .workspace_assets import bootstrap_assets
 
 
@@ -75,6 +77,10 @@ def query_ambiguity_register(app: OddSdlcApp) -> dict[str, Any]:
     return load_or_build_ambiguity_register(app.config.workspace_root)
 
 
+def query_requirement_closure_register(app: OddSdlcApp) -> dict[str, Any]:
+    return load_or_build_requirement_closure_register(app.config.workspace_root)
+
+
 def query_domain(app: OddSdlcApp) -> dict[str, Any]:
     catalog_payload = catalog(app)
     return {
@@ -85,6 +91,7 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
         "asset_families": catalog_payload["asset_families"],
         "assets": query_assets(app),
         "ambiguity_register": query_ambiguity_register(app),
+        "requirement_closure_register": query_requirement_closure_register(app),
         "collections": catalog_payload["collections"],
         "functions": catalog_payload["functions"],
         "edge_contracts": catalog_payload["edge_contracts"],

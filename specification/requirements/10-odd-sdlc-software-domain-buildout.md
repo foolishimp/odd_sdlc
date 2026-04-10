@@ -306,3 +306,49 @@ lifecycle boundary.
 - AC-5: qualification proves at least one real inherited-project use case where
   ambiguity is first recorded and later reduced or resolved without losing the
   earlier evidence, and one use case where policy causes `F_H` escalation
+
+### REQ-F-ODDSDLC-029 — odd_sdlc carries unresolved live requirements forward across iterations
+
+`odd_sdlc` treats full closure as an iterative outcome and therefore preserves
+unresolved live requirements as active future pressure across bounded waves.
+
+**Acceptance Criteria**:
+- AC-1: `odd_sdlc` publishes a machine-readable requirement closure register for
+  the active workspace
+- AC-2: every live requirement is classified at least as realized, partially
+  realized, planned, specified, or missing from the current generated
+  requirement surface
+- AC-3: unresolved live requirements remain visible and binding in later runs
+  until they are explicitly realized, withdrawn, or superseded
+- AC-4: wave-level completion is distinguished from full closure of the live
+  requirement inventory
+
+### REQ-F-ODDSDLC-030 — generated source and test surfaces carry explicit trace authority
+
+Generated implementation and generated tests carry explicit requirement trace
+authority so the realization chain remains auditable down to the source level.
+
+**Acceptance Criteria**:
+- AC-1: generated source files carry explicit `Implements:` requirement tags
+  for the requirements claimed by the current implementation branch
+- AC-2: generated test files carry explicit `Validates:` requirement tags for
+  the requirements claimed by the current test or authority branch
+- AC-3: where one file owns materially different requirement families, the
+  design may require finer-grained trace anchors below the file level
+- AC-4: generated source and test files without trace authority are treated as
+  orphaned realization surface rather than as governed closure
+
+### REQ-F-ODDSDLC-031 — odd_sdlc enforces scope and traceability integrity deterministically
+
+`odd_sdlc` uses deterministic authority checks to prevent silent scope loss and
+to verify the req -> design -> module -> code or test traceability chain.
+
+**Acceptance Criteria**:
+- AC-1: the goal surface is checked against imported intent authority so live
+  intent identifiers cannot silently disappear downstream
+- AC-2: the generated requirement surface is checked against live requirement
+  authority so carried-forward obligations do not vanish from the active wave
+- AC-3: deterministic checks verify that generated code and generated tests
+  satisfy the current traceability contract
+- AC-4: deterministic checks identify orphan generated source or test files
+  that carry no governing trace authority

@@ -1,6 +1,7 @@
 # Implements: REQ-F-ODDSDLC-003
 # Implements: REQ-F-ODDSDLC-004
 # Implements: REQ-F-ASSETMODEL-005
+# Implements: REQ-F-ODDSDLC-030
 """Bounded constructor turn for odd_sdlc software-domain workspaces."""
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ IMPORTED_AUTHORITY_CANDIDATES: tuple[Path, ...] = (
     Path("specification/mapper_requirements.md"),
 )
 PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface"}
+_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -96,6 +98,17 @@ def _imported_authority_lines(workspace_root: Path) -> tuple[str, ...]:
     if not sources:
         return ("- no imported authority source detected",)
     return tuple(f"- `{path.relative_to(workspace_root).as_posix()}`" for path in sources)
+
+
+def _imported_requirement_authority_lines(workspace_root: Path) -> tuple[str, ...]:
+    ids: set[str] = set()
+    for path in _imported_authority_paths(workspace_root):
+        if "requirement" not in path.name.lower():
+            continue
+        ids.update(_REQUIREMENT_ID_RE.findall(path.read_text(encoding="utf-8")))
+    if not ids:
+        return ("- no imported REQ-* authority markers detected",)
+    return tuple(f"- {requirement_id}: carried forward from imported requirement authority" for requirement_id in sorted(ids))
 
 
 def _file_heading(path: Path) -> str:
@@ -189,6 +202,16 @@ def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
         f"- build tool: `{build_tool}`",
         f"- declared modules: {module_names}",
     )
+
+
+def _intent_authority_lines(workspace_root: Path) -> tuple[str, ...]:
+    intent_path = workspace_root / "specification" / "INTENT.md"
+    if not intent_path.exists():
+        return ("- no imported INT-* authority markers detected",)
+    intent_ids = tuple(sorted(set(re.findall(r"\bINT-\d{3}\b", intent_path.read_text(encoding="utf-8")))))
+    if not intent_ids:
+        return ("- no imported INT-* authority markers detected",)
+    return tuple(f"- {intent_id}: carried forward from imported intent authority" for intent_id in intent_ids)
 
 
 def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
@@ -453,6 +476,9 @@ def _construct_goals(workspace_root: Path) -> str:
                 "- align generated design, implementation, test, and release surfaces to the governed branch",
                 "- keep returned runtime evidence and retrofit planning within the same worksite lifecycle",
                 "",
+                "## Intent Authority Carry-Forward",
+                *_intent_authority_lines(workspace_root),
+                "",
                 "## Imported Authority",
                 *_imported_authority_lines(workspace_root),
                 "",
@@ -495,6 +521,9 @@ def _construct_requirements(workspace_root: Path) -> str:
                 "- implementation outputs must be attributable through governed work reports and checkpoints",
                 f"- qualification must project over the governed branch and declared test runner `{profile.test_runner or 'unspecified'}`",
                 "- release, deployment, runtime observation, and retrofit surfaces must remain projections over governed assets and evidence",
+                "",
+                "## Requirement Authority Carry-Forward",
+                *_imported_requirement_authority_lines(workspace_root),
                 "",
                 "## Imported Authority",
                 *_imported_authority_lines(workspace_root),
@@ -793,6 +822,7 @@ def _construct_implementation_design(workspace_root: Path) -> str:
             "- generated or adopted implementation must remain bound to the governed code root",
             "- downstream release and qualification surfaces must project over that governed branch",
             "- carried-forward implementation must be represented as governed provenance rather than ambient file state",
+            "- implementation planning surfaces must retain explicit requirement identifiers so generated source files can carry `Implements:` authority tags",
             "",
             "## Source Design Snapshot",
             design,
@@ -842,6 +872,7 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
             f"- build markers detected: {', '.join(code_summary['build_markers']) or 'none'}",
             f"- source files detected: {code_summary['source_file_count']}",
             f"- test-source files detected: {code_summary['test_source_file_count']}",
+            "- generated source files in the governed branch must carry `Implements:` tags for the requirements claimed by this branch",
             "",
             "## Source Implementation Design Snapshot",
             implementation_design,
@@ -870,6 +901,8 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated odd_sdlc proving-subset implementation package."""',
             "",
+            "# Implements: REQ-F-ODDSDLC-003",
+            "# Implements: REQ-F-ODDSDLC-004",
             f"# {code_marker}",
             "",
             "from .app import hello_message, main",
@@ -883,6 +916,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated hello-world application for the odd_sdlc proving subset."""',
             "",
+            "# Implements: REQ-F-ODDSDLC-003",
             f"HELLO_MESSAGE = {hello_message!r}",
             "",
             "def hello_message() -> str:",
@@ -903,6 +937,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Package entry point for the generated odd_sdlc proving application."""',
             "",
+            "# Implements: REQ-F-ODDSDLC-003",
             "from .app import main",
             "",
             'if __name__ == "__main__":',
@@ -914,6 +949,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated implementation workflow helpers for the odd_sdlc proving subset."""',
             "",
+            "# Implements: REQ-F-ODDSDLC-004",
             f"CODE_MARKER = {code_marker!r}",
             "",
             "def implementation_summary() -> dict[str, object]:",
@@ -946,11 +982,41 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
             "",
         )
     )
+    test_app_text = "\n".join(
+        (
+            '"""Generated proving-subset test coverage for the retained odd_sdlc application."""',
+            "",
+            "# Validates: REQ-F-ODDSDLC-003",
+            "from odd_sdlc_proving_impl.app import hello_message",
+            "",
+            "def test_hello_message() -> None:",
+            '    """Validate the generated hello-world boundary remains stable."""',
+            '    assert hello_message() == "Hello from odd_sdlc proving subset."',
+            "",
+        )
+    )
+    test_workflow_text = "\n".join(
+        (
+            '"""Generated proving-subset test coverage for the retained odd_sdlc workflow summary."""',
+            "",
+            "# Validates: REQ-F-ODDSDLC-004",
+            "from odd_sdlc_proving_impl.workflow import implementation_summary",
+            "",
+            "def test_implementation_summary_contains_traceable_branch() -> None:",
+            '    """Validate the generated implementation summary remains branch-aware."""',
+            "    summary = implementation_summary()",
+            '    assert summary["graph_function"] == "bootstrap_release_self_test"',
+            '    assert "derive_code_surface" in summary["implementation_branch"]',
+            "",
+        )
+    )
     return {
         "__init__.py": init_text,
         "__main__.py": main_text,
         "app.py": app_text,
         "workflow.py": workflow_text,
+        "tests/test_app.py": test_app_text,
+        "tests/test_workflow.py": test_workflow_text,
     }
 
 
@@ -1161,6 +1227,7 @@ def _construct_test_design(workspace_root: Path) -> str:
                 "## Governed Qualification Boundary",
                 "- qualification work is tied to the governed implementation branch, not a shadow proving subset",
                 "- archive and release projection must summarize evidence discovered under the active code root",
+                "- generated test files in the governed branch must carry `Validates:` tags for the requirements claimed by testcase authority",
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
@@ -1236,6 +1303,7 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
                 "",
                 "## Module Layout",
                 *module_lines,
+                "- generated test files in the governed branch must carry `Validates:` tags for the requirements claimed by testcase authority",
                 "",
             )
         )

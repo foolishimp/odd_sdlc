@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Date**: 2026-04-08
-**Implements**: REQ-F-ODDSDLC-009, REQ-F-ODDSDLC-010, REQ-F-ODDSDLC-011, REQ-F-ODDSDLC-012, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-016, REQ-F-ODDSDLC-017, REQ-F-ODDSDLC-018, REQ-F-ODDSDLC-019, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-022, REQ-F-ODDSDLC-023, REQ-F-ODDSDLC-024, REQ-F-ODDSDLC-025, REQ-F-ODDSDLC-026
+**Implements**: REQ-F-ODDSDLC-009, REQ-F-ODDSDLC-010, REQ-F-ODDSDLC-011, REQ-F-ODDSDLC-012, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-016, REQ-F-ODDSDLC-017, REQ-F-ODDSDLC-018, REQ-F-ODDSDLC-019, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-022, REQ-F-ODDSDLC-023, REQ-F-ODDSDLC-024, REQ-F-ODDSDLC-025, REQ-F-ODDSDLC-026, REQ-F-ODDSDLC-029, REQ-F-ODDSDLC-030, REQ-F-ODDSDLC-031
 **Derives From**: `specification/PRODUCT.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/07-asset-typing-and-binding.md`, `specification/requirements/08-odd-sdlc-first-slice.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `build_tenants/common/design/ODD_SDLC_TRANSLATION.md`
 
 ## Position
@@ -257,6 +257,59 @@ Executional or operational lanes such as:
 
 may converge only when the governing build tenant declares the corresponding
 technology capability dependency explicitly.
+
+## Requirement Closure Register
+
+`odd_sdlc` publishes a machine-readable requirement closure register as current
+workspace truth.
+
+That register exists to keep iteration self-healing rather than forgetful.
+
+The register records, for each live requirement:
+
+- whether it is still present in live authority
+- whether it is still present in the current generated requirement surface
+- which implementation or test planning surfaces currently claim it
+- which generated source files currently `Implement` it
+- which generated test files currently `Validate` it
+- whether it is realized, partially realized, planned, specified, or missing
+  from the current generated requirement surface
+
+This means a bounded partial wave may close lawfully without allowing the
+unresolved live requirement set to fall out of future closure pressure.
+
+## Generated Traceability Chain
+
+`odd_sdlc` treats generated realization traceability as part of the operative
+asset chain, not as optional review commentary.
+
+The minimum active chain is:
+
+- live requirement authority
+- generated implementation and qualification planning surfaces
+- generated source files with `Implements:` tags
+- generated test files with `Validates:` tags
+- requirement closure register summarizing the resulting closure state
+
+File-level trace authority is mandatory.
+
+Where one generated file owns materially different requirement families, the
+tenant-local design may extend the trace contract to function or symbol level.
+
+## Deterministic Scope And Traceability Gates
+
+`odd_sdlc` uses deterministic authority checks to keep iteration honest.
+
+Those checks are expected to verify at least:
+
+- goal surface retains imported intent identifiers
+- generated requirement surface carries forward the live requirement inventory
+- generated code retains explicit trace authority for claimed implementation
+  requirements
+- generated tests retain explicit trace authority for claimed verification
+  requirements
+- orphan generated source or test files are treated as ungoverned realization
+  rather than as closure evidence
 
 Representative capabilities include:
 

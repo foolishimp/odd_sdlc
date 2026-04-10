@@ -82,7 +82,7 @@ def _seed_workspace(path: Path) -> None:
                 "structure:",
                 "  design_tenants:",
                 '    - name: "python_default"',
-                '      output_dir: "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"',
+                '      output_dir: ""',
                 '      description: "First-slice proving layout"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: "docs/deployment-contract.md"',
@@ -110,6 +110,9 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
     assert asset_path(tmp_path, "requirement_surface") == tmp_path / "specification" / "requirements"
     assert asset_path(tmp_path, "ambiguity_register_surface") == (
         tmp_path / ".ai-workspace" / "runtime" / "odd_sdlc-ambiguity-register.json"
+    )
+    assert asset_path(tmp_path, "requirement_closure_register_surface") == (
+        tmp_path / ".ai-workspace" / "runtime" / "odd_sdlc-requirement-closure.json"
     )
     assert asset_path(tmp_path, "code_surface") == (
         tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
@@ -366,6 +369,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert asset_types["scenario_surface"]["specializes"] == ["scenario_collection_surface"]
     assert asset_types["release_surface"]["specializes"] == ["release_document_surface"]
     assert asset_types["ambiguity_register_surface"]["library_level"] == "specialized"
+    assert asset_types["requirement_closure_register_surface"]["library_level"] == "specialized"
     assert asset_types["implementation_design_surface"]["specializes"] == ["design_document_surface"]
     assert asset_types["implementation_stack_profile"]["specializes"] == ["stack_profile_surface"]
     assert asset_types["implementation_module_surface"]["specializes"] == ["module_structure_surface"]
@@ -632,12 +636,13 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "programs",
         "query_contract",
         "recent_events",
+        "requirement_closure_register",
         "runs",
         "semantic_facets",
         "work_act_types",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 25
+    assert len(payload["assets"]) == 26
     assert len(payload["functions"]) == 21
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
@@ -650,6 +655,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
     assert payload["continuations"] == []
     assert payload["recent_events"] == []
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
+    assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert all(asset["projection_source"] == "workspace_scan" for asset in payload["assets"])
 
@@ -691,13 +697,14 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "jobs",
         "programs",
         "query_contract",
+        "requirement_closure_register",
         "semantic_facets",
         "work_act_types",
         "workspace_root",
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v6",
+        "version": "v7",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
@@ -706,6 +713,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
             "asset_families",
             "assets",
             "ambiguity_register",
+            "requirement_closure_register",
             "collections",
             "functions",
             "edge_contracts",
@@ -722,7 +730,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 25
+    assert len(payload["assets"]) == 26
     assert len(payload["functions"]) == 21
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
@@ -731,6 +739,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert len(payload["programs"]) == 2
     assert payload["gaps"]["converged"] is False
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
+    assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert payload["asset_families"][0]["name"] == "worksite_inputs"
     assert payload["work_act_types"][0]["name"] == "generate"
     assert payload["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"

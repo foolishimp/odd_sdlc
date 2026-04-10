@@ -114,10 +114,13 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     app = initialize(bootstrap(workspace_root=workspace))
     initial_domain = query_domain(app)
     run_archive.capture_json("query_domain.initial.json", initial_domain)
-    assert initial_domain["query_contract"]["version"] == "v6"
+    assert initial_domain["query_contract"]["version"] == "v7"
     assert "ambiguity_register" in initial_domain["query_contract"]["top_level_keys"]
+    assert "requirement_closure_register" in initial_domain["query_contract"]["top_level_keys"]
     assert any(asset["asset_id"] == "ambiguity_register_surface" for asset in initial_domain["assets"])
+    assert any(asset["asset_id"] == "requirement_closure_register_surface" for asset in initial_domain["assets"])
     assert initial_domain["ambiguity_register"]["summary"]["active"] == initial_register["summary"]["active"]
+    assert initial_domain["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
 
     _rewrite_output_dir(workspace, "imp_scala_spark/")
     second_report = normalize_workspace(
@@ -140,3 +143,4 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     reduced_domain = query_domain(initialize(bootstrap(workspace_root=workspace)))
     run_archive.capture_json("query_domain.reduced.json", reduced_domain)
     assert reduced_domain["ambiguity_register"]["summary"]["active"] == reduced_register["summary"]["active"]
+    assert reduced_domain["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"

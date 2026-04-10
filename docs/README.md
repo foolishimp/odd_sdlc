@@ -16,6 +16,10 @@ surfaces under `build_tenants/`.
 - [ODD_SDLC_DISAMBIGUATION_TASK_PLAN.md](./ODD_SDLC_DISAMBIGUATION_TASK_PLAN.md)
   breaks that strategy into implementation work packages for the active
   `odd_sdlc` wave
+- [ODD_SDLC_RC_NOTES.md](./ODD_SDLC_RC_NOTES.md) records current release-candidate
+  caveats and known limitations for the active `odd_sdlc` wave
+- [ODD_SDLC_RC_RELEASE_NOTE.md](./ODD_SDLC_RC_RELEASE_NOTE.md) records the
+  current `odd_sdlc` release-candidate shipment summary and verification footer
 - [OODD_future_strategy.md](./OODD_future_strategy.md) records a supplemental
   future strategy for `OODD` as an organisational operating model built on
   `odd_method`

@@ -2,6 +2,7 @@
 # Implements: REQ-F-ODDSDLC-007
 # Implements: REQ-F-ODDSDLC-022
 # Implements: REQ-F-ODDSDLC-027
+# Implements: REQ-F-ODDSDLC-029
 """Deterministic workspace normalization for odd_sdlc operation."""
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
+from .traceability import REQUIREMENT_CLOSURE_REGISTER_PATH, build_requirement_closure_register
 
 NORMALIZATION_REPORT_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-normalization.json")
 IMPORTED_REQUIREMENTS_PATH = Path("specification/requirements/00-imported-sources.md")
@@ -117,6 +119,32 @@ def _project_identity(workspace_root: Path) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _intent_ids_from_surface(workspace_root: Path) -> tuple[str, ...]:
+    intent_path = workspace_root / "specification" / "INTENT.md"
+    if not intent_path.exists():
+        return ()
+    return tuple(sorted(set(re.findall(r"\bINT-\d{3}\b", intent_path.read_text(encoding="utf-8")))))
+
+
+def _goals_surface_with_intent_carry_forward(existing_text: str, *, intent_ids: tuple[str, ...]) -> str:
+    if not intent_ids:
+        return existing_text
+    if all(intent_id in existing_text for intent_id in intent_ids):
+        return existing_text
+
+    lines = existing_text.rstrip().splitlines()
+    if lines and lines[-1] != "":
+        lines.append("")
+    lines.extend(
+        (
+            "## Intent Authority Carry-Forward",
+            *[f"- {intent_id}: carried forward from imported intent authority" for intent_id in intent_ids],
+            "",
+        )
+    )
+    return "\n".join(lines)
+
+
 def _ontology_anchor_headings(path: Path) -> list[str]:
     keywords = (
         "ontology",
@@ -213,6 +241,7 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "- `specification/requirements/00-imported-sources.md`",
             "- imported requirement-like sources listed there",
             "- `.ai-workspace/runtime/odd_sdlc-ambiguity-register.json` for current major ambiguity state",
+            "- `.ai-workspace/runtime/odd_sdlc-requirement-closure.json` for live requirement carry-forward and code/test closure state",
             "- `README.md` only as provenance/context after the imported authority",
             "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
             "",
@@ -263,6 +292,11 @@ def _default_goals_surface(workspace_root: Path) -> str:
         [f"- imported source present: `{path.relative_to(workspace_root).as_posix()}`" for path in imported]
         or ["- imported source present: none detected"]
     )
+    intent_ids = _intent_ids_from_surface(workspace_root)
+    intent_bullets = (
+        [f"- {intent_id}: carried forward from imported intent authority" for intent_id in intent_ids]
+        or ["- no imported INT-* authority markers detected"]
+    )
     return "\n".join(
         (
             "# Goals",
@@ -273,6 +307,9 @@ def _default_goals_surface(workspace_root: Path) -> str:
             "- establish the canonical odd_sdlc bootstrap surfaces without discarding imported project authority",
             "- make the workspace installable, iterable, and auditable through the odd_sdlc executive",
             "- preserve imported requirement-like sources as carried context for later refinement",
+            "",
+            "## Intent Authority Carry-Forward",
+            *intent_bullets,
             "",
             "## Imported Sources",
             *bullets,
@@ -461,6 +498,19 @@ def normalize_workspace(
             detail="created GOALS.md from imported workspace context",
             actions=actions,
         )
+    else:
+        updated_goals = _goals_surface_with_intent_carry_forward(
+            goals_path.read_text(encoding="utf-8"),
+            intent_ids=_intent_ids_from_surface(root),
+        )
+        if updated_goals != goals_path.read_text(encoding="utf-8"):
+            _write_text(
+                goals_path,
+                updated_goals,
+                kind="update_goals_surface",
+                detail="carried imported INT-* authority into existing GOALS.md",
+                actions=actions,
+            )
 
     requirements_root = root / "specification" / "requirements"
     if not requirements_root.exists():
@@ -530,6 +580,28 @@ def normalize_workspace(
                 ambiguity_content,
                 kind="update_ambiguity_register",
                 detail="updated ambiguity register from deterministic normalization and topology inspection",
+                actions=actions,
+            )
+
+    requirement_closure_path = root / REQUIREMENT_CLOSURE_REGISTER_PATH
+    requirement_closure_payload = build_requirement_closure_register(root, stage="normalize_workspace")
+    requirement_closure_content = json.dumps(requirement_closure_payload, indent=2, sort_keys=True)
+    if not requirement_closure_path.exists():
+        _write_text(
+            requirement_closure_path,
+            requirement_closure_content,
+            kind="create_requirement_closure_register",
+            detail="created initial requirement closure register from deterministic normalization and traceability inspection",
+            actions=actions,
+        )
+    else:
+        existing_requirement_closure = requirement_closure_path.read_text(encoding="utf-8")
+        if existing_requirement_closure != requirement_closure_content:
+            _write_text(
+                requirement_closure_path,
+                requirement_closure_content,
+                kind="update_requirement_closure_register",
+                detail="updated requirement closure register from deterministic normalization and traceability inspection",
                 actions=actions,
             )
 

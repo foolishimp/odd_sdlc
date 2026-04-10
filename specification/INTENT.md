@@ -15,6 +15,7 @@ It is a fresh constitutional line with these governing commitments:
 - specification defines `WHAT`
 - graph-native execution through GTL and ABG
 - graph-function-first constructive realization
+- iterative closure through governed repricing rather than one-shot completion
 - explicit runtime fact ownership
 - scenario-driven proof
 - standard realization topology from bootstrap without invented tenant-local
@@ -32,6 +33,9 @@ The project must deliver:
 - an explicit graph-function catalog as the operative constructive carrier
 - a lawful product layer for outcome-driven work that remains subordinate to the
   GTL/ABG carrier
+- an iterative SDLC operating model where partial waves are lawful, but
+  unresolved live requirements remain active closure pressure across future
+  waves until they are realized, withdrawn, or superseded
 - an on-demand application lane where a bounded request can be gated, carried
   through the full ODD SDLC, and closed as a deployed release
 - a dedicated-release model for existing applications so one operator,
@@ -53,6 +57,9 @@ The project is constrained by these rules:
 - ABG owns traversal, execution, and raw runtime fact truth
 - `odd_method` must not create a product-local shadow-runtime seam after ABG
   dispatch
+- unresolved live requirements must not disappear after a partial wave,
+  deferment, or scoped iteration; they remain binding constitutional pressure
+  until they are explicitly realized, withdrawn, or superseded
 - any orchestration or service layer incubated inside `odd_method` must remain
   subordinate to ABG for runs, events, convergence, lineage, and provenance
 - capability claims require written testcase authority and scenario proof

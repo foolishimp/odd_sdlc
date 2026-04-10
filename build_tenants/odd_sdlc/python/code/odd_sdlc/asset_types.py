@@ -298,6 +298,17 @@ ASSET_TYPES: dict[str, AssetTypeProfile] = {
         library_level="specialized",
         proof_hints=("post_mortem_event_audit",),
     ),
+    "requirement_closure_register_surface": AssetTypeProfile(
+        name="requirement_closure_register_surface",
+        description="Machine-readable register of live requirement closure state, carry-forward pressure, and realized code/test traceability for the active workspace.",
+        semantic_facets=("authority_surface", "worksite_surface", "generated_surface", "singleton_surface", "machine_readable_surface"),
+        fd_evaluator="generic.requirement-closure-register-present",
+        fp_gap_description="The requirement closure register is not yet current for the workspace state.",
+        fp_descriptive_framing="A requirement closure register records live requirement carry-forward state together with the generated design, code, and test traces that justify closure or continued pressure.",
+        library_level="specialized",
+        proof_hints=("post_mortem_event_audit",),
+        closure_hints=("published_requirement_closure_register_surface",),
+    ),
     "intent_doc": AssetTypeProfile(
         name="intent_doc",
         description="Singleton intent surface for the project line.",

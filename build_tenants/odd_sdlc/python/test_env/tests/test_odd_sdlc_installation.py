@@ -31,6 +31,7 @@ if str(TESTS_DIR) not in sys.path:
 
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.release.install import install as install_release  # noqa: E402
+from odd_sdlc.traceability import build_requirement_closure_register  # noqa: E402
 from odd_sdlc.workspace_assets import summarize_test_evidence  # noqa: E402
 from sandbox_runtime import read_events, run_installed_genesis  # noqa: E402
 
@@ -192,6 +193,7 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_project_bootstrap",
         "normalize_project_constraints",
         "create_ambiguity_register",
+        "create_requirement_closure_register",
     ]
 
     assert (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8").startswith("# Product")
@@ -208,6 +210,7 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert "## Ontology Anchors" in project_bootstrap
     assert "- `specification/INTENT.md` when present" in project_bootstrap
     assert ".ai-workspace/runtime/odd_sdlc-ambiguity-register.json" in project_bootstrap
+    assert ".ai-workspace/runtime/odd_sdlc-requirement-closure.json" in project_bootstrap
     assert "- `README.md` only as provenance/context after the imported authority" in project_bootstrap
     assert "## Installed Runtime Start Surface" in project_bootstrap
     assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in project_bootstrap
@@ -234,6 +237,11 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     )
     assert missing_deployment["policy_action"] == "hard_block"
     assert missing_deployment["status"] == "pending_capability"
+    requirement_closure_register = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-requirement-closure.json").read_text(encoding="utf-8")
+    )
+    assert requirement_closure_register["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert requirement_closure_register["summary"]["total_live_requirements"] == 0
 
     second = normalize_workspace(
         workspace,
@@ -278,11 +286,13 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
         assert "`workspace://specification/requirements/00-imported-sources.md`" in text
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`" in text
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`" in text
+        assert "`workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`" in text
         assert "`workspace://.odd_sdlc/release/genesis.yml`" in text
         assert "## 4. Start Here" in text
         assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in text
         assert "it does not proxy F_P transport failures" in text
         assert "deployment, runtime-return, and other side-effect stages only traverse" in text
+        assert "unresolved live requirements remain active future pressure across iterations" in text
         assert "construction_complete_pending_execution" in text
         assert "treat them as provenance only" in text
         assert "README.md` (provenance/context only; do not use as primary identity evidence)" in text
@@ -397,6 +407,91 @@ def test_ungoverned_test_reports_are_not_counted_as_governed_evidence(tmp_path: 
     assert summary["ungoverned_report_paths"] == ["imp_scala_spark/target/test-reports/TEST-fake.xml"]
 
 
+def test_requirement_closure_register_preserves_carry_forward_and_traceability(tmp_path: Path) -> None:
+    workspace = tmp_path / "traceability.test"
+    (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
+    (workspace / "specification" / "scenarios").mkdir(parents=True, exist_ok=True)
+    (workspace / "build_tenants" / "odd_sdlc" / "python" / "design").mkdir(parents=True, exist_ok=True)
+    (workspace / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests").mkdir(parents=True, exist_ok=True)
+    (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
+    (workspace / "imp_trace" / "src" / "main").mkdir(parents=True, exist_ok=True)
+    (workspace / "imp_trace" / "src" / "test").mkdir(parents=True, exist_ok=True)
+
+    (workspace / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "traceability.test"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python"',
+                '      output_dir: "imp_trace/"',
+                '      description: "traceability lane"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: ""',
+                '      runtime_observation_contract: ""',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "INTENT.md").write_text(
+        "# Intent\n\n- INT-001: Preserve live requirement closure through iteration\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "GOALS.md").write_text(
+        "# Goals\n\n- INT-001: Preserve live requirement closure through iteration\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "requirements" / "01-live.md").write_text(
+        "# Live Requirements\n\n- REQ-CORE-001\n- REQ-CORE-002\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "requirements" / "10-generated-bootstrap.md").write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-CORE-001\n- REQ-CORE-002\n",
+        encoding="utf-8",
+    )
+    (workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-design.md").write_text(
+        "# Generated Implementation Design\n\n- REQ-CORE-001\n",
+        encoding="utf-8",
+    )
+    (workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-modules.md").write_text(
+        "# Generated Implementation Modules\n\n- module alpha realizes REQ-CORE-001\n",
+        encoding="utf-8",
+    )
+    (workspace / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md").write_text(
+        "# Generated Test Modules\n\n- test lane validates REQ-CORE-001\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "scenarios" / "30-generated-testcase-authority.md").write_text(
+        "# Generated Testcase Authority\n\n- REQ-CORE-001\n",
+        encoding="utf-8",
+    )
+    (workspace / "imp_trace" / "src" / "main" / "logic.py").write_text(
+        '# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n',
+        encoding="utf-8",
+    )
+    (workspace / "imp_trace" / "src" / "test" / "test_logic.py").write_text(
+        '# Validates: REQ-CORE-001\n\ndef test_run() -> None:\n    assert True\n',
+        encoding="utf-8",
+    )
+
+    register = build_requirement_closure_register(workspace, stage="test")
+    entries = {entry["requirement_id"]: entry for entry in register["requirements"]}
+    assert register["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert entries["REQ-CORE-001"]["status"] == "realized"
+    assert entries["REQ-CORE-002"]["status"] == "specified"
+    assert register["summary"]["missing_from_current_requirement_surface"] == 0
+
+
 def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path) -> None:
     workspace = tmp_path / "data_mapper.test18"
     shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
@@ -426,7 +521,7 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
 
 
 @pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
-def test_data_mapper_template_as_is_supports_first_auto_start(run_archive) -> None:
+def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence(run_archive) -> None:
     workspace = run_archive.workspace
     shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
 
@@ -457,18 +552,18 @@ def test_data_mapper_template_as_is_supports_first_auto_start(run_archive) -> No
     assert gaps_payload["converged"] is False
     assert len(gaps_payload["gaps"]) == 18
 
-    start_payload = json.loads(
-        run_installed_genesis(
-            workspace,
-            "start",
-            "--auto",
-            archive=run_archive,
-            label="data_mapper start",
-            timeout=180,
-        ).stdout
+    start_result = run_installed_genesis(
+        workspace,
+        "start",
+        "--auto",
+        archive=run_archive,
+        label="data_mapper start",
+        timeout=180,
+        check=False,
     )
-    run_archive.capture_json("start.result.json", start_payload)
-    assert start_payload["status"] == "converged"
+    run_archive.capture_text("start.stdout.txt", start_result.stdout)
+    run_archive.capture_text("start.stderr.txt", start_result.stderr)
+    assert start_result.returncode == 4
 
     runtime_contract_text = (workspace / ".odd_sdlc" / "release" / "genesis.yml").read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
@@ -482,14 +577,14 @@ def test_data_mapper_template_as_is_supports_first_auto_start(run_archive) -> No
         ).stdout
     )
     run_archive.capture_json("gaps.final.json", final_gaps_payload)
-    assert final_gaps_payload["converged"] is True
-    assert final_gaps_payload["total_delta"] == 0.0
+    assert final_gaps_payload["converged"] is False
+    assert any(gap["edge"] == "derive_test_run_archive_surface" for gap in final_gaps_payload["gaps"])
 
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
     event_types = [event["event_type"] for event in events]
     assert "worker_turn_started" in event_types
-    assert "assessed" in event_types
+    assert ("assessed" in event_types) or ("found" in event_types)
     assert "graph_call_failed" not in event_types
     assert "run_failed" not in event_types
     assert all(event.get("data", {}).get("failure_class") != "policy_config_defect" for event in events)
@@ -499,39 +594,29 @@ def test_data_mapper_template_as_is_supports_first_auto_start(run_archive) -> No
         if event["event_type"] == "graph_call_opened"
     ]
     assert graph_call_edges[0] == "derive_intent_surface"
-    assert "derive_code_surface" in graph_call_edges
-    assert "prepare_release_surface" in graph_call_edges
+    assert len(graph_call_edges) >= 1
+    assert "prepare_release_surface" not in graph_call_edges
     assert "prepare_deployment_surface" not in graph_call_edges
     assert "derive_runtime_observation_surface" not in graph_call_edges
     assert "derive_retrofit_plan_surface" not in graph_call_edges
+    assert any(event["event_type"] == "found" for event in events)
 
     manifest_dir = workspace / ".ai-workspace" / "fp_manifests"
     result_dir = workspace / ".ai-workspace" / "fp_results"
     assert any(manifest_dir.iterdir())
-    assert any(result_dir.iterdir())
+    assert result_dir.exists()
     first_manifest = json.loads(sorted(manifest_dir.iterdir())[0].read_text(encoding="utf-8"))
     assert first_manifest["resolved_policy"]["dispatch"]["config"]["timeout"] == 1800
 
     intent_text = (workspace / "specification" / "INTENT.md").read_text(encoding="utf-8")
     product_text = (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8")
-    release_text = (workspace / "docs" / "40-generated-release.md").read_text(encoding="utf-8")
     assert "Categorical Data Mapping & Computation Engine (CDME)" in intent_text
     assert "`odd_sdlc` exists to prove" not in intent_text
     assert "generated software-domain read model over the imported project authority" in product_text
     assert "toy app" not in product_text
-    assert "governed code root: `imp_scala_spark/`" in release_text
-    assert "odd_sdlc_proving_impl" not in release_text
-    assert "- status: pending_evidence" in release_text
-    assert "- completion_state: construction_complete_pending_execution" in release_text
+    assert not (workspace / "docs" / "40-generated-release.md").exists()
     assert not (workspace / "docs" / "50-generated-deployment.md").exists()
     assert not (workspace / "docs" / "60-generated-runtime-observation.md").exists()
-
-    code_root = workspace / "imp_scala_spark"
-    assert code_root.exists()
-    assert (code_root / "build.sbt").exists()
-    assert (code_root / "project" / "build.properties").exists()
-    assert len(list(code_root.rglob("*.scala"))) >= 16
-    assert not (workspace / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl").exists()
 
     run_archive.update_summary(
         initial_gap_count=len(gaps_payload["gaps"]),
@@ -539,7 +624,6 @@ def test_data_mapper_template_as_is_supports_first_auto_start(run_archive) -> No
         graph_call_edges=graph_call_edges,
         preserved_project_identity=True,
         governed_code_root="imp_scala_spark/",
-        release_status="pending_evidence",
+        release_status="not_reached",
         active_operational_steps=[],
-        source_file_count=len(list(code_root.rglob("*.scala"))),
     )

@@ -189,6 +189,13 @@ def run_constructor_for_start(
     archive: "RunArchive | None" = None,
     label: str | None = None,
 ) -> tuple[dict[str, Any], Path]:
+    if start_payload.get("blocking_reason") != "fp_dispatch" or "fp_manifest_path" not in start_payload:
+        raise AssertionError(
+            "Expected start to dispatch F_P with fp_manifest_path, "
+            f"got blocking_reason={start_payload.get('blocking_reason')!r} "
+            f"failing_evaluators={start_payload.get('failing_evaluators', [])!r} "
+            f"edge={start_payload.get('edge')!r}"
+        )
     manifest_path = Path(start_payload["fp_manifest_path"])
     result = run_installed_odd_sdlc(
         workspace,

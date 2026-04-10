@@ -1,5 +1,7 @@
 # Implements: REQ-F-ASSETMODEL-004
 # Implements: REQ-F-ODDSDLC-002
+# Implements: REQ-F-ODDSDLC-030
+# Implements: REQ-F-ODDSDLC-031
 """Named function catalog for the retained odd_sdlc proving subset."""
 from __future__ import annotations
 
@@ -23,14 +25,14 @@ FUNCTION_CATALOG: tuple[FunctionCatalogEntry, ...] = (
     ),
     FunctionCatalogEntry(
         name="derive_goal_surface",
-        intent="Derive or revise the goals surface from the bound bootstrap input set, the current intent surface, and the current product surface.",
+        intent="Derive or revise the goals surface from the bound bootstrap input set, the current intent surface, and the current product surface without dropping imported intent identifiers or inventing silent scope loss.",
         inputs=("input_set", "intent_surface", "product_surface"),
         outputs=("goal_surface",),
         backing_graph_function="derive_goal_surface",
     ),
     FunctionCatalogEntry(
         name="derive_requirement_surface",
-        intent="Derive the requirement family surface from input, intent, product, and goals.",
+        intent="Derive the requirement family surface from input, intent, product, and goals while carrying forward the full live requirement inventory into the current wave.",
         inputs=("input_set", "intent_surface", "product_surface", "goal_surface"),
         outputs=("requirement_surface",),
         backing_graph_function="derive_requirement_surface",
@@ -79,14 +81,14 @@ FUNCTION_CATALOG: tuple[FunctionCatalogEntry, ...] = (
     ),
     FunctionCatalogEntry(
         name="derive_implementation_module_surface",
-        intent="Derive generated implementation module structure from the current implementation design and selected stack profile.",
+        intent="Derive generated implementation module structure from the current implementation design and selected stack profile, including the requirement sets each module claims to realize.",
         inputs=("implementation_design_surface", "implementation_stack_profile"),
         outputs=("implementation_module_surface",),
         backing_graph_function="derive_implementation_module_surface",
     ),
     FunctionCatalogEntry(
         name="derive_code_surface",
-        intent="Derive generated executable code from the current implementation module surface and selected implementation stack profile.",
+        intent="Derive generated executable code from the current implementation module surface and selected implementation stack profile, with explicit Implements trace authority for every requirement claimed by the current implementation branch.",
         inputs=("implementation_module_surface", "implementation_stack_profile"),
         outputs=("code_surface",),
         backing_graph_function="derive_code_surface",
@@ -107,14 +109,14 @@ FUNCTION_CATALOG: tuple[FunctionCatalogEntry, ...] = (
     ),
     FunctionCatalogEntry(
         name="derive_test_module_surface",
-        intent="Derive generated test module structure from the current test design and selected stack profile.",
+        intent="Derive generated test module structure from the current test design and selected stack profile, including the requirement sets each generated test lane is expected to validate.",
         inputs=("test_design_surface", "test_stack_profile"),
         outputs=("test_module_surface",),
         backing_graph_function="derive_test_module_surface",
     ),
     FunctionCatalogEntry(
         name="derive_test_run_archive_surface",
-        intent="Derive governed archive-evidence design from the current test module surface and selected test stack profile.",
+        intent="Derive governed archive-evidence design from the current test module surface and selected test stack profile, with explicit Validates trace authority for the requirements claimed by the current test branch.",
         inputs=("test_module_surface", "test_stack_profile"),
         outputs=("test_run_archive_surface",),
         backing_graph_function="derive_test_run_archive_surface",

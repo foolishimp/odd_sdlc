@@ -72,15 +72,15 @@ def _seed_test19_like_workspace(workspace: Path) -> None:
         encoding="utf-8",
     )
     (workspace / "specification" / "INTENT.md").write_text(
-        "# Project Intent\n\nImported intent authority.\n",
+        "# Project Intent\n\n- INT-001: preserve imported topology authority while adopting the governed realization root.\n",
         encoding="utf-8",
     )
     (workspace / "specification" / "REQUIREMENTS.md").write_text(
-        "# Imported Requirements\n\nImported requirement-like authority.\n",
+        "# Imported Requirements\n\n- REQ-CDME-001: adopted Scala sources must remain attributable to the governed realization root.\n",
         encoding="utf-8",
     )
     (workspace / "specification" / "mapper_requirements.md").write_text(
-        "# Mapper Requirements\n\nImported mapper-specific authority.\n",
+        "# Mapper Requirements\n\n- REQ-CDME-001: topology qualification must project over the governed Scala realization tree.\n",
         encoding="utf-8",
     )
     (workspace / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
@@ -102,6 +102,7 @@ def _seed_test19_like_workspace(workspace: Path) -> None:
                 (
                     f"package cdme.runtime",
                     "",
+                    "// Implements: REQ-CDME-001",
                     f"object Stage{index} {{",
                     f'  def name: String = "stage-{index}"',
                     "}",
@@ -116,6 +117,7 @@ def _seed_test19_like_workspace(workspace: Path) -> None:
                 (
                     "package cdme.runtime",
                     "",
+                    "// Validates: REQ-CDME-001",
                     f"object Stage{index}Spec {{",
                     "  def passed: Boolean = true",
                     "}",
@@ -208,12 +210,16 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
     assert archive_attestation["contract_satisfied"] is True
     release_path = asset_path(workspace, "release_surface")
     release_text = release_path.read_text(encoding="utf-8")
+    assert "- status: pending_evidence" in release_text
+    assert "- completion_state: construction_complete_pending_execution" in release_text
     assert "governed code root: `imp_scala_spark/`" in release_text
-    assert "- tests observed: 15" in release_text
+    assert "- tests observed: 0" in release_text
     assert "- failures observed: 0" in release_text
+    assert "- ungoverned report files observed: 3" in release_text
     archive_text = asset_path(workspace, "test_run_archive_surface").read_text(encoding="utf-8")
-    assert "- report files observed: 3" in archive_text
-    assert "- parsed reports: 3" in archive_text
+    assert "- report files observed: 0" in archive_text
+    assert "- parsed reports: 0" in archive_text
+    assert "- ungoverned report files observed: 3" in archive_text
 
 
 @pytest.mark.usecase_id("data_mapper_test19_topology_regression")
