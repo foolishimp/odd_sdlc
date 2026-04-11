@@ -38,7 +38,7 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
     "requirements_boundary_sources_present": FdEvaluatorContract(
         evaluator_name="requirements_boundary_sources_present",
         cli_name="requirements-boundary-sources-present",
-        description="Intent, product, and goals have already been regenerated and the requirement surface root exists.",
+        description="Intent, product, and goals have already been regenerated so requirement derivation may lawfully begin.",
     ),
     "requirement_scope_complete": FdEvaluatorContract(
         evaluator_name="requirement_scope_complete",
@@ -123,22 +123,32 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
     "test_stack_profile_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="test_stack_profile_dependency_surfaces_present",
         cli_name="test-stack-profile-dependency-surfaces-present",
-        description="The test stack profile derivation depends on a regenerated test design surface.",
+        description="The test stack profile derivation depends on regenerated test design, implementation design, and implementation stack profile surfaces.",
     ),
     "test_module_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="test_module_dependency_surfaces_present",
         cli_name="test-module-dependency-surfaces-present",
-        description="The test module derivation depends on regenerated test design and test stack profile surfaces.",
+        description="The test module derivation depends on regenerated test design, test stack profile, and implementation module surfaces.",
+    ),
+    "planned_test_traceability_present": FdEvaluatorContract(
+        evaluator_name="planned_test_traceability_present",
+        cli_name="planned-test-traceability-present",
+        description="The generated test module surface carries planned Validates claims that remain within the current implementation branch requirement inventory.",
     ),
     "test_run_archive_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="test_run_archive_dependency_surfaces_present",
         cli_name="test-run-archive-dependency-surfaces-present",
         description="The archive-evidence derivation depends on regenerated test module and test stack profile surfaces.",
     ),
+    "realized_test_traceability_present": FdEvaluatorContract(
+        evaluator_name="realized_test_traceability_present",
+        cli_name="realized-test-traceability-present",
+        description="The archive-stage developer-test realization carries explicit Validates traces for the requirements claimed by the planned developer-test branch and contains no orphan generated test files.",
+    ),
     "test_traceability_present": FdEvaluatorContract(
         evaluator_name="test_traceability_present",
         cli_name="test-traceability-present",
-        description="The generated test surface carries explicit Validates traces for the requirements claimed by the test branch and contains no orphan generated test files.",
+        description="Compatibility alias for the realized test traceability rule while the split planning/realized test branch is being adopted.",
     ),
     "deployment_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="deployment_dependency_surfaces_present",

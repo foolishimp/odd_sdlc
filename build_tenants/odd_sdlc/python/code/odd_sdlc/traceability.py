@@ -21,8 +21,10 @@ _IMPLEMENTATION_TRACE_PATHS = (
     Path("build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md"),
     Path("build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md"),
 )
-_TEST_TRACE_PATHS = (
+_PLANNED_TEST_TRACE_PATHS = (
     Path("build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md"),
+)
+_UAT_TESTCASE_AUTHORITY_PATHS = (
     Path("specification/scenarios/30-generated-testcase-authority.md"),
 )
 
@@ -113,8 +115,16 @@ def implementation_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
     return _surface_requirement_refs(workspace_root, _IMPLEMENTATION_TRACE_PATHS)
 
 
+def planned_test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return _surface_requirement_refs(workspace_root, _PLANNED_TEST_TRACE_PATHS)
+
+
+def testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return _surface_requirement_refs(workspace_root, _UAT_TESTCASE_AUTHORITY_PATHS)
+
+
 def test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _TEST_TRACE_PATHS)
+    return planned_test_claim_refs(workspace_root)
 
 
 def _is_source_file(path: Path, *, code_root: Path) -> bool:
@@ -198,19 +208,35 @@ def missing_code_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
     return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in code_refs))
 
 
-def missing_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
-    claimed = test_claim_refs(workspace_root)
+def missing_planned_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
+    claimed = planned_test_claim_refs(workspace_root)
+    if not claimed:
+        return ()
+    implementation_ids = set(implementation_claim_refs(workspace_root))
+    if implementation_ids:
+        return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in implementation_ids))
+    current_ids = set(current_requirement_refs(workspace_root))
+    return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in current_ids))
+
+
+def missing_realized_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
+    claimed = planned_test_claim_refs(workspace_root)
     if not claimed:
         return ()
     test_refs = traceability_scan(workspace_root)["test_refs"]
     return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in test_refs))
 
 
+def missing_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
+    return missing_realized_test_traceability_ids(workspace_root)
+
+
 def build_requirement_closure_register(workspace_root: Path, *, stage: str = "workspace_scan") -> dict[str, Any]:
     authority_refs = authority_requirement_refs(workspace_root)
     current_refs = current_requirement_refs(workspace_root)
     implementation_refs = implementation_claim_refs(workspace_root)
-    validation_refs = test_claim_refs(workspace_root)
+    planned_validation_refs = planned_test_claim_refs(workspace_root)
+    uat_validation_refs = testcase_authority_refs(workspace_root)
     scan = traceability_scan(workspace_root)
     code_refs = scan["code_refs"]
     test_refs = scan["test_refs"]
@@ -219,7 +245,8 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
         set(authority_refs)
         | set(current_refs)
         | set(implementation_refs)
-        | set(validation_refs)
+        | set(planned_validation_refs)
+        | set(uat_validation_refs)
         | set(code_refs)
         | set(test_refs)
     )
@@ -230,7 +257,8 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
         in_authority = requirement_id in authority_refs
         in_current = requirement_id in current_refs
         implementation_files = implementation_refs.get(requirement_id, [])
-        validation_files = validation_refs.get(requirement_id, [])
+        planned_validation_files = planned_validation_refs.get(requirement_id, [])
+        uat_validation_files = uat_validation_refs.get(requirement_id, [])
         code_files = code_refs.get(requirement_id, [])
         test_files = test_refs.get(requirement_id, [])
         if in_authority and not in_current:
@@ -239,7 +267,7 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
             status = "realized"
         elif code_files or test_files:
             status = "partially_realized"
-        elif implementation_files or validation_files:
+        elif implementation_files or planned_validation_files or uat_validation_files:
             status = "planned"
         elif in_current:
             status = "specified"
@@ -254,7 +282,9 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
                 "authority_refs": authority_refs.get(requirement_id, []),
                 "current_requirement_refs": current_refs.get(requirement_id, []),
                 "implementation_claim_refs": implementation_files,
-                "test_claim_refs": validation_files,
+                "planned_test_claim_refs": planned_validation_files,
+                "testcase_authority_refs": uat_validation_files,
+                "test_claim_refs": planned_validation_files,
                 "code_refs": code_files,
                 "test_refs": test_files,
                 "status": status,
@@ -272,7 +302,8 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
             "missing_from_current_requirement_surface": len(missing_requirement_ids_from_current_surface(workspace_root)),
             "missing_intent_ids_from_goals": len(missing_intent_ids_from_goals(workspace_root)),
             "requirements_missing_code_traceability": len(missing_code_traceability_ids(workspace_root)),
-            "requirements_missing_test_traceability": len(missing_test_traceability_ids(workspace_root)),
+            "requirements_missing_planned_test_traceability": len(missing_planned_test_traceability_ids(workspace_root)),
+            "requirements_missing_test_traceability": len(missing_realized_test_traceability_ids(workspace_root)),
             "orphan_code_files": len(scan["orphan_code_files"]),
             "orphan_test_files": len(scan["orphan_test_files"]),
             "status_counts": status_counts,

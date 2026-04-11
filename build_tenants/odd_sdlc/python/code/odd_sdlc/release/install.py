@@ -28,13 +28,17 @@ _ODD_SDLC_BOOTLOADER_END = "<!-- ODD_SDLC_BOOTLOADER_END -->"
 def _copy_package(target_root: Path) -> Path:
     package_root = target_root / "build_tenants" / "odd_sdlc" / "python" / "code"
     package_root.mkdir(parents=True, exist_ok=True)
+    destination = package_root / "odd_sdlc"
+    # Source-workspace self-install must not try to copy the package onto itself.
+    if destination.resolve() == SOURCE_PACKAGE:
+        return destination
     shutil.copytree(
         SOURCE_PACKAGE,
-        package_root / "odd_sdlc",
+        destination,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
-    return package_root / "odd_sdlc"
+    return destination
 
 
 def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, Any]:
@@ -60,12 +64,26 @@ def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: 
 
 
 def _runtime_contract_lines() -> tuple[str, ...]:
+    asset_binding_contract = json.dumps(
+        {
+            "command": ["python", "-m", "odd_sdlc", "query-domain", "--workspace", "."],
+            "assets_key": "assets",
+            "asset_id_key": "asset_id",
+            "uri_key": "uri",
+            "relative_path_key": "metadata.relative_path",
+            "path_kind_key": "checkpoint.path_kind",
+            "exists_key": "checkpoint.exists",
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
     return (
         "# odd_sdlc runtime contract",
         "module: odd_sdlc.gtl_module:MODULE",
         "package: odd_sdlc.gtl_module:MODULE",
         "domain_package: odd_sdlc",
         "runtime_backend: claude",
+        f"asset_binding_contract: {asset_binding_contract}",
         "pythonpath:",
         "  - .genesis",
         "  - build_tenants/odd_sdlc/python/code",

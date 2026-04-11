@@ -41,7 +41,7 @@ ASSET_FAMILIES: tuple[AssetFamilyDescriptor, ...] = (
     ),
     AssetFamilyDescriptor(
         name="qualification_branch",
-        description="Test design, module, and archived evidence surfaces used to qualify the active software branch.",
+        description="Test design, planned coverage, and archived evidence surfaces used to qualify the active software branch, including realized developer-test source generated under the archive stage.",
         lifecycle_role="qualification",
         representative_asset_types=(
             "uat_testcases_surface",
@@ -193,7 +193,7 @@ EDGE_CONTRACTS: tuple[EdgeContractDescriptor, ...] = (
     ),
     EdgeContractDescriptor(
         name="materialize_qualification_branch",
-        description="Traverse from the current design branch into test design, test structure, archived evidence, and testcase authority surfaces.",
+        description="Traverse from the current design branch into test design, test structure, archived evidence, and testcase authority surfaces while materializing realized developer-test source under the archive stage.",
         source_asset_families=("solution_design",),
         target_asset_family="qualification_branch",
         configured_fp_role="Build or revise the qualification branch and emit the governed evidence model used by later proof and closure acts.",

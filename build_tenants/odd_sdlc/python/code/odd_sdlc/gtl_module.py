@@ -177,14 +177,14 @@ _test_stack_profile = _asset_node(
     "test_stack_profile",
     schema="odd.asset.test_stack_profile",
     kind="test_stack_profile",
-    required_contexts=("test_design_surface",),
+    required_contexts=("test_design_surface", "implementation_design_surface", "implementation_stack_profile"),
     output_contract_refs=("test_stack_profile_present",),
 )
 _test_module_surface = _asset_node(
     "test_module_surface",
     schema="odd.asset.test_module_surface",
     kind="test_module_surface",
-    required_contexts=("test_design_surface", "test_stack_profile"),
+    required_contexts=("test_design_surface", "test_stack_profile", "implementation_module_surface"),
     output_contract_refs=("test_module_surface_present",),
 )
 _test_run_archive_surface = _asset_node(
@@ -294,7 +294,9 @@ _release_fd = _fd_evaluator("release_dependency_surfaces_present")
 _test_design_fd = _fd_evaluator("test_design_dependency_surfaces_present")
 _test_stack_profile_fd = _fd_evaluator("test_stack_profile_dependency_surfaces_present")
 _test_module_fd = _fd_evaluator("test_module_dependency_surfaces_present")
+_planned_test_traceability_fd = _fd_evaluator("planned_test_traceability_present")
 _test_run_archive_fd = _fd_evaluator("test_run_archive_dependency_surfaces_present")
+_realized_test_traceability_fd = _fd_evaluator("realized_test_traceability_present")
 _test_traceability_fd = _fd_evaluator("test_traceability_present")
 _deployment_fd = _fd_evaluator("deployment_dependency_surfaces_present")
 _runtime_observation_fd = _fd_evaluator("runtime_observation_dependency_surfaces_present")
@@ -412,7 +414,7 @@ _test_module_fp = Evaluator(
 _test_run_archive_fp = Evaluator(
     name="test_run_archive_surface_semantically_converged",
     regime=F_P,
-    description="The test run archive surface is semantically converged for the current generated test module and stack profile.",
+    description="The test run archive surface is semantically converged for the current test module structure and selected test stack profile while retaining the realized developer-test evidence view.",
 )
 _deployment_fp = Evaluator(
     name="deployment_surface_semantically_converged",
@@ -732,6 +734,7 @@ GF_DERIVE_TEST_MODULE = _graph_function(
     target=_test_module_surface,
     fd_evaluator=_test_module_fd,
     fp_evaluator=_test_module_fp,
+    extra_fd_evaluators=(_planned_test_traceability_fd,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
@@ -740,7 +743,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     target=_test_run_archive_surface,
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
-    extra_fd_evaluators=(_test_traceability_fd,),
+    extra_fd_evaluators=(_realized_test_traceability_fd,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_PREPARE_RELEASE = _graph_function(
@@ -1312,7 +1315,10 @@ def _build_module(workspace_root: Path) -> Module:
             _test_design_fd,
             _test_stack_profile_fd,
             _test_module_fd,
+            _planned_test_traceability_fd,
             _test_run_archive_fd,
+            _realized_test_traceability_fd,
+            _test_traceability_fd,
             _intent_fp,
             _product_fp,
             _goal_fp,

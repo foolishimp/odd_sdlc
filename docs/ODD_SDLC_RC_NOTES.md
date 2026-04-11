@@ -52,6 +52,39 @@ could be semantically covered but omitted literally from
 The fix preserves deterministic requirement-ID carry-forward for clean
 installed runs without weakening the deterministic F_D gate.
 
+### Installed ABG Boundary Is Now Consumed Through Installer Composition
+
+The current RC consumes the released ABG runtime boundary through
+`odd_method`'s installer path rather than through source-runtime mirroring.
+
+That means:
+
+- downstream `.genesis` truth is refreshed only by installer execution
+- the `odd_sdlc` proof lanes now run against the released ABG provenance-ready
+  runtime boundary
+- unresolved deterministic gaps that remain after a constructive continuation
+  now surface back out as `fd_gap` rather than as generic runtime failure
+
+### Public Test Branch Shape Is Preserved While Realized Test Traceability Moves Inside Archive Construction
+
+The current RC keeps the published developer-test branch shape stable:
+
+- `derive_test_module_surface`
+- `derive_test_run_archive_surface`
+- `qualify_testcase_authority`
+
+while moving realized governed developer-test source generation behind the
+archive boundary.
+
+That means:
+
+- planned developer-test traceability is still checked at test-module stage
+- realized developer-test traceability is checked at archive stage
+- empty generated orphan test files are no longer created just to satisfy the
+  internal realized-test branch
+- the release-record first-slice, synthetic regression, and installed sandbox
+  lanes stay aligned to the published graph
+
 ## Current Known Limitations
 
 ### Traceability Path Resolution Is Still Self-Hosting-Oriented
@@ -84,7 +117,7 @@ The current release-candidate proving footer is:
 
 - `36 passed`
 - `4 skipped`
-- `520.28s`
+- `553.02s`
 
 from:
 

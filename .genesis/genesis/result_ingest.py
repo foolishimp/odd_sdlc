@@ -7,6 +7,9 @@ result_ingest — engine-owned F_P result ingestion and assessed-event emission.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -15,7 +18,6 @@ from typing import Any
 from .events import EventContext, EventStream, emit
 from .continuation import continuation_state
 from .policy import materialize_policy_concern, resolve_policy_bundle
-from .policy_defaults import execute_closure_policy, execute_proof_policy
 from .provenance import _read_workflow_version
 
 
@@ -107,6 +109,81 @@ def _policy_bundle(manifest: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(resolved, Mapping):
         return dict(resolved)
     return resolve_policy_bundle()
+
+
+def _target_binding_materialization(workspace: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
+    binding = manifest.get("target_asset_binding")
+    if not isinstance(binding, Mapping):
+        return {"passed": True, "reason": "no_target_binding"}
+    relative_path = binding.get("relative_path")
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        return {"passed": True, "reason": "no_relative_target_binding"}
+    materialized_path = workspace / relative_path
+    if materialized_path.exists():
+        return {
+            "passed": True,
+            "reason": "target_binding_materialized",
+            "relative_path": relative_path,
+        }
+    return {
+        "passed": False,
+        "reason": "target_binding_not_materialized",
+        "relative_path": relative_path,
+    }
+
+
+def _rerun_manifest_fd_failures(
+    workspace: Path,
+    manifest: Mapping[str, Any],
+    *,
+    work_key: str | None,
+) -> dict[str, Any]:
+    raw_failures = manifest.get("fd_failures")
+    if not isinstance(raw_failures, list) or not raw_failures:
+        return {"passed": True, "failures": []}
+
+    env = os.environ.copy()
+    extra = os.pathsep.join(p for p in sys.path if p)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [extra, existing]))
+    if work_key:
+        env["WORK_KEY"] = work_key
+
+    unresolved: list[dict[str, Any]] = []
+    for entry in raw_failures:
+        if not isinstance(entry, Mapping):
+            continue
+        name = str(entry.get("name") or "").strip() or "unknown_fd"
+        shell_command = str(entry.get("binding") or "").strip()
+        if shell_command.startswith("exec://"):
+            shell_command = shell_command[len("exec://"):]
+        if not shell_command:
+            unresolved.append({"name": name, "reason": "missing_binding"})
+            continue
+        try:
+            result = subprocess.run(
+                shell_command,
+                shell=True,
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            unresolved.append({"name": name, "reason": "timeout"})
+            continue
+        if result.returncode != 0:
+            unresolved.append(
+                {
+                    "name": name,
+                    "reason": "fd_still_failing",
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[-1000:],
+                    "stderr": result.stderr[-500:],
+                }
+            )
+    return {"passed": not unresolved, "failures": unresolved}
 
 
 def _event_writer(
@@ -227,10 +304,11 @@ def ingest_fp_result(
     manifest_work_key = manifest.get("work_key") if isinstance(manifest.get("work_key"), str) else ""
     call_id = manifest.get("call_id") if isinstance(manifest.get("call_id"), str) and manifest.get("call_id") else ""
     graph_call_terminal = bool(manifest.get("graph_call_terminal_on_result", True))
-    workflow_version = _read_provenance(
-        manifest.get("workflow_version"),
-        _read_workflow_version(workspace, active_workflow_path),
-    ) or "unknown"
+    workflow_version = _read_provenance(manifest.get("workflow_version"))
+    if not workflow_version:
+        workflow_version = _read_workflow_version(workspace, active_workflow_path)
+    if not workflow_version:
+        raise ValueError("workflow_version provenance missing from manifest and active workflow metadata")
     graph_function_id = _read_provenance(manifest.get("graph_function_id"))
     materialization_id = _read_provenance(manifest.get("materialization_id"))
     vector_id = _read_provenance(manifest.get("vector_id"))
@@ -318,8 +396,8 @@ def ingest_fp_result(
             }
         )
 
-    proof_decision = execute_proof_policy(proof_policy, assessments=result_data["assessments"])
-    if proof_decision["passed"]:
+    proof_passed = all(assessment["result"] == "pass" for assessment in result_data["assessments"])
+    if proof_passed:
         proof_event = _event_writer(
             workspace,
             emit_event,
@@ -329,7 +407,6 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": proof_policy.get("mode"),
-                "policy_reason": proof_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,
@@ -347,19 +424,42 @@ def ingest_fp_result(
         emitted_count += 1
         latest_event_id = proof_event.get("event_id")
 
-        closure_decision = execute_closure_policy(closure_policy, proof_decision=proof_decision)
-        if not closure_decision["passed"]:
+        closure_config = closure_policy.get("config", {})
+        closure_passed = not (isinstance(closure_config, Mapping) and bool(closure_config.get("force_fail")))
+        closure_reason = "forced_closure_failure" if not closure_passed else "resolved_without_fh"
+        fd_recheck_decision = _rerun_manifest_fd_failures(
+            workspace,
+            manifest,
+            work_key=manifest_work_key or None,
+        )
+        if not fd_recheck_decision["passed"]:
+            closure_passed = False
+            closure_reason = "fd_failures_unresolved_after_fp"
+        target_binding_decision = _target_binding_materialization(workspace, manifest)
+        if not target_binding_decision["passed"]:
+            closure_passed = False
+            closure_reason = str(target_binding_decision["reason"])
+        if not closure_passed:
+            closure_event_data = {
+                "call_id": call_id or None,
+                "edge": result_data["edge"],
+                "manifest_id": manifest_id,
+                "policy_mode": closure_policy.get("mode"),
+                "policy_reason": closure_reason,
+            }
+            if isinstance(target_binding_decision.get("relative_path"), str):
+                closure_event_data["target_relative_path"] = target_binding_decision["relative_path"]
+            if isinstance(fd_recheck_decision.get("failures"), list) and fd_recheck_decision["failures"]:
+                closure_event_data["fd_failures"] = [
+                    failure.get("name")
+                    for failure in fd_recheck_decision["failures"]
+                    if isinstance(failure, Mapping) and isinstance(failure.get("name"), str)
+                ]
             closure_event = _event_writer(
                 workspace,
                 emit_event,
                 "closure_failed",
-                {
-                    "call_id": call_id or None,
-                    "edge": result_data["edge"],
-                    "manifest_id": manifest_id,
-                    "policy_mode": closure_policy.get("mode"),
-                    "policy_reason": closure_decision.get("reason"),
-                },
+                closure_event_data,
                 workflow_version=workflow_version,
                 work_key=manifest_work_key or None,
                 run_id=manifest_run_id or None,
@@ -375,6 +475,48 @@ def ingest_fp_result(
             )
             emitted_count += 1
             latest_event_id = closure_event.get("event_id")
+
+            if closure_reason == "fd_failures_unresolved_after_fp":
+                found_event = _event_writer(
+                    workspace,
+                    emit_event,
+                    "found",
+                    {
+                        "kind": "fd_gap",
+                        "edge": result_data["edge"],
+                        "failing": [
+                            failure.get("name")
+                            for failure in fd_recheck_decision.get("failures", [])
+                            if isinstance(failure, Mapping) and isinstance(failure.get("name"), str)
+                        ],
+                        "delta_summary": manifest.get("delta_summary", ""),
+                    },
+                    workflow_version=workflow_version,
+                    work_key=manifest_work_key or None,
+                    run_id=manifest_run_id or None,
+                    aggregate_type="graph_call" if call_id else ("run" if manifest_run_id else None),
+                    aggregate_id=call_id or (manifest_run_id or None),
+                    parent_aggregate_id=(manifest_run_id or None) if call_id else None,
+                    causation_event_id=latest_event_id,
+                    job_id=job_id or None,
+                    graph_function_id=graph_function_id or None,
+                    materialization_id=materialization_id or None,
+                    call_id=call_id or None,
+                    vector_id=vector_id or None,
+                )
+                emitted_count += 1
+                latest_event_id = found_event.get("event_id")
+                return {
+                    "status": "pending",
+                    "result_path": str(result_file),
+                    "manifest_id": manifest_id,
+                    "spec_hash": spec_hash,
+                    "workflow_version": workflow_version,
+                    "events_emitted": emitted_count,
+                    "assessments": emitted,
+                    "blocking_reason": "fd_gap",
+                    "stopped_by": "fd_gap",
+                }
 
             graph_call_failed = None
             if call_id and graph_call_terminal:
@@ -470,7 +612,6 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": closure_policy.get("mode"),
-                "policy_reason": closure_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,
@@ -572,7 +713,6 @@ def ingest_fp_result(
                 "edge": result_data["edge"],
                 "manifest_id": manifest_id,
                 "policy_mode": proof_policy.get("mode"),
-                "policy_reason": proof_decision.get("reason"),
             },
             workflow_version=workflow_version,
             work_key=manifest_work_key or None,

@@ -14,7 +14,8 @@ from typing import Any
 from genesis.events import EventContext, EventStream, emit
 
 from .asset_types import ASSET_TYPES
-from .project_profile import load_project_profile
+from .project_profile import SOURCE_EXTENSIONS, load_project_profile
+from .traceability import planned_test_claim_refs
 from .workspace_assets import (
     assess_generated_asset_contract,
     asset_declared_type,
@@ -36,6 +37,7 @@ IMPORTED_AUTHORITY_CANDIDATES: tuple[Path, ...] = (
 )
 PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface"}
 _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
+_GENERATED_TEST_CODE_MARKER = "Generated governed test code for the odd_sdlc test_code_surface."
 
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -180,7 +182,7 @@ def _package_name_for_module(module_name: str) -> str:
     return ".".join(_package_segments_for_module(module_name))
 
 
-def _scala_identifier(module_name: str) -> str:
+def _module_identifier(module_name: str) -> str:
     parts = [part for part in re.split(r"[^A-Za-z0-9]+", module_name) if part]
     if not parts:
         return "GeneratedModule"
@@ -204,6 +206,277 @@ def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
     )
 
 
+def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
+    profile = load_project_profile(workspace_root)
+    language = (profile.language or "").strip().lower()
+    test_runner = (profile.test_runner or "").strip().lower()
+    build_tool = (_project_constraint_scalar(workspace_root, "tool") or "").strip().lower()
+    combined = " ".join(part for part in (language, test_runner, build_tool, profile.tenant_name.lower()) if part)
+
+    default_family = "generic_test_harness"
+
+    if "playwright" in combined:
+        return {
+            "family": default_family,
+            "binding": "browser_playwright",
+            "implementation": "playwright_typescript",
+            "primary_harness": "Playwright",
+            "summary": "generic_test_harness bound to a Playwright browser-testing implementation over the governed implementation branch.",
+        }
+    if "pytest" in combined or language == "python":
+        return {
+            "family": default_family,
+            "binding": "python_pytest",
+            "implementation": "pytest_source_trace",
+            "primary_harness": "pytest",
+            "summary": "generic_test_harness bound to a pytest-style developer-test implementation over the governed implementation branch.",
+        }
+    if "scala" in combined or "sbt" in combined or "spark" in combined:
+        return {
+            "family": default_family,
+            "binding": "scala_sbt",
+            "implementation": "scala_source_trace",
+            "primary_harness": "Scala source trace",
+            "summary": "generic_test_harness bound to a Scala source-level developer-test implementation over the governed sbt branch.",
+        }
+    if "java" in combined or "maven" in combined or "gradle" in combined:
+        return {
+            "family": default_family,
+            "binding": "java_junit",
+            "implementation": "java_source_trace",
+            "primary_harness": "Java source trace",
+            "summary": "generic_test_harness bound to a Java source-level developer-test implementation over the governed implementation branch.",
+        }
+    if "kotlin" in combined:
+        return {
+            "family": default_family,
+            "binding": "kotlin_junit",
+            "implementation": "kotlin_source_trace",
+            "primary_harness": "Kotlin source trace",
+            "summary": "generic_test_harness bound to a Kotlin source-level developer-test implementation over the governed implementation branch.",
+        }
+    if language == "go":
+        return {
+            "family": default_family,
+            "binding": "go_test",
+            "implementation": "go_source_trace",
+            "primary_harness": "go test",
+            "summary": "generic_test_harness bound to a Go developer-test implementation over the governed implementation branch.",
+        }
+    if language == "rust":
+        return {
+            "family": default_family,
+            "binding": "rust_test",
+            "implementation": "rust_source_trace",
+            "primary_harness": "cargo test",
+            "summary": "generic_test_harness bound to a Rust developer-test implementation over the governed implementation branch.",
+        }
+    if language in {"typescript", "javascript"} or any(token in combined for token in ("node", "jest", "vitest", "react", "tsx", "ts")):
+        extension = "ts" if language == "typescript" or "typescript" in combined or "ts" in combined else "js"
+        return {
+            "family": default_family,
+            "binding": "js_ts_test",
+            "implementation": f"{extension}_source_trace",
+            "primary_harness": "TypeScript/JavaScript source trace",
+            "summary": "generic_test_harness bound to a TypeScript or JavaScript source-level developer-test implementation over the governed implementation branch.",
+        }
+    return {
+        "family": default_family,
+        "binding": "generic_source_trace",
+        "implementation": "python_source_trace",
+        "primary_harness": "generic source trace",
+        "summary": "generic_test_harness bound to a generic source-level developer-test implementation over the governed implementation branch.",
+    }
+
+
+def _planned_test_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
+    return tuple(sorted(planned_test_claim_refs(workspace_root)))
+
+
+def _distributed_requirement_ids(requirement_ids: tuple[str, ...], modules: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
+    if not modules:
+        return {}
+    distributed: dict[str, list[str]] = {module_name: [] for module_name in modules}
+    for index, requirement_id in enumerate(requirement_ids):
+        distributed[modules[index % len(modules)]].append(requirement_id)
+    return {
+        module_name: tuple(distributed[module_name])
+        for module_name in modules
+    }
+
+
+def _generated_test_relpath(module_name: str, *, implementation: str) -> str:
+    module_slug = module_name.replace("-", "_")
+    identifier = _module_identifier(module_name)
+    if implementation == "scala_source_trace":
+        return f"{module_name}/src/test/scala/odd/generated/{identifier}GeneratedTraceSpec.scala"
+    if implementation == "pytest_source_trace":
+        return f"tests/test_{module_slug}_generated.py"
+    if implementation in {"ts_source_trace", "js_source_trace", "playwright_typescript"}:
+        extension = "ts" if implementation in {"ts_source_trace", "playwright_typescript"} else "js"
+        return f"tests/{module_slug}.generated.spec.{extension}"
+    if implementation == "java_source_trace":
+        return f"{module_name}/src/test/java/odd/generated/{identifier}GeneratedTraceTest.java"
+    if implementation == "kotlin_source_trace":
+        return f"{module_name}/src/test/kotlin/odd/generated/{identifier}GeneratedTraceTest.kt"
+    if implementation == "go_source_trace":
+        return f"tests/{module_slug}_generated_test.go"
+    if implementation == "rust_source_trace":
+        return f"tests/{module_slug}_generated.rs"
+    return f"tests/test_{module_slug}_generated.py"
+
+
+def _quoted_requirement_list(requirement_ids: tuple[str, ...]) -> str:
+    return ", ".join(f'"{requirement_id}"' for requirement_id in requirement_ids)
+
+
+def _render_generated_test_source(
+    *,
+    module_name: str,
+    requirement_ids: tuple[str, ...],
+    implementation: str,
+) -> str:
+    identifier = _module_identifier(module_name)
+    module_slug = module_name.replace("-", "_")
+    quoted = _quoted_requirement_list(requirement_ids)
+
+    if implementation == "scala_source_trace":
+        body = "Nil" if not requirement_ids else f"List({quoted})"
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                "package odd.generated",
+                "",
+                f"object {identifier}GeneratedTraceSpec {{",
+                f'  val moduleName: String = "{module_name}"',
+                f"  val tracedRequirements: List[String] = {body}",
+                "}",
+                "",
+            )
+        )
+    if implementation == "java_source_trace":
+        body = "{}" if not requirement_ids else "{ " + quoted + " }"
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                "package odd.generated;",
+                "",
+                f"public final class {identifier}GeneratedTraceTest {{",
+                f'  public static final String MODULE_NAME = "{module_name}";',
+                f"  public static final String[] TRACED_REQUIREMENTS = new String[] {body};",
+                "}",
+                "",
+            )
+        )
+    if implementation == "kotlin_source_trace":
+        body = "emptyList()" if not requirement_ids else f"listOf({quoted})"
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                "package odd.generated",
+                "",
+                f"object {identifier}GeneratedTraceTest {{",
+                f'    val moduleName: String = "{module_name}"',
+                f"    val tracedRequirements: List<String> = {body}",
+                "}",
+                "",
+            )
+        )
+    if implementation == "go_source_trace":
+        body = "nil" if not requirement_ids else "[]string{" + quoted + "}"
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                "package tests",
+                "",
+                f"var {identifier}GeneratedTrace = {body}",
+                "",
+            )
+        )
+    if implementation == "rust_source_trace":
+        body = "&[]" if not requirement_ids else "&[" + quoted + "]"
+        const_name = re.sub(r"[^A-Za-z0-9]+", "_", identifier).upper()
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                f'pub const {const_name}_GENERATED_TRACE_MODULE: &str = "{module_name}";',
+                f"pub const {const_name}_GENERATED_TRACE_REQUIREMENTS: &[&str] = {body};",
+                "",
+            )
+        )
+    if implementation in {"ts_source_trace", "js_source_trace", "playwright_typescript"}:
+        return "\n".join(
+            (
+                f"// {_GENERATED_TEST_CODE_MARKER}",
+                *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+                f'export const {identifier}GeneratedTrace = {{',
+                f'  moduleName: "{module_name}",',
+                f"  tracedRequirements: [{quoted}],",
+                "};",
+                "",
+            )
+        )
+    return "\n".join(
+        (
+            f"# {_GENERATED_TEST_CODE_MARKER}",
+            *(f"# Validates: {requirement_id}" for requirement_id in requirement_ids),
+            f'MODULE_NAME = "{module_name}"',
+            f"TRACED_REQUIREMENTS = [{quoted}]",
+            "",
+            f"def test_{module_slug}_generated_trace() -> None:",
+            "    assert MODULE_NAME",
+            "    assert isinstance(TRACED_REQUIREMENTS, list)",
+            "",
+        )
+    )
+
+
+def _clear_generated_test_code_files(workspace_root: Path) -> None:
+    code_root = _code_surface_root(workspace_root)
+    if not code_root.exists() or not code_root.is_dir():
+        return
+    for path in sorted(code_root.rglob("*")):
+        if not path.is_file() or path.suffix not in SOURCE_EXTENSIONS:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if _GENERATED_TEST_CODE_MARKER in text:
+            path.unlink()
+
+
+def _planned_generated_test_files(workspace_root: Path) -> tuple[dict[str, object], ...]:
+    stack = _selected_test_stack_defaults(workspace_root)
+    modules = _module_names(workspace_root)
+    requirement_ids = _planned_test_requirement_ids(workspace_root)
+    distributed = _distributed_requirement_ids(requirement_ids, modules)
+    planned: list[dict[str, object]] = []
+    for module_name in modules:
+        module_requirement_ids = distributed.get(module_name, ())
+        if not module_requirement_ids:
+            continue
+        relative_path = _generated_test_relpath(module_name, implementation=stack["implementation"])
+        planned.append(
+            {
+                "module_name": module_name,
+                "relative_path": relative_path,
+                "requirement_ids": module_requirement_ids,
+                "content": _render_generated_test_source(
+                    module_name=module_name,
+                    requirement_ids=module_requirement_ids,
+                    implementation=stack["implementation"],
+                ),
+            }
+        )
+    return tuple(planned)
+
+
 def _intent_authority_lines(workspace_root: Path) -> tuple[str, ...]:
     intent_path = workspace_root / "specification" / "INTENT.md"
     if not intent_path.exists():
@@ -222,7 +495,7 @@ def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
     root_name = profile.project_slug.replace("_", "-")
 
     def module_project_block(module_name: str) -> str:
-        identifier = _scala_identifier(module_name)
+        identifier = _module_identifier(module_name)
         return "\n".join(
             (
                 f"lazy val {identifier[:1].lower() + identifier[1:]} = (project in file({module_name!r}))",
@@ -242,7 +515,7 @@ def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
         ")",
         "",
         "lazy val root = (project in file(\".\"))",
-        "  .aggregate(" + ", ".join(_scala_identifier(name)[:1].lower() + _scala_identifier(name)[1:] for name in modules) + ")",
+        "  .aggregate(" + ", ".join(_module_identifier(name)[:1].lower() + _module_identifier(name)[1:] for name in modules) + ")",
         "  .settings(commonSettings)",
         f"  .settings(name := {root_name!r})",
         "  .settings(publish / skip := true)",
@@ -271,7 +544,7 @@ def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
     }
 
     for module_name in modules:
-        identifier = _scala_identifier(module_name)
+        identifier = _module_identifier(module_name)
         package_segments = _package_segments_for_module(module_name)
         package_name = ".".join(package_segments)
         package_path = "/".join(package_segments)
@@ -1259,6 +1532,7 @@ def _construct_test_design(workspace_root: Path) -> str:
 def _construct_test_stack_profile(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
         profile = load_project_profile(workspace_root)
+        stack = _selected_test_stack_defaults(workspace_root)
         return "\n".join(
             (
                 "# Generated Test Stack Profile",
@@ -1267,8 +1541,13 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
                 "",
                 "## Selected Stack",
                 f"- declared test runner: {profile.test_runner or 'unspecified'}",
+                f"- selected harness family: {stack['family']}",
+                f"- selected stack binding: {stack['binding']}",
+                f"- primary harness: {stack['primary_harness']}",
                 f"- governed code root: {profile.code_relative_path()}",
+                f"- implementation: {stack['implementation']}",
                 "- evidence projection is rooted in discovered reports under the governed implementation branch",
+                f"- stack rationale: {stack['summary']}",
                 "",
             )
         )
@@ -1280,10 +1559,12 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
             asset_marker("test_stack_profile"),
             "",
             "## Selected Stack",
-            "- primary harness: pytest",
+            "- selected harness family: generic_test_harness",
+            "- selected stack binding: proving_subset_default",
+            "- primary harness: proving-subset sandbox defaults",
             "- sandbox orchestration: installed odd_sdlc workspace seeded through gen-install",
             "- archive model: persistent run archive with runtime snapshots and comparative analysis",
-            "- UI path remains open for a later Playwright-derived branch",
+            "- concrete harness binding remains selectable from downstream implementation truth",
             "",
             "## Source Test Design Snapshot",
             test_design,
@@ -1294,6 +1575,7 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
 
 def _construct_test_module_surface(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
+        planned_requirement_ids = _planned_test_requirement_ids(workspace_root)
         module_lines = tuple(f"- `{module_name}` test sources under the governed implementation branch" for module_name in _module_names(workspace_root))
         return "\n".join(
             (
@@ -1303,7 +1585,9 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
                 "",
                 "## Module Layout",
                 *module_lines,
-                "- generated test files in the governed branch must carry `Validates:` tags for the requirements claimed by testcase authority",
+                "- this surface declares planned developer-test coverage and module ownership; it does not itself count as realized test source",
+                "- realized test traceability is satisfied only when governed test source is materialized under the active code root",
+                f"- planned requirement claims: {', '.join(planned_requirement_ids) if planned_requirement_ids else 'none yet declared'}",
                 "",
             )
         )
@@ -1330,12 +1614,40 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
     )
 
 
+def _construct_test_code_surface(workspace_root: Path) -> str:
+    stack = _selected_test_stack_defaults(workspace_root)
+    planned_files = _planned_generated_test_files(workspace_root)
+    inventory_lines = tuple(
+        f"- `{entry['relative_path']}` ({entry['module_name']}): "
+        + (", ".join(entry["requirement_ids"]) if entry["requirement_ids"] else "no explicit planned requirement claims yet")
+        for entry in planned_files
+    ) or ("- no generated test source files planned",)
+    return "\n".join(
+        (
+            "# Generated Test Code",
+            "",
+            "## Realized Test-Code Position",
+            f"- governed code root: `{load_project_profile(workspace_root).code_relative_path()}`",
+            f"- selected harness family: {stack['family']}",
+            f"- selected stack binding: {stack['binding']}",
+            f"- primary harness: {stack['primary_harness']}",
+            f"- generated test source files: {len(planned_files)}",
+            "- this surface summarizes realized developer-test source generated under the governed implementation branch",
+            "",
+            "## Generated Test Source Inventory",
+            *inventory_lines,
+            "",
+        )
+    )
+
+
 def _construct_test_run_archive(workspace_root: Path) -> str:
     test_summary = summarize_test_evidence(workspace_root)
     ungoverned_report_lines = tuple(
         f"- `{path}`" for path in test_summary["ungoverned_report_paths"]
     ) or ("- no undeclared execution reports observed",)
     if _software_project_mode(workspace_root):
+        test_code = _construct_test_code_surface(workspace_root)
         report_lines = tuple(f"- `{path}`" for path in test_summary["report_paths"]) or (
             "- no report files observed yet",
         )
@@ -1355,6 +1667,9 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
+                "",
+                "## Source Test Code Snapshot",
+                test_code,
                 "",
                 "## Observed Report Paths",
                 *report_lines,
@@ -1482,8 +1797,8 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
             )
         operation = "adopt"
     elif not preserve_authority:
-        content = _constructed_content(target_asset, workspace)
         if target_asset == "code_surface":
+            content = _constructed_content(target_asset, workspace)
             if target_path.exists():
                 shutil.rmtree(target_path)
             target_path.mkdir(parents=True, exist_ok=True)
@@ -1492,6 +1807,13 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 file_path.write_text(file_content, encoding="utf-8")
         else:
+            if target_asset == "test_run_archive_surface":
+                _clear_generated_test_code_files(workspace)
+                for entry in _planned_generated_test_files(workspace):
+                    file_path = _code_surface_root(workspace) / str(entry["relative_path"])
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_text(str(entry["content"]), encoding="utf-8")
+            content = _constructed_content(target_asset, workspace)
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(content, encoding="utf-8")
             if previous_checkpoint.exists and operation == "generate":

@@ -2,8 +2,8 @@
 
 This release candidate closes the current `odd_sdlc` framework-strengthening
 wave around capability governance, ambiguity governance, iterative requirement
-closure, generated traceability, and installed-workspace requirement
-carry-forward.
+closure, generated traceability, installed-workspace requirement
+carry-forward, and downstream uptake of the released ABG runtime boundary.
 
 ## What Shipped
 
@@ -19,8 +19,20 @@ carry-forward.
 - requirement-authority carry-forward on installed workspaces:
   `derive_requirement_surface` now carries the live requirement-closure
   register so imported REQ IDs remain literal downstream pressure
+- downstream ABG uptake through installer composition:
+  released ABG runtime truth is now consumed by reinstall, not by source
+  `.genesis` mirroring
 - generated source and test trace authority through `Implements:` and
   `Validates:` markers
+- developer-test branch refactor without public graph drift:
+  realized generated test source now materializes within
+  `derive_test_run_archive_surface`, while the public
+  `test_module -> test_run_archive -> testcase_authority` branch shape stays
+  stable
+- archive-stage traceability repair:
+  empty orphan generated test files are no longer emitted, and adopted
+  code-surface deterministic gaps now surface back out as `fd_gap` after
+  constructive continuation recheck
 - workspace-root and catalog honesty fixes for installed workspaces
 - repriced `data_mapper_test19_topology_regression` proving lane under current
   framework semantics
@@ -47,10 +59,19 @@ Targeted red-lane recovery:
 - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test19_regression.py -q`
 - result: `2 passed`
 
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_first_slice.py -q`
+- result: `9 passed`
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py -q -k 'installed_self_test_command_drives_the_current_executive_program or operational_cycle_projects_deployment_runtime_and_retrofit_surfaces or canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly'`
+- result: `3 passed, 3 deselected`
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence'`
+- result: `1 passed, 9 deselected`
+
 Framework suite:
 
 - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
-- result: `36 passed, 4 skipped in 520.28s`
+- result: `36 passed, 4 skipped in 553.02s`
 
 Installed-workspace recovery:
 

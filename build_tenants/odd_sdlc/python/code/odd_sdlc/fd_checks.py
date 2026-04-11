@@ -16,6 +16,8 @@ from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
 from .traceability import (
     missing_code_traceability_ids,
     missing_intent_ids_from_goals,
+    missing_planned_test_traceability_ids,
+    missing_realized_test_traceability_ids,
     missing_requirement_ids_from_current_surface,
     missing_test_traceability_ids,
     traceability_scan,
@@ -48,9 +50,8 @@ CHECK_RULES: dict[str, CheckRule] = {
         required_generated_assets=("intent_surface", "goal_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["requirements-boundary-sources-present"].cli_name: CheckRule(
-        required_root_assets=("intent_surface", "product_surface", "goal_surface", "requirement_surface"),
-        required_materialization_assets=("requirement_surface",),
-        required_generated_assets=("intent_surface", "product_surface", "goal_surface", "requirement_surface"),
+        required_root_assets=("intent_surface", "product_surface", "goal_surface"),
+        required_generated_assets=("intent_surface", "product_surface", "goal_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["requirement-scope-complete"].cli_name: CheckRule(
         required_generated_assets=("requirement_surface",),
@@ -108,16 +109,22 @@ CHECK_RULES: dict[str, CheckRule] = {
         required_generated_assets=("design_surface", "scenario_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-stack-profile-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_design_surface",),
+        required_generated_assets=("test_design_surface", "implementation_design_surface", "implementation_stack_profile"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-module-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_design_surface", "test_stack_profile"),
+        required_generated_assets=("test_design_surface", "test_stack_profile", "implementation_module_surface"),
+    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["planned-test-traceability-present"].cli_name: CheckRule(
+        required_generated_assets=("test_module_surface", "implementation_module_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-run-archive-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("test_module_surface", "test_stack_profile"),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["realized-test-traceability-present"].cli_name: CheckRule(
+        required_generated_assets=("test_module_surface", "code_surface"),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-traceability-present"].cli_name: CheckRule(
-        required_generated_assets=("test_module_surface", "testcase_authority_surface", "code_surface"),
+        required_generated_assets=("test_module_surface", "code_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("release_surface",),
@@ -254,13 +261,21 @@ def test_module_dependency_surfaces_present(workspace_root: Path) -> int:
     return _run_check("test-module-dependency-surfaces-present", workspace_root)
 
 
+def planned_test_traceability_present(workspace_root: Path) -> int:
+    return 0 if not missing_planned_test_traceability_ids(workspace_root) else 1
+
+
 def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
     return _run_check("test-run-archive-dependency-surfaces-present", workspace_root)
 
 
-def test_traceability_present(workspace_root: Path) -> int:
+def realized_test_traceability_present(workspace_root: Path) -> int:
     scan = traceability_scan(workspace_root)
-    return 0 if not missing_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
+    return 0 if not missing_realized_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
+
+
+def test_traceability_present(workspace_root: Path) -> int:
+    return realized_test_traceability_present(workspace_root)
 
 
 def deployment_dependency_surfaces_present(workspace_root: Path) -> int:

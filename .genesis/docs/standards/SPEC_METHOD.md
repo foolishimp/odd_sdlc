@@ -53,6 +53,8 @@ We make **design** the explicit structural bridge between requirements and code.
 
 We require **code** to be derivable from requirements and design, not defended as accidental precedent.
 
+We treat spec-driven development as a **disambiguation pipeline**: each major gate reduces the space of lawful interpretations before downstream realization proceeds.
+
 We demand **evidence** for claims through scenarios, tests, events, projection, and delta.
 
 We treat **repricing** as part of correctness: when reality exposes a constitutional gap, the specification must change.
@@ -82,6 +84,7 @@ The work is not genuinely spec-driven if any of these fail:
 9. A live domain artifact is rewritten in place after becoming part of the live constitutional surface.
 10. A capability claim has no operational evidence.
 11. Drift is discovered, but the constitutional source is not repriced.
+12. A major ambiguity at a constitutional or realization boundary is neither recorded nor explicitly governed.
 
 ---
 
@@ -107,6 +110,12 @@ The important boundary is:
 - `specification/requirements/` is the live requirement surface derived from product definition
 - a shared design surface plus any tenant-local design surfaces choose the concrete mechanism
 - when a project realization model uses build tenants, `build_tenants/` is the project-owned realization root beneath one shared specification
+
+The authoritative split is strict:
+
+- `specification/` defines `WHAT`
+- design and realization surfaces define `HOW`
+- no build-tenant, design, code, or derived surface may become co-equal constitutional authority with `specification/`
 
 Structurally, `requirements/` is a folder under `specification/`. Requirements may be stored as individual files or grouped into requirement families. The purpose of this shape is to avoid collapsing the constitutional surface into one monolithic requirements document.
 
@@ -152,12 +161,119 @@ Requirements are the constitutional **what** of the project. They are not limite
 
 Design is the structural **how**. It chooses the concrete realization that satisfies requirement truth: interfaces, topology, file placement, carrier documents, entry/control surfaces, runtime wiring, and lawful tenant boundaries. Requirements may require such surfaces to exist and be delivered; design chooses where and how they are realized unless the path itself is constitutional.
 
+Where a project uses build tenants, that split remains exact:
+
+- `specification/` is the shared constitutional `WHAT`
+- `build_tenants/` contains one or more independent `HOW` realizations of that shared `WHAT`
+- tenant-local realization is derivative unless and until the governing truth is ratified in specification
+
+---
+
+## Ambiguity Governance Rule
+
+Spec-driven development is not only a derivation pipeline. It is a governed
+disambiguation pipeline.
+
+The point of the upstream chain is to progressively reduce ambiguity:
+
+- goals narrow active priority and work-wave focus
+- intent narrows direction and scope
+- product narrows current realization shape and terms
+- requirements narrow constitutional obligation
+- build-tenant or stack choice narrows executable realization class
+- design narrows structural interpretation
+- implementation narrows local realization detail
+
+This narrowing is not uniform. The methodology distinguishes between:
+
+- **major ambiguity**: ambiguity that materially changes architecture, stack,
+  product boundary, execution/deployment admissibility, public contract shape,
+  or other downstream realization law
+- **micro ambiguity**: local implementation choice that remains inside an
+  already-governed design boundary
+
+Major ambiguity must always be surfaced and governed. It may not remain hidden
+inside informal operator judgment, ambient precedent, or silent model choice.
+
+Therefore, at each major boundary the process must:
+
+- detect and record the major ambiguity that remains or is newly introduced
+- identify the affected invariant, asset, or decision boundary
+- record the decision taken if work proceeds
+- record whether the ambiguity was resolved, carried forward, escalated, or
+  blocked
+
+Ambiguity detection is mandatory. Blocking is policy.
+
+The default governance model is:
+
+- ambiguity may be carried or decided by lawful probabilistic processing such as
+  `F_P` when project policy allows it
+- ambiguity may be escalated to human judgment such as `F_H` when project policy
+  requires it
+- the threshold between those actions is determined by declared risk appetite,
+  not by silent convenience
+
+Projects may therefore choose different ambiguity-handling policies. A lower
+risk appetite escalates more major ambiguity to explicit human judgment. A
+higher risk appetite permits more bounded `F_P` decision-making. In either
+case, the ambiguity and the decision must be recorded.
+
+Some conditions are not optional ambiguity decisions and therefore remain hard
+stops regardless of risk appetite. Typical hard-stop classes include:
+
+- violated invariant or guarantee
+- absent required authority surface
+- missing declared capability for an executional or operational stage
+- undeclared irreversible side effect
+- explicit policy gate requiring human approval
+
+The methodology is therefore not "eliminate all ambiguity before work." It is
+"make ambiguity visible, govern it explicitly, and reduce it progressively until
+downstream realization is sufficiently constrained."
+
 ---
 
 ## Change Management Rule
 
-Every substantive change begins with an explicit declared change intent and a lawful
-re-entry point into the constitutional chain.
+Every substantive change begins with intake triage, an explicit declared change
+intent, and a lawful re-entry point into the constitutional chain.
+
+### Universal Intake Triage
+
+There is one front door for substantive change.
+
+The intake label does not determine the process class.
+
+That means a reported:
+
+- bug
+- feature request
+- issue
+- regression
+- operator finding
+- release blocker
+- scenario failure
+
+all enter through the same intake-triage process.
+
+Intake triage must determine:
+
+- whether the report represents a substantive change at all
+- the affected product boundary and intended scope
+- the lawful change class
+- the lawful re-entry point into the constitutional chain
+- the downstream surfaces and evidence that must be repriced, re-derived, or
+  re-proved
+- whether the work remains within the currently declared release scope or
+  requires repricing of that release plan
+
+No bug, feature, issue, or other intake may bypass this triage by going
+straight to code, tests, or release handling.
+
+The purpose of triage is not to create a separate ticket bureaucracy. It is to
+classify impact correctly so the change enters the method at the right
+constitutional boundary.
 
 The minimum lawful change classes are:
 
@@ -352,6 +468,10 @@ Failures at any boundary indicate a specification defect:
 - If code cannot be derived from requirements plus design, the design surface is incomplete, ambiguous, or not operational enough.
 
 The purpose of ADRs and design documents is therefore not decorative explanation. They are the load-bearing bridge between constitutional truth and executable realization.
+
+Reconstruction sufficiency also depends on ambiguity governance. If a boundary
+can be crossed only by hiding a major unresolved ambiguity, the upstream surface
+is not yet sufficient even if some downstream artifact can be produced.
 
 ## Design Rule
 
@@ -560,7 +680,7 @@ The target constitutional shape for a project is:
 
 If the realization model is tenanted, the target project topology also includes:
 
-- `build_tenants/` as the project-owned realization root for one-to-many independent implementations of the shared specification
+- `build_tenants/` as the project-owned realization root for one-to-many independent `HOW` realizations of the shared `WHAT` defined in specification
 - `build_tenants/TENANT_REGISTRY.md` as the canonical registry of tenant families, variants, and activity state
 - `build_tenants/common/` as the shared realization root for cross-tenant law
 - `docs/` as project-owned supporting documentation
@@ -617,6 +737,13 @@ This rule exists to keep the requirement surface structurally clear, derivable, 
 
 ## Method
 
+When any substantive intake arrives:
+
+1. Triage the intake and classify the change.
+2. Determine the lawful re-entry point into the constitutional chain.
+3. Identify the affected downstream span that must remain consistent.
+4. Only then treat the work as implementation, repricing, or release-bound change.
+
 When a feature is introduced or changed:
 
 1. Update **Goals** if the current bounded work wave or overriding concerns have changed.
@@ -627,8 +754,9 @@ When a feature is introduced or changed:
 6. Write **Scenarios** for capability claims that require operational proof, and define other evidence surfaces for non-capability requirements where appropriate.
 7. Prefer declarative expression of the problem and acceptance surface before adding imperative mechanism.
 8. Check the reconstruction boundary: can the current goals support the current intent, can the current intent support the current product, can the current product support the intended requirements, can the current requirements support the intended design, and can the current design support the intended implementation?
-9. Only then implement **Code**.
-10. Use **Events, Projection, and Delta** to verify whether reality still satisfies the requirements.
+9. Record any major ambiguity discovered at the active boundary, and govern it according to declared risk appetite rather than silent convenience.
+10. Only then implement **Code**.
+11. Use **Events, Projection, and Delta** to verify whether reality still satisfies the requirements.
 
 When bootstrapping a project or repricing a requirement surface:
 
@@ -640,7 +768,8 @@ When bootstrapping a project or repricing a requirement surface:
 6. Store requirements as individual files or grouped requirement families, whichever best preserves clarity and avoids monolithic sprawl.
 7. Make `requirements/` the sole live requirement authority before proceeding to design and code.
 8. Prefer declarative structure over procedural workaround while shaping the new requirement surface.
-9. Only after that surface exists should downstream design and implementation be treated as constitutionally grounded.
+9. Record any major ambiguity that remains at the current boundary before downstream realization proceeds.
+10. Only after that surface exists should downstream design and implementation be treated as constitutionally grounded.
 
 When a real use case reveals a gap:
 
@@ -648,6 +777,12 @@ When a real use case reveals a gap:
 2. Run **Gap Analysis** — is this a missing implementation or a constitutional insufficiency?
 3. If constitutional: reprice **Goals** when the current work wave changes, write a new **Intent**, then flow forward (product → requirements → design → code).
 4. If implementation: write requirements/design as needed, then implement.
+
+The intake source does not change this rule.
+
+A bug report, feature request, failed testcase, release blocker, or operator
+observation still enters through intake triage first, then follows the lawful
+change class selected there.
 
 ---
 
@@ -670,4 +805,4 @@ If a requirement names an operational mechanism, the ADR must name that mechanis
 
 ## Stone Version
 
-Spec-driven development treats specification as constitutional source, not commentary on code. Methodology defines the process constitution. Intent and requirements define the project constitution. Requirements define the full constitutional what: capabilities, guarantees, governance, and verification obligations. Design defines the structural how, and ADRs are one durable form of that design record. Scenarios verify operational meaning where capability claims need end-to-end proof. Code realizes decisions. Design must be derivable from intent and requirements; code must be derivable from requirements and design. Iteration is cumulative repricing, not waterfall. Events, projection, and delta reveal drift. Every live requirement family must have design ownership, explicit classification, and downstream closure or explicit deferment. Every design record must ground itself in requirements. Shipping behavior must trace back to constitutional authority. Live constitutional surfaces are versioned history and must change by supersession or withdrawal, not silent in-place mutation. New intent emerges from real use cases hitting the current model — through explicit gap analysis, not ad hoc pressure.
+Spec-driven development treats specification as constitutional source, not commentary on code. Methodology defines the process constitution. Intent, product, and requirements define the project constitution. Specification defines `WHAT`. Design and realization define `HOW`. In tenanted projects, `build_tenants/` holds one or more independent `HOW` realizations of the shared `WHAT`; it does not define a rival constitution. Requirements define the full constitutional what: capabilities, guarantees, governance, and verification obligations. Design defines the structural how, and ADRs are one durable form of that design record. The SDLC is a governed disambiguation pipeline: each major boundary reduces the space of lawful interpretations and must surface major ambiguity explicitly. Ambiguity detection is mandatory; blocking or escalation is policy-driven by declared risk appetite, except for hard-stop prerequisite failures. Scenarios verify operational meaning where capability claims need end-to-end proof. Code realizes decisions. Design must be derivable from intent and requirements; code must be derivable from requirements and design. Iteration is cumulative repricing, not waterfall. Events, projection, and delta reveal drift. Every live requirement family must have design ownership, explicit classification, and downstream closure or explicit deferment. Every design record must ground itself in requirements. Shipping behavior must trace back to constitutional authority. Live constitutional surfaces are versioned history and must change by supersession or withdrawal, not silent in-place mutation. New intent emerges from real use cases hitting the current model — through explicit gap analysis, not ad hoc pressure.
