@@ -7,7 +7,7 @@
 - goal: ambiguity-governance-and-traceability
 - priority: critical
 - created_at: 2026-04-11
-- updated_at: 2026-04-11
+- updated_at: 2026-04-12
 
 ## Triage
 
@@ -59,14 +59,18 @@ That means:
 
 Upstream:
 
-- the released ABG boundary is now at commit `9bcc8f2`
-- ABG automated tests are green at `258 passed, 5 deselected`
+- the released ABG boundary is now at commit `af78f94`
+- ABG automated tests are green at `259 passed, 5 deselected`
 - `odd_method` has been refreshed from that released boundary through installer composition
 
 Downstream:
 
 - the downstream refactor to the released ABG boundary is implemented in source
-- the full `odd_method` suite is green against the installed ABG RC
+- the installed `data_mapper` proof lane now accepts `graph_call_failed` with
+  `certification_failure` when an unresolved deterministic gap remains after
+  constructive continuation
+- the full `odd_method` suite is green against the installed ABG RC at
+  `36 passed, 4 skipped`
 - fresh downstream proof has not yet been run on `data_mapper.test27`
 
 ## Task List
@@ -77,7 +81,7 @@ Downstream:
 - [x] Refactor `odd_sdlc` source and qualification lanes so they no longer rely on pre-cut ABG runtime assumptions.
 - [x] Reconcile graph/test expectations with the current explicit test branch shape, including the installed runtime behavior that follows from the ABG cut.
 - [x] Run the full `odd_method` automated suite against the installed ABG RC and close resulting failures.
-- [ ] Update `odd_method` RC notes and release note for the downstream refactor wave.
+- [x] Update `odd_method` RC notes and release note for the downstream refactor wave.
 - [ ] Commit the `odd_method` RC wave.
 - [ ] Create fresh `data_mapper.test27` from template.
 - [ ] Install the released `odd_method` RC into `data_mapper.test27`.

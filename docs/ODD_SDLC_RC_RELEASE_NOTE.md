@@ -22,6 +22,10 @@ carry-forward, and downstream uptake of the released ABG runtime boundary.
 - downstream ABG uptake through installer composition:
   released ABG runtime truth is now consumed by reinstall, not by source
   `.genesis` mirroring
+- installed proof lanes aligned to ABG certification semantics:
+  unresolved post-`F_P` deterministic gaps may now emit
+  `graph_call_failed` with `certification_failure` while the enclosing run
+  still completes cleanly
 - generated source and test trace authority through `Implements:` and
   `Validates:` markers
 - developer-test branch refactor without public graph drift:
@@ -71,7 +75,7 @@ Targeted red-lane recovery:
 Framework suite:
 
 - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
-- result: `36 passed, 4 skipped in 553.02s`
+- result: `36 passed, 4 skipped in 542.71s`
 
 Installed-workspace recovery:
 

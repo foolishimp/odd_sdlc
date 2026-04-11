@@ -585,9 +585,14 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     event_types = [event["event_type"] for event in events]
     assert "worker_turn_started" in event_types
     assert ("assessed" in event_types) or ("found" in event_types)
-    assert "graph_call_failed" not in event_types
+    assert "graph_call_failed" in event_types
     assert "run_failed" not in event_types
     assert all(event.get("data", {}).get("failure_class") != "policy_config_defect" for event in events)
+    assert any(
+        event["event_type"] == "graph_call_failed"
+        and event.get("data", {}).get("failure_class") == "certification_failure"
+        for event in events
+    )
     graph_call_edges = [
         event["data"]["edge"]
         for event in events

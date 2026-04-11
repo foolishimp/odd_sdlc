@@ -65,6 +65,21 @@ That means:
 - unresolved deterministic gaps that remain after a constructive continuation
   now surface back out as `fd_gap` rather than as generic runtime failure
 
+### Installed Proof Lanes Now Expect Certification Failure Facts For Unresolved Post-F_P Gaps
+
+The current RC also accepts the stricter ABG retry/certification envelope.
+
+That means:
+
+- an unresolved deterministic gap after constructive continuation may emit
+  `graph_call_failed`
+- the expected failure class in that case is `certification_failure`
+- the enclosing run still completes cleanly rather than degrading into generic
+  runtime failure
+
+This is now the correct installed-workspace proof shape for unresolved
+post-`F_P` deterministic gaps.
+
 ### Public Test Branch Shape Is Preserved While Realized Test Traceability Moves Inside Archive Construction
 
 The current RC keeps the published developer-test branch shape stable:
@@ -117,7 +132,7 @@ The current release-candidate proving footer is:
 
 - `36 passed`
 - `4 skipped`
-- `553.02s`
+- `542.71s`
 
 from:
 
