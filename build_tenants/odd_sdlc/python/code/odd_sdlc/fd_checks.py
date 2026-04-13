@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .fd_contracts import FD_EVALUATOR_CONTRACTS_BY_CLI_NAME
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
@@ -21,6 +23,8 @@ from .traceability import (
     missing_requirement_ids_from_current_surface,
     missing_test_traceability_ids,
     traceability_scan,
+    unexpected_planned_test_traceability_ids,
+    unexpected_realized_test_traceability_ids,
 )
 from .workspace_assets import assess_generated_asset_contract, asset_materialization_path, asset_path
 
@@ -168,6 +172,174 @@ def _run_check(check_name: str, workspace_root: Path) -> int:
     return 0
 
 
+def _generic_failure_detail(check_name: str, workspace_root: Path) -> dict[str, Any]:
+    rule = CHECK_RULES[check_name]
+    profile = load_project_profile(workspace_root)
+    enforce_declared_capabilities = (workspace_root / PROJECT_CONSTRAINTS_PATH).exists()
+    missing_root_assets = [
+        asset_id
+        for asset_id in rule.required_root_assets
+        if not _require_exists(asset_path(workspace_root, asset_id))
+    ]
+    missing_materialization_assets = [
+        asset_id
+        for asset_id in rule.required_materialization_assets
+        if not _require_exists(asset_materialization_path(workspace_root, asset_id))
+    ]
+    generated_contract_failures = [
+        assess_generated_asset_contract(workspace_root, asset_id)
+        for asset_id in rule.required_generated_assets
+        if not assess_generated_asset_contract(workspace_root, asset_id)["contract_satisfied"]
+    ]
+    missing_profile_fields = [
+        field_name
+        for field_name in rule.required_profile_fields
+        if enforce_declared_capabilities and not getattr(profile, field_name, "").strip()
+    ]
+    return {
+        "check": check_name,
+        "failure_kind": "dependency_gap",
+        "workspace_root": str(workspace_root),
+        "missing_root_assets": missing_root_assets,
+        "missing_materialization_assets": missing_materialization_assets,
+        "generated_contract_failures": generated_contract_failures,
+        "missing_profile_fields": missing_profile_fields,
+    }
+
+
+def _goal_surface_authority_detail(workspace_root: Path) -> dict[str, Any]:
+    missing_ids = list(missing_intent_ids_from_goals(workspace_root))
+    generic = _generic_failure_detail("goal-surface-authority-validated", workspace_root)
+    generated_contract_failures = list(generic["generated_contract_failures"])
+    missing_root_assets = list(generic["missing_root_assets"])
+    missing_materialization_assets = list(generic["missing_materialization_assets"])
+    failure_kind = "authority_gap" if missing_ids else "dependency_gap"
+    suggested_repair = (
+        "Carry the missing INT-* identifiers into GOALS.md so active goals retain live intent authority."
+        if missing_ids
+        else "Repair the generated goal surface contract so the active goal surface is materially governed before closure."
+    )
+    return {
+        "check": "goal-surface-authority-validated",
+        "failure_kind": failure_kind,
+        "workspace_root": str(workspace_root),
+        "goal_surface": "specification/GOALS.md",
+        "intent_surface": "specification/INTENT.md",
+        "missing_intent_ids": missing_ids,
+        "missing_root_assets": missing_root_assets,
+        "missing_materialization_assets": missing_materialization_assets,
+        "generated_contract_failures": generated_contract_failures,
+        "suggested_repair": suggested_repair,
+    }
+
+
+def _requirement_scope_detail(workspace_root: Path) -> dict[str, Any]:
+    missing_ids = list(missing_requirement_ids_from_current_surface(workspace_root))
+    generic = _generic_failure_detail("requirement-scope-complete", workspace_root)
+    generated_contract_failures = list(generic["generated_contract_failures"])
+    missing_root_assets = list(generic["missing_root_assets"])
+    missing_materialization_assets = list(generic["missing_materialization_assets"])
+    failure_kind = "requirement_gap" if missing_ids else "dependency_gap"
+    suggested_repair = (
+        "Carry the missing REQ ids into the generated requirement surface instead of silently narrowing scope."
+        if missing_ids
+        else "Repair the generated requirement surface contract so the active requirement surface is materially governed before closure."
+    )
+    return {
+        "check": "requirement-scope-complete",
+        "failure_kind": failure_kind,
+        "workspace_root": str(workspace_root),
+        "generated_requirement_surface": "specification/requirements/10-generated-bootstrap.md",
+        "missing_requirement_ids": missing_ids,
+        "missing_root_assets": missing_root_assets,
+        "missing_materialization_assets": missing_materialization_assets,
+        "generated_contract_failures": generated_contract_failures,
+        "suggested_repair": suggested_repair,
+    }
+
+
+def _code_traceability_detail(workspace_root: Path) -> dict[str, Any]:
+    scan = traceability_scan(workspace_root)
+    return {
+        "check": "code-traceability-present",
+        "failure_kind": "traceability_gap",
+        "workspace_root": str(workspace_root),
+        "code_root": scan["code_root"],
+        "missing_requirement_ids": list(missing_code_traceability_ids(workspace_root)),
+        "orphan_code_files": list(scan["orphan_code_files"]),
+        "suggested_repair": "Add Implements tags for the missing REQ ids and remove or tag orphan generated source files.",
+    }
+
+
+def _planned_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
+    missing_ids = list(missing_planned_test_traceability_ids(workspace_root))
+    unexpected_ids = list(unexpected_planned_test_traceability_ids(workspace_root))
+    return {
+        "check": "planned-test-traceability-present",
+        "failure_kind": "planned_test_gap",
+        "workspace_root": str(workspace_root),
+        "test_module_surface": "build_tenants/<tenant>/test_env/tests/40-generated-test-modules.md",
+        "missing_requirement_ids": missing_ids,
+        "unexpected_requirement_ids": unexpected_ids,
+        "suggested_repair": "Align planned Validates coverage to the live implementation branch requirement inventory.",
+    }
+
+
+def _expected_realized_test_roots(workspace_root: Path) -> list[str]:
+    profile = load_project_profile(workspace_root)
+    code_root = Path(profile.code_relative_path())
+    language = profile.language.strip().lower()
+    test_runner = profile.test_runner.strip().lower()
+    if language == "scala" or "sbt" in test_runner:
+        return [
+            (code_root / "src" / "test").as_posix(),
+            (code_root / "src" / "test" / "scala").as_posix(),
+        ]
+    if language == "python" or "pytest" in test_runner:
+        return [
+            (code_root / "tests").as_posix(),
+            (code_root / "src" / "tests").as_posix(),
+        ]
+    return [
+        (code_root / "tests").as_posix(),
+        (code_root / "src" / "test").as_posix(),
+    ]
+
+
+def _realized_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
+    scan = traceability_scan(workspace_root)
+    missing_ids = list(missing_realized_test_traceability_ids(workspace_root))
+    unexpected_ids = list(unexpected_realized_test_traceability_ids(workspace_root))
+    return {
+        "check": "realized-test-traceability-present",
+        "failure_kind": "realized_test_gap",
+        "workspace_root": str(workspace_root),
+        "code_root": scan["code_root"],
+        "missing_requirement_ids": missing_ids,
+        "unexpected_requirement_ids": unexpected_ids,
+        "orphan_test_files": list(scan["orphan_test_files"]),
+        "expected_test_roots": _expected_realized_test_roots(workspace_root),
+        "suggested_repair": "Materialize real test source under the governed code root with Validates tags for the missing REQ ids and remove or retag orphan test files.",
+    }
+
+
+def _failure_detail(check_name: str, workspace_root: Path) -> dict[str, Any]:
+    if check_name == "goal-surface-authority-validated":
+        return _goal_surface_authority_detail(workspace_root)
+    if check_name == "requirement-scope-complete":
+        return _requirement_scope_detail(workspace_root)
+    if check_name == "code-traceability-present":
+        return _code_traceability_detail(workspace_root)
+    if check_name == "planned-test-traceability-present":
+        return _planned_test_traceability_detail(workspace_root)
+    if check_name in {"realized-test-traceability-present", "test-traceability-present"}:
+        detail = _realized_test_traceability_detail(workspace_root)
+        if check_name == "test-traceability-present":
+            detail["check"] = check_name
+        return detail
+    return _generic_failure_detail(check_name, workspace_root)
+
+
 def bootstrap_input_set_present(workspace_root: Path) -> int:
     return _run_check("bootstrap-input-set-present", workspace_root)
 
@@ -181,7 +353,12 @@ def goal_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def goal_surface_authority_validated(workspace_root: Path) -> int:
-    return 0 if not missing_intent_ids_from_goals(workspace_root) else 1
+    return (
+        0
+        if _run_check("goal-surface-authority-validated", workspace_root) == 0
+        and not missing_intent_ids_from_goals(workspace_root)
+        else 1
+    )
 
 
 def requirements_boundary_sources_present(workspace_root: Path) -> int:
@@ -189,7 +366,12 @@ def requirements_boundary_sources_present(workspace_root: Path) -> int:
 
 
 def requirement_scope_complete(workspace_root: Path) -> int:
-    return 0 if not missing_requirement_ids_from_current_surface(workspace_root) else 1
+    return (
+        0
+        if _run_check("requirement-scope-complete", workspace_root) == 0
+        and not missing_requirement_ids_from_current_surface(workspace_root)
+        else 1
+    )
 
 
 def feature_decomp_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -262,7 +444,7 @@ def test_module_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def planned_test_traceability_present(workspace_root: Path) -> int:
-    return 0 if not missing_planned_test_traceability_ids(workspace_root) else 1
+    return 0 if not missing_planned_test_traceability_ids(workspace_root) and not unexpected_planned_test_traceability_ids(workspace_root) else 1
 
 
 def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -271,7 +453,7 @@ def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
 
 def realized_test_traceability_present(workspace_root: Path) -> int:
     scan = traceability_scan(workspace_root)
-    return 0 if not missing_realized_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
+    return 0 if not missing_realized_test_traceability_ids(workspace_root) and not unexpected_realized_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
 
 
 def test_traceability_present(workspace_root: Path) -> int:
@@ -299,8 +481,12 @@ def main(argv: list[str] | None = None) -> int:
     function_name = args.check.replace("-", "_")
     check_function = globals().get(function_name)
     if callable(check_function):
-        return int(check_function(workspace_root))
-    return _run_check(args.check, workspace_root)
+        exit_code = int(check_function(workspace_root))
+    else:
+        exit_code = _run_check(args.check, workspace_root)
+    if exit_code != 0:
+        print(json.dumps(_failure_detail(args.check, workspace_root), indent=2, sort_keys=True))
+    return exit_code
 
 
 if __name__ == "__main__":

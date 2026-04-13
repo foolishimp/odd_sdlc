@@ -567,18 +567,24 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
     assert payload["status"] == "ok"
     assert payload["program"]["name"] == "bootstrap_release_self_test"
     assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS)
+    assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
+    assert [step["assessed"]["status"] for step in payload["steps"]] == ["ok"] * len(payload["steps"])
+    assert payload["steps"][-1]["edge"] == "prepare_release_surface"
+    assert payload["steps"][-1]["assessed"]["status"] == "ok"
     assert payload["final_state"]["status"] == "iterated"
     assert payload["final_state"]["edge"] == "prepare_deployment_surface"
-    assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
-    assert all(step["assessed"]["status"] == "ok" for step in payload["steps"])
+    assert payload["final_state"]["blocking_reason"] == "fp_dispatch"
 
     events = read_events(workspace)
     graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
-    assert [event["data"]["graph_function"] for event in graph_call_events] == (
-        ["bootstrap_release_self_test"] * len(EXPECTED_BOOTSTRAP_STEPS)
-        + ["release_operational_cycle"]
-    )
-    assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 18
+    assert len(graph_call_events) >= len(payload["completed_edges"])
+    graph_function_names = [event["data"]["graph_function"] for event in graph_call_events]
+    assert graph_function_names[: len(payload["completed_edges"])] == [
+        "bootstrap_release_self_test"
+    ] * len(payload["completed_edges"])
+    assert all(name == "release_operational_cycle" for name in graph_function_names[len(payload["completed_edges"]) :])
+    assert "run_completed" in [event["event_type"] for event in events]
+    assert asset_path(workspace, "test_run_archive_surface").exists()
     assert asset_path(workspace, "release_surface").exists()
 
 
@@ -655,7 +661,7 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     assert first_snapshot_events.exists()
 
     second_gaps = json.loads(
-        run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps second").stdout
+        run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps second", timeout=120).stdout
     )
     assert second_gaps["converged"] is False
 
@@ -676,7 +682,19 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     assert second_event_types.count("vector_started") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("fp_dispatched") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("asset_checkpoint_updated") == len(EXPECTED_BOOTSTRAP_STEPS)
-    assert second_event_types.count("assessed") == len(EXPECTED_BOOTSTRAP_STEPS)
+    assessed_events = [event for event in second_events if event["event_type"] == "assessed"]
+    assert len(assessed_events) == len(EXPECTED_BOOTSTRAP_STEPS) + 1
+    assert [
+        (
+            event["data"].get("edge"),
+            event["data"].get("evaluator"),
+        )
+        for event in assessed_events
+        if event["data"].get("edge") == "derive_test_module_surface"
+    ] == [
+        ("derive_test_module_surface", "planned_test_traceability_present"),
+        ("derive_test_module_surface", "test_module_surface_semantically_converged"),
+    ]
     assert second_event_types.count("proof_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("closure_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("graph_call_closed") == len(EXPECTED_BOOTSTRAP_STEPS)

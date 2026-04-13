@@ -15,7 +15,7 @@ from genesis.events import EventContext, EventStream, emit
 
 from .asset_types import ASSET_TYPES
 from .project_profile import SOURCE_EXTENSIONS, load_project_profile
-from .traceability import planned_test_claim_refs
+from .traceability import current_requirement_refs, implementation_claim_refs, planned_test_claim_refs
 from .workspace_assets import (
     assess_generated_asset_contract,
     asset_declared_type,
@@ -290,6 +290,12 @@ def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
 
 
 def _planned_test_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
+    implementation_ids = tuple(sorted(implementation_claim_refs(workspace_root)))
+    if implementation_ids:
+        return implementation_ids
+    current_ids = tuple(sorted(current_requirement_refs(workspace_root)))
+    if current_ids:
+        return current_ids
     return tuple(sorted(planned_test_claim_refs(workspace_root)))
 
 
@@ -1134,6 +1140,15 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
     implementation_design = _asset_text(workspace_root, "implementation_design_surface")
     implementation_stack = _asset_text(workspace_root, "implementation_stack_profile")
     code_summary = summarize_code_surface(workspace_root)
+    proving_subset_requirement_ids = (
+        "REQ-F-ODDSDLC-003",
+        "REQ-F-ODDSDLC-004",
+    ) if load_project_profile(workspace_root).realization_mode == "generated_proving_subset" else ()
+    claimed_requirement_lines = (
+        (f"- claimed requirement ids: {', '.join(proving_subset_requirement_ids)}",)
+        if proving_subset_requirement_ids
+        else ()
+    )
     return "\n".join(
         (
             "# Generated Implementation Modules",
@@ -1146,6 +1161,7 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
             f"- source files detected: {code_summary['source_file_count']}",
             f"- test-source files detected: {code_summary['test_source_file_count']}",
             "- generated source files in the governed branch must carry `Implements:` tags for the requirements claimed by this branch",
+            *claimed_requirement_lines,
             "",
             "## Source Implementation Design Snapshot",
             implementation_design,
@@ -1509,6 +1525,7 @@ def _construct_test_design(workspace_root: Path) -> str:
         )
     design = _asset_text(workspace_root, "design_surface")
     scenarios = _asset_text(workspace_root, "scenario_surface")
+    profile = load_project_profile(workspace_root)
     return "\n".join(
         (
             "# Generated Test Design",
@@ -1516,7 +1533,7 @@ def _construct_test_design(workspace_root: Path) -> str:
             asset_marker("test_design_surface"),
             "",
             "## Retained Proving-Subset Test Branch",
-            "- test work is modeled as one bounded proving-subset SDLC branch under build_tenants/odd_sdlc/python/test_env",
+            f"- test work is modeled as one bounded proving-subset SDLC branch under `build_tenants/{profile.tenant_name}/test_env`",
             "- sandbox design, stack choice, module structure, and archived run evidence are explicit generated proving-subset assets",
             "",
             "## Source Design Snapshot",
@@ -1593,6 +1610,10 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
         )
     test_design = _asset_text(workspace_root, "test_design_surface")
     test_stack = _asset_text(workspace_root, "test_stack_profile")
+    planned_requirement_ids = (
+        "REQ-F-ODDSDLC-003",
+        "REQ-F-ODDSDLC-004",
+    )
     return "\n".join(
         (
             "# Generated Test Modules",
@@ -1603,6 +1624,7 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
             "- sandbox_runtime.py: installed sandbox orchestration helpers",
             "- run_archive.py: persistent comparative archive helpers",
             "- test_odd_sdlc_sandbox_usecase.py: canonical sandbox proving lane",
+            f"- planned requirement claims: {', '.join(planned_requirement_ids)}",
             "",
             "## Source Test Design Snapshot",
             test_design,
@@ -1873,7 +1895,18 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         ),
     )
 
-    primary_evaluator = failing_evaluators[0]["name"]
+    assessment_evaluators = [
+        evaluator["name"]
+        for evaluator in failing_evaluators
+        if isinstance(evaluator, dict) and isinstance(evaluator.get("name"), str) and evaluator["name"]
+    ]
+    if not assessment_evaluators:
+        raise ValueError("manifest failing_evaluators must include evaluator names")
+    primary_evaluator = assessment_evaluators[0]
+    evidence = (
+        f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
+        "and satisfied the generated-asset contract"
+    )
     payload = {
         "edge": manifest["edge"],
         "actor": "odd_sdlc_constructor",
@@ -1881,13 +1914,11 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         "work_report": work_report,
         "assessments": [
             {
-                "evaluator": primary_evaluator,
+                "evaluator": evaluator_name,
                 "result": "pass",
-                "evidence": (
-                    f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
-                    "and satisfied the generated-asset contract"
-                ),
+                "evidence": evidence,
             }
+            for evaluator_name in assessment_evaluators
         ],
     }
     result_file = Path(result_path)

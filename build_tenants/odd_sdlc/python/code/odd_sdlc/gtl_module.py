@@ -26,7 +26,10 @@ from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
 from .ambiguity import refresh_ambiguity_register
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
-from .traceability import REQUIREMENT_CLOSURE_REGISTER_PATH, refresh_requirement_closure_register
+from .traceability import (
+    REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    refresh_requirement_closure_register,
+)
 
 
 def _asset_node(
@@ -246,6 +249,15 @@ _builder = Operator(
 )
 
 _PENDING_CONTEXT_DIGEST = "sha256:" + ("0" * 64)
+_STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-stateful-builder-control-frame.md"
+)
+_REALIZED_TEST_SOURCE_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-realized-test-source-obligation.md"
+)
+_REALIZATION_DEEPENING_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-realization-deepening-control-frame.md"
+)
 
 
 def _workspace_context(name: str, relative_path: Path) -> Context:
@@ -256,9 +268,21 @@ def _workspace_context(name: str, relative_path: Path) -> Context:
     )
 
 
+_stateful_builder_control_context = _workspace_context(
+    "odd_sdlc_stateful_builder_control_frame",
+    _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+)
 _requirement_closure_context = _workspace_context(
-    "requirement_closure_register",
-    REQUIREMENT_CLOSURE_REGISTER_PATH,
+    "odd_sdlc_requirement_closure_builder_context",
+    REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+)
+_realized_test_source_context = _workspace_context(
+    "odd_sdlc_realized_test_source_obligation",
+    _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+)
+_realization_deepening_context = _workspace_context(
+    "odd_sdlc_realization_deepening_control_frame",
+    _REALIZATION_DEEPENING_CONTEXT_PATH,
 )
 
 def _fd_evaluator(name: str) -> Evaluator:
@@ -446,13 +470,14 @@ def _graph_function(
     extra_fd_evaluators: tuple[Evaluator, ...] = (),
     contexts: tuple[Context, ...] = (),
 ) -> GraphFunction:
+    published_contexts = (_stateful_builder_control_context, *contexts)
     vector = GraphVector(
         name=name,
         source=source,
         target=target,
         operators=(_builder,),
         evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
-        contexts=contexts,
+        contexts=published_contexts,
         declarations=Attrs(
             entries=(
                 (
@@ -701,6 +726,7 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
     target=_implementation_module_surface,
     fd_evaluator=_implementation_module_fd,
     fp_evaluator=_implementation_module_fp,
+    contexts=(_realization_deepening_context,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_CODE = _graph_function(
@@ -710,6 +736,7 @@ GF_DERIVE_CODE = _graph_function(
     fd_evaluator=_code_fd,
     fp_evaluator=_code_fp,
     extra_fd_evaluators=(_code_traceability_fd,),
+    contexts=(_realization_deepening_context,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_DESIGN = _graph_function(
@@ -735,6 +762,7 @@ GF_DERIVE_TEST_MODULE = _graph_function(
     fd_evaluator=_test_module_fd,
     fp_evaluator=_test_module_fp,
     extra_fd_evaluators=(_planned_test_traceability_fd,),
+    contexts=(_realization_deepening_context,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
@@ -744,6 +772,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
     extra_fd_evaluators=(_realized_test_traceability_fd,),
+    contexts=(_realized_test_source_context,),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_PREPARE_RELEASE = _graph_function(
@@ -1095,8 +1124,31 @@ def _active_workspace_root(start: Path | None = None) -> Path:
 
 
 def _module_workspace_root() -> Path:
-    package_root = Path(__file__).resolve().parents[5]
-    return _active_workspace_root(package_root)
+    return _active_workspace_root(Path(__file__).resolve().parent)
+
+
+def _write_runtime_builder_contexts(workspace_root: Path) -> None:
+    package_python_root = Path(__file__).resolve().parents[2]
+    published_contexts = (
+        (
+            package_python_root / "design" / "fp" / "STATEFUL_ITERATOR_CONTROL_FRAME.md",
+            workspace_root / _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+        ),
+        (
+            package_python_root / "design" / "fp" / "REALIZED_TEST_SOURCE_OBLIGATION.md",
+            workspace_root / _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+        ),
+        (
+            package_python_root / "design" / "fp" / "REALIZATION_DEEPENING_CONTROL_FRAME.md",
+            workspace_root / _REALIZATION_DEEPENING_CONTEXT_PATH,
+        ),
+    )
+    for source_path, target_path in published_contexts:
+        content = source_path.read_text(encoding="utf-8")
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = target_path.read_text(encoding="utf-8") if target_path.exists() else None
+        if existing != content:
+            target_path.write_text(content, encoding="utf-8")
 
 
 def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
@@ -1240,6 +1292,7 @@ def _configured_leaf_graph_functions(
 
 
 def _build_module(workspace_root: Path) -> Module:
+    _write_runtime_builder_contexts(workspace_root)
     refresh_requirement_closure_register(workspace_root, stage="module_build")
     active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
     active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
@@ -1399,5 +1452,5 @@ MODULE = _build_module(_module_workspace_root())
 
 def module(workspace_root: Path | str | None = None) -> Module:
     if workspace_root is None:
-        return _build_module(_module_workspace_root())
+        return MODULE
     return _build_module(Path(workspace_root).resolve())

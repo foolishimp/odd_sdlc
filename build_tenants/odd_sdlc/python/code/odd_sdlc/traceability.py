@@ -9,21 +9,23 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .project_profile import IGNORE_ROOTS, SOURCE_EXTENSIONS, load_project_profile
+from .project_profile import (
+    IGNORE_ROOTS,
+    SOURCE_EXTENSIONS,
+    load_project_profile,
+    profile_design_relative_path,
+    profile_test_env_tests_relative_path,
+)
 
 
 REQUIREMENT_CLOSURE_REGISTER_KIND = "odd_sdlc.requirement_closure_register"
 REQUIREMENT_CLOSURE_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-requirement-closure.json")
+REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-requirement-closure-context.md"
+)
 _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _INTENT_ID_RE = re.compile(r"\bINT-\d{3}\b")
 _GENERATED_REQUIREMENT_SURFACE_PATH = Path("specification/requirements/10-generated-bootstrap.md")
-_IMPLEMENTATION_TRACE_PATHS = (
-    Path("build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md"),
-    Path("build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md"),
-)
-_PLANNED_TEST_TRACE_PATHS = (
-    Path("build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md"),
-)
 _UAT_TESTCASE_AUTHORITY_PATHS = (
     Path("specification/scenarios/30-generated-testcase-authority.md"),
 )
@@ -111,12 +113,27 @@ def _surface_requirement_refs(workspace_root: Path, relative_paths: tuple[Path, 
     return refs
 
 
+def _implementation_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    profile = load_project_profile(workspace_root)
+    return (
+        Path(profile_design_relative_path(profile, "40-generated-implementation-design.md")),
+        Path(profile_design_relative_path(profile, "40-generated-implementation-modules.md")),
+    )
+
+
+def _planned_test_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    profile = load_project_profile(workspace_root)
+    return (
+        Path(profile_test_env_tests_relative_path(profile, "40-generated-test-modules.md")),
+    )
+
+
 def implementation_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _IMPLEMENTATION_TRACE_PATHS)
+    return _surface_requirement_refs(workspace_root, _implementation_trace_paths(workspace_root))
 
 
 def planned_test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _PLANNED_TEST_TRACE_PATHS)
+    return _surface_requirement_refs(workspace_root, _planned_test_trace_paths(workspace_root))
 
 
 def testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
@@ -139,12 +156,15 @@ def _is_source_file(path: Path, *, code_root: Path) -> bool:
 def _is_test_file(path: Path, *, code_root: Path) -> bool:
     relative_parts = [part.lower() for part in path.relative_to(code_root).parts]
     name = path.name.lower()
+    under_main_source = len(relative_parts) >= 2 and relative_parts[0] == "src" and relative_parts[1] == "main"
     return (
         "test" in relative_parts
         or "tests" in relative_parts
         or name.startswith("test_")
-        or name.endswith("spec.scala")
-        or name.endswith("test.scala")
+        or (
+            (name.endswith("spec.scala") or name.endswith("test.scala"))
+            and not under_main_source
+        )
     )
 
 
@@ -201,34 +221,57 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
 
 
 def missing_code_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
-    claimed = implementation_claim_refs(workspace_root)
-    if not claimed:
+    expected_ids = _expected_implementation_requirement_ids(workspace_root)
+    if not expected_ids:
         return ()
     code_refs = traceability_scan(workspace_root)["code_refs"]
-    return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in code_refs))
+    return tuple(sorted(requirement_id for requirement_id in expected_ids if requirement_id not in code_refs))
 
 
 def missing_planned_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
-    claimed = planned_test_claim_refs(workspace_root)
-    if not claimed:
+    expected_ids = _expected_validation_requirement_ids(workspace_root)
+    if not expected_ids:
         return ()
-    implementation_ids = set(implementation_claim_refs(workspace_root))
-    if implementation_ids:
-        return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in implementation_ids))
-    current_ids = set(current_requirement_refs(workspace_root))
-    return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in current_ids))
+    claimed_ids = set(planned_test_claim_refs(workspace_root))
+    return tuple(sorted(expected_ids - claimed_ids))
 
 
 def missing_realized_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
-    claimed = planned_test_claim_refs(workspace_root)
-    if not claimed:
+    expected_ids = _expected_validation_requirement_ids(workspace_root)
+    if not expected_ids:
         return ()
-    test_refs = traceability_scan(workspace_root)["test_refs"]
-    return tuple(sorted(requirement_id for requirement_id in claimed if requirement_id not in test_refs))
+    realized_ids = set(traceability_scan(workspace_root)["test_refs"])
+    return tuple(sorted(expected_ids - realized_ids))
 
 
 def missing_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
     return missing_realized_test_traceability_ids(workspace_root)
+
+
+def unexpected_planned_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
+    expected_ids = _expected_validation_requirement_ids(workspace_root)
+    claimed_ids = set(planned_test_claim_refs(workspace_root))
+    return tuple(sorted(claimed_ids - expected_ids))
+
+
+def unexpected_realized_test_traceability_ids(workspace_root: Path) -> tuple[str, ...]:
+    expected_ids = _expected_validation_requirement_ids(workspace_root)
+    realized_ids = set(traceability_scan(workspace_root)["test_refs"])
+    return tuple(sorted(realized_ids - expected_ids))
+
+
+def _expected_validation_requirement_ids(workspace_root: Path) -> set[str]:
+    implementation_ids = _expected_implementation_requirement_ids(workspace_root)
+    if implementation_ids:
+        return implementation_ids
+    return set(current_requirement_refs(workspace_root))
+
+
+def _expected_implementation_requirement_ids(workspace_root: Path) -> set[str]:
+    implementation_ids = set(implementation_claim_refs(workspace_root))
+    if implementation_ids:
+        return implementation_ids
+    return set(current_requirement_refs(workspace_root))
 
 
 def build_requirement_closure_register(workspace_root: Path, *, stage: str = "workspace_scan") -> dict[str, Any]:
@@ -303,7 +346,9 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
             "missing_intent_ids_from_goals": len(missing_intent_ids_from_goals(workspace_root)),
             "requirements_missing_code_traceability": len(missing_code_traceability_ids(workspace_root)),
             "requirements_missing_planned_test_traceability": len(missing_planned_test_traceability_ids(workspace_root)),
+            "requirements_with_unexpected_planned_test_traceability": len(unexpected_planned_test_traceability_ids(workspace_root)),
             "requirements_missing_test_traceability": len(missing_realized_test_traceability_ids(workspace_root)),
+            "requirements_with_unexpected_realized_test_traceability": len(unexpected_realized_test_traceability_ids(workspace_root)),
             "orphan_code_files": len(scan["orphan_code_files"]),
             "orphan_test_files": len(scan["orphan_test_files"]),
             "status_counts": status_counts,
@@ -311,6 +356,80 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
         "traceability": scan,
         "requirements": requirements,
     }
+
+
+def _format_id_lines(
+    label: str,
+    ids: tuple[str, ...],
+    *,
+    max_items: int = 12,
+) -> list[str]:
+    if not ids:
+        return [f"- {label}: none"]
+    shown = ids[:max_items]
+    suffix = ""
+    if len(ids) > max_items:
+        suffix = f" (+{len(ids) - max_items} more)"
+    return [f"- {label}: {', '.join(shown)}{suffix}"]
+
+
+def build_requirement_closure_prompt_context(
+    workspace_root: Path,
+    *,
+    register: dict[str, Any] | None = None,
+) -> str:
+    payload = register or build_requirement_closure_register(workspace_root, stage="workspace_scan")
+    summary = payload["summary"]
+    missing_requirement_ids = missing_requirement_ids_from_current_surface(workspace_root)
+    missing_goal_intent_ids = missing_intent_ids_from_goals(workspace_root)
+    missing_code_ids = missing_code_traceability_ids(workspace_root)
+    missing_planned_test_ids = missing_planned_test_traceability_ids(workspace_root)
+    unexpected_planned_test_ids = unexpected_planned_test_traceability_ids(workspace_root)
+    missing_realized_test_ids = missing_realized_test_traceability_ids(workspace_root)
+    unexpected_realized_test_ids = unexpected_realized_test_traceability_ids(workspace_root)
+    full_register_path = REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix()
+    generated_surface_path = _GENERATED_REQUIREMENT_SURFACE_PATH.as_posix()
+
+    lines = [
+        "# odd_sdlc Requirement Closure Builder Context",
+        "",
+        "Use this as a compact builder-facing summary of the live requirement closure state.",
+        "Treat the generated requirement surface as the target asset under construction.",
+        "Use the full closure register only when you need per-id detail.",
+        "",
+        "## Working Boundary",
+        f"- target generated requirement surface: `{generated_surface_path}`",
+        f"- full closure register for on-demand inspection: `{full_register_path}`",
+        "- preserve authority ids and imported source boundaries; do not rewrite authority files to hide closure defects",
+        "- reduce requirement-scope gaps in the generated requirement surface before asking for assessment",
+        "",
+        "## Summary",
+        f"- total live requirements: {summary['total_live_requirements']}",
+        f"- missing from current requirement surface: {summary['missing_from_current_requirement_surface']}",
+        f"- missing intent ids from goals: {summary['missing_intent_ids_from_goals']}",
+        f"- requirements missing code traceability: {summary['requirements_missing_code_traceability']}",
+        f"- requirements missing planned test traceability: {summary['requirements_missing_planned_test_traceability']}",
+        f"- requirements with unexpected planned test traceability: {summary['requirements_with_unexpected_planned_test_traceability']}",
+        f"- requirements missing realized test traceability: {summary['requirements_missing_test_traceability']}",
+        f"- requirements with unexpected realized test traceability: {summary['requirements_with_unexpected_realized_test_traceability']}",
+        f"- orphan code files: {summary['orphan_code_files']}",
+        f"- orphan test files: {summary['orphan_test_files']}",
+        "",
+        "## Immediate Repair Signal",
+        *_format_id_lines("missing from current requirement surface", missing_requirement_ids),
+        *_format_id_lines("intent ids still missing from goals", missing_goal_intent_ids),
+        *_format_id_lines("requirement ids still missing code traceability", missing_code_ids),
+        *_format_id_lines("requirement ids still missing planned test traceability", missing_planned_test_ids),
+        *_format_id_lines("unexpected requirement ids claimed by planned tests", unexpected_planned_test_ids),
+        *_format_id_lines("requirement ids still missing realized test traceability", missing_realized_test_ids),
+        *_format_id_lines("unexpected requirement ids claimed by realized tests", unexpected_realized_test_ids),
+        "",
+        "## Builder Law",
+        "- inspect the current generated requirement surface first",
+        "- continue from the current workspace state rather than restating the whole imported authority",
+        "- use the full closure register only when the compact summary is insufficient for the next repair step",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def refresh_requirement_closure_register(workspace_root: Path, *, stage: str = "workspace_scan") -> dict[str, Any]:
@@ -321,6 +440,18 @@ def refresh_requirement_closure_register(workspace_root: Path, *, stage: str = "
     existing = path.read_text(encoding="utf-8") if path.exists() else None
     if existing != content:
         path.write_text(content, encoding="utf-8")
+    prompt_context_path = workspace_root / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH
+    prompt_context_content = build_requirement_closure_prompt_context(
+        workspace_root,
+        register=payload,
+    )
+    existing_prompt_context = (
+        prompt_context_path.read_text(encoding="utf-8")
+        if prompt_context_path.exists()
+        else None
+    )
+    if existing_prompt_context != prompt_context_content:
+        prompt_context_path.write_text(prompt_context_content, encoding="utf-8")
     return payload
 
 

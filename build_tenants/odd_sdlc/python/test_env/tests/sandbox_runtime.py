@@ -18,6 +18,7 @@ ODD_ROOT = TESTS_DIR.parents[4]
 APPS_ROOT = TESTS_DIR.parents[5]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 SOURCE_PACKAGE = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc"
+SOURCE_DESIGN_FP = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "design" / "fp"
 
 
 def install_kernel_sandbox(target: Path, *, archive: "RunArchive | None" = None) -> dict[str, Any]:
@@ -41,9 +42,12 @@ def install_kernel_sandbox(target: Path, *, archive: "RunArchive | None" = None)
 
 
 def seed_odd_sdlc_package(target: Path) -> None:
-    package_root = target / "build_tenants" / "odd_sdlc" / "python" / "code"
+    package_root = target / ".odd_sdlc" / "python" / "code"
+    design_root = target / ".odd_sdlc" / "python" / "design"
     package_root.mkdir(parents=True, exist_ok=True)
+    design_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE_PACKAGE, package_root / "odd_sdlc", dirs_exist_ok=True)
+    shutil.copytree(SOURCE_DESIGN_FP, design_root / "fp", dirs_exist_ok=True)
 
 
 def seed_canonical_spec_surface(target: Path) -> None:
@@ -102,7 +106,7 @@ def sandbox_env(workspace: Path) -> dict[str, str]:
     env["PYTHONPATH"] = os.pathsep.join(
         (
             str(workspace / ".genesis"),
-            str(workspace / "build_tenants" / "odd_sdlc" / "python" / "code"),
+            str(workspace / ".odd_sdlc" / "python" / "code"),
         )
     )
     env.pop("PYTEST_CURRENT_TEST", None)
@@ -169,12 +173,14 @@ def run_installed_self_test(
     *,
     archive: "RunArchive | None" = None,
     label: str = "odd_sdlc self-test",
+    timeout: int = 120,
 ) -> dict[str, Any]:
     result = run_installed_odd_sdlc(
         workspace,
         "self-test",
         archive=archive,
         label=label,
+        timeout=timeout,
     )
     payload = json.loads(result.stdout)
     if archive is not None:

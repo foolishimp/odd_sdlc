@@ -5,6 +5,9 @@
 **Purpose**: Prove that `odd_method` adopts the standard realization structure from
 bootstrap without inventing artificial tenant-local roots.
 
+This scenario validates the `odd_method` source repository. Downstream
+installed workspace topology is governed separately by `REQ-F-ODDSDLC-032`.
+
 ## Scenario
 
 Inspect the live `odd_method` project tree and the active specification and design
@@ -13,7 +16,7 @@ surfaces after bootstrap.
 ## Significant Paths
 
 - success path: `build_tenants/` exists with canonical registry and shared
-  `common/` realization root
+  `common/` realization root in the source repository
 - boundary path: `specification/` remains singleton constitutional authority
   while realization structure lives beneath `build_tenants/`
 - fail-closed path: tenant-local roots are absent until real local realization
@@ -24,7 +27,7 @@ surfaces after bootstrap.
 ## Expected Outcomes
 
 1. `build_tenants/` exists as the project-owned realization root
-2. `build_tenants/TENANT_REGISTRY.md` records `common` as the active bootstrap
-   realization root
+2. `build_tenants/TENANT_REGISTRY.md` records `common` as the source-repository
+   bootstrap realization root
 3. shared realization surfaces are explicit without inventing a fake tenant
 4. `docs/` exists as a supporting, non-constitutional root

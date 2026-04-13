@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"path": "../../../../odd_manager"
+		},
+		{
+			"path": "../../../../ai_sdlc_method"
+		},
+		{
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../ai_sdlc_examples"
+		},
+		{
+			"path": "../../../../abiogenesis"
+		},
+		{
+			"path": "../../../../specification_methodology"
+		}
+	],
+	"settings": {
+		"files.watcherExclude": {
+			"**/target": true
+		}
+	}
+}

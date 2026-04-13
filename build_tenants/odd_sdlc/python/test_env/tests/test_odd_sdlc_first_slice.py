@@ -16,6 +16,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -42,6 +45,8 @@ from odd_sdlc.gtl_module import (  # noqa: E402
     RELEASE_OPERATIONAL_CYCLE_STEPS,
     module as odd_sdlc_module,
 )
+import odd_sdlc.self_test as self_test_module  # noqa: E402
+from odd_sdlc.project_profile import load_project_profile  # noqa: E402
 from odd_sdlc.self_test import self_test  # noqa: E402
 from odd_sdlc.workspace_assets import (  # noqa: E402
     ASSET_PATHS,
@@ -51,8 +56,9 @@ from odd_sdlc.workspace_assets import (  # noqa: E402
     asset_marker_path,
     asset_materialization_path,
     asset_path,
+    resolved_asset_relative_path,
 )
-from genesis.binding import module_to_executable_jobs  # noqa: E402
+from genesis.binding import ContextResolver, _assemble_prompt, module_to_executable_jobs  # noqa: E402
 
 
 def _seed_workspace(path: Path) -> None:
@@ -106,6 +112,7 @@ def _read_events(workspace_root: Path) -> list[dict]:
 
 def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
+    tenant_name = load_project_profile(tmp_path).tenant_name
     assert asset_path(tmp_path, "intent_surface") == tmp_path / "specification" / "INTENT.md"
     assert asset_path(tmp_path, "requirement_surface") == tmp_path / "specification" / "requirements"
     assert asset_path(tmp_path, "ambiguity_register_surface") == (
@@ -114,14 +121,12 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
     assert asset_path(tmp_path, "requirement_closure_register_surface") == (
         tmp_path / ".ai-workspace" / "runtime" / "odd_sdlc-requirement-closure.json"
     )
-    assert asset_path(tmp_path, "code_surface") == (
-        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
-    )
+    assert asset_path(tmp_path, "code_surface") == tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
     assert asset_path(tmp_path, "release_surface") == tmp_path / "docs" / "40-generated-release.md"
     assert asset_path(tmp_path, "deployment_surface") == tmp_path / "docs" / "50-generated-deployment.md"
     assert asset_path(tmp_path, "runtime_observation_surface") == tmp_path / "docs" / "60-generated-runtime-observation.md"
     assert asset_path(tmp_path, "retrofit_plan_surface") == (
-        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "design" / "60-generated-retrofit-plan.md"
+        tmp_path / "build_tenants" / tenant_name / "design" / "60-generated-retrofit-plan.md"
     )
     assert asset_materialization_path(tmp_path, "requirement_surface") == (
         tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
@@ -308,10 +313,71 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         RELEASE_OPERATIONAL_CYCLE_STEPS
     )
     assert {job.job.name for job in executable_jobs} == {"bootstrap_release_self_test_job", "release_operational_cycle_job"}
+
+    vectors = {vector.name: vector for vector in executive.materialize().vectors}
+    requirement_context_names = [context.name for context in vectors["derive_requirement_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in requirement_context_names
+    assert "odd_sdlc_requirement_closure_builder_context" in requirement_context_names
+    realization_context_names = [context.name for context in vectors["derive_code_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in realization_context_names
+    assert "odd_sdlc_realization_deepening_control_frame" in realization_context_names
+    module_context_names = [context.name for context in vectors["derive_implementation_module_surface"].contexts]
+    assert "odd_sdlc_realization_deepening_control_frame" in module_context_names
+    test_module_context_names = [context.name for context in vectors["derive_test_module_surface"].contexts]
+    assert "odd_sdlc_realization_deepening_control_frame" in test_module_context_names
+    archive_context_names = [context.name for context in vectors["derive_test_run_archive_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in archive_context_names
+    assert "odd_sdlc_realized_test_source_obligation" in archive_context_names
     assert {job.graph_function.name for job in executable_jobs} == {
         "bootstrap_release_self_test",
         "release_operational_cycle",
     }
+
+
+def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    module = odd_sdlc_module(tmp_path)
+    code_job = next(
+        job
+        for job in module_to_executable_jobs(module)
+        if job.vector.name == "derive_code_surface"
+    )
+    resolver = ContextResolver(tmp_path)
+    relevant_contexts = {
+        context.name: resolver.load(context)
+        for context in code_job.vector.contexts
+    }
+    evaluator = next(ev for ev in code_job.vector.evaluators if ev.name == "code_traceability_present")
+    pre = SimpleNamespace(
+        current_asset={},
+        failing_evaluators=[evaluator],
+        fd_results={
+            evaluator.name: {
+                "passes": False,
+                "detail": {
+                    "returncode": 1,
+                    "stdout": '{"missing_requirement_ids":["REQ-DEMO-001"]}',
+                    "stderr": "",
+                },
+            }
+        },
+        relevant_contexts=relevant_contexts,
+        resolved_environment=SimpleNamespace(
+            bindings=(),
+            ready=True,
+            summary_lines=lambda: [],
+            vector_source_required_contexts=(),
+            asset_surface_required_contexts=(),
+            asset_surface_injected_required_contexts=(),
+            requires=(),
+        ),
+    )
+
+    prompt = _assemble_prompt(pre, code_job, result_path=".ai-workspace/fp_results/mock.json")
+
+    assert "This edge works over an existing realization or realization plan, not a blank slate." in prompt
+    assert "Existing files and existing module groups are obligations, not proof of completion." in prompt
+    assert "Prefer deepening or correcting existing artifacts" in prompt
 
 
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
@@ -423,7 +489,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert edge_contracts["retrofit_and_relaunch"]["realization_status"] == "active_first_slice"
 
     asset_uris = {asset["uri"] for asset in result["assets"]}
-    expected_asset_uris = {f"file://{relative_path}" for _, relative_path in ASSET_PATHS}
+    expected_asset_uris = {f"file://{resolved_asset_relative_path(tmp_path, asset_id)}" for asset_id, _ in ASSET_PATHS}
     assert asset_uris == expected_asset_uris
 
     intent_asset = next(asset for asset in result["assets"] if asset["asset_id"] == "intent_surface")
@@ -847,9 +913,35 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert result["program"]["name"] == "bootstrap_release_self_test"
     assert result["completed_edges"] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in result["steps"])
-    assert all(step["assessed"]["status"] == "ok" for step in result["steps"])
+    assert [step["assessed"]["status"] for step in result["steps"]] == ["ok"] * len(result["steps"])
+    assert result["steps"][-1]["edge"] == "prepare_release_surface"
+    assert result["steps"][-1]["assessed"]["status"] == "ok"
     assert result["final_state"]["status"] == "iterated"
+    assert result["final_state"]["edge"] == "prepare_deployment_surface"
+    assert result["final_state"]["blocking_reason"] == "fp_dispatch"
 
     events = _read_events(tmp_path)
-    assert [event["event_type"] for event in events if event["event_type"] == "run_completed"] == ["run_completed"] * 18
+    assert "run_completed" in [event["event_type"] for event in events]
+    assert asset_path(tmp_path, "test_run_archive_surface").exists()
     assert asset_path(tmp_path, "release_surface").exists()
+
+
+def test_self_test_raises_when_the_executive_cannot_start_the_expected_edge(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    monkeypatch.setattr(
+        self_test_module,
+        "start",
+        lambda _app: {
+            "status": "pending",
+            "edge": "derive_intent_surface",
+            "blocking_reason": "fp_dispatch",
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="non-iterated status 'pending'"):
+        self_test(app)

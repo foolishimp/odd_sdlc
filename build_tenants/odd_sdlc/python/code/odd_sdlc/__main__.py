@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("self-test", parents=[common])
     normalize_parser = subparsers.add_parser("normalize-workspace", parents=[common])
     normalize_parser.add_argument("--project-slug")
-    normalize_parser.add_argument("--platform", default="python")
+    normalize_parser.add_argument("--platform")
     construct_parser = subparsers.add_parser("construct", parents=[common])
     construct_parser.add_argument("--manifest", required=True)
     start_parser = subparsers.add_parser("start", parents=[common])

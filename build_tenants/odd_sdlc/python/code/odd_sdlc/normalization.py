@@ -3,15 +3,24 @@
 # Implements: REQ-F-ODDSDLC-022
 # Implements: REQ-F-ODDSDLC-027
 # Implements: REQ-F-ODDSDLC-029
+# Implements: REQ-F-ODDSDLC-032
 """Deterministic workspace normalization for odd_sdlc operation."""
 from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
 from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
+from .project_profile import (
+    _parse_constraints_lines,
+    canonical_tenant_name,
+    load_project_profile,
+    parse_design_tenants,
+    tenant_output_dir,
+)
 from .traceability import REQUIREMENT_CLOSURE_REGISTER_PATH, build_requirement_closure_register
 
 NORMALIZATION_REPORT_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-normalization.json")
@@ -25,6 +34,7 @@ TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("deployment_contract", '""'),
     ("runtime_observation_contract", '""'),
 )
+TENANT_REGISTRY_PATH = Path("build_tenants/TENANT_REGISTRY.md")
 
 
 def default_project_slug(workspace_root: Path) -> str:
@@ -326,6 +336,8 @@ def _normalize_project_constraints(
     actions: list[dict[str, str]],
 ) -> None:
     path = workspace_root / ".ai-workspace" / "context" / "project_constraints.yml"
+    canonical_platform = canonical_tenant_name(platform)
+    canonical_output = tenant_output_dir(canonical_platform)
     if not path.exists():
         content = "\n".join(
             (
@@ -343,9 +355,9 @@ def _normalize_project_constraints(
                 "",
                 "structure:",
                 "  design_tenants:",
-                f'    - name: "{platform}"',
-                f'      output_dir: "build_tenants/{project_slug}/{platform}/"',
-                '      description: "Normalized tenant target for odd_sdlc operation"',
+                f'    - name: "{canonical_platform}"',
+                f'      output_dir: "{canonical_output}"',
+                '      description: "Normalized project realization tenant for odd_sdlc operation"',
                 '      test_execution_contract: ""',
                 '      deployment_contract: ""',
                 '      runtime_observation_contract: ""',
@@ -374,9 +386,13 @@ def _normalize_project_constraints(
     tenant_field_indent = "      "
     tenant_fields_seen: set[str] = set()
     tenant_capabilities_flushed = False
+    tenant_output_written = False
 
     def _flush_missing_tenant_capabilities() -> None:
-        nonlocal tenant_capabilities_flushed
+        nonlocal tenant_capabilities_flushed, tenant_output_written
+        if design_tenant_seen and not tenant_output_written:
+            updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
+            tenant_output_written = True
         if tenant_capabilities_flushed or not design_tenant_seen:
             return
         for field_name, default_value in TENANT_CAPABILITY_FIELDS:
@@ -436,14 +452,19 @@ def _normalize_project_constraints(
                 first_design_tenant_scope = True
                 tenant_fields_seen = set()
                 tenant_capabilities_flushed = False
-            updated.append(line)
+                tenant_output_written = False
+                indent = line[: len(line) - len(line.lstrip())]
+                updated.append(f'{indent}- name: "{canonical_platform}"')
+            else:
+                updated.append(line)
             continue
         if first_design_tenant_scope and ":" in stripped and not stripped.startswith("- name:"):
             field_name = stripped.partition(":")[0].strip()
             tenant_fields_seen.add(field_name)
             tenant_field_indent = line[: len(line) - len(line.lstrip())]
-        if in_design_tenants and stripped.startswith("output_dir:") and design_tenant_seen:
-            updated.append(line)
+        if first_design_tenant_scope and stripped.startswith("output_dir:") and design_tenant_seen:
+            updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
+            tenant_output_written = True
         else:
             updated.append(line)
 
@@ -461,19 +482,202 @@ def _normalize_project_constraints(
             path,
             normalized,
             kind="normalize_project_constraints",
-            detail="updated workspace identity while preserving the declared realization root and tenant selection",
+            detail="updated workspace identity and canonicalized the active project tenant root for spec-method operation",
             actions=actions,
         )
+
+
+def _migrate_legacy_realization_root(
+    workspace_root: Path,
+    *,
+    legacy_output_dir: str,
+    canonical_output_dir: str,
+    actions: list[dict[str, str]],
+) -> None:
+    if not legacy_output_dir:
+        return
+    legacy_root = workspace_root / legacy_output_dir
+    canonical_root = workspace_root / canonical_output_dir
+    if legacy_root == canonical_root or not legacy_root.exists():
+        return
+
+    def _merge_tree(source: Path, destination: Path) -> None:
+        destination.mkdir(parents=True, exist_ok=True)
+        for child in source.iterdir():
+            target = destination / child.name
+            if child.is_dir():
+                if target.exists() and not target.is_dir():
+                    raise FileExistsError(f"cannot merge directory `{child}` into file `{target}`")
+                _merge_tree(child, target)
+                child.rmdir()
+                continue
+            if target.exists():
+                raise FileExistsError(f"cannot overwrite existing canonical file `{target}` during legacy-root migration")
+            shutil.move(str(child), str(target))
+
+    if canonical_root.exists():
+        _merge_tree(legacy_root, canonical_root)
+        legacy_root.rmdir()
+    else:
+        canonical_root.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(legacy_root), str(canonical_root))
+    actions.append(
+        _normalization_action(
+            kind="migrate_realization_root",
+            path=canonical_root,
+            detail=(
+                "migrated the declared legacy realization root into the canonical "
+                f"tenant-rooted path `{canonical_output_dir}`"
+            ),
+        )
+    )
+
+
+def _is_legacy_common_scaffold(path: Path) -> bool:
+    expected = {
+        "README.md",
+        "design/README.md",
+    }
+    actual = {
+        item.relative_to(path).as_posix()
+        for item in path.rglob("*")
+        if item.is_file()
+    }
+    return actual == expected
+
+
+def _is_legacy_project_tenant_scaffold(path: Path) -> bool:
+    expected = {
+        "README.md",
+        "code/README.md",
+        "code/__init__.py",
+        "code/app_bootstrap.py",
+        "design/README.md",
+        "design/fp/README.md",
+        "design/fp/INTENT.md",
+        "design/fp/edge-overrides/README.md",
+        "design/fp/edge-overrides/EDGE_OVERRIDE_TEMPLATE.json",
+    }
+    actual = {
+        item.relative_to(path).as_posix()
+        for item in path.rglob("*")
+        if item.is_file()
+    }
+    return actual == expected
+
+
+def _remove_legacy_installer_scaffolds(
+    workspace_root: Path,
+    *,
+    project_slug: str,
+    platform: str,
+    active_tenant_name: str,
+    actions: list[dict[str, str]],
+) -> None:
+    common_root = workspace_root / "build_tenants" / "common"
+    if common_root.exists() and _is_legacy_common_scaffold(common_root):
+        shutil.rmtree(common_root)
+        actions.append(
+            _normalization_action(
+                kind="remove_legacy_common_scaffold",
+                path=common_root,
+                detail="removed the legacy shared scaffold root because downstream project tenants must not default to build_tenants/common/",
+            )
+        )
+
+    legacy_project_root = workspace_root / "build_tenants" / project_slug / platform
+    canonical_root = workspace_root / tenant_output_dir(active_tenant_name)
+    if legacy_project_root.exists() and legacy_project_root != canonical_root and _is_legacy_project_tenant_scaffold(legacy_project_root):
+        shutil.rmtree(legacy_project_root)
+        parent = legacy_project_root.parent
+        if parent.exists() and not any(parent.iterdir()):
+            parent.rmdir()
+        actions.append(
+            _normalization_action(
+                kind="remove_legacy_project_tenant_scaffold",
+                path=legacy_project_root,
+                detail=(
+                    "removed the legacy project-scoped tenant scaffold because "
+                    "downstream realization is canonical under "
+                    f"`{tenant_output_dir(active_tenant_name)}`"
+                ),
+            )
+        )
+
+
+def _tenant_registry_markdown(*, tenant_names: tuple[str, ...]) -> str:
+    if not tenant_names:
+        tenant_names = ("python",)
+    rows = [
+        f"| `{tenant_name}` | realization | `{tenant_output_dir(tenant_name)}` | Active | Canonical project realization tenant |"
+        for tenant_name in tenant_names
+    ]
+    return "\n".join(
+        (
+            "# Tenant Registry",
+            "",
+            "This registry records the active project-owned realization tenants.",
+            "",
+            "| Tenant | Kind | Root | Status | Notes |",
+            "| --- | --- | --- | --- | --- |",
+            *rows,
+            "",
+        )
+    )
+
+
+def _normalize_tenant_registry(workspace_root: Path, *, tenant_name: str, actions: list[dict[str, str]]) -> None:
+    registry_path = workspace_root / TENANT_REGISTRY_PATH
+    declared_tenants = parse_design_tenants(workspace_root / ".ai-workspace" / "context" / "project_constraints.yml")
+    tenant_names = tuple(
+        dict.fromkeys(
+            [tenant_name, *[str(entry.get("name") or "").strip() for entry in declared_tenants if str(entry.get("name") or "").strip()]]
+        )
+    )
+    content = _tenant_registry_markdown(tenant_names=tenant_names)
+    if not registry_path.exists():
+        _write_text(
+            registry_path,
+            content,
+            kind="create_tenant_registry",
+            detail="created canonical tenant registry for the active project realization tenants",
+            actions=actions,
+        )
+        return
+    original = registry_path.read_text(encoding="utf-8")
+    if original != content:
+        _write_text(
+            registry_path,
+            content,
+            kind="update_tenant_registry",
+            detail="rewrote tenant registry to the canonical multi-tenant project realization topology",
+            actions=actions,
+        )
+
+
+def _resolved_platform(workspace_root: Path, requested_platform: str | None) -> str:
+    if requested_platform and requested_platform.strip():
+        return canonical_tenant_name(requested_platform)
+    constraints_path = workspace_root / ".ai-workspace" / "context" / "project_constraints.yml"
+    if constraints_path.exists():
+        tenants = parse_design_tenants(constraints_path)
+        if tenants:
+            return canonical_tenant_name(tenants[0].get("name", ""))
+        constraints = _parse_constraints_lines(constraints_path)
+        if constraints.get("tenant_name"):
+            return canonical_tenant_name(constraints["tenant_name"])
+    return "python"
 
 
 def normalize_workspace(
     workspace_root: Path | str,
     *,
     project_slug: str | None = None,
-    platform: str = "python",
+    platform: str | None = None,
 ) -> dict[str, Any]:
     root = Path(workspace_root).resolve()
     slug = (project_slug or default_project_slug(root)).strip() or "project"
+    resolved_platform = _resolved_platform(root, platform)
     actions: list[dict[str, str]] = []
 
     (root / ".ai-workspace" / "runtime").mkdir(parents=True, exist_ok=True)
@@ -534,7 +738,7 @@ def normalize_workspace(
         )
 
     project_bootstrap = root / PROJECT_BOOTSTRAP_PATH
-    bootstrap_content = _project_bootstrap_markdown(root, project_slug=slug, platform=platform)
+    bootstrap_content = _project_bootstrap_markdown(root, project_slug=slug, platform=resolved_platform)
     if not project_bootstrap.exists():
         _write_text(
             project_bootstrap,
@@ -554,10 +758,33 @@ def normalize_workspace(
                 actions=actions,
             )
 
+    constraints_path = root / ".ai-workspace" / "context" / "project_constraints.yml"
+    raw_constraints = _parse_constraints_lines(constraints_path)
+    legacy_output_dir = raw_constraints.get("tenant_output_dir", "")
+
     _normalize_project_constraints(
         root,
         project_slug=slug,
-        platform=platform,
+        platform=resolved_platform,
+        actions=actions,
+    )
+    _migrate_legacy_realization_root(
+        root,
+        legacy_output_dir=legacy_output_dir,
+        canonical_output_dir=tenant_output_dir(resolved_platform),
+        actions=actions,
+    )
+    profile = load_project_profile(root)
+    _remove_legacy_installer_scaffolds(
+        root,
+        project_slug=slug,
+        platform=resolved_platform,
+        active_tenant_name=profile.tenant_name,
+        actions=actions,
+    )
+    _normalize_tenant_registry(
+        root,
+        tenant_name=profile.tenant_name,
         actions=actions,
     )
 
@@ -609,7 +836,7 @@ def normalize_workspace(
         "workspace_root": str(root),
         "workspace_name": root.name,
         "project_slug": slug,
-        "platform": platform,
+        "platform": resolved_platform,
         "changed": bool(actions),
         "actions": actions,
         "report_path": NORMALIZATION_REPORT_PATH.as_posix(),

@@ -23,7 +23,7 @@ from odd_sdlc.app import bootstrap, initialize
 from odd_sdlc.normalization import normalize_workspace
 from odd_sdlc.query import query_domain
 from odd_sdlc.release.install import install as install_release
-from test_odd_sdlc_installation import DATA_MAPPER_TEMPLATE
+from test_odd_sdlc_installation import _seed_data_mapper_template_workspace
 
 
 def _create_competing_realization_root(workspace: Path) -> None:
@@ -87,7 +87,7 @@ def _rewrite_output_dir(workspace: Path, output_dir: str) -> None:
 @pytest.mark.usecase_id("ambiguity_register_disambiguation_pipeline")
 def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> None:
     workspace = run_archive.workspace
-    shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
+    _seed_data_mapper_template_workspace(workspace)
     _rewrite_output_dir(workspace, "build_tenants/data_mapper/spark_scala/")
     _create_competing_realization_root(workspace)
 
@@ -107,9 +107,8 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     assert initial_register["schema_version"] == "v2"
     assert initial_entries["multiple-realization-roots"]["status"] == "fh_required"
     assert initial_entries["multiple-realization-roots"]["policy_action"] == "escalate_fh"
-    assert initial_entries["declared-root-vs-realized-root-mismatch"]["status"] == "open"
-    assert initial_entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "fp_decide"
-    assert initial_register["summary"]["active"] >= 2
+    assert "declared-root-vs-realized-root-mismatch" not in initial_entries
+    assert initial_register["summary"]["active"] >= 1
 
     app = initialize(bootstrap(workspace_root=workspace))
     initial_domain = query_domain(app)
@@ -122,7 +121,7 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     assert initial_domain["ambiguity_register"]["summary"]["active"] == initial_register["summary"]["active"]
     assert initial_domain["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
 
-    _rewrite_output_dir(workspace, "imp_scala_spark/")
+    shutil.rmtree(workspace / "imp_scala_spark")
     second_report = normalize_workspace(
         workspace,
         project_slug="data_mapper",
@@ -136,9 +135,9 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     run_archive.capture_json("ambiguity_register.reduced.json", reduced_register)
     reduced_entries = {entry["ambiguity_id"]: entry for entry in reduced_register["ambiguities"]}
     assert reduced_entries["multiple-realization-roots"]["status"] == "resolved"
-    assert reduced_entries["declared-root-vs-realized-root-mismatch"]["status"] == "resolved"
+    assert "declared-root-vs-realized-root-mismatch" not in reduced_entries
     assert reduced_register["summary"]["active"] < initial_register["summary"]["active"]
-    assert reduced_register["summary"]["status_counts"]["resolved"] >= 2
+    assert reduced_register["summary"]["status_counts"]["resolved"] >= 1
 
     reduced_domain = query_domain(initialize(bootstrap(workspace_root=workspace)))
     run_archive.capture_json("query_domain.reduced.json", reduced_domain)

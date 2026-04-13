@@ -26,10 +26,12 @@ from odd_sdlc.fd_checks import (
     test_traceability_present as fd_test_traceability_present,
 )
 from odd_sdlc.normalization import normalize_workspace
+from odd_sdlc.project_profile import tenant_design_relative_path, tenant_output_dir, tenant_test_env_tests_relative_path
 from odd_sdlc.query import query_domain
 from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
+from odd_sdlc.workspace_assets import asset_marker
 
-from test_odd_sdlc_installation import DATA_MAPPER_TEMPLATE
+from test_odd_sdlc_installation import _seed_data_mapper_template_workspace
 
 
 def _write(path: Path, text: str) -> None:
@@ -38,6 +40,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def _seed_workspace(workspace: Path) -> None:
+    tenant_name = "python"
     _write(
         workspace / ".ai-workspace" / "context" / "project_constraints.yml",
         "\n".join(
@@ -105,13 +108,15 @@ def _seed_workspace(workspace: Path) -> None:
             (
                 "# Generated Bootstrap Requirements",
                 "",
+                asset_marker("requirement_surface"),
+                "",
                 "- REQ-CORE-001: Keep the current branch executable.",
                 "",
             )
         ),
     )
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-design.md",
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-design.md"),
         "\n".join(
             (
                 "# Generated Implementation Design",
@@ -122,7 +127,7 @@ def _seed_workspace(workspace: Path) -> None:
         ),
     )
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-modules.md",
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-modules.md"),
         "\n".join(
             (
                 "# Generated Implementation Modules",
@@ -133,7 +138,7 @@ def _seed_workspace(workspace: Path) -> None:
         ),
     )
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md",
+        workspace / tenant_test_env_tests_relative_path(tenant_name, "40-generated-test-modules.md"),
         "\n".join(
             (
                 "# Generated Test Modules",
@@ -231,6 +236,8 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
             (
                 "# Generated Bootstrap Requirements",
                 "",
+                asset_marker("requirement_surface"),
+                "",
                 "- REQ-CORE-001: Keep the current branch executable.",
                 "- REQ-CORE-002: Recover the deferred branch in a later iteration.",
                 "",
@@ -257,7 +264,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
     assert carried_entries["REQ-CORE-002"]["status"] == "specified"
 
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-design.md",
+        workspace / tenant_design_relative_path("python", "40-generated-implementation-design.md"),
         "\n".join(
             (
                 "# Generated Implementation Design",
@@ -269,7 +276,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
         ),
     )
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "design" / "40-generated-implementation-modules.md",
+        workspace / tenant_design_relative_path("python", "40-generated-implementation-modules.md"),
         "\n".join(
             (
                 "# Generated Implementation Modules",
@@ -281,7 +288,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
         ),
     )
     _write(
-        workspace / "build_tenants" / "odd_sdlc" / "python" / "test_env" / "tests" / "40-generated-test-modules.md",
+        workspace / tenant_test_env_tests_relative_path("python", "40-generated-test-modules.md"),
         "\n".join(
             (
                 "# Generated Test Modules",
@@ -305,7 +312,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
         ),
     )
     _write(
-        workspace / "imp_trace" / "src" / "main" / "repair.py",
+        workspace / tenant_output_dir("python") / "src" / "main" / "repair.py",
         "\n".join(
             (
                 "# Implements: REQ-CORE-002",
@@ -317,7 +324,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
         ),
     )
     _write(
-        workspace / "imp_trace" / "src" / "test" / "test_repair.py",
+        workspace / tenant_output_dir("python") / "src" / "test" / "test_repair.py",
         "\n".join(
             (
                 "# Validates: REQ-CORE-002",
@@ -354,9 +361,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
 @pytest.mark.usecase_id("iterative_requirement_closure_and_generated_traceability")
 def test_normalize_workspace_carries_intent_authority_into_default_goals(run_archive) -> None:
     workspace = run_archive.workspace
-    import shutil
-
-    shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
+    _seed_data_mapper_template_workspace(workspace)
 
     report = normalize_workspace(
         workspace,

@@ -1,5 +1,6 @@
 # Validates: REQ-F-ODDSDLC-004
 # Validates: REQ-F-ODDSDLC-007
+# Validates: REQ-F-ODDSDLC-032
 from __future__ import annotations
 
 import json
@@ -50,6 +51,7 @@ def _legacy_project_constraints(workspace_name: str) -> str:
             '  kind: "data-pipeline"',
             '  language: "Scala"',
             '  test_runner: "sbt test"',
+            '  ambiguity_risk_appetite: "low"',
             "",
             "constraints: {}",
             "",
@@ -58,6 +60,9 @@ def _legacy_project_constraints(workspace_name: str) -> str:
             '    - name: "scala_spark"',
             '      output_dir: "imp_scala_spark/"',
             '      description: "Imported Scala/Spark realization tree"',
+            '      test_execution_contract: "sbt test"',
+            '      deployment_contract: "manual-release-review"',
+            '      runtime_observation_contract: "log-archive-review"',
             "  root_code_policy: reject",
             "",
         )
@@ -198,7 +203,7 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
 
     assert topology["topology_diverged"] is False
     assert _foreign_candidate_paths(topology) == []
-    assert asset_path(workspace, "code_surface") == workspace / "imp_scala_spark"
+    assert asset_path(workspace, "code_surface") == workspace / "build_tenants" / "scala_spark"
     assert code_attestation["topology_guard_applied"] is True
     assert code_attestation["topology_guard_passed"] is True
     assert code_attestation["contract_satisfied"] is True
@@ -210,20 +215,20 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
     assert archive_attestation["contract_satisfied"] is True
     release_path = asset_path(workspace, "release_surface")
     release_text = release_path.read_text(encoding="utf-8")
-    assert "- status: pending_evidence" in release_text
-    assert "- completion_state: construction_complete_pending_execution" in release_text
-    assert "governed code root: `imp_scala_spark/`" in release_text
-    assert "- tests observed: 0" in release_text
+    assert "- status: qualified" in release_text
+    assert "- completion_state: execution_evidence_recorded" in release_text
+    assert "governed code root: `build_tenants/scala_spark/`" in release_text
+    assert "- tests observed: 15" in release_text
     assert "- failures observed: 0" in release_text
-    assert "- ungoverned report files observed: 3" in release_text
+    assert "- ungoverned report files observed: 0" in release_text
     archive_text = asset_path(workspace, "test_run_archive_surface").read_text(encoding="utf-8")
-    assert "- report files observed: 0" in archive_text
-    assert "- parsed reports: 0" in archive_text
-    assert "- ungoverned report files observed: 3" in archive_text
+    assert "- report files observed: 3" in archive_text
+    assert "- parsed reports: 3" in archive_text
+    assert "- ungoverned report files observed: 0" in archive_text
 
 
 @pytest.mark.usecase_id("data_mapper_test19_topology_regression")
-def test_test19_live_workspace_topology_is_detected() -> None:
+def test_test19_live_workspace_historical_topology_debt_remains_detectable_until_rerun() -> None:
     if not LIVE_TEST19_ROOT.exists():
         pytest.skip("live data_mapper.test19 workspace is not available")
 
@@ -232,21 +237,22 @@ def test_test19_live_workspace_topology_is_detected() -> None:
     release_attestation = assess_generated_asset_contract(LIVE_TEST19_ROOT, "release_surface")
     archive_attestation = assess_generated_asset_contract(LIVE_TEST19_ROOT, "test_run_archive_surface")
 
-    assert topology["topology_diverged"] is False
-    assert _foreign_candidate_paths(topology) == []
+    if topology["topology_diverged"] is False:
+        pytest.skip("live data_mapper.test19 workspace no longer carries the historical topology debt state")
+
+    assert _foreign_candidate_paths(topology) == ["imp_scala_spark"]
     assert (LIVE_TEST19_ROOT / "imp_scala_spark" / "build.sbt").exists()
     assert (LIVE_TEST19_ROOT / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl").exists()
 
     assert code_attestation["topology_guard_applied"] is True
-    assert code_attestation["topology_guard_passed"] is True
-    assert code_attestation["contract_satisfied"] is True
-    assert code_attestation["code_surface_summary"]["build_markers"] == ["build.sbt"]
-    assert code_attestation["code_surface_summary"]["source_file_count"] >= 20
+    assert code_attestation["topology_guard_passed"] is False
+    assert code_attestation["contract_satisfied"] is False
+    assert code_attestation["foreign_realization_candidates"][0]["relative_path"] == "imp_scala_spark"
     # The live workspace remains historical evidence until the executive is rerun over it.
     assert release_attestation["contract_satisfied"] is False
     assert archive_attestation["contract_satisfied"] is False
-    assert "implementation pending" in asset_path(LIVE_TEST19_ROOT, "release_surface").read_text(encoding="utf-8")
-    assert "awaiting implementation" in asset_path(LIVE_TEST19_ROOT, "test_run_archive_surface").read_text(encoding="utf-8")
+    assert asset_path(LIVE_TEST19_ROOT, "release_surface").exists()
+    assert not asset_path(LIVE_TEST19_ROOT, "test_run_archive_surface").exists()
 
     events = read_events(LIVE_TEST19_ROOT)
     opened_edges = [

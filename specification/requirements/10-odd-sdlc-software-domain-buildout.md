@@ -352,3 +352,28 @@ to verify the req -> design -> module -> code or test traceability chain.
   satisfy the current traceability contract
 - AC-4: deterministic checks identify orphan generated source or test files
   that carry no governing trace authority
+
+### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
+
+`odd_sdlc` treats downstream installed workspaces as target projects governed by
+the method package, not as extensions of the `odd_method` source repository.
+
+Imported or understructured bootstrap input may be broad, but the first lawful
+installed shape must be conformant:
+
+- project-owned constitutional `WHAT` remains under `specification/`
+- project-owned realization `HOW` lands under `build_tenants/<tenant>/`
+- immutable released `odd_sdlc` runtime/software remains under `.odd_sdlc/`
+  rather than inside the project tenant topology
+
+**Acceptance Criteria**:
+- AC-1: downstream install and normalization project broad bootstrap input into
+  `specification/` plus `build_tenants/<tenant>/` rather than into a flat
+  top-level realization root such as `imp_*`
+- AC-2: downstream generated design, implementation, test, and traceability
+  surfaces bind to the active project tenant root rather than to
+  `build_tenants/common/` or `build_tenants/odd_sdlc/` by default
+- AC-3: released `odd_sdlc` install payload is carried under `.odd_sdlc/` and
+  does not masquerade as a project realization tenant in downstream workspaces
+- AC-4: reset/replay and subsequent bounded traversals continue to operate
+  against the tenant-rooted downstream workspace shape

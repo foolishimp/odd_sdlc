@@ -14,6 +14,10 @@ Declare one bounded bootstrap `input_set`, publish one graph function
 requirements boundary `{input_set, specification/INTENT.md,
 specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`.
 
+Where bootstrap input already implies a build tenant, the same first traversal
+must also land the conformant project-owned realization root under
+`build_tenants/<tenant>/`.
+
 ## Significant Paths
 
 - publication path: the bootstrap asset set is explicit and inspectable
@@ -27,6 +31,8 @@ specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements
   `{input_set, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements/}`
 - decomposition path: requirements output is expressed as family files rather
   than one monolithic artifact
+- topology path: tenant-bearing bootstrap input is projected into
+  `build_tenants/<tenant>/` rather than a flat ad hoc realization root
 - recursive path: intent and product remain independently derivable upstream
   assets feeding the requirements boundary
 
@@ -39,5 +45,7 @@ specification/PRODUCT.md, specification/GOALS.md} -> {specification/requirements
 4. the downstream requirements contract is inspectable at the outer boundary
 4. requirements output is rooted at `specification/requirements/` and
    folderized as requirement families
-5. intent, product, goals, and requirements remain one coherent downstream
+5. tenant-bearing bootstrap input lands a conformant `build_tenants/<tenant>/`
+   realization root on the same first traversal
+6. intent, product, goals, and requirements remain one coherent downstream
    span

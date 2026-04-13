@@ -3,10 +3,12 @@
 # Implements: REQ-F-ODDSDLC-026
 # Implements: REQ-F-ODDSDLC-027
 # Implements: REQ-F-ODDSDLC-028
+# Implements: REQ-F-ODDSDLC-032
 """Project-profile resolution for the active odd_sdlc software-domain package."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 
@@ -14,6 +16,9 @@ PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
 DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"
 DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
 AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
+TENANT_NAME_ALIASES = {
+    "spark_scala": "scala_spark",
+}
 BUILD_MARKERS = (
     "build.sbt",
     "pom.xml",
@@ -46,6 +51,28 @@ IGNORE_ROOTS = {
     "venv",
     ".venv",
 }
+NON_REALIZATION_TENANT_NAMES = {
+    "common",
+    "odd_sdlc",
+    "odd_service",
+}
+SUMMARY_IGNORED_DIR_NAMES = {
+    ".ai-workspace",
+    ".genesis",
+    ".odd_sdlc",
+    ".pytest_cache",
+    "__pycache__",
+    "design",
+    "dist",
+    "docs",
+    "node_modules",
+    "specification",
+    "test_env",
+    "test_install",
+    "test_runs",
+    "venv",
+    ".venv",
+}
 
 
 def _strip_quotes(value: str) -> str:
@@ -60,6 +87,54 @@ def _default_project_slug(workspace_root: Path) -> str:
     if not name:
         return "project"
     return name.split(".", 1)[0].replace("-", "_")
+
+
+def canonical_tenant_name(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        return "python"
+    return TENANT_NAME_ALIASES.get(normalized, normalized)
+
+
+def tenant_root_relative_path(tenant_name: str) -> str:
+    return f"build_tenants/{canonical_tenant_name(tenant_name)}"
+
+
+def tenant_output_dir(tenant_name: str) -> str:
+    return f"{tenant_root_relative_path(tenant_name)}/"
+
+
+def tenant_design_relative_path(tenant_name: str, filename: str) -> str:
+    return f"{tenant_root_relative_path(tenant_name)}/design/{filename}"
+
+
+def tenant_test_env_relative_path(tenant_name: str, filename: str) -> str:
+    return f"{tenant_root_relative_path(tenant_name)}/test_env/{filename}"
+
+
+def tenant_test_env_tests_relative_path(tenant_name: str, filename: str) -> str:
+    return f"{tenant_root_relative_path(tenant_name)}/test_env/tests/{filename}"
+
+
+def profile_tenant_root_relative_path(profile: "ProjectProfile") -> str:
+    if profile.realization_mode == "generated_proving_subset":
+        return tenant_root_relative_path(profile.tenant_name)
+    output_dir = profile.output_dir.strip().rstrip("/")
+    if output_dir.startswith("build_tenants/"):
+        return output_dir
+    return tenant_root_relative_path(profile.tenant_name)
+
+
+def profile_design_relative_path(profile: "ProjectProfile", filename: str) -> str:
+    return f"{profile_tenant_root_relative_path(profile)}/design/{filename}"
+
+
+def profile_test_env_relative_path(profile: "ProjectProfile", filename: str) -> str:
+    return f"{profile_tenant_root_relative_path(profile)}/test_env/{filename}"
+
+
+def profile_test_env_tests_relative_path(profile: "ProjectProfile", filename: str) -> str:
+    return f"{profile_tenant_root_relative_path(profile)}/test_env/tests/{filename}"
 
 
 @dataclass(frozen=True)
@@ -118,8 +193,16 @@ class ProjectProfile:
 
 def realization_candidates_for_declared_root(workspace_root: Path) -> list[dict[str, object]]:
     profile = load_project_profile(workspace_root)
-    declared_top_level = Path(profile.declared_output_dir).parts[0] if profile.declared_output_dir else None
-    return _top_level_realization_candidates(workspace_root, selected_top_level=declared_top_level)
+    selected_relative = Path(profile.declared_output_dir.strip("/")) if profile.declared_output_dir else None
+    return _realization_candidates(workspace_root, selected_relative=selected_relative)
+
+
+def realization_candidates_for_selected_root(workspace_root: Path) -> list[dict[str, object]]:
+    profile = load_project_profile(workspace_root)
+    return _realization_candidates(
+        workspace_root,
+        selected_relative=Path(profile.code_relative_path().strip("/")),
+    )
 
 
 def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> list[dict[str, object]]:
@@ -136,7 +219,7 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
                 "ambiguity_id": "multiple-realization-roots",
                 "class": "multiple_realization_roots",
                 "title": "Multiple plausible realization roots are present",
-                "description": "The workspace declares one realization root while other top-level trees also appear to contain governed product realization.",
+                "description": "The workspace declares one realization root while other workspace trees, including sibling build_tenants, also appear to contain governed product realization.",
                 "severity": "major",
                 "status": "open",
                 "hard_stop": False,
@@ -295,17 +378,26 @@ def _code_root_summary(path: Path) -> dict[str, int | list[str] | bool]:
     source_file_count = 0
     test_source_file_count = 0
     test_report_file_count = 0
-    for child in path.rglob("*"):
-        if not child.is_file():
+    for current_root, dirnames, filenames in os.walk(path):
+        dirnames[:] = [
+            dirname
+            for dirname in dirnames
+            if dirname not in SUMMARY_IGNORED_DIR_NAMES
+        ]
+        current_path = Path(current_root)
+        relative_parts = current_path.relative_to(path).parts if current_path != path else ()
+        if any(part == "target" for part in relative_parts):
+            for filename in filenames:
+                child = current_path / filename
+                if child.suffix == ".xml" and "test-reports" in child.parts:
+                    test_report_file_count += 1
             continue
-        if any(part in {"target", "__pycache__", ".pytest_cache"} for part in child.parts):
-            if child.suffix == ".xml" and "test-reports" in child.parts:
-                test_report_file_count += 1
-            continue
-        if child.suffix in SOURCE_EXTENSIONS:
-            source_file_count += 1
-            if "test" in child.parts:
-                test_source_file_count += 1
+        for filename in filenames:
+            child = current_path / filename
+            if child.suffix in SOURCE_EXTENSIONS:
+                source_file_count += 1
+                if "test" in child.parts:
+                    test_source_file_count += 1
     return {
         "exists": True,
         "build_markers": build_markers,
@@ -323,36 +415,105 @@ def _realization_score(summary: dict[str, int | list[str] | bool]) -> int:
     return (100 * len(build_markers)) + source_file_count + (2 * test_source_file_count) + (5 * test_report_file_count)
 
 
-def _top_level_realization_candidates(workspace_root: Path, *, selected_top_level: str | None) -> list[dict[str, object]]:
+def _candidate_entry(workspace_root: Path, path: Path) -> dict[str, object] | None:
+    summary = _code_root_summary(path)
+    if not summary["build_markers"] and int(summary["source_file_count"]) < 4 and int(summary["test_report_file_count"]) == 0:
+        return None
+    return {
+        "relative_path": path.relative_to(workspace_root).as_posix(),
+        "build_markers": list(summary["build_markers"]),
+        "source_file_count": int(summary["source_file_count"]),
+        "test_source_file_count": int(summary["test_source_file_count"]),
+        "test_report_file_count": int(summary["test_report_file_count"]),
+        "score": _realization_score(summary),
+    }
+
+
+def _top_level_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
     candidates: list[dict[str, object]] = []
     for entry in sorted(workspace_root.iterdir(), key=lambda item: item.name):
         if not entry.is_dir():
             continue
         if entry.name in IGNORE_ROOTS or entry.name.startswith("."):
             continue
-        if selected_top_level and entry.name == selected_top_level:
+        if selected_relative and _is_selected_or_ancestor(
+            entry.relative_to(workspace_root).as_posix(),
+            selected_relative.as_posix() if selected_relative else None,
+        ):
             continue
-        summary = _code_root_summary(entry)
-        if not summary["build_markers"] and int(summary["source_file_count"]) < 4 and int(summary["test_report_file_count"]) == 0:
+        candidate = _candidate_entry(workspace_root, entry)
+        if candidate is not None:
+            candidates.append(candidate)
+    return candidates
+
+
+def _is_selected_or_ancestor(candidate_path: str, selected_path: str | None) -> bool:
+    """Return True when *candidate_path* is the selected root or an ancestor of it."""
+    if selected_path is None:
+        return False
+    if candidate_path == selected_path:
+        return True
+    return selected_path.startswith(candidate_path + "/")
+
+
+def _build_tenant_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
+    build_tenants_root = workspace_root / "build_tenants"
+    if not build_tenants_root.exists() or not build_tenants_root.is_dir():
+        return []
+
+    selected_relative_posix = selected_relative.as_posix() if selected_relative is not None else None
+    candidates: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for tenant_root in sorted(build_tenants_root.iterdir(), key=lambda item: item.name):
+        if not tenant_root.is_dir():
             continue
-        candidates.append(
-            {
-                "relative_path": entry.relative_to(workspace_root).as_posix(),
-                "build_markers": list(summary["build_markers"]),
-                "source_file_count": int(summary["source_file_count"]),
-                "test_source_file_count": int(summary["test_source_file_count"]),
-                "test_report_file_count": int(summary["test_report_file_count"]),
-                "score": _realization_score(summary),
-            }
-        )
+        if tenant_root.name in NON_REALIZATION_TENANT_NAMES:
+            continue
+        tenant_candidate = _candidate_entry(workspace_root, tenant_root)
+        if tenant_candidate is not None:
+            relative_path = str(tenant_candidate["relative_path"])
+            if not _is_selected_or_ancestor(relative_path, selected_relative_posix) and relative_path not in seen:
+                seen.add(relative_path)
+                candidates.append(tenant_candidate)
+            continue
+
+        for child in sorted(tenant_root.iterdir(), key=lambda item: item.name):
+            if not child.is_dir():
+                continue
+            candidate = _candidate_entry(workspace_root, child)
+            if candidate is None:
+                continue
+            relative_path = str(candidate["relative_path"])
+            if _is_selected_or_ancestor(relative_path, selected_relative_posix) or relative_path in seen:
+                continue
+            seen.add(relative_path)
+            candidates.append(candidate)
+    return candidates
+
+
+def _realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
+    candidates: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for candidate in _top_level_realization_candidates(workspace_root, selected_relative=selected_relative):
+        relative_path = str(candidate["relative_path"])
+        if relative_path in seen:
+            continue
+        seen.add(relative_path)
+        candidates.append(candidate)
+    for candidate in _build_tenant_realization_candidates(workspace_root, selected_relative=selected_relative):
+        relative_path = str(candidate["relative_path"])
+        if relative_path in seen:
+            continue
+        seen.add(relative_path)
+        candidates.append(candidate)
     return candidates
 
 
 def _resolved_output_from_topology(workspace_root: Path, declared_output_dir: str) -> tuple[str, str] | None:
     declared_path = workspace_root / declared_output_dir
     declared_summary = _code_root_summary(declared_path)
-    selected_top_level = Path(declared_output_dir).parts[0] if declared_output_dir else None
-    candidates = _top_level_realization_candidates(workspace_root, selected_top_level=selected_top_level)
+    selected_relative = Path(declared_output_dir.strip("/")) if declared_output_dir else None
+    candidates = _realization_candidates(workspace_root, selected_relative=selected_relative)
     if not candidates:
         return None
 
@@ -435,27 +596,101 @@ def _parse_constraints_lines(path: Path) -> dict[str, str]:
     return values
 
 
+def parse_design_tenants(path: Path) -> list[dict[str, str]]:
+    tenants: list[dict[str, str]] = []
+    if not path.exists():
+        return tenants
+
+    section = ""
+    in_design_tenants = False
+    current_tenant: dict[str, str] | None = None
+
+    def _flush_current() -> None:
+        nonlocal current_tenant
+        if current_tenant is not None:
+            tenants.append(current_tenant)
+            current_tenant = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped == "project:":
+            _flush_current()
+            section = "project"
+            in_design_tenants = False
+            continue
+        if stripped == "structure:":
+            _flush_current()
+            section = "structure"
+            in_design_tenants = False
+            continue
+        if stripped == "constraints:":
+            _flush_current()
+            section = "constraints"
+            in_design_tenants = False
+            continue
+        if section == "structure" and stripped == "design_tenants:":
+            in_design_tenants = True
+            continue
+        if section == "structure" and stripped.startswith("root_code_policy:"):
+            _flush_current()
+            in_design_tenants = False
+            continue
+
+        if in_design_tenants and stripped.startswith("- name:"):
+            _flush_current()
+            current_tenant = {
+                "name": canonical_tenant_name(_strip_quotes(stripped.partition(":")[2])),
+            }
+            continue
+
+        if current_tenant is not None and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            current_tenant[key.strip()] = _strip_quotes(value)
+
+    _flush_current()
+    return tenants
+
+
 def load_project_profile(workspace_root: Path) -> ProjectProfile:
     constraints = _parse_constraints_lines(workspace_root / PROJECT_CONSTRAINTS_PATH)
     workspace_name = workspace_root.resolve().name
     project_slug = constraints.get("name") or _default_project_slug(workspace_root)
-    tenant_name = constraints.get("tenant_name") or "python"
+    tenant_name = canonical_tenant_name(constraints.get("tenant_name") or "python")
     declared_output_dir = constraints.get("tenant_output_dir", "")
+    canonical_output_dir = tenant_output_dir(tenant_name)
+    canonical_output_path = workspace_root / canonical_output_dir
 
     if declared_output_dir:
         declared_path = workspace_root / declared_output_dir
-        recovered = _resolved_output_from_topology(workspace_root, declared_output_dir)
-        if recovered is not None:
-            output_dir, resolution_reason = recovered
+        declared_summary = _code_root_summary(declared_path)
+        declared_realized = bool(declared_summary["build_markers"]) or int(declared_summary["source_file_count"]) > 0
+        canonical_summary = _code_root_summary(canonical_output_path)
+        canonical_realized = bool(canonical_summary["build_markers"]) or int(canonical_summary["source_file_count"]) > 0
+        if canonical_realized:
+            output_dir = canonical_output_dir
             realization_mode = "selected_output_tree"
+            resolution_reason = "canonical_tenant_root"
+        elif declared_realized:
+            output_dir = declared_output_dir
+            realization_mode = "selected_output_tree"
+            resolution_reason = "declared_output_tree"
         elif declared_path.exists():
             output_dir = declared_output_dir
-            realization_mode = "selected_output_tree"
-            resolution_reason = "project_constraints"
-        else:
-            output_dir = declared_output_dir
             realization_mode = "planned_output_tree"
-            resolution_reason = "project_constraints_declared_output_tree"
+            resolution_reason = "legacy_declared_output_tree_pending_migration"
+        else:
+            output_dir = canonical_output_dir
+            realization_mode = "planned_output_tree"
+            resolution_reason = "canonical_tenant_root_planned"
+        # Once constraints are canonicalized to the tenant root, keep that root authoritative.
+        # Competing realized trees should surface as ambiguity, not silently replace the declared root.
+        allow_topology_recovery = declared_output_dir != canonical_output_dir
+        topology_recovery = _resolved_output_from_topology(workspace_root, declared_output_dir) if allow_topology_recovery else None
+        if topology_recovery is not None:
+            output_dir, resolution_reason = topology_recovery
+            realization_mode = "selected_output_tree"
     else:
         output_dir = DEFAULT_PROVING_CODE_RELATIVE_PATH
         realization_mode = "generated_proving_subset"

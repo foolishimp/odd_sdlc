@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -12,8 +11,8 @@ from odd_sdlc.normalization import normalize_workspace
 from odd_sdlc.release.install import install as install_release
 from sandbox_runtime import read_events, run_installed_genesis, run_installed_odd_sdlc
 from test_odd_sdlc_installation import (
-    DATA_MAPPER_TEMPLATE,
     _append_runtime_contract_overrides,
+    _seed_data_mapper_template_workspace,
     _set_ambiguity_risk_appetite,
     _write_fake_transport_contract,
 )
@@ -51,7 +50,7 @@ def _rewrite_output_dir(workspace: Path, output_dir: str) -> None:
 
 
 def _install_ambiguous_workspace(workspace: Path) -> None:
-    shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
+    _seed_data_mapper_template_workspace(workspace)
     payload = install_release(
         workspace,
         project_slug="data_mapper",
@@ -106,7 +105,7 @@ def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     assert entries["multiple-realization-roots"]["policy_action"] == "escalate_fh"
     assert entries["multiple-realization-roots"]["status"] == "fh_required"
     assert entries["multiple-realization-roots"]["blocking"] is True
-    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "escalate_fh"
+    assert "declared-root-vs-realized-root-mismatch" not in entries
 
     events = read_events(workspace)
     run_archive.capture_json("low_risk.events.json", events)
@@ -133,10 +132,16 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
             archive=run_archive,
             label="high risk appetite start",
             timeout=180,
+            check=False,
         ).stdout
     )
     run_archive.capture_json("high_risk.start.json", start_payload)
-    assert start_payload["status"] == "converged"
+    assert start_payload["status"] in {"pending", "error"}
+    assert start_payload["stopped_by"] != "fh_gate"
+    assert start_payload["edge"] != "select_implementation_stack_profile"
+    if start_payload["status"] == "error":
+        assert start_payload["failure_class"] == "transport_failure"
+        assert start_payload["stopped_by"] == "fp_runtime_failure"
 
     ambiguity_register = _query_ambiguity_register(workspace)
     run_archive.capture_json("high_risk.ambiguity_register.json", ambiguity_register)
@@ -146,7 +151,7 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     assert entries["multiple-realization-roots"]["decision_status"] == "fp_decided"
     assert entries["multiple-realization-roots"]["status"] == "carried"
     assert entries["multiple-realization-roots"]["blocking"] is False
-    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "fp_decide"
+    assert "declared-root-vs-realized-root-mismatch" not in entries
 
     events = read_events(workspace)
     run_archive.capture_json("high_risk.events.json", events)

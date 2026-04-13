@@ -14,6 +14,14 @@ Its retained capability content must be re-adopted explicitly into the active
 software-domain surface. Nothing in this file remains current operative law by
 inertia.
 
+Historical references here to `build_tenants/odd_sdlc/` describe the original
+`odd_method` source-repository proving slice only. They do not define
+downstream installed-workspace topology, which is governed by
+`REQ-F-ODDSDLC-032`.
+
+The acceptance criteria below are retained as historical provenance, not as
+current operative law for downstream workspaces.
+
 ### REQ-F-ODDSDLC-001 — odd_sdlc is the first live tenant package
 
 `odd_sdlc` is the first live tenant package on the `odd_method` line.

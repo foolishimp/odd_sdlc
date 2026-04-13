@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import json
-import shutil
-
 import pytest
 
 from odd_sdlc.release.install import install as install_release
 from sandbox_runtime import run_installed_genesis, run_installed_odd_sdlc
 from test_odd_sdlc_installation import (
-    DATA_MAPPER_TEMPLATE,
     _append_runtime_contract_overrides,
     _append_tenant_capability_contracts,
+    _seed_data_mapper_template_workspace,
     _write_fake_transport_contract,
 )
 
 
 def _install_data_mapper_with_fake_transport(workspace):
-    shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
+    _seed_data_mapper_template_workspace(workspace)
     payload = install_release(
         workspace,
         project_slug="data_mapper",

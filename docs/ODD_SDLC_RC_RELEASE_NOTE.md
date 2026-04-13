@@ -75,7 +75,17 @@ Targeted red-lane recovery:
 Framework suite:
 
 - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
-- result: `36 passed, 4 skipped in 542.71s`
+- result: green at the RC boundary cut; subsequent follow-on topology,
+  traceability, and iterator regressions were added afterward and are tracked
+  through their own targeted lanes
+
+Current targeted follow-on regressions:
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_fd_evidence.py -q`
+- result: green
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test28_regression.py -q`
+- result: green
 
 Installed-workspace recovery:
 
@@ -85,8 +95,7 @@ Installed-workspace recovery:
 
 ## Known RC Limitation
 
-Generated trace-path discovery is still self-hosting-oriented and resolves some
-surfaces through fixed `build_tenants/odd_sdlc/python/...` paths.
+The full homeostatic gap-triage loop remains post-RC work.
 
 This is documented in [ODD_SDLC_RC_NOTES.md](/Users/jim/src/apps/odd_method/docs/ODD_SDLC_RC_NOTES.md)
-and is accepted as non-blocking for this RC.
+and remains outside this RC cut.

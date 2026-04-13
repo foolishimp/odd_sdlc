@@ -4,6 +4,7 @@
 # Implements: REQ-F-ODDSDLC-020
 # Implements: REQ-F-ODDSDLC-027
 # Implements: REQ-F-ODDSDLC-029
+# Implements: REQ-F-ODDSDLC-032
 """Active odd_sdlc asset inventory and bindings for software-domain workspaces."""
 from __future__ import annotations
 
@@ -22,7 +23,15 @@ from .domain_model import (
     AssetProvenance,
     relative_file_uri,
 )
-from .project_profile import DEFAULT_PROVING_CODE_RELATIVE_PATH, ProjectProfile, load_project_profile
+from .project_profile import (
+    DEFAULT_PROVING_CODE_RELATIVE_PATH,
+    ProjectProfile,
+    load_project_profile,
+    profile_design_relative_path,
+    profile_test_env_relative_path,
+    profile_test_env_tests_relative_path,
+    realization_candidates_for_selected_root,
+)
 from .traceability import (
     REQUIREMENT_CLOSURE_REGISTER_KIND,
     REQUIREMENT_CLOSURE_REGISTER_PATH,
@@ -36,28 +45,43 @@ ASSET_PATHS: tuple[tuple[str, str], ...] = (
     ("ambiguity_register_surface", AMBIGUITY_REGISTER_PATH.as_posix()),
     ("requirement_closure_register_surface", REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix()),
     ("requirement_surface", "specification/requirements"),
-    ("feature_decomp_surface", "build_tenants/common/design/20-generated-feature-decomp.md"),
+    ("feature_decomp_surface", "build_tenants/<tenant>/design/20-generated-feature-decomp.md"),
     ("uat_testcases_surface", "specification/scenarios/20-generated-uat-testcases.md"),
-    ("design_surface", "build_tenants/common/design/30-generated-odd-design.md"),
-    ("review_assessment_surface", "build_tenants/common/design/35-generated-review-assessments.md"),
-    ("consensus_decision_surface", "build_tenants/common/design/35-generated-consensus-decision.md"),
-    ("reviewed_design_surface", "build_tenants/common/design/35-reviewed-odd-design.md"),
+    ("design_surface", "build_tenants/<tenant>/design/30-generated-odd-design.md"),
+    ("review_assessment_surface", "build_tenants/<tenant>/design/35-generated-review-assessments.md"),
+    ("consensus_decision_surface", "build_tenants/<tenant>/design/35-generated-consensus-decision.md"),
+    ("reviewed_design_surface", "build_tenants/<tenant>/design/35-reviewed-odd-design.md"),
     ("testcase_authority_surface", "specification/scenarios/30-generated-testcase-authority.md"),
     ("scenario_surface", "specification/scenarios/40-generated-scenarios.md"),
-    ("implementation_design_surface", "build_tenants/odd_sdlc/python/design/40-generated-implementation-design.md"),
-    ("implementation_stack_profile", "build_tenants/odd_sdlc/python/design/40-generated-implementation-stack.md"),
-    ("implementation_module_surface", "build_tenants/odd_sdlc/python/design/40-generated-implementation-modules.md"),
+    ("implementation_design_surface", "build_tenants/<tenant>/design/40-generated-implementation-design.md"),
+    ("implementation_stack_profile", "build_tenants/<tenant>/design/40-generated-implementation-stack.md"),
+    ("implementation_module_surface", "build_tenants/<tenant>/design/40-generated-implementation-modules.md"),
     ("code_surface", DEFAULT_PROVING_CODE_RELATIVE_PATH),
-    ("test_design_surface", "build_tenants/odd_sdlc/python/design/40-generated-test-design.md"),
-    ("test_stack_profile", "build_tenants/odd_sdlc/python/test_env/40-generated-test-stack.md"),
-    ("test_module_surface", "build_tenants/odd_sdlc/python/test_env/tests/40-generated-test-modules.md"),
-    ("test_run_archive_surface", "build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md"),
+    ("test_design_surface", "build_tenants/<tenant>/design/40-generated-test-design.md"),
+    ("test_stack_profile", "build_tenants/<tenant>/test_env/40-generated-test-stack.md"),
+    ("test_module_surface", "build_tenants/<tenant>/test_env/tests/40-generated-test-modules.md"),
+    ("test_run_archive_surface", "build_tenants/<tenant>/test_env/50-generated-run-archive.md"),
     ("release_surface", "docs/40-generated-release.md"),
     ("deployment_surface", "docs/50-generated-deployment.md"),
     ("runtime_observation_surface", "docs/60-generated-runtime-observation.md"),
-    ("retrofit_plan_surface", "build_tenants/odd_sdlc/python/design/60-generated-retrofit-plan.md"),
+    ("retrofit_plan_surface", "build_tenants/<tenant>/design/60-generated-retrofit-plan.md"),
 )
 ASSET_RELATIVE_PATHS = dict(ASSET_PATHS)
+DYNAMIC_TENANT_ASSET_IDS = {
+    "feature_decomp_surface",
+    "design_surface",
+    "review_assessment_surface",
+    "consensus_decision_surface",
+    "reviewed_design_surface",
+    "implementation_design_surface",
+    "implementation_stack_profile",
+    "implementation_module_surface",
+    "test_design_surface",
+    "test_stack_profile",
+    "test_module_surface",
+    "test_run_archive_surface",
+    "retrofit_plan_surface",
+}
 ASSET_PRIMARY_MEMBERS: dict[str, tuple[str, ...]] = {
     "requirement_surface": ("10-generated-bootstrap.md",),
 }
@@ -351,7 +375,40 @@ def asset_relative_path(asset_id: str) -> str:
         raise ValueError(f"Unsupported asset_id {asset_id!r}") from exc
 
 
+def _tenant_asset_relative_path(workspace_root: Path, asset_id: str) -> str:
+    profile = load_project_profile(workspace_root)
+    if asset_id == "feature_decomp_surface":
+        return profile_design_relative_path(profile, "20-generated-feature-decomp.md")
+    if asset_id == "design_surface":
+        return profile_design_relative_path(profile, "30-generated-odd-design.md")
+    if asset_id == "review_assessment_surface":
+        return profile_design_relative_path(profile, "35-generated-review-assessments.md")
+    if asset_id == "consensus_decision_surface":
+        return profile_design_relative_path(profile, "35-generated-consensus-decision.md")
+    if asset_id == "reviewed_design_surface":
+        return profile_design_relative_path(profile, "35-reviewed-odd-design.md")
+    if asset_id == "implementation_design_surface":
+        return profile_design_relative_path(profile, "40-generated-implementation-design.md")
+    if asset_id == "implementation_stack_profile":
+        return profile_design_relative_path(profile, "40-generated-implementation-stack.md")
+    if asset_id == "implementation_module_surface":
+        return profile_design_relative_path(profile, "40-generated-implementation-modules.md")
+    if asset_id == "test_design_surface":
+        return profile_design_relative_path(profile, "40-generated-test-design.md")
+    if asset_id == "test_stack_profile":
+        return profile_test_env_relative_path(profile, "40-generated-test-stack.md")
+    if asset_id == "test_module_surface":
+        return profile_test_env_tests_relative_path(profile, "40-generated-test-modules.md")
+    if asset_id == "test_run_archive_surface":
+        return profile_test_env_relative_path(profile, "50-generated-run-archive.md")
+    if asset_id == "retrofit_plan_surface":
+        return profile_design_relative_path(profile, "60-generated-retrofit-plan.md")
+    raise ValueError(f"Unsupported dynamic tenant asset_id {asset_id!r}")
+
+
 def resolved_asset_relative_path(workspace_root: Path, asset_id: str) -> str:
+    if asset_id in DYNAMIC_TENANT_ASSET_IDS:
+        return _tenant_asset_relative_path(workspace_root, asset_id)
     if asset_id != "code_surface":
         return asset_relative_path(asset_id)
     return load_project_profile(workspace_root).code_relative_path()
@@ -496,6 +553,30 @@ def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
                 if path.is_file() and path not in seen:
                     seen.add(path)
                     report_files.append(path)
+    foreign_report_files: list[Path] = []
+    seen_foreign: set[Path] = set()
+    selected_code_root_name = _selected_code_root_name(workspace_root)
+    for child in sorted(workspace_root.iterdir()):
+        if not child.is_dir() or child.name in GOVERNANCE_TOP_LEVEL_NAMES or child.name == selected_code_root_name:
+            continue
+        for pattern in TEST_REPORT_PATTERNS:
+            for path in child.glob(pattern):
+                if path.is_file() and path not in seen_foreign:
+                    seen_foreign.add(path)
+                    foreign_report_files.append(path)
+    active_build_tenant_root = _selected_build_tenant_root(workspace_root)
+    build_tenants_root = workspace_root / "build_tenants"
+    if build_tenants_root.exists() and build_tenants_root.is_dir():
+        for tenant_root in sorted(build_tenants_root.iterdir()):
+            if not tenant_root.is_dir():
+                continue
+            if active_build_tenant_root is not None and tenant_root == active_build_tenant_root:
+                continue
+            for pattern in TEST_REPORT_PATTERNS:
+                for path in tenant_root.glob(pattern):
+                    if path.is_file() and path not in seen_foreign:
+                        seen_foreign.add(path)
+                        foreign_report_files.append(path)
     tests = 0
     failures = 0
     errors = 0
@@ -519,6 +600,10 @@ def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
         path.relative_to(workspace_root).as_posix()
         for path in sorted(report_files)
     ]
+    ungoverned_report_paths = [
+        path.relative_to(workspace_root).as_posix()
+        for path in sorted((*report_files, *foreign_report_files))
+    ]
     if not profile.has_test_execution_capability():
         return {
             "report_file_count": 0,
@@ -528,8 +613,8 @@ def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
             "errors": 0,
             "skipped": 0,
             "report_paths": [],
-            "ungoverned_report_file_count": len(report_files),
-            "ungoverned_report_paths": report_paths,
+            "ungoverned_report_file_count": len(ungoverned_report_paths),
+            "ungoverned_report_paths": ungoverned_report_paths,
         }
     return {
         "report_file_count": len(report_files),
@@ -539,8 +624,11 @@ def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
         "errors": errors,
         "skipped": skipped,
         "report_paths": report_paths,
-        "ungoverned_report_file_count": 0,
-        "ungoverned_report_paths": [],
+        "ungoverned_report_file_count": len(foreign_report_files),
+        "ungoverned_report_paths": [
+            path.relative_to(workspace_root).as_posix()
+            for path in sorted(foreign_report_files)
+        ],
     }
 
 
@@ -553,40 +641,19 @@ def _selected_code_root_name(workspace_root: Path) -> str | None:
     return relative.parts[0] if relative.parts else None
 
 
+def _selected_build_tenant_root(workspace_root: Path) -> Path | None:
+    selected = asset_path(workspace_root, "code_surface")
+    try:
+        relative = selected.relative_to(workspace_root)
+    except ValueError:
+        return None
+    if len(relative.parts) >= 2 and relative.parts[0] == "build_tenants":
+        return workspace_root / relative.parts[0] / relative.parts[1]
+    return None
+
+
 def foreign_realization_candidates(workspace_root: Path) -> list[dict[str, object]]:
-    selected_code_root_name = _selected_code_root_name(workspace_root)
-    candidates: list[dict[str, object]] = []
-    for child in sorted(workspace_root.iterdir()):
-        if not child.is_dir() or child.name in GOVERNANCE_TOP_LEVEL_NAMES or child.name == selected_code_root_name:
-            continue
-        build_markers = [marker for marker in SOFTWARE_BUILD_MARKERS if (child / marker).is_file()]
-        source_files = sum(1 for path in child.rglob("*") if path.is_file() and _is_realization_file(path, root=child))
-        test_source_files = sum(
-            1
-            for path in child.rglob("*")
-            if path.is_file()
-            and _is_realization_file(path, root=child)
-            and "test" in {part.lower() for part in path.relative_to(child).parts}
-        )
-        test_report_files = _test_report_count(child)
-        if not build_markers and source_files == 0 and test_report_files == 0:
-            continue
-        if not (
-            (build_markers and source_files > 0)
-            or (source_files >= 5)
-            or (source_files > 0 and test_report_files > 0)
-        ):
-            continue
-        candidates.append(
-            {
-                "relative_path": child.relative_to(workspace_root).as_posix(),
-                "build_markers": build_markers,
-                "source_file_count": source_files,
-                "test_source_file_count": test_source_files,
-                "test_report_file_count": test_report_files,
-            }
-        )
-    return candidates
+    return realization_candidates_for_selected_root(workspace_root)
 
 
 def assess_realization_topology(workspace_root: Path) -> dict[str, object]:
