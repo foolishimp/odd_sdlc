@@ -12,10 +12,10 @@ from typing import Any
 from .project_profile import (
     IGNORE_ROOTS,
     SOURCE_EXTENSIONS,
-    current_workspace_input_fingerprint,
     is_source_domain_repo_workspace,
     load_project_profile,
     load_published_workspace_state,
+    published_analysis_is_current,
     profile_design_relative_path,
     profile_test_env_tests_relative_path,
 )
@@ -548,9 +548,7 @@ def load_published_requirement_closure_register(workspace_root: Path) -> dict[st
     workspace_state = load_published_workspace_state(workspace_root)
     if not isinstance(workspace_state, dict):
         return None
-    if not bool(workspace_state.get("ready")):
-        return None
-    if workspace_state.get("input_fingerprint") != current_workspace_input_fingerprint(workspace_root):
+    if not published_analysis_is_current(workspace_root):
         return None
     path = workspace_root / REQUIREMENT_CLOSURE_REGISTER_PATH
     if not path.exists():

@@ -36,6 +36,9 @@ The project must deliver:
 - an iterative SDLC operating model where partial waves are lawful, but
   unresolved live requirements remain active closure pressure across future
   waves until they are realized, withdrawn, or superseded
+- a homeostatic renewal path where observation and gap analysis lawfully
+  re-enter the constitutional chain instead of collapsing directly into ambient
+  repair
 - an on-demand application lane where a bounded request can be gated, carried
   through the full ODD SDLC, and closed as a deployed release
 - a dedicated-release model for existing applications so one operator,
@@ -60,6 +63,9 @@ The project is constrained by these rules:
 - unresolved live requirements must not disappear after a partial wave,
   deferment, or scoped iteration; they remain binding constitutional pressure
   until they are explicitly realized, withdrawn, or superseded
+- homeostatic renewal must remain explicit: observation, triage, route
+  selection, and constitutional repricing are distinct lawful acts rather than
+  hidden control flow
 - any orchestration or service layer incubated inside `odd_method` must remain
   subordinate to ABG for runs, events, convergence, lineage, and provenance
 - capability claims require written testcase authority and scenario proof

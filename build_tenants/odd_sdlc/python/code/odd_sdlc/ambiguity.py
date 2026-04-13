@@ -9,10 +9,10 @@ from typing import Any
 
 from .project_profile import (
     DEFAULT_AMBIGUITY_RISK_APPETITE,
-    current_workspace_input_fingerprint,
     detect_project_profile_ambiguities,
     load_project_profile,
     load_published_workspace_state,
+    published_analysis_is_current,
 )
 
 
@@ -280,9 +280,7 @@ def load_published_ambiguity_register(workspace_root: Path) -> dict[str, Any] | 
     workspace_state = load_published_workspace_state(workspace_root)
     if not isinstance(workspace_state, dict):
         return None
-    if not bool(workspace_state.get("ready")):
-        return None
-    if workspace_state.get("input_fingerprint") != current_workspace_input_fingerprint(workspace_root):
+    if not published_analysis_is_current(workspace_root):
         return None
     path = workspace_root / AMBIGUITY_REGISTER_PATH
     if not path.exists():

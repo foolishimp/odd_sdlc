@@ -2,8 +2,8 @@
 
 **Status**: Active
 **Date**: 2026-04-06
-**Implements**: REQ-F-ODDSDLC-005
-**Derives From**: `build_tenants/common/design/adrs/ADR-006-abg-runtime-and-odd-query-plugin-boundary.md`, `specification/requirements/08-odd-sdlc-first-slice.md`
+**Implements**: REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-033, REQ-F-ODDSDLC-037
+**Derives From**: `build_tenants/common/design/adrs/ADR-006-abg-runtime-and-odd-query-plugin-boundary.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`, `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
 
 ## Position
 
@@ -37,7 +37,8 @@ It is intended to answer:
 - what assets exist
 - what semantic types they carry
 - what functions and bindings exist
-- what the current domain gap picture is
+- what the current domain gap picture is, including current analysis freshness,
+  edge-scoped observation, triage, route, and gated constitutional state
 
 It is not intended to answer:
 
@@ -99,6 +100,19 @@ The current asset-node binding surface.
 ### `gaps`
 
 The current domain gap picture for the tenant.
+
+At minimum this field must be rich enough to expose:
+
+- current analysis identity and freshness state
+- current edge-scoped observation state
+- current edge-scoped triage state
+- current route binding or unresolved-route state
+- current gated constitutional proposal state where applicable
+
+This remains current-state domain projection.
+
+It does not replace ABG event truth for full history, causation, or approval
+lineage.
 
 ## Consumer Model
 

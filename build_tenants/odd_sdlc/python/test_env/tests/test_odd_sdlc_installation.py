@@ -30,10 +30,11 @@ if str(CODE_PATH) not in sys.path:
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
-from odd_sdlc.analysis import load_workspace_state  # noqa: E402
+from odd_sdlc.analysis import load_analysis_manifest, load_workspace_state  # noqa: E402
 from odd_sdlc.app import bootstrap, initialize  # noqa: E402
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
+    ANALYSIS_MANIFEST_PATH,
     WORKSPACE_STATE_PATH,
     detect_project_profile_ambiguities,
     load_project_profile,
@@ -267,6 +268,7 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_ambiguity_register",
         "create_requirement_closure_register",
         "create_requirement_closure_prompt_context",
+        "create_analysis_manifest",
         "create_workspace_state",
     ]
 
@@ -324,7 +326,19 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert workspace_state["ready"] is True
     assert workspace_state["workspace_mode"] == "governed_workspace"
     assert workspace_state["project_profile"]["tenant_name"] == "scala_spark"
+    assert workspace_state["analysis_manifest_path"] == ANALYSIS_MANIFEST_PATH.as_posix()
+    analysis_manifest = load_analysis_manifest(workspace)
+    assert analysis_manifest is not None
+    assert analysis_manifest["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    assert analysis_manifest["analysis_fingerprint"] == workspace_state["analysis_fingerprint"]
+    assert {entry["artifact_kind"] for entry in analysis_manifest["published_artifacts"]} == {
+        "ambiguity_register",
+        "requirement_closure_register",
+        "requirement_closure_prompt_context",
+    }
+    assert any(entry["input_kind"] == "project_constraints" for entry in analysis_manifest["source_inputs"])
     assert report["workspace_state_path"] == WORKSPACE_STATE_PATH.as_posix()
+    assert report["analysis_manifest_path"] == ANALYSIS_MANIFEST_PATH.as_posix()
 
     second = normalize_workspace(
         workspace,
@@ -365,7 +379,10 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     assert workspace_state is not None
     assert workspace_state["ready"] is True
     assert workspace_state["workspace_mode"] == "installed_target"
-    assert workspace_state["input_fingerprint"]
+    assert workspace_state["analysis_fingerprint"]
+    analysis_manifest = load_analysis_manifest(workspace)
+    assert analysis_manifest is not None
+    assert analysis_manifest["analysis_fingerprint"] == workspace_state["analysis_fingerprint"]
     claude_text = (workspace / "CLAUDE.md").read_text(encoding="utf-8")
     agents_text = (workspace / "AGENTS.md").read_text(encoding="utf-8")
     for text in (claude_text, agents_text):
@@ -985,6 +1002,7 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
     assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_method/python/src/main/logic.py"]
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
+    assert queried["analysis_manifest"] is None
     queried_entries = {
         entry["requirement_id"]: entry
         for entry in queried["requirement_closure_register"]["requirements"]
@@ -1155,6 +1173,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
     }.isdisjoint({"multiple_realization_roots", "declared_root_vs_realized_root_mismatch"})
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
+    assert queried["analysis_manifest"] is None
     assert queried["requirement_closure_register"]["traceability"]["code_root"] == "build_tenants/odd_sdlc/python"
     queried_entries = {
         entry["requirement_id"]: entry

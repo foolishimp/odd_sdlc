@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[5]
 GENESIS_PATH = ROOT / ".genesis"
 CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 GRAPH_FUNCTION_NAMES = [
     "bootstrap_release_self_test",
@@ -38,8 +40,8 @@ if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
 
 import odd_sdlc.app as app_module  # noqa: E402
-from odd_sdlc.analysis import refresh_analysis, workspace_state_ready  # noqa: E402
-from odd_sdlc.app import bootstrap, catalog, initialize, start  # noqa: E402
+from odd_sdlc.analysis import load_analysis_manifest, refresh_analysis, workspace_state_ready  # noqa: E402
+from odd_sdlc.app import bootstrap, catalog, gaps, initialize, start  # noqa: E402
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
     BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
@@ -60,6 +62,7 @@ from odd_sdlc.traceability import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
     load_or_build_requirement_closure_register,
 )
+from odd_sdlc.triage import CURRENT_TRIAGE_DIR, enrich_gap_snapshot, load_current_edge_triage  # noqa: E402
 from odd_sdlc.workspace_assets import (  # noqa: E402
     ASSET_PATHS,
     CODE_SURFACE_PREFIXES,
@@ -71,6 +74,8 @@ from odd_sdlc.workspace_assets import (  # noqa: E402
     resolved_asset_relative_path,
 )
 from genesis.binding import ContextResolver, _assemble_prompt, module_to_executable_jobs  # noqa: E402
+from genesis.cli_adapter import _emit_event_cmd  # noqa: E402
+from genesis.events import emit  # noqa: E402
 
 
 def _seed_workspace(path: Path) -> None:
@@ -120,6 +125,26 @@ def _read_events(workspace_root: Path) -> list[dict]:
         for line in events_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def _goal_gap_payload(delta_summary: str = "goal surface remains insufficient under the current constitution") -> dict[str, object]:
+    return {
+        "scope": {},
+        "jobs_considered": 1,
+        "total_delta": 0.5,
+        "open_frames": 0,
+        "converged": False,
+        "gaps": [
+            {
+                "edge": "derive_goal_surface",
+                "delta": 0.5,
+                "failing": ["goal_surface_semantically_converged"],
+                "passing": [],
+                "delta_summary": delta_summary,
+                "environment_ready": True,
+            }
+        ],
+    }
 
 
 def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> None:
@@ -410,10 +435,19 @@ def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path)
 
 def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
-    payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    before_events = list(app.stream.all_events())
+    payload = query_domain(app)
+    after_events = list(app.stream.all_events())
 
+    assert payload["analysis_manifest"] is None
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert payload["gaps"]["analysis_current"] is False
+    assert payload["gaps"]["gaps"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
+    assert payload["gaps"]["gaps"][0]["route_binding"]["state"] == "blocked_stale_analysis"
+    assert before_events == after_events
+    assert not (tmp_path / CURRENT_TRIAGE_DIR).exists()
     assert not (tmp_path / STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH).exists()
     assert not (tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH).exists()
 
@@ -464,6 +498,521 @@ def test_published_analysis_invalidates_when_requirement_surface_changes(tmp_pat
     register = load_or_build_requirement_closure_register(tmp_path)
     entries = {entry["requirement_id"] for entry in register["requirements"]}
     assert {"REQ-DEMO-001", "REQ-DEMO-002"} <= entries
+
+
+def test_start_auto_refreshes_stale_published_analysis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object, bool]] = []
+
+    def _fake_gen_start(scope, stream, *, auto: bool = False) -> dict[str, object]:
+        calls.append((scope, stream, auto))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    refresh_analysis(tmp_path, stage="test")
+    intent_surface = tmp_path / "specification" / "INTENT.md"
+    intent_surface.write_text(
+        "\n".join(
+            (
+                "# Intent",
+                "",
+                "This intent surface is regenerated by the bounded odd_sdlc constructor turn.",
+                "",
+                "## Purpose",
+                "`odd_sdlc` exists to prove that iterative starts can refresh stale published analysis.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    ready_before, _ = workspace_state_ready(tmp_path)
+    assert ready_before is False
+
+    result = start(app, auto=True)
+
+    assert result == {"status": "ok"}
+    assert len(calls) == 1
+    assert calls[0][2] is True
+    ready_after, payload = workspace_state_ready(tmp_path)
+    assert ready_after is True
+    assert payload is not None
+    analysis_manifest = load_analysis_manifest(tmp_path)
+    assert analysis_manifest is not None
+    assert analysis_manifest["stage"] == "start"
+    assert analysis_manifest["analysis_fingerprint"] == payload["analysis_fingerprint"]
+
+
+def test_refresh_analysis_publishes_distinct_analysis_manifest(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    requirement_surface = tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
+    requirement_surface.write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-DEMO-001\n",
+        encoding="utf-8",
+    )
+
+    report = refresh_analysis(tmp_path, stage="test")
+    analysis_manifest = load_analysis_manifest(tmp_path)
+
+    assert analysis_manifest is not None
+    assert analysis_manifest["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    assert analysis_manifest["analysis_fingerprint"] == report["workspace_state"]["analysis_fingerprint"]
+    assert report["workspace_state"]["analysis_manifest_path"] == report["analysis_manifest_path"]
+    assert {entry["artifact_kind"] for entry in analysis_manifest["published_artifacts"]} == {
+        "ambiguity_register",
+        "requirement_closure_register",
+        "requirement_closure_prompt_context",
+    }
+    assert any(entry["input_kind"] == "requirement_surface" for entry in analysis_manifest["source_inputs"])
+
+
+def test_query_domain_exposes_published_analysis_manifest(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    requirement_surface = tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
+    requirement_surface.write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-DEMO-001\n",
+        encoding="utf-8",
+    )
+
+    refresh_analysis(tmp_path, stage="test")
+    payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
+
+    assert payload["analysis_manifest"] is not None
+    assert payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    assert {entry["artifact_kind"] for entry in payload["analysis_manifest"]["published_artifacts"]} == {
+        "ambiguity_register",
+        "requirement_closure_register",
+        "requirement_closure_prompt_context",
+    }
+    assert payload["gaps"]["analysis_current"] is True
+    assert payload["gaps"]["gaps"][0]["observation"]["observed_signal"] == "unresolved_gap_pressure"
+    assert payload["gaps"]["gaps"][0]["route_binding"]["state"] in {"unresolved", "suppressed_by_mode"}
+
+
+def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = gaps(app)
+
+    assert payload["analysis_current"] is False
+    assert payload["gaps"][0]["observation"]["observed_signal"] == "stale_published_analysis"
+    assert payload["gaps"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
+    assert payload["gaps"][0]["route_binding"]["route_id"].startswith("route_")
+    assert payload["gaps"][0]["route_binding"]["state"] == "blocked_stale_analysis"
+    triage_artifact = load_current_edge_triage(tmp_path, payload["gaps"][0]["edge"])
+    assert triage_artifact is not None
+    assert triage_artifact["artifact_kind"] == "odd_sdlc.current_edge_triage"
+    assert triage_artifact["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
+    assert triage_artifact["route_binding"]["state"] == "blocked_stale_analysis"
+    assert triage_artifact["observation"]["event_id"]
+    assert triage_artifact["triage"]["event_id"]
+    assert triage_artifact["route_binding"]["route_event_id"]
+    event_types = [event["event_type"] for event in app.stream.all_events()]
+    assert "observation_recorded" in event_types
+    assert "triage_produced" in event_types
+    assert "route_recorded" in event_types
+    observation_event = next(event for event in app.stream.all_events() if event["event_type"] == "observation_recorded")
+    triage_event = next(event for event in app.stream.all_events() if event["event_type"] == "triage_produced")
+    route_event = next(event for event in app.stream.all_events() if event["event_type"] == "route_recorded")
+    assert observation_event["data"]["run_id"] == triage_event["data"]["run_id"] == route_event["data"]["run_id"]
+    assert triage_event["correlation_id"] == observation_event["event_id"]
+    assert route_event["correlation_id"] == triage_event["event_id"]
+
+
+def test_query_domain_prefers_current_triage_artifact_when_analysis_is_current(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    published = gaps(app)
+    edge_id = published["gaps"][0]["edge"]
+    artifact_path = tmp_path / CURRENT_TRIAGE_DIR / f"{edge_id}.json"
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    artifact["triage"]["triage_id"] = "tri_from_current_artifact"
+    artifact_path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    before_events = _read_events(tmp_path)
+    payload = query_domain(app)
+    after_events = _read_events(tmp_path)
+
+    assert payload["gaps"]["gaps"][0]["triage"]["triage_id"] == "tri_from_current_artifact"
+    assert before_events == after_events
+
+
+def test_gaps_deduplicates_identical_projection_publication(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    first = gaps(app)
+    first_events = _read_events(tmp_path)
+    second = gaps(app)
+    second_events = _read_events(tmp_path)
+
+    assert second["gaps"][0]["triage"]["triage_id"] == first["gaps"][0]["triage"]["triage_id"]
+    assert second_events == first_events
+
+
+def test_triage_divergence_records_prior_observation_chain(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+
+    first = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload("goal surface remains insufficient under the current constitution"),
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+    second = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload("goal surface remains contradictory under the current constitution"),
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+
+    first_edge = first["gaps"][0]
+    second_edge = second["gaps"][0]
+    divergence = [event for event in _read_events(tmp_path) if event["event_type"] == "triage_divergence"]
+
+    assert second_edge["triage"]["prior_observation_id"] == first_edge["observation"]["observation_id"]
+    assert divergence
+    assert divergence[-1]["data"]["prior_triage_id"] == first_edge["triage"]["triage_id"]
+    assert divergence[-1]["data"]["current_triage_id"] == second_edge["triage"]["triage_id"]
+
+
+def test_governed_workspace_constitutional_pressure_is_suppressed_by_default(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_goal_surface",
+                    "delta": 0.5,
+                    "failing": ["goal_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "goal surface remains insufficient under the current constitution",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config={},
+        publish=True,
+    )
+
+    edge = payload["gaps"][0]
+    assert edge["triage"]["process_outcome_kind"] == "propose_constitutional_reprice"
+    assert edge["constitutional_proposal"]["state"] == "suppressed"
+    assert edge["constitutional_proposal"]["policy_mode"] == "suppress"
+    assert edge["route_binding"]["state"] == "suppressed_by_mode"
+    event_types = [event["event_type"] for event in app.stream.all_events()]
+    assert "constitutional_proposal_recorded" in event_types
+
+
+def test_constitutional_pressure_can_be_gated_to_fh_and_deferred(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+    raw_gap_payload = {
+        "scope": {},
+        "jobs_considered": 1,
+        "total_delta": 0.5,
+        "open_frames": 0,
+        "converged": False,
+        "gaps": [
+            {
+                "edge": "derive_goal_surface",
+                "delta": 0.5,
+                "failing": ["goal_surface_semantically_converged"],
+                "passing": [],
+                "delta_summary": "goal surface remains insufficient under the current constitution",
+                "environment_ready": True,
+            }
+        ],
+    }
+
+    initial = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=raw_gap_payload,
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+
+    assert initial["gaps"][0]["constitutional_proposal"]["state"] == "pending_fh"
+    assert initial["gaps"][0]["route_binding"]["state"] == "await_fh_resolution"
+
+    emit(
+        "constitutional_proposal_deferred",
+        {
+            "edge": "derive_goal_surface",
+            "proposal_id": initial["gaps"][0]["constitutional_proposal"]["proposal_id"],
+            "reason": "operator deferred constitutional decision",
+        },
+        stream=app.stream,
+    )
+
+    deferred = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=raw_gap_payload,
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    assert deferred["gaps"][0]["constitutional_proposal"]["state"] == "defer"
+    assert deferred["gaps"][0]["constitutional_proposal"]["resumption_trigger"] == "approved_or_revoked"
+    assert deferred["gaps"][0]["route_binding"]["state"] == "deferred"
+
+
+def test_constitutional_resolution_uses_matching_proposal_id(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+
+    first = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload("goal surface remains insufficient under the current constitution"),
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+    first_proposal = first["gaps"][0]["constitutional_proposal"]["proposal_id"]
+    emit(
+        "constitutional_proposal_deferred",
+        {
+            "edge": "derive_goal_surface",
+            "proposal_id": first_proposal,
+            "reason": "operator deferred earlier constitutional decision",
+        },
+        stream=app.stream,
+    )
+
+    second = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload("goal surface remains contradictory under the current constitution"),
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    second_edge = second["gaps"][0]
+    assert second_edge["constitutional_proposal"]["proposal_id"] != first_proposal
+    assert second_edge["constitutional_proposal"]["state"] == "pending_fh"
+    assert second_edge["route_binding"]["state"] == "await_fh_resolution"
+
+
+def test_invalid_constitutional_policy_mode_fails_closed(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "bogus"}},
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="invalid constitutional_repricing.mode"):
+        enrich_gap_snapshot(
+            workspace_root=tmp_path,
+            stream=app.stream,
+            workflow_version=app.scope().workflow_version,
+            raw_gap_payload=_goal_gap_payload(),
+            runtime_config=app.config.runtime_config,
+            publish=False,
+        )
+
+
+def test_emit_event_cmd_accepts_constitutional_operator_events(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    initialize(bootstrap(workspace_root=tmp_path))
+
+    deferred = _emit_event_cmd(
+        "constitutional_proposal_deferred",
+        json.dumps(
+            {
+                "edge": "derive_goal_surface",
+                "proposal_id": "const_demo",
+                "reason": "operator deferred constitutional decision",
+            }
+        ),
+        tmp_path,
+    )
+    approved = _emit_event_cmd(
+        "constitutional_proposal_approved_with_edits",
+        json.dumps(
+            {
+                "edge": "derive_goal_surface",
+                "proposal_id": "const_demo",
+                "actor": "human",
+            }
+        ),
+        tmp_path,
+    )
+
+    assert deferred == 0
+    assert approved == 0
+    event_types = [event["event_type"] for event in _read_events(tmp_path)]
+    assert "constitutional_proposal_deferred" in event_types
+    assert "constitutional_proposal_approved_with_edits" in event_types
+
+
+def test_shallow_code_findings_prefer_deepen_realization_with_structured_evidence(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    fixture_code_root = FIXTURES_DIR / "test28_pass2_replay" / "code"
+    code_root = asset_path(tmp_path, "code_surface")
+    code_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(fixture_code_root, code_root, dirs_exist_ok=True)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.75,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_code_surface",
+                    "delta": 0.75,
+                    "failing": ["code_traceability_present"],
+                    "passing": [],
+                    "delta_summary": "existing code realization is still shallow",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    edge = payload["gaps"][0]
+    evidence_roles = {item["evidence_role"] for item in edge["triage"]["evidence"]}
+
+    assert edge["triage"]["framework_condition"] == "shallow"
+    assert edge["triage"]["gap_kind"] == "code_gap"
+    assert edge["route_proposal"]["fixed_vector"] == "deepen_realization"
+    assert edge["route_binding"]["state"] == "advance_fixed_vector"
+    assert edge["route_binding"]["selected_vector"] == "deepen_realization"
+    assert edge["triage"]["extensions"]["deepening_preferred_over_expansion"] is True
+    assert {"literal_stub", "trivial_passthrough", "hard_coded_success"} <= evidence_roles
+    assert all(item["path"].endswith(".scala") for item in edge["triage"]["evidence"])
+    assert all(item["line_start"] >= 1 for item in edge["triage"]["evidence"])
+
+
+def test_live_graph_edge_maps_testcase_authority_to_test_reentry(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "qualify_testcase_authority",
+                    "delta": 0.5,
+                    "failing": ["testcase_authority_validated"],
+                    "passing": [],
+                    "delta_summary": "testcase authority remains incomplete",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    edge = payload["gaps"][0]
+    assert edge["triage"]["framework_layer"] == "test"
+    assert edge["triage"]["reentry_layer"] == "test"
+    assert edge["route_proposal"]["fixed_vector"] == "realize_missing_tests"
+
+
+def test_release_gap_without_declared_route_is_explicit_no_lawful_route(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "prepare_release_surface",
+                    "delta": 0.5,
+                    "failing": ["release_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "release preparation is unresolved but has no lawful re-entry vector",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    edge = payload["gaps"][0]
+    assert edge["triage"]["framework_layer"] == "execution"
+    assert edge["triage"]["framework_condition"] == "unroutable"
+    assert edge["triage"]["process_outcome_kind"] == "no_lawful_route"
+    assert edge["route_binding"]["state"] == "no_lawful_route"
 
 
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
@@ -773,6 +1322,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
         "ambiguity_register",
+        "analysis_manifest",
         "asset_families",
         "asset_types",
         "assets",
@@ -837,6 +1387,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
         "ambiguity_register",
+        "analysis_manifest",
         "asset_families",
         "asset_types",
         "assets",
@@ -856,10 +1407,11 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v7",
+        "version": "v10",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
+            "analysis_manifest",
             "semantic_facets",
             "asset_types",
             "asset_families",
@@ -890,6 +1442,10 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert len(payload["collections"]) == 1
     assert len(payload["programs"]) == 2
     assert payload["gaps"]["converged"] is False
+    assert "analysis_current" in payload["gaps"]
+    assert "observation" in payload["gaps"]["gaps"][0]
+    assert "triage" in payload["gaps"]["gaps"][0]
+    assert "route_binding" in payload["gaps"]["gaps"][0]
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert payload["asset_families"][0]["name"] == "worksite_inputs"

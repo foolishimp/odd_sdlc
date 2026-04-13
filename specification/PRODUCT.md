@@ -38,6 +38,9 @@ It gives a project a lawful way to declare:
 - deterministic install-and-normalize behavior over imported or stale workspaces
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
+- explicit homeostatic observation, gap triage, lawful re-entry, and
+  constitutional repricing over active SDLC work without inventing a second
+  runtime truth
 - an orchestration/service boundary for session lifecycle, worker registry,
   dispatch routing, and client-safe observation that remains subordinate to ABG
   runtime truth
@@ -190,10 +193,53 @@ function boundary.
 An event or equivalent substrate truth emitted by ABG during traversal and
 execution.
 
+### Observation Event
+
+A domain-facing record that a meaningful disturbance has been detected during
+readiness checking, traversal, or closure.
+
+Observation events surface homeostatic pressure for operators, routing, and
+later forensic comparison. They do not replace ABG runtime fact truth.
+
+### Analysis Manifest
+
+A machine-readable publication surface that declares which current analysis
+artifacts were published for a workspace, from which selected root and input
+basis, and against which freshness fingerprint.
+
 ### Policy Surface
 
 A declarative configuration surface that constrains evaluation, escalation,
 worker/backend selection, or closure expectations without redefining graph law.
+
+### Gap Triage
+
+A domain-local semantic appraisal of observed mismatch that classifies the
+affected layer, the current condition, the lawful re-entry layer, and the next
+action shape.
+
+Gap triage may use probabilistic judgment, but it remains bounded by
+deterministic evidence and published authority.
+
+### Lawful Re-entry
+
+The named constitutional or realization layer where the system must re-enter
+after gap analysis before forward derivation resumes.
+
+Lawful re-entry preserves the direction of authority instead of collapsing
+every gap into immediate code repair.
+
+### Route Binding
+
+The action-selection result that binds one triaged gap into fixed repair,
+dynamic family selection, gated state, or unresolved route state.
+
+### Constitutional Repricing Proposal
+
+An explicit proposed change to Goals or Intent opened when a gap cannot be
+resolved lawfully beneath the current constitutional layer.
+
+Constitutional repricing proposals remain gated and do not apply silently.
 
 ### Orchestration Plane
 

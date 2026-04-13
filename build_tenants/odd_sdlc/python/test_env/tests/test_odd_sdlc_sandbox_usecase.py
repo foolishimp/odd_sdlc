@@ -314,6 +314,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     run_archive.capture_json("query-domain.json", domain_query)
     assert sorted(domain_query.keys()) == [
         "ambiguity_register",
+        "analysis_manifest",
         "asset_families",
         "asset_types",
         "assets",
@@ -332,10 +333,11 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v7"
+    assert domain_query["query_contract"]["version"] == "v10"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
+        "analysis_manifest",
         "semantic_facets",
         "asset_types",
         "asset_families",
@@ -375,7 +377,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         assert observed_asset["provenance"]["source"] == "asset_checkpoint_events"
         assert observed_asset["provenance"]["last_event_id"] == event["event_id"]
         assert observed_asset["checkpoint"] == event["data"]["current_checkpoint"]
-    assert [run["status"] for run in observed["runs"]] == ["completed"] * 18
+    assert [run["status"] for run in observed["runs"]] == ["not_started"] + (["completed"] * 18)
     assert [call["status"] for call in observed["graph_calls"]] == ["closed"] * 18
     assert observed["continuations"] == []
     recent_event_types = [event["event_type"] for event in observed["recent_events"]]
@@ -673,6 +675,15 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps second", timeout=120).stdout
     )
     assert second_gaps["converged"] is False
+    second_refresh = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="odd_sdlc refresh-analysis second",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.second.json", second_refresh)
 
     second_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="second")
     second_events = read_events(workspace)

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .app import OddSdlcApp, catalog, gaps
+from .app import OddSdlcApp, catalog, gap_snapshot
+from .analysis import load_analysis_manifest
 from .ambiguity import load_or_build_ambiguity_register
 from .query_contract import query_domain_contract
 from .traceability import load_or_build_requirement_closure_register
@@ -86,6 +87,7 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
     return {
         "query_contract": query_domain_contract(),
         "workspace_root": str(app.config.workspace_root),
+        "analysis_manifest": load_analysis_manifest(app.config.workspace_root),
         "semantic_facets": catalog_payload["semantic_facets"],
         "asset_types": catalog_payload["asset_types"],
         "asset_families": catalog_payload["asset_families"],
@@ -100,5 +102,5 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
         "jobs": catalog_payload["jobs"],
         "graph_functions": catalog_payload["graph_functions"],
         "bindings": catalog_payload["bindings"],
-        "gaps": gaps(app),
+        "gaps": gap_snapshot(app),
     }

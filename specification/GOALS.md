@@ -16,6 +16,8 @@ temporary focus into accidental constitutional law.
 
 ## Current Goals
 
+- ratify and implement homeostatic gap triage, lawful re-entry, and governed
+  intent renewal on top of the stabilized `odd_sdlc` runtime boundary
 - keep the current `odd_sdlc` wave focused on ambiguity governance, lawful
   bounded closure, and inherited-workspace traceability
 - keep inherited-project qualification centered on `data_mapper` as the
@@ -37,6 +39,7 @@ This wave reads current invariant truth from:
 - `specification/requirements/03-runtime-governance.md`
 - `specification/requirements/08-odd-sdlc-first-slice.md`
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
 
 ## Boundary
 

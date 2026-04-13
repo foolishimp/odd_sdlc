@@ -16,6 +16,7 @@ from pathlib import Path
 
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
 WORKSPACE_STATE_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-state.json")
+ANALYSIS_MANIFEST_PATH = Path(".ai-workspace/runtime/odd_sdlc-analysis-manifest.json")
 DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"
 DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
 AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
@@ -229,7 +230,7 @@ class ProjectProfile:
         )
 
 
-def current_workspace_input_fingerprint(workspace_root: Path | str) -> str:
+def _tracked_workspace_input_entries(workspace_root: Path | str) -> list[dict[str, str | bool]]:
     root = Path(workspace_root).resolve()
     tracked: list[dict[str, str | bool]] = []
     explicit_paths = (
@@ -278,6 +279,15 @@ def current_workspace_input_fingerprint(workspace_root: Path | str) -> str:
                         "sha256": hashlib.sha256(child.read_bytes()).hexdigest(),
                     }
                 )
+    return tracked
+
+
+def current_workspace_inputs(workspace_root: Path | str) -> list[dict[str, str | bool]]:
+    return _tracked_workspace_input_entries(workspace_root)
+
+
+def current_workspace_input_fingerprint(workspace_root: Path | str) -> str:
+    tracked = _tracked_workspace_input_entries(workspace_root)
     return hashlib.sha256(
         json.dumps(tracked, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -301,14 +311,42 @@ def load_published_workspace_state(workspace_root: Path | str) -> dict[str, obje
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_published_analysis_manifest(workspace_root: Path | str) -> dict[str, object] | None:
+    root = Path(workspace_root).resolve()
+    path = root / ANALYSIS_MANIFEST_PATH
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def published_analysis_is_current(workspace_root: Path | str) -> bool:
+    root = Path(workspace_root).resolve()
+    current = current_workspace_input_fingerprint(root)
+    workspace_state = load_published_workspace_state(root)
+    analysis_manifest = load_published_analysis_manifest(root)
+    if not isinstance(workspace_state, dict) or not isinstance(analysis_manifest, dict):
+        return False
+    if not bool(workspace_state.get("ready")):
+        return False
+    state_fingerprint = str(
+        workspace_state.get("analysis_fingerprint")
+        or workspace_state.get("input_fingerprint")
+        or ""
+    )
+    if state_fingerprint != current:
+        return False
+    if str(workspace_state.get("analysis_manifest_path") or "") != ANALYSIS_MANIFEST_PATH.as_posix():
+        return False
+    if str(analysis_manifest.get("analysis_fingerprint") or "") != current:
+        return False
+    return True
+
+
 def load_published_project_profile(workspace_root: Path | str) -> ProjectProfile | None:
     payload = load_published_workspace_state(workspace_root)
-    root = Path(workspace_root).resolve()
     if payload is None:
         return None
-    if not bool(payload.get("ready")):
-        return None
-    if payload.get("input_fingerprint") != current_workspace_input_fingerprint(root):
+    if not published_analysis_is_current(workspace_root):
         return None
     profile_payload = payload.get("project_profile")
     if not isinstance(profile_payload, dict):

@@ -799,6 +799,7 @@ def normalize_workspace(
         "actions": actions,
         "report_path": NORMALIZATION_REPORT_PATH.as_posix(),
         "workspace_state_path": analysis_report["workspace_state_path"],
+        "analysis_manifest_path": analysis_report["analysis_manifest_path"],
     }
 
     report_path = root / NORMALIZATION_REPORT_PATH

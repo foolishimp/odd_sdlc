@@ -12,9 +12,15 @@ Adopted common law:
 Tenant-local design law:
 
 - `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
+- `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+- `build_tenants/odd_sdlc/python/design/QUERY_PLUGIN_CONTRACT.md`
 
-`SOFTWARE_DOMAIN_BUILDOUT.md` is the current operative tenant-local design
-surface for `odd_sdlc`.
+`SOFTWARE_DOMAIN_BUILDOUT.md` and
+`HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md` are the current operative
+tenant-local design surfaces for `odd_sdlc`.
+
+`QUERY_PLUGIN_CONTRACT.md` is the versioned query-surface contract derived from
+that tenant-local design.
 
 The shared translation remains adopted common law only where it still provides
 current cross-tenant truth. First-slice-only content does not remain active by
@@ -29,3 +35,5 @@ proving subset treated only as a bounded proof lane inside that package:
 - ABG runtime over the first graph-function call
 - a versioned ODD query plugin contract for UI composition
 - a tenant-local software-domain build-out over the full SDLC lifecycle
+- a tenant-local homeostatic reverse path over observation, triage, route, and
+  constitutional repricing

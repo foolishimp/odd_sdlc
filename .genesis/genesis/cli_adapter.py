@@ -349,6 +349,8 @@ def _emit_event_cmd(event_type: str, data_json: str, workspace: Path) -> int:
       assessed  — requires: kind, edge, evaluator, result (pass | fail)
         kind=fp additionally requires: spec_hash
       revoked   — requires: kind (fh_approval), edge, actor, reason
+      constitutional_proposal_deferred — requires: edge, proposal_id, reason
+      constitutional_proposal_approved_with_edits — requires: edge, proposal_id, actor
     """
     import json as _json
 
@@ -398,6 +400,14 @@ def _emit_event_cmd(event_type: str, data_json: str, workspace: Path) -> int:
                 errors.append(f"revoked requires '{fld}' field")
         if data.get("kind") not in (None, "fh_approval", "fp_assessment"):
             errors.append(f"revoked 'kind' must be 'fh_approval' or 'fp_assessment', got '{data.get('kind')!s}'")
+    elif event_type == "constitutional_proposal_deferred":
+        for fld in ("edge", "proposal_id", "reason"):
+            if fld not in data:
+                errors.append(f"constitutional_proposal_deferred requires '{fld}' field")
+    elif event_type == "constitutional_proposal_approved_with_edits":
+        for fld in ("edge", "proposal_id", "actor"):
+            if fld not in data:
+                errors.append(f"constitutional_proposal_approved_with_edits requires '{fld}' field")
 
     if event_type == "reset":
         if "scope" not in data:

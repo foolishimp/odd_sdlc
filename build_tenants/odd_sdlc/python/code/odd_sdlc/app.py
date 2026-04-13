@@ -22,6 +22,7 @@ from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
 from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
+from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
 
@@ -191,7 +192,29 @@ def catalog(app: OddSdlcApp) -> dict:
 
 
 def gaps(app: OddSdlcApp) -> dict:
-    return gen_gaps(app.scope(), app.stream)
+    scope = app.scope()
+    raw_payload = gen_gaps(scope, app.stream)
+    return enrich_gap_snapshot(
+        workspace_root=app.config.workspace_root,
+        stream=app.stream,
+        workflow_version=scope.workflow_version,
+        raw_gap_payload=raw_payload,
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+
+
+def gap_snapshot(app: OddSdlcApp) -> dict:
+    scope = app.scope()
+    raw_payload = gen_gaps(scope, app.stream)
+    return enrich_gap_snapshot(
+        workspace_root=app.config.workspace_root,
+        stream=app.stream,
+        workflow_version=scope.workflow_version,
+        raw_gap_payload=raw_payload,
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
 
 
 def iterate(app: OddSdlcApp) -> dict:
