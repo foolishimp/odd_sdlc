@@ -30,8 +30,7 @@ from .models import WorkerRecord
 _ROUTER_WORKER_ID = "odd_service_router"
 
 
-def _router_worker(authority_ref: str) -> Worker:
-    module = odd_sdlc_module()
+def _router_worker(module, authority_ref: str) -> Worker:
     return Worker(
         id=_ROUTER_WORKER_ID,
         can_execute=module_to_executable_jobs(module),
@@ -52,12 +51,14 @@ def _runtime_identity(record: WorkerRecord) -> RuntimeIdentity:
 
 
 def create_app(workspace: Path, *, worker_record: WorkerRecord | None = None) -> OddSdlcApp:
+    domain_module = odd_sdlc_module(workspace)
     identity = _runtime_identity(worker_record) if worker_record is not None else None
-    router = _router_worker(worker_record.authority_ref) if worker_record is not None else None
+    router = _router_worker(domain_module, worker_record.authority_ref) if worker_record is not None else None
     config = odd_bootstrap(
         workspace_root=workspace,
         build="odd_service",
         runtime_identity=identity,
+        domain_module=domain_module,
     )
     return odd_initialize(config, worker=router)
 

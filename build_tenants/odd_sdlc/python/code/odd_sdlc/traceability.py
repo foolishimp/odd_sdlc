@@ -12,7 +12,10 @@ from typing import Any
 from .project_profile import (
     IGNORE_ROOTS,
     SOURCE_EXTENSIONS,
+    current_workspace_input_fingerprint,
+    is_source_domain_repo_workspace,
     load_project_profile,
+    load_published_workspace_state,
     profile_design_relative_path,
     profile_test_env_tests_relative_path,
 )
@@ -23,12 +26,14 @@ REQUIREMENT_CLOSURE_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-require
 REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH = Path(
     ".ai-workspace/runtime/odd_sdlc-requirement-closure-context.md"
 )
-_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
+_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3}\b")
 _INTENT_ID_RE = re.compile(r"\bINT-\d{3}\b")
 _GENERATED_REQUIREMENT_SURFACE_PATH = Path("specification/requirements/10-generated-bootstrap.md")
-_UAT_TESTCASE_AUTHORITY_PATHS = (
-    Path("specification/scenarios/30-generated-testcase-authority.md"),
-)
+_GENERATED_TESTCASE_AUTHORITY_PATH = Path("specification/scenarios/30-generated-testcase-authority.md")
+_TESTCASE_AUTHORITY_MATRIX_PATH = Path("specification/scenarios/TESTCASE_AUTHORITY.md")
+_TESTCASE_AUTHORITY_FAMILY_RE = re.compile(r"`((?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*-\*)`")
+_MARKDOWN_FILE_TOKEN_RE = re.compile(r"`([^`]+\.md)`")
+_SOURCE_DOMAIN_CODE_ROOT = Path("build_tenants/odd_sdlc/python")
 
 
 def _read_text(path: Path) -> str:
@@ -43,6 +48,18 @@ def _relative(path: Path, *, workspace_root: Path) -> str:
 
 def _collect_ids(path: Path, pattern: re.Pattern[str]) -> set[str]:
     return set(pattern.findall(_read_text(path)))
+
+
+def _merge_requirement_refs(
+    target: dict[str, list[str]],
+    source: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    for requirement_id, refs in source.items():
+        for ref in refs:
+            current = target.setdefault(requirement_id, [])
+            if ref not in current:
+                current.append(ref)
+    return target
 
 
 def _authority_requirement_paths(workspace_root: Path) -> tuple[Path, ...]:
@@ -113,6 +130,46 @@ def _surface_requirement_refs(workspace_root: Path, relative_paths: tuple[Path, 
     return refs
 
 
+def _written_testcase_authority_paths(workspace_root: Path) -> tuple[Path, ...]:
+    scenarios_root = workspace_root / "specification" / "scenarios"
+    if not scenarios_root.exists():
+        return ()
+    paths: list[Path] = []
+    for path in sorted(scenarios_root.glob("*.md")):
+        if path.name == "20-generated-uat-testcases.md":
+            continue
+        relative = path.relative_to(workspace_root)
+        if relative == _TESTCASE_AUTHORITY_MATRIX_PATH:
+            continue
+        paths.append(relative)
+    return tuple(paths)
+
+
+def _matrix_testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
+    path = workspace_root / _TESTCASE_AUTHORITY_MATRIX_PATH
+    if not path.exists():
+        return {}
+    live_requirement_ids = set(authority_requirement_refs(workspace_root)) | set(current_requirement_refs(workspace_root))
+    refs: dict[str, list[str]] = {}
+    for line in _read_text(path).splitlines():
+        family_match = _TESTCASE_AUTHORITY_FAMILY_RE.search(line)
+        if family_match is None:
+            continue
+        family_pattern = family_match.group(1)
+        family_prefix = family_pattern[:-1]
+        supporting_paths = [
+            Path("specification/scenarios") / token
+            for token in _MARKDOWN_FILE_TOKEN_RE.findall(line)
+        ]
+        authority_refs = [_TESTCASE_AUTHORITY_MATRIX_PATH.as_posix(), *[item.as_posix() for item in supporting_paths]]
+        for requirement_id in sorted(req_id for req_id in live_requirement_ids if req_id.startswith(family_prefix)):
+            current = refs.setdefault(requirement_id, [])
+            for ref in authority_refs:
+                if ref not in current:
+                    current.append(ref)
+    return refs
+
+
 def _implementation_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
     profile = load_project_profile(workspace_root)
     return (
@@ -137,7 +194,19 @@ def planned_test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
 
 
 def testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _UAT_TESTCASE_AUTHORITY_PATHS)
+    refs: dict[str, list[str]] = {}
+    _merge_requirement_refs(
+        refs,
+        _surface_requirement_refs(
+            workspace_root,
+            (
+                _GENERATED_TESTCASE_AUTHORITY_PATH,
+                *_written_testcase_authority_paths(workspace_root),
+            ),
+        ),
+    )
+    _merge_requirement_refs(refs, _matrix_testcase_authority_refs(workspace_root))
+    return refs
 
 
 def test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
@@ -177,9 +246,29 @@ def _tagged_requirement_ids(path: Path, *, tag: str) -> set[str]:
     return ids
 
 
-def traceability_scan(workspace_root: Path) -> dict[str, Any]:
+def _workspace_mode(workspace_root: Path) -> str | None:
+    published = load_published_workspace_state(workspace_root)
+    if isinstance(published, dict):
+        workspace_mode = published.get("workspace_mode")
+        if isinstance(workspace_mode, str) and workspace_mode:
+            return workspace_mode
+    if is_source_domain_repo_workspace(workspace_root):
+        return "source_domain_repo"
+    return None
+
+
+def _traceability_code_root_relative_path(workspace_root: Path) -> str:
+    if _workspace_mode(workspace_root) == "source_domain_repo":
+        source_domain_root = workspace_root / _SOURCE_DOMAIN_CODE_ROOT / "code" / "odd_sdlc"
+        if source_domain_root.exists():
+            return _SOURCE_DOMAIN_CODE_ROOT.as_posix()
     profile = load_project_profile(workspace_root)
-    code_root = workspace_root / profile.code_relative_path()
+    return profile.code_relative_path()
+
+
+def traceability_scan(workspace_root: Path) -> dict[str, Any]:
+    code_root_relative_path = _traceability_code_root_relative_path(workspace_root)
+    code_root = workspace_root / code_root_relative_path
     code_refs: dict[str, list[str]] = {}
     test_refs: dict[str, list[str]] = {}
     orphan_code_files: list[str] = []
@@ -189,7 +278,7 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
         return {
             "code_root": _relative(code_root, workspace_root=workspace_root)
             if code_root.is_relative_to(workspace_root)
-            else profile.code_relative_path(),
+            else code_root_relative_path,
             "code_refs": {},
             "test_refs": {},
             "orphan_code_files": [],
@@ -455,5 +544,22 @@ def refresh_requirement_closure_register(workspace_root: Path, *, stage: str = "
     return payload
 
 
+def load_published_requirement_closure_register(workspace_root: Path) -> dict[str, Any] | None:
+    workspace_state = load_published_workspace_state(workspace_root)
+    if not isinstance(workspace_state, dict):
+        return None
+    if not bool(workspace_state.get("ready")):
+        return None
+    if workspace_state.get("input_fingerprint") != current_workspace_input_fingerprint(workspace_root):
+        return None
+    path = workspace_root / REQUIREMENT_CLOSURE_REGISTER_PATH
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def load_or_build_requirement_closure_register(workspace_root: Path) -> dict[str, Any]:
-    return refresh_requirement_closure_register(workspace_root, stage="workspace_scan")
+    published = load_published_requirement_closure_register(workspace_root)
+    if published is not None:
+        return published
+    return build_requirement_closure_register(workspace_root, stage="workspace_scan")

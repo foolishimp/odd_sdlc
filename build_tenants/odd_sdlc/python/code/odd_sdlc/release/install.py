@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from odd_sdlc.analysis import refresh_analysis
 from odd_sdlc.ambiguity import AMBIGUITY_REGISTER_PATH
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
 from odd_sdlc.project_profile import canonical_tenant_name
@@ -277,6 +278,7 @@ def install(
         project_slug=slug,
         platform=canonical_platform,
     )
+    analysis = refresh_analysis(root, stage="install_release")
     return {
         "status": "installed",
         "target_root": str(root),
@@ -286,6 +288,7 @@ def install(
         "package_path": str(package_path.relative_to(root)),
         "runtime_contract": str(contract_path.relative_to(root)),
         "normalization": normalization,
+        "analysis": analysis,
         "agents_md": agents_md,
         "claude_md": claude_md,
     }

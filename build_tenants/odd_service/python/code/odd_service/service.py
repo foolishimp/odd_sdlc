@@ -126,6 +126,20 @@ def _require_session(workspace: Path, run_id: str) -> SessionRecord:
     return session
 
 
+def _worker_for_session(workspace: Path, session: SessionRecord) -> WorkerRecord | None:
+    if session.worker_name:
+        worker = get_worker(workspace, name=session.worker_name)
+        if worker is not None:
+            return worker
+    if session.agent:
+        return WorkerRecord(
+            name=session.worker_name or f"ephemeral-{session.agent}",
+            agent=session.agent,
+            metadata={"ephemeral": True},
+        )
+    return None
+
+
 def _filtered_observation(workspace: Path, run_id: str, *, since: str | None = None) -> dict[str, Any]:
     domain = runtime_observe(workspace)
     from odd_sdlc.app import initialize as odd_initialize
@@ -327,7 +341,7 @@ def step(
 ) -> dict[str, Any]:
     root = _workspace(workspace)
     session = _require_session(root, run_id)
-    worker = get_worker(root, name=session.worker_name) if session.worker_name else None
+    worker = _worker_for_session(root, session)
     result = runtime_iterate(root, worker_record=worker)
     session = _session_for_result(
         root,
@@ -351,7 +365,7 @@ def gaps(
 ) -> dict[str, Any]:
     root = _workspace(workspace)
     session = _require_session(root, run_id)
-    worker = get_worker(root, name=session.worker_name) if session.worker_name else None
+    worker = _worker_for_session(root, session)
     return {
         "workspace_root": str(root),
         "service_status": SERVICE_STATUS,

@@ -9,8 +9,10 @@ from typing import Any
 
 from .project_profile import (
     DEFAULT_AMBIGUITY_RISK_APPETITE,
+    current_workspace_input_fingerprint,
     detect_project_profile_ambiguities,
     load_project_profile,
+    load_published_workspace_state,
 )
 
 
@@ -274,8 +276,25 @@ def refresh_ambiguity_register(workspace_root: Path, *, stage: str = "workspace_
     return payload
 
 
+def load_published_ambiguity_register(workspace_root: Path) -> dict[str, Any] | None:
+    workspace_state = load_published_workspace_state(workspace_root)
+    if not isinstance(workspace_state, dict):
+        return None
+    if not bool(workspace_state.get("ready")):
+        return None
+    if workspace_state.get("input_fingerprint") != current_workspace_input_fingerprint(workspace_root):
+        return None
+    path = workspace_root / AMBIGUITY_REGISTER_PATH
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def load_or_build_ambiguity_register(workspace_root: Path) -> dict[str, Any]:
-    return refresh_ambiguity_register(workspace_root, stage="workspace_scan")
+    published = load_published_ambiguity_register(workspace_root)
+    if published is not None:
+        return published
+    return build_ambiguity_register(workspace_root, stage="workspace_scan")
 
 
 def fh_required_ambiguities_by_edge(workspace_root: Path) -> dict[str, list[dict[str, Any]]]:

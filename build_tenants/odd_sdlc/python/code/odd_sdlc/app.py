@@ -15,6 +15,7 @@ from genesis.identity import RuntimeIdentity
 from genesis.install import workspace_bootstrap
 from genesis.services import Scope, gen_gaps, gen_iterate, gen_start
 
+from .analysis import ensure_workspace_ready
 from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
 from .ambiguity import load_or_build_ambiguity_register
 from .function_catalog import FUNCTION_CATALOG
@@ -30,6 +31,11 @@ class AppConfig:
     runtime_config: dict[str, Any] = field(default_factory=dict)
     build: str | None = None
     runtime_identity: RuntimeIdentity | None = None
+    domain_module: Any | None = None
+
+
+def _app_module(config: AppConfig):
+    return config.domain_module or odd_sdlc_module(config.workspace_root)
 
 
 @dataclass
@@ -40,7 +46,7 @@ class OddSdlcApp:
 
     def scope(self) -> Scope:
         return Scope(
-            module=odd_sdlc_module(self.config.workspace_root),
+            module=_app_module(self.config),
             workspace_root=self.config.workspace_root,
             build=self.config.build,
             worker=self.worker,
@@ -55,6 +61,7 @@ def bootstrap(
     runtime_config: dict[str, Any] | None = None,
     build: str | None = None,
     runtime_identity: RuntimeIdentity | None = None,
+    domain_module: Any | None = None,
 ) -> AppConfig:
     return AppConfig(
         workspace_root=Path(workspace_root).resolve(),
@@ -64,6 +71,7 @@ def bootstrap(
         },
         build=build,
         runtime_identity=runtime_identity,
+        domain_module=domain_module,
     )
 
 
@@ -73,7 +81,7 @@ def initialize(config: AppConfig, *, worker: Worker | None = None) -> OddSdlcApp
 
 
 def catalog(app: OddSdlcApp) -> dict:
-    module = odd_sdlc_module(app.config.workspace_root)
+    module = _app_module(app.config)
     workspace_root = app.config.workspace_root
     active_function_catalog = list(module.metadata.get("function_catalog", FUNCTION_CATALOG))
     active_executive_programs = set(module.metadata.get("executive_graph_functions", ()))
@@ -191,4 +199,5 @@ def iterate(app: OddSdlcApp) -> dict:
 
 
 def start(app: OddSdlcApp, *, auto: bool = False) -> dict:
+    ensure_workspace_ready(app.config.workspace_root)
     return gen_start(app.scope(), app.stream, auto=auto)

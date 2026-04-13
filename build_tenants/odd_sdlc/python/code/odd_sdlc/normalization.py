@@ -13,7 +13,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
+from .analysis import refresh_analysis
 from .project_profile import (
     _parse_constraints_lines,
     canonical_tenant_name,
@@ -21,7 +21,6 @@ from .project_profile import (
     parse_design_tenants,
     tenant_output_dir,
 )
-from .traceability import REQUIREMENT_CLOSURE_REGISTER_PATH, build_requirement_closure_register
 
 NORMALIZATION_REPORT_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-normalization.json")
 IMPORTED_REQUIREMENTS_PATH = Path("specification/requirements/00-imported-sources.md")
@@ -788,49 +787,8 @@ def normalize_workspace(
         actions=actions,
     )
 
-    ambiguity_path = root / AMBIGUITY_REGISTER_PATH
-    ambiguity_payload = build_ambiguity_register(root, stage="normalize_workspace")
-    ambiguity_content = json.dumps(ambiguity_payload, indent=2, sort_keys=True)
-    if not ambiguity_path.exists():
-        _write_text(
-            ambiguity_path,
-            ambiguity_content,
-            kind="create_ambiguity_register",
-            detail="created initial ambiguity register from deterministic normalization and topology inspection",
-            actions=actions,
-        )
-    else:
-        existing_ambiguity = ambiguity_path.read_text(encoding="utf-8")
-        if existing_ambiguity != ambiguity_content:
-            _write_text(
-                ambiguity_path,
-                ambiguity_content,
-                kind="update_ambiguity_register",
-                detail="updated ambiguity register from deterministic normalization and topology inspection",
-                actions=actions,
-            )
-
-    requirement_closure_path = root / REQUIREMENT_CLOSURE_REGISTER_PATH
-    requirement_closure_payload = build_requirement_closure_register(root, stage="normalize_workspace")
-    requirement_closure_content = json.dumps(requirement_closure_payload, indent=2, sort_keys=True)
-    if not requirement_closure_path.exists():
-        _write_text(
-            requirement_closure_path,
-            requirement_closure_content,
-            kind="create_requirement_closure_register",
-            detail="created initial requirement closure register from deterministic normalization and traceability inspection",
-            actions=actions,
-        )
-    else:
-        existing_requirement_closure = requirement_closure_path.read_text(encoding="utf-8")
-        if existing_requirement_closure != requirement_closure_content:
-            _write_text(
-                requirement_closure_path,
-                requirement_closure_content,
-                kind="update_requirement_closure_register",
-                detail="updated requirement closure register from deterministic normalization and traceability inspection",
-                actions=actions,
-            )
+    analysis_report = refresh_analysis(root, stage="normalize_workspace")
+    actions.extend(analysis_report["actions"])
 
     report = {
         "workspace_root": str(root),
@@ -840,6 +798,7 @@ def normalize_workspace(
         "changed": bool(actions),
         "actions": actions,
         "report_path": NORMALIZATION_REPORT_PATH.as_posix(),
+        "workspace_state_path": analysis_report["workspace_state_path"],
     }
 
     report_path = root / NORMALIZATION_REPORT_PATH

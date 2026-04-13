@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
+from .analysis import refresh_analysis
 from .app import bootstrap, catalog, gaps, initialize, iterate, start
 from .constructor import construct_manifest
 from .normalization import normalize_workspace
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("programs", parents=[common])
     subparsers.add_parser("observe", parents=[common])
     subparsers.add_parser("query-domain", parents=[common])
+    subparsers.add_parser("refresh-analysis", parents=[common])
     subparsers.add_parser("gaps", parents=[common])
     subparsers.add_parser("iterate", parents=[common])
     subparsers.add_parser("self-test", parents=[common])
@@ -73,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
         result = observe(app)
     elif args.command == "query-domain":
         result = query_domain(app)
+    elif args.command == "refresh-analysis":
+        result = refresh_analysis(args.workspace)
     elif args.command == "gaps":
         result = gaps(app)
     elif args.command == "iterate":

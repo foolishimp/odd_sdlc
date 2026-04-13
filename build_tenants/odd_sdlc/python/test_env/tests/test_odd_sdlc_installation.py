@@ -30,9 +30,11 @@ if str(CODE_PATH) not in sys.path:
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
+from odd_sdlc.analysis import load_workspace_state  # noqa: E402
 from odd_sdlc.app import bootstrap, initialize  # noqa: E402
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
+    WORKSPACE_STATE_PATH,
     detect_project_profile_ambiguities,
     load_project_profile,
     realization_candidates_for_declared_root,
@@ -259,8 +261,13 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_project_bootstrap",
         "normalize_project_constraints",
         "create_tenant_registry",
+        "create_stateful_builder_control_frame",
+        "create_realized_test_source_obligation",
+        "create_realization_deepening_control_frame",
         "create_ambiguity_register",
         "create_requirement_closure_register",
+        "create_requirement_closure_prompt_context",
+        "create_workspace_state",
     ]
 
     assert (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8").startswith("# Product")
@@ -312,6 +319,12 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     )
     assert requirement_closure_register["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert requirement_closure_register["summary"]["total_live_requirements"] == 0
+    workspace_state = load_workspace_state(workspace)
+    assert workspace_state is not None
+    assert workspace_state["ready"] is True
+    assert workspace_state["workspace_mode"] == "governed_workspace"
+    assert workspace_state["project_profile"]["tenant_name"] == "scala_spark"
+    assert report["workspace_state_path"] == WORKSPACE_STATE_PATH.as_posix()
 
     second = normalize_workspace(
         workspace,
@@ -348,6 +361,11 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     runtime_contract_text = (workspace / ".odd_sdlc" / "release" / "genesis.yml").read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
     assert "  - .odd_sdlc/python/code" in runtime_contract_text
+    workspace_state = load_workspace_state(workspace)
+    assert workspace_state is not None
+    assert workspace_state["ready"] is True
+    assert workspace_state["workspace_mode"] == "installed_target"
+    assert workspace_state["input_fingerprint"]
     claude_text = (workspace / "CLAUDE.md").read_text(encoding="utf-8")
     agents_text = (workspace / "AGENTS.md").read_text(encoding="utf-8")
     for text in (claude_text, agents_text):
@@ -592,6 +610,99 @@ def test_requirement_closure_register_preserves_carry_forward_and_traceability(t
     assert "full closure register for on-demand inspection" in prompt_context
     assert ".ai-workspace/runtime/odd_sdlc-requirement-closure.json" in prompt_context
     assert "missing from current requirement surface: none" in prompt_context
+
+
+def test_requirement_closure_register_ignores_family_headers_and_counts_written_testcase_authority(tmp_path: Path) -> None:
+    workspace = tmp_path / "traceability.family_matrix"
+    (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
+    (workspace / "specification" / "scenarios").mkdir(parents=True, exist_ok=True)
+    (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
+    (workspace / ".ai-workspace" / "runtime").mkdir(parents=True, exist_ok=True)
+
+    (workspace / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "traceability.family_matrix"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python"',
+                '      output_dir: "build_tenants/python/"',
+                '      description: "traceability lane"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: ""',
+                '      runtime_observation_contract: ""',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "INTENT.md").write_text(
+        "# Intent\n\n- INT-001: Preserve testcase authority truth.\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "GOALS.md").write_text(
+        "# Goals\n\n- INT-001: Preserve testcase authority truth.\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "requirements" / "09-odd-service-orchestration-plane.md").write_text(
+        "\n".join(
+            (
+                "# odd_service Orchestration Plane Requirements",
+                "",
+                "**Family**: REQ-F-ODDSVC-*",
+                "",
+                "### REQ-F-ODDSVC-001",
+                "",
+                "### REQ-F-ODDSVC-002",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "requirements" / "10-generated-bootstrap.md").write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-F-ODDSVC-001\n- REQ-F-ODDSVC-002\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "scenarios" / "08-odd-service-orchestration-plane.md").write_text(
+        "# odd_service Orchestration Plane\n\n**Validates**: REQ-F-ODDSVC-001, REQ-F-ODDSVC-002\n",
+        encoding="utf-8",
+    )
+    (workspace / "specification" / "scenarios" / "TESTCASE_AUTHORITY.md").write_text(
+        "\n".join(
+            (
+                "# Testcase Authority Matrix",
+                "",
+                "| Requirement family | Authority surface | Notes |",
+                "| --- | --- | --- |",
+                "| `REQ-F-ODDSVC-*` | `08-odd-service-orchestration-plane.md` | proves the service boundary |",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    register = build_requirement_closure_register(workspace, stage="test")
+    entries = {entry["requirement_id"]: entry for entry in register["requirements"]}
+
+    assert "REQ-F-ODDSVC" not in entries
+    assert register["summary"]["total_live_requirements"] == 2
+    assert entries["REQ-F-ODDSVC-001"]["testcase_authority_refs"] == [
+        "specification/scenarios/08-odd-service-orchestration-plane.md",
+        "specification/scenarios/TESTCASE_AUTHORITY.md",
+    ]
+    assert entries["REQ-F-ODDSVC-002"]["testcase_authority_refs"] == [
+        "specification/scenarios/08-odd-service-orchestration-plane.md",
+        "specification/scenarios/TESTCASE_AUTHORITY.md",
+    ]
 
 
 def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path) -> None:
@@ -971,6 +1082,10 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
         "# Generated Bootstrap Requirements\n\n- REQ-CORE-001: Preserve the source repo declared tenant.\n",
         encoding="utf-8",
     )
+    (workspace / "specification" / "requirements" / "09-odd-service-orchestration-plane.md").write_text(
+        "# odd_service Orchestration Plane Requirements\n\n### REQ-F-ODDSVC-001\n\n- Preserve the source-repo service boundary.\n",
+        encoding="utf-8",
+    )
     (workspace / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
         "\n".join(
             (
@@ -1006,7 +1121,10 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
 
     odd_sdlc_root = workspace / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc"
     odd_sdlc_root.mkdir(parents=True, exist_ok=True)
-    (odd_sdlc_root / "app.py").write_text("def run() -> int:\n    return 1\n", encoding="utf-8")
+    (odd_sdlc_root / "app.py").write_text(
+        "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
+        encoding="utf-8",
+    )
     (workspace / "build_tenants" / "odd_sdlc" / "python" / "pyproject.toml").write_text(
         "[project]\nname='odd_sdlc'\n",
         encoding="utf-8",
@@ -1037,11 +1155,12 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
     }.isdisjoint({"multiple_realization_roots", "declared_root_vs_realized_root_mismatch"})
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
+    assert queried["requirement_closure_register"]["traceability"]["code_root"] == "build_tenants/odd_sdlc/python"
     queried_entries = {
         entry["requirement_id"]: entry
         for entry in queried["requirement_closure_register"]["requirements"]
     }
-    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_method/python/src/main/logic.py"]
+    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/code/odd_sdlc/app.py"]
 
 
 def test_installed_normalize_workspace_without_platform_preserves_existing_active_tenant(tmp_path: Path) -> None:

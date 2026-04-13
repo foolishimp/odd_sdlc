@@ -179,6 +179,15 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
     seed_odd_sdlc_package(workspace)
     seed_canonical_spec_surface(workspace)
+    refresh_analysis = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="odd_sdlc refresh-analysis",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.json", refresh_analysis)
     run_archive.note("sandbox_prepared", workspace=str(workspace))
 
 

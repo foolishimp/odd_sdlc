@@ -37,7 +37,9 @@ if str(GENESIS_PATH) not in sys.path:
 if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
 
-from odd_sdlc.app import bootstrap, catalog, initialize  # noqa: E402
+import odd_sdlc.app as app_module  # noqa: E402
+from odd_sdlc.analysis import refresh_analysis, workspace_state_ready  # noqa: E402
+from odd_sdlc.app import bootstrap, catalog, initialize, start  # noqa: E402
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
     BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
@@ -47,7 +49,17 @@ from odd_sdlc.gtl_module import (  # noqa: E402
 )
 import odd_sdlc.self_test as self_test_module  # noqa: E402
 from odd_sdlc.project_profile import load_project_profile  # noqa: E402
+from odd_sdlc.query import query_domain  # noqa: E402
+from odd_sdlc.runtime_contexts import (  # noqa: E402
+    REALIZATION_DEEPENING_CONTEXT_PATH,
+    REALIZED_TEST_SOURCE_CONTEXT_PATH,
+    STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+)
 from odd_sdlc.self_test import self_test  # noqa: E402
+from odd_sdlc.traceability import (  # noqa: E402
+    REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    load_or_build_requirement_closure_register,
+)
 from odd_sdlc.workspace_assets import (  # noqa: E402
     ASSET_PATHS,
     CODE_SURFACE_PREFIXES,
@@ -334,8 +346,24 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     }
 
 
+def test_module_build_does_not_publish_runtime_sidecars(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    runtime_paths = (
+        tmp_path / STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+        tmp_path / REALIZED_TEST_SOURCE_CONTEXT_PATH,
+        tmp_path / REALIZATION_DEEPENING_CONTEXT_PATH,
+        tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    )
+    assert all(not path.exists() for path in runtime_paths)
+
+    odd_sdlc_module(tmp_path)
+
+    assert all(not path.exists() for path in runtime_paths)
+
+
 def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
     module = odd_sdlc_module(tmp_path)
     code_job = next(
         job
@@ -378,6 +406,64 @@ def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path)
     assert "This edge works over an existing realization or realization plan, not a blank slate." in prompt
     assert "Existing files and existing module groups are obligations, not proof of completion." in prompt
     assert "Prefer deepening or correcting existing artifacts" in prompt
+
+
+def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
+
+    assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
+    assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert not (tmp_path / STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH).exists()
+    assert not (tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH).exists()
+
+
+def test_start_requires_explicit_analysis_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object, bool]] = []
+
+    def _fake_gen_start(scope, stream, *, auto: bool = False) -> dict[str, object]:
+        calls.append((scope, stream, auto))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    with pytest.raises(RuntimeError, match="refresh-analysis"):
+        start(app)
+    assert calls == []
+
+    refresh_analysis(tmp_path, stage="test")
+    result = start(app, auto=True)
+
+    assert result == {"status": "ok"}
+    assert len(calls) == 1
+    assert calls[0][2] is True
+
+
+def test_published_analysis_invalidates_when_requirement_surface_changes(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    requirement_surface = tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
+    requirement_surface.write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-DEMO-001\n",
+        encoding="utf-8",
+    )
+
+    refresh_analysis(tmp_path, stage="test")
+    ready_before, _ = workspace_state_ready(tmp_path)
+    assert ready_before is True
+
+    requirement_surface.write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-DEMO-001\n- REQ-DEMO-002\n",
+        encoding="utf-8",
+    )
+
+    ready_after, _ = workspace_state_ready(tmp_path)
+    assert ready_after is False
+
+    register = load_or_build_requirement_closure_register(tmp_path)
+    entries = {entry["requirement_id"] for entry in register["requirements"]}
+    assert {"REQ-DEMO-001", "REQ-DEMO-002"} <= entries
 
 
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
@@ -870,6 +956,21 @@ def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -
         **os.environ,
         "PYTHONPATH": os.pathsep.join((str(GENESIS_PATH), str(CODE_PATH))),
     }
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "odd_sdlc",
+            "refresh-analysis",
+            "--workspace",
+            str(tmp_path),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
     result = subprocess.run(
         [
             sys.executable,
@@ -905,6 +1006,7 @@ def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -
 
 def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
 
     result = self_test(app)

@@ -22,13 +22,17 @@ from gtl.module_model import Module
 from gtl.operator_model import Evaluator, Rule, F_D, F_H, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
 
+from .ambiguity import load_or_build_ambiguity_register
 from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
-from .ambiguity import refresh_ambiguity_register
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
+from .runtime_contexts import (
+    REALIZATION_DEEPENING_CONTEXT_PATH as _REALIZATION_DEEPENING_CONTEXT_PATH,
+    REALIZED_TEST_SOURCE_CONTEXT_PATH as _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+    STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH as _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+)
 from .traceability import (
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
-    refresh_requirement_closure_register,
 )
 
 
@@ -249,17 +253,6 @@ _builder = Operator(
 )
 
 _PENDING_CONTEXT_DIGEST = "sha256:" + ("0" * 64)
-_STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH = Path(
-    ".ai-workspace/runtime/odd_sdlc-stateful-builder-control-frame.md"
-)
-_REALIZED_TEST_SOURCE_CONTEXT_PATH = Path(
-    ".ai-workspace/runtime/odd_sdlc-realized-test-source-obligation.md"
-)
-_REALIZATION_DEEPENING_CONTEXT_PATH = Path(
-    ".ai-workspace/runtime/odd_sdlc-realization-deepening-control-frame.md"
-)
-
-
 def _workspace_context(name: str, relative_path: Path) -> Context:
     return Context(
         name=name,
@@ -1127,30 +1120,6 @@ def _module_workspace_root() -> Path:
     return _active_workspace_root(Path(__file__).resolve().parent)
 
 
-def _write_runtime_builder_contexts(workspace_root: Path) -> None:
-    package_python_root = Path(__file__).resolve().parents[2]
-    published_contexts = (
-        (
-            package_python_root / "design" / "fp" / "STATEFUL_ITERATOR_CONTROL_FRAME.md",
-            workspace_root / _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
-        ),
-        (
-            package_python_root / "design" / "fp" / "REALIZED_TEST_SOURCE_OBLIGATION.md",
-            workspace_root / _REALIZED_TEST_SOURCE_CONTEXT_PATH,
-        ),
-        (
-            package_python_root / "design" / "fp" / "REALIZATION_DEEPENING_CONTROL_FRAME.md",
-            workspace_root / _REALIZATION_DEEPENING_CONTEXT_PATH,
-        ),
-    )
-    for source_path, target_path in published_contexts:
-        content = source_path.read_text(encoding="utf-8")
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        existing = target_path.read_text(encoding="utf-8") if target_path.exists() else None
-        if existing != content:
-            target_path.write_text(content, encoding="utf-8")
-
-
 def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
     return (workspace_root / PROJECT_CONSTRAINTS_PATH).exists()
 
@@ -1240,7 +1209,7 @@ def _ambiguity_fh_evaluator(edge_name: str, entries: tuple[dict[str, Any], ...])
 def _configured_leaf_graph_functions(
     workspace_root: Path,
 ) -> tuple[tuple[GraphFunction, ...], tuple[Evaluator, ...], dict[str, list[dict[str, Any]]], dict[str, Any]]:
-    ambiguity_register = refresh_ambiguity_register(workspace_root, stage="module_build")
+    ambiguity_register = load_or_build_ambiguity_register(workspace_root)
     fh_required_by_edge: dict[str, list[dict[str, Any]]] = {}
     for entry in ambiguity_register.get("ambiguities", []):
         if not isinstance(entry, dict):
@@ -1292,8 +1261,6 @@ def _configured_leaf_graph_functions(
 
 
 def _build_module(workspace_root: Path) -> Module:
-    _write_runtime_builder_contexts(workspace_root)
-    refresh_requirement_closure_register(workspace_root, stage="module_build")
     active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
     active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
     active_operational_executive = _build_release_operational_cycle(active_operational_functions)

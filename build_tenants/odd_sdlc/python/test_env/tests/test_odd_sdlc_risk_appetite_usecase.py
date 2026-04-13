@@ -66,6 +66,11 @@ def _install_ambiguous_workspace(workspace: Path) -> None:
 
 
 def _query_ambiguity_register(workspace: Path) -> dict:
+    run_installed_odd_sdlc(
+        workspace,
+        "refresh-analysis",
+        label="odd_sdlc refresh-analysis",
+    )
     payload = json.loads(
         run_installed_odd_sdlc(
             workspace,

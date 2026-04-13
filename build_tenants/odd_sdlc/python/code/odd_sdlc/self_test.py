@@ -6,6 +6,7 @@ from typing import Any
 
 from genesis.result_ingest import ingest_fp_result
 
+from .analysis import refresh_analysis
 from .app import OddSdlcApp, start
 from .constructor import construct_manifest
 from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name
@@ -21,6 +22,7 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     steps: list[dict[str, Any]] = []
 
     for expected_edge in program.steps:
+        refresh_analysis(workspace_root, stage="self_test")
         start_result = start(app)
         status = start_result.get("status")
         if status != "iterated":

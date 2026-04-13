@@ -8,11 +8,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 import os
 from pathlib import Path
 
 
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
+WORKSPACE_STATE_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-state.json")
 DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"
 DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
 AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
@@ -28,6 +31,9 @@ BUILD_MARKERS = (
     "Cargo.toml",
     "go.mod",
 )
+SOURCE_DOMAIN_PRODUCT_ROOT = Path("build_tenants/odd_sdlc/python/code/odd_sdlc")
+SOURCE_SERVICE_PRODUCT_ROOT = Path("build_tenants/odd_service/python/code/odd_service")
+SOURCE_SERVICE_SPEC_PATH = Path("specification/requirements/09-odd-service-orchestration-plane.md")
 SOURCE_EXTENSIONS = {
     ".py",
     ".scala",
@@ -39,6 +45,18 @@ SOURCE_EXTENSIONS = {
     ".tsx",
     ".rs",
     ".go",
+}
+FINGERPRINT_IGNORED_DIR_NAMES = {
+    ".ai-workspace",
+    ".genesis",
+    ".odd_sdlc",
+    ".pytest_cache",
+    "__pycache__",
+    "dist",
+    "node_modules",
+    "test_runs",
+    "venv",
+    ".venv",
 }
 IGNORE_ROOTS = {
     ".ai-workspace",
@@ -189,6 +207,113 @@ class ProjectProfile:
             "realization_mode": self.realization_mode,
             "resolution_reason": self.resolution_reason,
         }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, str]) -> "ProjectProfile":
+        return cls(
+            workspace_name=str(payload.get("workspace_name", "")),
+            project_slug=str(payload.get("project_slug", "")),
+            project_kind=str(payload.get("project_kind", "")),
+            language=str(payload.get("language", "")),
+            test_runner=str(payload.get("test_runner", "")),
+            ambiguity_risk_appetite=str(payload.get("ambiguity_risk_appetite", DEFAULT_AMBIGUITY_RISK_APPETITE)),
+            tenant_name=str(payload.get("tenant_name", "python")),
+            output_dir=str(payload.get("output_dir", "")),
+            declared_output_dir=str(payload.get("declared_output_dir", "")),
+            test_execution_contract=str(payload.get("test_execution_contract", "")),
+            deployment_contract=str(payload.get("deployment_contract", "")),
+            runtime_observation_contract=str(payload.get("runtime_observation_contract", "")),
+            root_code_policy=str(payload.get("root_code_policy", "")),
+            realization_mode=str(payload.get("realization_mode", "")),
+            resolution_reason=str(payload.get("resolution_reason", "")),
+        )
+
+
+def current_workspace_input_fingerprint(workspace_root: Path | str) -> str:
+    root = Path(workspace_root).resolve()
+    tracked: list[dict[str, str | bool]] = []
+    explicit_paths = (
+        PROJECT_CONSTRAINTS_PATH,
+        Path(".odd_sdlc/release/genesis.yml"),
+    )
+    seen: set[str] = set()
+    for relative_path in explicit_paths:
+        path = root / relative_path
+        tracked.append(
+            {
+                "path": relative_path.as_posix(),
+                "exists": path.exists(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else "",
+            }
+        )
+        seen.add(relative_path.as_posix())
+    for base_relative in (Path("specification"), Path("build_tenants")):
+        base = root / base_relative
+        if not base.exists() or not base.is_dir():
+            continue
+        for current_root, dirnames, filenames in os.walk(base):
+            dirnames[:] = sorted(
+                dirname
+                for dirname in dirnames
+                if dirname not in FINGERPRINT_IGNORED_DIR_NAMES
+            )
+            current_path = Path(current_root)
+            for filename in sorted(filenames):
+                child = current_path / filename
+                if (
+                    child.suffix not in SOURCE_EXTENSIONS
+                    and child.suffix != ".md"
+                    and child.name not in BUILD_MARKERS
+                ):
+                    continue
+                relative_path = child.relative_to(root)
+                key = relative_path.as_posix()
+                if key in seen:
+                    continue
+                seen.add(key)
+                tracked.append(
+                    {
+                        "path": key,
+                        "exists": True,
+                        "sha256": hashlib.sha256(child.read_bytes()).hexdigest(),
+                    }
+                )
+    return hashlib.sha256(
+        json.dumps(tracked, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def is_source_domain_repo_workspace(workspace_root: Path | str) -> bool:
+    root = Path(workspace_root).resolve()
+    return (
+        not (root / ".odd_sdlc" / "release" / "genesis.yml").exists()
+        and (root / SOURCE_DOMAIN_PRODUCT_ROOT).exists()
+        and (root / SOURCE_SERVICE_PRODUCT_ROOT).exists()
+        and (root / SOURCE_SERVICE_SPEC_PATH).exists()
+    )
+
+
+def load_published_workspace_state(workspace_root: Path | str) -> dict[str, object] | None:
+    root = Path(workspace_root).resolve()
+    path = root / WORKSPACE_STATE_PATH
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_published_project_profile(workspace_root: Path | str) -> ProjectProfile | None:
+    payload = load_published_workspace_state(workspace_root)
+    root = Path(workspace_root).resolve()
+    if payload is None:
+        return None
+    if not bool(payload.get("ready")):
+        return None
+    if payload.get("input_fingerprint") != current_workspace_input_fingerprint(root):
+        return None
+    profile_payload = payload.get("project_profile")
+    if not isinstance(profile_payload, dict):
+        return None
+    return ProjectProfile.from_dict({key: str(value) for key, value in profile_payload.items()})
 
 
 def realization_candidates_for_declared_root(workspace_root: Path) -> list[dict[str, object]]:
@@ -653,7 +778,8 @@ def parse_design_tenants(path: Path) -> list[dict[str, str]]:
     return tenants
 
 
-def load_project_profile(workspace_root: Path) -> ProjectProfile:
+def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
+    workspace_root = Path(workspace_root).resolve()
     constraints = _parse_constraints_lines(workspace_root / PROJECT_CONSTRAINTS_PATH)
     workspace_name = workspace_root.resolve().name
     project_slug = constraints.get("name") or _default_project_slug(workspace_root)
@@ -713,3 +839,10 @@ def load_project_profile(workspace_root: Path) -> ProjectProfile:
         realization_mode=realization_mode,
         resolution_reason=resolution_reason,
     )
+
+
+def load_project_profile(workspace_root: Path | str) -> ProjectProfile:
+    published = load_published_project_profile(workspace_root)
+    if published is not None:
+        return published
+    return resolve_project_profile(workspace_root)

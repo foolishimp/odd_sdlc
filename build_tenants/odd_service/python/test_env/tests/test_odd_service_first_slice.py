@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import odd_service.service as service_module
 from odd_sdlc.release.install import install as install_release
 from odd_service.service import approve
 from odd_service.service import attach_worker
@@ -20,6 +21,7 @@ from odd_service.service import gaps
 from odd_service.service import observe
 from odd_service.service import start
 from odd_service.service import status
+from odd_service.service import step
 from odd_service.service import workers
 
 
@@ -128,3 +130,62 @@ def test_gaps_and_approval_use_service_session_but_runtime_truth_stays_in_abg(in
     review_log = root / ".ai-workspace" / "reviews" / "human_proxy.log"
     assert review_log.exists()
     assert "approved" in review_log.read_text(encoding="utf-8")
+
+
+def test_ephemeral_agent_session_rehydrates_execution_identity_for_gaps_and_step(
+    installed_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = installed_workspace
+    seen: dict[str, dict[str, object] | None] = {}
+
+    def _fake_start(workspace: Path, *, worker_record=None):  # type: ignore[no-untyped-def]
+        seen["start"] = worker_record.to_dict() if worker_record is not None else None
+        return {
+            "status": "pending",
+            "pending_run_id": "run-ephemeral-claude",
+            "blocking_reason": "fp_dispatch",
+            "edge": "derive_intent_surface",
+        }
+
+    def _fake_gaps(workspace: Path, *, worker_record=None):  # type: ignore[no-untyped-def]
+        seen["gaps"] = worker_record.to_dict() if worker_record is not None else None
+        return {"converged": False, "gaps": []}
+
+    def _fake_iterate(workspace: Path, *, worker_record=None):  # type: ignore[no-untyped-def]
+        seen["step"] = worker_record.to_dict() if worker_record is not None else None
+        return {
+            "status": "pending",
+            "pending_run_id": "run-ephemeral-claude",
+            "blocking_reason": "fp_dispatch",
+            "edge": "derive_intent_surface",
+        }
+
+    monkeypatch.setattr(service_module, "runtime_start", _fake_start)
+    monkeypatch.setattr(service_module, "runtime_gaps", _fake_gaps)
+    monkeypatch.setattr(service_module, "runtime_iterate", _fake_iterate)
+
+    started = start(root, agent="claude")
+    run_id = _run_id(started)
+    gap_payload = gaps(root, run_id=run_id)
+    step_payload = step(root, run_id=run_id)
+
+    assert seen["start"] == {
+        "name": "ephemeral-claude",
+        "agent": "claude",
+        "transport": "local",
+        "authority_ref": "runtime://odd_service",
+        "metadata": {"ephemeral": True},
+    }
+    assert seen["gaps"] == {
+        "name": "ephemeral-claude",
+        "agent": "claude",
+        "transport": "local",
+        "authority_ref": "runtime://odd_service",
+        "metadata": {"ephemeral": True},
+    }
+    assert seen["step"] == seen["gaps"]
+    assert gap_payload["service_session"]["worker_name"] == "ephemeral-claude"
+    assert gap_payload["service_session"]["agent"] == "claude"
+    assert step_payload["service_session"]["worker_name"] == "ephemeral-claude"
+    assert step_payload["service_session"]["agent"] == "claude"
