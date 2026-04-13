@@ -62,23 +62,26 @@ That means:
 - downstream `.genesis` truth is refreshed only by installer execution
 - the `odd_sdlc` proof lanes now run against the released ABG provenance-ready
   runtime boundary
-- unresolved deterministic gaps that remain after a constructive continuation
-  now surface back out as `fd_gap` rather than as generic runtime failure
+- unresolved non-blocking deterministic findings that remain after a
+  constructive continuation now surface as yielded observer fact truth rather
+  than as generic runtime failure or a synthetic hard-stop `fd_gap`
 
-### Installed Proof Lanes Now Expect Certification Failure Facts For Unresolved Post-F_P Gaps
+### Installed Proof Lanes Now Expect Yielded Observer Handoff For Non-Blocking Post-F_P Findings
 
-The current RC also accepts the stricter ABG retry/certification envelope.
+The current RC now accepts the repriced ABG handoff envelope.
 
 That means:
 
-- an unresolved deterministic gap after constructive continuation may emit
-  `graph_call_failed`
-- the expected failure class in that case is `certification_failure`
-- the enclosing run still completes cleanly rather than degrading into generic
-  runtime failure
+- non-blocking deterministic findings that remain after constructive
+  continuation may emit `found(kind=fd_findings)`
+- the graph call may still lawfully close
+- the enclosing run may yield rather than complete when handoff to the next
+  observer/routing layer is required
+- declared hard-stop policy, safety/config/runtime defects, and explicit
+  blocker-class conditions still fail closed
 
-This is now the correct installed-workspace proof shape for unresolved
-post-`F_P` deterministic gaps.
+This is now the correct installed-workspace proof shape for non-blocking
+post-`F_P` deterministic findings.
 
 ### Public Test Branch Shape Is Preserved While Realized Test Traceability Moves Inside Archive Construction
 

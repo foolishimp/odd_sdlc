@@ -268,6 +268,46 @@ def _open_continuation_ids(
     return open_ids
 
 
+def _resolve_open_continuations(
+    workspace: Path,
+    emit_event: Callable[..., Any] | None,
+    *,
+    stream: EventStream,
+    workflow_version: str,
+    work_key: str | None,
+    run_id: str | None,
+    call_id: str | None,
+    latest_event_id: str | None,
+    emitted_count: int,
+) -> tuple[int, str | None]:
+    for continuation_id in _open_continuation_ids(
+        stream,
+        run_id=run_id,
+        call_id=call_id,
+    ):
+        continuation_event = _event_writer(
+            workspace,
+            emit_event,
+            "continuation_resolved",
+            {
+                "continuation_id": continuation_id,
+                "call_id": call_id or None,
+                "caused_by_event_id": latest_event_id,
+            },
+            workflow_version=workflow_version,
+            work_key=work_key,
+            run_id=run_id,
+            aggregate_type="continuation",
+            aggregate_id=continuation_id,
+            parent_aggregate_id=run_id,
+            causation_event_id=latest_event_id,
+            call_id=call_id or None,
+        )
+        emitted_count += 1
+        latest_event_id = continuation_event.get("event_id")
+    return emitted_count, latest_event_id
+
+
 def ingest_fp_result(
     result_path: str | Path,
     workspace: Path,
@@ -424,17 +464,46 @@ def ingest_fp_result(
         emitted_count += 1
         latest_event_id = proof_event.get("event_id")
 
-        closure_config = closure_policy.get("config", {})
-        closure_passed = not (isinstance(closure_config, Mapping) and bool(closure_config.get("force_fail")))
-        closure_reason = "forced_closure_failure" if not closure_passed else "resolved_without_fh"
         fd_recheck_decision = _rerun_manifest_fd_failures(
             workspace,
             manifest,
             work_key=manifest_work_key or None,
         )
-        if not fd_recheck_decision["passed"]:
-            closure_passed = False
-            closure_reason = "fd_failures_unresolved_after_fp"
+        yielded_post_transform = not fd_recheck_decision["passed"]
+        if yielded_post_transform:
+            found_event = _event_writer(
+                workspace,
+                emit_event,
+                "found",
+                {
+                    "kind": "fd_findings",
+                    "edge": result_data["edge"],
+                    "failing": [
+                        failure.get("name")
+                        for failure in fd_recheck_decision.get("failures", [])
+                        if isinstance(failure, Mapping) and isinstance(failure.get("name"), str)
+                    ],
+                    "delta_summary": manifest.get("delta_summary", ""),
+                },
+                workflow_version=workflow_version,
+                work_key=manifest_work_key or None,
+                run_id=manifest_run_id or None,
+                aggregate_type="graph_call" if call_id else ("run" if manifest_run_id else None),
+                aggregate_id=call_id or (manifest_run_id or None),
+                parent_aggregate_id=(manifest_run_id or None) if call_id else None,
+                causation_event_id=latest_event_id,
+                job_id=job_id or None,
+                graph_function_id=graph_function_id or None,
+                materialization_id=materialization_id or None,
+                call_id=call_id or None,
+                vector_id=vector_id or None,
+            )
+            emitted_count += 1
+            latest_event_id = found_event.get("event_id")
+
+        closure_config = closure_policy.get("config", {})
+        closure_passed = not (isinstance(closure_config, Mapping) and bool(closure_config.get("force_fail")))
+        closure_reason = "forced_closure_failure" if not closure_passed else "resolved_without_fh"
         target_binding_decision = _target_binding_materialization(workspace, manifest)
         if not target_binding_decision["passed"]:
             closure_passed = False
@@ -475,48 +544,6 @@ def ingest_fp_result(
             )
             emitted_count += 1
             latest_event_id = closure_event.get("event_id")
-
-            if closure_reason == "fd_failures_unresolved_after_fp":
-                found_event = _event_writer(
-                    workspace,
-                    emit_event,
-                    "found",
-                    {
-                        "kind": "fd_gap",
-                        "edge": result_data["edge"],
-                        "failing": [
-                            failure.get("name")
-                            for failure in fd_recheck_decision.get("failures", [])
-                            if isinstance(failure, Mapping) and isinstance(failure.get("name"), str)
-                        ],
-                        "delta_summary": manifest.get("delta_summary", ""),
-                    },
-                    workflow_version=workflow_version,
-                    work_key=manifest_work_key or None,
-                    run_id=manifest_run_id or None,
-                    aggregate_type="graph_call" if call_id else ("run" if manifest_run_id else None),
-                    aggregate_id=call_id or (manifest_run_id or None),
-                    parent_aggregate_id=(manifest_run_id or None) if call_id else None,
-                    causation_event_id=latest_event_id,
-                    job_id=job_id or None,
-                    graph_function_id=graph_function_id or None,
-                    materialization_id=materialization_id or None,
-                    call_id=call_id or None,
-                    vector_id=vector_id or None,
-                )
-                emitted_count += 1
-                latest_event_id = found_event.get("event_id")
-                return {
-                    "status": "pending",
-                    "result_path": str(result_file),
-                    "manifest_id": manifest_id,
-                    "spec_hash": spec_hash,
-                    "workflow_version": workflow_version,
-                    "events_emitted": emitted_count,
-                    "assessments": emitted,
-                    "blocking_reason": "fd_gap",
-                    "stopped_by": "fd_gap",
-                }
 
             graph_call_failed = None
             if call_id and graph_call_terminal:
@@ -655,17 +682,26 @@ def ingest_fp_result(
             emitted_count += 1
             latest_event_id = graph_call_closed.get("event_id")
 
-        for continuation_id in _open_continuation_ids(
-            stream,
-            run_id=manifest_run_id or None,
-            call_id=call_id or None,
-        ):
-            continuation_event = _event_writer(
+        if yielded_post_transform:
+            emitted_count, latest_event_id = _resolve_open_continuations(
                 workspace,
                 emit_event,
-                "continuation_resolved",
+                stream=stream,
+                workflow_version=workflow_version,
+                work_key=manifest_work_key or None,
+                run_id=manifest_run_id or None,
+                call_id=call_id or None,
+                latest_event_id=latest_event_id,
+                emitted_count=emitted_count,
+            )
+            continuation_id = f"cont-{uuid.uuid4().hex}"
+            continuation_opened = _event_writer(
+                workspace,
+                emit_event,
+                "continuation_opened",
                 {
                     "continuation_id": continuation_id,
+                    "continuation_kind": "observer_handoff",
                     "call_id": call_id or None,
                     "caused_by_event_id": latest_event_id,
                 },
@@ -679,7 +715,58 @@ def ingest_fp_result(
                 call_id=call_id or None,
             )
             emitted_count += 1
-            latest_event_id = continuation_event.get("event_id")
+            latest_event_id = continuation_opened.get("event_id")
+
+            if manifest_run_id:
+                _event_writer(
+                    workspace,
+                    emit_event,
+                    "run_yielded",
+                    {
+                        "call_id": call_id or None,
+                        "edge": result_data["edge"],
+                        "continuation_id": continuation_id,
+                        "handoff_kind": "observer_handoff",
+                        "handoff_reason": "fd_findings",
+                    },
+                    workflow_version=workflow_version,
+                    work_key=manifest_work_key or None,
+                    run_id=manifest_run_id,
+                    aggregate_type="run",
+                    aggregate_id=manifest_run_id,
+                    causation_event_id=latest_event_id,
+                    job_id=job_id or None,
+                    graph_function_id=graph_function_id or None,
+                    materialization_id=materialization_id or None,
+                    call_id=call_id or None,
+                    vector_id=vector_id or None,
+                )
+                emitted_count += 1
+            return {
+                "status": "yield",
+                "result_path": str(result_file),
+                "manifest_id": manifest_id,
+                "spec_hash": spec_hash,
+                "workflow_version": workflow_version,
+                "events_emitted": emitted_count,
+                "assessments": emitted,
+                "continuation_id": continuation_id,
+                "handoff_kind": "observer_handoff",
+                "handoff_reason": "fd_findings",
+                "stopped_by": "yield",
+            }
+
+        emitted_count, latest_event_id = _resolve_open_continuations(
+            workspace,
+            emit_event,
+            stream=stream,
+            workflow_version=workflow_version,
+            work_key=manifest_work_key or None,
+            run_id=manifest_run_id or None,
+            call_id=call_id or None,
+            latest_event_id=latest_event_id,
+            emitted_count=emitted_count,
+        )
 
         if manifest_run_id:
             _event_writer(

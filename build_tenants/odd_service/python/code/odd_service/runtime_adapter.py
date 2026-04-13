@@ -111,6 +111,10 @@ def run_auto(
             )
             if dispatch_result.get("status") == "ok":
                 continue
+            if dispatch_result.get("status") == "yield":
+                result.update(dispatch_result)
+                result["stopped_by"] = dispatch_result.get("stopped_by", "yield")
+                return result
             result.update(dispatch_result)
             result["stopped_by"] = dispatch_result.get("stopped_by", "fp_runtime_failure")
             return result

@@ -78,8 +78,10 @@ runtime facts, wipe runtime state, and then rerun the same use case.
    surface
 4. each bounded constructor turn records attributable asset checkpoint mutation
    and then successful result ingestion produces lawful `assessed`,
-   `proof_passed`, `closure_passed`, `graph_call_closed`, and `run_completed`
-   truth
+   `proof_passed`, `closure_passed`, and `graph_call_closed` truth, followed
+   by either `run_completed` when the callable boundary closes cleanly or
+   `run_yielded` when non-blocking post-transform observer truth requires a
+   handoff before redispatch
 5. resetting the sandbox clears runtime state without corrupting the app
 6. rerunning produces a clean event log with the same significant lifecycle
    shape

@@ -11,8 +11,10 @@ from pathlib import Path
 
 import pytest
 
+import odd_service.runtime_adapter as runtime_adapter_module
 import odd_service.service as service_module
 from odd_sdlc.release.install import install as install_release
+from odd_service.models import WorkerRecord
 from odd_service.service import approve
 from odd_service.service import attach_worker
 from odd_service.service import catalog
@@ -189,3 +191,81 @@ def test_ephemeral_agent_session_rehydrates_execution_identity_for_gaps_and_step
     assert gap_payload["service_session"]["agent"] == "claude"
     assert step_payload["service_session"]["worker_name"] == "ephemeral-claude"
     assert step_payload["service_session"]["agent"] == "claude"
+
+
+def test_runtime_adapter_run_auto_surfaces_yield_handoff_without_redispatch(
+    installed_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = installed_workspace
+    worker = WorkerRecord(name="builder", agent="claude")
+    start_calls = {"count": 0}
+
+    def _fake_start(app, *, auto=False):  # type: ignore[no-untyped-def]
+        start_calls["count"] += 1
+        return {
+            "status": "pending",
+            "blocking_reason": "fp_dispatch",
+            "run_id": "run-yield-service",
+            "call_id": "call-yield-service",
+            "edge": "derive_design_surface",
+        }
+
+    def _fake_dispatch(result, workspace, *, config):  # type: ignore[no-untyped-def]
+        return {
+            "status": "yield",
+            "stopped_by": "yield",
+            "handoff_kind": "observer_handoff",
+            "handoff_reason": "fd_findings",
+            "run_id": result["run_id"],
+            "call_id": result["call_id"],
+            "edge": result["edge"],
+        }
+
+    monkeypatch.setattr(runtime_adapter_module, "odd_start", _fake_start)
+    monkeypatch.setattr(runtime_adapter_module, "auto_dispatch_from_result", _fake_dispatch)
+
+    payload = runtime_adapter_module.run_auto(root, worker_record=worker)
+
+    assert start_calls["count"] == 1
+    assert payload["status"] == "yield"
+    assert payload["stopped_by"] == "yield"
+    assert payload["handoff_kind"] == "observer_handoff"
+    assert payload["handoff_reason"] == "fd_findings"
+    assert payload["run_id"] == "run-yield-service"
+    assert payload["call_id"] == "call-yield-service"
+
+
+def test_service_run_preserves_yielded_handoff_truth_in_service_session(
+    installed_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = installed_workspace
+    attach_worker(root, name="builder", agent="claude")
+
+    def _fake_run_auto(workspace: Path, *, worker_record=None, human_proxy=False):  # type: ignore[no-untyped-def]
+        assert worker_record is not None
+        return {
+            "status": "yield",
+            "stopped_by": "yield",
+            "handoff_kind": "observer_handoff",
+            "handoff_reason": "fd_findings",
+            "run_id": "run-yield-service",
+            "call_id": "call-yield-service",
+            "edge": "derive_design_surface",
+            "auto": True,
+        }
+
+    monkeypatch.setattr(service_module, "runtime_run_auto", _fake_run_auto)
+
+    payload = service_module.run(root, worker_name="builder")
+
+    assert payload["status"] == "yield"
+    assert payload["stopped_by"] == "yield"
+    assert payload["handoff_kind"] == "observer_handoff"
+    assert payload["handoff_reason"] == "fd_findings"
+    assert payload["service_worker"]["name"] == "builder"
+    assert payload["service_session"]["run_id"] == "run-yield-service"
+    assert payload["service_session"]["status"] == "yield"
+    assert payload["service_session"]["edge"] == "derive_design_surface"
+    assert payload["service_session"]["last_result"]["handoff_kind"] == "observer_handoff"

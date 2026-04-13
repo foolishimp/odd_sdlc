@@ -502,7 +502,12 @@ def _build_observation(*, entry: dict[str, Any], analysis_current: bool) -> dict
                 for name in failing
             ],
         }
-    if any("missing-" in name or "capability" in name for name in failing):
+    if any(
+        name.startswith("missing_")
+        or name.startswith("missing-")
+        or "capability" in name
+        for name in failing
+    ):
         return {
             "observed_boundary": "capability",
             "observed_signal": "missing_capability",
@@ -644,7 +649,12 @@ def _build_triage(
         }
         triage["route_proposal"] = None
         return triage
-    if any("missing-" in name or "capability" in name for name in failing):
+    if any(
+        name.startswith("missing_")
+        or name.startswith("missing-")
+        or "capability" in name
+        for name in failing
+    ):
         triage = {
             "analysis_fingerprint": analysis_fingerprint,
             "framework_layer": "capability",

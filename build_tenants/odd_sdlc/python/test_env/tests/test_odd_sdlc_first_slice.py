@@ -715,6 +715,53 @@ def test_triage_divergence_records_prior_observation_chain(tmp_path: Path) -> No
     assert divergence[-1]["data"]["current_triage_id"] == second_edge["triage"]["triage_id"]
 
 
+def test_missing_capability_is_projected_as_blocked_missing_capability(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_runtime_observation_surface",
+                    "delta": 0.5,
+                    "failing": ["missing_runtime_observation_contract"],
+                    "passing": [],
+                    "delta_summary": "runtime observation capability contract is not declared",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config=app.config.runtime_config,
+        publish=True,
+    )
+
+    edge = payload["gaps"][0]
+    triage_artifact = load_current_edge_triage(tmp_path, edge["edge"])
+    assert edge["triage"]["process_outcome_kind"] == "blocked_missing_capability"
+    assert edge["triage"]["framework_condition"] == "blocked"
+    assert edge["triage"]["resumption_trigger"] == "capability_declaration_changed"
+    assert edge["triage"]["policy_gate"] == {
+        "state": "capability_blocked",
+        "reason": "missing_capability",
+    }
+    assert edge["route_proposal"] is None
+    assert edge["route_binding"]["state"] == "blocked_missing_capability"
+    assert edge["route_binding"]["priority_source"] == "capability_gate"
+    assert triage_artifact is not None
+    assert triage_artifact["triage"]["process_outcome_kind"] == "blocked_missing_capability"
+    assert triage_artifact["route_binding"]["state"] == "blocked_missing_capability"
+
+
 def test_governed_workspace_constitutional_pressure_is_suppressed_by_default(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     refresh_analysis(tmp_path, stage="test")

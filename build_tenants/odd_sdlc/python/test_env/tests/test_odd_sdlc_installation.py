@@ -796,7 +796,13 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_text("start.stdout.txt", start_result.stdout)
     run_archive.capture_text("start.stderr.txt", start_result.stderr)
-    assert start_result.returncode == 4
+    assert start_result.returncode == 6
+    start_payload = json.loads(start_result.stdout)
+    run_archive.capture_json("start.payload.json", start_payload)
+    assert start_payload["status"] == "yield"
+    assert start_payload["stopped_by"] == "yield"
+    assert start_payload["handoff_kind"] == "observer_handoff"
+    assert start_payload["handoff_reason"] == "fd_findings"
 
     runtime_contract_text = (workspace / ".odd_sdlc" / "release" / "genesis.yml").read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
@@ -818,12 +824,15 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     event_types = [event["event_type"] for event in events]
     assert "worker_turn_started" in event_types
     assert ("assessed" in event_types) or ("found" in event_types)
-    assert "graph_call_failed" in event_types
+    assert "graph_call_closed" in event_types
+    assert "continuation_opened" in event_types
+    assert "run_yielded" in event_types
     assert "run_failed" not in event_types
     assert all(event.get("data", {}).get("failure_class") != "policy_config_defect" for event in events)
+    assert not any(event["event_type"] == "graph_call_failed" for event in events)
     assert any(
-        event["event_type"] == "graph_call_failed"
-        and event.get("data", {}).get("failure_class") == "certification_failure"
+        event["event_type"] == "found"
+        and event.get("data", {}).get("kind") == "fd_findings"
         for event in events
     )
     graph_call_edges = [
@@ -831,7 +840,16 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
         for event in events
         if event["event_type"] == "graph_call_opened"
     ]
+    yielded_graph_calls = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"].get("edge") == start_payload["edge"]
+        and event["data"].get("run_id") == start_payload["run_id"]
+        and event["data"].get("call_id") == start_payload["call_id"]
+    ]
     assert graph_call_edges[0] == "derive_intent_surface"
+    assert len(yielded_graph_calls) == 1
     assert len(graph_call_edges) >= 1
     assert "prepare_release_surface" not in graph_call_edges
     assert "prepare_deployment_surface" not in graph_call_edges

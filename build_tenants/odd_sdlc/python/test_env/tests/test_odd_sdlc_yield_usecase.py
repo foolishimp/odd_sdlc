@@ -1,0 +1,317 @@
+# Validates: REQ-F-ODDSDLC-027
+# Validates: REQ-F-ODDSDLC-032
+# Derived-From: /Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/B-005-adopt-abg-yielded-handoff-in-odd-method.md
+# Derived-From: /Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md
+# Derived-From: /Users/jim/src/apps/odd_method/specification/scenarios/07-canonical-sandbox-repeatability.md
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from odd_sdlc.release.install import install as install_release
+from sandbox_runtime import (
+    read_events,
+    run_installed_genesis,
+    run_installed_odd_sdlc,
+)
+from test_odd_sdlc_installation import (
+    _append_runtime_contract_overrides,
+    _seed_data_mapper_template_workspace,
+    _write_fake_transport_contract,
+)
+
+
+def _prepare_installed_yield_workspace(
+    run_archive,
+    *,
+    workspace: Path | None = None,
+    artifact_prefix: str = "install",
+) -> Path:
+    workspace = workspace or run_archive.workspace
+    _seed_data_mapper_template_workspace(workspace)
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    run_archive.capture_json(f"{artifact_prefix}.payload.json", payload)
+    assert payload["status"] == "installed"
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+    run_archive.copy_file(
+        transport_contract,
+        dest_name=f"{artifact_prefix}.transport_contract.test_transport_contract.json",
+    )
+    return workspace
+
+
+def _run_start_auto_expect_yield(
+    workspace: Path,
+    *,
+    run_archive,
+    label: str,
+) -> dict[str, Any]:
+    start_result = run_installed_genesis(
+        workspace,
+        "start",
+        "--auto",
+        archive=run_archive,
+        label=label,
+        timeout=180,
+        check=False,
+    )
+    run_archive.capture_text(f"{label}.stdout.txt", start_result.stdout)
+    run_archive.capture_text(f"{label}.stderr.txt", start_result.stderr)
+    assert start_result.returncode == 6
+    payload = json.loads(start_result.stdout)
+    run_archive.capture_json(f"{label}.payload.json", payload)
+    assert payload["status"] == "yield"
+    assert payload["stopped_by"] == "yield"
+    assert payload["handoff_kind"] == "observer_handoff"
+    assert payload["handoff_reason"] == "fd_findings"
+    assert isinstance(payload.get("run_id"), str) and payload["run_id"]
+    assert isinstance(payload.get("call_id"), str) and payload["call_id"]
+    return payload
+
+
+def _observe_runtime(workspace: Path, *, run_archive, label: str) -> dict[str, Any]:
+    observed = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "observe",
+            archive=run_archive,
+            label=label,
+            timeout=120,
+        ).stdout
+    )
+    run_archive.capture_json(f"{label}.json", observed)
+    return observed
+
+
+def _yielded_run_projection(observed: dict[str, Any], *, run_id: str) -> dict[str, Any]:
+    for run in observed["runs"]:
+        if run["run_id"] == run_id:
+            return run
+    raise AssertionError(f"missing run projection for {run_id!r}")
+
+
+def _yielded_call_projection(observed: dict[str, Any], *, call_id: str) -> dict[str, Any]:
+    for graph_call in observed["graph_calls"]:
+        if graph_call["call_id"] == call_id:
+            return graph_call
+    raise AssertionError(f"missing graph call projection for {call_id!r}")
+
+
+def _observer_handoff_projection(observed: dict[str, Any], *, run_id: str, call_id: str) -> dict[str, Any]:
+    matches = [
+        continuation
+        for continuation in observed["continuations"]
+        if continuation["run_id"] == run_id
+        and continuation["call_id"] == call_id
+        and continuation["continuation_kind"] == "observer_handoff"
+    ]
+    if len(matches) != 1:
+        raise AssertionError(
+            f"expected one observer_handoff continuation for run={run_id!r} call={call_id!r}, got {matches!r}"
+        )
+    return matches[0]
+
+
+@pytest.mark.usecase_id("yield_handoff_canned_chain")
+def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archive) -> None:
+    workspace = _prepare_installed_yield_workspace(run_archive)
+
+    initial_gaps = json.loads(
+        run_installed_genesis(
+            workspace,
+            "gaps",
+            archive=run_archive,
+            label="yield_chain.initial_gaps",
+        ).stdout
+    )
+    run_archive.capture_json("yield_chain.initial_gaps.json", initial_gaps)
+    assert initial_gaps["converged"] is False
+    assert len(initial_gaps["gaps"]) == 18
+
+    start_payload = _run_start_auto_expect_yield(
+        workspace,
+        run_archive=run_archive,
+        label="yield_chain.start",
+    )
+
+    events = read_events(workspace)
+    run_archive.capture_json("yield_chain.events.json", events)
+    event_types = [event["event_type"] for event in events]
+    assert "worker_turn_started" in event_types
+    assert "graph_call_closed" in event_types
+    assert "continuation_opened" in event_types
+    assert "run_yielded" in event_types
+    assert event_types.index("graph_call_closed") < event_types.index("continuation_opened") < event_types.index("run_yielded")
+    assert "run_failed" not in event_types
+    assert "graph_call_failed" not in event_types
+    assert any(
+        event["event_type"] == "found"
+        and event.get("data", {}).get("kind") == "fd_findings"
+        for event in events
+    )
+
+    intent_text = (workspace / "specification" / "INTENT.md").read_text(encoding="utf-8")
+    product_text = (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8")
+    assert "Categorical Data Mapping & Computation Engine (CDME)" in intent_text
+    assert "Categorical Data Mapping & Computation Engine (CDME)" in product_text
+
+    manifest_dir = workspace / ".ai-workspace" / "fp_manifests"
+    result_dir = workspace / ".ai-workspace" / "fp_results"
+    assert any(manifest_dir.iterdir())
+    assert any(result_dir.iterdir())
+    first_manifest = json.loads(sorted(manifest_dir.iterdir())[0].read_text(encoding="utf-8"))
+    assert first_manifest["resolved_policy"]["dispatch"]["config"]["timeout"] == 1800
+    graph_call_edges = [
+        event["data"]["edge"]
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+    ]
+    yielded_graph_calls = [
+        event
+        for event in events
+        if event["event_type"] == "graph_call_opened"
+        and event["data"].get("edge") == start_payload["edge"]
+        and event["data"].get("run_id") == start_payload["run_id"]
+        and event["data"].get("call_id") == start_payload["call_id"]
+    ]
+    assert graph_call_edges[0] == "derive_intent_surface"
+    assert graph_call_edges[-1] == start_payload["edge"]
+    assert len(yielded_graph_calls) == 1
+    assert start_payload["edge"] == "derive_design_surface"
+    assert "prepare_release_surface" not in graph_call_edges
+
+
+@pytest.mark.usecase_id("yield_handoff_canned_chain")
+def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_archive) -> None:
+    workspace = _prepare_installed_yield_workspace(run_archive)
+    start_payload = _run_start_auto_expect_yield(
+        workspace,
+        run_archive=run_archive,
+        label="yield_projection.start",
+    )
+
+    observed_before = _observe_runtime(
+        workspace,
+        run_archive=run_archive,
+        label="yield_projection.observe_before",
+    )
+    yielded_run = _yielded_run_projection(observed_before, run_id=start_payload["run_id"])
+    yielded_call = _yielded_call_projection(observed_before, call_id=start_payload["call_id"])
+    handoff = _observer_handoff_projection(
+        observed_before,
+        run_id=start_payload["run_id"],
+        call_id=start_payload["call_id"],
+    )
+    assert yielded_run["status"] == "yielded"
+    assert yielded_call["status"] == "closed"
+    assert handoff["status"] == "open"
+
+    raw_gaps = json.loads(
+        run_installed_genesis(
+            workspace,
+            "gaps",
+            archive=run_archive,
+            label="yield_projection.raw_gaps",
+        ).stdout
+    )
+    run_archive.capture_json("yield_projection.raw_gaps.json", raw_gaps)
+    assert raw_gaps["converged"] is False
+    assert raw_gaps["total_delta"] > 0
+    assert raw_gaps["gaps"]
+
+    domain_gaps = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            archive=run_archive,
+            label="yield_projection.domain_gaps",
+            timeout=120,
+        ).stdout
+    )
+    run_archive.capture_json("yield_projection.domain_gaps.json", domain_gaps)
+    assert domain_gaps["converged"] is False
+    assert any(
+        "observation" in gap
+        and "triage" in gap
+        and "route_proposal" in gap
+        and "route_binding" in gap
+        for gap in domain_gaps["gaps"]
+    )
+
+    observed_after = _observe_runtime(
+        workspace,
+        run_archive=run_archive,
+        label="yield_projection.observe_after",
+    )
+    before_run_ids = {run["instance_id"] for run in observed_before["runs"]}
+    after_run_ids = {run["instance_id"] for run in observed_after["runs"]}
+    assert before_run_ids.issubset(after_run_ids)
+    assert after_run_ids - before_run_ids == {
+        run_id for run_id in after_run_ids if run_id.startswith("gap_snapshot::")
+    }
+    assert _yielded_run_projection(observed_after, run_id=start_payload["run_id"])["status"] == "yielded"
+    assert _observer_handoff_projection(
+        observed_after,
+        run_id=start_payload["run_id"],
+        call_id=start_payload["call_id"],
+    )["continuation_id"] == handoff["continuation_id"]
+
+
+@pytest.mark.usecase_id("yield_handoff_canned_chain")
+def test_data_mapper_yield_chain_reissues_fresh_handoff_on_a_fresh_workspace(run_archive) -> None:
+    first_workspace = _prepare_installed_yield_workspace(
+        run_archive,
+        artifact_prefix="yield_reissue_first.install",
+    )
+    first_start = _run_start_auto_expect_yield(
+        first_workspace,
+        run_archive=run_archive,
+        label="yield_reissue.start_first",
+    )
+    first_observed = _observe_runtime(
+        first_workspace,
+        run_archive=run_archive,
+        label="yield_reissue.observe_first",
+    )
+    first_handoff = _observer_handoff_projection(
+        first_observed,
+        run_id=first_start["run_id"],
+        call_id=first_start["call_id"],
+    )
+
+    second_workspace = run_archive.run_dir / "workspace_second"
+    second_workspace.mkdir(parents=True, exist_ok=True)
+    _prepare_installed_yield_workspace(
+        run_archive,
+        workspace=second_workspace,
+        artifact_prefix="yield_reissue_second.install",
+    )
+    second_start = _run_start_auto_expect_yield(
+        second_workspace,
+        run_archive=run_archive,
+        label="yield_reissue.start_second",
+    )
+    second_observed = _observe_runtime(
+        second_workspace,
+        run_archive=run_archive,
+        label="yield_reissue.observe_second",
+    )
+    second_handoff = _observer_handoff_projection(
+        second_observed,
+        run_id=second_start["run_id"],
+        call_id=second_start["call_id"],
+    )
+
+    assert second_start["edge"] == first_start["edge"] == "derive_design_surface"
+    assert second_start["run_id"] != first_start["run_id"]
+    assert second_start["call_id"] != first_start["call_id"]
+    assert second_handoff["continuation_id"] != first_handoff["continuation_id"]
+    assert second_handoff["status"] == "open"

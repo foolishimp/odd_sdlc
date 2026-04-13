@@ -349,8 +349,6 @@ def _emit_event_cmd(event_type: str, data_json: str, workspace: Path) -> int:
       assessed  — requires: kind, edge, evaluator, result (pass | fail)
         kind=fp additionally requires: spec_hash
       revoked   — requires: kind (fh_approval), edge, actor, reason
-      constitutional_proposal_deferred — requires: edge, proposal_id, reason
-      constitutional_proposal_approved_with_edits — requires: edge, proposal_id, actor
     """
     import json as _json
 
@@ -400,14 +398,6 @@ def _emit_event_cmd(event_type: str, data_json: str, workspace: Path) -> int:
                 errors.append(f"revoked requires '{fld}' field")
         if data.get("kind") not in (None, "fh_approval", "fp_assessment"):
             errors.append(f"revoked 'kind' must be 'fh_approval' or 'fp_assessment', got '{data.get('kind')!s}'")
-    elif event_type == "constitutional_proposal_deferred":
-        for fld in ("edge", "proposal_id", "reason"):
-            if fld not in data:
-                errors.append(f"constitutional_proposal_deferred requires '{fld}' field")
-    elif event_type == "constitutional_proposal_approved_with_edits":
-        for fld in ("edge", "proposal_id", "actor"):
-            if fld not in data:
-                errors.append(f"constitutional_proposal_approved_with_edits requires '{fld}' field")
 
     if event_type == "reset":
         if "scope" not in data:
@@ -653,6 +643,10 @@ def _run_start_auto(
             )
             if dispatch_result.get("status") == "ok":
                 continue
+            if dispatch_result.get("status") == "yield":
+                result.update(dispatch_result)
+                result["stopped_by"] = dispatch_result.get("stopped_by", "yield")
+                return result
             result.update(dispatch_result)
             result["stopped_by"] = dispatch_result.get("stopped_by", "fp_runtime_failure")
             return result
@@ -836,8 +830,9 @@ def main() -> None:
     #   1 — error (already exited above)
     #   2 — fp_dispatched (F_P actor required; fp_manifest_path in output)
     #   3 — fh_gate_pending (F_H evaluation required; fh_gate.criteria in output)
-    #   4 — fd_gap (deterministic checks still failing after F_P resolved)
+    #   4 — fd_gap (declared deterministic hard stop before constructive transition)
     #   5 — max_iterations (auto-loop limit hit without convergence)
+    #   6 — yield (constructive turn advanced the asset and yielded handoff truth)
     #
     # IMPORTANT: exit 0 means ONLY converged/nothing_to_do — never a blocked run.
     stopped_by = result.get("stopped_by", "")
@@ -849,5 +844,7 @@ def main() -> None:
         sys.exit(4)
     if stopped_by == "max_iterations":
         sys.exit(5)
+    if stopped_by == "yield":
+        sys.exit(6)
     if result.get("status") == "error":
         sys.exit(1)

@@ -22,10 +22,10 @@ carry-forward, and downstream uptake of the released ABG runtime boundary.
 - downstream ABG uptake through installer composition:
   released ABG runtime truth is now consumed by reinstall, not by source
   `.genesis` mirroring
-- installed proof lanes aligned to ABG certification semantics:
-  unresolved post-`F_P` deterministic gaps may now emit
-  `graph_call_failed` with `certification_failure` while the enclosing run
-  still completes cleanly
+- installed proof lanes aligned to ABG yielded handoff semantics:
+  unresolved non-blocking post-`F_P` deterministic findings may now emit
+  `found(kind=fd_findings)` and yield observer handoff truth rather than
+  flattening into runtime failure or synthetic hard-stop `fd_gap`
 - generated source and test trace authority through `Implements:` and
   `Validates:` markers
 - developer-test branch refactor without public graph drift:
@@ -35,8 +35,8 @@ carry-forward, and downstream uptake of the released ABG runtime boundary.
   stable
 - archive-stage traceability repair:
   empty orphan generated test files are no longer emitted, and adopted
-  code-surface deterministic gaps now surface back out as `fd_gap` after
-  constructive continuation recheck
+  code-surface deterministic findings now surface back out as yielded observer
+  fact truth after constructive continuation recheck
 - workspace-root and catalog honesty fixes for installed workspaces
 - repriced `data_mapper_test19_topology_regression` proving lane under current
   framework semantics
