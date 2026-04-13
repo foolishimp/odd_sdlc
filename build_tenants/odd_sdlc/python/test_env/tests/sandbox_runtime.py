@@ -188,6 +188,23 @@ def run_installed_self_test(
     return payload
 
 
+def refresh_installed_analysis(
+    workspace: Path,
+    *,
+    archive: "RunArchive | None" = None,
+    label: str = "odd_sdlc refresh-analysis",
+    timeout: int = 60,
+) -> dict[str, Any]:
+    result = run_installed_odd_sdlc(
+        workspace,
+        "refresh-analysis",
+        archive=archive,
+        label=label,
+        timeout=timeout,
+    )
+    return json.loads(result.stdout)
+
+
 def run_constructor_for_start(
     workspace: Path,
     *,
@@ -223,6 +240,11 @@ def complete_current_call(
     archive: "RunArchive | None" = None,
     label_prefix: str,
 ) -> dict[str, Any]:
+    refresh = refresh_installed_analysis(
+        workspace,
+        archive=archive,
+        label=f"{label_prefix} refresh-analysis",
+    )
     start = json.loads(
         run_installed_odd_sdlc(
             workspace,
@@ -248,6 +270,7 @@ def complete_current_call(
         ).stdout
     )
     return {
+        "refresh_analysis": refresh,
         "start": start,
         "constructor": constructor,
         "assessed": assessed,

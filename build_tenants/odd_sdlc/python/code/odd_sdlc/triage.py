@@ -104,26 +104,16 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:16]}"
 
 
-def _event_value(event: dict[str, Any], key: str) -> Any:
-    if key in event:
-        return event.get(key)
-    return (event.get("data") or {}).get(key)
-
-
-def _latest_run_id(all_events: list[dict[str, Any]], *, work_key: str | None) -> str | None:
-    for event in reversed(all_events):
-        event_work_key = _event_value(event, "work_key")
-        if work_key is not None and event_work_key not in {None, work_key}:
-            continue
-        run_id = _event_value(event, "run_id")
-        if isinstance(run_id, str) and run_id:
-            return run_id
-    return None
-
-
-def _fallback_run_id(work_key: str | None) -> str:
-    suffix = work_key or "global"
-    return f"manual_gap::{suffix}"
+def _gap_snapshot_run_id(*, analysis_fingerprint: str | None, work_key: str | None) -> str:
+    payload = {
+        "kind": "gap_snapshot",
+        "analysis_fingerprint": analysis_fingerprint or "unpublished",
+        "work_key": work_key or "global",
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:16]
+    return f"gap_snapshot::{digest}"
 
 
 def _normalize_text(value: str) -> str:
@@ -343,7 +333,10 @@ def enrich_gap_snapshot(
         ):
             projection = prior
         else:
-            run_id = _latest_run_id(all_events, work_key=work_key) or _fallback_run_id(work_key)
+            run_id = _gap_snapshot_run_id(
+                analysis_fingerprint=analysis_fingerprint,
+                work_key=work_key,
+            )
             projection = _build_edge_projection(
                 workspace_root=root,
                 entry=entry,
@@ -577,6 +570,8 @@ def _build_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None:
     fixed_vector: str | None = None
     if triage["gap_kind"] == "dependency_gap":
         fixed_vector = f"resume_from_{reentry_layer}" if reentry_layer else None
+    elif reentry_layer == "product":
+        fixed_vector = "reopen_product"
     elif reentry_layer == "requirements":
         fixed_vector = "reopen_requirements"
     elif reentry_layer == "design":
@@ -758,12 +753,12 @@ def _build_triage(
         }
         triage["route_proposal"] = None
         return triage
-    if delta > 0 and reentry_layer in {"requirements", "design", "code", "test"}:
+    if delta > 0 and reentry_layer in {"product", "requirements", "design", "code", "test"}:
         triage = {
             "analysis_fingerprint": analysis_fingerprint,
             "framework_layer": framework_layer,
             "framework_condition": "unproven",
-            "gap_kind": f"{reentry_layer}_gap",
+            "gap_kind": f"{reentry_layer}_gap" if reentry_layer in {"requirements", "design", "code", "test"} else "unclassified_gap",
             "process_outcome_kind": "advance_fixed_vector",
             "reentry_layer": reentry_layer,
             "resumption_trigger": None,

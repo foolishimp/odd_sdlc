@@ -757,6 +757,7 @@ For route-bearing outcomes, the domain emits a lawful route proposal:
   - `repair_output_contract`
   - `realize_missing_tests`
   - `reopen_design`
+  - `reopen_product`
   - `reopen_requirements`
   - `goal_reprice`
   - `intent_reprice`
@@ -834,8 +835,9 @@ The closed core taxonomy is:
 - `topology_gap`
 - `dependency_gap`
 
-The closed core taxonomy intentionally does not include `goal_gap`,
-`intent_gap`, `execution_gap`, or `capability_gap` as first-class gap kinds.
+The closed core taxonomy intentionally does not include `product_gap`,
+`goal_gap`, `intent_gap`, `execution_gap`, or `capability_gap` as first-class
+gap kinds.
 Those are modeled through:
 
 - `framework_layer`
@@ -865,6 +867,7 @@ Canonical `reentry_layer` values:
 - `test`
 - `design`
 - `requirements`
+- `product`
 - `goals`
 - `intent`
 

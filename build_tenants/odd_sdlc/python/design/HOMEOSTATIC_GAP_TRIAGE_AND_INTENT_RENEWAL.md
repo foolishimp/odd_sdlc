@@ -139,6 +139,15 @@ The route layer distinguishes:
 - suppressed state
 - explicit no-lawful-route state
 
+Fixed-vector examples in the first implementation cut are:
+
+- `deepen_realization`
+- `repair_output_contract`
+- `realize_missing_tests`
+- `reopen_design`
+- `reopen_product`
+- `reopen_requirements`
+
 The primary routing carrier is `reentry_layer`, not a boolean alarm.
 
 Canonical re-entry layers are:
@@ -147,6 +156,7 @@ Canonical re-entry layers are:
 - `test`
 - `design`
 - `requirements`
+- `product`
 - `goals`
 - `intent`
 

@@ -26,7 +26,14 @@ if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from odd_sdlc.release.install import install as install_release  # noqa: E402
-from sandbox_runtime import complete_current_call, read_events, run_installed_genesis, run_installed_odd_sdlc, sandbox_env  # noqa: E402
+from sandbox_runtime import (  # noqa: E402
+    complete_current_call,
+    read_events,
+    refresh_installed_analysis,
+    run_installed_genesis,
+    run_installed_odd_sdlc,
+    sandbox_env,
+)
 from test_odd_sdlc_installation import (  # noqa: E402
     DATA_MAPPER_TEMPLATE,
     _seed_data_mapper_template_workspace,
@@ -334,6 +341,10 @@ def test_second_pass_code_replay_can_deepen_an_existing_shallow_realization(tmp_
     assert "???" not in after_second_pass
     assert '"deepened-pass-2"' in after_second_pass
 
+    refresh_installed_analysis(
+        workspace,
+        label="test28_deepening_post_second_code_refresh_analysis",
+    )
     next_start = json.loads(
         run_installed_odd_sdlc(
             workspace,

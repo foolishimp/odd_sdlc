@@ -48,7 +48,7 @@ from that layer rather than collapsing everything into immediate code repair.
 
 **Acceptance Criteria**:
 - AC-1: triage names the lawful re-entry layer at least across code, test,
-  design, requirements, goals, and intent
+  design, requirements, product, goals, and intent
 - AC-2: chosen route distinguishes fixed-vector repair from declared
   dynamic-family selection and resumes from the named re-entry layer
 - AC-3: when shallow existing realization is present, deepening that

@@ -500,7 +500,10 @@ def test_published_analysis_invalidates_when_requirement_surface_changes(tmp_pat
     assert {"REQ-DEMO-001", "REQ-DEMO-002"} <= entries
 
 
-def test_start_auto_refreshes_stale_published_analysis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_requires_explicit_refresh_when_published_analysis_is_stale(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _seed_workspace(tmp_path)
     app = initialize(bootstrap(workspace_root=tmp_path))
     calls: list[tuple[object, object, bool]] = []
@@ -531,18 +534,12 @@ def test_start_auto_refreshes_stale_published_analysis(tmp_path: Path, monkeypat
     ready_before, _ = workspace_state_ready(tmp_path)
     assert ready_before is False
 
-    result = start(app, auto=True)
+    with pytest.raises(RuntimeError, match="workspace analysis is stale"):
+        start(app, auto=True)
 
-    assert result == {"status": "ok"}
-    assert len(calls) == 1
-    assert calls[0][2] is True
-    ready_after, payload = workspace_state_ready(tmp_path)
-    assert ready_after is True
-    assert payload is not None
-    analysis_manifest = load_analysis_manifest(tmp_path)
-    assert analysis_manifest is not None
-    assert analysis_manifest["stage"] == "start"
-    assert analysis_manifest["analysis_fingerprint"] == payload["analysis_fingerprint"]
+    assert calls == []
+    ready_after, _ = workspace_state_ready(tmp_path)
+    assert ready_after is False
 
 
 def test_refresh_analysis_publishes_distinct_analysis_manifest(tmp_path: Path) -> None:
@@ -620,6 +617,31 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     assert observation_event["data"]["run_id"] == triage_event["data"]["run_id"] == route_event["data"]["run_id"]
     assert triage_event["correlation_id"] == observation_event["event_id"]
     assert route_event["correlation_id"] == triage_event["event_id"]
+    assert observation_event["data"]["run_id"].startswith("gap_snapshot::")
+
+
+def test_gap_publication_does_not_inherit_unrelated_prior_run_id(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    emit(
+        "workflow_selected",
+        {
+            "edge": "derive_intent_surface",
+            "run_id": "run_previous_real_start",
+            "work_key": "derive_intent_surface",
+        },
+        stream=app.stream,
+    )
+
+    payload = gaps(app)
+    triage_artifact = load_current_edge_triage(tmp_path, payload["gaps"][0]["edge"])
+    events = app.stream.all_events()
+    triage_event = next(event for event in events if event["event_type"] == "triage_produced")
+    assert triage_artifact is not None
+    assert triage_artifact["run_id"] == triage_event["data"]["run_id"]
+    assert triage_event["data"]["run_id"].startswith("gap_snapshot::")
+    assert triage_event["data"]["run_id"] != "run_previous_real_start"
 
 
 def test_query_domain_prefers_current_triage_artifact_when_analysis_is_current(tmp_path: Path) -> None:
@@ -976,6 +998,45 @@ def test_live_graph_edge_maps_testcase_authority_to_test_reentry(tmp_path: Path)
     assert edge["triage"]["framework_layer"] == "test"
     assert edge["triage"]["reentry_layer"] == "test"
     assert edge["route_proposal"]["fixed_vector"] == "realize_missing_tests"
+
+
+def test_product_gap_reopens_product_surface(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_product_surface",
+                    "delta": 0.5,
+                    "failing": ["product_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "product surface remains unresolved under the current intent authority",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    edge = payload["gaps"][0]
+    assert edge["triage"]["framework_layer"] == "product"
+    assert edge["triage"]["reentry_layer"] == "product"
+    assert edge["triage"]["gap_kind"] == "unclassified_gap"
+    assert edge["triage"]["process_outcome_kind"] == "advance_fixed_vector"
+    assert edge["route_proposal"]["fixed_vector"] == "reopen_product"
+    assert edge["route_binding"]["state"] == "advance_fixed_vector"
 
 
 def test_release_gap_without_declared_route_is_explicit_no_lawful_route(tmp_path: Path) -> None:

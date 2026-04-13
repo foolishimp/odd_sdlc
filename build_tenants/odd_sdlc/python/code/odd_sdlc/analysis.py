@@ -306,11 +306,7 @@ def ensure_workspace_ready(workspace_root: Path | str) -> dict[str, Any]:
             "odd_sdlc workspace analysis has not been published; run `python -m odd_sdlc refresh-analysis --workspace .` "
             "or `python -m odd_sdlc normalize-workspace --workspace .` before `start`."
         )
-    refresh_analysis(root, stage="start")
-    refreshed_ready, refreshed_payload = workspace_state_ready(root)
-    if refreshed_ready and refreshed_payload is not None:
-        return refreshed_payload
     raise RuntimeError(
-        "odd_sdlc workspace analysis is stale and could not be refreshed; rerun "
+        "odd_sdlc workspace analysis is stale; rerun "
         "`python -m odd_sdlc refresh-analysis --workspace .` before `start`."
     )

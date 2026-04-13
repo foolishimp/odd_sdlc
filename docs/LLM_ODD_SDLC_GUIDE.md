@@ -1,41 +1,94 @@
 # LLM odd_sdlc Guide
 
 **Status**: Active supporting documentation
-**Audience**: LLM agents, operator-authors, and reviewers working on or through `odd_sdlc`
-**Purpose**: Explain `odd_sdlc` as the live software-domain package on the `odd_method` line
-**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/GOALS.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `build_tenants/common/design/ODD_SDLC_TRANSLATION.md`, `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
+**Audience**: LLM-first operator reference, human second
+**Purpose**: Bootstrap and orient work on or through the active `odd_sdlc` software-domain package
+**Keep Subordinate To**:
+- `specification/INTENT.md`
+- `specification/PRODUCT.md`
+- `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
+- `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
+- `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+- `build_tenants/odd_sdlc/python/design/QUERY_PLUGIN_CONTRACT.md`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/__main__.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/app.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/analysis.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/project_profile.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/query.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/query_contract.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/triage.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/software_domain_catalog.py`
+- `build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py`
 
 ## 1. Position
 
-`odd_sdlc` is the live software-domain package on the `odd_method` line.
+`odd_sdlc` is the first live software-domain package on the `odd_method` line.
 
-It is not:
+Read it as a generic software-domain package expressed through GTL graph functions, executed through ABG runtime truth, and built to govern the full software worksite lifecycle across imported, stale, and already-partially-governed workspaces.
 
-- a toy app
-- a one-off bootstrap demo
-- a language-specific scaffold
-- a shadow runtime above ABG
+The old bootstrap-to-release slice still matters, but only as a bounded proving subset inside the larger software-domain package.
 
-It is:
+## 2. Hard Boundaries
 
-- a software-domain package expressed through GTL graph functions
-- executed through ABG runtime truth
-- installed into real workspaces, including inherited and partially structured projects
-- designed to govern the full software lifecycle rather than only specification generation
+Keep these boundaries explicit.
 
-The current package still proves itself through a bounded executable subset, but the governing direction is the full software-domain model, not the old first-slice-only tenant.
+### Specification
 
-## 2. Core Mental Model
+`specification/` is the only authoritative `WHAT`.
 
-Treat a governed software project as an active worksite.
+It defines:
 
-Useful analogies:
+- intent
+- product position
+- goals
+- requirements
+- scenarios
 
-- shipyard
-- aircraft hangar
-- precision instrument workshop
+### Realization
 
-The project is not a generate-once tree that becomes external to the method after code appears.
+`build_tenants/` is `HOW`.
+
+It carries:
+
+- tenant-local design
+- tenant-local code
+- tenant-local proving surfaces
+- reusable graph-function publications
+
+### ABG
+
+ABG owns runtime truth.
+
+That includes:
+
+- runs
+- graph calls
+- continuations
+- raw event truth
+- approval provenance
+- causation and lineage
+
+### odd_sdlc
+
+`odd_sdlc` owns software-domain semantics layered over ABG, including:
+
+- asset meaning
+- edge contracts
+- work-act semantics
+- project-profile resolution
+- analysis publication
+- ambiguity and closure registers
+- homeostatic observation, triage, route, and constitutional proposal semantics
+- query-domain as a domain overlay
+
+### odd_service
+
+`odd_service` is the incubating orchestration plane. It is not runtime truth. If it exists in the picture, treat it as session, worker, and routing infrastructure above `odd_sdlc`, not as a rival domain constitution.
+
+## 3. Core Mental Model
+
+Treat the project as an active software worksite, not as a tree that becomes unmanaged after code appears.
 
 The governed cycle is:
 
@@ -52,446 +105,475 @@ The governed cycle is:
 11. retrofit
 12. relaunch
 
-This means:
+The reverse path is equally first-class:
 
-- release is a transition, not terminal completion
-- runtime evidence returns to the same governed line
-- repair and retrofit are first-class lawful work, not out-of-band maintenance
+`observation -> triage -> route -> constitutional proposal -> renewed forward derivation`
 
-## 3. GTL / ABG / odd_sdlc Boundary
+This is the center of the current philosophy. `odd_sdlc` is not only about forward generation. It is about staying lawfully inside the same governed line when the workspace, runtime evidence, or closure picture says the current state is insufficient.
 
-The boundary must stay clean.
+## 4. Read The Workspace Before Acting
 
-### GTL
+Before you interpret any code root or try to start work, resolve the workspace shape.
 
-GTL provides:
+The current workspace modes are:
 
-- graph structure
-- graph algebra
-- graph functions
-- lawful higher-order composition
-- publication boundaries
+- `source_domain_repo`
+- `installed_target`
+- `governed_workspace`
+- `unclassified_workspace`
 
-### ABG
+The important distinction is:
 
-ABG provides:
+- `declared_output_dir` is what the workspace says should be governed
+- `selected_output_dir` is what current profile resolution chose as the active governed root
 
-- traversal execution
-- event truth
-- provenance and lineage
-- dispatch and result ingest
-- proof and closure execution
-- replayable runtime facts
+Do not infer the active code root from:
 
-ABG owns runtime truth. `odd_sdlc` must not create a rival runtime.
-
-### odd_sdlc
-
-`odd_sdlc` provides:
-
-- software-domain asset semantics
-- software lifecycle edges
-- install and normalization for imported workspaces
-- configured `F_P` traversal policy for generic software work
-- layered `F_D` around that traversal
-- software work-act provenance
-- software-domain query and catalog surfaces
-
-Software semantics stay here, not in ABG.
-
-## 4. What odd_sdlc Governs
-
-`odd_sdlc` governs software-delivery work over explicit assets and graph edges.
-
-Its subject includes:
-
-- imported project authority
-- requests and gates
-- intent, product, goals, requirements, design, and scenarios
-- implementation profiles and implementation assets
-- test design, test modules, testcase authority, and run evidence
-- release and deployment
-- runtime observation and returned operational evidence
-- retrofit and maintenance release
-
-This is intentionally generic within the software domain.
-
-Language-, framework-, and platform-specific behavior belongs in:
-
-- profiles
-- bindings
-- specialized deterministic authorities
-
-It does not belong in the core domain model as hard-coded branches.
-
-## 5. Installed Workspace Interpretation
-
-When `odd_sdlc` is installed into a workspace, interpret that workspace in this order:
-
-1. imported project authority
-2. project-owned normalized read models
-3. installed `odd_sdlc` governance surfaces
-4. GTL/ABG substrate surfaces
-
-The installed guidance surfaces must keep identity and provenance separate.
-
-For imported projects:
-
-- `specification/INTENT.md` is primary project identity when present
-- imported requirement and product documents describe what the project is
-- README, template history, old bootstrap commands, and sibling-workspace context are provenance unless imported authority makes them project-defining
-
-The package must not let an agent infer project identity from:
-
+- repository name
+- sibling trees
 - template lineage
-- old bootstrap instructions
-- repository naming
-- methodology examples
+- an old bootstrap guide
 
-## 6. Asset Model
+Use published workspace state and project profile resolution instead.
 
-`odd_sdlc` governs URI-addressed, typed assets with provenance.
+## 5. Current Runtime And Analysis Surfaces
 
-Important consequences:
+An LLM should reason from the current published surfaces, not from ambient filesystem guesswork.
 
-- an asset is not only a file payload
-- asset identity is durable
-- the visible file tree is a projected checkpoint over constructive history
-- mutable assets are allowed, but silent unattributed mutation is not
+### Workspace State
 
-### Minimum asset-family groups
+`.ai-workspace/runtime/odd_sdlc-workspace-state.json`
 
-The active software-domain model includes these family groups:
+Use it to answer:
 
-- request and gate assets
-- specification and design assets
-- implementation profile and implementation assets
-- build and packaging artifacts
-- qualification design, testcase authority, run, and report assets
-- release and deployment assets
-- runtime observation and incident or gap assets
-- retrofit and maintenance-release assets
+- workspace mode
+- readiness
+- selected output root
+- declared output root
+- current project profile
+- current analysis fingerprint
 
-Representative live families include:
+### Analysis Manifest
 
-- `request_surface`
-- `gate_decision_surface`
-- `intent_surface`
-- `product_surface`
-- `goal_surface`
-- `requirement_surface`
-- `design_surface`
-- `implementation_profile_surface`
-- `implementation_module_surface`
-- `implementation_asset_surface`
-- `build_artifact_surface`
-- `test_design_surface`
-- `test_module_surface`
-- `test_run_surface`
-- `test_report_surface`
-- `testcase_authority_surface`
-- `release_surface`
-- `deployment_surface`
-- `runtime_observation_surface`
-- `incident_or_gap_surface`
-- `retrofit_plan_surface`
-- `maintenance_release_surface`
+`.ai-workspace/runtime/odd_sdlc-analysis-manifest.json`
 
-## 7. Work Acts And Provenance
+Use it to answer:
 
-`odd_sdlc` treats software work as explicit provenance-bearing acts.
+- which analysis artifacts are current
+- which source inputs were fingerprinted
+- which root the analysis was published against
 
-The first lawful work-act classes are:
+### Normalization Report
 
-- `generated`
-- `adopted`
-- `imported`
-- `repaired`
-- `retrofitted`
-- `validated`
-- `released`
-- `deployed`
-- `observed`
-- `returned`
+`.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
 
-The package must distinguish these acts.
+Treat this as normalization/setup evidence, not as the current readiness or current-analysis authority surface.
 
-It must not silently treat these as equivalent:
+### Requirement Closure Register
 
-- freshly generated implementation
-- imported implementation
-- adopted implementation
-- repaired implementation
+This is the machine-readable record of live requirements, planned realization, and current code or test evidence. It exists so unresolved requirements remain future pressure rather than disappearing after a bounded wave.
 
-They may converge to the same governed target role, but they do not have the same constructive history.
+### Ambiguity Register
 
-## 8. Edge Contract Model
+This is the governed register for major ambiguity. Do not invent a second ambiguity regime in prompts or local notes when current ambiguity truth already exists.
 
-Each `odd_sdlc` edge is an explicit traversal contract.
+### Current Edge Triage
 
-The minimum contract surface is:
+`.ai-workspace/runtime/triage/<edge>.json`
+
+This is the current domain projection for one edge:
+
+- observation
+- triage
+- route proposal
+- route binding
+- constitutional proposal when applicable
+
+Historical causation still belongs to ABG events.
+
+## 6. Published Query Surface
+
+The stable domain query contract is `odd_sdlc.query-domain`.
+
+It is a domain overlay, not a replacement runtime model.
+
+`query-domain` is the stable read contract.
+
+`observe` remains a transitional observer composition.
+
+Use `query-domain` to inspect:
+
+- `analysis_manifest`
+- `asset_types`
+- `asset_families`
+- `assets`
+- `ambiguity_register`
+- `requirement_closure_register`
+- `functions`
+- `edge_contracts`
+- `programs`
+- `work_act_types`
+- `graph_functions`
+- `bindings`
+- `gaps`
+
+Do not use it to reconstruct:
+
+- live run lifecycle
+- continuation lifecycle
+- raw event history
+- approval lineage
+
+That remains ABG-native.
+
+Also keep this distinction:
+
+- `query-domain` reads the current domain overlay without publishing new current-edge triage artifacts
+- `gaps` computes and publishes the current edge-scoped observation, triage, route, and constitutional projection
+
+## 7. Asset And Edge Model
+
+The live software-domain model is broader than the old first-slice asset list.
+
+Important active asset families and lanes include:
+
+- worksite inputs
+- solution design
+- implementation branch
+- qualification branch
+- release readiness
+- deployment records
+- runtime evidence
+- retrofit plans
+
+Use `catalog --workspace .` or `query-domain --workspace .` for the full live function set.
+
+Representative graph functions are enough for cold-start orientation:
+
+- `derive_requirement_surface`
+- `derive_design_surface`
+- `derive_implementation_module_surface`
+- `qualify_testcase_authority`
+- `prepare_release_surface`
+- `derive_runtime_observation_surface`
+
+There are also retained reusable consensus publications:
+
+- `review_design_consensus_round`
+- `review_design_by_consensus`
+
+Those are active GTL graph-function publications, not hidden engine paths. In the current tenant they are still design-scoped, but they remain published as reusable higher-order capability rather than special runtime behavior.
+
+## 8. Current Evaluation Model
+
+`odd_sdlc` is built around explicit edge contracts.
+
+Each edge is expected to declare at least:
 
 - source asset set
 - target asset
-- transform dependency or transform profile
+- transform dependency or profile
+- capability dependency where execution or side effects are implied
 - preflight `F_D`
 - configured `F_P`
 - postflight `F_D`
-- optional `Capability F_D`
+- optional capability or operational `F_D`
 - optional `F_H`
 - work-report contract
-- proof policy
-- closure policy
-
-This is the center of the software-domain model.
-
-It keeps traversal explicit while allowing generic software work to remain constructive rather than pretending determinism is always available.
-
-## 9. Evaluator Regime In odd_sdlc
+- proof and closure expectations
 
 ### Configured F_P
 
-For generic software-domain work, configured `F_P` is the normal supervisory transform.
+For generic software-domain work, configured `F_P` is the normal constructive carrier.
 
-It is expected to:
+It must:
 
-- interpret the edge contract
-- update the actual governed target artifacts
-- resolve bounded local build or structure problems inside the declared edge scope
-- emit a machine-readable work report
+- modify the governed target surfaces
+- produce a machine-readable work report
 - classify the work act it performed
-- attach produced evidence
+- attach evidence
 
-`F_P` must not reduce to assessment prose alone.
+Assessment prose alone is not enough.
 
 ### Layered F_D
 
-`F_D` is stratified.
+`F_D` stays layered:
 
-#### Core F_D
+- `core_fd`
+- `capability_fd`
+- `operational_fd`
 
-Universal deterministic checks over:
+This is how the system distinguishes structural integrity, capability-gated execution, and operational or returned evidence without collapsing them into one opaque check.
 
-- target binding
-- asset identity
-- provenance shape
-- work-report shape
-- evidence existence
-- cross-surface consistency
+## 9. Traceability And Closure
 
-#### Capability F_D
+Generated realization is only governed if it remains traceable.
 
-Optional specialized deterministic authorities for a stack or subsystem.
+The active minimum chain is:
 
-Examples:
+1. live requirement authority
+2. generated implementation or qualification planning surfaces
+3. generated source with `Implements:` tags
+4. generated tests with `Validates:` tags
+5. requirement closure register summarizing what is realized, partial, planned, specified, or missing
 
-- schema compilers
-- lineage analyzers
-- migration planners
-- packaging validators
+Do not treat untagged generated code or tests as closure evidence.
 
-#### Postflight F_D
+Do not treat partial-wave completion as full closure.
 
-Required deterministic validation of what `F_P` claims to have produced, adopted, imported, repaired, or retrofitted.
+## 10. Homeostatic Gap Model
 
-This ties proof to target truth rather than to assessment prose alone.
+The current reverse path is generic-first and totalized at the process boundary.
 
-#### Operational F_D
+Meaning:
 
-Deterministic validation over returned runtime, release, qualification, and maintenance evidence.
+- triage first classifies a `framework_layer`
+- then a `framework_condition`
+- then refines to `gap_kind`, `reentry_layer`, and action state
 
-### F_H
+Treat the classification as matrix-shaped:
 
-Human escalation is for unresolved judgment or policy conflict.
+- `framework_layer` is the affected domain or process layer
+- `framework_condition` is the kind of pressure or incompleteness at that layer
 
-It is not the ordinary path for routine structure checks.
+Current layers in the active implementation include:
 
-## 10. Work-Report Boundary
+- `analysis`
+- `capability`
+- `ambiguity`
+- `intent`
+- `product`
+- `goals`
+- `requirements`
+- `design`
+- `code`
+- `test`
+- `execution`
+- `routing`
 
-Every `F_P`-supervised edge is expected to produce a machine-readable work report.
+Current conditions in the active implementation include:
 
-The minimum work-report shape is:
+- `stale`
+- `blocked`
+- `missing`
+- `contradictory`
+- `shallow`
+- `insufficient`
+- `unproven`
+- `unroutable`
+- `complete`
 
-- target asset id
-- target binding or path
-- work-act classification
-- input identity or digest summary
-- output identity or digest summary
-- evidence references
-- claimed contract satisfaction
+Do not collapse these next three names into one field:
 
-This report is a domain contract.
+- `gap_kind` names semantic mismatch, such as `dependency_gap`, `ambiguity_gap`, `<layer>_gap`, or `unclassified_gap`
+- `process_outcome_kind` names the total process outcome
+- `route_binding.state` names the routed or gated state now projected for the edge
 
-It is not a second runtime. ABG remains authoritative for:
+The current closed `process_outcome_kind` set in code is:
 
-- dispatch truth
-- ingest truth
-- run facts
-- proof and closure facts
-- continuation truth
-- event projection
+- `converged`
+- `advance_fixed_vector`
+- `advance_dynamic_family`
+- `blocked_stale_analysis`
+- `blocked_missing_capability`
+- `await_fh_resolution`
+- `propose_constitutional_reprice`
+- `no_lawful_route`
 
-## 11. Imported Workspace Law
+The important sink behavior is:
 
-`odd_sdlc` is designed to work over imported and stale workspaces, not only clean scaffolds.
+- `unclassified_gap` is the default semantic sink when the framework classification is real but no stronger domain-specific gap name is available
+- `no_lawful_route` is the explicit tail state when triage cannot lawfully map into a declared next action
+- `suppressed_by_mode` is a route state, not a process outcome; it appears when constitutional repricing is recommended but policy suppresses application
 
-The install-and-normalize path must:
+No meaningful mismatch should silently fall through into ambient retry or generic code repair.
 
-- preserve imported authority
-- prepare the workspace for lawful operation
-- separate project-owned, install-owned, and substrate-owned surfaces
-- avoid rewriting imported truth into false generated truth
+### Re-entry Layers
 
-Examples of correct behavior:
+The current canonical re-entry layers are:
 
-- keep imported intent as project identity
-- bind to a declared implementation root like `imp_scala_spark/`
-- adopt or import existing implementation honestly
-- treat old bootstrap instructions as provenance only
+- `intent`
+- `product`
+- `goals`
+- `requirements`
+- `design`
+- `code`
+- `test`
 
-Examples of incorrect behavior:
+The key rule is simple:
 
-- overwrite imported project identity with `odd_sdlc` proving language
-- collapse a real project into `odd_sdlc_proving_impl`
-- certify placeholder release or test archive surfaces while real implementation truth lives elsewhere
+Once re-entry is named, forward derivation resumes from that layer and flows downstream again. Do not skip the named upstream authority layer.
 
-## 12. Current Executive Proving Chain
+### Deepening Rule
 
-The current executable proving chain remains important.
+If shallow realization already exists, the preferred route is usually to deepen that realization rather than expand laterally. This is one of the most important current operator rules.
 
-It is the first published carrier over the software-domain package, not the whole ontology.
+In the current implementation this is not only a design slogan. Triage can scan governed code or test roots for shallow findings and attach concrete evidence such as:
 
-The current chain traverses:
+- `path`
+- `excerpt`
+- `line_start`
+- `line_end`
+- finding kinds like `missing_implementation`, `trivial_passthrough`, or `hard_coded_success`
 
-1. `derive_intent_surface`
-2. `derive_product_surface`
-3. `derive_goal_surface`
-4. `derive_requirement_surface`
-5. `derive_feature_decomp_surface`
-6. `derive_uat_testcases_surface`
-7. `derive_design_surface`
-8. `derive_scenario_surface`
-9. `derive_implementation_design_surface`
-10. `select_implementation_stack_profile`
-11. `derive_implementation_module_surface`
-12. `derive_code_surface`
-13. `derive_test_design_surface`
-14. `select_test_stack_profile`
-15. `derive_test_module_surface`
-16. `derive_test_run_archive_surface`
-17. `qualify_testcase_authority`
-18. `prepare_release_surface`
-19. `prepare_deployment_surface`
-20. `derive_runtime_observation_surface`
-21. `derive_retrofit_plan_surface`
+That evidence is what drives `deepen_realization` rather than vague operator intuition.
 
-This chain proves that the worksite lifecycle is now represented through the executive carrier, including deployment, observation, and retrofit.
+### Event Chain
 
-## 13. Query, Catalog, And Runtime Boundary
+The homeostatic layer is projected as current state, but it is emitted as an explicit event chain.
 
-`odd_sdlc` publishes a machine-readable read model through its catalog and query surfaces.
+When `gaps` publishes a new current-edge result, the domain sequence is:
 
-That read model should expose:
+1. `observation_recorded`
+2. `triage_produced`
+3. `route_recorded`
+4. `constitutional_proposal_recorded` when repricing is opened
 
-- assets and asset-family descriptors
-- work-act descriptors
-- edge-contract descriptors
-- functions and graph functions
-- gap and projection views aligned with ABG
+These remain ABG events with explicit causation and correlation. The current-edge triage artifact is the current projection over that chain, not the canonical event history.
 
-It should not redefine ABG runtime truth.
+### Structured Basis
 
-ABG remains the authority for:
+Each triage result carries two typed evidence bases:
 
-- runs
-- calls
-- continuations
-- event streams
-- runtime-derived projections
+- `authority_basis`: the authority-side reason for the appraisal, including edge, analysis fingerprint, failing evaluators, missing bindings, and re-entry layer
+- `realized_basis`: the realized-side situation being judged, including delta, delta summary, environment readiness, work key, and selected output root
 
-## 14. Qualification And Forensics
+These exist so a later LLM or operator can reconstruct why triage happened without relying on prose memory alone.
 
-`odd_sdlc` is expected to prove itself through installed-workspace qualification, not only through unit assertions.
+### Divergence And Supersession
 
-The important proving lanes include:
+Later triage may supersede the current result for the same edge when the semantic reading changes materially.
 
-- canonical sandbox qualification
-- inherited-workspace install and convergence qualification
-- topology regression for imported/foreign realization trees
-- live transport qualification lanes
-- persistent run archives for significant end-to-end and live lanes
+The operational rule is:
 
-The `data_mapper` inherited-project lane is a core qualification corpus because it exercises:
+- one clear current projection exists at `.ai-workspace/runtime/triage/<edge>.json`
+- a materially different later result replaces that current projection
+- prior meaning stays visible in ABG history
+- divergence is surfaced explicitly through the `triage_divergence` event
 
-- real imported authority
-- mixed provenance
-- first-edge `F_P` dispatch
-- tenant-selected realization
-- release, deployment, runtime-observation, and retrofit traversal
+This keeps the read model simple without pretending prior triage never happened.
 
-For significant lanes, the preferred evidence surface is a persistent run archive containing:
+## 11. Constitutional Repricing
 
-- summary
-- event log
-- manifests
-- results
-- stdout/stderr
-- copied workspace artifacts
-- final runtime snapshot
+Gaps that cannot be resolved lawfully beneath current Goals or Intent may open constitutional repricing.
 
-## 15. Anti-Patterns
+That path is explicit and gated.
 
-When reasoning about `odd_sdlc`, reject these anti-patterns:
+Current outcomes remain distinct:
 
-- treating the package as only a toy bootstrap tenant
-- treating release as project completion
-- using template provenance as project identity
-- certifying placeholder code, test, or release surfaces as if they were real governed truth
-- letting `F_P` emit prose while no governed target changes occur
-- shrinking `F_D` into trivial marker checks
-- pushing software-domain semantics down into ABG runtime defaults
-- creating a service or UI layer that becomes a shadow runtime
+- `approve`
+- `approve_with_edits`
+- `reject`
+- `defer`
+- `suppressed`
 
-## 16. Operator Read Order
+No semantic triage path may silently apply constitutional change.
 
-For an LLM entering an installed imported workspace, the recommended order is:
+## 12. Freshness Law
 
-1. installed workspace governance surface in `CLAUDE.md` or `AGENTS.md`
-2. `.ai-workspace/context/project_bootstrap.md`
+Published analysis is load-bearing.
+
+If published analysis is stale against current authority or realization inputs:
+
+- the workspace is not ready for `start`
+- current route truth is blocked
+- lawful re-entry is `refresh-analysis`
+
+Current code fails closed here. `start` does not auto-refresh stale analysis; it requires explicit republishing first.
+
+The current input fingerprint includes tracked specification and realization surfaces, not only one configuration file. Do not trust any current triage, closure, or ambiguity picture if analysis is stale.
+
+## 13. How To Read An odd_sdlc Workspace
+
+Recommended read order for an LLM:
+
+1. `.ai-workspace/runtime/odd_sdlc-workspace-state.json` if present
+2. `.ai-workspace/runtime/odd_sdlc-analysis-manifest.json` if present
 3. `specification/INTENT.md`
-4. `specification/requirements/00-imported-sources.md`
-5. imported authority named there
-6. normalized `PRODUCT.md` and `GOALS.md`
-7. current gaps via `PYTHONPATH=.genesis python -m genesis gaps --workspace .`
-8. only then full traversal via `PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .`
+4. `specification/PRODUCT.md`
+5. relevant requirement families, especially `10-...` and `11-...`
+6. tenant-local design under `build_tenants/odd_sdlc/python/design/`
+7. `python -m odd_sdlc query-domain --workspace .`
+8. `python -m odd_sdlc gaps --workspace .`
+9. only then constructive or iterative actions such as `start`, `construct`, or `iterate`
 
-Use README and old bootstrap history later and only as provenance/context.
+If the workspace is imported or stale, treat normalization and analysis publication as part of lawful setup, not as optional housekeeping.
 
-## 17. Current Commands
+## 14. Current Commands
 
-Common commands in an installed workspace:
-
-```bash
-PYTHONPATH=.genesis python -m genesis gaps --workspace .
-PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .
-PYTHONPATH=.genesis python -m odd_sdlc catalog --workspace .
-PYTHONPATH=.genesis python -m odd_sdlc query-domain --workspace .
-PYTHONPATH=.genesis python -m odd_sdlc observe --workspace .
-```
-
-For installation from source:
+From an installed or already-available `odd_sdlc` environment:
 
 ```bash
-PYTHONPATH=/path/to/odd_method/build_tenants/odd_sdlc/python/code:/path/to/odd_method/.genesis \
-python -m odd_sdlc install --target /path/to/workspace --project-slug project_slug --platform platform
+python -m odd_sdlc install --target /path/to/workspace --project-slug project_slug --platform python
+python -m odd_sdlc normalize-workspace --workspace .
+python -m odd_sdlc refresh-analysis --workspace .
+python -m odd_sdlc query-domain --workspace .
+python -m odd_sdlc catalog --workspace .
+python -m odd_sdlc gaps --workspace .
+python -m odd_sdlc start --workspace . --auto
+python -m odd_sdlc iterate --workspace .
+python -m odd_sdlc observe --workspace .
+python -m odd_sdlc self-test --workspace .
 ```
 
-## 18. Final Rule
+From the source checkout, ensure the source tenant code and `.genesis` are on `PYTHONPATH` before running the same commands.
 
-If there is tension between:
+Use the commands like this:
 
-- substrate explanation
-- `odd_sdlc` governance explanation
-- imported project authority
+- `install`: install the released package surfaces into a target workspace
+- `normalize-workspace`: install-owned normalization for imported or stale workspaces
+- `refresh-analysis`: republish ambiguity, closure, prompt context, workspace state, and analysis manifest
+- `query-domain`: inspect the current domain overlay
+- `catalog`: inspect the published function, asset, and graph-function catalog
+- `gaps`: publish current observation, triage, route, and proposal state
+- `start`: enter the current executive proving chain after readiness is satisfied
+- `iterate`: continue governed work on the current scope
+- `observe`: emit the current observer view
 
-then imported project authority wins for project identity, `odd_sdlc` wins for software-domain governance, and ABG wins for runtime fact truth.
+## 15. LLM Operating Rules
+
+When you are the active operator:
+
+- start from published state, not from memory
+- confirm workspace mode and selected output root before reading code
+- prefer `query-domain` and `gaps` over ad hoc interpretation when current surfaces exist
+- treat ambiguity, closure, and triage as governed truth surfaces, not as private scratchpad material
+- keep project identity subordinate to imported authority and current specification
+- treat runtime return, release, deployment, and retrofit as first-class domain stages
+- use the named re-entry layer to decide what to edit next
+
+Use scenario proof anchors when you need to know what is supposed to be real right now:
+
+- `specification/scenarios/12-iterative-requirement-closure-and-generated-traceability.md`
+- `specification/scenarios/13-homeostatic-gap-triage-and-intent-renewal.md`
+
+Do not:
+
+- treat `odd_sdlc` as only a bootstrap demo
+- treat `query-domain` as runtime truth
+- treat stale analysis as good enough
+- collapse every mismatch into code repair
+- silently rewrite goals or intent
+- confuse template provenance with project identity
+- certify placeholder or orphaned realization as closure
+
+## 16. Anti-Patterns
+
+Reject these mistakes immediately:
+
+- inferring project identity from README, repo name, or template lineage when imported authority exists
+- assuming the visible code tree is the governed code root without checking profile resolution
+- serving stale analysis as if it were current domain truth
+- treating ambiguity as a reason to invent hidden control flow
+- treating `odd_service` or a UI as the runtime authority
+- treating consensus harnesses as magic engine behavior instead of inspectable graph-function publications
+
+## 17. Final Rule
+
+If there is tension between imported project authority, `odd_sdlc` governance explanation, and runtime facts:
+
+- imported project authority wins for project identity and project `WHAT`
+- `odd_sdlc` wins for software-domain governance semantics
+- ABG wins for runtime fact truth
+
+That is the stable frame to keep.
