@@ -11,9 +11,9 @@ Adopted common law:
 
 Tenant-local design law:
 
-- `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
-- `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
-- `build_tenants/odd_sdlc/python/design/QUERY_PLUGIN_CONTRACT.md`
+- `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
+- `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+- `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
 
 `SOFTWARE_DOMAIN_BUILDOUT.md` and
 `HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md` are the current operative

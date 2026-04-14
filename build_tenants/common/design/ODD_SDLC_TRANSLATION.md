@@ -20,7 +20,7 @@ The translation re-expresses the active ODD SDLC domain as:
 
 This shared translation document does not define the current tenant-local
 software-domain package shape. The active `odd_sdlc` package surface lives
-under `build_tenants/odd_sdlc/python/design/`.
+under `build_tenants/python/design/`.
 
 The active tenant may prove these shared patterns through a bounded proving
 subset, but that proving shape is tenant-local design law rather than common
@@ -464,14 +464,14 @@ This translation document remains shared design law under
 
 The current tenant-local root is:
 
-`build_tenants/odd_sdlc/python/`
+`build_tenants/python/`
 
 Expected tenant-local surfaces:
 
 - `build_tenants/odd_sdlc/design/`
 - `build_tenants/odd_sdlc/test_env/`
-- `build_tenants/odd_sdlc/python/design/`
-- `build_tenants/odd_sdlc/python/code/`
+- `build_tenants/python/design/`
+- `build_tenants/python/code/`
 
 Tenant-local package shape, proving-lane shape, and software-domain expansion
 belong in tenant-local design once they stop being common translation law.

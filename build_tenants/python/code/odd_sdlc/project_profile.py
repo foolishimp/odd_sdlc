@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
 WORKSPACE_STATE_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-state.json")
 ANALYSIS_MANIFEST_PATH = Path(".ai-workspace/runtime/odd_sdlc-analysis-manifest.json")
-DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/odd_sdlc/python/code/odd_sdlc_proving_impl"
+DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/python/code/odd_sdlc_proving_impl"
 DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
 AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
 TENANT_NAME_ALIASES = {
@@ -32,7 +32,7 @@ BUILD_MARKERS = (
     "Cargo.toml",
     "go.mod",
 )
-SOURCE_DOMAIN_PRODUCT_ROOT = Path("build_tenants/odd_sdlc/python/code/odd_sdlc")
+SOURCE_DOMAIN_PRODUCT_ROOT = Path("build_tenants/python/code/odd_sdlc")
 SOURCE_SERVICE_PRODUCT_ROOT = Path("build_tenants/odd_service/python/code/odd_service")
 SOURCE_SERVICE_SPEC_PATH = Path("specification/requirements/09-odd-service-orchestration-plane.md")
 SOURCE_EXTENSIONS = {

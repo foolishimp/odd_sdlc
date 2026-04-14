@@ -60,31 +60,31 @@ This preserves iterative closure without allowing false operational truth.
 
 Targeted red-lane recovery:
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test19_regression.py -q`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_test19_regression.py -q`
 - result: `2 passed`
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_first_slice.py -q`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q`
 - result: `9 passed`
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py -q -k 'installed_self_test_command_drives_the_current_executive_program or operational_cycle_projects_deployment_runtime_and_retrofit_surfaces or canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly'`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py -q -k 'installed_self_test_command_drives_the_current_executive_program or operational_cycle_projects_deployment_runtime_and_retrofit_surfaces or canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly'`
 - result: `3 passed, 3 deselected`
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence'`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence'`
 - result: `1 passed, 9 deselected`
 
 Framework suite:
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
+- `python -m pytest build_tenants/python/test_env/tests -q`
 - result: green at the RC boundary cut; subsequent follow-on topology,
   traceability, and iterator regressions were added afterward and are tracked
   through their own targeted lanes
 
 Current targeted follow-on regressions:
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_fd_evidence.py -q`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_fd_evidence.py -q`
 - result: green
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test28_regression.py -q`
+- `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_test28_regression.py -q`
 - result: green
 
 Installed-workspace recovery:

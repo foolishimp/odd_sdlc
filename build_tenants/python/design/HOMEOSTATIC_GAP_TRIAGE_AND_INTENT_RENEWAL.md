@@ -3,7 +3,7 @@
 **Status**: Active
 **Date**: 2026-04-13
 **Implements**: REQ-F-ODDSDLC-033, REQ-F-ODDSDLC-034, REQ-F-ODDSDLC-035, REQ-F-ODDSDLC-036, REQ-F-ODDSDLC-037
-**Derives From**: `specification/PRODUCT.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`, `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/odd_sdlc/python/design/QUERY_PLUGIN_CONTRACT.md`
+**Derives From**: `specification/PRODUCT.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`, `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
 
 ## Position
 
@@ -259,7 +259,7 @@ surfaces, especially:
 - `specification/scenarios/11-ambiguity-register-disambiguation-pipeline.md`
 - `specification/scenarios/12-iterative-requirement-closure-and-generated-traceability.md`
 - `specification/scenarios/13-homeostatic-gap-triage-and-intent-renewal.md`
-- `build_tenants/odd_sdlc/python/test_env/fixtures/test28_pass2_replay/`
+- `build_tenants/python/test_env/fixtures/test28_pass2_replay/`
 
 The critical proving question is not only whether a gap is detected.
 

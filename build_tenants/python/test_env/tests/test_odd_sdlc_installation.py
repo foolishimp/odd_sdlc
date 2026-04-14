@@ -1155,13 +1155,13 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
         encoding="utf-8",
     )
 
-    odd_sdlc_root = workspace / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc"
+    odd_sdlc_root = workspace / "build_tenants" / "python" / "code" / "odd_sdlc"
     odd_sdlc_root.mkdir(parents=True, exist_ok=True)
     (odd_sdlc_root / "app.py").write_text(
         "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
         encoding="utf-8",
     )
-    (workspace / "build_tenants" / "odd_sdlc" / "python" / "pyproject.toml").write_text(
+    (workspace / "build_tenants" / "python" / "pyproject.toml").write_text(
         "[project]\nname='odd_sdlc'\n",
         encoding="utf-8",
     )
@@ -1192,12 +1192,12 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
     assert queried["analysis_manifest"] is None
-    assert queried["requirement_closure_register"]["traceability"]["code_root"] == "build_tenants/odd_sdlc/python"
+    assert queried["requirement_closure_register"]["traceability"]["code_root"] == "build_tenants/python"
     queried_entries = {
         entry["requirement_id"]: entry
         for entry in queried["requirement_closure_register"]["requirements"]
     }
-    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/code/odd_sdlc/app.py"]
+    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/python/code/odd_sdlc/app.py"]
 
 
 def test_installed_normalize_workspace_without_platform_preserves_existing_active_tenant(tmp_path: Path) -> None:

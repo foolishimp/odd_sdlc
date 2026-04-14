@@ -124,10 +124,10 @@ This means:
   `fd_findings` event truth
 - focused downstream verification is green on:
   - `python -m pytest build_tenants/odd_service/python/test_env/tests/test_odd_service_first_slice.py -q`
-  - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_installation.py::test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence -q`
-  - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_yield_usecase.py -q`
-  - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'blocked_missing_capability or gap_publication_does_not_inherit_unrelated_prior_run_id or triage_divergence or shallow_code_findings or release_gap_without_declared_route_is_explicit_no_lawful_route or stale_analysis'`
-  - `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test19_regression.py build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test28_regression.py -x -vv`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py::test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence -q`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_yield_usecase.py -q`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'blocked_missing_capability or gap_publication_does_not_inherit_unrelated_prior_run_id or triage_divergence or shallow_code_findings or release_gap_without_declared_route_is_explicit_no_lawful_route or stale_analysis'`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_test19_regression.py build_tenants/python/test_env/tests/test_odd_sdlc_test28_regression.py -x -vv`
   - targeted odd_sdlc first-slice / sandbox / risk-appetite lanes covering the
     previously suspected post-dispatch seam
 - a full-suite confirmation pass progressed past the original late failure

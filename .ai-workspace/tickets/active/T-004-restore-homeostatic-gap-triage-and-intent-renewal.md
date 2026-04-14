@@ -1144,7 +1144,7 @@ Minimum payload:
 
 - [ ] Add named shallow-realization fixtures from the `test28.02` survivor set.
 - [ ] Place the survivor fixture at
-  `build_tenants/odd_sdlc/python/test_env/fixtures/test28_pass2_replay/`.
+  `build_tenants/python/test_env/fixtures/test28_pass2_replay/`.
 - [ ] Add deterministic route-selection proofs over multiple matching dynamic
   candidates.
 - [ ] Add repricing-gate proofs for governed fixture and live installed/source

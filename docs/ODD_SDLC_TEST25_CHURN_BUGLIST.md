@@ -66,7 +66,7 @@ It now includes the source fixes already applied and the remaining open issues.
   - fresh reinstall on `data_mapper.test26` now resolves `26` bindings, including:
     - `uat_testcases_surface -> specification/scenarios/20-generated-uat-testcases.md`
     - `design_surface -> build_tenants/common/design/30-generated-odd-design.md`
-    - `test_run_archive_surface -> build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md`
+    - `test_run_archive_surface -> build_tenants/python/test_env/50-generated-run-archive.md`
 
 ### OUT-02 — Target asset materialization was not blocking closure
 
@@ -165,7 +165,7 @@ It now includes the source fixes already applied and the remaining open issues.
   - expected `specification/scenarios/20-generated-uat-testcases.md`
   - actual observed file `build_tenants/common/design/30-generated-uat-testcases.md`
 - Canonical test run archive exists and satisfies contract:
-  - `build_tenants/odd_sdlc/python/test_env/50-generated-run-archive.md`
+  - `build_tenants/python/test_env/50-generated-run-archive.md`
 - Final open deterministic gap in the run:
   - `test_traceability_present`
 

@@ -2,7 +2,7 @@
 
 **Status**: Supporting strategy
 **Purpose**: Define `odd_sdlc` as a disambiguation pipeline and establish how ambiguity should be tracked, reduced, and governed across the SDLC
-**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/GOALS.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `docs/REQUIREMENTS_TRACEABILITY.md`
+**Derives From**: `specification/INTENT.md`, `specification/PRODUCT.md`, `specification/GOALS.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `docs/REQUIREMENTS_TRACEABILITY.md`
 
 # Position
 

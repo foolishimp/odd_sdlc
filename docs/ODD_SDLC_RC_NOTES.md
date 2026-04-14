@@ -108,9 +108,9 @@ That means:
 ### Traceability Path Resolution Is Still Self-Hosting-Oriented
 
 The current generated traceability and closure logic in
-[`traceability.py`](/Users/jim/src/apps/odd_method/build_tenants/odd_sdlc/python/code/odd_sdlc/traceability.py)
+[`traceability.py`](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/traceability.py)
 still resolves some design and test trace surfaces through fixed
-`build_tenants/odd_sdlc/python/...` paths.
+`build_tenants/python/...` paths.
 
 That matches the currently published proving subset and the asset contract
 surfaces, so the current `odd_sdlc` self-hosting lane is internally
@@ -139,4 +139,4 @@ The current release-candidate proving footer is:
 
 from:
 
-- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
+- `python -m pytest build_tenants/python/test_env/tests -q`

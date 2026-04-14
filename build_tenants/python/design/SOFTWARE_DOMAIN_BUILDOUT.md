@@ -536,12 +536,12 @@ The current implementation inventory is classified as follows.
 
 ### Active
 
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/app.py`
+- `build_tenants/python/code/odd_sdlc/app.py`
   Active as the package bootstrap, runtime entry, and machine-readable catalog
   surface, but subject to further edge and install refactor
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/query.py`
+- `build_tenants/python/code/odd_sdlc/query.py`
   Active as the ABG-aligned domain query surface
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py`
+- `build_tenants/python/code/odd_sdlc/gtl_module.py`
   Active as the current executive and reusable-harness carrier over the proving
   subset
 - deployment, runtime-return, and retrofit graph edges
@@ -551,13 +551,13 @@ The current implementation inventory is classified as follows.
 
 ### Superseded
 
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py`
+- `build_tenants/python/code/odd_sdlc/workspace_assets.py`
   superseded in its current hard-coded first-slice path assumptions and
   placeholder target bindings
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py`
+- `build_tenants/python/code/odd_sdlc/constructor.py`
   superseded where it manufactures placeholder implementation, archive, and
   release surfaces as if they were current software-domain truth
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/fd_checks.py`
+- `build_tenants/python/code/odd_sdlc/fd_checks.py`
   superseded where it proves only marker-presence on first-slice placeholder
   surfaces rather than current target truth and provenance
 

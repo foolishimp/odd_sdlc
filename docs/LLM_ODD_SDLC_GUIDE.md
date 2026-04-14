@@ -8,18 +8,18 @@
 - `specification/PRODUCT.md`
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 - `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
-- `build_tenants/odd_sdlc/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
-- `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
-- `build_tenants/odd_sdlc/python/design/QUERY_PLUGIN_CONTRACT.md`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/__main__.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/app.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/analysis.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/project_profile.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/query.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/query_contract.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/triage.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/software_domain_catalog.py`
-- `build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py`
+- `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
+- `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+- `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
+- `build_tenants/python/code/odd_sdlc/__main__.py`
+- `build_tenants/python/code/odd_sdlc/app.py`
+- `build_tenants/python/code/odd_sdlc/analysis.py`
+- `build_tenants/python/code/odd_sdlc/project_profile.py`
+- `build_tenants/python/code/odd_sdlc/query.py`
+- `build_tenants/python/code/odd_sdlc/query_contract.py`
+- `build_tenants/python/code/odd_sdlc/triage.py`
+- `build_tenants/python/code/odd_sdlc/software_domain_catalog.py`
+- `build_tenants/python/code/odd_sdlc/gtl_module.py`
 
 ## 1. Position
 
@@ -492,7 +492,7 @@ Recommended read order for an LLM:
 3. `specification/INTENT.md`
 4. `specification/PRODUCT.md`
 5. relevant requirement families, especially `10-...` and `11-...`
-6. tenant-local design under `build_tenants/odd_sdlc/python/design/`
+6. tenant-local design under `build_tenants/python/design/`
 7. `python -m odd_sdlc query-domain --workspace .`
 8. `python -m odd_sdlc gaps --workspace .`
 9. only then constructive or iterative actions such as `start`, `construct`, or `iterate`

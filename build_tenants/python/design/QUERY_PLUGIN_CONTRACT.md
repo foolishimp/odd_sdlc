@@ -3,7 +3,7 @@
 **Status**: Active
 **Date**: 2026-04-06
 **Implements**: REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-033, REQ-F-ODDSDLC-037
-**Derives From**: `build_tenants/common/design/adrs/ADR-006-abg-runtime-and-odd-query-plugin-boundary.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`, `build_tenants/odd_sdlc/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+**Derives From**: `build_tenants/common/design/adrs/ADR-006-abg-runtime-and-odd-query-plugin-boundary.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`, `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
 
 ## Position
 

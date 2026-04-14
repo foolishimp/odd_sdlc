@@ -26,7 +26,7 @@ constitutional repricing, while preserving ABG as the event-driven substrate.
    records observation of the disturbance and blocks current triage or route
    truth until analysis is republished.
 4. Use a shallow-realization proving lane, including the named
-   `build_tenants/odd_sdlc/python/test_env/fixtures/test28_pass2_replay/`
+   `build_tenants/python/test_env/fixtures/test28_pass2_replay/`
    survivor fixture, and verify that triage names the affected layer, classifies
    the mismatch, and prefers lawful deepening over lateral expansion.
 5. Use a major-ambiguity or unroutable case and verify that triage preserves

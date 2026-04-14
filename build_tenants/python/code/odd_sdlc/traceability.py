@@ -33,7 +33,7 @@ _GENERATED_TESTCASE_AUTHORITY_PATH = Path("specification/scenarios/30-generated-
 _TESTCASE_AUTHORITY_MATRIX_PATH = Path("specification/scenarios/TESTCASE_AUTHORITY.md")
 _TESTCASE_AUTHORITY_FAMILY_RE = re.compile(r"`((?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*-\*)`")
 _MARKDOWN_FILE_TOKEN_RE = re.compile(r"`([^`]+\.md)`")
-_SOURCE_DOMAIN_CODE_ROOT = Path("build_tenants/odd_sdlc/python")
+_SOURCE_DOMAIN_CODE_ROOT = Path("build_tenants/python")
 
 
 def _read_text(path: Path) -> str:
