@@ -19,3 +19,4 @@ venv/
 
 # Sandbox historical run archives
 build_tenants/*/python/test_runs/
+build_tenants/python/test_runs/
