@@ -4,8 +4,8 @@ This generated surface is a deterministic read model over imported project autho
 It is not a replacement for project-owned specification truth.
 
 ## Workspace Identity
-- workspace: `odd_method`
-- project slug: `odd_method`
+- workspace: `odd_sdlc`
+- project slug: `odd_sdlc`
 - platform: `python`
 
 ## Project Identity
@@ -14,8 +14,8 @@ It is not a replacement for project-owned specification truth.
 - workspace/template/bootstrap provenance does not change project identity
 
 ## Source Titles
-- `specification/INTENT.md`: odd_method Intent
-- `README.md`: odd_method [provenance/context]
+- `specification/INTENT.md`: odd_sdlc Intent
+- `README.md`: odd_sdlc [provenance/context]
 
 ## Ontology Anchors
 - no explicit ontology anchors detected in imported authority

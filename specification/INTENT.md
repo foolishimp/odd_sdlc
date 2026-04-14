@@ -1,12 +1,12 @@
-# odd_method Intent
+# odd_sdlc Intent
 
 **Status**: Active
 **Date**: 2026-04-05
-**Derived From**: `odd_method` bootstrap and project-owned repricing
+**Derived From**: project bootstrap and project-owned repricing
 
 ## Purpose
 
-`odd_method` exists to realize outcome-driven development as a lightweight
+`odd_sdlc` exists to realize outcome-driven development as a lightweight
 graph-native product built directly on GTL and ABG.
 
 It is a fresh constitutional line with these governing commitments:
@@ -58,7 +58,7 @@ The project is constrained by these rules:
 - `build_tenants/` remains realization `HOW` and does not outrank
   `specification/`
 - ABG owns traversal, execution, and raw runtime fact truth
-- `odd_method` must not create a product-local shadow-runtime seam after ABG
+- `odd_sdlc` must not create a product-local shadow-runtime seam after ABG
   dispatch
 - unresolved live requirements must not disappear after a partial wave,
   deferment, or scoped iteration; they remain binding constitutional pressure
@@ -66,7 +66,7 @@ The project is constrained by these rules:
 - homeostatic renewal must remain explicit: observation, triage, route
   selection, and constitutional repricing are distinct lawful acts rather than
   hidden control flow
-- any orchestration or service layer incubated inside `odd_method` must remain
+- any orchestration or service layer incubated inside `odd_sdlc` must remain
   subordinate to ABG for runs, events, convergence, lineage, and provenance
 - capability claims require written testcase authority and scenario proof
 - lightweight means smaller and cleaner constitutional and runtime surfaces, not

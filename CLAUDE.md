@@ -7,8 +7,8 @@ GTL/ABG are the substrate. `odd_sdlc` is the governance/runtime package.
 The target project may be imported, partial, stale, or still underdefined.
 
 ## 1. Workspace Identity
-- workspace: `odd_method`
-- project slug: `odd_method`
+- workspace: `odd_sdlc`
+- project slug: `odd_sdlc`
 - platform: `python`
 - active runtime contract: `workspace://.odd_sdlc/release/genesis.yml`
 - normalization report: `workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
