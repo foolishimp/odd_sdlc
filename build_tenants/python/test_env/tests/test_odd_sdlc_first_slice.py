@@ -22,9 +22,9 @@ from types import SimpleNamespace
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT / ".genesis"
-CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 GRAPH_FUNCTION_NAMES = [
@@ -158,7 +158,7 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
     assert asset_path(tmp_path, "requirement_closure_register_surface") == (
         tmp_path / ".ai-workspace" / "runtime" / "odd_sdlc-requirement-closure.json"
     )
-    assert asset_path(tmp_path, "code_surface") == tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl"
+    assert asset_path(tmp_path, "code_surface") == tmp_path / "build_tenants" / "python" / "code" / "odd_sdlc_proving_impl"
     assert asset_path(tmp_path, "release_surface") == tmp_path / "docs" / "40-generated-release.md"
     assert asset_path(tmp_path, "deployment_surface") == tmp_path / "docs" / "50-generated-deployment.md"
     assert asset_path(tmp_path, "runtime_observation_surface") == tmp_path / "docs" / "60-generated-runtime-observation.md"
@@ -169,7 +169,7 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
         tmp_path / "specification" / "requirements" / "10-generated-bootstrap.md"
     )
     assert asset_marker_path(tmp_path, "code_surface") == (
-        tmp_path / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc_proving_impl" / "__init__.py"
+        tmp_path / "build_tenants" / "python" / "code" / "odd_sdlc_proving_impl" / "__init__.py"
     )
 
 

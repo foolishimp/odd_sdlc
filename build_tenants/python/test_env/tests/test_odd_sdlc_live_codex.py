@@ -17,9 +17,9 @@ import pytest
 
 
 TESTS_DIR = Path(__file__).resolve().parent
-ODD_ROOT = TESTS_DIR.parents[4]
+ODD_ROOT = TESTS_DIR.parents[3]
 GENESIS_PATH = ODD_ROOT / ".genesis"
-CODE_PATH = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+CODE_PATH = ODD_ROOT / "build_tenants" / "python" / "code"
 
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))

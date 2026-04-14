@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT / ".genesis"
-CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 TESTS_DIR = Path(__file__).resolve().parent
 DATA_MAPPER_TEMPLATE = (
     ROOT.parents[0] / "ai_sdlc_examples" / "local_projects" / "data_mapper.template"

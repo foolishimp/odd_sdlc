@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT / ".genesis"
 
 if str(GENESIS_PATH) not in sys.path:

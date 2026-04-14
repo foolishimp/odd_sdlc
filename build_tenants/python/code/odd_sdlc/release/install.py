@@ -22,7 +22,7 @@ from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
 
 SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
 SOURCE_PYTHON_ROOT = Path(__file__).resolve().parents[3]
-APPS_ROOT = Path(__file__).resolve().parents[7]
+APPS_ROOT = Path(__file__).resolve().parents[6]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 RUNTIME_CONTRACT_RELATIVE = Path(".odd_sdlc/release/genesis.yml")
 _ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->"

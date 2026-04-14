@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT / ".genesis"
 CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
 

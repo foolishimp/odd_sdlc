@@ -17,8 +17,8 @@ from typing import Any
 
 TESTS_DIR = Path(__file__).resolve().parent
 VARIANT_ROOT = TESTS_DIR.parents[1]
-ODD_ROOT = TESTS_DIR.parents[4]
-CODE_PATH = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
+ODD_ROOT = TESTS_DIR.parents[3]
+CODE_PATH = ODD_ROOT / "build_tenants" / "python" / "code"
 
 if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))

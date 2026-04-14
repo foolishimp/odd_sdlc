@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from run_archive import RunArchive
 
 TESTS_DIR = Path(__file__).resolve().parent
-ODD_ROOT = TESTS_DIR.parents[4]
-APPS_ROOT = TESTS_DIR.parents[5]
+ODD_ROOT = TESTS_DIR.parents[3]
+APPS_ROOT = TESTS_DIR.parents[4]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
-SOURCE_PACKAGE = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_sdlc"
-SOURCE_DESIGN_FP = ODD_ROOT / "build_tenants" / "odd_sdlc" / "python" / "design" / "fp"
+SOURCE_PACKAGE = ODD_ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
+SOURCE_DESIGN_FP = ODD_ROOT / "build_tenants" / "python" / "design" / "fp"
 
 
 def install_kernel_sandbox(target: Path, *, archive: "RunArchive | None" = None) -> dict[str, Any]:
