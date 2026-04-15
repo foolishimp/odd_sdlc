@@ -15,7 +15,12 @@ from genesis.events import EventContext, EventStream, emit
 
 from .asset_types import ASSET_TYPES
 from .project_profile import SOURCE_EXTENSIONS, load_project_profile
-from .traceability import current_requirement_refs, implementation_claim_refs, planned_test_claim_refs
+from .traceability import (
+    authority_requirement_refs,
+    current_requirement_refs,
+    implementation_claim_refs,
+    planned_test_claim_refs,
+)
 from .workspace_assets import (
     assess_generated_asset_contract,
     asset_declared_type,
@@ -38,6 +43,7 @@ IMPORTED_AUTHORITY_CANDIDATES: tuple[Path, ...] = (
 PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface"}
 _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _GENERATED_TEST_CODE_MARKER = "Generated governed test code for the odd_sdlc test_code_surface."
+_GENERIC_TITLE_HEADINGS = {"intent", "product", "goals", "requirements"}
 
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -113,6 +119,16 @@ def _imported_requirement_authority_lines(workspace_root: Path) -> tuple[str, ..
     return tuple(f"- {requirement_id}: carried forward from imported requirement authority" for requirement_id in sorted(ids))
 
 
+def _authority_requirement_lines(workspace_root: Path) -> tuple[str, ...]:
+    refs = authority_requirement_refs(workspace_root)
+    if not refs:
+        return ("- no live REQ-* authority markers detected",)
+    return tuple(
+        f"- {requirement_id}: carried forward from {', '.join(refs[requirement_id])}"
+        for requirement_id in sorted(refs)
+    )
+
+
 def _file_heading(path: Path) -> str:
     for line in path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
@@ -129,12 +145,12 @@ def _project_title(workspace_root: Path) -> str:
             if stripped.lower().startswith("**project**:"):
                 return _strip_quotes(stripped.partition(":")[2]).strip()
         heading = _file_heading(intent_path)
-        if heading:
+        if heading and heading.strip().lower() not in _GENERIC_TITLE_HEADINGS:
             return heading
     readme_path = workspace_root / "README.md"
     if readme_path.exists():
         heading = _file_heading(readme_path)
-        if heading:
+        if heading and heading.strip().lower() not in _GENERIC_TITLE_HEADINGS:
             return heading
     return load_project_profile(workspace_root).project_slug
 
@@ -802,7 +818,7 @@ def _construct_requirements(workspace_root: Path) -> str:
                 "- release, deployment, runtime observation, and retrofit surfaces must remain projections over governed assets and evidence",
                 "",
                 "## Requirement Authority Carry-Forward",
-                *_imported_requirement_authority_lines(workspace_root),
+                *_authority_requirement_lines(workspace_root),
                 "",
                 "## Imported Authority",
                 *_imported_authority_lines(workspace_root),

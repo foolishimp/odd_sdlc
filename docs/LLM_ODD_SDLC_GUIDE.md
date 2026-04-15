@@ -1,37 +1,63 @@
-# LLM odd_sdlc Guide
+# LLM ODD Product Design Guide
 
 **Status**: Active supporting documentation
-**Audience**: LLM-first operator reference, human second
-**Purpose**: Bootstrap and orient work on or through the active `odd_sdlc` software-domain package
+**Audience**: LLM-first design and build orientation, human second
+**Purpose**: Give an LLM or designer the minimum correct mental model for
+authoring new ODD products that follow the same GTL graph-function discipline as
+`odd_sdlc`
+**Primary Use**: Read this before designing a new ODD domain package, repricing
+an imperative prototype into GTL, or asking an LLM to propose product structure
+**Canonical Reference Product**: `odd_sdlc`
 **Keep Subordinate To**:
 - `specification/INTENT.md`
 - `specification/PRODUCT.md`
-- `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
-- `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
-- `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
-- `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
-- `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
-- `build_tenants/python/code/odd_sdlc/__main__.py`
-- `build_tenants/python/code/odd_sdlc/app.py`
-- `build_tenants/python/code/odd_sdlc/analysis.py`
-- `build_tenants/python/code/odd_sdlc/project_profile.py`
-- `build_tenants/python/code/odd_sdlc/query.py`
-- `build_tenants/python/code/odd_sdlc/query_contract.py`
-- `build_tenants/python/code/odd_sdlc/triage.py`
-- `build_tenants/python/code/odd_sdlc/software_domain_catalog.py`
+- `specification/requirements/02-graph-functions.md`
+- `specification/requirements/07-asset-typing-and-binding.md`
+- `build_tenants/common/design/adrs/ADR-002-graph-function-first-carrier-and-runtime-boundary.md`
+- `build_tenants/common/design/adrs/ADR-006-abg-runtime-and-odd-query-plugin-boundary.md`
 - `build_tenants/python/code/odd_sdlc/gtl_module.py`
+- `build_tenants/python/code/odd_sdlc/function_catalog.py`
+- `build_tenants/python/code/odd_sdlc/query.py`
+- `/Users/jim/src/apps/abiogenesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`
 
 ## 1. Position
 
-`odd_sdlc` is the first live software-domain package on the `odd_sdlc` line.
+Use `odd_sdlc` as the canonical reference implementation for how an ODD
+product should be shaped.
 
-Read it as a generic software-domain package expressed through GTL graph functions, executed through ABG runtime truth, and built to govern the full software worksite lifecycle across imported, stale, and already-partially-governed workspaces.
+The point is not to copy SDLC-specific asset names.
 
-The old bootstrap-to-release slice still matters, but only as a bounded proving subset inside the larger software-domain package.
+The point is to copy the structural law:
 
-## 2. Hard Boundaries
+1. define typed domain assets and nodes
+2. publish explicit named graph functions over those nodes
+3. bind those functions into a GTL module as the operative carrier
+4. expose current state through projection and query without replacing ABG
+   runtime truth
 
-Keep these boundaries explicit.
+If a new domain keeps its semantic chain in prose but leaves constructive work
+inside product-local scripts or loops, it is not following the `odd_sdlc`
+pattern yet.
+
+## 2. What An ODD Product Is
+
+An ODD product is a configured domain product over GTL and ABG.
+
+The stable app boundary is:
+
+```text
+App
+= Bootstrap Surface
++ Initialization Surface
++ Domain Configuration
++ GTL Program Surface
++ Policy Hook Bindings
++ ABG Runtime
++ Projection / Audit Surface
++ Proof Surface
+```
+
+Read the ownership split strictly.
 
 ### Specification
 
@@ -51,529 +77,601 @@ It defines:
 
 It carries:
 
-- tenant-local design
-- tenant-local code
+- design
+- code
+- tests
+- GTL publications
 - tenant-local proving surfaces
-- reusable graph-function publications
 
 ### ABG
 
-ABG owns runtime truth.
+ABG owns:
 
-That includes:
-
+- traversal
+- execution
+- raw runtime facts
 - runs
 - graph calls
+- frames
 - continuations
-- raw event truth
-- approval provenance
-- causation and lineage
+- lineage and provenance
 
-### odd_sdlc
+### ODD Domain Product
 
-`odd_sdlc` owns software-domain semantics layered over ABG, including:
+The ODD product owns:
 
+- domain semantics
 - asset meaning
-- edge contracts
-- work-act semantics
-- project-profile resolution
-- analysis publication
-- ambiguity and closure registers
-- homeostatic observation, triage, route, and constitutional proposal semantics
-- query-domain as a domain overlay
+- function meaning
+- policy surfaces
+- gap and closure interpretation
+- query overlays over domain state
 
-### odd_service
+### Orchestration Or Service Layers
 
-`odd_service` is the incubating orchestration plane. It is not runtime truth. If it exists in the picture, treat it as session, worker, and routing infrastructure above `odd_sdlc`, not as a rival domain constitution.
+Service layers may own:
 
-## 3. Core Mental Model
+- sessions
+- workers
+- routing
+- transport
+- browser-safe observation
 
-Treat the project as an active software worksite, not as a tree that becomes unmanaged after code appears.
+They do not own runtime truth.
 
-The governed cycle is:
+Do not invent a shadow runtime beneath the word "service".
 
-1. request
-2. gate
-3. specify
-4. design
-5. implement
-6. qualify
-7. release
-8. deploy
-9. observe
-10. return
-11. retrofit
-12. relaunch
+## 3. Non-Negotiable Structural Law
 
-The reverse path is equally first-class:
+Any new ODD product should satisfy all of the following.
 
-`observation -> triage -> route -> constitutional proposal -> renewed forward derivation`
+### 3.1 Singleton Constitutional Authority
 
-This is the center of the current philosophy. `odd_sdlc` is not only about forward generation. It is about staying lawfully inside the same governed line when the workspace, runtime evidence, or closure picture says the current state is insufficient.
+There is one authoritative specification stack.
 
-## 4. Read The Workspace Before Acting
+Do not split semantic truth between:
 
-Before you interpret any code root or try to start work, resolve the workspace shape.
+- prompt lore
+- code comments
+- local notebooks
+- UI payload shapes
+- an undocumented service layer
 
-The current workspace modes are:
+### 3.2 Typed Assets And Typed Nodes
 
-- `source_domain_repo`
-- `installed_target`
-- `governed_workspace`
-- `unclassified_workspace`
+An ODD product does not work over an unnamed project blob.
 
-The important distinction is:
+It works over:
 
-- `declared_output_dir` is what the workspace says should be governed
-- `selected_output_dir` is what current profile resolution chose as the active governed root
+- assets with URI identity
+- asset types with semantic meaning
+- typed asset nodes
+- explicit bindings from concrete assets into those nodes
 
-Do not infer the active code root from:
+When an asset is a real produced or consumed boundary, declare its
+`asset_surface` truth:
 
-- repository name
-- sibling trees
-- template lineage
-- an old bootstrap guide
+- `kind`
+- `required_contexts`
+- `standards_refs`
+- `output_contract_refs`
 
-Use published workspace state and project profile resolution instead.
+### 3.3 Graph Functions Are The Primary Constructive Carrier
 
-## 5. Current Runtime And Analysis Surfaces
+Every operative constructive step should be carried by:
 
-An LLM should reason from the current published surfaces, not from ambient filesystem guesswork.
+- one named `GraphFunction`, or
+- one lawful graph-function composition
 
-### Workspace State
+Do not invent a second executor such as:
 
-`.ai-workspace/runtime/odd_sdlc-workspace-state.json`
+- a hidden imperative runner
+- a product-local pipeline engine
+- ad hoc Python loops that remain the real carrier
 
-Use it to answer:
+Work vectors may exist, but they are productization over graph functions, not a
+separate runtime.
 
-- workspace mode
-- readiness
-- selected output root
-- declared output root
-- current project profile
-- current analysis fingerprint
+### 3.4 The Function Catalog Must Be Explicit
 
-### Analysis Manifest
+The live line must publish a machine-readable graph-function catalog.
 
-`.ai-workspace/runtime/odd_sdlc-analysis-manifest.json`
+At minimum, each published function must expose:
 
-Use it to answer:
+- name
+- inputs
+- outputs
+- intent
+- whether it is a public carrier, a reusable helper, or a higher-order harness
 
-- which analysis artifacts are current
-- which source inputs were fingerprinted
-- which root the analysis was published against
+If the catalog only exists in prose or prompt memory, the line is under-built.
 
-### Normalization Report
+### 3.5 The GTL Module Is The Operative Publication Surface
 
-`.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
+The product must publish:
 
-Treat this as normalization/setup evidence, not as the current readiness or current-analysis authority surface.
+- the public graph-function carriers
+- the materialized graph or graphs
+- lawful traversal boundaries such as `RefinementBoundary` or
+  `CandidateFamily`
+- semantic jobs bound to the outer public carrier
 
-### Requirement Closure Register
+Do not bind jobs directly to hidden internal vectors.
 
-This is the machine-readable record of live requirements, planned realization, and current code or test evidence. It exists so unresolved requirements remain future pressure rather than disappearing after a bounded wave.
+Do not publish a public carrier without publishing the traversable structure ABG
+needs to execute it.
 
-### Ambiguity Register
+### 3.6 Cumulative Environment Law
 
-This is the governed register for major ambiguity. Do not invent a second ambiguity regime in prompts or local notes when current ambiguity truth already exists.
+Do not model composition as "the last output feeds the next input".
 
-### Current Edge Triage
+The real law is:
 
-`.ai-workspace/runtime/triage/<edge>.json`
+- each `GraphFunction` declares `environment.requires`
+- each `GraphFunction` declares `environment.provides`
+- each `GraphFunction` declares `environment.carries`
+- later steps may require any binding available in the cumulative environment
 
-This is the current domain projection for one edge:
+That means a late function may still require upstream bindings such as:
+
+- input set
+- requirements
+- design
+
+The environment is cumulative, typed, and replay-visible.
+
+### 3.7 Query Is A Projection Over Constructive History
+
+Visible current state is a projection.
+
+It is not a replacement for runtime truth.
+
+The domain query lane may expose:
+
+- asset views
+- asset type meaning
+- function catalog views
+- checkpoint and provenance overlays
+- gap and closure overlays
+
+It must not redefine:
+
+- run
+- graph call
+- continuation
+- frame
+- raw event truth
+
+Those remain ABG-native.
+
+### 3.8 Gap Handling Re-Enters The Constitutional Chain
+
+An ODD product is not only a forward generator.
+
+It must support lawful return through:
 
 - observation
 - triage
-- route proposal
-- route binding
-- constitutional proposal when applicable
+- route selection
+- explicit re-entry
+- constitutional repricing when needed
 
-Historical causation still belongs to ABG events.
+Do not collapse all mismatch into direct code repair.
 
-## 6. Published Query Surface
+## 4. What To Copy From odd_sdlc Exactly
 
-The stable domain query contract is `odd_sdlc.query-domain`.
+Copy these patterns.
 
-It is a domain overlay, not a replacement runtime model.
+### 4.1 Copy The Structural Pattern, Not The Nouns
 
-`query-domain` is the stable read contract.
+Do not copy `odd_sdlc` asset names into another domain.
 
-`observe` remains a transitional observer composition.
+Do copy:
 
-Use `query-domain` to inspect:
+- typed semantic assets
+- explicit typed nodes
+- named graph functions
+- published GTL module carriers
+- machine-readable function catalog
+- projection-based query surface
 
-- `analysis_manifest`
-- `asset_types`
-- `asset_families`
-- `assets`
-- `ambiguity_register`
-- `requirement_closure_register`
-- `functions`
-- `edge_contracts`
-- `programs`
-- `work_act_types`
-- `graph_functions`
-- `bindings`
-- `gaps`
+### 4.2 Keep Public Carriers Explicit
 
-Do not use it to reconstruct:
+`odd_sdlc` proves that graph functions are not decorative wrappers.
 
-- live run lifecycle
-- continuation lifecycle
-- raw event history
-- approval lineage
+They are the public constructive carrier.
 
-That remains ABG-native.
+A new domain should therefore expose public names such as:
 
-Also keep this distinction:
+- `trace_source_observations`
+- `assure_attribute_claims`
+- `materialize_attribute_ledger`
+- `project_markov_object_cut`
+- `publish_domain_artifact`
+- `compose_world_model`
 
-- `query-domain` reads the current domain overlay without publishing new current-edge triage artifacts
-- `gaps` computes and publishes the current edge-scoped observation, triage, route, and constitutional projection
+Those names are illustrative.
 
-## 7. Asset And Edge Model
+The requirement is the callable pattern, not the exact vocabulary.
 
-The live software-domain model is broader than the old first-slice asset list.
+### 4.3 Keep Deterministic Materialization Separate From Semantic Derivation
 
-Important active asset families and lanes include:
+If the domain has deterministic record materialization, keep it explicit.
 
-- worksite inputs
-- solution design
-- implementation branch
-- qualification branch
-- release readiness
-- deployment records
-- runtime evidence
-- retrofit plans
+Use deterministic lanes for things like:
 
-Use `catalog --workspace .` or `query-domain --workspace .` for the full live function set.
+- record assembly
+- structural validation
+- cheap trustworthy checks
+- output packaging
 
-Representative graph functions are enough for cold-start orientation:
+Use GTL constructive carriers for semantic work such as:
 
-- `derive_requirement_surface`
-- `derive_design_surface`
-- `derive_implementation_module_surface`
-- `qualify_testcase_authority`
-- `prepare_release_surface`
-- `derive_runtime_observation_surface`
+- derivation
+- synthesis
+- review
+- promotion
+- composition
 
-There are also retained reusable consensus publications:
+Do not expand a deterministic helper into a rival runtime.
 
-- `review_design_consensus_round`
-- `review_design_by_consensus`
+### 4.4 Keep Query Projection-Based
 
-Those are active GTL graph-function publications, not hidden engine paths. In the current tenant they are still design-scoped, but they remain published as reusable higher-order capability rather than special runtime behavior.
+The current visible state should be understandable as:
 
-## 8. Current Evaluation Model
+- current checkpoint
+- current provenance
+- current closure posture
 
-`odd_sdlc` is built around explicit edge contracts.
+without pretending prior constructive turns never happened.
 
-Each edge is expected to declare at least:
+## 5. Design Procedure For A New ODD Domain
 
-- source asset set
-- target asset
-- transform dependency or profile
-- capability dependency where execution or side effects are implied
-- preflight `F_D`
-- configured `F_P`
-- postflight `F_D`
-- optional capability or operational `F_D`
-- optional `F_H`
-- work-report contract
-- proof and closure expectations
+If you are designing a new domain, follow this order.
 
-### Configured F_P
+### 5.1 Define The Semantic Chain First
 
-For generic software-domain work, configured `F_P` is the normal constructive carrier.
+Start by naming the real domain chain from imported or authored source to
+published domain outcomes.
 
-It must:
+Example shape:
 
-- modify the governed target surfaces
-- produce a machine-readable work report
-- classify the work act it performed
-- attach evidence
-
-Assessment prose alone is not enough.
-
-### Layered F_D
-
-`F_D` stays layered:
-
-- `core_fd`
-- `capability_fd`
-- `operational_fd`
-
-This is how the system distinguishes structural integrity, capability-gated execution, and operational or returned evidence without collapsing them into one opaque check.
-
-## 9. Traceability And Closure
-
-Generated realization is only governed if it remains traceable.
-
-The active minimum chain is:
-
-1. live requirement authority
-2. generated implementation or qualification planning surfaces
-3. generated source with `Implements:` tags
-4. generated tests with `Validates:` tags
-5. requirement closure register summarizing what is realized, partial, planned, specified, or missing
-
-Do not treat untagged generated code or tests as closure evidence.
-
-Do not treat partial-wave completion as full closure.
-
-## 10. Homeostatic Gap Model
-
-The current reverse path is generic-first and totalized at the process boundary.
-
-Meaning:
-
-- triage first classifies a `framework_layer`
-- then a `framework_condition`
-- then refines to `gap_kind`, `reentry_layer`, and action state
-
-Treat the classification as matrix-shaped:
-
-- `framework_layer` is the affected domain or process layer
-- `framework_condition` is the kind of pressure or incompleteness at that layer
-
-Current layers in the active implementation include:
-
-- `analysis`
-- `capability`
-- `ambiguity`
-- `intent`
-- `product`
-- `goals`
-- `requirements`
-- `design`
-- `code`
-- `test`
-- `execution`
-- `routing`
-
-Current conditions in the active implementation include:
-
-- `stale`
-- `blocked`
-- `missing`
-- `contradictory`
-- `shallow`
-- `insufficient`
-- `unproven`
-- `unroutable`
-- `complete`
-
-Do not collapse these next three names into one field:
-
-- `gap_kind` names semantic mismatch, such as `dependency_gap`, `ambiguity_gap`, `<layer>_gap`, or `unclassified_gap`
-- `process_outcome_kind` names the total process outcome
-- `route_binding.state` names the routed or gated state now projected for the edge
-
-The current closed `process_outcome_kind` set in code is:
-
-- `converged`
-- `advance_fixed_vector`
-- `advance_dynamic_family`
-- `blocked_stale_analysis`
-- `blocked_missing_capability`
-- `await_fh_resolution`
-- `propose_constitutional_reprice`
-- `no_lawful_route`
-
-The important sink behavior is:
-
-- `unclassified_gap` is the default semantic sink when the framework classification is real but no stronger domain-specific gap name is available
-- `no_lawful_route` is the explicit tail state when triage cannot lawfully map into a declared next action
-- `suppressed_by_mode` is a route state, not a process outcome; it appears when constitutional repricing is recommended but policy suppresses application
-
-No meaningful mismatch should silently fall through into ambient retry or generic code repair.
-
-### Re-entry Layers
-
-The current canonical re-entry layers are:
-
-- `intent`
-- `product`
-- `goals`
-- `requirements`
-- `design`
-- `code`
-- `test`
-
-The key rule is simple:
-
-Once re-entry is named, forward derivation resumes from that layer and flows downstream again. Do not skip the named upstream authority layer.
-
-### Deepening Rule
-
-If shallow realization already exists, the preferred route is usually to deepen that realization rather than expand laterally. This is one of the most important current operator rules.
-
-In the current implementation this is not only a design slogan. Triage can scan governed code or test roots for shallow findings and attach concrete evidence such as:
-
-- `path`
-- `excerpt`
-- `line_start`
-- `line_end`
-- finding kinds like `missing_implementation`, `trivial_passthrough`, or `hard_coded_success`
-
-That evidence is what drives `deepen_realization` rather than vague operator intuition.
-
-### Event Chain
-
-The homeostatic layer is projected as current state, but it is emitted as an explicit event chain.
-
-When `gaps` publishes a new current-edge result, the domain sequence is:
-
-1. `observation_recorded`
-2. `triage_produced`
-3. `route_recorded`
-4. `constitutional_proposal_recorded` when repricing is opened
-
-These remain ABG events with explicit causation and correlation. The current-edge triage artifact is the current projection over that chain, not the canonical event history.
-
-### Structured Basis
-
-Each triage result carries two typed evidence bases:
-
-- `authority_basis`: the authority-side reason for the appraisal, including edge, analysis fingerprint, failing evaluators, missing bindings, and re-entry layer
-- `realized_basis`: the realized-side situation being judged, including delta, delta summary, environment readiness, work key, and selected output root
-
-These exist so a later LLM or operator can reconstruct why triage happened without relying on prose memory alone.
-
-### Divergence And Supersession
-
-Later triage may supersede the current result for the same edge when the semantic reading changes materially.
-
-The operational rule is:
-
-- one clear current projection exists at `.ai-workspace/runtime/triage/<edge>.json`
-- a materially different later result replaces that current projection
-- prior meaning stays visible in ABG history
-- divergence is surfaced explicitly through the `triage_divergence` event
-
-This keeps the read model simple without pretending prior triage never happened.
-
-## 11. Constitutional Repricing
-
-Gaps that cannot be resolved lawfully beneath current Goals or Intent may open constitutional repricing.
-
-That path is explicit and gated.
-
-Current outcomes remain distinct:
-
-- `approve`
-- `approve_with_edits`
-- `reject`
-- `defer`
-- `suppressed`
-
-No semantic triage path may silently apply constitutional change.
-
-## 12. Freshness Law
-
-Published analysis is load-bearing.
-
-If published analysis is stale against current authority or realization inputs:
-
-- the workspace is not ready for `start`
-- current route truth is blocked
-- lawful re-entry is `refresh-analysis`
-
-Current code fails closed here. `start` does not auto-refresh stale analysis; it requires explicit republishing first.
-
-The current input fingerprint includes tracked specification and realization surfaces, not only one configuration file. Do not trust any current triage, closure, or ambiguity picture if analysis is stale.
-
-## 13. How To Read An odd_sdlc Workspace
-
-Recommended read order for an LLM:
-
-1. `.ai-workspace/runtime/odd_sdlc-workspace-state.json` if present
-2. `.ai-workspace/runtime/odd_sdlc-analysis-manifest.json` if present
-3. `specification/INTENT.md`
-4. `specification/PRODUCT.md`
-5. relevant requirement families, especially `10-...` and `11-...`
-6. tenant-local design under `build_tenants/python/design/`
-7. `python -m odd_sdlc query-domain --workspace .`
-8. `python -m odd_sdlc gaps --workspace .`
-9. only then constructive or iterative actions such as `start`, `construct`, or `iterate`
-
-If the workspace is imported or stale, treat normalization and analysis publication as part of lawful setup, not as optional housekeeping.
-
-## 14. Current Commands
-
-From an installed or already-available `odd_sdlc` environment:
-
-```bash
-python -m odd_sdlc install --target /path/to/workspace --project-slug project_slug --platform python
-python -m odd_sdlc normalize-workspace --workspace .
-python -m odd_sdlc refresh-analysis --workspace .
-python -m odd_sdlc query-domain --workspace .
-python -m odd_sdlc catalog --workspace .
-python -m odd_sdlc gaps --workspace .
-python -m odd_sdlc start --workspace . --auto
-python -m odd_sdlc iterate --workspace .
-python -m odd_sdlc observe --workspace .
-python -m odd_sdlc self-test --workspace .
+```text
+source -> trace -> assurance -> ledger -> object cut -> published artifact -> composed model
 ```
 
-From the source checkout, ensure the source tenant code and `.genesis` are on `PYTHONPATH` before running the same commands.
+Do not start with:
 
-Use the commands like this:
+- UI screens
+- API routes
+- background workers
+- filesystem layout
 
-- `install`: install the released package surfaces into a target workspace
-- `normalize-workspace`: install-owned normalization for imported or stale workspaces
-- `refresh-analysis`: republish ambiguity, closure, prompt context, workspace state, and analysis manifest
-- `query-domain`: inspect the current domain overlay
-- `catalog`: inspect the published function, asset, and graph-function catalog
-- `gaps`: publish current observation, triage, route, and proposal state
-- `start`: enter the current executive proving chain after readiness is satisfied
-- `iterate`: continue governed work on the current scope
-- `observe`: emit the current observer view
+Those are downstream.
 
-## 15. LLM Operating Rules
+### 5.2 Define Asset Families And Node Contracts
 
-When you are the active operator:
+For each major stage, define:
 
-- start from published state, not from memory
-- confirm workspace mode and selected output root before reading code
-- prefer `query-domain` and `gaps` over ad hoc interpretation when current surfaces exist
-- treat ambiguity, closure, and triage as governed truth surfaces, not as private scratchpad material
-- keep project identity subordinate to imported authority and current specification
-- treat runtime return, release, deployment, and retrofit as first-class domain stages
-- use the named re-entry layer to decide what to edit next
+- asset family name
+- URI identity policy
+- asset type meaning
+- mutable or immutable status
+- provenance expectation
+- `asset_surface.kind`
+- `asset_surface.required_contexts`
+- `asset_surface.standards_refs`
+- `asset_surface.output_contract_refs`
 
-Use scenario proof anchors when you need to know what is supposed to be real right now:
+The design question is:
 
-- `specification/scenarios/12-iterative-requirement-closure-and-generated-traceability.md`
-- `specification/scenarios/13-homeostatic-gap-triage-and-intent-renewal.md`
+"What typed truth exists at this boundary, and what context must lawfully travel
+with it?"
 
-Do not:
+### 5.3 Define Named Graph Functions Over That Chain
 
-- treat `odd_sdlc` as only a bootstrap demo
-- treat `query-domain` as runtime truth
-- treat stale analysis as good enough
-- collapse every mismatch into code repair
-- silently rewrite goals or intent
-- confuse template provenance with project identity
-- certify placeholder or orphaned realization as closure
+For each lawful transition, publish:
 
-## 16. Anti-Patterns
+- function name
+- semantic intent
+- typed inputs
+- typed outputs
+- carried environment
+- whether it is public, helper, higher-order, or recursive
 
-Reject these mistakes immediately:
+The function name should describe the domain act, not the implementation
+mechanism.
 
-- inferring project identity from README, repo name, or template lineage when imported authority exists
-- assuming the visible code tree is the governed code root without checking profile resolution
-- serving stale analysis as if it were current domain truth
-- treating ambiguity as a reason to invent hidden control flow
-- treating `odd_service` or a UI as the runtime authority
-- treating consensus harnesses as magic engine behavior instead of inspectable graph-function publications
+Prefer names like:
 
-## 17. Final Rule
+- `derive_design_surface`
+- `qualify_testcase_authority`
+- `publish_domain_artifact`
 
-If there is tension between imported project authority, `odd_sdlc` governance explanation, and runtime facts:
+Avoid names like:
 
-- imported project authority wins for project identity and project `WHAT`
-- `odd_sdlc` wins for software-domain governance semantics
-- ABG wins for runtime fact truth
+- `run_step_3`
+- `process_data`
+- `pipeline_main`
 
-That is the stable frame to keep.
+### 5.4 Publish One Outer Carrier For Live Work
+
+The general publication shape is:
+
+1. author leaf or mid-level graph functions with explicit environments
+2. compose them into one public executive carrier where appropriate
+3. materialize the executive graph
+4. publish traversal truth through `Module.graphs`
+5. publish `RefinementBoundary` or `CandidateFamily` for live internal vectors
+6. bind semantic `Job` contracts to the outer public carrier
+
+This is the point where many prototypes fail.
+
+If the real execution still depends on a handwritten runner, the GTL line is
+not finished.
+
+### 5.5 Split F_D, F_P, And F_H Correctly
+
+Use the execution lanes deliberately.
+
+`F_D` is for:
+
+- deterministic checks
+- deterministic record materialization
+- structural verification
+- cheap trustworthy readiness tests
+
+`F_P` is for:
+
+- constructive semantic work
+- synthesis
+- review
+- promotion
+- composition
+
+`F_H` is for:
+
+- escalation
+- approval
+- governance intervention
+
+Do not hide `F_P` inside `F_D`.
+
+Do not use `F_H` as a general-purpose operator patch channel.
+
+### 5.6 Define Query And Projection Surfaces
+
+Define what current state the domain should expose.
+
+Usually that includes:
+
+- current assets
+- current asset families
+- current bindings
+- current function catalog
+- current gaps
+- current closure posture
+- current checkpoint and provenance overlays
+
+Keep the boundary clean:
+
+- ABG exposes runtime truth
+- the domain exposes semantic read models
+
+### 5.7 Define Proof And The First Proving Slice
+
+Do not attempt whole-product completion first.
+
+Choose one proving slice that forces the full structural law to exist:
+
+- typed assets
+- named graph functions
+- published module
+- query/projection
+- proof lane
+
+If one bounded slice cannot be carried end to end under GTL/ABG, the larger
+design is still only aspirational.
+
+## 6. What A Designer Should Produce
+
+A good first-pass ODD design packet should contain all of the following.
+
+### 6.1 Product Statement
+
+- what domain outcome the product governs
+- what the installed product is
+- what the released product is
+- what the builder or workspace role is
+
+Keep those distinct.
+
+Do not collapse:
+
+- released product
+- install
+- builder project
+- runtime session
+
+### 6.2 Semantic Chain
+
+- ordered asset chain
+- transition names
+- closure expectations at each stage
+
+### 6.3 Asset Model
+
+- asset families
+- asset types
+- URI model
+- mutability and projection posture
+- asset-surface contracts
+
+### 6.4 Function Catalog
+
+- public graph functions
+- helper graph functions
+- higher-order harnesses
+- recursive carriers if any
+- input and output node types
+- environment contracts
+
+### 6.5 Module Publication Plan
+
+- public jobs
+- module graphs
+- refinement boundaries
+- candidate families
+- selection visibility rules
+
+### 6.6 Query Plan
+
+- domain query views
+- current checkpoint views
+- provenance overlays
+- gap and closure views
+- explicit runtime/domain boundary
+
+### 6.7 Proof Plan
+
+- proving scenarios
+- deterministic checks
+- closure evidence
+- what counts as convergence
+
+If the design packet cannot yet answer one of those sections, the missing
+section is a real design gap.
+
+## 7. Anti-Patterns
+
+Reject these patterns when designing a new ODD product.
+
+### 7.1 Imperative Shadow Runners
+
+The docs describe graph functions, but actual work still happens inside:
+
+- one custom executive loop
+- one product-local iterator
+- one hidden orchestration function
+
+That is not GTL-native.
+
+### 7.2 Hidden Global Graphs
+
+The product talks about assets, but call sites still assume:
+
+- ambient filesystem knowledge
+- unnamed project-global graph shape
+- implicit upstream availability
+
+Bindings must be explicit.
+
+### 7.3 Output-Piping-Only Composition
+
+If composition assumes only "last output becomes next input", the design is too
+weak.
+
+Late steps often need older bindings.
+
+Design for cumulative environment.
+
+### 7.4 Query Surfaces That Recreate Runtime Truth
+
+Do not build one monolithic observer payload that quietly duplicates ABG.
+
+Use domain query as overlay, not runtime replacement.
+
+### 7.5 Direct Repair Instead Of Lawful Re-Entry
+
+Do not jump from observed mismatch directly to code edits.
+
+The lawful chain is:
+
+```text
+observation -> triage -> route -> re-entry -> renewed forward derivation
+```
+
+### 7.6 Copying odd_sdlc Vocabulary Instead Of Pattern
+
+Another domain should not rename its concepts until they look like SDLC.
+
+Keep the domain's own nouns.
+
+Copy the structure.
+
+## 8. Prompt Contract For An LLM Designer
+
+When you ask an LLM to design an ODD product, require it to answer these
+questions explicitly.
+
+1. What is the product's semantic chain from source to published outcome?
+2. What are the typed asset families and node contracts?
+3. What are the named public graph functions?
+4. What cumulative environment must each function require, provide, and carry?
+5. What GTL module, jobs, and traversal boundaries will be published?
+6. What remains deterministic `F_D`, what is constructive `F_P`, and what is
+   escalated `F_H`?
+7. What query surfaces expose current checkpoints and provenance without
+   replacing ABG runtime truth?
+8. What is the first proving slice that demonstrates the full law?
+
+If the LLM cannot answer those eight questions, it has not designed the product
+yet.
+
+## 9. Cross-Domain Example Reading
+
+Use these reference readings together.
+
+### odd_sdlc
+
+Read `odd_sdlc` for the canonical structural law:
+
+- typed assets and nodes
+- graph-function-first execution
+- explicit function catalog
+- GTL module publication
+- projection-based query
+
+### odd_domain Strategy
+
+Reference:
+`/Users/jim/src/apps/odd_domain/.ai-workspace/comments/codex/20260416T000013Z_STRATEGY_odd-domain-gtl-basis-from-odd-sdlc-review.md`
+
+Read the `odd_domain` strategy note for the correct carryover rule:
+
+- keep the new domain's own semantic chain
+- do not copy SDLC asset names
+- re-express the domain as typed GTL graph functions
+- keep deterministic record materialization distinct from GTL constructive work
+
+### abiogenesis Builder Guide
+
+Reference:
+`/Users/jim/src/apps/abiogenesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`
+
+Read the GTL app builder guide for:
+
+- app boundary
+- cumulative environment law
+- module publication shape
+- runtime environment resolution
+- higher-order and recursive carrier patterns
+
+## 10. Bottom Line
+
+For a new ODD product, the deliverable is not "some code that seems aligned".
+
+The deliverable is:
+
+- one lawful semantic chain
+- one typed asset model
+- one explicit graph-function catalog
+- one published GTL module
+- one clean ABG runtime boundary
+- one projection/query surface over constructive history
+- one explicit proof and closure posture
+
+`odd_sdlc` is the reference because it proves that shape.
+
+Future domains should keep their own nouns and outcomes, but they should follow
+the same structural law.

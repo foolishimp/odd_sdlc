@@ -25,6 +25,7 @@ if str(CODE_PATH) not in sys.path:
 
 from genesis.binding import _assemble_prompt  # noqa: E402
 from gtl.operator_model import F_D  # noqa: E402
+from odd_sdlc.constructor import construct_manifest  # noqa: E402
 from odd_sdlc.fd_checks import main  # noqa: E402
 from odd_sdlc.project_profile import tenant_design_relative_path, tenant_test_env_tests_relative_path  # noqa: E402
 from odd_sdlc.traceability import traceability_scan  # noqa: E402
@@ -221,6 +222,37 @@ def _run_fd_check(check: str, workspace: Path) -> tuple[int, dict[str, object], 
     stdout = buffer.getvalue().strip()
     assert stdout
     return exit_code, json.loads(stdout), stdout
+
+
+def _write_manifest(path: Path, *, target_asset: str, evaluator_name: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "manifest_id": f"test-{target_asset}",
+                "edge": f"derive_{target_asset}",
+                "target_asset": target_asset,
+                "result_path": str(path.parent.parent / "fp_results" / f"{target_asset}.json"),
+                "failing_evaluators": [
+                    {
+                        "name": evaluator_name,
+                        "regime": "F_P",
+                        "description": "test harness",
+                    }
+                ],
+                "workflow_version": "test",
+                "run_id": "run-test",
+                "job_id": "job-test",
+                "graph_function_id": "gf-test",
+                "materialization_id": "mat-test",
+                "call_id": "call-test",
+                "vector_id": "vector-test",
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 @pytest.mark.parametrize(
@@ -457,3 +489,45 @@ def test_requirement_scope_complete_fails_when_generated_requirement_surface_lac
     assert failures[0]["asset_id"] == "requirement_surface"
     assert failures[0]["marker_present"] is False
     assert failures[0]["heading_matches"] is True
+
+
+def test_constructor_carries_live_requirement_authority_into_generated_bootstrap_surface(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-constructor-bootstrap"
+    _seed_traceability_workspace(workspace)
+    _write(
+        workspace / "README.md",
+        "\n".join(
+            (
+                "# fd-evidence-demo",
+                "",
+                "Traceability-first downstream project.",
+                "",
+            )
+        ),
+    )
+    generated_requirement = workspace / "specification" / "requirements" / "10-generated-bootstrap.md"
+    if generated_requirement.exists():
+        generated_requirement.unlink()
+
+    manifest_path = _write_manifest(
+        workspace / ".ai-workspace" / "fp_manifests" / "derive_requirement_surface_test.json",
+        target_asset="requirement_surface",
+        evaluator_name="requirement_scope_complete",
+    )
+
+    constructor_result = construct_manifest(manifest_path, workspace_root=workspace)
+
+    assert constructor_result["target_asset"] == "requirement_surface"
+    text = generated_requirement.read_text(encoding="utf-8")
+    assert "REQ-TRACE-001" in text
+    assert "REQ-TRACE-002" in text
+    assert "project: `fd-evidence-demo`" in text
+    assert "project: `Intent`" not in text
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        exit_code = main(["requirement-scope-complete", "--workspace", str(workspace)])
+    assert exit_code == 0
+    assert buffer.getvalue().strip() == ""
