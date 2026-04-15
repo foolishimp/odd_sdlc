@@ -2,7 +2,7 @@
 
 Generated: 2026-04-10T01:20:00Z
 
-This support report traces `odd_method` requirements to the active `odd_sdlc` code and test surfaces. It is non-constitutional commentary in the sense of `SPEC_METHOD`.
+This support report traces `odd_sdlc` requirements to the active `odd_sdlc` code and test surfaces. It is non-constitutional commentary in the sense of `SPEC_METHOD`.
 
 ## Scope
 
@@ -37,7 +37,7 @@ This support report traces `odd_method` requirements to the active `odd_sdlc` co
 - `REQ-F-ODDSDLC-021` — odd_sdlc publishes the current executive GTL carrier over its active software-domain graph
 - `REQ-F-ODDSDLC-023` — odd_sdlc retains reusable higher-order review and consensus harnesses as active software-domain capability
 - `REQ-F-ODDSDLC-024` — active odd_sdlc qualification proves the current software-domain model rather than first-slice habit
-- `REQ-F-ODDSVC-001` — odd_service is incubated as an odd_method product line before standalone promotion
+- `REQ-F-ODDSVC-001` — odd_service is incubated as an odd_sdlc product line before standalone promotion
 - `REQ-F-ODDSVC-002` — odd_service owns orchestration and worker-session authority, not runtime truth
 - `REQ-F-ODDSVC-003` — odd_service wraps the existing local execution path rather than redefining execution law
 - `REQ-F-ODDSVC-004` — odd_service exposes peer client surfaces for CLI and browser clients
@@ -46,12 +46,12 @@ This support report traces `odd_method` requirements to the active `odd_sdlc` co
 - `REQ-F-ODDSVC-007` — remote transport requires explicit workspace snapshot provenance and fail-closed verification
 - `REQ-F-ODDSVC-008` — odd_manager consumes odd_service as a client, not as a competing session owner
 - `REQ-F-ODDSVC-009` — consensus is the first serious proving lane for odd_service
-- `REQ-F-REALIZATION-001` — `odd_method` adopts the tenanted realization model from bootstrap
+- `REQ-F-REALIZATION-001` — `odd_sdlc` adopts the tenanted realization model from bootstrap
 - `REQ-F-REALIZATION-002` — `build_tenants/` is the project-owned realization root beneath singleton specification
 - `REQ-F-REALIZATION-003` — Shared and tenant-local realization law are explicit
 - `REQ-F-REALIZATION-004` — Supporting documentation has a non-constitutional home
 - `REQ-F-RUNTIME-001` — ABG owns raw runtime fact truth
-- `REQ-F-RUNTIME-002` — `odd_method` configures policy but does not implement a shadow runtime
+- `REQ-F-RUNTIME-002` — `odd_sdlc` configures policy but does not implement a shadow runtime
 - `REQ-F-RUNTIME-004` — Runtime topology is GTL/ABG-native and project-owned
 - `REQ-F-UPSTREAM-001` — Source material is not live authority until re-adopted
 - `REQ-F-UPSTREAM-002` — Imported truth is classified explicitly before downstream use

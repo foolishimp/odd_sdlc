@@ -6,7 +6,7 @@
 
 ## Context
 
-`odd_method` is intentionally a fresh constitutional line, but that does not justify
+`odd_sdlc` is intentionally a fresh constitutional line, but that does not justify
 inventing a special flat bootstrap topology.
 
 The project direction now favors standardization over early optimization.
@@ -16,7 +16,7 @@ fake structure.
 
 ## Decision
 
-`odd_method` adopts the standard tenanted realization topology from bootstrap.
+`odd_sdlc` adopts the standard tenanted realization topology from bootstrap.
 
 The structural split is:
 
@@ -35,8 +35,8 @@ Tenant-local realization or design detail belongs under a tenant-local root in
 
 ## Consequences
 
-- `odd_method` no longer implies that tenant structure is optional or deferred
-- `odd_method` also does not invent a nominal tenant before tenant-local law exists
+- `odd_sdlc` no longer implies that tenant structure is optional or deferred
+- `odd_sdlc` also does not invent a nominal tenant before tenant-local law exists
 - shared design law lives with shared realization law rather than under
   `specification/`
 - later domain-specific realizations can add tenant-local roots without

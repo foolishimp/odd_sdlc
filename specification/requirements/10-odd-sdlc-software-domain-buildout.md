@@ -5,7 +5,7 @@
 **Category**: Capability
 
 This family defines the build-out of `odd_sdlc` from the first realization slice
-into the generic software-domain package on the `odd_method` line.
+into the generic software-domain package on the `odd_sdlc` line.
 
 This build-out is a transformation wave over mutable realization surfaces, not
 an additive coexistence plan. Transitional mixed state may exist while the wave
@@ -13,10 +13,10 @@ is in flight, but the landing state must leave one current operative
 software-domain model rather than a permanent mix of first-slice and full-SDLC
 process.
 
-### REQ-F-ODDSDLC-009 — odd_sdlc is the generic software-domain package on the odd_method line
+### REQ-F-ODDSDLC-009 — odd_sdlc is the generic software-domain package on the odd_sdlc line
 
 `odd_sdlc` is built out as the generic software-domain package for ODD work on
-the `odd_method` line.
+the `odd_sdlc` line.
 
 **Acceptance Criteria**:
 - AC-1: current product and tenant design law name `odd_sdlc` as the
@@ -356,7 +356,7 @@ to verify the req -> design -> module -> code or test traceability chain.
 ### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
 
 `odd_sdlc` treats downstream installed workspaces as target projects governed by
-the method package, not as extensions of the `odd_method` source repository.
+the method package, not as extensions of the `odd_sdlc` source repository.
 
 Imported or understructured bootstrap input may be broad, but the first lawful
 installed shape must be conformant:

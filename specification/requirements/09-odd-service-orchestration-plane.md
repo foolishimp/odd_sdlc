@@ -4,25 +4,25 @@
 **Status**: Active
 **Category**: Capability
 
-This family defines the `odd_service` incubation line inside `odd_method`.
+This family defines the `odd_service` incubation line inside `odd_sdlc`.
 
 `odd_service` is the enduring orchestration plane proposed above `odd_sdlc`.
 It is not a second runtime. It remains subordinate to GTL, ABG, and the
 published `odd_sdlc` domain package.
 
-### REQ-F-ODDSVC-001 — odd_service is incubated as an odd_method product line before standalone promotion
+### REQ-F-ODDSVC-001 — odd_service is incubated as an odd_sdlc product line before standalone promotion
 
-`odd_service` begins as an incubating product line inside `odd_method` so its
+`odd_service` begins as an incubating product line inside `odd_sdlc` so its
 interfaces, proofs, and boundaries can be stabilized against the live
 `odd_sdlc` domain and ABG runtime before promotion to a separate project.
 
 **Acceptance Criteria**:
-- AC-1: `odd_method` publishes the `odd_service` carve-out as a deliberate
+- AC-1: `odd_sdlc` publishes the `odd_service` carve-out as a deliberate
   product line rather than as an ad hoc utility or UI helper
 - AC-2: the incubation path preserves a clean future promotion path to its own
   project root without changing the governing service/domain/runtime boundary
 - AC-3: `odd_service` does not claim standalone runtime authority while it is
-  still an incubating line under `odd_method`
+  still an incubating line under `odd_sdlc`
 
 ### REQ-F-ODDSVC-002 — odd_service owns orchestration and worker-session authority, not runtime truth
 

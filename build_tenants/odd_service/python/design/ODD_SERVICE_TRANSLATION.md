@@ -8,7 +8,7 @@
 ## Position
 
 `odd_service` is the proposed enduring orchestration translation of
-`odd_method`.
+`odd_sdlc`.
 
 It exists because:
 
@@ -199,7 +199,7 @@ design boundary.
 
 Near-term:
 
-- incubate inside `odd_method`
+- incubate inside `odd_sdlc`
 
 Later:
 

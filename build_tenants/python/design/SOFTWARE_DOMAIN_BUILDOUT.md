@@ -9,7 +9,7 @@
 
 `odd_sdlc` is no longer treated only as the first executable realization slice.
 
-It is built out as the generic software-domain package on the `odd_method`
+It is built out as the generic software-domain package on the `odd_sdlc`
 line.
 
 The already-proven bootstrap-to-release chain remains important, but it is a

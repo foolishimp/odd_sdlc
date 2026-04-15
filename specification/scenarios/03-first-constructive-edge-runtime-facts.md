@@ -7,7 +7,7 @@ preserving complete substrate fact truth and lawful next-step interpretation.
 
 ## Scenario
 
-Run the first constructive edge for `odd_method` through the declared GTL/ABG entry
+Run the first constructive edge for `odd_sdlc` through the declared GTL/ABG entry
 and runtime surfaces in an installed development environment.
 
 ## Significant Paths
@@ -24,6 +24,6 @@ and runtime surfaces in an installed development environment.
 ## Expected Outcomes
 
 1. ABG emits the runtime facts needed to explain what happened
-2. `odd_method` interprets those facts lawfully without becoming a shadow runtime
+2. `odd_sdlc` interprets those facts lawfully without becoming a shadow runtime
 3. the proving lane remains install-first and runtime-real rather than
    source-tree-only

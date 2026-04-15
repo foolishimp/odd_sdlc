@@ -6,7 +6,7 @@
 
 ## Context
 
-`odd_method` needs a smallest lawful recursive graph that is worth publishing.
+`odd_sdlc` needs a smallest lawful recursive graph that is worth publishing.
 
 The boundary needs to be explicit about:
 

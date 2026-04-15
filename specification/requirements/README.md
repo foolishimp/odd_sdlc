@@ -1,4 +1,4 @@
-# odd_method Requirements
+# odd_sdlc Requirements
 
 Project-specific requirement families live in this folder.
 

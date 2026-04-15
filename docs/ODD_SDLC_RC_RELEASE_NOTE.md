@@ -97,5 +97,5 @@ Installed-workspace recovery:
 
 The full homeostatic gap-triage loop remains post-RC work.
 
-This is documented in [ODD_SDLC_RC_NOTES.md](/Users/jim/src/apps/odd_method/docs/ODD_SDLC_RC_NOTES.md)
+This is documented in [ODD_SDLC_RC_NOTES.md](/Users/jim/src/apps/odd_sdlc/docs/ODD_SDLC_RC_NOTES.md)
 and remains outside this RC cut.

@@ -1,15 +1,15 @@
-# odd_method Product
+# odd_sdlc Product
 
 **Status**: Active
 **Derived From**: [GOALS.md](./GOALS.md),
 [INTENT.md](./INTENT.md),
 `.genesis/docs/standards/SPEC_METHOD.md`
 **Purpose**: Define the current product realization and product terms for
-`odd_method`
+`odd_sdlc`
 
 ## Product Position
 
-`odd_method` is an installed outcome-driven development product.
+`odd_sdlc` is an installed outcome-driven development product.
 
 It provides an outcome-driven development domain expressed through GTL and
 executed through ABG.
@@ -333,7 +333,7 @@ Requirements then decompose that product realization into constitutional truth.
 
 The intended end-state product shape is:
 
-This section describes the `odd_method` source repository as the product under
+This section describes the `odd_sdlc` source repository as the product under
 development.
 
 The source-repository realization rules below do not redefine downstream
@@ -346,13 +346,13 @@ Downstream installed workspaces are governed separately by
 `build_tenants/<tenant>/`, and released `odd_sdlc` runtime/software remains
 under `.odd_sdlc/`.
 
-1. install `odd_method` clean as a GTL/ABG-native product
+1. install `odd_sdlc` clean as a GTL/ABG-native product
 2. author project-owned intent, product, and requirements surfaces
 3. maintain project-owned realization structure beneath `build_tenants/`
-4. within the `odd_method` source repository, keep design under
+4. within the `odd_sdlc` source repository, keep design under
    `build_tenants/common/design/` or a tenant-local
    `build_tenants/<tenant>/design/` root rather than under `specification/`
-5. within the `odd_method` source repository, keep shared bootstrap
+5. within the `odd_sdlc` source repository, keep shared bootstrap
    realization law in `build_tenants/common/` until real tenant-local
    divergence appears
 6. publish graph functions and lawful higher-order compositions directly over
@@ -376,7 +376,7 @@ under `.odd_sdlc/`.
 
 ## Current Product Definition
 
-The current product definition of `odd_method` is:
+The current product definition of `odd_sdlc` is:
 
 - a fresh constitutional line
 - an outcome-driven development product

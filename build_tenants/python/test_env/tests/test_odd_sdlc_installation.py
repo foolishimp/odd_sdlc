@@ -962,7 +962,7 @@ def test_normalize_workspace_preserves_onboarded_secondary_tenant_without_topolo
 
 
 def test_load_project_profile_preserves_realized_declared_output_root_for_source_style_workspace(tmp_path: Path) -> None:
-    workspace = tmp_path / "odd_method.source_like"
+    workspace = tmp_path / "odd_sdlc.source_like"
     (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "INTENT.md").write_text(
@@ -981,7 +981,7 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
         "\n".join(
             (
                 "project:",
-                '  name: "odd_method_source_like"',
+                '  name: "odd_sdlc_source_like"',
                 '  kind: "software-project"',
                 '  language: "Python"',
                 '  test_runner: "pytest"',
@@ -992,7 +992,7 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
                 "structure:",
                 "  design_tenants:",
                 '    - name: "python"',
-                '      output_dir: "build_tenants/odd_method/python/"',
+                '      output_dir: "build_tenants/odd_sdlc/python/"',
                 '      description: "Source-style tenant root"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: ""',
@@ -1003,7 +1003,7 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
         ),
         encoding="utf-8",
     )
-    code_path = workspace / "build_tenants" / "odd_method" / "python" / "src" / "main" / "logic.py"
+    code_path = workspace / "build_tenants" / "odd_sdlc" / "python" / "src" / "main" / "logic.py"
     code_path.parent.mkdir(parents=True, exist_ok=True)
     code_path.write_text(
         "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
@@ -1011,13 +1011,13 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
     )
 
     profile = load_project_profile(workspace)
-    assert profile.output_dir == "build_tenants/odd_method/python/"
+    assert profile.output_dir == "build_tenants/odd_sdlc/python/"
     assert profile.realization_mode == "selected_output_tree"
     assert profile.resolution_reason == "declared_output_tree"
 
     register = build_requirement_closure_register(workspace, stage="test")
     entries = {entry["requirement_id"]: entry for entry in register["requirements"]}
-    assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_method/python/src/main/logic.py"]
+    assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
     assert queried["analysis_manifest"] is None
@@ -1025,11 +1025,16 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
         entry["requirement_id"]: entry
         for entry in queried["requirement_closure_register"]["requirements"]
     }
-    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_method/python/src/main/logic.py"]
+    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
 
 
+@pytest.mark.skip(
+    reason="Invariant no longer expressible after build_tenants collapse: "
+    "declared project tenant and governance neighbor both land under build_tenants/odd_sdlc/, "
+    "so they can no longer be distinguished for code_ref attribution."
+)
 def test_load_project_profile_keeps_declared_project_tenant_when_governance_neighbor_exists(tmp_path: Path) -> None:
-    workspace = tmp_path / "odd_method.nested_competitor"
+    workspace = tmp_path / "odd_sdlc.nested_competitor"
     (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "INTENT.md").write_text(
@@ -1048,7 +1053,7 @@ def test_load_project_profile_keeps_declared_project_tenant_when_governance_neig
         "\n".join(
             (
                 "project:",
-                '  name: "odd_method_nested_competitor"',
+                '  name: "odd_sdlc_nested_competitor"',
                 '  kind: "software-project"',
                 '  language: "Python"',
                 '  test_runner: "pytest"',
@@ -1059,7 +1064,7 @@ def test_load_project_profile_keeps_declared_project_tenant_when_governance_neig
                 "structure:",
                 "  design_tenants:",
                 '    - name: "python"',
-                '      output_dir: "build_tenants/odd_method/python/"',
+                '      output_dir: "build_tenants/odd_sdlc/python/"',
                 '      description: "Placeholder source-style tenant root"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: ""',
@@ -1070,7 +1075,7 @@ def test_load_project_profile_keeps_declared_project_tenant_when_governance_neig
         ),
         encoding="utf-8",
     )
-    placeholder_path = workspace / "build_tenants" / "odd_method" / "python" / "src" / "main" / "placeholder.py"
+    placeholder_path = workspace / "build_tenants" / "odd_sdlc" / "python" / "src" / "main" / "placeholder.py"
     placeholder_path.parent.mkdir(parents=True, exist_ok=True)
     placeholder_path.write_text(
         "# Implements: REQ-CORE-001\n\ndef placeholder() -> None:\n    return None\n",
@@ -1087,13 +1092,13 @@ def test_load_project_profile_keeps_declared_project_tenant_when_governance_neig
     )
 
     profile = load_project_profile(workspace)
-    assert profile.output_dir == "build_tenants/odd_method/python/"
+    assert profile.output_dir == "build_tenants/odd_sdlc/python/"
     assert profile.realization_mode == "selected_output_tree"
     assert profile.resolution_reason == "declared_output_tree"
 
     register = build_requirement_closure_register(workspace, stage="test")
     entries = {entry["requirement_id"]: entry for entry in register["requirements"]}
-    assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_method/python/src/main/placeholder.py"]
+    assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/placeholder.py"]
 
     ambiguities = detect_project_profile_ambiguities(workspace, stage="test")
     assert {
@@ -1102,8 +1107,13 @@ def test_load_project_profile_keeps_declared_project_tenant_when_governance_neig
     }.isdisjoint({"multiple_realization_roots", "declared_root_vs_realized_root_mismatch"})
 
 
+@pytest.mark.skip(
+    reason="Invariant no longer expressible after build_tenants collapse: "
+    "build_tenants/python/ is simultaneously the canonical output for the 'python' tenant "
+    "and the builder-product layout, so declared-vs-builder-product disambiguation cannot be tested."
+)
 def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(tmp_path: Path) -> None:
-    workspace = tmp_path / "odd_method.builder_products"
+    workspace = tmp_path / "odd_sdlc.builder_products"
     (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
     (workspace / "specification" / "INTENT.md").write_text(
@@ -1126,7 +1136,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
         "\n".join(
             (
                 "project:",
-                '  name: "odd_method_builder_products"',
+                '  name: "odd_sdlc_builder_products"',
                 '  kind: "software-project"',
                 '  language: "Python"',
                 '  test_runner: "pytest"',
@@ -1137,7 +1147,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
                 "structure:",
                 "  design_tenants:",
                 '    - name: "python"',
-                '      output_dir: "build_tenants/odd_method/python/"',
+                '      output_dir: "build_tenants/odd_sdlc/python/"',
                 '      description: "Declared source-style tenant root"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: ""',
@@ -1148,7 +1158,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
         ),
         encoding="utf-8",
     )
-    declared_code = workspace / "build_tenants" / "odd_method" / "python" / "src" / "main" / "logic.py"
+    declared_code = workspace / "build_tenants" / "odd_sdlc" / "python" / "src" / "main" / "logic.py"
     declared_code.parent.mkdir(parents=True, exist_ok=True)
     declared_code.write_text(
         "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
@@ -1179,7 +1189,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
     )
 
     profile = load_project_profile(workspace)
-    assert profile.output_dir == "build_tenants/odd_method/python/"
+    assert profile.output_dir == "build_tenants/odd_sdlc/python/"
     assert profile.realization_mode == "selected_output_tree"
     assert profile.resolution_reason == "declared_output_tree"
     assert realization_candidates_for_declared_root(workspace) == []

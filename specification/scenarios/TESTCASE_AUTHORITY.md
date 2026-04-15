@@ -1,6 +1,6 @@
 # Testcase Authority Matrix
 
-This matrix records the current written testcase authority for the live `odd_method`
+This matrix records the current written testcase authority for the live `odd_sdlc`
 requirement families.
 
 | Requirement family | Authority surface | Notes |

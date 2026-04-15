@@ -6,7 +6,7 @@
 
 ## Context
 
-`odd_method` is standardized around the ABG event model.
+`odd_sdlc` is standardized around the ABG event model.
 
 That event model already gives the strongest understanding of realtime runtime
 truth:
@@ -43,7 +43,7 @@ The desired compromise is:
 
 ## Decision
 
-`odd_method` adopts this boundary:
+`odd_sdlc` adopts this boundary:
 
 - ABG owns the canonical runtime event model and runtime aggregate projections
 - ODD owns domain query logic as a Python library

@@ -1,6 +1,6 @@
 # odd_service Realization Root
 
-`odd_service` is the incubating service realization on the `odd_method` line.
+`odd_service` is the incubating service realization on the `odd_sdlc` line.
 
 Its `WHAT` is defined under `specification/`.
 
@@ -35,4 +35,4 @@ This root currently holds:
 
 The project carve-out is described in:
 
-- `/Users/jim/src/apps/odd_method/.ai-workspace/comments/codex/20260408T023007Z_PROJECT_odd-service-carveout-and-odd-manager-client.md`
+- `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260408T023007Z_PROJECT_odd-service-carveout-and-odd-manager-client.md`

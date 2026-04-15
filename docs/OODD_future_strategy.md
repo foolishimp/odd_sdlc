@@ -3,7 +3,7 @@
 **Status**: Supplemental future strategy
 **Authority**: Supporting documentation only; not constitutional authority
 **Scope**: Organisational operating model built on Outcome Driven Development
-**Relation**: Extends the current `odd_method` outcome-driven development line
+**Relation**: Extends the current `odd_sdlc` outcome-driven development line
 
 ---
 
@@ -19,7 +19,7 @@ The distinction is useful:
 - `OODD` explains how an organisation is structured around that work model
 
 This note treats `OODD` as a supporting future-strategy surface for
-`odd_method`.
+`odd_sdlc`.
 
 It is not constitutional method yet.
 

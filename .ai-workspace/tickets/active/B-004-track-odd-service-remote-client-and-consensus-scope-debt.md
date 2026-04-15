@@ -65,5 +65,5 @@ When this ticket is activated, the work should:
 
 ## Links
 
-- parent: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
-- requirement: `/Users/jim/src/apps/odd_method/specification/requirements/09-odd-service-orchestration-plane.md`
+- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
+- requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/09-odd-service-orchestration-plane.md`

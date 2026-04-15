@@ -1,7 +1,7 @@
-# B-005 Adopt ABG Yielded Handoff In odd_method
+# B-005 Adopt ABG Yielded Handoff In odd_sdlc
 
 - id: B-005
-- title: Adopt the yielded post-dispatch handoff seam in odd_method consumer runtime and proofs
+- title: Adopt the yielded post-dispatch handoff seam in odd_sdlc consumer runtime and proofs
 - type: bug
 - status: active
 - goal: ambiguity-governance-and-traceability
@@ -15,7 +15,7 @@
 - intake: upstream runtime change / consumer interface migration / proving drift
 - lawful_change_class: interface_reprice
 - affected_boundary: installed ABG runtime surface under `.genesis/`, odd_service auto adapter behavior, and odd_sdlc proving lanes
-- lawful_re_entry: odd_method installed-runtime refresh, odd_service runtime adapter, odd_sdlc scenarios, and consumer regression proofs
+- lawful_re_entry: odd_sdlc installed-runtime refresh, odd_service runtime adapter, odd_sdlc scenarios, and consumer regression proofs
 - downstream_proof_span: released-install refresh plus odd_sdlc and odd_service qualification against the yielded handoff seam
 
 ## Why This Ticket Exists
@@ -32,7 +32,7 @@ ABG now exposes a third lawful post-dispatch outcome:
 - new observer truth over that updated asset remains unresolved but non-blocking
 - control must hand off before the same constructive lane is redispatched
 
-`odd_method` is still installed against the older vendored engine seam under
+`odd_sdlc` is still installed against the older vendored engine seam under
 `.genesis/`, and several local consumer surfaces still encode the previous
 two-state assumption:
 
@@ -47,7 +47,7 @@ This is a consumer migration bug, not a new GTL change.
 
 ## Intended Direction
 
-`odd_method` should consume the released ABG engine through the lawful installed
+`odd_sdlc` should consume the released ABG engine through the lawful installed
 surface and then reprice only the consumer strata that actually depend on the
 old completion seam.
 
@@ -63,7 +63,7 @@ This means:
 
 ## Task List
 
-- [ ] Reinstall `odd_method` through the lawful `odd_sdlc` installer so the
+- [ ] Reinstall `odd_sdlc` through the lawful `odd_sdlc` installer so the
   vendored `.genesis/` engine matches the released ABG yield seam.
 - [ ] Reprice `odd_service.runtime_adapter` to treat yielded handoff as a first
   class non-failure outcome.
@@ -72,13 +72,13 @@ This means:
   lawful.
 - [ ] Update the affected docs/notes that still describe the old post-dispatch
   deterministic gap surfacing behavior.
-- [ ] Run the full odd_method qualification surface against the yielded handoff
+- [ ] Run the full odd_sdlc qualification surface against the yielded handoff
   engine and record the result here.
 
 ## Proof Required
 
 - install refresh proof:
-  - `.genesis/genesis/` in `odd_method` reflects the released ABG yield-aware
+  - `.genesis/genesis/` in `odd_sdlc` reflects the released ABG yield-aware
     engine surface
 - odd_service proof:
   - `run_auto()` yields rather than redispatching blindly on yielded handoff
@@ -101,7 +101,7 @@ This means:
 
 ## Acceptance
 
-- odd_method consumes the yielded post-dispatch handoff seam through its
+- odd_sdlc consumes the yielded post-dispatch handoff seam through its
   installed engine surface
 - odd_service and odd_sdlc consumer logic no longer assume the old binary
   dispatch outcome model
@@ -111,7 +111,7 @@ This means:
 ## Progress
 
 - 2026-04-13: refreshed the installed `.genesis/` engine surface in
-  `odd_method` from the released `abiogenesis` source truth and kept the
+  `odd_sdlc` from the released `abiogenesis` source truth and kept the
   migration scoped to the derived kernel/runtime seam rather than accepting an
   accidental source-workspace topology rewrite
 - updated `odd_service.runtime_adapter.run_auto()` to honor
@@ -149,6 +149,6 @@ This means:
 
 - upstream bug: `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/B-003-restore-gap-first-fd-authority-and-remove-post-fp-closure-regression.md`
 - upstream follow-up: `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/B-004-tighten-yield-classification-and-consumption-after-b003.md`
-- parent: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
+- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`

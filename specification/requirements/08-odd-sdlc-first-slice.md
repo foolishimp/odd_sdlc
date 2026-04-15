@@ -15,7 +15,7 @@ software-domain surface. Nothing in this file remains current operative law by
 inertia.
 
 Historical references here to `build_tenants/odd_sdlc/` describe the original
-`odd_method` source-repository proving slice only. They do not define
+`odd_sdlc` source-repository proving slice only. They do not define
 downstream installed-workspace topology, which is governed by
 `REQ-F-ODDSDLC-032`.
 
@@ -24,7 +24,7 @@ current operative law for downstream workspaces.
 
 ### REQ-F-ODDSDLC-001 — odd_sdlc is the first live tenant package
 
-`odd_sdlc` is the first live tenant package on the `odd_method` line.
+`odd_sdlc` is the first live tenant package on the `odd_sdlc` line.
 
 **Acceptance Criteria**:
 - AC-1: `build_tenants/odd_sdlc/` exists as an active tenant root

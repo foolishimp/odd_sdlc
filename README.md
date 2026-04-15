@@ -1,4 +1,4 @@
-# odd_method
+# odd_sdlc
 
 This is a GTL/ABG project scaffold.
 

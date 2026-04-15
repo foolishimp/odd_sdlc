@@ -1,6 +1,6 @@
-# odd_method Scenarios
+# odd_sdlc Scenarios
 
-This root carries written testcase authority and scenario bundles for `odd_method`.
+This root carries written testcase authority and scenario bundles for `odd_sdlc`.
 
 Scenarios validate operational meaning.
 

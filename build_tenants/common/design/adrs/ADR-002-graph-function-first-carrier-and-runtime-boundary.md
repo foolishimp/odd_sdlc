@@ -6,7 +6,7 @@
 
 ## Context
 
-The product direction for `odd_method` is lightweight and GTL/ABG-native.
+The product direction for `odd_sdlc` is lightweight and GTL/ABG-native.
 
 A common failure mode in graph-native product lines is a bad boundary where
 product code becomes a shadow runtime after ABG dispatch.
@@ -16,15 +16,15 @@ so a second execution primitive is unnecessary.
 
 ## Decision
 
-`odd_method` adopts a graph-function-first runtime model.
+`odd_sdlc` adopts a graph-function-first runtime model.
 
 The structural split is:
 
 - GTL defines graph-function algebra and contracts
 - ABG owns traversal, execution, and raw runtime fact truth
-- `odd_method` publishes graph functions and may publish work vectors as
+- `odd_sdlc` publishes graph functions and may publish work vectors as
   productization over graph functions
-- `odd_method` attaches policy declaratively and interprets substrate facts, but does
+- `odd_sdlc` attaches policy declaratively and interprets substrate facts, but does
   not implement a second imperative runtime after dispatch
 
 Work vectors are therefore a product/read model over graph functions or lawful

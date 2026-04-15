@@ -5,11 +5,11 @@
 **Category**: Capability
 
 This family defines the bootstrap asset set and the first recursive graph
-contracts on the `odd_method` line.
+contracts on the `odd_sdlc` line.
 
 ### REQ-F-ASSET-001 — The bootstrap asset set is explicit
 
-`odd_method` defines an explicit bootstrap asset set rather than leaving the
+`odd_sdlc` defines an explicit bootstrap asset set rather than leaving the
 bootstrap graph to ambient folder conventions.
 
 **Acceptance Criteria**:

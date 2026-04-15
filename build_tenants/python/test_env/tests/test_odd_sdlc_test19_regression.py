@@ -242,7 +242,7 @@ def test_test19_live_workspace_historical_topology_debt_remains_detectable_until
 
     assert _foreign_candidate_paths(topology) == ["imp_scala_spark"]
     assert (LIVE_TEST19_ROOT / "imp_scala_spark" / "build.sbt").exists()
-    assert (LIVE_TEST19_ROOT / "build_tenants" / "odd_method" / "python" / "code" / "odd_generated_impl").exists()
+    assert (LIVE_TEST19_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_generated_impl").exists()
 
     assert code_attestation["topology_guard_applied"] is True
     assert code_attestation["topology_guard_passed"] is False

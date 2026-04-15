@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Governance
 
-This family defines the standard realization topology for the `odd_method`
+This family defines the standard realization topology for the `odd_sdlc`
 source repository.
 
 Downstream installed workspaces are governed separately by
@@ -14,9 +14,9 @@ Nothing in this family authorizes downstream installed workspaces to place
 project realization under `build_tenants/common/` or to treat released
 `odd_sdlc` runtime as a project tenant.
 
-### REQ-F-REALIZATION-001 — `odd_method` adopts the tenanted realization model from bootstrap
+### REQ-F-REALIZATION-001 — `odd_sdlc` adopts the tenanted realization model from bootstrap
 
-`odd_method` adopts the standard tenanted realization model from the start rather
+`odd_sdlc` adopts the standard tenanted realization model from the start rather
 than deferring it as a later optimization.
 
 **Acceptance Criteria**:
@@ -49,7 +49,7 @@ In short:
 
 ### REQ-F-REALIZATION-003 — Shared and tenant-local realization law are explicit
 
-`odd_method` keeps shared realization law and tenant-local realization law in
+`odd_sdlc` keeps shared realization law and tenant-local realization law in
 explicit separate surfaces inside the source repository.
 
 **Acceptance Criteria**:
@@ -64,7 +64,7 @@ explicit separate surfaces inside the source repository.
 
 ### REQ-F-REALIZATION-004 — Supporting documentation has a non-constitutional home
 
-`odd_method` maintains a `docs/` root for project-owned supporting documentation that
+`odd_sdlc` maintains a `docs/` root for project-owned supporting documentation that
 should not become accidental constitutional authority.
 
 **Acceptance Criteria**:

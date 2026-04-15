@@ -292,7 +292,7 @@ Each is realized as a GTL `GraphFunction`.
 ### Bootstrap Functions
 
 The bootstrap translation starts with the bounded upstream edges already
-required on the `odd_method` line.
+required on the `odd_sdlc` line.
 
 The first explicit bootstrap contracts are:
 

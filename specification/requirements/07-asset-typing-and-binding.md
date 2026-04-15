@@ -8,7 +8,7 @@ This family defines the first live ODD asset model.
 
 ### REQ-F-ASSETMODEL-001 — Assets are identified by URI
 
-`odd_method` treats assets as first-class domain objects addressed by URI.
+`odd_sdlc` treats assets as first-class domain objects addressed by URI.
 
 **Acceptance Criteria**:
 - AC-1: every asset has stable URI identity

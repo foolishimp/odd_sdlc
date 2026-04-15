@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Governance
 
-This family defines the runtime boundary between ABG as substrate and `odd_method` as
+This family defines the runtime boundary between ABG as substrate and `odd_sdlc` as
 configured domain product.
 
 ### REQ-F-RUNTIME-001 — ABG owns raw runtime fact truth
@@ -13,16 +13,16 @@ Traversal lifecycle, execution facts, and event truth are emitted by ABG as the
 runtime substrate.
 
 **Acceptance Criteria**:
-- AC-1: `odd_method` does not become the authoritative producer of post-dispatch
+- AC-1: `odd_sdlc` does not become the authoritative producer of post-dispatch
   runtime fact truth
 - AC-2: execution facts needed for recovery, retry, or escalation reasoning are
   emitted by the substrate rather than hidden behind product-local summary
   artifacts
-- AC-3: `odd_method` consumes substrate fact truth rather than recreating it locally
+- AC-3: `odd_sdlc` consumes substrate fact truth rather than recreating it locally
 
-### REQ-F-RUNTIME-002 — `odd_method` configures policy but does not implement a shadow runtime
+### REQ-F-RUNTIME-002 — `odd_sdlc` configures policy but does not implement a shadow runtime
 
-`odd_method` may provide evaluator, escalation, and selection policy surfaces, but it
+`odd_sdlc` may provide evaluator, escalation, and selection policy surfaces, but it
 does not own a second imperative runtime after ABG dispatch.
 
 **Acceptance Criteria**:
@@ -44,12 +44,12 @@ trustworthy checks and `F_H` used for governance escalation.
 
 ### REQ-F-RUNTIME-004 — Runtime topology is GTL/ABG-native and project-owned
 
-`odd_method` defines runtime behavior through GTL and ABG-native configuration and
+`odd_sdlc` defines runtime behavior through GTL and ABG-native configuration and
 publication surfaces rather than by inheriting foreign control-plane artifacts
 by default.
 
 **Acceptance Criteria**:
-- AC-1: `odd_method` runtime behavior is explainable from `odd_method` and substrate
+- AC-1: `odd_sdlc` runtime behavior is explainable from `odd_sdlc` and substrate
   surfaces alone
 - AC-2: inherited control-plane artifacts are not presumed live
   unless explicitly retained as compatibility features

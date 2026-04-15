@@ -8,7 +8,7 @@ It now includes the source fixes already applied and the remaining open issues.
 ## Scope
 
 - Workspace under observation: `ai_sdlc_examples/local_projects/data_mapper.test25`
-- RC source under test: `odd_method` commit `26ba806`
+- RC source under test: `odd_sdlc` commit `26ba806`
 - Installed engine source under test: `abiogenesis`
 - Runtime entrypoint under observation: `PYTHONPATH=.genesis python -m genesis start --auto --workspace .`
 
@@ -62,7 +62,7 @@ It now includes the source fixes already applied and the remaining open issues.
   - `test25` produced non-canonical files such as `build_tenants/common/design/30-generated-uat-testcases.md`
 - Fix applied:
   - `abiogenesis/.../genesis/binding.py` now runs asset-binding queries with runtime `PYTHONPATH`
-  - `odd_method/.../release/install.py` now writes an explicit `asset_binding_contract` into `.odd_sdlc/release/genesis.yml`
+  - `odd_sdlc/.../release/install.py` now writes an explicit `asset_binding_contract` into `.odd_sdlc/release/genesis.yml`
   - fresh reinstall on `data_mapper.test26` now resolves `26` bindings, including:
     - `uat_testcases_surface -> specification/scenarios/20-generated-uat-testcases.md`
     - `design_surface -> build_tenants/common/design/30-generated-odd-design.md`

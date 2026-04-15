@@ -2,7 +2,7 @@
 
 **Validates**: REQ-F-ODDSVC-001, REQ-F-ODDSVC-002, REQ-F-ODDSVC-003, REQ-F-ODDSVC-004, REQ-F-ODDSVC-005, REQ-F-ODDSVC-006, REQ-F-ODDSVC-007, REQ-F-ODDSVC-008, REQ-F-ODDSVC-009
 
-**Purpose**: Prove that `odd_service` can incubate as an `odd_method` service
+**Purpose**: Prove that `odd_service` can incubate as an `odd_sdlc` service
 line that wraps the existing local GTL/ABG + `odd_sdlc` execution path, owns
 session and worker orchestration without becoming a rival runtime, and exposes
 one client-facing coordination surface that both CLI and browser clients can
@@ -26,7 +26,7 @@ coordinate over one ABG runtime truth:
 ## Significant Paths
 
 - incubation path: `odd_service` is realized as its own tenant line under
-  `build_tenants/odd_service/` while still incubating inside `odd_method`
+  `build_tenants/odd_service/` while still incubating inside `odd_sdlc`
 - authority path: the service owns orchestration and worker-session state while
   ABG remains authoritative for runs, graph calls, convergence, and provenance
 - wrapper path: the service drives the same local engine/runtime contract used
@@ -45,7 +45,7 @@ coordinate over one ABG runtime truth:
 
 ## Expected Outcomes
 
-1. `odd_service` is a distinct product line inside `odd_method`, not a hidden
+1. `odd_service` is a distinct product line inside `odd_sdlc`, not a hidden
    utility buried inside `odd_sdlc` or `odd_manager`
 2. the service can coordinate one run without redefining runtime truth already
    owned by ABG

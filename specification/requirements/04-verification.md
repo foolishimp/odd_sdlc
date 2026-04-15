@@ -4,11 +4,11 @@
 **Status**: Active
 **Category**: Verification
 
-This family defines the proving obligations for the new `odd_method` line.
+This family defines the proving obligations for the new `odd_sdlc` line.
 
 ### REQ-F-VERIFY-001 — Every live requirement has written testcase authority
 
-No live `odd_method` requirement is fully proved by ambient confidence or unlabeled
+No live `odd_sdlc` requirement is fully proved by ambient confidence or unlabeled
 tests alone.
 
 **Acceptance Criteria**:
@@ -29,7 +29,7 @@ that declare and exercise the significant paths for the behavior being claimed.
 
 ### REQ-F-VERIFY-003 — Installed-dev proof is the decisive proving lane
 
-Where `odd_method` has an installable or runnable development form, the decisive
+Where `odd_sdlc` has an installable or runnable development form, the decisive
 proof runs against the installed development artifact through the same runtime
 surfaces the real product uses.
 

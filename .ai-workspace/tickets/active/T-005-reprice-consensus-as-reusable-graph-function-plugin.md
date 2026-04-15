@@ -15,7 +15,7 @@
 - intake: strategy / operator use case / architectural repricing
 - lawful_change_class: requirement_reprice
 - affected_boundary: shared graph-function capability, consensus harness ownership, host binding in odd_sdlc, and later service-boundary proving
-- lawful_re_entry: odd_method product and requirement surfaces, shared design/realization placement, and odd_sdlc host binding
+- lawful_re_entry: odd_sdlc product and requirement surfaces, shared design/realization placement, and odd_sdlc host binding
 - downstream_proof_span: shared plugin catalog proof, odd_sdlc comment-review host proof, and explicit boundary with later odd_service proving
 
 ## Why This Ticket Exists
@@ -73,7 +73,7 @@ The intended ownership split is:
 This ticket is in scope for:
 
 - repricing shared requirement and product surfaces so consensus review is a
-  reusable graph-function plugin capability on the `odd_method` line
+  reusable graph-function plugin capability on the `odd_sdlc` line
 - extracting or reshaping the current consensus harness into a generic
   subject-based plugin contract
 - choosing explicit shared design and realization placement for the plugin and
@@ -167,7 +167,7 @@ operator flow end to end.
 ## Acceptance
 
 - shared specification surfaces explicitly state that consensus review is a
-  reusable graph-function plugin capability on the `odd_method` line
+  reusable graph-function plugin capability on the `odd_sdlc` line
 - the line publishes a generic consensus plugin contract over subject,
   assessment, decision, and reviewed-subject assets
 - the graph-function catalog distinguishes the shared plugin from host-specific
@@ -203,7 +203,7 @@ operator flow end to end.
 
 ## Links
 
-- strategy: `/Users/jim/src/apps/odd_method/.ai-workspace/comments/codex/20260413T144430Z_STRATEGY_consensus-as-reusable-graph-function-plugin.md`
-- related: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
-- requirement: `/Users/jim/src/apps/odd_method/specification/requirements/02-graph-functions.md`
-- requirement: `/Users/jim/src/apps/odd_method/specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- strategy: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260413T144430Z_STRATEGY_consensus-as-reusable-graph-function-plugin.md`
+- related: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
+- requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/02-graph-functions.md`
+- requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/10-odd-sdlc-software-domain-buildout.md`

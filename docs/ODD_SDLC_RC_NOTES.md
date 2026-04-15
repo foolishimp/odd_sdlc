@@ -55,7 +55,7 @@ installed runs without weakening the deterministic F_D gate.
 ### Installed ABG Boundary Is Now Consumed Through Installer Composition
 
 The current RC consumes the released ABG runtime boundary through
-`odd_method`'s installer path rather than through source-runtime mirroring.
+`odd_sdlc`'s installer path rather than through source-runtime mirroring.
 
 That means:
 
@@ -108,7 +108,7 @@ That means:
 ### Traceability Path Resolution Is Still Self-Hosting-Oriented
 
 The current generated traceability and closure logic in
-[`traceability.py`](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/traceability.py)
+[`traceability.py`](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/traceability.py)
 still resolves some design and test trace surfaces through fixed
 `build_tenants/python/...` paths.
 

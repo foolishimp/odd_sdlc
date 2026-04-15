@@ -36,9 +36,9 @@ implementation lands.
 ### Done when
 
 - the new requirements are present in
-  [10-odd-sdlc-software-domain-buildout.md](/Users/jim/src/apps/odd_method/specification/requirements/10-odd-sdlc-software-domain-buildout.md)
+  [10-odd-sdlc-software-domain-buildout.md](/Users/jim/src/apps/odd_sdlc/specification/requirements/10-odd-sdlc-software-domain-buildout.md)
 - the new scenarios are present in
-  [specification/scenarios](/Users/jim/src/apps/odd_method/specification/scenarios)
+  [specification/scenarios](/Users/jim/src/apps/odd_sdlc/specification/scenarios)
 - testcase authority names the new proving lanes
 
 ## WP-2: Extend tenant design with an ambiguity asset model
@@ -62,7 +62,7 @@ the lifecycle.
 ### Done when
 
 - the design exists in
-  [SOFTWARE_DOMAIN_BUILDOUT.md](/Users/jim/src/apps/odd_method/build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md)
+  [SOFTWARE_DOMAIN_BUILDOUT.md](/Users/jim/src/apps/odd_sdlc/build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md)
 - the ambiguity asset and its lifecycle are described in current tenant law
 
 ## WP-3: Seed the ambiguity register during normalization
@@ -74,7 +74,7 @@ Make ambiguity visible from the first deterministic workspace pass.
 ### Tasks
 
 - extend
-  [normalization.py](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/normalization.py)
+  [normalization.py](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/normalization.py)
   to write an initial machine-readable ambiguity register
 - optionally add a human-readable ambiguity projection beside
   `project_bootstrap.md`
@@ -99,10 +99,10 @@ Stop silent topology recovery from hiding important ambiguity facts.
 ### Tasks
 
 - extend
-  [project_profile.py](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/project_profile.py)
+  [project_profile.py](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/project_profile.py)
   so recovery logic emits ambiguity facts instead of only choosing a root
 - extend
-  [workspace_assets.py](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/workspace_assets.py)
+  [workspace_assets.py](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/workspace_assets.py)
   so topology-guard findings can be recorded in the ambiguity register
 - define stable ambiguity classes for:
   - competing realization roots
@@ -136,7 +136,7 @@ Make ambiguity visible through ordinary domain queries and catalog surfaces.
 ### Done when
 
 - ambiguity is returned from
-  [query.py](/Users/jim/src/apps/odd_method/build_tenants/python/code/odd_sdlc/query.py)
+  [query.py](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/query.py)
 - the ambiguity asset is part of the active machine-readable domain surface
 
 ## WP-6: Update ambiguity only at major graph boundaries
@@ -226,7 +226,7 @@ and back from code/tests to requirements.
 ### Tasks
 
 - extend
-  [REQUIREMENTS_TRACEABILITY.md](/Users/jim/src/apps/odd_method/docs/REQUIREMENTS_TRACEABILITY.md)
+  [REQUIREMENTS_TRACEABILITY.md](/Users/jim/src/apps/odd_sdlc/docs/REQUIREMENTS_TRACEABILITY.md)
   with the new ambiguity requirements, code paths, and test lanes
 - mark any ambiguity logic that lacks a requirement as orphaned
 - mark any ambiguity requirement that lacks code/tests as unimplemented

@@ -402,7 +402,7 @@ Migrate in this order:
 - let ABG own traversal, selection, recursive frame opening, and rebound
 - inspect emitted runtime facts instead of hand-writing a driver loop
 
-This is the right migration path for `odd_method`-class apps that currently have
+This is the right migration path for `odd_sdlc`-class apps that currently have
 an app-owned program catalog plus a custom iteration runner.
 
 ### Eager vs deferred composition

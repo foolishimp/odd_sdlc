@@ -23,7 +23,7 @@
 
 ## 1. Position
 
-`odd_sdlc` is the first live software-domain package on the `odd_method` line.
+`odd_sdlc` is the first live software-domain package on the `odd_sdlc` line.
 
 Read it as a generic software-domain package expressed through GTL graph functions, executed through ABG runtime truth, and built to govern the full software worksite lifecycle across imported, stale, and already-partially-governed workspaces.
 

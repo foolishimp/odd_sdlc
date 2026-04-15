@@ -1,6 +1,6 @@
-# odd_method Goals
+# odd_sdlc Goals
 
-State the current overriding concerns for `odd_method` in present tense.
+State the current overriding concerns for `odd_sdlc` in present tense.
 
 Use the installed method surfaces under `.genesis/docs/standards/` as the
 governing standards while you fill this document out.
@@ -23,7 +23,7 @@ temporary focus into accidental constitutional law.
 - keep inherited-project qualification centered on `data_mapper` as the
   standing regression corpus for the active software-domain package
 - keep GTL and ABG substrate ownership explicit and small while `odd_sdlc`
-  carries software-domain semantics on the live `odd_method` line
+  carries software-domain semantics on the live `odd_sdlc` line
 - keep `odd_service` incubation subordinate to current ABG runtime truth and
   `odd_sdlc` domain law
 - keep current-wave changes traceable back to the live intent, product, and

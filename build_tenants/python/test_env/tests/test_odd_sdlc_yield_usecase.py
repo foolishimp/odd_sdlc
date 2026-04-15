@@ -1,8 +1,8 @@
 # Validates: REQ-F-ODDSDLC-027
 # Validates: REQ-F-ODDSDLC-032
-# Derived-From: /Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/B-005-adopt-abg-yielded-handoff-in-odd-method.md
-# Derived-From: /Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md
-# Derived-From: /Users/jim/src/apps/odd_method/specification/scenarios/07-canonical-sandbox-repeatability.md
+# Derived-From: /Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/B-005-adopt-abg-yielded-handoff-in-odd-sdlc.md
+# Derived-From: /Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md
+# Derived-From: /Users/jim/src/apps/odd_sdlc/specification/scenarios/07-canonical-sandbox-repeatability.md
 from __future__ import annotations
 
 import json

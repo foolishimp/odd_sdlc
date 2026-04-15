@@ -553,7 +553,7 @@ Identity law:
 - `installed_target`
   - marked by `.odd_sdlc/release/genesis.yml`
 - `source_domain_repo`
-  - marked by the real `odd_method` source-repo structure
+  - marked by the real `odd_sdlc` source-repo structure
 - `governed_workspace`
   - marked by the presence of `.ai-workspace/context/project_constraints.yml`
     while not satisfying `installed_target` or `source_domain_repo`
@@ -1276,14 +1276,14 @@ consensus product-line debt. That work remains explicitly tracked in `B-004`.
 
 ## Links
 
-- parent: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md`
-- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
-- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
-- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/T-003-enforce-spec-method-structured-build-topology-for-project-tenants.md`
-- deferred_scope: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
-- strategy: `/Users/jim/src/apps/odd_method/.ai-workspace/comments/codex/20260413T023750Z_STRATEGY_preserve-builder-direction-separate-runtime-boundaries.md`
-- review: `/Users/jim/src/apps/odd_method/.ai-workspace/comments/claude/20260413T150000_REVIEW_odd-sdlc-in-progress-refactor.md`
-- review: `/Users/jim/src/apps/odd_method/.ai-workspace/comments/claude/20260413T160000_REVIEW_T-004-axiomatic-boundaries-for-agentic-builder.md`
-- review: `/Users/jim/src/apps/odd_method/.ai-workspace/comments/claude/20260413T170000_REVIEW_post-checkpoint-runtime-boundary-fixes.md`
+- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md`
+- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
+- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
+- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-003-enforce-spec-method-structured-build-topology-for-project-tenants.md`
+- deferred_scope: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
+- strategy: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260413T023750Z_STRATEGY_preserve-builder-direction-separate-runtime-boundaries.md`
+- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T150000_REVIEW_odd-sdlc-in-progress-refactor.md`
+- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T160000_REVIEW_T-004-axiomatic-boundaries-for-agentic-builder.md`
+- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T170000_REVIEW_post-checkpoint-runtime-boundary-fixes.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`

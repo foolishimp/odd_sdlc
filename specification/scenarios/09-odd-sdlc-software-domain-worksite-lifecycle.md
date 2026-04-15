@@ -57,7 +57,7 @@ explicit in provenance and bound to the same governed asset graph.
 
 ## Expected Outcomes
 
-1. `odd_sdlc` is explainable as the software-domain package on the `odd_method`
+1. `odd_sdlc` is explainable as the software-domain package on the `odd_sdlc`
    line rather than only as a bootstrap proving toy
 2. one bounded software request can be traced through request, gate, specify,
    design, implement, qualify, release, deploy, observe, return, retrofit, and

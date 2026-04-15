@@ -1,4 +1,4 @@
-# odd_method Supporting Docs
+# odd_sdlc Supporting Docs
 
 This root holds project-owned supporting documentation.
 
@@ -22,4 +22,4 @@ surfaces under `build_tenants/`.
   current `odd_sdlc` release-candidate shipment summary and verification footer
 - [OODD_future_strategy.md](./OODD_future_strategy.md) records a supplemental
   future strategy for `OODD` as an organisational operating model built on
-  `odd_method`
+  `odd_sdlc`

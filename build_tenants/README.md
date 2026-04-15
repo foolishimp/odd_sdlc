@@ -1,4 +1,4 @@
-# odd_method Build Tenants
+# odd_sdlc Build Tenants
 
 `build_tenants/` is the project-owned realization root beneath the singleton
 shared `specification/` surface.

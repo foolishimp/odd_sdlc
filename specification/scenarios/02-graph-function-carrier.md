@@ -2,7 +2,7 @@
 
 **Validates**: REQ-F-GFUNC-001, REQ-F-GFUNC-002, REQ-F-GFUNC-003, REQ-F-GFUNC-004, REQ-F-GFUNC-005
 
-**Purpose**: Prove that `odd_method` treats graph functions as the operative
+**Purpose**: Prove that `odd_sdlc` treats graph functions as the operative
 constructive carrier and work vectors as productized views over that carrier.
 
 ## Scenario

@@ -2,15 +2,15 @@
 
 **Validates**: REQ-F-REALIZATION-001, REQ-F-REALIZATION-002, REQ-F-REALIZATION-003, REQ-F-REALIZATION-004
 
-**Purpose**: Prove that `odd_method` adopts the standard realization structure from
+**Purpose**: Prove that `odd_sdlc` adopts the standard realization structure from
 bootstrap without inventing artificial tenant-local roots.
 
-This scenario validates the `odd_method` source repository. Downstream
+This scenario validates the `odd_sdlc` source repository. Downstream
 installed workspace topology is governed separately by `REQ-F-ODDSDLC-032`.
 
 ## Scenario
 
-Inspect the live `odd_method` project tree and the active specification and design
+Inspect the live `odd_sdlc` project tree and the active specification and design
 surfaces after bootstrap.
 
 ## Significant Paths
