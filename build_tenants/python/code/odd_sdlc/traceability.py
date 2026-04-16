@@ -26,7 +26,7 @@ REQUIREMENT_CLOSURE_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-require
 REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH = Path(
     ".ai-workspace/runtime/odd_sdlc-requirement-closure-context.md"
 )
-_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3}\b")
+_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _INTENT_ID_RE = re.compile(r"\bINT-\d{3}\b")
 _GENERATED_REQUIREMENT_SURFACE_PATH = Path("specification/requirements/10-generated-bootstrap.md")
 _GENERATED_TESTCASE_AUTHORITY_PATH = Path("specification/scenarios/30-generated-testcase-authority.md")
@@ -48,6 +48,24 @@ def _relative(path: Path, *, workspace_root: Path) -> str:
 
 def _collect_ids(path: Path, pattern: re.Pattern[str]) -> set[str]:
     return set(pattern.findall(_read_text(path)))
+
+
+def _normalize_requirement_id(requirement_id: str) -> str:
+    parts = requirement_id.upper().split("-")
+    normalized = [parts[0]]
+    for part in parts[1:]:
+        if part.isdigit() and len(part) < 3:
+            normalized.append(part.zfill(3))
+        else:
+            normalized.append(part)
+    return "-".join(normalized)
+
+
+def _collect_requirement_ids(path: Path) -> set[str]:
+    return {
+        _normalize_requirement_id(requirement_id)
+        for requirement_id in _collect_ids(path, _REQUIREMENT_ID_RE)
+    }
 
 
 def _merge_requirement_refs(
@@ -93,7 +111,7 @@ def _current_requirement_paths(workspace_root: Path) -> tuple[Path, ...]:
 def authority_requirement_refs(workspace_root: Path) -> dict[str, list[str]]:
     refs: dict[str, list[str]] = {}
     for path in _authority_requirement_paths(workspace_root):
-        for requirement_id in sorted(_collect_ids(path, _REQUIREMENT_ID_RE)):
+        for requirement_id in sorted(_collect_requirement_ids(path)):
             refs.setdefault(requirement_id, []).append(_relative(path, workspace_root=workspace_root))
     return refs
 
@@ -101,7 +119,7 @@ def authority_requirement_refs(workspace_root: Path) -> dict[str, list[str]]:
 def current_requirement_refs(workspace_root: Path) -> dict[str, list[str]]:
     refs: dict[str, list[str]] = {}
     for path in _current_requirement_paths(workspace_root):
-        for requirement_id in sorted(_collect_ids(path, _REQUIREMENT_ID_RE)):
+        for requirement_id in sorted(_collect_requirement_ids(path)):
             refs.setdefault(requirement_id, []).append(_relative(path, workspace_root=workspace_root))
     return refs
 
@@ -125,7 +143,7 @@ def _surface_requirement_refs(workspace_root: Path, relative_paths: tuple[Path, 
         if not path.exists():
             continue
         rel = relative_path.as_posix()
-        for requirement_id in sorted(_collect_ids(path, _REQUIREMENT_ID_RE)):
+        for requirement_id in sorted(_collect_requirement_ids(path)):
             refs.setdefault(requirement_id, []).append(rel)
     return refs
 
@@ -242,7 +260,7 @@ def _tagged_requirement_ids(path: Path, *, tag: str) -> set[str]:
     for line in _read_text(path).splitlines():
         if tag not in line:
             continue
-        ids.update(_REQUIREMENT_ID_RE.findall(line))
+        ids.update(_normalize_requirement_id(requirement_id) for requirement_id in _REQUIREMENT_ID_RE.findall(line))
     return ids
 
 
@@ -273,6 +291,8 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
     test_refs: dict[str, list[str]] = {}
     orphan_code_files: list[str] = []
     orphan_test_files: list[str] = []
+    code_file_count = 0
+    test_file_count = 0
 
     if not code_root.exists() or not code_root.is_dir():
         return {
@@ -283,17 +303,21 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
             "test_refs": {},
             "orphan_code_files": [],
             "orphan_test_files": [],
+            "code_file_count": 0,
+            "test_file_count": 0,
         }
 
     for path in sorted(item for item in code_root.rglob("*") if item.is_file() and _is_source_file(item, code_root=code_root)):
         rel = _relative(path, workspace_root=workspace_root)
         if _is_test_file(path, code_root=code_root):
+            test_file_count += 1
             ids = _tagged_requirement_ids(path, tag="Validates:")
             if not ids:
                 orphan_test_files.append(rel)
             for requirement_id in sorted(ids):
                 test_refs.setdefault(requirement_id, []).append(rel)
             continue
+        code_file_count += 1
         ids = _tagged_requirement_ids(path, tag="Implements:")
         if not ids:
             orphan_code_files.append(rel)
@@ -306,6 +330,8 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
         "test_refs": test_refs,
         "orphan_code_files": orphan_code_files,
         "orphan_test_files": orphan_test_files,
+        "code_file_count": code_file_count,
+        "test_file_count": test_file_count,
     }
 
 
@@ -444,6 +470,43 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
         },
         "traceability": scan,
         "requirements": requirements,
+    }
+
+
+def current_requirement_executability_gap(workspace_root: Path) -> dict[str, Any]:
+    register = build_requirement_closure_register(workspace_root, stage="workspace_scan")
+    blocking_requirements: list[dict[str, Any]] = []
+    status_counts: dict[str, int] = {}
+
+    for entry in register["requirements"]:
+        if not entry["present_in_current_requirement_surface"]:
+            continue
+        if entry["status"] == "realized":
+            continue
+        requirement_id = str(entry["requirement_id"])
+        status = str(entry["status"])
+        status_counts[status] = status_counts.get(status, 0) + 1
+        blocking_requirements.append(
+            {
+                "requirement_id": requirement_id,
+                "status": status,
+                "code_refs": list(entry.get("code_refs", ())),
+                "test_refs": list(entry.get("test_refs", ())),
+                "implementation_claim_refs": list(entry.get("implementation_claim_refs", ())),
+                "planned_test_claim_refs": list(entry.get("planned_test_claim_refs", ())),
+            }
+        )
+
+    return {
+        "scope": "current_requirement_surface",
+        "requires_build_out": bool(blocking_requirements),
+        "converged": not blocking_requirements,
+        "delta": 1.0 if blocking_requirements else 0.0,
+        "blocking_requirement_ids": [
+            item["requirement_id"] for item in blocking_requirements
+        ],
+        "blocking_status_counts": status_counts,
+        "blocking_requirements": blocking_requirements,
     }
 
 

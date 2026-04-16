@@ -7,6 +7,7 @@ import json
 
 from .analysis import refresh_analysis
 from .app import bootstrap, catalog, gaps, initialize, iterate, start
+from .continuation import continue_with_result
 from .constructor import construct_manifest
 from .normalization import normalize_workspace
 from .observer import observe
@@ -30,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("gaps", parents=[common])
     subparsers.add_parser("iterate", parents=[common])
     subparsers.add_parser("self-test", parents=[common])
+    continue_parser = subparsers.add_parser("continue", parents=[common])
+    continue_parser.add_argument("--result", required=True)
     normalize_parser = subparsers.add_parser("normalize-workspace", parents=[common])
     normalize_parser.add_argument("--project-slug")
     normalize_parser.add_argument("--platform")
@@ -83,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
         result = iterate(app)
     elif args.command == "self-test":
         result = self_test(app)
+    elif args.command == "continue":
+        result = continue_with_result(app, result_path=args.result)
     elif args.command == "construct":
         result = construct_manifest(args.manifest, workspace_root=args.workspace)
     else:

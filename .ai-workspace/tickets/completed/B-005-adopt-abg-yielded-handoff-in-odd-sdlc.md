@@ -3,11 +3,11 @@
 - id: B-005
 - title: Adopt the yielded post-dispatch handoff seam in odd_sdlc consumer runtime and proofs
 - type: bug
-- status: active
+- status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: high
 - created_at: 2026-04-13
-- updated_at: 2026-04-13
+- updated_at: 2026-04-16
 - dependencies: T-004
 
 ## Triage
@@ -63,16 +63,16 @@ This means:
 
 ## Task List
 
-- [ ] Reinstall `odd_sdlc` through the lawful `odd_sdlc` installer so the
+- [x] Reinstall `odd_sdlc` through the lawful `odd_sdlc` installer so the
   vendored `.genesis/` engine matches the released ABG yield seam.
-- [ ] Reprice `odd_service.runtime_adapter` to treat yielded handoff as a first
+- [x] Reprice `odd_service.runtime_adapter` to treat yielded handoff as a first
   class non-failure outcome.
-- [ ] Update odd_sdlc and odd_service tests that currently assume
+- [x] Update odd_sdlc and odd_service tests that currently assume
   `run_completed` or a pure `ok/failure` dispatch seam where yield is now
   lawful.
-- [ ] Update the affected docs/notes that still describe the old post-dispatch
+- [x] Update the affected docs/notes that still describe the old post-dispatch
   deterministic gap surfacing behavior.
-- [ ] Run the full odd_sdlc qualification surface against the yielded handoff
+- [x] Run the full odd_sdlc qualification surface against the yielded handoff
   engine and record the result here.
 
 ## Proof Required
@@ -152,3 +152,18 @@ This means:
 - parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`
+
+## Completion Notes
+
+- The stale installed-workspace `data_mapper.template` fixture path in
+  `test_odd_sdlc_installation.py` is fixed, so the canned installed proofs now
+  exercise the current example layout rather than failing before the yielded
+  seam is reached.
+- The installed yielded-handoff qualification surface is green:
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_yield_usecase.py -q`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py::test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence -q`
+  - `PYTHONPATH=build_tenants/python/code:build_tenants/odd_service/python/code python -m pytest build_tenants/odd_service/python/test_env/tests/test_odd_service_first_slice.py -q -k 'yield_handoff or preserves_yielded_handoff'`
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'gaps_publishes_homeostatic_observation_and_triage or triage_divergence_records_prior_observation_chain or missing_capability_is_projected_as_blocked_missing_capability or release_gap_without_declared_route_is_explicit_no_lawful_route'`
+- The refreshed installed proofs now show yielded handoff, preserved event
+  truth, preserved observer projection truth, and fresh-workspace reissue with
+  fresh run/call/continuation identifiers against the current ABG seam.

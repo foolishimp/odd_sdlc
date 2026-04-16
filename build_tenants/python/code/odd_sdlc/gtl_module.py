@@ -215,18 +215,60 @@ _release_surface = _asset_node(
     ),
     output_contract_refs=("release_surface_present",),
 )
+_build_execution_surface = _asset_node(
+    "build_execution_surface",
+    schema="odd.asset.build_execution_surface",
+    kind="work_request_surface",
+    required_contexts=("release_surface",),
+    output_contract_refs=("build_execution_surface_present",),
+)
+_build_execution_result_surface = _asset_node(
+    "build_execution_result_surface",
+    schema="odd.asset.build_execution_result_surface",
+    kind="operational_evidence_surface",
+    required_contexts=("build_execution_surface",),
+    output_contract_refs=("build_execution_result_surface_present",),
+)
+_test_execution_surface = _asset_node(
+    "test_execution_surface",
+    schema="odd.asset.test_execution_surface",
+    kind="work_request_surface",
+    required_contexts=("release_surface",),
+    output_contract_refs=("test_execution_surface_present",),
+)
+_test_execution_result_surface = _asset_node(
+    "test_execution_result_surface",
+    schema="odd.asset.test_execution_result_surface",
+    kind="operational_evidence_surface",
+    required_contexts=("test_execution_surface", "test_run_archive_surface"),
+    output_contract_refs=("test_execution_result_surface_present",),
+)
 _deployment_surface = _asset_node(
     "deployment_surface",
     schema="odd.asset.deployment_surface",
-    kind="deployment_surface",
+    kind="work_request_surface",
     required_contexts=("release_surface",),
     output_contract_refs=("deployment_surface_present",),
+)
+_deployment_result_surface = _asset_node(
+    "deployment_result_surface",
+    schema="odd.asset.deployment_result_surface",
+    kind="operational_evidence_surface",
+    required_contexts=("deployment_surface",),
+    output_contract_refs=("deployment_result_surface_present",),
+)
+_deployed_environment_surface = _asset_node(
+    "deployed_environment_surface",
+    schema="odd.asset.deployed_environment_surface",
+    kind="deployment_record_surface",
+    required_contexts=("deployment_result_surface",),
+    output_contract_refs=("deployed_environment_surface_present",),
 )
 _runtime_observation_surface = _asset_node(
     "runtime_observation_surface",
     schema="odd.asset.runtime_observation_surface",
     kind="runtime_observation_surface",
-    required_contexts=("deployment_surface", "test_run_archive_surface"),
+    required_contexts=("deployment_result_surface", "test_run_archive_surface"),
     output_contract_refs=("runtime_observation_surface_present",),
 )
 _retrofit_plan_surface = _asset_node(
@@ -308,6 +350,8 @@ _implementation_module_fd = _fd_evaluator("implementation_module_dependency_surf
 _code_fd = _fd_evaluator("code_dependency_surfaces_present")
 _code_traceability_fd = _fd_evaluator("code_traceability_present")
 _release_fd = _fd_evaluator("release_dependency_surfaces_present")
+_build_execution_fd = _fd_evaluator("build_execution_dependency_surfaces_present")
+_build_execution_result_fd = _fd_evaluator("build_execution_result_dependency_surfaces_present")
 _test_design_fd = _fd_evaluator("test_design_dependency_surfaces_present")
 _test_stack_profile_fd = _fd_evaluator("test_stack_profile_dependency_surfaces_present")
 _test_module_fd = _fd_evaluator("test_module_dependency_surfaces_present")
@@ -315,7 +359,11 @@ _planned_test_traceability_fd = _fd_evaluator("planned_test_traceability_present
 _test_run_archive_fd = _fd_evaluator("test_run_archive_dependency_surfaces_present")
 _realized_test_traceability_fd = _fd_evaluator("realized_test_traceability_present")
 _test_traceability_fd = _fd_evaluator("test_traceability_present")
+_test_execution_fd = _fd_evaluator("test_execution_dependency_surfaces_present")
+_test_execution_result_fd = _fd_evaluator("test_execution_result_dependency_surfaces_present")
 _deployment_fd = _fd_evaluator("deployment_dependency_surfaces_present")
+_deployment_result_fd = _fd_evaluator("deployment_result_dependency_surfaces_present")
+_deployed_environment_fd = _fd_evaluator("deployed_environment_dependency_surfaces_present")
 _runtime_observation_fd = _fd_evaluator("runtime_observation_dependency_surfaces_present")
 _retrofit_plan_fd = _fd_evaluator("retrofit_plan_dependency_surfaces_present")
 _intent_fp = Evaluator(
@@ -378,11 +426,7 @@ _design_consensus_gate_fp = Evaluator(
     regime=F_P,
     description="The current review assessment vector satisfies the declared consensus rule for design review.",
 )
-_design_consensus_termination = Evaluator(
-    name="design_consensus_terminated",
-    regime=F_P,
-    description="The current design consensus carrier has either converged or lawfully exhausted its declared review rounds.",
-)
+_design_consensus_termination = _fd_evaluator("design_consensus_terminated")
 _scenario_fp = Evaluator(
     name="scenario_surface_semantically_converged",
     regime=F_P,
@@ -413,6 +457,16 @@ _release_fp = Evaluator(
     regime=F_P,
     description="The release surface is semantically converged for the current requirement, design, scenario, code, testcase authority, and archived test-evidence state.",
 )
+_build_execution_fp = Evaluator(
+    name="build_execution_surface_semantically_converged",
+    regime=F_P,
+    description="The build execution command surface is semantically converged for the current release position and declared build substrate.",
+)
+_build_execution_result_fp = Evaluator(
+    name="build_execution_result_surface_semantically_converged",
+    regime=F_P,
+    description="The build execution result surface is semantically converged for the current admitted build result or pending external build state.",
+)
 _test_design_fp = Evaluator(
     name="test_design_surface_semantically_converged",
     regime=F_P,
@@ -433,15 +487,35 @@ _test_run_archive_fp = Evaluator(
     regime=F_P,
     description="The test run archive surface is semantically converged for the current test module structure and selected test stack profile while retaining the realized developer-test evidence view.",
 )
+_test_execution_fp = Evaluator(
+    name="test_execution_surface_semantically_converged",
+    regime=F_P,
+    description="The test execution command surface is semantically converged for the current release position and declared test execution substrate.",
+)
+_test_execution_result_fp = Evaluator(
+    name="test_execution_result_surface_semantically_converged",
+    regime=F_P,
+    description="The test execution result surface is semantically converged for the admitted test execution evidence and bounded pending/failure state.",
+)
 _deployment_fp = Evaluator(
     name="deployment_surface_semantically_converged",
     regime=F_P,
-    description="The deployment surface is semantically converged for the current release readiness and governed implementation evidence.",
+    description="The deployment command surface is semantically converged for the current release readiness and declared deployment substrate.",
+)
+_deployment_result_fp = Evaluator(
+    name="deployment_result_surface_semantically_converged",
+    regime=F_P,
+    description="The deployment result surface is semantically converged for the admitted deployment outcome or pending external completion state.",
+)
+_deployed_environment_fp = Evaluator(
+    name="deployed_environment_surface_semantically_converged",
+    regime=F_P,
+    description="The deployed environment surface is semantically converged as a current read model over the admitted deployment result.",
 )
 _runtime_observation_fp = Evaluator(
     name="runtime_observation_surface_semantically_converged",
     regime=F_P,
-    description="The runtime observation surface is semantically converged for the current governed deployment record and returned evidence.",
+    description="The runtime observation surface is semantically converged for the current admitted deployment result and returned runtime evidence.",
 )
 _retrofit_plan_fp = Evaluator(
     name="retrofit_plan_surface_semantically_converged",
@@ -783,21 +857,69 @@ GF_PREPARE_RELEASE = _graph_function(
     fp_evaluator=_release_fp,
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
+GF_PREPARE_BUILD_EXECUTION = _graph_function(
+    name="prepare_build_execution_surface",
+    source=_release_surface,
+    target=_build_execution_surface,
+    fd_evaluator=_build_execution_fd,
+    fp_evaluator=_build_execution_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+GF_DERIVE_BUILD_EXECUTION_RESULT = _graph_function(
+    name="derive_build_execution_result_surface",
+    source=_build_execution_surface,
+    target=_build_execution_result_surface,
+    fd_evaluator=_build_execution_result_fd,
+    fp_evaluator=_build_execution_result_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+GF_PREPARE_TEST_EXECUTION = _graph_function(
+    name="prepare_test_execution_surface",
+    source=_release_surface,
+    target=_test_execution_surface,
+    fd_evaluator=_test_execution_fd,
+    fp_evaluator=_test_execution_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+GF_DERIVE_TEST_EXECUTION_RESULT = _graph_function(
+    name="derive_test_execution_result_surface",
+    source=(_test_execution_surface, _test_run_archive_surface),
+    target=_test_execution_result_surface,
+    fd_evaluator=_test_execution_result_fd,
+    fp_evaluator=_test_execution_result_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
 GF_PREPARE_DEPLOYMENT = _graph_function(
     name="prepare_deployment_surface",
     source=_release_surface,
     target=_deployment_surface,
     fd_evaluator=_deployment_fd,
     fp_evaluator=_deployment_fp,
-    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+GF_DERIVE_DEPLOYMENT_RESULT = _graph_function(
+    name="derive_deployment_result_surface",
+    source=_deployment_surface,
+    target=_deployment_result_surface,
+    fd_evaluator=_deployment_result_fd,
+    fp_evaluator=_deployment_result_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+GF_DERIVE_DEPLOYED_ENVIRONMENT = _graph_function(
+    name="derive_deployed_environment_surface",
+    source=_deployment_result_surface,
+    target=_deployed_environment_surface,
+    fd_evaluator=_deployed_environment_fd,
+    fp_evaluator=_deployed_environment_fp,
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
 )
 GF_DERIVE_RUNTIME_OBSERVATION = _graph_function(
     name="derive_runtime_observation_surface",
-    source=(_deployment_surface, _test_run_archive_surface),
+    source=(_deployment_result_surface, _test_run_archive_surface),
     target=_runtime_observation_surface,
     fd_evaluator=_runtime_observation_fd,
     fp_evaluator=_runtime_observation_fp,
-    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
 )
 GF_DERIVE_RETROFIT_PLAN = _graph_function(
     name="derive_retrofit_plan_surface",
@@ -805,7 +927,7 @@ GF_DERIVE_RETROFIT_PLAN = _graph_function(
     target=_retrofit_plan_surface,
     fd_evaluator=_retrofit_plan_fd,
     fp_evaluator=_retrofit_plan_fp,
-    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
+    req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
 )
 
 REVIEW_DESIGN_CONSENSUS_ROUND_INTENT = (
@@ -1011,7 +1133,13 @@ LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
     GF_PREPARE_RELEASE,
 )
 OPERATIONAL_LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
+    GF_PREPARE_BUILD_EXECUTION,
+    GF_DERIVE_BUILD_EXECUTION_RESULT,
+    GF_PREPARE_TEST_EXECUTION,
+    GF_DERIVE_TEST_EXECUTION_RESULT,
     GF_PREPARE_DEPLOYMENT,
+    GF_DERIVE_DEPLOYMENT_RESULT,
+    GF_DERIVE_DEPLOYED_ENVIRONMENT,
     GF_DERIVE_RUNTIME_OBSERVATION,
     GF_DERIVE_RETROFIT_PLAN,
 )
@@ -1035,43 +1163,36 @@ BOOTSTRAP_RELEASE_SELF_TEST_STEPS: tuple[str, ...] = tuple(
 )
 
 RELEASE_OPERATIONAL_CYCLE_INTENT = (
-    "Act as the current operational continuation executive over the odd_sdlc release, deployment, "
+    "Act as the current operational continuation executive over the odd_sdlc release, "
+    "build command/result, test command/result, deployment command/result, current deployed-state, "
     "runtime-return, and retrofit-planning asset functions."
 )
 
 def _build_release_operational_cycle(functions: tuple[GraphFunction, ...]) -> GraphFunction | None:
     if not functions:
         return None
-    function_names = {function.name for function in functions}
-    graph_inputs: tuple[Node, ...] = (_release_surface,)
-    graph_nodes: list[Node] = [_release_surface]
-    graph_outputs: tuple[Node, ...] = (_deployment_surface,)
-    environment_provides: tuple[Node, ...] = (_deployment_surface,)
-
-    if "derive_runtime_observation_surface" in function_names:
-        graph_inputs = (_release_surface, _test_run_archive_surface)
-        graph_nodes.append(_test_run_archive_surface)
-        graph_outputs = (_runtime_observation_surface,)
-        environment_provides = (_deployment_surface, _runtime_observation_surface)
-    if "prepare_deployment_surface" in function_names:
-        graph_nodes.append(_deployment_surface)
-    if "derive_runtime_observation_surface" in function_names:
-        graph_nodes.append(_runtime_observation_surface)
-    if "derive_retrofit_plan_surface" in function_names:
-        graph_nodes.append(_retrofit_plan_surface)
-        graph_outputs = (_retrofit_plan_surface,)
-        environment_provides = (
-            _deployment_surface,
-            _runtime_observation_surface,
-            _retrofit_plan_surface,
-        )
+    vectors = tuple(function.materialize().vectors[0] for function in functions)
+    produced_targets = [vector.target for vector in vectors]
+    produced_target_names = {node.name for node in produced_targets}
+    graph_nodes: list[Node] = []
+    graph_inputs: list[Node] = []
+    for vector in vectors:
+        sources = vector.source if isinstance(vector.source, tuple) else (vector.source,)
+        for node in (*sources, vector.target):
+            if node not in graph_nodes:
+                graph_nodes.append(node)
+        for node in sources:
+            if node.name not in produced_target_names and node not in graph_inputs:
+                graph_inputs.append(node)
+    graph_outputs: tuple[Node, ...] = (vectors[-1].target,)
+    environment_provides = tuple(dict.fromkeys(produced_targets))
 
     graph = Graph(
         name="release_operational_cycle_graph",
-        inputs=graph_inputs,
+        inputs=tuple(graph_inputs),
         outputs=graph_outputs,
         nodes=tuple(dict.fromkeys(graph_nodes)),
-        vectors=tuple(function.materialize().vectors[0] for function in functions),
+        vectors=vectors,
     )
     return GraphFunction.from_graph(
         name="release_operational_cycle",
@@ -1129,8 +1250,16 @@ def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[Grap
         return ()
     profile = load_project_profile(workspace_root)
     active: list[GraphFunction] = []
+    if profile.has_build_execution_capability():
+        active.append(GF_PREPARE_BUILD_EXECUTION)
+        active.append(GF_DERIVE_BUILD_EXECUTION_RESULT)
+    if profile.has_test_execution_capability():
+        active.append(GF_PREPARE_TEST_EXECUTION)
+        active.append(GF_DERIVE_TEST_EXECUTION_RESULT)
     if profile.has_deployment_capability():
         active.append(GF_PREPARE_DEPLOYMENT)
+        active.append(GF_DERIVE_DEPLOYMENT_RESULT)
+        active.append(GF_DERIVE_DEPLOYED_ENVIRONMENT)
     if profile.has_deployment_capability() and profile.has_runtime_observation_capability():
         active.append(GF_DERIVE_RUNTIME_OBSERVATION)
         active.append(GF_DERIVE_RETROFIT_PLAN)

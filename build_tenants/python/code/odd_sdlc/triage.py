@@ -397,6 +397,7 @@ def _build_edge_projection(
         analysis_fingerprint=analysis_fingerprint,
         observation=observation,
         workspace_state=workspace_state,
+        runtime_config=runtime_config,
     )
     semantic_hash = _semantic_hash(
         {
@@ -562,7 +563,7 @@ def _structured_realized_basis(
     }
 
 
-def _build_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None:
+def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None:
     outcome = str(triage["process_outcome_kind"])
     reentry_layer = str(triage.get("reentry_layer") or "")
     target_assets = [
@@ -601,8 +602,110 @@ def _build_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None:
         "vector_kind": "fixed",
         "fixed_vector": fixed_vector,
         "dynamic_family": None,
+        "selected_graphfunction": None,
         "target_assets": target_assets,
     }
+
+
+def _dynamic_route_candidates(runtime_config: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    section = runtime_config.get("dynamic_routing")
+    if not isinstance(section, dict):
+        return ()
+    candidates = section.get("candidates")
+    if not isinstance(candidates, list):
+        return ()
+    normalized: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        family = candidate.get("family")
+        graphfunction = candidate.get("graphfunction")
+        if not isinstance(family, str) or not family or not isinstance(graphfunction, str) or not graphfunction:
+            continue
+        applies_to = candidate.get("applies_to")
+        normalized.append(
+            {
+                "family": family,
+                "graphfunction": graphfunction,
+                "priority": int(candidate.get("priority", 0) or 0),
+                "applies_to": applies_to if isinstance(applies_to, dict) else {},
+            }
+        )
+    return tuple(normalized)
+
+
+def _dynamic_route_matches(candidate: dict[str, Any], triage: dict[str, Any]) -> bool:
+    applies_to = candidate.get("applies_to") or {}
+    for field in ("edge", "framework_layer", "framework_condition", "gap_kind", "reentry_layer"):
+        expected = applies_to.get(field)
+        if expected is None:
+            continue
+        actual = (
+            ((triage.get("authority_basis") or {}).get("edge"))
+            if field == "edge"
+            else triage.get(field)
+        )
+        if actual != expected:
+            return False
+    return True
+
+
+def _build_dynamic_route_proposal(
+    triage: dict[str, Any],
+    *,
+    runtime_config: dict[str, Any],
+) -> tuple[dict[str, Any] | None, bool]:
+    candidates = _dynamic_route_candidates(runtime_config)
+    if not candidates:
+        return None, isinstance(runtime_config.get("dynamic_routing"), dict)
+    matches = [candidate for candidate in candidates if _dynamic_route_matches(candidate, triage)]
+    if not matches:
+        return None, True
+    selected = sorted(
+        matches,
+        key=lambda candidate: (
+            -int(candidate["priority"]),
+            str(candidate["family"]),
+            str(candidate["graphfunction"]),
+        ),
+    )[0]
+    target_assets = [
+        finding["asset_id"]
+        for finding in triage.get("asset_findings", ())
+        if isinstance(finding, dict) and isinstance(finding.get("asset_id"), str)
+    ]
+    return {
+        "vector_kind": "dynamic",
+        "fixed_vector": None,
+        "dynamic_family": selected["family"],
+        "selected_graphfunction": selected["graphfunction"],
+        "target_assets": target_assets,
+    }, True
+
+
+def _assign_route_proposal(
+    triage: dict[str, Any],
+    *,
+    runtime_config: dict[str, Any],
+) -> dict[str, Any]:
+    proposal = _build_fixed_route_proposal(triage)
+    if proposal is not None:
+        triage["route_proposal"] = proposal
+        return triage
+    dynamic_proposal, dynamic_consulted = _build_dynamic_route_proposal(
+        triage,
+        runtime_config=runtime_config,
+    )
+    if dynamic_proposal is not None:
+        triage["process_outcome_kind"] = "advance_dynamic_family"
+        triage["route_proposal"] = dynamic_proposal
+        return triage
+    triage["route_proposal"] = None
+    if dynamic_consulted:
+        extensions = dict(triage.get("extensions") or {})
+        extensions["no_lawful_route_reason"] = "no_matching_dynamic_candidate"
+        triage["extensions"] = extensions
+    return triage
 
 
 def _build_triage(
@@ -613,6 +716,7 @@ def _build_triage(
     analysis_fingerprint: str | None,
     observation: dict[str, Any],
     workspace_state: dict[str, Any],
+    runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
     failing = tuple(entry.get("failing") or ())
     missing_required = tuple(entry.get("missing_required_bindings") or ())
@@ -695,7 +799,7 @@ def _build_triage(
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage["route_proposal"] = _build_route_proposal(triage)
+        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
         if triage["route_proposal"] is None:
             triage["process_outcome_kind"] = "no_lawful_route"
             triage["framework_condition"] = "unroutable"
@@ -743,7 +847,7 @@ def _build_triage(
             ],
             "extensions": {"deepening_preferred_over_expansion": True},
         }
-        triage["route_proposal"] = _build_route_proposal(triage)
+        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
         return triage
     if delta > 0 and reentry_layer in {"goals", "intent"}:
         triage = {
@@ -779,7 +883,7 @@ def _build_triage(
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage["route_proposal"] = _build_route_proposal(triage)
+        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
         if triage["route_proposal"] is None:
             triage["process_outcome_kind"] = "no_lawful_route"
             triage["framework_condition"] = "unroutable"
@@ -800,7 +904,7 @@ def _build_triage(
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage["route_proposal"] = None
+        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
         return triage
     triage = {
         "analysis_fingerprint": analysis_fingerprint,
@@ -1125,7 +1229,7 @@ def _build_route_binding(
             "vector_kind": route_proposal["vector_kind"],
             "selected_vector": None,
             "dynamic_family": route_proposal["dynamic_family"],
-            "selected_graphfunction": None,
+            "selected_graphfunction": route_proposal.get("selected_graphfunction"),
             "target_assets": route_proposal["target_assets"],
             "priority_source": "triage.dynamic_family_mapping",
             "no_lawful_route_reason": None,
@@ -1211,7 +1315,10 @@ def _build_route_binding(
             "selected_graphfunction": None,
             "target_assets": target_assets,
             "priority_source": "triage.no_lawful_route",
-            "no_lawful_route_reason": "no_declared_route_mapping",
+            "no_lawful_route_reason": (triage.get("extensions") or {}).get(
+                "no_lawful_route_reason",
+                "no_declared_route_mapping",
+            ),
         }
     return {
         "route_id": route_id,

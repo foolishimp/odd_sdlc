@@ -7,35 +7,138 @@ from typing import Any
 from genesis.result_ingest import ingest_fp_result
 
 from .analysis import refresh_analysis
-from .app import OddSdlcApp, start
+from .app import OddSdlcApp, active_programs, start
 from .constructor import construct_manifest
-from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name
+from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name, program_for_edge
 
 
 def programs() -> list[dict[str, Any]]:
     return [entry.to_dict() for entry in PROGRAM_CATALOG]
 
 
+def _program_runtime_context(app: OddSdlcApp, *, current_program_name: str, edge: Any) -> dict[str, Any]:
+    active = active_programs(app)
+    follow_on = None
+    if isinstance(edge, str):
+        candidate = program_for_edge(edge)
+        if candidate is not None and candidate.name != current_program_name:
+            follow_on = candidate.to_dict()
+    return {
+        "active_programs": active,
+        "other_active_programs": [entry for entry in active if entry["name"] != current_program_name],
+        "follow_on_program": follow_on,
+    }
+
+
+def _program_completed_without_iteration(
+    app: OddSdlcApp,
+    *,
+    program_name: str,
+    program_payload: dict[str, Any],
+    final_state: dict[str, Any],
+) -> dict[str, Any]:
+    context = _program_runtime_context(
+        app,
+        current_program_name=program_name,
+        edge=final_state.get("edge"),
+    )
+    return {
+        "status": "ok",
+        "program": program_payload,
+        "already_converged": True,
+        "completed_edges": [],
+        "steps": [],
+        "final_state": final_state,
+        **context,
+    }
+
+
+def _program_pending_without_iteration(
+    app: OddSdlcApp,
+    *,
+    program_name: str,
+    program_payload: dict[str, Any],
+    final_state: dict[str, Any],
+) -> dict[str, Any]:
+    context = _program_runtime_context(
+        app,
+        current_program_name=program_name,
+        edge=final_state.get("edge"),
+    )
+    return {
+        "status": "ok",
+        "program": program_payload,
+        "already_converged": False,
+        "blocked_by_pending_dispatch": True,
+        "completed_edges": [],
+        "steps": [],
+        "final_state": final_state,
+        **context,
+    }
+
+
 def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     program = program_by_name(name)
+    program_payload = program.to_dict()
     workspace_root = app.config.workspace_root
     steps: list[dict[str, Any]] = []
+    step_index = 0
 
-    for expected_edge in program.steps:
+    while step_index < len(program.steps):
+        expected_edge = program.steps[step_index]
         refresh_analysis(workspace_root, stage="self_test")
         start_result = start(app)
         status = start_result.get("status")
+        actual_edge = start_result.get("edge")
+        if not steps and status == "converged":
+            return _program_completed_without_iteration(
+                app,
+                program_name=program.name,
+                program_payload=program_payload,
+                final_state=start_result,
+            )
+        if not steps and status == "pending":
+            if isinstance(actual_edge, str):
+                follow_on = program_for_edge(actual_edge)
+                if follow_on is not None and follow_on.name != program.name:
+                    return _program_completed_without_iteration(
+                        app,
+                        program_name=program.name,
+                        program_payload=program_payload,
+                        final_state=start_result,
+                    )
+                if actual_edge in program.steps:
+                    return _program_pending_without_iteration(
+                        app,
+                        program_name=program.name,
+                        program_payload=program_payload,
+                        final_state=start_result,
+                    )
         if status != "iterated":
             raise RuntimeError(
                 f"executive program {program.name!r} expected {expected_edge!r} "
                 f"but start returned non-iterated status {status!r}"
             )
-        actual_edge = start_result.get("edge")
         if actual_edge != expected_edge:
-            raise RuntimeError(
-                f"executive program {program.name!r} expected {expected_edge!r} "
-                f"but start selected {actual_edge!r}"
-            )
+            if not steps:
+                follow_on = program_for_edge(actual_edge) if isinstance(actual_edge, str) else None
+                if follow_on is not None and follow_on.name != program.name:
+                    return _program_completed_without_iteration(
+                        app,
+                        program_name=program.name,
+                        program_payload=program_payload,
+                        final_state=start_result,
+                    )
+                if isinstance(actual_edge, str) and actual_edge in program.steps:
+                    resumed_index = program.steps.index(actual_edge)
+                    if resumed_index > step_index:
+                        step_index = resumed_index
+                        expected_edge = program.steps[step_index]
+            if actual_edge != expected_edge:
+                raise RuntimeError(
+                    f"executive program {program.name!r} expected {expected_edge!r} "
+                    f"but start selected {actual_edge!r}"
+                )
         manifest_path = start_result.get("fp_manifest_path")
         if not isinstance(manifest_path, str) or not manifest_path:
             raise RuntimeError(
@@ -52,14 +155,22 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                 "assessed": assessed_result,
             }
         )
+        step_index += 1
 
     final_state = start(app)
+    context = _program_runtime_context(
+        app,
+        current_program_name=program.name,
+        edge=final_state.get("edge"),
+    )
     return {
         "status": "ok",
-        "program": program.to_dict(),
+        "program": program_payload,
+        "already_converged": False,
         "completed_edges": [step["edge"] for step in steps],
         "steps": steps,
         "final_state": final_state,
+        **context,
     }
 
 

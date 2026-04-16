@@ -107,6 +107,7 @@ def _seed_workspace(path: Path) -> None:
                 '    - name: "python_default"',
                 '      output_dir: ""',
                 '      description: "First-slice proving layout"',
+                '      build_execution_contract: "python -m build"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: "docs/deployment-contract.md"',
                 '      runtime_observation_contract: "docs/runtime-observation-contract.md"',
@@ -345,7 +346,7 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job", "release_operational_cycle_job"]
 
     executable_jobs = module_to_executable_jobs(module)
-    assert len(executable_jobs) == 21
+    assert len(executable_jobs) == len(BOOTSTRAP_RELEASE_SELF_TEST_STEPS) + len(RELEASE_OPERATIONAL_CYCLE_STEPS)
     assert [job.vector.name for job in executable_jobs] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS) + list(
         RELEASE_OPERATIONAL_CYCLE_STEPS
     )
@@ -1123,6 +1124,104 @@ def test_release_gap_without_declared_route_is_explicit_no_lawful_route(tmp_path
     assert edge["route_binding"]["state"] == "no_lawful_route"
 
 
+def test_dynamic_route_selection_is_deterministic_across_matching_candidates(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    raw_gap_payload = {
+        "scope": {},
+        "jobs_considered": 1,
+        "total_delta": 0.5,
+        "open_frames": 0,
+        "converged": False,
+        "gaps": [
+            {
+                "edge": "prepare_release_surface",
+                "delta": 0.5,
+                "failing": ["release_surface_semantically_converged"],
+                "passing": [],
+                "delta_summary": "release preparation is unresolved and should route through dynamic recovery",
+                "environment_ready": True,
+            }
+        ],
+    }
+    dynamic_candidates = [
+        {
+            "family": "execution_recovery",
+            "graphfunction": "zz_candidate",
+            "priority": 5,
+            "applies_to": {"edge": "prepare_release_surface", "framework_layer": "execution"},
+        },
+        {
+            "family": "execution_recovery",
+            "graphfunction": "aa_candidate",
+            "priority": 5,
+            "applies_to": {"edge": "prepare_release_surface", "framework_layer": "execution"},
+        },
+    ]
+
+    first = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=raw_gap_payload,
+        runtime_config={"dynamic_routing": {"candidates": dynamic_candidates}},
+        publish=False,
+    )
+    second = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=raw_gap_payload,
+        runtime_config={"dynamic_routing": {"candidates": list(reversed(dynamic_candidates))}},
+        publish=False,
+    )
+
+    first_edge = first["gaps"][0]
+    second_edge = second["gaps"][0]
+    assert first_edge["triage"]["process_outcome_kind"] == "advance_dynamic_family"
+    assert first_edge["route_proposal"]["dynamic_family"] == "execution_recovery"
+    assert first_edge["route_binding"]["state"] == "advance_dynamic_family"
+    assert first_edge["route_binding"]["selected_graphfunction"] == "aa_candidate"
+    assert second_edge["route_binding"]["selected_graphfunction"] == "aa_candidate"
+
+
+def test_zero_candidate_dynamic_route_is_explicit_no_lawful_route(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": {},
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "prepare_release_surface",
+                    "delta": 0.5,
+                    "failing": ["release_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "release preparation is unresolved and declared dynamic routing found no candidates",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config={"dynamic_routing": {"candidates": []}},
+        publish=False,
+    )
+
+    edge = payload["gaps"][0]
+    assert edge["triage"]["process_outcome_kind"] == "no_lawful_route"
+    assert edge["route_binding"]["state"] == "no_lawful_route"
+    assert edge["route_binding"]["no_lawful_route_reason"] == "no_matching_dynamic_candidate"
+
+
 def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     app = initialize(bootstrap(workspace_root=tmp_path))
@@ -1452,8 +1551,8 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "work_act_types",
         "workspace_root",
     ]
-    assert len(payload["assets"]) == 26
-    assert len(payload["functions"]) == 21
+    assert len(payload["assets"]) == len(ASSET_PATHS)
+    assert len(payload["functions"]) == 27
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
@@ -1542,8 +1641,8 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
-    assert len(payload["assets"]) == 26
-    assert len(payload["functions"]) == 21
+    assert len(payload["assets"]) == len(ASSET_PATHS)
+    assert len(payload["functions"]) == 27
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
@@ -1593,8 +1692,14 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "testcase_authority_surface",
         "test_run_archive_surface",
     ]
+    assert functions["prepare_build_execution_surface"]["inputs"] == ["release_surface"]
+    assert functions["derive_build_execution_result_surface"]["inputs"] == ["build_execution_surface"]
+    assert functions["prepare_test_execution_surface"]["inputs"] == ["release_surface"]
+    assert functions["derive_test_execution_result_surface"]["inputs"] == ["test_execution_surface", "test_run_archive_surface"]
     assert functions["prepare_deployment_surface"]["inputs"] == ["release_surface"]
-    assert functions["derive_runtime_observation_surface"]["inputs"] == ["deployment_surface", "test_run_archive_surface"]
+    assert functions["derive_deployment_result_surface"]["inputs"] == ["deployment_surface"]
+    assert functions["derive_deployed_environment_surface"]["inputs"] == ["deployment_result_surface"]
+    assert functions["derive_runtime_observation_surface"]["inputs"] == ["deployment_result_surface", "test_run_archive_surface"]
     assert functions["derive_retrofit_plan_surface"]["inputs"] == ["runtime_observation_surface", "release_surface"]
     assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
     assert payload["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
@@ -1683,7 +1788,7 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert result["steps"][-1]["edge"] == "prepare_release_surface"
     assert result["steps"][-1]["assessed"]["status"] == "ok"
     assert result["final_state"]["status"] == "iterated"
-    assert result["final_state"]["edge"] == "prepare_deployment_surface"
+    assert result["final_state"]["edge"] == "prepare_build_execution_surface"
     assert result["final_state"]["blocking_reason"] == "fp_dispatch"
 
     events = _read_events(tmp_path)
@@ -1692,7 +1797,7 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert asset_path(tmp_path, "release_surface").exists()
 
 
-def test_self_test_raises_when_the_executive_cannot_start_the_expected_edge(
+def test_self_test_reports_clean_pending_dispatch_when_the_current_program_edge_is_in_flight(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1705,6 +1810,34 @@ def test_self_test_raises_when_the_executive_cannot_start_the_expected_edge(
         lambda _app: {
             "status": "pending",
             "edge": "derive_intent_surface",
+            "blocking_reason": "fp_dispatch",
+        },
+    )
+
+    result = self_test(app)
+
+    assert result["status"] == "ok"
+    assert result["already_converged"] is False
+    assert result["blocked_by_pending_dispatch"] is True
+    assert result["completed_edges"] == []
+    assert result["steps"] == []
+    assert result["final_state"]["status"] == "pending"
+    assert result["final_state"]["edge"] == "derive_intent_surface"
+
+
+def test_self_test_still_raises_when_pending_dispatch_is_outside_the_current_program(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    monkeypatch.setattr(
+        self_test_module,
+        "start",
+        lambda _app: {
+            "status": "pending",
+            "edge": "nonexistent_edge",
             "blocking_reason": "fp_dispatch",
         },
     )

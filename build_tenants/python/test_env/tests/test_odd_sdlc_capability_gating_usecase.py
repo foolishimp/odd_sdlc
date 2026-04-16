@@ -73,6 +73,8 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     payload = _install_data_mapper_with_fake_transport(workspace)
     _append_tenant_capability_contracts(
         workspace,
+        build_execution_contract="sbt test",
+        test_execution_contract="sbt test",
         deployment_contract="docs/deployment-contract.md",
         runtime_observation_contract="docs/runtime-observation-contract.md",
     )
@@ -88,7 +90,7 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     )
     run_archive.capture_json("gaps.initial.json", initial_gaps)
     assert initial_gaps["converged"] is False
-    assert len(initial_gaps["gaps"]) == 21
+    assert len(initial_gaps["gaps"]) == 27
 
     domain_query = json.loads(
         run_installed_odd_sdlc(
@@ -103,7 +105,13 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     graph_function_names = [entry["name"] for entry in domain_query["graph_functions"]]
     program_names = [entry["name"] for entry in domain_query["programs"]]
 
+    assert "prepare_build_execution_surface" in function_names
+    assert "derive_build_execution_result_surface" in function_names
+    assert "prepare_test_execution_surface" in function_names
+    assert "derive_test_execution_result_surface" in function_names
     assert "prepare_deployment_surface" in function_names
+    assert "derive_deployment_result_surface" in function_names
+    assert "derive_deployed_environment_surface" in function_names
     assert "derive_runtime_observation_surface" in function_names
     assert "derive_retrofit_plan_surface" in function_names
     assert "release_operational_cycle" in graph_function_names

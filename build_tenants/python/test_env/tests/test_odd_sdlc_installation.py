@@ -19,9 +19,23 @@ ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT / ".genesis"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 TESTS_DIR = Path(__file__).resolve().parent
-DATA_MAPPER_TEMPLATE = (
-    ROOT.parents[0] / "ai_sdlc_examples" / "local_projects" / "data_mapper.template"
-)
+
+
+def _resolve_data_mapper_template() -> Path:
+    local_projects_root = ROOT.parent / "ai_sdlc_examples" / "local_projects"
+    candidates = (
+        local_projects_root / "data_mapper" / "data_mapper.template",
+        local_projects_root / "data_mapper.template",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "unable to locate data_mapper.template under ai_sdlc_examples/local_projects"
+    )
+
+
+DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
 
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))
@@ -71,6 +85,7 @@ def _legacy_project_constraints(workspace_name: str) -> str:
             '    - name: "scala_spark"',
             '      output_dir: "imp_scala_spark/"',
             '      description: "Legacy layout"',
+            '      build_execution_contract: ""',
             '      test_execution_contract: ""',
             '      deployment_contract: ""',
             '      runtime_observation_contract: ""',
@@ -151,6 +166,7 @@ def _append_runtime_contract_overrides(workspace: Path, *, transport_contract: P
 def _append_tenant_capability_contracts(
     workspace: Path,
     *,
+    build_execution_contract: str = "",
     test_execution_contract: str = "",
     deployment_contract: str = "",
     runtime_observation_contract: str = "",
@@ -159,6 +175,7 @@ def _append_tenant_capability_contracts(
     lines = constraints_path.read_text(encoding="utf-8").splitlines()
     updated: list[str] = []
     replacements = {
+        "build_execution_contract": f'      build_execution_contract: "{build_execution_contract}"',
         "test_execution_contract": f'      test_execution_contract: "{test_execution_contract}"',
         "deployment_contract": f'      deployment_contract: "{deployment_contract}"',
         "runtime_observation_contract": f'      runtime_observation_contract: "{runtime_observation_contract}"',
@@ -178,7 +195,7 @@ def _append_tenant_capability_contracts(
             continue
         updated.append(line)
         if stripped.startswith("description:"):
-            for required_name in ("test_execution_contract", "deployment_contract", "runtime_observation_contract"):
+            for required_name in ("build_execution_contract", "test_execution_contract", "deployment_contract", "runtime_observation_contract"):
                 if required_name in seen or required_name in existing_fields:
                     continue
                 updated.append(replacements[required_name])
@@ -212,6 +229,7 @@ def _append_design_tenant(
     name: str,
     output_dir: str,
     description: str,
+    build_execution_contract: str = "",
     test_execution_contract: str = "",
     deployment_contract: str = "",
     runtime_observation_contract: str = "",
@@ -223,6 +241,7 @@ def _append_design_tenant(
             f'    - name: "{name}"',
             f'      output_dir: "{output_dir}"',
             f'      description: "{description}"',
+            f'      build_execution_contract: "{build_execution_contract}"',
             f'      test_execution_contract: "{test_execution_contract}"',
             f'      deployment_contract: "{deployment_contract}"',
             f'      runtime_observation_contract: "{runtime_observation_contract}"',
@@ -299,6 +318,7 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert 'name: "scala_spark"' in constraints
     assert 'output_dir: "build_tenants/scala_spark/"' in constraints
     assert 'ambiguity_risk_appetite: "medium"' in constraints
+    assert 'build_execution_contract: ""' in constraints
     assert 'test_execution_contract: ""' in constraints
     assert 'deployment_contract: ""' in constraints
     assert 'runtime_observation_contract: ""' in constraints
@@ -466,6 +486,8 @@ def test_module_publishes_operational_cycle_when_capability_is_declared(tmp_path
     _seed_imported_workspace(workspace)
     _append_tenant_capability_contracts(
         workspace,
+        build_execution_contract="python -m build",
+        test_execution_contract="pytest",
         deployment_contract="docs/deployment-contract.md",
         runtime_observation_contract="docs/runtime-observation-contract.md",
     )
@@ -475,7 +497,13 @@ def test_module_publishes_operational_cycle_when_capability_is_declared(tmp_path
     enabled = gtl_module.module(workspace)
     assert "release_operational_cycle" in [function.name for function in enabled.graph_functions]
     assert enabled.metadata.get("active_operational_steps") == (
+        "prepare_build_execution_surface",
+        "derive_build_execution_result_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface",
         "prepare_deployment_surface",
+        "derive_deployment_result_surface",
+        "derive_deployed_environment_surface",
         "derive_runtime_observation_surface",
         "derive_retrofit_plan_surface",
     )

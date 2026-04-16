@@ -64,8 +64,29 @@ def _asset_text(workspace_root: Path, asset_id: str, *parts: str) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
+def _optional_asset_text(workspace_root: Path, asset_id: str, *parts: str) -> str:
+    path = asset_materialization_path(workspace_root, asset_id)
+    if parts:
+        path = asset_path(workspace_root, asset_id).joinpath(*parts)
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
 def _code_surface_root(workspace_root: Path) -> Path:
     return asset_path(workspace_root, "code_surface")
+
+
+def _build_artifact_summary(workspace_root: Path) -> dict[str, Any]:
+    observed_paths: list[str] = []
+    for relative in ("dist", "build", "target"):
+        candidate = workspace_root / relative
+        if candidate.exists():
+            observed_paths.append(relative)
+    return {
+        "observed_paths": observed_paths,
+        "artifact_root_count": len(observed_paths),
+    }
 
 
 def _strip_quotes(value: str) -> str:
@@ -604,10 +625,12 @@ def _work_act_for_target_asset(target_asset: str, *, operation: str) -> str:
         return operation
     if target_asset == "release_surface":
         return "release"
+    if target_asset in {"deployment_surface", "deployment_result_surface", "deployed_environment_surface"}:
+        return "deploy"
+    if target_asset in {"build_execution_result_surface", "test_execution_result_surface", "runtime_observation_surface"}:
+        return "return"
     if target_asset == "deployment_surface":
         return "deploy"
-    if target_asset == "runtime_observation_surface":
-        return "return"
     if target_asset == "retrofit_plan_surface":
         return "retrofit"
     if target_asset in {"test_run_archive_surface", "testcase_authority_surface"}:
@@ -656,11 +679,19 @@ def _build_work_report(
     if target_asset in {
         "test_run_archive_surface",
         "release_surface",
+        "build_execution_surface",
+        "build_execution_result_surface",
+        "test_execution_surface",
+        "test_execution_result_surface",
         "deployment_surface",
+        "deployment_result_surface",
+        "deployed_environment_surface",
         "runtime_observation_surface",
         "retrofit_plan_surface",
     }:
         report["test_evidence_summary"] = summarize_test_evidence(workspace_root)
+    if target_asset in {"build_execution_surface", "build_execution_result_surface"}:
+        report["build_artifact_summary"] = _build_artifact_summary(workspace_root)
     return report
 
 
@@ -1393,72 +1424,228 @@ def _construct_release(workspace_root: Path) -> str:
     )
 
 
-def _construct_deployment_surface(workspace_root: Path) -> str:
+def _construct_build_execution_surface(workspace_root: Path) -> str:
     release_surface = _asset_text(workspace_root, "release_surface")
     code_summary = summarize_code_surface(workspace_root)
-    test_summary = summarize_test_evidence(workspace_root)
+    build_summary = _build_artifact_summary(workspace_root)
     project_profile = load_project_profile(workspace_root)
-    if test_summary["parsed_report_count"] == 0:
-        completion_state = "construction_complete_pending_execution"
-    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
-        completion_state = "execution_evidence_recorded"
-    else:
-        completion_state = "execution_evidence_recorded_with_failures"
-    if test_summary["parsed_report_count"] == 0:
-        deployment_status = "pending_evidence"
-    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
-        deployment_status = "deployed"
-    else:
-        deployment_status = "blocked"
     return "\n".join(
         (
-            "# Generated Deployment Surface",
+            "# Generated Build Execution Surface",
             "",
-            asset_marker("deployment_surface"),
+            asset_marker("build_execution_surface"),
             "",
-            "## Governed Deployment Record",
-            f"- status: {deployment_status}",
-            f"- completion_state: {completion_state}",
+            "## Operational Transition Command",
+            "- status: prepared",
+            "- saga_state: prepared",
+            f"- substrate_contract: `{project_profile.build_execution_contract or 'undeclared'}`",
+            "- target_result_surface: `build_execution_result_surface`",
             f"- governed code root: `{code_summary['relative_path']}`",
-            f"- realization mode: `{project_profile.realization_mode}`",
-            f"- resolution reason: `{project_profile.resolution_reason}`",
             f"- build markers observed: {', '.join(code_summary['build_markers']) or 'none'}",
-            f"- tests carried into deployment record: {test_summary['tests']}",
-            f"- failures carried into deployment record: {test_summary['failures']}",
-            f"- ungoverned report files excluded from deployment record: {test_summary['ungoverned_report_file_count']}",
+            f"- observed build artifact roots: {', '.join(build_summary['observed_paths']) or 'none'}",
             "",
-            "## Release Readiness Snapshot",
+            "## Source Release Snapshot",
             release_surface,
             "",
             "## Governed Code Summary",
             json.dumps(code_summary, indent=2, sort_keys=True),
             "",
-            "## Governed Evidence Projection",
+            "## Build Artifact Summary",
+            json.dumps(build_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_build_execution_result_surface(workspace_root: Path) -> str:
+    build_execution_surface = _asset_text(workspace_root, "build_execution_surface")
+    build_summary = _build_artifact_summary(workspace_root)
+    status = "result_admitted" if build_summary["artifact_root_count"] else "pending_external_evidence"
+    saga_state = "result_admitted" if build_summary["artifact_root_count"] else "dispatched"
+    return "\n".join(
+        (
+            "# Generated Build Execution Result Surface",
+            "",
+            asset_marker("build_execution_result_surface"),
+            "",
+            "## Admitted Build Result",
+            f"- status: {status}",
+            f"- saga_state: {saga_state}",
+            f"- observed build artifact roots: {', '.join(build_summary['observed_paths']) or 'none'}",
+            "",
+            "## Source Build Execution Snapshot",
+            build_execution_surface,
+            "",
+            "## Build Artifact Summary",
+            json.dumps(build_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_test_execution_surface(workspace_root: Path) -> str:
+    release_surface = _asset_text(workspace_root, "release_surface")
+    test_summary = summarize_test_evidence(workspace_root)
+    project_profile = load_project_profile(workspace_root)
+    return "\n".join(
+        (
+            "# Generated Test Execution Surface",
+            "",
+            asset_marker("test_execution_surface"),
+            "",
+            "## Operational Transition Command",
+            "- status: prepared",
+            "- saga_state: prepared",
+            f"- substrate_contract: `{project_profile.test_execution_contract or 'undeclared'}`",
+            "- target_result_surface: `test_execution_result_surface`",
+            f"- expected returned report files observed now: {test_summary['report_file_count']}",
+            "",
+            "## Source Release Snapshot",
+            release_surface,
+            "",
+            "## Current Test Evidence Summary",
             json.dumps(test_summary, indent=2, sort_keys=True),
             "",
         )
     )
 
 
-def _construct_runtime_observation_surface(workspace_root: Path) -> str:
+def _construct_test_execution_result_surface(workspace_root: Path) -> str:
+    test_execution_surface = _asset_text(workspace_root, "test_execution_surface")
+    test_summary = summarize_test_evidence(workspace_root)
+    if test_summary["parsed_report_count"] == 0:
+        status = "pending_external_evidence"
+        saga_state = "dispatched"
+    elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
+        status = "result_admitted"
+        saga_state = "result_admitted"
+    else:
+        status = "result_admitted_with_failures"
+        saga_state = "result_admitted"
+    return "\n".join(
+        (
+            "# Generated Test Execution Result Surface",
+            "",
+            asset_marker("test_execution_result_surface"),
+            "",
+            "## Admitted Test Execution Result",
+            f"- status: {status}",
+            f"- saga_state: {saga_state}",
+            f"- report files returned: {test_summary['report_file_count']}",
+            f"- parsed reports: {test_summary['parsed_report_count']}",
+            f"- tests observed: {test_summary['tests']}",
+            f"- failures observed: {test_summary['failures']}",
+            f"- errors observed: {test_summary['errors']}",
+            "",
+            "## Source Test Execution Snapshot",
+            test_execution_surface,
+            "",
+            "## Returned Evidence Projection",
+            json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_deployment_surface(workspace_root: Path) -> str:
+    release_surface = _asset_text(workspace_root, "release_surface")
+    project_profile = load_project_profile(workspace_root)
+    test_execution_result = _optional_asset_text(workspace_root, "test_execution_result_surface")
+    return "\n".join(
+        (
+            "# Generated Deployment Surface",
+            "",
+            asset_marker("deployment_surface"),
+            "",
+            "## Operational Transition Command",
+            "- status: prepared",
+            "- saga_state: prepared",
+            f"- substrate_contract: `{project_profile.deployment_contract or 'undeclared'}`",
+            "- target_result_surface: `deployment_result_surface`",
+            "- target_state_surface: `deployed_environment_surface`",
+            "",
+            "## Source Release Snapshot",
+            release_surface,
+            "",
+            "## Source Test Execution Result Snapshot",
+            (
+                test_execution_result
+                if test_execution_result
+                else "- no admitted test execution result surface is present in the current branch"
+            ),
+            "",
+        )
+    )
+
+
+def _construct_deployment_result_surface(workspace_root: Path) -> str:
     deployment_surface = _asset_text(workspace_root, "deployment_surface")
+    test_summary = summarize_test_evidence(workspace_root)
+    return "\n".join(
+        (
+            "# Generated Deployment Result Surface",
+            "",
+            asset_marker("deployment_result_surface"),
+            "",
+            "## Admitted Deployment Result",
+            "- status: pending_external_evidence",
+            "- saga_state: dispatched",
+            f"- returned runtime or deployment reports currently observed: {test_summary['report_file_count']}",
+            "",
+            "## Source Deployment Snapshot",
+            deployment_surface,
+            "",
+            "## Returned Evidence Summary",
+            json.dumps(test_summary, indent=2, sort_keys=True),
+            "",
+        )
+    )
+
+
+def _construct_deployed_environment_surface(workspace_root: Path) -> str:
+    deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
+    return "\n".join(
+        (
+            "# Generated Deployed Environment Surface",
+            "",
+            asset_marker("deployed_environment_surface"),
+            "",
+            "## Current Projected State",
+            "- status: deployment_pending_external_evidence",
+            "- projection_basis: admitted deployment result surface",
+            "",
+            "## Source Deployment Result Snapshot",
+            deployment_result_surface,
+            "",
+        )
+    )
+
+
+def _construct_runtime_observation_surface(workspace_root: Path) -> str:
+    deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
     if test_summary["parsed_report_count"] == 0:
         completion_state = "construction_complete_pending_execution"
+        observed_status = "pending_external_evidence"
+        saga_state = "dispatched"
     elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
         completion_state = "execution_evidence_recorded"
+        observed_status = "result_admitted"
+        saga_state = "result_admitted"
     else:
         completion_state = "execution_evidence_recorded_with_failures"
-    observed_status = "returned" if test_summary["report_file_count"] else "no_evidence"
+        observed_status = "result_admitted_with_failures"
+        saga_state = "result_admitted"
     return "\n".join(
         (
             "# Generated Runtime Observation Surface",
             "",
             asset_marker("runtime_observation_surface"),
             "",
-            "## Returned Runtime Position",
+            "## Admitted Runtime Observation",
             f"- status: {observed_status}",
+            f"- saga_state: {saga_state}",
             f"- completion_state: {completion_state}",
             f"- governed code root: `{code_summary['relative_path']}`",
             f"- report files returned: {test_summary['report_file_count']}",
@@ -1468,8 +1655,8 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
             f"- errors observed: {test_summary['errors']}",
             f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
             "",
-            "## Source Deployment Snapshot",
-            deployment_surface,
+            "## Source Deployment Result Snapshot",
+            deployment_result_surface,
             "",
             "## Returned Evidence Projection",
             json.dumps(test_summary, indent=2, sort_keys=True),
@@ -1792,8 +1979,20 @@ def _constructed_content(target_asset: str, workspace_root: Path) -> str:
         return _construct_test_run_archive(workspace_root)
     if target_asset == "release_surface":
         return _construct_release(workspace_root)
+    if target_asset == "build_execution_surface":
+        return _construct_build_execution_surface(workspace_root)
+    if target_asset == "build_execution_result_surface":
+        return _construct_build_execution_result_surface(workspace_root)
+    if target_asset == "test_execution_surface":
+        return _construct_test_execution_surface(workspace_root)
+    if target_asset == "test_execution_result_surface":
+        return _construct_test_execution_result_surface(workspace_root)
     if target_asset == "deployment_surface":
         return _construct_deployment_surface(workspace_root)
+    if target_asset == "deployment_result_surface":
+        return _construct_deployment_result_surface(workspace_root)
+    if target_asset == "deployed_environment_surface":
+        return _construct_deployed_environment_surface(workspace_root)
     if target_asset == "runtime_observation_surface":
         return _construct_runtime_observation_surface(workspace_root)
     if target_asset == "retrofit_plan_surface":
@@ -1821,7 +2020,11 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     previous_checkpoint = checkpoint_for_path(target_path)
     operation = {
+        "build_execution_result_surface": "return",
+        "test_execution_result_surface": "return",
         "deployment_surface": "deploy",
+        "deployment_result_surface": "deploy",
+        "deployed_environment_surface": "deploy",
         "runtime_observation_surface": "return",
         "retrofit_plan_surface": "retrofit",
     }.get(target_asset, "generate")

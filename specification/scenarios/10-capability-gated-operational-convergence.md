@@ -1,6 +1,6 @@
 # Scenario Bundle - odd_sdlc Capability-Gated Operational Convergence
 
-**Validates**: REQ-F-ODDSDLC-025, REQ-F-ODDSDLC-026
+**Validates**: REQ-F-ODDSDLC-025, REQ-F-ODDSDLC-026, REQ-F-ODDSDLC-038
 
 **Purpose**: Prove that `odd_sdlc` reuses workflow forms across typed asset
 lanes while stopping lawfully when executional or operational technology
@@ -64,3 +64,5 @@ contract.
 5. release readiness may still be projected honestly from the completed
    construction wave without implying that tests, deployment, or runtime return
    have occurred
+6. declared operational command intent is not conflated with admitted returned
+   execution/deployment evidence or current projected state

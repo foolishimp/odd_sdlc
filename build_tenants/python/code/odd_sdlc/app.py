@@ -22,6 +22,7 @@ from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
 from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
+from .traceability import current_requirement_executability_gap
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
@@ -81,6 +82,16 @@ def initialize(config: AppConfig, *, worker: Worker | None = None) -> OddSdlcApp
     return OddSdlcApp(config=config, stream=stream, worker=worker)
 
 
+def active_programs(app: OddSdlcApp) -> list[dict[str, Any]]:
+    module = _app_module(app.config)
+    active_executive_programs = set(module.metadata.get("executive_graph_functions", ()))
+    return [
+        entry.to_dict()
+        for entry in PROGRAM_CATALOG
+        if entry.name in active_executive_programs
+    ]
+
+
 def catalog(app: OddSdlcApp) -> dict:
     module = _app_module(app.config)
     workspace_root = app.config.workspace_root
@@ -127,11 +138,7 @@ def catalog(app: OddSdlcApp) -> dict:
             for entry in active_function_catalog
         ],
         "edge_contracts": [descriptor.to_dict() for descriptor in EDGE_CONTRACTS],
-        "programs": [
-            entry.to_dict()
-            for entry in PROGRAM_CATALOG
-            if entry.name in active_executive_programs
-        ],
+        "programs": active_programs(app),
         "graph_functions": [
             {
                 "id": function.id,
@@ -194,7 +201,7 @@ def catalog(app: OddSdlcApp) -> dict:
 def gaps(app: OddSdlcApp) -> dict:
     scope = app.scope()
     raw_payload = gen_gaps(scope, app.stream)
-    return enrich_gap_snapshot(
+    payload = enrich_gap_snapshot(
         workspace_root=app.config.workspace_root,
         stream=app.stream,
         workflow_version=scope.workflow_version,
@@ -202,12 +209,17 @@ def gaps(app: OddSdlcApp) -> dict:
         runtime_config=app.config.runtime_config,
         publish=True,
     )
+    global_gap = current_requirement_executability_gap(app.config.workspace_root)
+    payload["global_requirement_executability"] = global_gap
+    payload["overall_delta"] = payload.get("total_delta", 0.0) + global_gap["delta"]
+    payload["converged"] = bool(payload.get("converged")) and bool(global_gap["converged"])
+    return payload
 
 
 def gap_snapshot(app: OddSdlcApp) -> dict:
     scope = app.scope()
     raw_payload = gen_gaps(scope, app.stream)
-    return enrich_gap_snapshot(
+    payload = enrich_gap_snapshot(
         workspace_root=app.config.workspace_root,
         stream=app.stream,
         workflow_version=scope.workflow_version,
@@ -215,6 +227,11 @@ def gap_snapshot(app: OddSdlcApp) -> dict:
         runtime_config=app.config.runtime_config,
         publish=False,
     )
+    global_gap = current_requirement_executability_gap(app.config.workspace_root)
+    payload["global_requirement_executability"] = global_gap
+    payload["overall_delta"] = payload.get("total_delta", 0.0) + global_gap["delta"]
+    payload["converged"] = bool(payload.get("converged")) and bool(global_gap["converged"])
+    return payload
 
 
 def iterate(app: OddSdlcApp) -> dict:

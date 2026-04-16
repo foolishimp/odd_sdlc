@@ -37,3 +37,10 @@ def program_by_name(name: str) -> ExecutiveProgramEntry:
         if entry.name == name:
             return entry
     raise ValueError(f"Unknown executive program {name!r}")
+
+
+def program_for_edge(edge: str) -> ExecutiveProgramEntry | None:
+    for entry in PROGRAM_CATALOG:
+        if edge in entry.steps:
+            return entry
+    return None

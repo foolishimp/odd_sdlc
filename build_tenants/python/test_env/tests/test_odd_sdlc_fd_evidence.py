@@ -27,8 +27,14 @@ from genesis.binding import _assemble_prompt  # noqa: E402
 from gtl.operator_model import F_D  # noqa: E402
 from odd_sdlc.constructor import construct_manifest  # noqa: E402
 from odd_sdlc.fd_checks import main  # noqa: E402
+from odd_sdlc.fd_checks import code_traceability_present, test_traceability_present as realized_test_traceability_present  # noqa: E402
 from odd_sdlc.project_profile import tenant_design_relative_path, tenant_test_env_tests_relative_path  # noqa: E402
-from odd_sdlc.traceability import traceability_scan  # noqa: E402
+from odd_sdlc.traceability import (
+    build_requirement_closure_register,
+    current_requirement_executability_gap,
+    missing_requirement_ids_from_current_surface,
+    traceability_scan,
+)  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -222,6 +228,134 @@ def _run_fd_check(check: str, workspace: Path) -> tuple[int, dict[str, object], 
     stdout = buffer.getvalue().strip()
     assert stdout
     return exit_code, json.loads(stdout), stdout
+
+
+def _seed_two_digit_equivalence_workspace(workspace: Path) -> None:
+    tenant_name = "python"
+    _write(
+        workspace / ".ai-workspace" / "context" / "project_constraints.yml",
+        "\n".join(
+            (
+                "project:",
+                '  name: "two-digit-equivalence.test"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python"',
+                '      output_dir: "imp_two_digit/"',
+                '      description: "two-digit traceability lane"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: ""',
+                '      runtime_observation_contract: ""',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "specification" / "REQUIREMENTS.md",
+        "\n".join(
+            (
+                "# Imported Requirements",
+                "",
+                "- REQ-IMP-01: Carry imported literal authority.",
+                "- REQ-IMP-02-A: Preserve suffixed imported authority.",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "specification" / "requirements" / "10-generated-bootstrap.md",
+        "\n".join(
+            (
+                "# Generated Bootstrap Requirements",
+                "",
+                "- REQ-IMP-001: Carry imported literal authority.",
+                "- REQ-IMP-002-A: Preserve suffixed imported authority.",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-design.md"),
+        "\n".join(
+            (
+                "# Generated Implementation Design",
+                "",
+                "- REQ-IMP-001",
+                "- REQ-IMP-002-A",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-modules.md"),
+        "\n".join(
+            (
+                "# Generated Implementation Modules",
+                "",
+                "- module alpha realizes REQ-IMP-001",
+                "- module beta realizes REQ-IMP-002-A",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-stack.md"),
+        "\n".join(
+            (
+                "# Generated Implementation Stack Profile",
+                "",
+                "- Python 3.11",
+                "- pytest",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_test_env_tests_relative_path(tenant_name, "40-generated-test-modules.md"),
+        "\n".join(
+            (
+                "# Generated Test Modules",
+                "",
+                "- validation alpha covers REQ-IMP-01",
+                "- validation beta covers REQ-IMP-02-A",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "imp_two_digit" / "src" / "main" / "logic.py",
+        "\n".join(
+            (
+                "# Implements: REQ-IMP-01",
+                "# Implements: REQ-IMP-02-A",
+                "",
+                "def run() -> int:",
+                "    return 1",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "imp_two_digit" / "src" / "tests" / "test_logic.py",
+        "\n".join(
+            (
+                "# Validates: REQ-IMP-01",
+                "# Validates: REQ-IMP-02-A",
+                "",
+                "def test_run() -> None:",
+                "    assert True",
+                "",
+            )
+        ),
+    )
 
 
 def _write_manifest(path: Path, *, target_asset: str, evaluator_name: str) -> Path:
@@ -426,6 +560,105 @@ def test_traceability_scan_treats_scala_main_spec_as_code_not_orphan_test(tmp_pa
     assert "build_tenants/scala_spark/src/main/scala/pkg/LookupSpec.scala" not in scan["orphan_test_files"]
     assert scan["code_refs"]["REQ-TRACE-002"] == [
         "build_tenants/scala_spark/src/main/scala/pkg/LookupSpec.scala",
+    ]
+
+
+def test_traceability_scan_counts_governed_code_and_test_files(tmp_path: Path) -> None:
+    workspace = tmp_path / "fd-evidence-counts"
+    _seed_traceability_workspace(workspace)
+
+    scan = traceability_scan(workspace)
+
+    assert scan["code_file_count"] == 2
+    assert scan["test_file_count"] == 2
+
+
+@pytest.mark.parametrize(
+    ("check", "expected_reason"),
+    (
+        ("code-traceability-present", "governed_code_surface_empty"),
+        ("realized-test-traceability-present", "governed_realized_test_surface_empty"),
+    ),
+)
+def test_fd_checks_fail_explicitly_on_zero_surface_traceability(
+    tmp_path: Path,
+    check: str,
+    expected_reason: str,
+) -> None:
+    workspace = tmp_path / "fd-evidence-zero-surface"
+    _seed_traceability_workspace(workspace)
+    for path in (workspace / "build_tenants" / "scala_spark" / "src").rglob("*.scala"):
+        path.unlink()
+
+    exit_code, payload, _ = _run_fd_check(check, workspace)
+
+    assert exit_code == 1
+    assert payload["failure_kind"] == "zero_surface_gap"
+    assert payload["surface_failure_reason"] == expected_reason
+    assert payload["code_file_count"] == 0
+    assert payload["test_file_count"] == 0
+
+
+def test_two_digit_imported_requirement_ids_remain_trace_equivalent_after_normalization(tmp_path: Path) -> None:
+    workspace = tmp_path / "fd-evidence-two-digit"
+    _seed_two_digit_equivalence_workspace(workspace)
+
+    register = build_requirement_closure_register(workspace)
+    entries = {
+        entry["requirement_id"]: entry
+        for entry in register["requirements"]
+    }
+
+    assert missing_requirement_ids_from_current_surface(workspace) == ()
+    assert code_traceability_present(workspace) == 0
+    assert realized_test_traceability_present(workspace) == 0
+    assert entries["REQ-IMP-001"]["present_in_authority"] is True
+    assert entries["REQ-IMP-001"]["authority_refs"] == ["specification/REQUIREMENTS.md"]
+    assert entries["REQ-IMP-001"]["code_refs"] == ["imp_two_digit/src/main/logic.py"]
+    assert entries["REQ-IMP-001"]["test_refs"] == ["imp_two_digit/src/tests/test_logic.py"]
+    assert entries["REQ-IMP-002-A"]["present_in_authority"] is True
+    assert entries["REQ-IMP-002-A"]["authority_refs"] == ["specification/REQUIREMENTS.md"]
+    assert entries["REQ-IMP-002-A"]["code_refs"] == ["imp_two_digit/src/main/logic.py"]
+    assert entries["REQ-IMP-002-A"]["test_refs"] == ["imp_two_digit/src/tests/test_logic.py"]
+
+
+def test_current_requirement_executability_gap_keeps_global_convergence_open_until_requirements_are_realized(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-global-executability"
+    _seed_traceability_workspace(workspace)
+    _write(
+        workspace / "specification" / "requirements" / "10-generated-bootstrap.md",
+        "\n".join(
+            (
+                "# Generated Bootstrap Requirements",
+                "",
+                "- REQ-TRACE-001: Carry a realized implementation path.",
+                "- REQ-TRACE-002: Carry a second realized implementation path.",
+                "",
+            )
+        ),
+    )
+
+    gap = current_requirement_executability_gap(workspace)
+
+    assert gap["converged"] is False
+    assert gap["requires_build_out"] is True
+    assert gap["delta"] == 1.0
+    assert gap["blocking_requirement_ids"] == ["REQ-TRACE-002"]
+    assert gap["blocking_status_counts"] == {"planned": 1}
+    assert gap["blocking_requirements"] == [
+        {
+            "requirement_id": "REQ-TRACE-002",
+            "status": "planned",
+            "code_refs": [],
+            "test_refs": [],
+            "implementation_claim_refs": [
+                "build_tenants/scala_spark/design/40-generated-implementation-design.md",
+                "build_tenants/scala_spark/design/40-generated-implementation-modules.md",
+            ],
+            "planned_test_claim_refs": [],
+        }
     ]
 
 

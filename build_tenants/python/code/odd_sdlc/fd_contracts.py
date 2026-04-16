@@ -75,6 +75,11 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
         cli_name="reviewed-design-dependency-surfaces-present",
         description="The reviewed design derivation depends on regenerated design and consensus decision surfaces.",
     ),
+    "design_consensus_terminated": FdEvaluatorContract(
+        evaluator_name="design_consensus_terminated",
+        cli_name="design-consensus-terminated",
+        description="The higher-order design consensus carrier remains closed only when the reviewed design surface and its upstream review artifacts are all materially present.",
+    ),
     "testcase_authority_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="testcase_authority_dependency_surfaces_present",
         cli_name="testcase-authority-dependency-surfaces-present",
@@ -115,6 +120,16 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
         cli_name="release-dependency-surfaces-present",
         description="The release derivation depends on regenerated requirement, design, scenario, code, testcase authority, and archived test-evidence surfaces.",
     ),
+    "build_execution_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="build_execution_dependency_surfaces_present",
+        cli_name="build-execution-dependency-surfaces-present",
+        description="The build execution command derivation depends on a regenerated release surface and a declared build execution contract.",
+    ),
+    "build_execution_result_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="build_execution_result_dependency_surfaces_present",
+        cli_name="build-execution-result-dependency-surfaces-present",
+        description="The build execution result derivation depends on a regenerated build execution command surface and a declared build execution contract.",
+    ),
     "test_design_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="test_design_dependency_surfaces_present",
         cli_name="test-design-dependency-surfaces-present",
@@ -150,15 +165,35 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
         cli_name="test-traceability-present",
         description="Compatibility alias for the realized test traceability rule while the split planning/realized test branch is being adopted.",
     ),
+    "test_execution_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="test_execution_dependency_surfaces_present",
+        cli_name="test-execution-dependency-surfaces-present",
+        description="The test execution command derivation depends on a regenerated release surface and a declared test execution contract.",
+    ),
+    "test_execution_result_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="test_execution_result_dependency_surfaces_present",
+        cli_name="test-execution-result-dependency-surfaces-present",
+        description="The test execution result derivation depends on regenerated test execution command and archived test-evidence surfaces.",
+    ),
     "deployment_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="deployment_dependency_surfaces_present",
         cli_name="deployment-dependency-surfaces-present",
         description="The deployment derivation depends on a regenerated release readiness surface.",
     ),
+    "deployment_result_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="deployment_result_dependency_surfaces_present",
+        cli_name="deployment-result-dependency-surfaces-present",
+        description="The deployment result derivation depends on a regenerated deployment command surface and a declared deployment contract.",
+    ),
+    "deployed_environment_dependency_surfaces_present": FdEvaluatorContract(
+        evaluator_name="deployed_environment_dependency_surfaces_present",
+        cli_name="deployed-environment-dependency-surfaces-present",
+        description="The deployed environment read-model derivation depends on a regenerated deployment result surface.",
+    ),
     "runtime_observation_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="runtime_observation_dependency_surfaces_present",
         cli_name="runtime-observation-dependency-surfaces-present",
-        description="The runtime observation derivation depends on regenerated deployment and archived test-evidence surfaces.",
+        description="The runtime observation derivation depends on regenerated deployment-result and archived test-evidence surfaces.",
     ),
     "retrofit_plan_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="retrofit_plan_dependency_surfaces_present",

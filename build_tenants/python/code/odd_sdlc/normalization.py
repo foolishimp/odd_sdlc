@@ -29,6 +29,7 @@ PROJECT_POLICY_FIELDS: tuple[tuple[str, str], ...] = (
     ("ambiguity_risk_appetite", '"medium"'),
 )
 TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("build_execution_contract", '""'),
     ("test_execution_contract", '""'),
     ("deployment_contract", '""'),
     ("runtime_observation_contract", '""'),
@@ -357,6 +358,7 @@ def _normalize_project_constraints(
                 f'    - name: "{canonical_platform}"',
                 f'      output_dir: "{canonical_output}"',
                 '      description: "Normalized project realization tenant for odd_sdlc operation"',
+                '      build_execution_contract: ""',
                 '      test_execution_contract: ""',
                 '      deployment_contract: ""',
                 '      runtime_observation_contract: ""',

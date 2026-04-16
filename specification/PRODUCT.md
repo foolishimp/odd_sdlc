@@ -31,10 +31,14 @@ It gives a project a lawful way to declare:
 - a governed SDLC worksite lifecycle over request, specification, design,
   implementation, qualification, release, deployment, runtime return, and
   retrofit work
-- explicit technology capability and execution contracts for test execution,
-  deployment, CI/CD, and runtime return where those stages are in scope
+- explicit technology capability and execution contracts for build, test
+  execution, deployment, CI/CD, and runtime return where those stages are in
+  scope
+- explicit operational transition command surfaces, admitted result/evidence
+  surfaces, and current projected state surfaces for executional and
+  operational work
 - explicit software work acts and operational-return evidence with attributable
-  provenance
+  provenance over that same governed line
 - deterministic install-and-normalize behavior over imported or stale workspaces
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
@@ -127,6 +131,8 @@ The current visible checkpoint of an asset derived from its governing history.
 ODD may borrow from CQRS here:
 
 - runtime and constructive history are authoritative for governance
+- command-side operational intent and admitted result/evidence remain distinct
+  from current projected state
 - the current materialized asset surface is the projected checkpoint operators
   usually edit or inspect
 
@@ -192,6 +198,51 @@ function boundary.
 
 An event or equivalent substrate truth emitted by ABG during traversal and
 execution.
+
+### Operational Transition Command Surface
+
+A typed surface that requests one operational transition over a declared
+substrate binding.
+
+It records intended transition law such as:
+
+- current bounded input state
+- target bounded state
+- declared execution or deployment substrate
+- required returned evidence contract
+
+It does not by itself prove that the side effect happened.
+
+### Operational Result Surface
+
+A typed surface that admits the governed returned result of an operational
+transition.
+
+Examples include:
+
+- build execution result
+- test execution result
+- deployment result
+- returned runtime evidence
+
+Operational result surfaces bind returned evidence into the governed line with
+explicit provenance. They are the lawful basis for projecting current
+operational state.
+
+### Operational State Projection
+
+A current read model projected from admitted operational result and runtime
+fact truth.
+
+It may summarize:
+
+- current build status
+- current test status
+- current deployed state
+- current returned runtime posture
+
+It is queryable and useful for operators, but it is not the underlying runtime
+authority.
 
 ### Observation Event
 
@@ -302,6 +353,14 @@ generate-once surface tree.
 
 Executional or operational stages inside that lifecycle are conditional on the
 declared technology capability of the active build-tenant realization.
+
+Those stages are modeled as:
+
+- command-side transition intent
+- admitted result or returned evidence
+- current projected state
+
+rather than as one ambiguous operational document.
 
 ### Software Work Act
 

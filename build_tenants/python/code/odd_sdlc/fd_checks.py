@@ -78,6 +78,14 @@ CHECK_RULES: dict[str, CheckRule] = {
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["reviewed-design-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("design_surface", "consensus_decision_surface"),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["design-consensus-terminated"].cli_name: CheckRule(
+        required_generated_assets=(
+            "design_surface",
+            "review_assessment_surface",
+            "consensus_decision_surface",
+            "reviewed_design_surface",
+        ),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["testcase-authority-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("uat_testcases_surface", "scenario_surface"),
     ),
@@ -109,6 +117,14 @@ CHECK_RULES: dict[str, CheckRule] = {
             "test_run_archive_surface",
         ),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["build-execution-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("release_surface",),
+        required_profile_fields=("build_execution_contract",),
+    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["build-execution-result-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("build_execution_surface",),
+        required_profile_fields=("build_execution_contract",),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-design-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("design_surface", "scenario_surface"),
     ),
@@ -130,12 +146,28 @@ CHECK_RULES: dict[str, CheckRule] = {
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-traceability-present"].cli_name: CheckRule(
         required_generated_assets=("test_module_surface", "code_surface"),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("release_surface",),
+        required_profile_fields=("test_execution_contract",),
+    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-result-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("test_execution_surface", "test_run_archive_surface"),
+        required_profile_fields=("test_execution_contract",),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("release_surface",),
         required_profile_fields=("deployment_contract",),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-result-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("deployment_surface",),
+        required_profile_fields=("deployment_contract",),
+    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployed-environment-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("deployment_result_surface",),
+        required_profile_fields=("deployment_contract",),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["runtime-observation-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("deployment_surface", "test_run_archive_surface"),
+        required_generated_assets=("deployment_result_surface", "test_run_archive_surface"),
         required_profile_fields=("deployment_contract", "runtime_observation_contract"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["retrofit-plan-dependency-surfaces-present"].cli_name: CheckRule(
@@ -260,14 +292,22 @@ def _requirement_scope_detail(workspace_root: Path) -> dict[str, Any]:
 
 def _code_traceability_detail(workspace_root: Path) -> dict[str, Any]:
     scan = traceability_scan(workspace_root)
+    zero_surface = scan["code_file_count"] == 0
     return {
         "check": "code-traceability-present",
-        "failure_kind": "traceability_gap",
+        "failure_kind": "zero_surface_gap" if zero_surface else "traceability_gap",
         "workspace_root": str(workspace_root),
         "code_root": scan["code_root"],
+        "code_file_count": scan["code_file_count"],
+        "test_file_count": scan["test_file_count"],
+        "surface_failure_reason": "governed_code_surface_empty" if zero_surface else "",
         "missing_requirement_ids": list(missing_code_traceability_ids(workspace_root)),
         "orphan_code_files": list(scan["orphan_code_files"]),
-        "suggested_repair": "Add Implements tags for the missing REQ ids and remove or tag orphan generated source files.",
+        "suggested_repair": (
+            "Materialize at least one governed source artifact under the selected code root before certifying implementation traceability."
+            if zero_surface
+            else "Add Implements tags for the missing REQ ids and remove or tag orphan generated source files."
+        ),
     }
 
 
@@ -310,16 +350,24 @@ def _realized_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
     scan = traceability_scan(workspace_root)
     missing_ids = list(missing_realized_test_traceability_ids(workspace_root))
     unexpected_ids = list(unexpected_realized_test_traceability_ids(workspace_root))
+    zero_surface = scan["test_file_count"] == 0
     return {
         "check": "realized-test-traceability-present",
-        "failure_kind": "realized_test_gap",
+        "failure_kind": "zero_surface_gap" if zero_surface else "realized_test_gap",
         "workspace_root": str(workspace_root),
         "code_root": scan["code_root"],
+        "code_file_count": scan["code_file_count"],
+        "test_file_count": scan["test_file_count"],
+        "surface_failure_reason": "governed_realized_test_surface_empty" if zero_surface else "",
         "missing_requirement_ids": missing_ids,
         "unexpected_requirement_ids": unexpected_ids,
         "orphan_test_files": list(scan["orphan_test_files"]),
         "expected_test_roots": _expected_realized_test_roots(workspace_root),
-        "suggested_repair": "Materialize real test source under the governed code root with Validates tags for the missing REQ ids and remove or retag orphan test files.",
+        "suggested_repair": (
+            "Materialize at least one governed realized test artifact under the selected code root before certifying realized test traceability."
+            if zero_surface
+            else "Materialize real test source under the governed code root with Validates tags for the missing REQ ids and remove or retag orphan test files."
+        ),
     }
 
 
@@ -398,6 +446,10 @@ def reviewed_design_dependency_surfaces_present(workspace_root: Path) -> int:
     return _run_check("reviewed-design-dependency-surfaces-present", workspace_root)
 
 
+def design_consensus_terminated(workspace_root: Path) -> int:
+    return _run_check("design-consensus-terminated", workspace_root)
+
+
 def testcase_authority_dependency_surfaces_present(workspace_root: Path) -> int:
     return _run_check("testcase-authority-dependency-surfaces-present", workspace_root)
 
@@ -424,6 +476,8 @@ def code_dependency_surfaces_present(workspace_root: Path) -> int:
 
 def code_traceability_present(workspace_root: Path) -> int:
     scan = traceability_scan(workspace_root)
+    if scan["code_file_count"] == 0:
+        return 1
     return 0 if not missing_code_traceability_ids(workspace_root) and not scan["orphan_code_files"] else 1
 
 
@@ -453,6 +507,8 @@ def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
 
 def realized_test_traceability_present(workspace_root: Path) -> int:
     scan = traceability_scan(workspace_root)
+    if scan["test_file_count"] == 0:
+        return 1
     return 0 if not missing_realized_test_traceability_ids(workspace_root) and not unexpected_realized_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
 
 

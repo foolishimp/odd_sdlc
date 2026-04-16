@@ -23,6 +23,7 @@ from sandbox_runtime import (
     run_installed_odd_sdlc,
     run_installed_self_test,
     seed_canonical_spec_surface,
+    seed_local_genesis_runtime,
     seed_odd_sdlc_package,
 )
 
@@ -69,7 +70,13 @@ EXPECTED_FUNCTIONS = (
     "derive_test_run_archive_surface",
     "qualify_testcase_authority",
     "prepare_release_surface",
+    "prepare_build_execution_surface",
+    "derive_build_execution_result_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface",
     "prepare_deployment_surface",
+    "derive_deployment_result_surface",
+    "derive_deployed_environment_surface",
     "derive_runtime_observation_surface",
     "derive_retrofit_plan_surface",
 )
@@ -81,7 +88,13 @@ EXPECTED_GRAPH_FUNCTIONS = (
     "review_design_by_consensus",
 )
 EXPECTED_OPERATIONAL_STEPS = (
+    "prepare_build_execution_surface",
+    "derive_build_execution_result_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface",
     "prepare_deployment_surface",
+    "derive_deployment_result_surface",
+    "derive_deployed_environment_surface",
     "derive_runtime_observation_surface",
     "derive_retrofit_plan_surface",
 )
@@ -105,6 +118,7 @@ EXPECTED_CONSENSUS_UPDATED_ASSETS = (
 
 CONSENSUS_ROUND_MODULE_REF = "odd_sdlc.consensus_module:MODULE"
 CONSENSUS_HARNESS_MODULE_REF = "odd_sdlc.consensus_harness_module:MODULE"
+ODD_SDLC_MODULE_REF = "odd_sdlc.gtl_module:MODULE"
 
 EXPECTED_UPDATED_ASSETS = (
     "intent_surface",
@@ -127,7 +141,13 @@ EXPECTED_UPDATED_ASSETS = (
     "release_surface",
 )
 EXPECTED_OPERATIONAL_UPDATED_ASSETS = (
+    "build_execution_surface",
+    "build_execution_result_surface",
+    "test_execution_surface",
+    "test_execution_result_surface",
     "deployment_surface",
+    "deployment_result_surface",
+    "deployed_environment_surface",
     "runtime_observation_surface",
     "retrofit_plan_surface",
 )
@@ -177,6 +197,7 @@ def _validate_generated_hello_world_app(workspace: Path) -> dict[str, object]:
 
 def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
+    seed_local_genesis_runtime(workspace)
     seed_odd_sdlc_package(workspace)
     seed_canonical_spec_surface(workspace)
     refresh_analysis = json.loads(
@@ -199,7 +220,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 26
+    assert len(catalog["assets"]) == 32
     assert any(asset["asset_id"] == "ambiguity_register_surface" for asset in catalog["assets"])
     assert any(asset["asset_id"] == "requirement_closure_register_surface" for asset in catalog["assets"])
     assert [item["name"] for item in catalog["asset_families"]] == [
@@ -549,6 +570,16 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
     assert consensus_gaps["converged"] is True
     assert [entry["edge"] for entry in consensus_gaps["gaps"]] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
     assert all(entry["delta"] == 0 for entry in consensus_gaps["gaps"])
+    assert len(consensus_gaps["refinement_gaps"]) == 1
+    refinement_gap = consensus_gaps["refinement_gaps"][0]
+    assert refinement_gap["edge"] == "review_design_by_consensus"
+    assert refinement_gap["graph_function"] == "review_design_by_consensus"
+    assert refinement_gap["scope"] == "refinement_parent_contract"
+    assert refinement_gap["termination_evaluator"] == "design_consensus_terminated"
+    assert refinement_gap["delta"] == 0
+    assert refinement_gap["failing"] == []
+    assert "design_consensus_terminated" in refinement_gap["passing"]
+    assert len(refinement_gap["child_keys"]) == len(EXPECTED_CONSENSUS_HARNESS_STEPS)
 
     events = read_events(workspace)
     consensus_graph_calls = [
@@ -577,14 +608,17 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
 
     assert payload["status"] == "ok"
     assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["already_converged"] is False
     assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS)
     assert all(step["start"]["blocking_reason"] == "fp_dispatch" for step in payload["steps"])
     assert [step["assessed"]["status"] for step in payload["steps"]] == ["ok"] * len(payload["steps"])
     assert payload["steps"][-1]["edge"] == "prepare_release_surface"
     assert payload["steps"][-1]["assessed"]["status"] == "ok"
     assert payload["final_state"]["status"] == "iterated"
-    assert payload["final_state"]["edge"] == "prepare_deployment_surface"
+    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
     assert payload["final_state"]["blocking_reason"] == "fp_dispatch"
+    assert payload["follow_on_program"]["name"] == "release_operational_cycle"
+    assert [entry["name"] for entry in payload["other_active_programs"]] == ["release_operational_cycle"]
 
     events = read_events(workspace)
     graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
@@ -597,6 +631,123 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
     assert "run_completed" in [event["event_type"] for event in events]
     assert asset_path(workspace, "test_run_archive_surface").exists()
     assert asset_path(workspace, "release_surface").exists()
+
+
+def test_installed_self_test_returns_clean_success_when_bootstrap_is_already_complete(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_complete")
+
+    payload = run_installed_self_test(
+        workspace,
+        archive=run_archive,
+        label="odd_sdlc self-test already complete bootstrap",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["already_converged"] is True
+    assert payload["completed_edges"] == []
+    assert payload["steps"] == []
+    assert payload["final_state"]["status"] == "iterated"
+    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
+    assert payload["follow_on_program"]["name"] == "release_operational_cycle"
+    assert [entry["name"] for entry in payload["other_active_programs"]] == ["release_operational_cycle"]
+
+
+def test_installed_self_test_resumes_bootstrap_from_the_current_active_edge(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="bootstrap_partial",
+        steps=EXPECTED_BOOTSTRAP_STEPS[:3],
+    )
+
+    payload = run_installed_self_test(
+        workspace,
+        archive=run_archive,
+        label="odd_sdlc self-test resumed bootstrap",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["already_converged"] is False
+    assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS[3:])
+    assert payload["steps"][0]["edge"] == "derive_requirement_surface"
+    assert payload["final_state"]["status"] == "iterated"
+    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
+    assert payload["follow_on_program"]["name"] == "release_operational_cycle"
+
+
+def test_installed_self_test_reports_clean_pending_dispatch_when_bootstrap_edge_is_already_in_flight(
+    run_archive,
+) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="bootstrap_partial",
+        steps=EXPECTED_BOOTSTRAP_STEPS[:3],
+    )
+
+    pending_start = json.loads(
+        run_installed_genesis(
+            workspace,
+            "start",
+            "--module",
+            ODD_SDLC_MODULE_REF,
+            archive=run_archive,
+            label="bootstrap pending start",
+        ).stdout
+    )
+    assert pending_start["status"] == "iterated"
+    assert pending_start["edge"] == "derive_requirement_surface"
+    assert pending_start["blocking_reason"] == "fp_dispatch"
+
+    payload = run_installed_self_test(
+        workspace,
+        archive=run_archive,
+        label="odd_sdlc self-test pending bootstrap dispatch",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["already_converged"] is False
+    assert payload["blocked_by_pending_dispatch"] is True
+    assert payload["completed_edges"] == []
+    assert payload["steps"] == []
+    assert payload["final_state"]["status"] == "pending"
+    assert payload["final_state"]["edge"] == "derive_requirement_surface"
+    assert payload["final_state"]["blocking_reason"] == "fp_dispatch"
+
+
+def test_installed_self_test_returns_clean_success_when_workspace_is_fully_converged(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_complete")
+    complete_bootstrap_chain(
+        workspace,
+        archive=run_archive,
+        label_prefix="operational_complete",
+        steps=EXPECTED_OPERATIONAL_STEPS,
+    )
+
+    payload = run_installed_self_test(
+        workspace,
+        archive=run_archive,
+        label="odd_sdlc self-test fully converged",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["program"]["name"] == "bootstrap_release_self_test"
+    assert payload["already_converged"] is True
+    assert payload["completed_edges"] == []
+    assert payload["steps"] == []
+    assert payload["final_state"]["status"] == "converged"
+    assert payload["follow_on_program"] is None
 
 
 def test_operational_cycle_projects_deployment_runtime_and_retrofit_surfaces(run_archive) -> None:
@@ -619,9 +770,9 @@ def test_operational_cycle_projects_deployment_runtime_and_retrofit_surfaces(run
     deployment_text = asset_path(workspace, "deployment_surface").read_text(encoding="utf-8")
     runtime_text = asset_path(workspace, "runtime_observation_surface").read_text(encoding="utf-8")
     retrofit_text = asset_path(workspace, "retrofit_plan_surface").read_text(encoding="utf-8")
-    assert "## Governed Deployment Record" in deployment_text
-    assert "- tests carried into deployment record:" in deployment_text
-    assert "## Returned Runtime Position" in runtime_text
+    assert "## Operational Transition Command" in deployment_text
+    assert "- target_result_surface: `deployment_result_surface`" in deployment_text
+    assert "## Admitted Runtime Observation" in runtime_text
     assert "- report files returned:" in runtime_text
     assert "## Retrofit Boundary" in retrofit_text
     assert "## Planned Next Actions" in retrofit_text

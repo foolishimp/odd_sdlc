@@ -24,6 +24,9 @@ temporary focus into accidental constitutional law.
   standing regression corpus for the active software-domain package
 - keep GTL and ABG substrate ownership explicit and small while `odd_sdlc`
   carries software-domain semantics on the live `odd_sdlc` line
+- ratify declarative operational state transitions as explicit command,
+  admitted-result, and projected-state law rather than as ambient release
+  appendages
 - keep `odd_service` incubation subordinate to current ABG runtime truth and
   `odd_sdlc` domain law
 - keep current-wave changes traceable back to the live intent, product, and
@@ -40,6 +43,7 @@ This wave reads current invariant truth from:
 - `specification/requirements/08-odd-sdlc-first-slice.md`
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 - `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
+- `specification/requirements/12-declarative-operational-state-transitions.md`
 
 ## Boundary
 

@@ -167,6 +167,7 @@ class ProjectProfile:
     tenant_name: str
     output_dir: str
     declared_output_dir: str
+    build_execution_contract: str
     test_execution_contract: str
     deployment_contract: str
     runtime_observation_contract: str
@@ -180,6 +181,9 @@ class ProjectProfile:
     def normalized_risk_appetite(self) -> str:
         appetite = self.ambiguity_risk_appetite.strip().lower()
         return appetite if appetite in AMBIGUITY_RISK_APPETITES else DEFAULT_AMBIGUITY_RISK_APPETITE
+
+    def has_build_execution_capability(self) -> bool:
+        return bool(self.build_execution_contract.strip())
 
     def has_test_execution_capability(self) -> bool:
         return bool(self.test_execution_contract.strip())
@@ -201,6 +205,7 @@ class ProjectProfile:
             "tenant_name": self.tenant_name,
             "output_dir": self.output_dir,
             "declared_output_dir": self.declared_output_dir,
+            "build_execution_contract": self.build_execution_contract,
             "test_execution_contract": self.test_execution_contract,
             "deployment_contract": self.deployment_contract,
             "runtime_observation_contract": self.runtime_observation_contract,
@@ -221,6 +226,7 @@ class ProjectProfile:
             tenant_name=str(payload.get("tenant_name", "python")),
             output_dir=str(payload.get("output_dir", "")),
             declared_output_dir=str(payload.get("declared_output_dir", "")),
+            build_execution_contract=str(payload.get("build_execution_contract", "")),
             test_execution_contract=str(payload.get("test_execution_contract", "")),
             deployment_contract=str(payload.get("deployment_contract", "")),
             runtime_observation_contract=str(payload.get("runtime_observation_contract", "")),
@@ -436,6 +442,14 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
 
     capability_specs = (
         (
+            "missing-build-execution-capability",
+            "build_execution",
+            profile.has_build_execution_capability(),
+            "build_execution_contract",
+            "build_execution_surface",
+            "Declare the build execution contract before treating build execution as a governed operational transition.",
+        ),
+        (
             "missing-test-execution-capability",
             profile.test_runner.strip(),
             profile.has_test_execution_capability(),
@@ -476,6 +490,7 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
                 "affected_assets": [affected_asset, "ambiguity_register_surface"],
                 "introduced_by": stage,
                 "expected_resolving_edge": {
+                    "build_execution_contract": "prepare_build_execution_surface",
                     "test_execution_contract": "derive_test_run_archive_surface",
                     "deployment_contract": "prepare_deployment_surface",
                     "runtime_observation_contract": "derive_runtime_observation_surface",
@@ -870,6 +885,7 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
         tenant_name=tenant_name,
         output_dir=output_dir,
         declared_output_dir=declared_output_dir,
+        build_execution_contract=constraints.get("tenant_build_execution_contract", ""),
         test_execution_contract=constraints.get("tenant_test_execution_contract", ""),
         deployment_contract=constraints.get("tenant_deployment_contract", ""),
         runtime_observation_contract=constraints.get("tenant_runtime_observation_contract", ""),

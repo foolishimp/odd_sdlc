@@ -19,6 +19,8 @@ APPS_ROOT = TESTS_DIR.parents[4]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 SOURCE_PACKAGE = ODD_ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
 SOURCE_DESIGN_FP = ODD_ROOT / "build_tenants" / "python" / "design" / "fp"
+SOURCE_GENESIS_RUNTIME = ODD_ROOT / ".genesis" / "genesis"
+SOURCE_GTL_RUNTIME = ODD_ROOT / ".genesis" / "gtl"
 
 
 def install_kernel_sandbox(target: Path, *, archive: "RunArchive | None" = None) -> dict[str, Any]:
@@ -48,6 +50,13 @@ def seed_odd_sdlc_package(target: Path) -> None:
     design_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE_PACKAGE, package_root / "odd_sdlc", dirs_exist_ok=True)
     shutil.copytree(SOURCE_DESIGN_FP, design_root / "fp", dirs_exist_ok=True)
+
+
+def seed_local_genesis_runtime(target: Path) -> None:
+    runtime_root = target / ".genesis"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(SOURCE_GENESIS_RUNTIME, runtime_root / "genesis", dirs_exist_ok=True)
+    shutil.copytree(SOURCE_GTL_RUNTIME, runtime_root / "gtl", dirs_exist_ok=True)
 
 
 def seed_canonical_spec_surface(target: Path) -> None:
@@ -90,6 +99,7 @@ def seed_canonical_spec_surface(target: Path) -> None:
                 '    - name: "python_default"',
                 '      output_dir: ""',
                 '      description: "Sandbox proving layout"',
+                '      build_execution_contract: "python -m build"',
                 '      test_execution_contract: "pytest"',
                 '      deployment_contract: "docs/deployment-contract.md"',
                 '      runtime_observation_contract: "docs/runtime-observation-contract.md"',
@@ -185,6 +195,29 @@ def run_installed_self_test(
     payload = json.loads(result.stdout)
     if archive is not None:
         archive.capture_json("self-test.result.json", payload)
+    return payload
+
+
+def continue_installed_result(
+    workspace: Path,
+    *,
+    result_path: Path,
+    archive: "RunArchive | None" = None,
+    label: str = "odd_sdlc continue",
+    timeout: int = 120,
+) -> dict[str, Any]:
+    result = run_installed_odd_sdlc(
+        workspace,
+        "continue",
+        "--result",
+        str(result_path),
+        archive=archive,
+        label=label,
+        timeout=timeout,
+    )
+    payload = json.loads(result.stdout)
+    if archive is not None:
+        archive.capture_json("continue.result.json", payload)
     return payload
 
 

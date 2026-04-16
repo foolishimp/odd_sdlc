@@ -13,7 +13,9 @@ import pytest
 
 from odd_sdlc.release.install import install as install_release
 from sandbox_runtime import (
+    continue_installed_result,
     read_events,
+    run_constructor_for_start,
     run_installed_genesis,
     run_installed_odd_sdlc,
 )
@@ -89,6 +91,49 @@ def _observe_runtime(workspace: Path, *, run_archive, label: str) -> dict[str, A
     )
     run_archive.capture_json(f"{label}.json", observed)
     return observed
+
+
+def _manual_start(workspace: Path, *, run_archive, label: str) -> dict[str, Any]:
+    payload = json.loads(
+        run_installed_genesis(
+            workspace,
+            "start",
+            archive=run_archive,
+            label=label,
+        ).stdout
+    )
+    run_archive.capture_json(f"{label}.json", payload)
+    return payload
+
+
+def _advance_to_edge(workspace: Path, *, target_edge: str, run_archive, label_prefix: str) -> dict[str, Any]:
+    while True:
+        start_payload = _manual_start(
+            workspace,
+            run_archive=run_archive,
+            label=f"{label_prefix}.start.{target_edge}",
+        )
+        if start_payload["edge"] == target_edge:
+            return start_payload
+        constructor, result_path = run_constructor_for_start(
+            workspace,
+            start_payload=start_payload,
+            archive=run_archive,
+            label=f"{label_prefix}.{start_payload['edge']}.construct",
+        )
+        run_archive.capture_json(f"{label_prefix}.{start_payload['edge']}.construct.json", constructor)
+        assessed = json.loads(
+            run_installed_genesis(
+                workspace,
+                "assess-result",
+                "--result",
+                str(result_path),
+                archive=run_archive,
+                label=f"{label_prefix}.{start_payload['edge']}.assess-result",
+            ).stdout
+        )
+        run_archive.capture_json(f"{label_prefix}.{start_payload['edge']}.assess-result.json", assessed)
+        assert assessed["status"] == "ok"
 
 
 def _yielded_run_projection(observed: dict[str, Any], *, run_id: str) -> dict[str, Any]:
@@ -190,6 +235,46 @@ def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archi
 
 
 @pytest.mark.usecase_id("yield_handoff_canned_chain")
+def test_data_mapper_continue_command_admits_result_refreshes_analysis_and_advances_start(run_archive) -> None:
+    workspace = _prepare_installed_yield_workspace(run_archive)
+
+    start_payload = _manual_start(
+        workspace,
+        run_archive=run_archive,
+        label="continue_resume.start_first",
+    )
+    assert start_payload["status"] == "iterated"
+    assert start_payload["edge"] == "derive_intent_surface"
+    constructor, result_path = run_constructor_for_start(
+        workspace,
+        start_payload=start_payload,
+        archive=run_archive,
+        label="continue_resume.construct_first",
+    )
+    run_archive.capture_json("continue_resume.construct_first.json", constructor)
+
+    continuation = continue_installed_result(
+        workspace,
+        result_path=result_path,
+        archive=run_archive,
+        label="continue_resume.continue_first",
+    )
+    run_archive.capture_json("continue_resume.continue_first.json", continuation)
+    assert continuation["status"] == "continued"
+    assert continuation["result_admission"]["status"] == "ok"
+    assert continuation["analysis"]["ready"] is True
+    assert continuation["gap_snapshot"]["converged"] is False
+
+    next_start = _manual_start(
+        workspace,
+        run_archive=run_archive,
+        label="continue_resume.start_second",
+    )
+    assert next_start["status"] == "iterated"
+    assert next_start["edge"] == "derive_product_surface"
+
+
+@pytest.mark.usecase_id("yield_handoff_canned_chain")
 def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_archive) -> None:
     workspace = _prepare_installed_yield_workspace(run_archive)
     start_payload = _run_start_auto_expect_yield(
@@ -263,6 +348,45 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
         run_id=start_payload["run_id"],
         call_id=start_payload["call_id"],
     )["continuation_id"] == handoff["continuation_id"]
+
+
+@pytest.mark.usecase_id("yield_handoff_canned_chain")
+def test_data_mapper_continue_command_preserves_yielded_handoff_truth(run_archive) -> None:
+    workspace = _prepare_installed_yield_workspace(run_archive)
+    start_payload = _advance_to_edge(
+        workspace,
+        target_edge="derive_design_surface",
+        run_archive=run_archive,
+        label_prefix="continue_yield",
+    )
+    assert start_payload["edge"] == "derive_design_surface"
+    constructor, result_path = run_constructor_for_start(
+        workspace,
+        start_payload=start_payload,
+        archive=run_archive,
+        label="continue_yield.construct",
+    )
+    run_archive.capture_json("continue_yield.construct.json", constructor)
+
+    continuation = continue_installed_result(
+        workspace,
+        result_path=result_path,
+        archive=run_archive,
+        label="continue_yield.continue",
+    )
+    run_archive.capture_json("continue_yield.continue.json", continuation)
+    assert continuation["status"] == "continued"
+    assert continuation["result_admission"]["status"] == "ok"
+    assert continuation["gap_snapshot"]["converged"] is False
+    design_gap = next(
+        gap
+        for gap in continuation["gap_snapshot"]["gaps"]
+        if gap["edge"] == "derive_design_surface"
+    )
+    assert "observation" in design_gap
+    assert "triage" in design_gap
+    assert "route_binding" in design_gap
+    assert design_gap["route_proposal"] is None
 
 
 @pytest.mark.usecase_id("yield_handoff_canned_chain")

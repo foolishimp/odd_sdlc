@@ -3,11 +3,11 @@
 - id: T-004
 - title: Restore homeostatic gap triage, lawful re-entry, and intent renewal on top of the stabilized runtime boundary
 - type: feature
-- status: active
+- status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: critical
 - created_at: 2026-04-13
-- updated_at: 2026-04-13
+- updated_at: 2026-04-16
 - dependencies: B-001, T-002, B-002, T-003
 
 ## Triage
@@ -1057,101 +1057,101 @@ Minimum payload:
 
 ### Slice 1. Substrate And Freshness
 
-- [ ] Add `odd_sdlc-analysis-manifest.json` as a separate published artifact.
-- [ ] Move published-analysis artifact pointers out of `workspace_state` and
+- [x] Add `odd_sdlc-analysis-manifest.json` as a separate published artifact.
+- [x] Move published-analysis artifact pointers out of `workspace_state` and
   into the analysis manifest, leaving `workspace_state` focused on readiness,
   mode, selected root, and published-analysis identity.
-- [ ] Publish one live per-edge triage artifact under
+- [x] Publish one live per-edge triage artifact under
   `.ai-workspace/runtime/triage/<edge_id>.json`.
-- [ ] Reuse ABG event truth rather than adding a second event or continuation
+- [x] Reuse ABG event truth rather than adding a second event or continuation
   store for observation, triage, route, or repricing state.
-- [ ] Codify the freshness law against declared input surfaces and require
+- [x] Codify the freshness law against declared input surfaces and require
   `analysis_fingerprint` match before any published analysis or triage result is
   treated as current truth.
-- [ ] Prove that source-domain helper trees cannot override the declared
+- [x] Prove that source-domain helper trees cannot override the declared
   selected root unless `workspace_mode == source_domain_repo`.
 
 ### Slice 2. Per-Edge Triage
 
-- [ ] Define the closed `process_outcome.kind` and `route_outcome.kind` sets.
-- [ ] Define the generic `framework_layer` and `framework_condition` model.
-- [ ] Define the closed core gap taxonomy and `reentry_layer` model.
-- [ ] Define `unclassified_gap` as the default outcome for undeclared or
+- [x] Define the closed `process_outcome.kind` and `route_outcome.kind` sets.
+- [x] Define the generic `framework_layer` and `framework_condition` model.
+- [x] Define the closed core gap taxonomy and `reentry_layer` model.
+- [x] Define `unclassified_gap` as the default outcome for undeclared or
   semantically void `(framework_layer, framework_condition)` pairs.
-- [ ] Emit durable observation events before triage and keep them correlated to
+- [x] Emit durable observation events before triage and keep them correlated to
   triage artifacts by `observation_id`.
-- [ ] Publish observation events in a stable telemetry shape that remains
+- [x] Publish observation events in a stable telemetry shape that remains
   queryable even when triage fails, is gated, or is not yet implemented for a
   given disturbance class.
-- [ ] Implement triage result publication for failed or incomplete edges using
+- [x] Implement triage result publication for failed or incomplete edges using
   deterministic evaluator output plus semantic evidence.
-- [ ] Emit `triage_divergence` when repeated triage for the same
+- [x] Emit `triage_divergence` when repeated triage for the same
   `(edge_id, analysis_fingerprint)` materially disagrees with the current
   artifact.
-- [ ] Ensure triage consumes deterministic truth rather than replacing it.
-- [ ] Define `authority_basis`, `realized_basis`, and `asset_findings[]` as
+- [x] Ensure triage consumes deterministic truth rather than replacing it.
+- [x] Define `authority_basis`, `realized_basis`, and `asset_findings[]` as
   structured comparison surfaces rather than unconstrained prose fields.
-- [ ] Add evidence extraction for shallow-realization patterns with durable
+- [x] Add evidence extraction for shallow-realization patterns with durable
   `path`, `excerpt`, and line data when available.
-- [ ] Emit `dependency_gap` when F_P triage exhausts its retry budget.
-- [ ] Make ambiguity-gap handling an explicit pass-through envelope over the
+- [x] Emit `dependency_gap` when F_P triage exhausts its retry budget.
+- [x] Make ambiguity-gap handling an explicit pass-through envelope over the
   existing ambiguity register.
-- [ ] Define observation, triage, route, and constitutional event schemas as
+- [x] Define observation, triage, route, and constitutional event schemas as
   first-class domain payloads on the ABG event substrate.
 
 ### Slice 3. Routing And Repricing
 
-- [ ] Separate fixed vectors from dynamic-family route binding.
-- [ ] Emit route events as first-class correlated artifacts rather than
+- [x] Separate fixed vectors from dynamic-family route binding.
+- [x] Emit route events as first-class correlated artifacts rather than
   implicit side effects of triage.
-- [ ] Bind `dynamic_family` through existing candidate-family machinery rather
+- [x] Bind `dynamic_family` through existing candidate-family machinery rather
   than new shadow routing code.
-- [ ] Reuse ABG `workflow_selected` provenance and ABG continuation truth
+- [x] Reuse ABG `workflow_selected` provenance and ABG continuation truth
   rather than inventing a parallel routing or child-lineage model.
-- [ ] Make route selection deterministic and queryable.
-- [ ] Add constitutional repricing proposals with mode gate and F_H approval
+- [x] Make route selection deterministic and queryable.
+- [x] Add constitutional repricing proposals with mode gate and F_H approval
   requirements.
-- [ ] Materialize governed-workspace constitutional policy through
+- [x] Materialize governed-workspace constitutional policy through
   `policy_bundle.constitutional_repricing.mode` rather than fixture-name
   inference.
-- [ ] Define fail-closed/default behavior for missing or malformed
+- [x] Define fail-closed/default behavior for missing or malformed
   `constitutional_repricing.mode`.
-- [ ] Reuse ABG `approved` / `revoked` events for constitutional approval state
+- [x] Reuse ABG `approved` / `revoked` events for constitutional approval state
   rather than introducing a second approval channel.
-- [ ] Define constitutional approval outcomes:
+- [x] Define constitutional approval outcomes:
   - `approve`
   - `approve_with_edits`
   - `reject`
   - `defer`
-- [ ] Keep zero-candidate dynamic routing as `no_lawful_route`, not silent
+- [x] Keep zero-candidate dynamic routing as `no_lawful_route`, not silent
   fallback to repair.
-- [ ] Define traversal budget rules for triage scope, caching, and overrun
+- [x] Define traversal budget rules for triage scope, caching, and overrun
   fallback.
-- [ ] Define blocked-state resumption triggers and deferred constitutional
+- [x] Define blocked-state resumption triggers and deferred constitutional
   proposal semantics explicitly.
 
 ### Slice 4a. Convergence And Budget Guarantees
 
-- [ ] Bound triage attempts per edge per traversal.
-- [ ] Bound active constitutional repricing proposals per constitutional target
+- [x] Bound triage attempts per edge per traversal.
+- [x] Bound active constitutional repricing proposals per constitutional target
   per run.
-- [ ] Suppress no-op supersession when normalized triage has not materially
+- [x] Suppress no-op supersession when normalized triage has not materially
   changed.
-- [ ] Define cache reuse for the current triage artifact at the same
+- [x] Define cache reuse for the current triage artifact at the same
   `analysis_fingerprint`.
 
 ### Slice 4. Proof Fixtures
 
-- [ ] Add named shallow-realization fixtures from the `test28.02` survivor set.
-- [ ] Place the survivor fixture at
+- [x] Add named shallow-realization fixtures from the `test28.02` survivor set.
+- [x] Place the survivor fixture at
   `build_tenants/python/test_env/fixtures/test28_pass2_replay/`.
-- [ ] Add deterministic route-selection proofs over multiple matching dynamic
+- [x] Add deterministic route-selection proofs over multiple matching dynamic
   candidates.
-- [ ] Add repricing-gate proofs for governed fixture and live installed/source
+- [x] Add repricing-gate proofs for governed fixture and live installed/source
   modes.
-- [ ] Add stale-analysis and selected-root boundary proofs as explicit
+- [x] Add stale-analysis and selected-root boundary proofs as explicit
   regression fixtures.
-- [ ] Re-run live downstream proving after checkpoint on the stabilized
+- [x] Re-run live downstream proving after checkpoint on the stabilized
   substrate.
 
 ## Proof Required
@@ -1273,6 +1273,24 @@ Required acceptance tests:
 
 This ticket does not silently absorb the broader odd_service remote-client and
 consensus product-line debt. That work remains explicitly tracked in `B-004`.
+
+## Completion Notes
+
+- `triage.py` now publishes a durable per-edge homeostatic chain over
+  observation, semantic triage, route binding, and constitutional proposal
+  state without introducing a second event or continuation substrate.
+- semantic triage is now bounded, cache-aware, analysis-freshness aware, and
+  divergence-aware; repeated materially changed triage emits
+  `triage_divergence`.
+- shallow-realization evidence is structured and durable, including path,
+  excerpt, and line data from the survivor fixtures.
+- the route layer now distinguishes fixed-vector repair from declared
+  dynamic-family selection and records zero-candidate dynamic routing as an
+  explicit `no_lawful_route` state.
+- constitutional repricing remains explicit and gated through policy plus ABG
+  approval/revocation truth rather than ambient file edits.
+- focused proof is green:
+  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q`
 
 ## Links
 
