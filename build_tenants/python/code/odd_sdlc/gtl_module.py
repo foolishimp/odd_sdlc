@@ -110,6 +110,18 @@ _design_surface = _asset_node(
     required_contexts=("requirement_surface", "feature_decomp_surface"),
     output_contract_refs=("design_surface_present",),
 )
+_subject_surface = _asset_node(
+    "subject_surface",
+    schema="odd.asset.subject_surface",
+    kind="review_subject_surface",
+    output_contract_refs=("review_subject_surface_present",),
+)
+_comment_review_subject_surface = _asset_node(
+    "comment_review_subject_surface",
+    schema="odd.asset.comment_review_subject_surface",
+    kind="review_subject_surface",
+    output_contract_refs=("review_subject_surface_present",),
+)
 _review_assessment_surface = _asset_node(
     "review_assessment_surface",
     schema="odd.asset.review_assessment_surface",
@@ -130,6 +142,20 @@ _reviewed_design_surface = _asset_node(
     kind="reviewed_design_surface",
     required_contexts=("design_surface", "consensus_decision_surface"),
     output_contract_refs=("reviewed_design_surface_present",),
+)
+_reviewed_subject_surface = _asset_node(
+    "reviewed_subject_surface",
+    schema="odd.asset.reviewed_subject_surface",
+    kind="reviewed_subject_surface",
+    required_contexts=("subject_surface", "consensus_decision_surface"),
+    output_contract_refs=("reviewed_subject_surface_present",),
+)
+_reviewed_comment_surface = _asset_node(
+    "reviewed_comment_surface",
+    schema="odd.asset.reviewed_comment_surface",
+    kind="reviewed_subject_surface",
+    required_contexts=("comment_review_subject_surface", "consensus_decision_surface"),
+    output_contract_refs=("reviewed_subject_surface_present",),
 )
 _testcase_authority_surface = _asset_node(
     "testcase_authority_surface",
@@ -934,6 +960,28 @@ REVIEW_DESIGN_CONSENSUS_ROUND_INTENT = (
     "Run one explicit design-review consensus round: derive review assessments, "
     "reduce them into a consensus decision, and apply the reviewed design result."
 )
+REVIEW_SUBJECT_CONSENSUS_ROUND_INTENT = (
+    "Run one reusable subject-review consensus round over a typed host subject, "
+    "publishing review assessment, decision, and reviewed-subject contract metadata."
+)
+REVIEW_COMMENT_CONSENSUS_ROUND_INTENT = (
+    "Bind the reusable subject-review consensus round to odd_sdlc comment-review subjects."
+)
+SUBJECT_CONSENSUS_HARNESS_CONTRACT = {
+    "subject_asset": "subject_surface",
+    "assessment_asset": "review_assessment_surface",
+    "decision_asset": "consensus_decision_surface",
+    "reviewed_asset": "reviewed_subject_surface",
+    "assessment_vector_asset": "review_assessment_vector",
+    "injected_functions": {
+        "review_round": "review_subject_assessment_round",
+        "reduce": "reduce_subject_consensus_decision",
+        "apply": "apply_subject_consensus_decision",
+    },
+    "policy_rule": "subject_consensus_rule",
+    "composable": True,
+    "recursive": True,
+}
 DESIGN_CONSENSUS_HARNESS_CONTRACT = {
     "subject_asset": "design_surface",
     "assessment_asset": "review_assessment_surface",
@@ -946,6 +994,17 @@ DESIGN_CONSENSUS_HARNESS_CONTRACT = {
         "apply": "apply_design_consensus_decision",
     },
     "policy_rule": "design_consensus_rule",
+    "composable": True,
+    "recursive": True,
+}
+COMMENT_REVIEW_CONSENSUS_HARNESS_CONTRACT = {
+    "subject_asset": "comment_review_subject_surface",
+    "assessment_asset": "review_assessment_surface",
+    "decision_asset": "consensus_decision_surface",
+    "reviewed_asset": "reviewed_comment_surface",
+    "assessment_vector_asset": "review_assessment_vector",
+    "binding_of": "review_subject_by_consensus",
+    "host_binding_kind": "comment_review",
     "composable": True,
     "recursive": True,
 }
@@ -966,6 +1025,10 @@ GF_REVIEW_DESIGN_CONSENSUS_ROUND = _annotate_graph_function(
     extra_declarations={
         "harness_kind": "consensus_round",
         "harness_contract": DESIGN_CONSENSUS_HARNESS_CONTRACT,
+        "host_binding_of": "review_subject_consensus_round",
+        "host_binding_kind": "design_review",
+        "host_subject_asset": "design_surface",
+        "host_reviewed_asset": "reviewed_design_surface",
     },
     tags=("consensus", "round"),
 )
@@ -1064,6 +1127,17 @@ _design_consensus_applier = _symbolic_graph_function(
     tags=("consensus", "apply"),
 )
 
+_subject_consensus_rule = Rule(
+    name="subject_consensus_rule",
+    kind="consensus",
+    config={
+        "quorum": 2,
+        "max_rounds": 3,
+        "on_open": "repeat_round",
+        "on_exhaust": "escalate_f_h",
+        "assessment_shape": "review_assessment_surface",
+    },
+)
 _design_consensus_rule = Rule(
     name="design_consensus_rule",
     kind="consensus",
@@ -1074,6 +1148,63 @@ _design_consensus_rule = Rule(
         "on_exhaust": "escalate_f_h",
         "assessment_shape": "review_assessment_surface",
     },
+)
+
+GF_REVIEW_SUBJECT_CONSENSUS_ROUND = _annotate_graph_function(
+    _symbolic_graph_function(
+        name="review_subject_consensus_round",
+        ref="odd_sdlc.shared.consensus:review_subject_consensus_round",
+        inputs=(_subject_surface,),
+        outputs=(_reviewed_subject_surface,),
+        declarations=Attrs(),
+        tags=("consensus", "plugin", "round"),
+    ),
+    function_kind="odd_consensus_plugin_round_graph_function",
+    intent=REVIEW_SUBJECT_CONSENSUS_ROUND_INTENT,
+    extra_declarations={
+        "plugin_kind": "shared_consensus_plugin",
+        "harness_kind": "consensus_round",
+        "harness_contract": SUBJECT_CONSENSUS_HARNESS_CONTRACT,
+        "harness_implementation": {
+            "custom_functions": (
+                "review_subject_assessment_round",
+                "reduce_subject_consensus_decision",
+                "apply_subject_consensus_decision",
+            ),
+            "policy_rule": _subject_consensus_rule.name,
+        },
+    },
+    tags=("plugin",),
+)
+
+GF_REVIEW_SUBJECT_BY_CONSENSUS = _annotate_graph_function(
+    _symbolic_graph_function(
+        name="review_subject_by_consensus",
+        ref="odd_sdlc.shared.consensus:review_subject_by_consensus",
+        inputs=(_subject_surface,),
+        outputs=(_reviewed_subject_surface,),
+        declarations=Attrs(),
+        tags=("consensus", "plugin", "library"),
+    ),
+    function_kind="odd_consensus_plugin_graph_function",
+    intent=(
+        "Run reusable subject-based consensus over GTL higher-order operators while "
+        "keeping the outer subject/assessment/decision/reviewed-subject contract stable."
+    ),
+    extra_declarations={
+        "plugin_kind": "shared_consensus_plugin",
+        "harness_kind": "consensus_harness",
+        "harness_contract": SUBJECT_CONSENSUS_HARNESS_CONTRACT,
+        "harness_implementation": {
+            "custom_functions": (
+                "review_subject_assessment_round",
+                "reduce_subject_consensus_decision",
+                "apply_subject_consensus_decision",
+            ),
+            "policy_rule": _subject_consensus_rule.name,
+        },
+    },
+    tags=("plugin",),
 )
 
 GF_REVIEW_DESIGN_BY_CONSENSUS = _annotate_graph_function(
@@ -1108,8 +1239,65 @@ GF_REVIEW_DESIGN_BY_CONSENSUS = _annotate_graph_function(
             ),
             "policy_rule": _design_consensus_rule.name,
         },
+        "host_binding_of": "review_subject_by_consensus",
+        "host_binding_kind": "design_review",
+        "host_subject_asset": "design_surface",
+        "host_reviewed_asset": "reviewed_design_surface",
     },
     tags=("consensus", "library"),
+)
+
+GF_REVIEW_COMMENT_CONSENSUS_ROUND = _annotate_graph_function(
+    _symbolic_graph_function(
+        name="review_comment_consensus_round",
+        ref="review_subject_consensus_round",
+        inputs=(_comment_review_subject_surface,),
+        outputs=(_reviewed_comment_surface,),
+        declarations=Attrs(),
+        tags=("consensus", "host_binding", "comment_review", "round"),
+    ),
+    function_kind="odd_consensus_host_binding_round_graph_function",
+    intent=REVIEW_COMMENT_CONSENSUS_ROUND_INTENT,
+    extra_declarations={
+        "plugin_kind": "host_binding",
+        "host_binding_of": "review_subject_consensus_round",
+        "host_binding_kind": "comment_review",
+        "host_subject_asset": "comment_review_subject_surface",
+        "host_reviewed_asset": "reviewed_comment_surface",
+        "harness_kind": "consensus_round",
+        "harness_contract": COMMENT_REVIEW_CONSENSUS_HARNESS_CONTRACT,
+    },
+    tags=("host_binding", "comment_review"),
+)
+
+GF_REVIEW_COMMENT_BY_CONSENSUS = _annotate_graph_function(
+    _symbolic_graph_function(
+        name="review_comment_by_consensus",
+        ref="review_subject_by_consensus",
+        inputs=(_comment_review_subject_surface,),
+        outputs=(_reviewed_comment_surface,),
+        declarations=Attrs(),
+        tags=("consensus", "host_binding", "comment_review", "library"),
+    ),
+    function_kind="odd_consensus_host_binding_graph_function",
+    intent=(
+        "Bind the reusable subject-based consensus plugin to odd_sdlc comment-review "
+        "subjects without making odd_sdlc the owner of the consensus law."
+    ),
+    extra_declarations={
+        "plugin_kind": "host_binding",
+        "host_binding_of": "review_subject_by_consensus",
+        "host_binding_kind": "comment_review",
+        "host_subject_asset": "comment_review_subject_surface",
+        "host_reviewed_asset": "reviewed_comment_surface",
+        "harness_kind": "consensus_harness",
+        "harness_contract": COMMENT_REVIEW_CONSENSUS_HARNESS_CONTRACT,
+        "harness_implementation": {
+            "plugin_graph_function": "review_subject_by_consensus",
+            "policy_rule": _subject_consensus_rule.name,
+        },
+    },
+    tags=("host_binding", "comment_review"),
 )
 
 LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
@@ -1142,6 +1330,14 @@ OPERATIONAL_LEAF_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
     GF_DERIVE_DEPLOYED_ENVIRONMENT,
     GF_DERIVE_RUNTIME_OBSERVATION,
     GF_DERIVE_RETROFIT_PLAN,
+)
+CATALOG_VISIBLE_LIBRARY_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
+    GF_REVIEW_SUBJECT_CONSENSUS_ROUND,
+    GF_REVIEW_SUBJECT_BY_CONSENSUS,
+    GF_REVIEW_DESIGN_CONSENSUS_ROUND,
+    GF_REVIEW_DESIGN_BY_CONSENSUS,
+    GF_REVIEW_COMMENT_CONSENSUS_ROUND,
+    GF_REVIEW_COMMENT_BY_CONSENSUS,
 )
 
 BOOTSTRAP_RELEASE_SELF_TEST_INTENT = (
@@ -1269,6 +1465,7 @@ def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[Grap
 def _active_function_catalog(active_operational_functions: tuple[GraphFunction, ...]) -> tuple[dict[str, object], ...]:
     active_names = {function.name for function in LEAF_GRAPH_FUNCTIONS}
     active_names.update(function.name for function in active_operational_functions)
+    active_names.update(function.name for function in CATALOG_VISIBLE_LIBRARY_GRAPH_FUNCTIONS)
     return tuple(
         entry.to_dict()
         for entry in FUNCTION_CATALOG
@@ -1404,8 +1601,12 @@ def _build_module(workspace_root: Path) -> Module:
 
     graph_functions = [
         *executive_graph_functions,
+        GF_REVIEW_SUBJECT_CONSENSUS_ROUND,
+        GF_REVIEW_SUBJECT_BY_CONSENSUS,
         GF_REVIEW_DESIGN_CONSENSUS_ROUND,
         GF_REVIEW_DESIGN_BY_CONSENSUS,
+        GF_REVIEW_COMMENT_CONSENSUS_ROUND,
+        GF_REVIEW_COMMENT_BY_CONSENSUS,
     ]
     refinement_vectors = [
         *bootstrap_executive.materialize().vectors,
@@ -1497,6 +1698,7 @@ def _build_module(workspace_root: Path) -> Module:
             *dynamic_fh_evaluators,
         ),
         rules=(
+            _subject_consensus_rule,
             _design_consensus_rule,
         ),
         metadata=Attrs(
@@ -1530,8 +1732,16 @@ def _build_module(workspace_root: Path) -> Module:
                 ("executive_graph_function", bootstrap_executive.name),
                 ("executive_graph_functions", tuple(function.name for function in executive_graph_functions)),
                 ("library_graph_functions", (
+                    GF_REVIEW_SUBJECT_CONSENSUS_ROUND.name,
+                    GF_REVIEW_SUBJECT_BY_CONSENSUS.name,
                     GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
                     GF_REVIEW_DESIGN_BY_CONSENSUS.name,
+                )),
+                ("host_binding_graph_functions", (
+                    GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
+                    GF_REVIEW_DESIGN_BY_CONSENSUS.name,
+                    GF_REVIEW_COMMENT_CONSENSUS_ROUND.name,
+                    GF_REVIEW_COMMENT_BY_CONSENSUS.name,
                 )),
                 ("operational_capability_gated", True),
                 ("ambiguity_risk_appetite", ambiguity_register.get("project_profile", {}).get("ambiguity_risk_appetite", "")),

@@ -3,11 +3,11 @@
 - id: T-008
 - title: Generalize odd_sdlc gap analysis so operators can zoom out over any two graph points and their dependent refined nodes for a full lawful gap analysis
 - type: feature
-- status: active
+- status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: high
 - created_at: 2026-04-16
-- updated_at: 2026-04-16
+- updated_at: 2026-04-18
 - dependencies: T-004, B-011
 
 ## Triage

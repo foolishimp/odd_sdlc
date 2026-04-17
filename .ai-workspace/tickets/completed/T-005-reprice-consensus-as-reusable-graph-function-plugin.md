@@ -3,11 +3,11 @@
 - id: T-005
 - title: Reprice consensus review as a shared reusable graph-function plugin with host bindings instead of odd_sdlc-owned product capability
 - type: feature
-- status: active
+- status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: high
 - created_at: 2026-04-13
-- updated_at: 2026-04-13
+- updated_at: 2026-04-17
 - dependencies: T-004
 
 ## Triage
@@ -144,25 +144,25 @@ operator flow end to end.
 
 ## Task List
 
-- [ ] Reprice shared product and requirement surfaces so the line explicitly
+- [x] Reprice shared product and requirement surfaces so the line explicitly
   supports reusable graph-function plugins and names consensus review as one
   such capability.
-- [ ] Decide whether the shared law lives as an extension of
+- [x] Decide whether the shared law lives as an extension of
   `02-graph-functions.md` or as a new dedicated requirement family, and make the
   choice explicit rather than ambient.
-- [ ] Reprice `REQ-F-ODDSDLC-023` so `odd_sdlc` is a host/proving consumer of
+- [x] Reprice `REQ-F-ODDSDLC-023` so `odd_sdlc` is a host/proving consumer of
   the reusable consensus plugin rather than the unique owner of the harness.
-- [ ] Choose shared design and realization placement for the plugin and future
+- [x] Choose shared design and realization placement for the plugin and future
   registry path, likely under a shared realization surface such as
   `build_tenants/common/` or another explicitly shared package root.
-- [ ] Generalize the current consensus asset contract from design-specific lanes
+- [x] Generalize the current consensus asset contract from design-specific lanes
   to subject-based lanes with stable outer naming and catalog visibility.
-- [ ] Publish the reusable plugin with explicit stage and policy metadata so the
+- [x] Publish the reusable plugin with explicit stage and policy metadata so the
   caller can consume the outer contract without hidden engine folklore.
-- [ ] Add one concrete `odd_sdlc` host binding for comment or strategy review.
-- [ ] Prove that the host binding can invoke the shared plugin without making
+- [x] Add one concrete `odd_sdlc` host binding for comment or strategy review.
+- [x] Prove that the host binding can invoke the shared plugin without making
   `odd_sdlc` the constitutional owner of consensus.
-- [ ] Link, but do not absorb, the later odd_service multi-worker proving lane.
+- [x] Link, but do not absorb, the later odd_service multi-worker proving lane.
 
 ## Acceptance
 
@@ -204,6 +204,7 @@ operator flow end to end.
 ## Links
 
 - strategy: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260413T144430Z_STRATEGY_consensus-as-reusable-graph-function-plugin.md`
-- related: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
+- related: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/backlog/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
 - requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/02-graph-functions.md`
 - requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- adr: `/Users/jim/src/apps/odd_sdlc/build_tenants/common/design/adrs/ADR-008-consensus-plugin-host-binding-boundary.md`

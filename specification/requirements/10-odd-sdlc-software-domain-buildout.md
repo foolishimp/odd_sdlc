@@ -39,6 +39,9 @@ generate-once surface tree.
   project completion
 - AC-3: runtime-returned evidence can lawfully open further governed work on the
   same line
+- AC-4: installed-dev sandbox/worksite preparation, observation, reset, and
+  rerun remain first-class lifecycle acts rather than hidden proving-harness
+  conventions
 
 ### REQ-F-ODDSDLC-011 — odd_sdlc expands the asset ontology across the full software lifecycle
 
@@ -176,6 +179,9 @@ runtime.
 - AC-3: the same query surface remains suitable for direct UI composition,
   service wrapping, or MCP-style exposure without changing its core domain
   logic
+- AC-4: operator-facing gap analysis may lawfully zoom over a bounded span
+  between two graph points, including dependent realizing structure, without
+  redefining runtime truth or forcing unconditional whole-graph solving
 
 ### REQ-F-ODDSDLC-021 — odd_sdlc publishes the current executive GTL carrier over its active software-domain graph
 
@@ -205,18 +211,22 @@ behavior for imported or stale workspaces.
 - AC-4: imported or adopted implementation and evidence are not rewritten into
   false generated truth
 
-### REQ-F-ODDSDLC-023 — odd_sdlc retains reusable higher-order review and consensus harnesses as active software-domain capability
+### REQ-F-ODDSDLC-023 — odd_sdlc proves reusable higher-order consensus plugins through explicit host bindings
 
-Reusable review, reduction, and consensus harnesses remain active capability in
-the current `odd_sdlc` software-domain package.
+Reusable review, reduction, and consensus harnesses remain active capability on
+the `odd_sdlc` line, while the `odd_sdlc` software-domain package proves them
+through explicit host bindings instead of acting as their unique owner.
 
 **Acceptance Criteria**:
-- AC-1: the tenant publishes one explicit reusable higher-order consensus
-  carrier over typed subject, assessment, decision, and reviewed-output assets
-- AC-2: the harness remains an ordinary GTL graph-function publication rather
+- AC-1: the line publishes one explicit reusable higher-order consensus plugin
+  carrier over typed subject, assessment, decision, and reviewed-subject assets
+- AC-2: `odd_sdlc` publishes host bindings over that plugin for concrete review
+  subjects such as design review or comment review
+- AC-3: the plugin remains an ordinary GTL graph-function publication rather
   than a hidden engine path
-- AC-3: its contract, injected stage functions, and governing policy remain
-  inspectable through the active design and catalog surfaces
+- AC-4: the plugin contract, injected stage functions, governing policy, and
+  host-binding relationship remain inspectable through the active design and
+  catalog surfaces
 
 ### REQ-F-ODDSDLC-024 — active odd_sdlc qualification proves the current software-domain model rather than first-slice habit
 

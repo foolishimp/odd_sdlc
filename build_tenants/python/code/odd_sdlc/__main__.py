@@ -11,8 +11,10 @@ from .continuation import continue_with_result
 from .constructor import construct_manifest
 from .normalization import normalize_workspace
 from .observer import observe
+from .operational_dispatch import dispatch_operational
 from .query import query_domain
 from .release.install import install as install_release
+from .sandbox_lifecycle import observe_sandbox, prepare_sandbox, reset_sandbox_runtime_state
 from .self_test import programs, self_test
 
 
@@ -28,9 +30,17 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("observe", parents=[common])
     subparsers.add_parser("query-domain", parents=[common])
     subparsers.add_parser("refresh-analysis", parents=[common])
-    subparsers.add_parser("gaps", parents=[common])
+    gaps_parser = subparsers.add_parser("gaps", parents=[common])
+    gaps_parser.add_argument("--from-edge")
+    gaps_parser.add_argument("--to-edge")
+    gaps_parser.add_argument("--zoom", choices=["coarse", "refined", "combined"], default="combined")
+    gaps_parser.add_argument("--include-dependent", action="store_true")
     subparsers.add_parser("iterate", parents=[common])
+    subparsers.add_parser("dispatch-operational", parents=[common])
     subparsers.add_parser("self-test", parents=[common])
+    subparsers.add_parser("prepare-sandbox", parents=[common])
+    subparsers.add_parser("observe-sandbox", parents=[common])
+    subparsers.add_parser("reset-sandbox", parents=[common])
     continue_parser = subparsers.add_parser("continue", parents=[common])
     continue_parser.add_argument("--result", required=True)
     normalize_parser = subparsers.add_parser("normalize-workspace", parents=[common])
@@ -65,6 +75,19 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
 
+    if args.command == "prepare-sandbox":
+        result = prepare_sandbox(args.workspace)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.command == "observe-sandbox":
+        result = observe_sandbox(args.workspace)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.command == "reset-sandbox":
+        result = reset_sandbox_runtime_state(args.workspace)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+
     app = initialize(bootstrap(workspace_root=args.workspace))
 
     if args.command == "catalog":
@@ -81,9 +104,17 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "refresh-analysis":
         result = refresh_analysis(args.workspace)
     elif args.command == "gaps":
-        result = gaps(app)
+        result = gaps(
+            app,
+            from_edge=args.from_edge,
+            to_edge=args.to_edge,
+            zoom=args.zoom,
+            include_dependent=args.include_dependent,
+        )
     elif args.command == "iterate":
         result = iterate(app)
+    elif args.command == "dispatch-operational":
+        result = dispatch_operational(app)
     elif args.command == "self-test":
         result = self_test(app)
     elif args.command == "continue":

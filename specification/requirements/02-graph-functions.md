@@ -74,3 +74,6 @@ contract and the published higher-order policy/binding surface.
   prompt folklore
 - AC-3: a higher-order harness may itself be composed or recursively chained as
   one graph function inside larger GTL carriers
+- AC-4: reusable higher-order graph-function plugins and host-specific bindings
+  are distinguished explicitly in the catalog and design surfaces rather than
+  being conflated into one product-local capability name

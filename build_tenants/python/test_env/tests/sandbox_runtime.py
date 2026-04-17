@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -10,117 +9,44 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
 
+from odd_sdlc.sandbox_lifecycle import (
+    assert_installed_genesis_runtime as _assert_installed_genesis_runtime,
+    install_kernel_sandbox as _install_kernel_sandbox,
+    observe_sandbox as _observe_sandbox,
+    reset_sandbox_runtime_state as _reset_sandbox_runtime_state,
+    sandbox_env,
+    seed_canonical_spec_surface as _seed_canonical_spec_surface,
+    seed_odd_sdlc_package as _seed_odd_sdlc_package,
+)
+
 if TYPE_CHECKING:
     from run_archive import RunArchive
 
 TESTS_DIR = Path(__file__).resolve().parent
-ODD_ROOT = TESTS_DIR.parents[3]
-APPS_ROOT = TESTS_DIR.parents[4]
-ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
-SOURCE_PACKAGE = ODD_ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
-SOURCE_DESIGN_FP = ODD_ROOT / "build_tenants" / "python" / "design" / "fp"
-SOURCE_GENESIS_RUNTIME = ODD_ROOT / ".genesis" / "genesis"
-SOURCE_GTL_RUNTIME = ODD_ROOT / ".genesis" / "gtl"
 
 
 def install_kernel_sandbox(target: Path, *, archive: "RunArchive | None" = None) -> dict[str, Any]:
-    target.mkdir(parents=True, exist_ok=True)
     try:
-        result = subprocess.run(
-            [sys.executable, str(ABI_INSTALLER), "--target", str(target), "--project-slug", "odd_sdlc_sandbox"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=True,
-        )
+        payload = _install_kernel_sandbox(target)
     except subprocess.CalledProcessError as error:
         if archive is not None:
             archive.log_subprocess("install_kernel_sandbox", error)
         raise
     if archive is not None:
-        archive.log_subprocess("install_kernel_sandbox", result)
-        archive.capture_text("installer.stdout.txt", result.stdout)
-    return json.loads(result.stdout)
+        archive.capture_json("installer.result.json", payload)
+    return payload
 
 
 def seed_odd_sdlc_package(target: Path) -> None:
-    package_root = target / ".odd_sdlc" / "python" / "code"
-    design_root = target / ".odd_sdlc" / "python" / "design"
-    package_root.mkdir(parents=True, exist_ok=True)
-    design_root.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SOURCE_PACKAGE, package_root / "odd_sdlc", dirs_exist_ok=True)
-    shutil.copytree(SOURCE_DESIGN_FP, design_root / "fp", dirs_exist_ok=True)
+    _seed_odd_sdlc_package(target)
 
 
-def seed_local_genesis_runtime(target: Path) -> None:
-    runtime_root = target / ".genesis"
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SOURCE_GENESIS_RUNTIME, runtime_root / "genesis", dirs_exist_ok=True)
-    shutil.copytree(SOURCE_GTL_RUNTIME, runtime_root / "gtl", dirs_exist_ok=True)
+def assert_installed_genesis_runtime(target: Path) -> None:
+    _assert_installed_genesis_runtime(target)
 
 
 def seed_canonical_spec_surface(target: Path) -> None:
-    spec_root = target / "specification"
-    context_root = target / ".ai-workspace" / "context"
-    (spec_root / "requirements").mkdir(parents=True, exist_ok=True)
-    context_root.mkdir(parents=True, exist_ok=True)
-    (spec_root / "INTENT.md").write_text(
-        "# Intent\n\n`odd_sdlc` exists to prove asset-typed GTL/ABG app execution.\n",
-        encoding="utf-8",
-    )
-    (spec_root / "PRODUCT.md").write_text(
-        "# Product\n\nThe canonical sandbox use case is a toy app with real GTL publication and ABG runtime audit.\n",
-        encoding="utf-8",
-    )
-    (spec_root / "GOALS.md").write_text(
-        "# Goals\n\n- run the sandbox\n- inspect emitted facts\n- reset and rerun\n",
-        encoding="utf-8",
-    )
-    (spec_root / "requirements" / "10-canonical-sandbox.md").write_text(
-        "# Canonical Sandbox Requirements\n\nThe sandbox lane must be repeatable.\n",
-        encoding="utf-8",
-    )
-    (context_root / "project_constraints.yml").write_text(
-        "\n".join(
-            (
-                "# Project Constraints — odd_sdlc_sandbox",
-                "",
-                "project:",
-                '  name: "odd_sdlc_sandbox"',
-                '  kind: "software-project"',
-                '  language: "Python"',
-                '  test_runner: "pytest"',
-                '  ambiguity_risk_appetite: "medium"',
-                "",
-                "constraints: {}",
-                "",
-                "structure:",
-                "  design_tenants:",
-                '    - name: "python_default"',
-                '      output_dir: ""',
-                '      description: "Sandbox proving layout"',
-                '      build_execution_contract: "python -m build"',
-                '      test_execution_contract: "pytest"',
-                '      deployment_contract: "docs/deployment-contract.md"',
-                '      runtime_observation_contract: "docs/runtime-observation-contract.md"',
-                "  root_code_policy: reject",
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
-
-
-def sandbox_env(workspace: Path) -> dict[str, str]:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        (
-            str(workspace / ".genesis"),
-            str(workspace / ".odd_sdlc" / "python" / "code"),
-        )
-    )
-    env.pop("PYTEST_CURRENT_TEST", None)
-    return env
+    _seed_canonical_spec_surface(target)
 
 
 def run_installed_odd_sdlc(
@@ -360,14 +286,14 @@ def reset_sandbox_runtime_state(
     if archive is not None and runtime_root.exists():
         archive.snapshot_runtime(snapshot_label, workspace=workspace)
         archive.note("runtime_reset", snapshot_label=snapshot_label)
-    if runtime_root.exists():
-        shutil.rmtree(runtime_root)
+    _reset_sandbox_runtime_state(workspace)
 
 
 def read_events(workspace: Path) -> list[dict[str, Any]]:
-    path = workspace / ".ai-workspace" / "events" / "events.jsonl"
-    if not path.exists():
+    observation = _observe_sandbox(workspace)
+    if observation["event_count"] == 0:
         return []
+    path = workspace / ".ai-workspace" / "events" / "events.jsonl"
     return [
         json.loads(line)
         for line in path.read_text(encoding="utf-8").splitlines()

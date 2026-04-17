@@ -3,11 +3,11 @@
 - id: B-004
 - title: Track deferred odd_service scope debt for remote verification, client boundary, and consensus proving
 - type: bug
-- status: active
+- status: backlog
 - goal: orchestration-plane
 - priority: medium
 - created_at: 2026-04-13
-- updated_at: 2026-04-13
+- updated_at: 2026-04-17
 - dependencies: T-004
 
 ## Triage
@@ -65,5 +65,5 @@ When this ticket is activated, the work should:
 
 ## Links
 
-- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
+- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
 - requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/09-odd-service-orchestration-plane.md`

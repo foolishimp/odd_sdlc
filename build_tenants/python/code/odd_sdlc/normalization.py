@@ -52,6 +52,26 @@ def _normalization_action(*, kind: str, path: Path, detail: str) -> dict[str, st
     }
 
 
+def _default_with_provenance(
+    *,
+    kind: str,
+    path: Path,
+    detail: str,
+    field: str | None = None,
+    value: str | None = None,
+) -> dict[str, str]:
+    payload = {
+        "kind": kind,
+        "path": path.as_posix(),
+        "detail": detail,
+    }
+    if field is not None:
+        payload["field"] = field
+    if value is not None:
+        payload["value"] = value
+    return payload
+
+
 def _write_text(path: Path, content: str, *, kind: str, detail: str, actions: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -179,7 +199,6 @@ def _ontology_anchor_headings(path: Path) -> list[str]:
 def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, platform: str) -> str:
     imported = _imported_requirement_sources(workspace_root)
     intent_path = workspace_root / "specification" / "INTENT.md"
-    readme = workspace_root / "README.md"
     identity_title, identity_source = _project_identity(workspace_root)
     candidate_titles = []
     if intent_path.exists():
@@ -190,10 +209,6 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
         title = _first_heading(source)
         if title:
             candidate_titles.append((source.relative_to(workspace_root).as_posix(), title))
-    if readme.exists():
-        title = _first_heading(readme)
-        if title:
-            candidate_titles.append(("README.md", f"{title} [provenance/context]"))
 
     title_lines = (
         [f"- `{source}`: {title}" for source, title in candidate_titles]
@@ -202,7 +217,7 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
 
     ontology_lines: list[str] = []
     seen_anchors: set[tuple[str, str]] = set()
-    candidate_sources = tuple(path for path in (readme, *imported) if path.exists())
+    candidate_sources = tuple(path for path in (intent_path, *imported) if path.exists())
     for source in candidate_sources:
         rel = source.relative_to(workspace_root).as_posix()
         for anchor in _ontology_anchor_headings(source):
@@ -252,7 +267,6 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "- imported requirement-like sources listed there",
             "- `.ai-workspace/runtime/odd_sdlc-ambiguity-register.json` for current major ambiguity state",
             "- `.ai-workspace/runtime/odd_sdlc-requirement-closure.json` for live requirement carry-forward and code/test closure state",
-            "- `README.md` only as provenance/context after the imported authority",
             "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
             "",
             "## Installed Runtime Start Surface",
@@ -267,11 +281,52 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "## Interpretation Rule",
             "- use this surface to orient quickly",
             "- use imported project sources as authority",
-            "- treat README/bootstrap history and template language as provenance unless an imported authority surface makes it project-defining",
+            "- treat copied template/bootstrap history as provenance rather than live workspace guidance",
             "- if ontology remains incomplete, say so explicitly rather than inferring it from repository context",
             "",
         )
     )
+
+
+def _remove_legacy_root_readme(workspace_root: Path, *, actions: list[dict[str, str]]) -> None:
+    readme_path = workspace_root / "README.md"
+    if not readme_path.exists() or not readme_path.is_file():
+        return
+    readme_path.unlink()
+    actions.append(
+        _normalization_action(
+            kind="remove_legacy_root_readme",
+            path=readme_path,
+            detail="removed copied root README so installed workspace guidance comes from bootloader and runtime surfaces only",
+        )
+    )
+
+
+def _validate_existing_project_constraints(path: Path) -> None:
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    if not text.strip():
+        raise ValueError("project_constraints.yml exists but is empty; normalization will not silently replace it")
+
+    missing_sections = [
+        section
+        for section in ("project:", "structure:", "design_tenants:")
+        if section not in text
+    ]
+    if missing_sections:
+        raise ValueError(
+            "project_constraints.yml is malformed; missing required sections: "
+            + ", ".join(missing_sections)
+        )
+
+    tenants = parse_design_tenants(path)
+    if not tenants:
+        raise ValueError(
+            "project_constraints.yml is malformed; at least one design tenant must be declared"
+        )
+
+
 def _default_product_surface(workspace_root: Path) -> str:
     imported = _imported_requirement_sources(workspace_root)
     bullets = (
@@ -334,6 +389,7 @@ def _normalize_project_constraints(
     project_slug: str,
     platform: str,
     actions: list[dict[str, str]],
+    defaults_with_provenance: list[dict[str, str]],
 ) -> None:
     path = workspace_root / ".ai-workspace" / "context" / "project_constraints.yml"
     canonical_platform = canonical_tenant_name(platform)
@@ -373,8 +429,16 @@ def _normalize_project_constraints(
             detail="created canonical project constraints surface for odd_sdlc operation",
             actions=actions,
         )
+        defaults_with_provenance.append(
+            _default_with_provenance(
+                kind="create_project_constraints",
+                path=path,
+                detail="created default project_constraints.yml because the imported workspace did not provide one",
+            )
+        )
         return
 
+    _validate_existing_project_constraints(path)
     original = path.read_text(encoding="utf-8")
     lines = original.splitlines()
     updated: list[str] = []
@@ -394,12 +458,30 @@ def _normalize_project_constraints(
         if design_tenant_seen and not tenant_output_written:
             updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
             tenant_output_written = True
+            defaults_with_provenance.append(
+                _default_with_provenance(
+                    kind="default_project_constraint_field",
+                    path=path,
+                    field="tenant_output_dir",
+                    value=canonical_output,
+                    detail="defaulted the active tenant output_dir to the canonical tenant-rooted path",
+                )
+            )
         if tenant_capabilities_flushed or not design_tenant_seen:
             return
         for field_name, default_value in TENANT_CAPABILITY_FIELDS:
             if field_name in tenant_fields_seen:
                 continue
             updated.append(f"{tenant_field_indent}{field_name}: {default_value}")
+            defaults_with_provenance.append(
+                _default_with_provenance(
+                    kind="default_project_constraint_field",
+                    path=path,
+                    field=field_name,
+                    value=default_value,
+                    detail=f"defaulted missing tenant capability field `{field_name}` during normalization",
+                )
+            )
         tenant_capabilities_flushed = True
 
     for index, line in enumerate(lines):
@@ -428,6 +510,15 @@ def _normalize_project_constraints(
                     if field_name in project_policy_seen:
                         continue
                     updated.append(f"  {field_name}: {default_value}")
+                    defaults_with_provenance.append(
+                        _default_with_provenance(
+                            kind="default_project_constraint_field",
+                            path=path,
+                            field=field_name,
+                            value=default_value,
+                            detail=f"defaulted missing project policy field `{field_name}` during normalization",
+                        )
+                    )
             in_project = False
             in_structure = True
             in_design_tenants = False
@@ -680,6 +771,7 @@ def normalize_workspace(
     slug = (project_slug or default_project_slug(root)).strip() or "project"
     resolved_platform = _resolved_platform(root, platform)
     actions: list[dict[str, str]] = []
+    defaults_with_provenance: list[dict[str, str]] = []
 
     (root / ".ai-workspace" / "runtime").mkdir(parents=True, exist_ok=True)
     (root / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
@@ -693,6 +785,13 @@ def normalize_workspace(
             detail="created PRODUCT.md from imported workspace context",
             actions=actions,
         )
+        defaults_with_provenance.append(
+            _default_with_provenance(
+                kind="create_product_surface",
+                path=product_path,
+                detail="created default PRODUCT.md because the imported workspace did not provide one",
+            )
+        )
 
     goals_path = root / "specification" / "GOALS.md"
     if not goals_path.exists():
@@ -702,6 +801,13 @@ def normalize_workspace(
             kind="create_goals_surface",
             detail="created GOALS.md from imported workspace context",
             actions=actions,
+        )
+        defaults_with_provenance.append(
+            _default_with_provenance(
+                kind="create_goals_surface",
+                path=goals_path,
+                detail="created default GOALS.md because the imported workspace did not provide one",
+            )
         )
     else:
         updated_goals = _goals_surface_with_intent_carry_forward(
@@ -737,6 +843,16 @@ def normalize_workspace(
             detail="captured imported requirement-like sources under the canonical requirements root",
             actions=actions,
         )
+        defaults_with_provenance.append(
+            _default_with_provenance(
+                kind="create_imported_requirements_summary",
+                path=imported_summary,
+                detail="created imported requirement source summary because the imported workspace had no canonical requirements root",
+            )
+        )
+
+    if (root / ".odd_sdlc").exists():
+        _remove_legacy_root_readme(root, actions=actions)
 
     project_bootstrap = root / PROJECT_BOOTSTRAP_PATH
     bootstrap_content = _project_bootstrap_markdown(root, project_slug=slug, platform=resolved_platform)
@@ -747,6 +863,13 @@ def normalize_workspace(
             kind="create_project_bootstrap",
             detail="created deterministic project bootstrap read model from imported authority",
             actions=actions,
+        )
+        defaults_with_provenance.append(
+            _default_with_provenance(
+                kind="create_project_bootstrap",
+                path=project_bootstrap,
+                detail="created project bootstrap read model because the imported workspace did not provide one",
+            )
         )
     else:
         original_bootstrap = project_bootstrap.read_text(encoding="utf-8")
@@ -768,6 +891,7 @@ def normalize_workspace(
         project_slug=slug,
         platform=resolved_platform,
         actions=actions,
+        defaults_with_provenance=defaults_with_provenance,
     )
     _migrate_legacy_realization_root(
         root,
@@ -799,6 +923,7 @@ def normalize_workspace(
         "platform": resolved_platform,
         "changed": bool(actions),
         "actions": actions,
+        "defaults_with_provenance": defaults_with_provenance,
         "report_path": NORMALIZATION_REPORT_PATH.as_posix(),
         "workspace_state_path": analysis_report["workspace_state_path"],
         "analysis_manifest_path": analysis_report["analysis_manifest_path"],

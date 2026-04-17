@@ -156,11 +156,6 @@ def _workspace_instruction_bootloader(
         if (target_root / relative).exists()
     )
     authority_surface_lines = authority_surfaces or ("- no imported authority surface was detected",)
-    provenance_lines = tuple(
-        f"- `workspace://README.md` (provenance/context only; do not use as primary identity evidence)"
-        for _ in [0]
-        if (target_root / "README.md").exists()
-    )
     return "\n".join(
         (
             "# odd_sdlc Workspace Governance Surface",
@@ -193,7 +188,6 @@ def _workspace_instruction_bootloader(
             f"- `{project_bootstrap}`",
             *authority_surface_lines,
             f"- `{imported_summary}`",
-            *provenance_lines,
             f"- `{normalization_report}`",
             f"- `{ambiguity_register}`",
             f"- `{requirement_closure_register}`",
@@ -214,7 +208,7 @@ def _workspace_instruction_bootloader(
             "- substrate truth explains how work is executed",
             "- governance truth explains how this project is operated",
             "- imported project sources explain what the project is",
-            "- README/bootstrap history and template lineage are provenance unless imported authority makes them project-defining",
+            "- copied template/bootstrap history is provenance unless imported authority makes it project-defining",
             "- repository and sibling-workspace context may explain provenance, but must not be used as project identity evidence",
             "",
             "If those layers disagree, imported project authority wins for project identity,",

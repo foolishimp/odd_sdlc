@@ -60,7 +60,8 @@ MODULE = Module(
         entries=(
             ("requirements", ("REQ-F-GFUNC-004", "REQ-F-ODDSDLC-004")),
             ("domain_package", "odd_sdlc"),
-            ("library_graph_function", GF_REVIEW_DESIGN_BY_CONSENSUS.name),
+            ("shared_plugin_graph_function", "review_subject_by_consensus"),
+            ("host_binding_graph_function", GF_REVIEW_DESIGN_BY_CONSENSUS.name),
             (
                 "injected_graph_functions",
                 (

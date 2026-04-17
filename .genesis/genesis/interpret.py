@@ -51,7 +51,6 @@ from .frames import (
     active_frames,
     build_frame_traversal_surface_from_graph_function,
     current_recursive_state,
-    deserialize_frame,
     frame_closed_event,
     foldback_opened_event,
     frame_opened_event,
@@ -897,21 +896,7 @@ def derive_operational_gaps(
                 )
                 certified_keys.add((job.vector.name, cert_key))
 
-    local_total_delta = sum(entry["delta"] for entry in results)
-    refinement_results, refinement_total_delta = _refinement_gap_results(
-        module=module,
-        workspace_root=workspace_root,
-        stream=stream,
-        workflow_version=workflow_version,
-        requirements=requirements,
-        resolver=resolver,
-        carry_forward=carry_forward,
-        all_events=operative.all_events,
-        certified_keys=certified_keys,
-        edge_filter=edge_filter,
-        work_key_filter=work_key_filter,
-    )
-    total_delta = local_total_delta + refinement_total_delta
+    total_delta = sum(entry["delta"] for entry in results)
     scope_info: dict = {
         "package": module.name,
         "work_key_filter": work_key_filter,
@@ -924,14 +909,10 @@ def derive_operational_gaps(
     return {
         "scope": scope_info,
         "jobs_considered": len(results),
-        "refinement_jobs_considered": len(refinement_results),
-        "local_total_delta": local_total_delta,
-        "refinement_total_delta": refinement_total_delta,
         "total_delta": total_delta,
         "open_frames": len(operative.open_frames),
         "converged": total_delta == 0 and not operative.open_frames,
         "gaps": results,
-        "refinement_gaps": refinement_results,
     }
 
 
@@ -986,21 +967,6 @@ def derive_operational_state(
                 work_key=work_key,
             )
             total_delta += precomputed_unresolved_fraction(job.vector.id, pre)
-
-    _, refinement_total_delta = _refinement_gap_results(
-        module=module,
-        workspace_root=workspace_root,
-        stream=stream,
-        workflow_version=workflow_version,
-        requirements=requirements,
-        resolver=resolver,
-        carry_forward=carry_forward,
-        all_events=operative.all_events,
-        certified_keys=None,
-        edge_filter=edge_filter,
-        work_key_filter=None,
-    )
-    total_delta += refinement_total_delta
 
     if total_delta == 0 and not operative.open_frames:
         return {"status": "converged"}
@@ -1258,235 +1224,6 @@ def _current_certified_keys(all_events: list[dict]) -> set[tuple[str, str | None
     return certified_keys
 
 
-def _latest_rebound_frames(all_events: tuple[dict, ...]) -> tuple[InvocationFrame, ...]:
-    opened_frames: dict[str, InvocationFrame] = {}
-    latest_rebounds: dict[tuple[str, str], str] = {}
-    for event in all_events:
-        event_type = event.get("event_type")
-        data = event.get("data", {})
-        frame_attempt_id = data.get("frame_attempt_id") or data.get("frame_id")
-        if not isinstance(frame_attempt_id, str) or not frame_attempt_id:
-            continue
-        if event_type == "frame_opened":
-            opened_frames[frame_attempt_id] = deserialize_frame(data)
-            continue
-        if event_type == "frame_rebound":
-            edge = str(data.get("edge") or "")
-            parent_key = str(data.get("parent_key") or "")
-            latest_rebounds[(edge, parent_key)] = frame_attempt_id
-
-    frames: list[InvocationFrame] = []
-    seen: set[str] = set()
-    for frame_attempt_id in latest_rebounds.values():
-        if frame_attempt_id in seen:
-            continue
-        frame = opened_frames.get(frame_attempt_id)
-        if frame is None:
-            continue
-        frames.append(frame)
-        seen.add(frame_attempt_id)
-    return tuple(frames)
-
-
-def _refinement_gap_results(
-    *,
-    module: Module,
-    workspace_root: Path,
-    stream: EventStream,
-    workflow_version: str,
-    requirements: tuple | list,
-    resolver: ContextResolver,
-    carry_forward: list[dict],
-    all_events: tuple[dict, ...],
-    certified_keys: set[tuple[str, str | None]] | None = None,
-    edge_filter: str | None = None,
-    work_key_filter: str | None = None,
-) -> tuple[list[dict], float]:
-    results: list[dict] = []
-    total_delta = 0.0
-    seen_parent_contracts: set[tuple[str, str | None]] = set()
-    for frame in _latest_rebound_frames(all_events):
-        if edge_filter and frame.parent_edge != edge_filter:
-            continue
-        if work_key_filter is not None and frame.parent_key != work_key_filter:
-            continue
-        termination = _recursive_termination_evaluator(frame)
-        if termination is None:
-            continue
-        termination_job = _parent_termination_job(module, frame, termination)
-        termination_spec_hash = spec_hash_for(
-            workflow_version=workflow_version,
-            executable_job=termination_job,
-            requirements=requirements,
-        )
-        termination_pre = bind_fd(
-            termination_job,
-            stream,
-            resolver,
-            workspace_root,
-            spec_hash=termination_spec_hash,
-            current_workflow_version=workflow_version,
-            carry_forward=carry_forward,
-            module=module,
-            work_key=frame.parent_key,
-        )
-        delta = precomputed_unresolved_fraction(termination_job.vector.id, termination_pre)
-        total_delta += delta
-        entry: dict = {
-            "edge": frame.parent_edge,
-            "delta": delta,
-            "failing": [ev.name for ev in termination_pre.failing_evaluators],
-            "passing": [ev.name for ev in termination_pre.passing_evaluators],
-            "delta_summary": termination_pre.delta_summary,
-            "environment_ready": termination_pre.resolved_environment.ready,
-            "work_key": frame.parent_key,
-            "scope": "refinement_parent_contract",
-            "graph_function": frame.graph_function,
-            "target": frame.parent_target,
-            "child_keys": [step.child_key for step in frame.steps],
-            "termination_evaluator": termination.name,
-        }
-        if termination_pre.resolved_environment.missing_required:
-            entry["missing_required_bindings"] = list(
-                termination_pre.resolved_environment.missing_required
-            )
-        if termination_pre.resolved_environment.conflicting_contracts:
-            entry["conflicting_environment_contracts"] = list(
-                termination_pre.resolved_environment.conflicting_contracts
-            )
-        results.append(entry)
-        seen_parent_contracts.add((frame.parent_edge, frame.parent_key))
-
-        cert_key = (frame.parent_edge, frame.parent_key)
-        if certified_keys is not None and delta == 0.0 and cert_key not in certified_keys:
-            _emit_event(
-                stream,
-                "edge_converged",
-                {
-                    "edge": frame.parent_edge,
-                    "vector_id": frame.parent_vector_id,
-                    "target": frame.parent_target,
-                    "work_key": frame.parent_key,
-                    "delta": 0,
-                    "certified_by": "refinement_parent",
-                },
-                context=EventContext(
-                    workflow_version=workflow_version,
-                    work_key=frame.parent_key,
-                ),
-            )
-            certified_keys.add(cert_key)
-
-    graph_functions_by_id = {
-        graph_function.id: graph_function
-        for graph_function in module.graph_functions
-    }
-    for job in module.jobs:
-        for contract in job.contracts:
-            if contract.kind != "graph_function":
-                continue
-            graph_function = graph_functions_by_id.get(contract.target_id)
-            if graph_function is None:
-                continue
-            termination = _termination_evaluator_from_decl(
-                graph_function.declarations.get("recursion"),
-                graph_function_name=graph_function.name,
-            )
-            if termination is None or not graph_function.outputs:
-                continue
-            if edge_filter and graph_function.name != edge_filter:
-                continue
-            if work_key_filter is not None:
-                continue
-            parent_contract_key = (graph_function.name, None)
-            if parent_contract_key in seen_parent_contracts:
-                continue
-            record = materialize_graph_function(
-                MaterializationRequest(graph_function=graph_function.name),
-                module,
-                published_graph_functions=(graph_function,),
-            )
-            source_nodes = (
-                graph_function.inputs
-                if len(graph_function.inputs) != 1
-                else graph_function.inputs[0]
-            )
-            termination_vector = GraphVector(
-                name=graph_function.name,
-                source=source_nodes,
-                target=graph_function.outputs[0],
-                evaluators=(termination,),
-                id=f"{graph_function.id}:termination",
-            )
-            termination_job = ExecutableJob(
-                job=job,
-                graph_function=graph_function,
-                materialization_id=record.materialization_id,
-                vector=termination_vector,
-            )
-            termination_spec_hash = spec_hash_for(
-                workflow_version=workflow_version,
-                executable_job=termination_job,
-                requirements=requirements,
-            )
-            termination_pre = bind_fd(
-                termination_job,
-                stream,
-                resolver,
-                workspace_root,
-                spec_hash=termination_spec_hash,
-                current_workflow_version=workflow_version,
-                carry_forward=carry_forward,
-                module=module,
-                work_key=None,
-            )
-            delta = precomputed_unresolved_fraction(termination_job.vector.id, termination_pre)
-            total_delta += delta
-            entry = {
-                "edge": graph_function.name,
-                "delta": delta,
-                "failing": [ev.name for ev in termination_pre.failing_evaluators],
-                "passing": [ev.name for ev in termination_pre.passing_evaluators],
-                "delta_summary": termination_pre.delta_summary,
-                "environment_ready": termination_pre.resolved_environment.ready,
-                "work_key": None,
-                "scope": "refinement_parent_contract",
-                "graph_function": graph_function.name,
-                "target": graph_function.outputs[0].name,
-                "child_keys": [vector.name for vector in record.graph.vectors],
-                "termination_evaluator": termination.name,
-            }
-            if termination_pre.resolved_environment.missing_required:
-                entry["missing_required_bindings"] = list(
-                    termination_pre.resolved_environment.missing_required
-                )
-            if termination_pre.resolved_environment.conflicting_contracts:
-                entry["conflicting_environment_contracts"] = list(
-                    termination_pre.resolved_environment.conflicting_contracts
-                )
-            results.append(entry)
-            seen_parent_contracts.add(parent_contract_key)
-            if certified_keys is not None and delta == 0.0 and parent_contract_key not in certified_keys:
-                _emit_event(
-                    stream,
-                    "edge_converged",
-                    {
-                        "edge": graph_function.name,
-                        "vector_id": termination_vector.id,
-                        "target": graph_function.outputs[0].name,
-                        "work_key": None,
-                        "delta": 0,
-                        "certified_by": "refinement_parent",
-                    },
-                    context=EventContext(
-                        workflow_version=workflow_version,
-                        work_key=None,
-                    ),
-                )
-                certified_keys.add(parent_contract_key)
-    return results, total_delta
-
-
 def selection_is_active(
     all_events: list[dict],
     *,
@@ -1549,19 +1286,7 @@ def _resolve_foldback_result(frame: InvocationFrame) -> ParentRebindResult:
 
 
 def _recursive_termination_evaluator(frame: InvocationFrame) -> Evaluator | None:
-    return _termination_evaluator_from_decl(
-        frame.graph_function_recursion,
-        graph_function_name=frame.graph_function,
-    )
-
-
-def _termination_evaluator_from_decl(
-    recursion_decl: Attrs | dict | None,
-    *,
-    graph_function_name: str,
-) -> Evaluator | None:
-    recursion = Attrs.coerce(recursion_decl or {})
-    termination_decl = recursion.get("termination")
+    termination_decl = frame.graph_function_recursion.get("termination")
     if not termination_decl:
         return None
     regime_name = termination_decl.get("regime", "F_D")
@@ -1573,7 +1298,7 @@ def _termination_evaluator_from_decl(
     if regime is None:
         raise ValueError(
             f"Unsupported recursion termination regime {regime_name!r} "
-            f"for graph function {graph_function_name!r}"
+            f"for graph function {frame.graph_function!r}"
         )
     return Evaluator(
         name=termination_decl["name"],

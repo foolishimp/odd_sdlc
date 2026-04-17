@@ -39,6 +39,9 @@ surfaces the real product uses.
 - AC-3: direct source-level checks do not replace installed-dev proof
 - AC-4: where a proving lane resets and reruns an installed sandbox, per-run
   post-mortem artifacts are retained for later comparison
+- AC-5: sandbox preparation, observation, and reset used by decisive proving
+  are published product surfaces; proving harnesses may invoke them but do not
+  privately define their meaning
 
 ### REQ-F-VERIFY-004 — The first proving lane exercises the first constructive edge under substrate fact truth
 

@@ -22,6 +22,7 @@ from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
 from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
+from .span_analysis import span_gap_analysis
 from .traceability import current_requirement_executability_gap
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
@@ -145,9 +146,14 @@ def catalog(app: OddSdlcApp) -> dict:
                 "name": function.name,
                 "intent": function_intent_by_name.get(function.name, function.declarations.get("intent", "")),
                 "function_kind": function.declarations.get("function_kind"),
+                "plugin_kind": function.declarations.get("plugin_kind"),
                 "harness_kind": function.declarations.get("harness_kind"),
                 "harness_contract": _decl_value(function.declarations.get("harness_contract")),
                 "harness_implementation": _decl_value(function.declarations.get("harness_implementation")),
+                "host_binding_of": function.declarations.get("host_binding_of"),
+                "host_binding_kind": function.declarations.get("host_binding_kind"),
+                "host_subject_asset": function.declarations.get("host_subject_asset"),
+                "host_reviewed_asset": function.declarations.get("host_reviewed_asset"),
                 "template_kind": function.template.kind,
                 "tags": list(function.tags),
                 "inputs": [node.name for node in function.inputs],
@@ -198,7 +204,24 @@ def catalog(app: OddSdlcApp) -> dict:
     }
 
 
-def gaps(app: OddSdlcApp) -> dict:
+def gaps(
+    app: OddSdlcApp,
+    *,
+    from_edge: str | None = None,
+    to_edge: str | None = None,
+    zoom: str = "combined",
+    include_dependent: bool = False,
+) -> dict:
+    if from_edge is not None or to_edge is not None:
+        if not from_edge or not to_edge:
+            raise ValueError("span gap analysis requires both from_edge and to_edge")
+        return span_gap_analysis(
+            app,
+            from_edge=from_edge,
+            to_edge=to_edge,
+            zoom=zoom,
+            include_dependent=include_dependent,
+        )
     scope = app.scope()
     raw_payload = gen_gaps(scope, app.stream)
     payload = enrich_gap_snapshot(

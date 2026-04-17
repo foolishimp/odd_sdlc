@@ -12,9 +12,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from genesis.events import EventContext, EventStream, emit
+from genesis.events import EventStream
 
 from .analysis import load_analysis_manifest, load_workspace_state, workspace_state_ready
+from .runtime_effects import publish_runtime_event
 from .workspace_assets import asset_path
 
 
@@ -1053,16 +1054,10 @@ def _publish_edge_projection(
             path.write_text(json.dumps(prior, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return prior
 
-    context = EventContext(
-        workflow_version=workflow_version,
-        work_key=projection.get("current_work_key"),
-        run_id=projection.get("run_id"),
-        aggregate_type="odd_sdlc.edge_triage",
-        aggregate_id=edge_id,
-    )
-    observation_event = emit(
-        "observation_recorded",
-        {
+    observation_event = publish_runtime_event(
+        stream=stream,
+        event_type="observation_recorded",
+        data={
             "kind": "odd_sdlc.homeostatic_gap",
             "edge": edge_id,
             "run_id": projection.get("run_id"),
@@ -1072,12 +1067,16 @@ def _publish_edge_projection(
             "observed_signal": projection["observation"]["observed_signal"],
             "evidence": projection["observation"]["evidence"],
         },
-        stream=stream,
-        context=context,
+        workflow_version=workflow_version,
+        work_key=projection.get("current_work_key"),
+        run_id=projection.get("run_id"),
+        aggregate_type="odd_sdlc.edge_triage",
+        aggregate_id=edge_id,
     )
-    triage_event = emit(
-        "triage_produced",
-        {
+    triage_event = publish_runtime_event(
+        stream=stream,
+        event_type="triage_produced",
+        data={
             "kind": "odd_sdlc.homeostatic_gap",
             "edge": edge_id,
             "run_id": projection.get("run_id"),
@@ -1098,20 +1097,18 @@ def _publish_edge_projection(
             "evidence": projection["triage"]["evidence"],
             "route_proposal": projection["route_proposal"],
         },
-        stream=stream,
-        context=EventContext(
-            workflow_version=workflow_version,
-            work_key=projection.get("current_work_key"),
-            run_id=projection.get("run_id"),
-            aggregate_type="odd_sdlc.edge_triage",
-            aggregate_id=edge_id,
-            correlation_id=observation_event["event_id"],
-            causation_event_id=observation_event["event_id"],
-        ),
+        workflow_version=workflow_version,
+        work_key=projection.get("current_work_key"),
+        run_id=projection.get("run_id"),
+        aggregate_type="odd_sdlc.edge_triage",
+        aggregate_id=edge_id,
+        correlation_id=observation_event["event_id"],
+        causation_event_id=observation_event["event_id"],
     )
-    route_event = emit(
-        "route_recorded",
-        {
+    route_event = publish_runtime_event(
+        stream=stream,
+        event_type="route_recorded",
+        data={
             "kind": "odd_sdlc.homeostatic_gap",
             "edge": edge_id,
             "run_id": projection.get("run_id"),
@@ -1127,22 +1124,20 @@ def _publish_edge_projection(
             "priority_source": projection["route_binding"]["priority_source"],
             "no_lawful_route_reason": projection["route_binding"].get("no_lawful_route_reason"),
         },
-        stream=stream,
-        context=EventContext(
-            workflow_version=workflow_version,
-            work_key=projection.get("current_work_key"),
-            run_id=projection.get("run_id"),
-            aggregate_type="odd_sdlc.edge_triage",
-            aggregate_id=edge_id,
-            correlation_id=triage_event["event_id"],
-            causation_event_id=triage_event["event_id"],
-        ),
+        workflow_version=workflow_version,
+        work_key=projection.get("current_work_key"),
+        run_id=projection.get("run_id"),
+        aggregate_type="odd_sdlc.edge_triage",
+        aggregate_id=edge_id,
+        correlation_id=triage_event["event_id"],
+        causation_event_id=triage_event["event_id"],
     )
     constitutional_event = None
     if projection["constitutional_proposal"] is not None:
-        constitutional_event = emit(
-            "constitutional_proposal_recorded",
-            {
+        constitutional_event = publish_runtime_event(
+            stream=stream,
+            event_type="constitutional_proposal_recorded",
+            data={
                 "kind": "odd_sdlc.homeostatic_gap",
                 "edge": edge_id,
                 "run_id": projection.get("run_id"),
@@ -1155,16 +1150,13 @@ def _publish_edge_projection(
                 "target_surface": projection["constitutional_proposal"]["target_surface"],
                 "reentry_layer": projection["constitutional_proposal"]["reentry_layer"],
             },
-            stream=stream,
-            context=EventContext(
-                workflow_version=workflow_version,
-                work_key=projection.get("current_work_key"),
-                run_id=projection.get("run_id"),
-                aggregate_type="odd_sdlc.edge_triage",
-                aggregate_id=edge_id,
-                correlation_id=route_event["event_id"],
-                causation_event_id=route_event["event_id"],
-            ),
+            workflow_version=workflow_version,
+            work_key=projection.get("current_work_key"),
+            run_id=projection.get("run_id"),
+            aggregate_type="odd_sdlc.edge_triage",
+            aggregate_id=edge_id,
+            correlation_id=route_event["event_id"],
+            causation_event_id=route_event["event_id"],
         )
     projection["observation"]["event_id"] = observation_event["event_id"]
     projection["triage"]["event_id"] = triage_event["event_id"]
@@ -1172,9 +1164,10 @@ def _publish_edge_projection(
     if constitutional_event is not None:
         projection["constitutional_proposal"]["event_id"] = constitutional_event["event_id"]
     if prior is not None and prior.get("triage_hash") != projection["triage_hash"]:
-        divergence_event = emit(
-            "triage_divergence",
-            {
+        divergence_event = publish_runtime_event(
+            stream=stream,
+            event_type="triage_divergence",
+            data={
                 "kind": "odd_sdlc.homeostatic_gap",
                 "edge": edge_id,
                 "run_id": projection.get("run_id"),
@@ -1183,8 +1176,11 @@ def _publish_edge_projection(
                 "prior_triage_id": (prior.get("triage") or {}).get("triage_id"),
                 "current_triage_id": projection["triage"]["triage_id"],
             },
-            stream=stream,
-            context=context,
+            workflow_version=workflow_version,
+            work_key=projection.get("current_work_key"),
+            run_id=projection.get("run_id"),
+            aggregate_type="odd_sdlc.edge_triage",
+            aggregate_id=edge_id,
         )
         projection["divergence_event_id"] = divergence_event["event_id"]
     path.write_text(json.dumps(projection, indent=2, sort_keys=True) + "\n", encoding="utf-8")

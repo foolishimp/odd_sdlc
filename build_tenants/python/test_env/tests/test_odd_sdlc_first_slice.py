@@ -30,8 +30,12 @@ FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 GRAPH_FUNCTION_NAMES = [
     "bootstrap_release_self_test",
     "release_operational_cycle",
+    "review_subject_consensus_round",
+    "review_subject_by_consensus",
     "review_design_consensus_round",
     "review_design_by_consensus",
+    "review_comment_consensus_round",
+    "review_comment_by_consensus",
 ]
 
 if str(GENESIS_PATH) not in sys.path:
@@ -58,6 +62,7 @@ from odd_sdlc.runtime_contexts import (  # noqa: E402
     STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
 )
 from odd_sdlc.self_test import self_test  # noqa: E402
+import odd_sdlc.span_analysis as span_analysis_module  # noqa: E402
 from odd_sdlc.traceability import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
     load_or_build_requirement_closure_register,
@@ -174,6 +179,52 @@ def test_workspace_assets_define_single_active_path_surface(tmp_path: Path) -> N
     )
 
 
+def test_workspace_assets_import_path_is_canonicalized_by_layer() -> None:
+    code_root = ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
+    tests_root = ROOT / "build_tenants" / "python" / "test_env" / "tests"
+
+    code_files = sorted(code_root.rglob("*.py"))
+    test_files = sorted(tests_root.rglob("*.py"))
+
+    code_violations = [
+        path.relative_to(ROOT).as_posix()
+        for path in code_files
+        if any(
+            line.strip().startswith("from odd_sdlc.workspace_assets import")
+            for line in path.read_text(encoding="utf-8").splitlines()
+        )
+    ]
+    test_violations = [
+        path.relative_to(ROOT).as_posix()
+        for path in test_files
+        if any(
+            line.strip().startswith("from .workspace_assets import")
+            for line in path.read_text(encoding="utf-8").splitlines()
+        )
+    ]
+
+    assert code_violations == []
+    assert test_violations == []
+
+
+def test_domain_modules_do_not_import_abg_emit_directly() -> None:
+    code_root = ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
+    allowed_emit_import_paths = {
+        "build_tenants/python/code/odd_sdlc/runtime_effects.py",
+    }
+    direct_emit_imports = []
+    for path in sorted(code_root.rglob("*.py")):
+        lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+        rel = path.relative_to(ROOT).as_posix()
+        if any(
+            line.startswith("from genesis.events import") and "emit" in line
+            for line in lines
+        ):
+            direct_emit_imports.append(rel)
+
+    assert direct_emit_imports == sorted(allowed_emit_import_paths)
+
+
 def test_generated_asset_contract_assessment_for_file_surface(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     intent_path = asset_path(tmp_path, "intent_surface")
@@ -248,8 +299,12 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     assert graph_function_names == [
         "bootstrap_release_self_test",
         "release_operational_cycle",
+        "review_subject_consensus_round",
+        "review_subject_by_consensus",
         "review_design_consensus_round",
         "review_design_by_consensus",
+        "review_comment_consensus_round",
+        "review_comment_by_consensus",
     ]
     input_signatures = {
         graph_function.name: [node.name for node in graph_function.inputs]
@@ -258,8 +313,12 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     assert input_signatures == {
         "bootstrap_release_self_test": ["input_set"],
         "release_operational_cycle": ["release_surface", "test_run_archive_surface"],
+        "review_subject_consensus_round": ["subject_surface"],
+        "review_subject_by_consensus": ["subject_surface"],
         "review_design_consensus_round": ["design_surface"],
         "review_design_by_consensus": ["design_surface"],
+        "review_comment_consensus_round": ["comment_review_subject_surface"],
+        "review_comment_by_consensus": ["comment_review_subject_surface"],
     }
     executive = module.graph_functions[0]
     assert executive.declarations.get("function_kind") == "odd_executive_graph_function"
@@ -315,25 +374,49 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     assert [node.name for node in operational.inputs] == ["release_surface", "test_run_archive_surface"]
     assert [node.name for node in operational.outputs] == ["retrofit_plan_surface"]
     assert [vector.name for vector in operational.materialize().vectors] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
-    consensus_round = module.graph_functions[2]
+    shared_consensus_round = module.graph_functions[2]
+    assert shared_consensus_round.declarations.get("function_kind") == "odd_consensus_plugin_round_graph_function"
+    assert shared_consensus_round.template.kind == "symbolic"
+    assert [node.name for node in shared_consensus_round.inputs] == ["subject_surface"]
+    assert [node.name for node in shared_consensus_round.outputs] == ["reviewed_subject_surface"]
+    assert shared_consensus_round.declarations.get("plugin_kind") == "shared_consensus_plugin"
+    assert shared_consensus_round.declarations.get("harness_implementation") == {
+        "custom_functions": (
+            "review_subject_assessment_round",
+            "reduce_subject_consensus_decision",
+            "apply_subject_consensus_decision",
+        ),
+        "policy_rule": "subject_consensus_rule",
+    }
+    shared_consensus_library = module.graph_functions[3]
+    assert shared_consensus_library.declarations.get("function_kind") == "odd_consensus_plugin_graph_function"
+    assert shared_consensus_library.template.kind == "symbolic"
+    assert [node.name for node in shared_consensus_library.inputs] == ["subject_surface"]
+    assert [node.name for node in shared_consensus_library.outputs] == ["reviewed_subject_surface"]
+    assert shared_consensus_library.declarations.get("plugin_kind") == "shared_consensus_plugin"
+    assert "consensus" in shared_consensus_library.tags
+    assert "plugin" in shared_consensus_library.tags
+    consensus_round = module.graph_functions[4]
     assert consensus_round.declarations.get("function_kind") == "odd_consensus_round_graph_function"
     assert consensus_round.template.kind == "inline_graph"
     assert [node.name for node in consensus_round.inputs] == ["design_surface"]
     assert [node.name for node in consensus_round.outputs] == ["reviewed_design_surface"]
     assert consensus_round.inputs[0].asset_surface.kind == "design_surface"
     assert consensus_round.outputs[0].asset_surface.kind == "reviewed_design_surface"
+    assert consensus_round.declarations.get("host_binding_of") == "review_subject_consensus_round"
     assert [vector.name for vector in consensus_round.materialize().vectors] == [
         "derive_review_assessment_surface",
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
-    consensus_library = module.graph_functions[3]
+    consensus_library = module.graph_functions[5]
     assert consensus_library.declarations.get("function_kind") == "odd_consensus_library_graph_function"
     assert consensus_library.template.kind == "symbolic"
     assert [node.name for node in consensus_library.inputs] == ["design_surface"]
     assert [node.name for node in consensus_library.outputs] == ["reviewed_design_surface"]
     assert "consensus" in consensus_library.tags
     assert "library" in consensus_library.tags
+    assert consensus_library.declarations.get("host_binding_of") == "review_subject_by_consensus"
     assert consensus_library.declarations.get("recursion") is not None
     assert consensus_library.declarations.get("harness_implementation") == {
         "custom_functions": (
@@ -343,6 +426,18 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         ),
         "policy_rule": "design_consensus_rule",
     }
+    comment_consensus_round = module.graph_functions[6]
+    assert comment_consensus_round.declarations.get("function_kind") == "odd_consensus_host_binding_round_graph_function"
+    assert comment_consensus_round.template.kind == "symbolic"
+    assert [node.name for node in comment_consensus_round.inputs] == ["comment_review_subject_surface"]
+    assert [node.name for node in comment_consensus_round.outputs] == ["reviewed_comment_surface"]
+    assert comment_consensus_round.declarations.get("host_binding_of") == "review_subject_consensus_round"
+    comment_consensus_library = module.graph_functions[7]
+    assert comment_consensus_library.declarations.get("function_kind") == "odd_consensus_host_binding_graph_function"
+    assert comment_consensus_library.template.kind == "symbolic"
+    assert [node.name for node in comment_consensus_library.inputs] == ["comment_review_subject_surface"]
+    assert [node.name for node in comment_consensus_library.outputs] == ["reviewed_comment_surface"]
+    assert comment_consensus_library.declarations.get("host_binding_of") == "review_subject_by_consensus"
     assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job", "release_operational_cycle_job"]
 
     executable_jobs = module_to_executable_jobs(module)
@@ -619,6 +714,110 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     assert triage_event["correlation_id"] == observation_event["event_id"]
     assert route_event["correlation_id"] == triage_event["event_id"]
     assert observation_event["data"]["run_id"].startswith("gap_snapshot::")
+
+
+def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    monkeypatch.setattr(
+        span_analysis_module,
+        "gen_gaps",
+        lambda _scope, _stream: {
+            "scope": {},
+            "jobs_considered": 18,
+            "total_delta": 1.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_requirement_surface",
+                    "delta": 0.5,
+                    "failing": ["requirement_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "requirement surface still needs refinement",
+                    "environment_ready": True,
+                },
+                {
+                    "edge": "derive_code_surface",
+                    "delta": 0.5,
+                    "failing": ["code_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "code surface remains shallow",
+                    "environment_ready": True,
+                },
+                {
+                    "edge": "derive_test_module_surface",
+                    "delta": 0.5,
+                    "failing": ["test_module_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "test module surface remains incomplete",
+                    "environment_ready": True,
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        span_analysis_module,
+        "current_requirement_executability_gap",
+        lambda _workspace_root: {
+            "delta": 0.75,
+            "converged": False,
+            "summary": "requirements still lack executable proof",
+        },
+    )
+
+    payload = gaps(
+        app,
+        from_edge="derive_requirement_surface",
+        to_edge="derive_test_module_surface",
+        zoom="combined",
+        include_dependent=True,
+    )
+
+    assert payload["analysis_kind"] == "odd_sdlc.span_gap_analysis"
+    assert payload["span"]["selected_edges"] == [
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_implementation_design_surface",
+        "select_implementation_stack_profile",
+        "derive_implementation_module_surface",
+        "derive_code_surface",
+        "derive_test_design_surface",
+        "select_test_stack_profile",
+        "derive_test_module_surface",
+    ]
+    assert {gap["edge"] for gap in payload["coarse"]["gaps"]} == {
+        "derive_requirement_surface",
+        "derive_code_surface",
+        "derive_test_module_surface",
+    }
+    assert payload["dependent_gaps"] == [
+        {
+            "delta": 0.75,
+            "converged": False,
+            "summary": "requirements still lack executable proof",
+        }
+    ]
+    assert payload["combined"]["converged"] is False
+    assert payload["combined"]["total_delta"] == pytest.approx(2.25)
+
+
+def test_gaps_rejects_inverted_span_order(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    with pytest.raises(ValueError, match="invalid span ordering"):
+        gaps(
+            app,
+            from_edge="derive_test_module_surface",
+            to_edge="derive_requirement_surface",
+            zoom="combined",
+        )
 
 
 def test_gap_publication_does_not_inherit_unrelated_prior_run_id(tmp_path: Path) -> None:
@@ -1438,9 +1637,55 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert operational["outputs"] == ["retrofit_plan_surface"]
     assert [vector["name"] for vector in operational["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
     assert operational["job_names"] == ["release_operational_cycle_job"]
-    consensus_round = result["graph_functions"][2]
+    shared_consensus_round = result["graph_functions"][2]
+    assert shared_consensus_round["function_kind"] == "odd_consensus_plugin_round_graph_function"
+    assert shared_consensus_round["plugin_kind"] == "shared_consensus_plugin"
+    assert shared_consensus_round["harness_kind"] == "consensus_round"
+    assert shared_consensus_round["template_kind"] == "symbolic"
+    assert shared_consensus_round["inputs"] == ["subject_surface"]
+    assert shared_consensus_round["outputs"] == ["reviewed_subject_surface"]
+    assert shared_consensus_round["job_names"] == []
+    assert shared_consensus_round["harness_contract"] == {
+        "subject_asset": "subject_surface",
+        "assessment_asset": "review_assessment_surface",
+        "decision_asset": "consensus_decision_surface",
+        "reviewed_asset": "reviewed_subject_surface",
+        "assessment_vector_asset": "review_assessment_vector",
+        "injected_functions": {
+            "review_round": "review_subject_assessment_round",
+            "reduce": "reduce_subject_consensus_decision",
+            "apply": "apply_subject_consensus_decision",
+        },
+        "policy_rule": "subject_consensus_rule",
+        "composable": True,
+        "recursive": True,
+    }
+    assert shared_consensus_round["harness_implementation"] == {
+        "custom_functions": (
+            "review_subject_assessment_round",
+            "reduce_subject_consensus_decision",
+            "apply_subject_consensus_decision",
+        ),
+        "policy_rule": "subject_consensus_rule",
+    }
+    shared_consensus_library = result["graph_functions"][3]
+    assert shared_consensus_library["function_kind"] == "odd_consensus_plugin_graph_function"
+    assert shared_consensus_library["plugin_kind"] == "shared_consensus_plugin"
+    assert shared_consensus_library["harness_kind"] == "consensus_harness"
+    assert shared_consensus_library["template_kind"] == "symbolic"
+    assert shared_consensus_library["inputs"] == ["subject_surface"]
+    assert shared_consensus_library["outputs"] == ["reviewed_subject_surface"]
+    assert shared_consensus_library["vectors"] == []
+    assert shared_consensus_library["job_names"] == []
+    assert shared_consensus_library["harness_contract"] == shared_consensus_round["harness_contract"]
+    assert shared_consensus_library["harness_implementation"] == shared_consensus_round["harness_implementation"]
+    consensus_round = result["graph_functions"][4]
     assert consensus_round["function_kind"] == "odd_consensus_round_graph_function"
     assert consensus_round["harness_kind"] == "consensus_round"
+    assert consensus_round["host_binding_of"] == "review_subject_consensus_round"
+    assert consensus_round["host_binding_kind"] == "design_review"
+    assert consensus_round["host_subject_asset"] == "design_surface"
+    assert consensus_round["host_reviewed_asset"] == "reviewed_design_surface"
     assert consensus_round["template_kind"] == "inline_graph"
     assert consensus_round["inputs"] == ["design_surface"]
     assert consensus_round["outputs"] == ["reviewed_design_surface"]
@@ -1467,9 +1712,13 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         {"name": "derive_reviewed_design_surface", "source": ["design_surface", "consensus_decision_surface"], "target": "reviewed_design_surface"},
     ]
     assert consensus_round["job_names"] == []
-    consensus_library = result["graph_functions"][3]
+    consensus_library = result["graph_functions"][5]
     assert consensus_library["function_kind"] == "odd_consensus_library_graph_function"
     assert consensus_library["harness_kind"] == "consensus_harness"
+    assert consensus_library["host_binding_of"] == "review_subject_by_consensus"
+    assert consensus_library["host_binding_kind"] == "design_review"
+    assert consensus_library["host_subject_asset"] == "design_surface"
+    assert consensus_library["host_reviewed_asset"] == "reviewed_design_surface"
     assert consensus_library["template_kind"] == "symbolic"
     assert consensus_library["inputs"] == ["design_surface"]
     assert consensus_library["outputs"] == ["reviewed_design_surface"]
@@ -1486,6 +1735,28 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         ),
         "policy_rule": "design_consensus_rule",
     }
+    comment_consensus_round = result["graph_functions"][6]
+    assert comment_consensus_round["function_kind"] == "odd_consensus_host_binding_round_graph_function"
+    assert comment_consensus_round["plugin_kind"] == "host_binding"
+    assert comment_consensus_round["host_binding_of"] == "review_subject_consensus_round"
+    assert comment_consensus_round["host_binding_kind"] == "comment_review"
+    assert comment_consensus_round["host_subject_asset"] == "comment_review_subject_surface"
+    assert comment_consensus_round["host_reviewed_asset"] == "reviewed_comment_surface"
+    assert comment_consensus_round["inputs"] == ["comment_review_subject_surface"]
+    assert comment_consensus_round["outputs"] == ["reviewed_comment_surface"]
+    assert comment_consensus_round["template_kind"] == "symbolic"
+    assert comment_consensus_round["job_names"] == []
+    comment_consensus_library = result["graph_functions"][7]
+    assert comment_consensus_library["function_kind"] == "odd_consensus_host_binding_graph_function"
+    assert comment_consensus_library["plugin_kind"] == "host_binding"
+    assert comment_consensus_library["host_binding_of"] == "review_subject_by_consensus"
+    assert comment_consensus_library["host_binding_kind"] == "comment_review"
+    assert comment_consensus_library["host_subject_asset"] == "comment_review_subject_surface"
+    assert comment_consensus_library["host_reviewed_asset"] == "reviewed_comment_surface"
+    assert comment_consensus_library["inputs"] == ["comment_review_subject_surface"]
+    assert comment_consensus_library["outputs"] == ["reviewed_comment_surface"]
+    assert comment_consensus_library["template_kind"] == "symbolic"
+    assert comment_consensus_library["job_names"] == []
     assert result["programs"] == [
         {
             "name": "bootstrap_release_self_test",
@@ -1552,7 +1823,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "workspace_root",
     ]
     assert len(payload["assets"]) == len(ASSET_PATHS)
-    assert len(payload["functions"]) == 27
+    assert len(payload["functions"]) == 33
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
@@ -1642,7 +1913,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert "graph_calls" not in payload
     assert "continuations" not in payload
     assert len(payload["assets"]) == len(ASSET_PATHS)
-    assert len(payload["functions"]) == 27
+    assert len(payload["functions"]) == 33
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
@@ -1702,15 +1973,16 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert functions["derive_runtime_observation_surface"]["inputs"] == ["deployment_result_surface", "test_run_archive_surface"]
     assert functions["derive_retrofit_plan_surface"]["inputs"] == ["runtime_observation_surface", "release_surface"]
     assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
-    assert payload["graph_functions"][0]["job_names"] == ["bootstrap_release_self_test_job"]
-    assert payload["graph_functions"][1]["job_names"] == ["release_operational_cycle_job"]
-    assert payload["graph_functions"][2]["job_names"] == []
-    assert payload["graph_functions"][3]["job_names"] == []
-    assert [vector["name"] for vector in payload["graph_functions"][0]["vectors"]] == list(
+    graph_functions = {entry["name"]: entry for entry in payload["graph_functions"]}
+    assert graph_functions["bootstrap_release_self_test"]["job_names"] == ["bootstrap_release_self_test_job"]
+    assert graph_functions["release_operational_cycle"]["job_names"] == ["release_operational_cycle_job"]
+    assert graph_functions["review_subject_consensus_round"]["job_names"] == []
+    assert graph_functions["review_subject_by_consensus"]["job_names"] == []
+    assert [vector["name"] for vector in graph_functions["bootstrap_release_self_test"]["vectors"]] == list(
         BOOTSTRAP_RELEASE_SELF_TEST_STEPS
     )
-    assert [vector["name"] for vector in payload["graph_functions"][1]["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
-    assert [vector["name"] for vector in payload["graph_functions"][2]["vectors"]] == [
+    assert [vector["name"] for vector in graph_functions["release_operational_cycle"]["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+    assert [vector["name"] for vector in graph_functions["review_design_consensus_round"]["vectors"]] == [
         "derive_review_assessment_surface",
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
@@ -1790,9 +2062,17 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert result["final_state"]["status"] == "iterated"
     assert result["final_state"]["edge"] == "prepare_build_execution_surface"
     assert result["final_state"]["blocking_reason"] == "fp_dispatch"
+    assert result["emit_boundary"]["passes"] is True
+    assert result["emit_boundary"]["observed_emit_import_paths"] == ["runtime_effects.py"]
+    assert result["homeostatic_loop"]["status"] == "retired"
+    assert result["homeostatic_loop"]["loopback"]["status"] == "retired"
 
     events = _read_events(tmp_path)
-    assert "run_completed" in [event["event_type"] for event in events]
+    event_types = [event["event_type"] for event in events]
+    assert "run_completed" in event_types
+    assert "proposal_applied" in event_types
+    assert "derivation_reopened" in event_types
+    assert "gap_retired" in event_types
     assert asset_path(tmp_path, "test_run_archive_surface").exists()
     assert asset_path(tmp_path, "release_surface").exists()
 

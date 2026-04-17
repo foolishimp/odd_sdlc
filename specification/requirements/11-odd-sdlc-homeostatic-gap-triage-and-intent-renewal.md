@@ -56,6 +56,9 @@ from that layer rather than collapsing everything into immediate code repair.
   stronger declared law
 - AC-4: when no lawful route exists, the system records that state explicitly
   rather than silently demoting to generic code repair
+- AC-5: once a constitutional proposal is lawfully applied, renewed derivation
+  must re-read the post-application constitutional surface before forward work
+  resumes
 
 ### REQ-F-ODDSDLC-036 — constitutional repricing is explicit and gated
 
@@ -71,6 +74,8 @@ Intent, `odd_sdlc` opens an explicit constitutional repricing path.
   attributable outcomes
 - AC-4: no traversal path may silently apply constitutional change after
   semantic triage alone
+- AC-5: `proposal_applied` remains a distinct attributable event from
+  proposal authoring and approval intent alone
 
 ### REQ-F-ODDSDLC-037 — published analysis and current triage remain fresh, separate, and queryable
 
@@ -88,3 +93,6 @@ re-entry behavior.
   triage result while preserving divergence history
 - AC-4: blocked or gated states declare their lawful re-entry trigger,
   including renewed analysis, declared capability, or approval resolution
+- AC-5: loopback over an applied proposal emits either `gap_retired` or a new
+  attributable `gap_event` rather than leaving the originating gap in
+  ambiguous limbo

@@ -2,6 +2,7 @@
 """Executive program runner derived from the current GTL carrier."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from genesis.result_ingest import ingest_fp_result
@@ -9,6 +10,7 @@ from genesis.result_ingest import ingest_fp_result
 from .analysis import refresh_analysis
 from .app import OddSdlcApp, active_programs, start
 from .constructor import construct_manifest
+from .homeostatic_loop import run_homeostatic_self_check
 from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name, program_for_edge
 
 
@@ -174,5 +176,29 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     }
 
 
+def _emit_boundary_check(workspace_root: Path) -> dict[str, Any]:
+    code_root = workspace_root / ".odd_sdlc" / "python" / "code" / "odd_sdlc"
+    if not code_root.exists():
+        code_root = Path(__file__).resolve().parent
+    allowed_emit_import_paths = {"runtime_effects.py"}
+    direct_emit_imports: list[str] = []
+    for path in sorted(code_root.rglob("*.py")):
+        lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+        if any(
+            line.startswith("from genesis.events import") and "emit" in line
+            for line in lines
+        ):
+            direct_emit_imports.append(path.name)
+    passes = sorted(direct_emit_imports) == sorted(allowed_emit_import_paths)
+    return {
+        "passes": passes,
+        "allowed_emit_import_paths": sorted(allowed_emit_import_paths),
+        "observed_emit_import_paths": sorted(direct_emit_imports),
+    }
+
+
 def self_test(app: OddSdlcApp) -> dict[str, Any]:
-    return run_program(app, name=BOOTSTRAP_RELEASE_SELF_TEST.name)
+    result = run_program(app, name=BOOTSTRAP_RELEASE_SELF_TEST.name)
+    result["emit_boundary"] = _emit_boundary_check(app.config.workspace_root)
+    result["homeostatic_loop"] = run_homeostatic_self_check(app)
+    return result

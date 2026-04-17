@@ -36,13 +36,13 @@ from odd_sdlc.fd_checks import (  # noqa: E402
 )
 from odd_sdlc.workspace_assets import assess_generated_asset_contract, asset_path, asset_relative_path  # noqa: E402
 from sandbox_runtime import (  # noqa: E402
+    assert_installed_genesis_runtime,
     run_constructor_for_start,
     install_kernel_sandbox,
     read_events,
     run_installed_genesis,
     run_installed_odd_sdlc,
     seed_canonical_spec_surface,
-    seed_local_genesis_runtime,
     seed_odd_sdlc_package,
 )
 
@@ -167,7 +167,7 @@ def _consensus_live_enabled() -> bool:
 
 def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
-    seed_local_genesis_runtime(workspace)
+    assert_installed_genesis_runtime(workspace)
     seed_odd_sdlc_package(workspace)
     seed_canonical_spec_surface(workspace)
     run_archive.note("sandbox_prepared", workspace=str(workspace), transport_agent="codex")

@@ -61,10 +61,16 @@ def _normalize_requirement_id(requirement_id: str) -> str:
     return "-".join(normalized)
 
 
+def _is_concrete_requirement_id(requirement_id: str) -> bool:
+    parts = requirement_id.upper().split("-")
+    return any(any(char.isdigit() for char in part) for part in parts[1:])
+
+
 def _collect_requirement_ids(path: Path) -> set[str]:
     return {
         _normalize_requirement_id(requirement_id)
         for requirement_id in _collect_ids(path, _REQUIREMENT_ID_RE)
+        if _is_concrete_requirement_id(requirement_id)
     }
 
 
@@ -260,7 +266,11 @@ def _tagged_requirement_ids(path: Path, *, tag: str) -> set[str]:
     for line in _read_text(path).splitlines():
         if tag not in line:
             continue
-        ids.update(_normalize_requirement_id(requirement_id) for requirement_id in _REQUIREMENT_ID_RE.findall(line))
+        ids.update(
+            _normalize_requirement_id(requirement_id)
+            for requirement_id in _REQUIREMENT_ID_RE.findall(line)
+            if _is_concrete_requirement_id(requirement_id)
+        )
     return ids
 
 

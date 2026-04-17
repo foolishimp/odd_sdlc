@@ -3,11 +3,11 @@
 - id: T-007
 - title: Deepen imported software-project feature, UAT, and design surfaces so the first generated cut is materially useful
 - type: feature
-- status: active
+- status: backlog
 - goal: ambiguity-governance-and-traceability
 - priority: medium
 - created_at: 2026-04-16
-- updated_at: 2026-04-16
+- updated_at: 2026-04-17
 - dependencies:
 
 ## Triage
@@ -128,5 +128,6 @@ replacement toward refinement.
 
 - downstream dogfood ticket: `/Users/jim/src/apps/odd_domain/.ai-workspace/tickets/active/T-018-dogfood-odd-domain-through-released-odd-sdlc.md`
 - downstream design note: `/Users/jim/src/apps/odd_domain/build_tenants/common/design/ODD_SDLC_DOGFOOD_LINE.md`
+- related backlog: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/backlog/T-008-add-arbitrary-span-graph-gap-analysis-with-lawful-zoom.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`

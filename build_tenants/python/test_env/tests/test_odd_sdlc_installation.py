@@ -45,6 +45,7 @@ if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from odd_sdlc.analysis import load_analysis_manifest, load_workspace_state  # noqa: E402
+import odd_sdlc.__main__ as odd_sdlc_cli  # noqa: E402
 from odd_sdlc.app import bootstrap, initialize  # noqa: E402
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
@@ -56,12 +57,14 @@ from odd_sdlc.project_profile import (  # noqa: E402
 )
 from odd_sdlc.query import query_domain  # noqa: E402
 from odd_sdlc.release.install import install as install_release  # noqa: E402
+from odd_sdlc.sandbox_lifecycle import observe_sandbox, reset_sandbox_runtime_state  # noqa: E402
 from odd_sdlc.traceability import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
     build_requirement_closure_register,
     refresh_requirement_closure_register,
 )
 from odd_sdlc.workspace_assets import summarize_test_evidence  # noqa: E402
+import sandbox_runtime  # noqa: E402
 from sandbox_runtime import read_events, run_installed_genesis, run_installed_odd_sdlc  # noqa: E402
 
 
@@ -114,9 +117,6 @@ def _seed_imported_workspace(path: Path) -> None:
 
 def _seed_data_mapper_template_workspace(path: Path) -> None:
     shutil.copytree(DATA_MAPPER_TEMPLATE, path, dirs_exist_ok=True)
-    readme_path = path / "README.md"
-    if readme_path.exists():
-        readme_path.unlink()
 
 
 def _write_fake_transport_contract(workspace: Path) -> Path:
@@ -290,6 +290,12 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_analysis_manifest",
         "create_workspace_state",
     ]
+    assert [entry["kind"] for entry in report["defaults_with_provenance"]] == [
+        "create_product_surface",
+        "create_goals_surface",
+        "create_imported_requirements_summary",
+        "create_project_bootstrap",
+    ]
 
     assert (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8").startswith("# Product")
     assert (workspace / "specification" / "GOALS.md").read_text(encoding="utf-8").startswith("# Goals")
@@ -306,13 +312,13 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert "- `specification/INTENT.md` when present" in project_bootstrap
     assert ".ai-workspace/runtime/odd_sdlc-ambiguity-register.json" in project_bootstrap
     assert ".ai-workspace/runtime/odd_sdlc-requirement-closure.json" in project_bootstrap
-    assert "- `README.md` only as provenance/context after the imported authority" in project_bootstrap
     assert "## Installed Runtime Start Surface" in project_bootstrap
     assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in project_bootstrap
     assert "it does not proxy F_P transport failures" in project_bootstrap
     assert "deployment, runtime-return, and similar side-effect stages only traverse" in project_bootstrap
     assert "construction_complete_pending_execution" in project_bootstrap
     assert "treat legacy bootstrap instructions" in project_bootstrap
+    assert not (workspace / "README.md").exists()
     constraints = (workspace / ".ai-workspace" / "context" / "project_constraints.yml").read_text(encoding="utf-8")
     assert 'name: "data_mapper.test18"' in constraints
     assert 'name: "scala_spark"' in constraints
@@ -367,6 +373,34 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     )
     assert second["changed"] is False
     assert second["actions"] == []
+    assert second["defaults_with_provenance"] == []
+
+
+def test_normalize_workspace_fails_closed_for_malformed_project_constraints(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.malformed_constraints"
+    _seed_imported_workspace(workspace)
+    constraints_path = workspace / ".ai-workspace" / "context" / "project_constraints.yml"
+    constraints_path.write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "data_mapper.malformed_constraints"',
+                '  kind: "software-project"',
+                "",
+                "constraints: {}",
+                "",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="project_constraints.yml is malformed"):
+        normalize_workspace(
+            workspace,
+            project_slug="data_mapper",
+            platform="spark_scala",
+        )
 
 
 def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Path) -> None:
@@ -427,9 +461,9 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
         assert "unresolved live requirements remain active future pressure across iterations" in text
         assert "construction_complete_pending_execution" in text
         assert "treat them as provenance only" in text
-        assert "README.md` (provenance/context only; do not use as primary identity evidence)" in text
         assert "<!-- GTL_BOOTLOADER_START -->" in text
         assert text.index("<!-- ODD_SDLC_BOOTLOADER_START -->") < text.index("<!-- GTL_BOOTLOADER_START -->")
+    assert not (workspace / "README.md").exists()
 
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
@@ -451,6 +485,141 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     payload = json.loads(result.stdout)
     assert payload["converged"] is False
     assert len(payload["gaps"]) == 18
+
+
+def test_sandbox_lifecycle_cli_commands_bypass_bootstrap_and_publish_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    workspace = tmp_path / "sandbox.lifecycle"
+    calls: list[tuple[str, Path]] = []
+
+    def _fail_bootstrap(*args: object, **kwargs: object) -> object:
+        raise AssertionError("sandbox lifecycle commands must not require app bootstrap")
+
+    monkeypatch.setattr(odd_sdlc_cli, "bootstrap", _fail_bootstrap)
+    monkeypatch.setattr(
+        odd_sdlc_cli,
+        "prepare_sandbox",
+        lambda root: calls.append(("prepare", Path(root))) or {"status": "prepared", "workspace_root": str(root)},
+    )
+    monkeypatch.setattr(
+        odd_sdlc_cli,
+        "observe_sandbox",
+        lambda root: calls.append(("observe", Path(root))) or {"status": "observed", "workspace_root": str(root)},
+    )
+    monkeypatch.setattr(
+        odd_sdlc_cli,
+        "reset_sandbox_runtime_state",
+        lambda root: calls.append(("reset", Path(root))) or {"status": "reset", "workspace_root": str(root)},
+    )
+
+    assert odd_sdlc_cli.main(["prepare-sandbox", "--workspace", str(workspace)]) == 0
+    prepare_payload = json.loads(capsys.readouterr().out)
+    assert prepare_payload["status"] == "prepared"
+
+    assert odd_sdlc_cli.main(["observe-sandbox", "--workspace", str(workspace)]) == 0
+    observe_payload = json.loads(capsys.readouterr().out)
+    assert observe_payload["status"] == "observed"
+
+    assert odd_sdlc_cli.main(["reset-sandbox", "--workspace", str(workspace)]) == 0
+    reset_payload = json.loads(capsys.readouterr().out)
+    assert reset_payload["status"] == "reset"
+
+    assert calls == [
+        ("prepare", workspace),
+        ("observe", workspace),
+        ("reset", workspace),
+    ]
+
+
+def test_sandbox_runtime_helpers_delegate_to_product_surfaces(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "sandbox.helpers"
+    events_path = workspace / ".ai-workspace" / "events" / "events.jsonl"
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.write_text(json.dumps({"event_type": "sandbox_prepared"}) + "\n", encoding="utf-8")
+    delegated: list[tuple[str, Path]] = []
+
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_install_kernel_sandbox",
+        lambda root: delegated.append(("install", Path(root))) or {"status": "installed"},
+    )
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_seed_odd_sdlc_package",
+        lambda root: delegated.append(("seed_package", Path(root))) or None,
+    )
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_assert_installed_genesis_runtime",
+        lambda root: delegated.append(("assert_runtime", Path(root))) or None,
+    )
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_seed_canonical_spec_surface",
+        lambda root: delegated.append(("seed_spec", Path(root))) or None,
+    )
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_reset_sandbox_runtime_state",
+        lambda root: delegated.append(("reset", Path(root))) or {"status": "reset"},
+    )
+    monkeypatch.setattr(
+        sandbox_runtime,
+        "_observe_sandbox",
+        lambda root: delegated.append(("observe", Path(root))) or {"event_count": 1},
+    )
+
+    assert sandbox_runtime.install_kernel_sandbox(workspace) == {"status": "installed"}
+    sandbox_runtime.seed_odd_sdlc_package(workspace)
+    sandbox_runtime.assert_installed_genesis_runtime(workspace)
+    sandbox_runtime.seed_canonical_spec_surface(workspace)
+    assert sandbox_runtime.read_events(workspace) == [{"event_type": "sandbox_prepared"}]
+    sandbox_runtime.reset_sandbox_runtime_state(workspace)
+
+    assert delegated == [
+        ("install", workspace),
+        ("seed_package", workspace),
+        ("assert_runtime", workspace),
+        ("seed_spec", workspace),
+        ("observe", workspace),
+        ("reset", workspace),
+    ]
+
+
+def test_sandbox_observation_and_reset_are_queryable_product_surfaces(tmp_path: Path) -> None:
+    workspace = tmp_path / "sandbox.observe"
+    (workspace / ".genesis" / "genesis").mkdir(parents=True, exist_ok=True)
+    (workspace / ".odd_sdlc" / "python" / "code" / "odd_sdlc").mkdir(parents=True, exist_ok=True)
+    events_path = workspace / ".ai-workspace" / "events" / "events.jsonl"
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.write_text(
+        "\n".join(
+            (
+                json.dumps({"event_type": "sandbox_prepared"}),
+                json.dumps({"event_type": "sandbox_reran"}),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    observed = observe_sandbox(workspace)
+    assert observed["event_count"] == 2
+    assert observed["latest_event_type"] == "sandbox_reran"
+    assert observed["installer_runtime_present"] is True
+    assert observed["product_package_present"] is True
+    assert observed["runtime_state_present"] is True
+
+    reset = reset_sandbox_runtime_state(workspace)
+    assert reset["status"] == "reset"
+    assert reset["removed"] is True
+    assert not (workspace / ".ai-workspace").exists()
 
 
 def test_module_export_is_materialized_and_stable() -> None:

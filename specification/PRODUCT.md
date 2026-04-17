@@ -45,6 +45,8 @@ It gives a project a lawful way to declare:
 - explicit homeostatic observation, gap triage, lawful re-entry, and
   constitutional repricing over active SDLC work without inventing a second
   runtime truth
+- explicit constitutional application, renewed derivation, and loopback
+  retirement over that same homeostatic line
 - an orchestration/service boundary for session lifecycle, worker registry,
   dispatch routing, and client-safe observation that remains subordinate to ABG
   runtime truth
@@ -457,6 +459,11 @@ The current product definition of `odd_sdlc` is:
 - keeping the current bootstrap-to-release toy subgraph as a proving subset
   rather than the whole software-domain definition
 - publishing a top-level executive GTL graph function over the current toy subgraph
+- publishing bounded operator-invoked span gap analysis so incompleteness can
+  be inspected lawfully across arbitrary graph points and their dependent
+  realizing structure
+- publishing first-class sandbox preparation, observation, and reset surfaces
+  as product behavior rather than leaving them as pytest-only orchestration
 - publishing reusable higher-order graph-function harnesses as ordinary GTL
   carriers rather than as hidden product-local engines
 - able to install itself into an imported workspace and normalize the canonical
@@ -486,10 +493,17 @@ The current top-level executive graph function over that subgraph is:
 
 - `bootstrap_release_self_test`
 
-The current reusable consensus graph-function surfaces are:
+The current reusable consensus plugin surfaces are:
+
+- `review_subject_consensus_round`
+- `review_subject_by_consensus`
+
+The current `odd_sdlc` host bindings over that plugin are:
 
 - `review_design_consensus_round`
 - `review_design_by_consensus`
+- `review_comment_consensus_round`
+- `review_comment_by_consensus`
 
 It acts as the current runtime authority above the leaf asset functions:
 
@@ -502,20 +516,40 @@ It acts as the current runtime authority above the leaf asset functions:
 - it ingests the resulting F_P assessment back through ABG
 - it stops only when the current toy subgraph converges at `release_surface`
 
+The current product also exposes bounded operator inspection and proving
+surfaces around that carrier:
+
+- `odd_sdlc gaps --from-edge ... --to-edge ... --zoom ...` for lawful
+  bounded span analysis over direct and dependent gap structure
+- `odd_sdlc prepare-sandbox` for first-class installed-dev sandbox preparation
+- `odd_sdlc observe-sandbox` for current sandbox evidence/observation summary
+- `odd_sdlc reset-sandbox` for governed runtime-state reset before rerun
+
+The current homeostatic loop is likewise explicit through:
+
+- proposal authoring and approval-resolution surfaces
+- `proposal_applied` as the constitutional write event
+- `derivation_reopened` as renewed forward derivation after application
+- `gap_retired` or renewed `gap_event` as loopback judgment
+
 The tenant still exposes a machine-readable `bootstrap_release_self_test`
 program surface, but that surface is a projection of the executive graph
 function rather than an app-owned controller with independent authority.
 
-The consensus surfaces establish the first higher-order harness pattern:
+The consensus surfaces establish the first higher-order plugin-and-host pattern:
 
-- `review_design_consensus_round` is the isolated executable round over
-  `design_surface -> review_assessment_surface -> consensus_decision_surface -> reviewed_design_surface`
-- `review_design_by_consensus` is the reusable higher-order carrier over GTL
+- `review_subject_consensus_round` is the shared round-level plugin contract
+  over `subject_surface -> review_assessment_surface -> consensus_decision_surface -> reviewed_subject_surface`
+- `review_subject_by_consensus` is the shared higher-order carrier over GTL
   `promote`, `fan_out`, `fan_in`, `gate`, and `recurse`
-- the harness publishes its outer contract and injected review/reduce/apply
+- `review_design_*` are explicit host bindings for design review rather than
+  the constitutional owner of consensus itself
+- `review_comment_*` are explicit host bindings for comment review inside
+  `odd_sdlc`
+- the plugin publishes its outer contract and injected review/reduce/apply
   stages as graph-function declaration truth
-- the same higher-order shape is intended to be reusable later for schema,
-  DQ-rules, release, and other review-governed subject assets
+- the same higher-order shape remains reusable later for schema, DQ-rules,
+  release, and other review-governed subject assets
 
 The current build focus is to reprice the first real `odd_sdlc` realization slice
 into the generic software-domain package:

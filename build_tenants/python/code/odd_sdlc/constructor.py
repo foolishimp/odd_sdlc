@@ -11,10 +11,9 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from genesis.events import EventContext, EventStream, emit
-
 from .asset_types import ASSET_TYPES
 from .project_profile import SOURCE_EXTENSIONS, load_project_profile
+from .runtime_effects import publish_workspace_runtime_event
 from .traceability import (
     authority_requirement_refs,
     current_requirement_refs,
@@ -44,6 +43,7 @@ PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface
 _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _GENERATED_TEST_CODE_MARKER = "Generated governed test code for the odd_sdlc test_code_surface."
 _GENERIC_TITLE_HEADINGS = {"intent", "product", "goals", "requirements"}
+_OPERATIONAL_DISPATCH_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-operational-dispatch.json")
 
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
@@ -87,6 +87,36 @@ def _build_artifact_summary(workspace_root: Path) -> dict[str, Any]:
         "observed_paths": observed_paths,
         "artifact_root_count": len(observed_paths),
     }
+
+
+def _load_operational_dispatch_register(workspace_root: Path) -> dict[str, Any]:
+    path = workspace_root / _OPERATIONAL_DISPATCH_REGISTER_PATH
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return raw if isinstance(raw, dict) else {}
+
+
+def _operational_dispatch_entry(workspace_root: Path, lane: str) -> dict[str, Any]:
+    payload = _load_operational_dispatch_register(workspace_root)
+    lanes = payload.get("lanes", {})
+    if not isinstance(lanes, dict):
+        return {}
+    entry = lanes.get(lane, {})
+    return dict(entry) if isinstance(entry, dict) else {}
+
+
+def _classify_operational_binding(contract: str) -> str:
+    lowered = contract.strip().lower()
+    if not lowered:
+        return "undeclared"
+    if "sbt" in lowered:
+        return "local_scala_sbt"
+    if "pytest" in lowered:
+        return "local_python_pytest"
+    if lowered.startswith("python "):
+        return "local_python_command"
+    return "local_shell_command"
 
 
 def _strip_quotes(value: str) -> str:
@@ -1429,6 +1459,7 @@ def _construct_build_execution_surface(workspace_root: Path) -> str:
     code_summary = summarize_code_surface(workspace_root)
     build_summary = _build_artifact_summary(workspace_root)
     project_profile = load_project_profile(workspace_root)
+    binding = _classify_operational_binding(project_profile.build_execution_contract or "")
     return "\n".join(
         (
             "# Generated Build Execution Surface",
@@ -1438,6 +1469,7 @@ def _construct_build_execution_surface(workspace_root: Path) -> str:
             "## Operational Transition Command",
             "- status: prepared",
             "- saga_state: prepared",
+            f"- substrate_binding: `{binding}`",
             f"- substrate_contract: `{project_profile.build_execution_contract or 'undeclared'}`",
             "- target_result_surface: `build_execution_result_surface`",
             f"- governed code root: `{code_summary['relative_path']}`",
@@ -1460,8 +1492,16 @@ def _construct_build_execution_surface(workspace_root: Path) -> str:
 def _construct_build_execution_result_surface(workspace_root: Path) -> str:
     build_execution_surface = _asset_text(workspace_root, "build_execution_surface")
     build_summary = _build_artifact_summary(workspace_root)
-    status = "result_admitted" if build_summary["artifact_root_count"] else "pending_external_evidence"
-    saga_state = "result_admitted" if build_summary["artifact_root_count"] else "dispatched"
+    dispatch = _operational_dispatch_entry(workspace_root, "build")
+    if dispatch.get("status") == "failed":
+        status = "failed"
+        saga_state = "failed"
+    elif dispatch.get("status") == "succeeded":
+        status = "result_admitted"
+        saga_state = "result_admitted"
+    else:
+        status = "result_admitted" if build_summary["artifact_root_count"] else "pending_external_evidence"
+        saga_state = "result_admitted" if build_summary["artifact_root_count"] else "dispatched"
     return "\n".join(
         (
             "# Generated Build Execution Result Surface",
@@ -1472,6 +1512,10 @@ def _construct_build_execution_result_surface(workspace_root: Path) -> str:
             f"- status: {status}",
             f"- saga_state: {saga_state}",
             f"- observed build artifact roots: {', '.join(build_summary['observed_paths']) or 'none'}",
+            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
+            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
+            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
+            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
             "",
             "## Source Build Execution Snapshot",
             build_execution_surface,
@@ -1487,6 +1531,7 @@ def _construct_test_execution_surface(workspace_root: Path) -> str:
     release_surface = _asset_text(workspace_root, "release_surface")
     test_summary = summarize_test_evidence(workspace_root)
     project_profile = load_project_profile(workspace_root)
+    binding = _classify_operational_binding(project_profile.test_execution_contract or "")
     return "\n".join(
         (
             "# Generated Test Execution Surface",
@@ -1496,6 +1541,7 @@ def _construct_test_execution_surface(workspace_root: Path) -> str:
             "## Operational Transition Command",
             "- status: prepared",
             "- saga_state: prepared",
+            f"- substrate_binding: `{binding}`",
             f"- substrate_contract: `{project_profile.test_execution_contract or 'undeclared'}`",
             "- target_result_surface: `test_execution_result_surface`",
             f"- expected returned report files observed now: {test_summary['report_file_count']}",
@@ -1513,7 +1559,14 @@ def _construct_test_execution_surface(workspace_root: Path) -> str:
 def _construct_test_execution_result_surface(workspace_root: Path) -> str:
     test_execution_surface = _asset_text(workspace_root, "test_execution_surface")
     test_summary = summarize_test_evidence(workspace_root)
-    if test_summary["parsed_report_count"] == 0:
+    dispatch = _operational_dispatch_entry(workspace_root, "test")
+    if dispatch.get("status") == "failed":
+        status = "failed"
+        saga_state = "failed"
+    elif dispatch.get("status") == "succeeded":
+        status = "result_admitted"
+        saga_state = "result_admitted"
+    elif test_summary["parsed_report_count"] == 0:
         status = "pending_external_evidence"
         saga_state = "dispatched"
     elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
@@ -1536,6 +1589,10 @@ def _construct_test_execution_result_surface(workspace_root: Path) -> str:
             f"- tests observed: {test_summary['tests']}",
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
+            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
+            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
+            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
+            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
             "",
             "## Source Test Execution Snapshot",
             test_execution_surface,
@@ -1551,6 +1608,7 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
     release_surface = _asset_text(workspace_root, "release_surface")
     project_profile = load_project_profile(workspace_root)
     test_execution_result = _optional_asset_text(workspace_root, "test_execution_result_surface")
+    binding = _classify_operational_binding(project_profile.deployment_contract or "")
     return "\n".join(
         (
             "# Generated Deployment Surface",
@@ -1560,6 +1618,7 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
             "## Operational Transition Command",
             "- status: prepared",
             "- saga_state: prepared",
+            f"- substrate_binding: `{binding}`",
             f"- substrate_contract: `{project_profile.deployment_contract or 'undeclared'}`",
             "- target_result_surface: `deployment_result_surface`",
             "- target_state_surface: `deployed_environment_surface`",
@@ -1581,6 +1640,16 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
 def _construct_deployment_result_surface(workspace_root: Path) -> str:
     deployment_surface = _asset_text(workspace_root, "deployment_surface")
     test_summary = summarize_test_evidence(workspace_root)
+    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    if dispatch.get("status") == "failed":
+        status = "failed"
+        saga_state = "failed"
+    elif dispatch.get("status") == "succeeded":
+        status = "result_admitted"
+        saga_state = "result_admitted"
+    else:
+        status = "pending_external_evidence"
+        saga_state = "dispatched"
     return "\n".join(
         (
             "# Generated Deployment Result Surface",
@@ -1588,9 +1657,13 @@ def _construct_deployment_result_surface(workspace_root: Path) -> str:
             asset_marker("deployment_result_surface"),
             "",
             "## Admitted Deployment Result",
-            "- status: pending_external_evidence",
-            "- saga_state: dispatched",
+            f"- status: {status}",
+            f"- saga_state: {saga_state}",
             f"- returned runtime or deployment reports currently observed: {test_summary['report_file_count']}",
+            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
+            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
+            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
+            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
             "",
             "## Source Deployment Snapshot",
             deployment_surface,
@@ -1604,6 +1677,13 @@ def _construct_deployment_result_surface(workspace_root: Path) -> str:
 
 def _construct_deployed_environment_surface(workspace_root: Path) -> str:
     deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
+    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    if dispatch.get("status") == "failed":
+        status = "deployment_failed"
+    elif dispatch.get("status") == "succeeded":
+        status = "deployment_result_admitted"
+    else:
+        status = "deployment_pending_external_evidence"
     return "\n".join(
         (
             "# Generated Deployed Environment Surface",
@@ -1611,8 +1691,9 @@ def _construct_deployed_environment_surface(workspace_root: Path) -> str:
             asset_marker("deployed_environment_surface"),
             "",
             "## Current Projected State",
-            "- status: deployment_pending_external_evidence",
+            f"- status: {status}",
             "- projection_basis: admitted deployment result surface",
+            f"- deployment_dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
             "",
             "## Source Deployment Result Snapshot",
             deployment_result_surface,
@@ -1625,7 +1706,16 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
     deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
-    if test_summary["parsed_report_count"] == 0:
+    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    if dispatch.get("status") == "failed":
+        completion_state = "deployment_failed"
+        observed_status = "failed"
+        saga_state = "failed"
+    elif dispatch.get("status") == "succeeded":
+        completion_state = "deployment_result_recorded"
+        observed_status = "result_admitted"
+        saga_state = "result_admitted"
+    elif test_summary["parsed_report_count"] == 0:
         completion_state = "construction_complete_pending_execution"
         observed_status = "pending_external_evidence"
         saga_state = "dispatched"
@@ -1654,6 +1744,7 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
             f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
+            f"- deployment_dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
             "",
             "## Source Deployment Result Snapshot",
             deployment_result_surface,
@@ -2086,9 +2177,10 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     declared_asset_type = asset_declared_type(target_asset)
     asset_profile = ASSET_TYPES[declared_asset_type]
 
-    emit(
-        "asset_checkpoint_updated",
-        {
+    publish_workspace_runtime_event(
+        workspace_root=workspace,
+        event_type="asset_checkpoint_updated",
+        data={
             "asset_id": target_asset,
             "asset_uri": relative_file_uri(target_path, workspace_root=workspace),
             "declared_asset_type": declared_asset_type,
@@ -2099,19 +2191,16 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
             "previous_checkpoint": previous_checkpoint.to_dict(),
             "current_checkpoint": current_checkpoint.to_dict(),
         },
-        stream=EventStream.open(workspace),
-        context=EventContext(
-            workflow_version=manifest.get("workflow_version", "unknown"),
-            run_id=manifest.get("run_id"),
-            job_id=manifest.get("job_id"),
-            graph_function_id=manifest.get("graph_function_id"),
-            materialization_id=manifest.get("materialization_id"),
-            call_id=manifest.get("call_id"),
-            vector_id=manifest.get("vector_id"),
-            aggregate_type="graph_call",
-            aggregate_id=manifest.get("call_id"),
-            correlation_id=manifest.get("call_id"),
-        ),
+        workflow_version=manifest.get("workflow_version", "unknown"),
+        run_id=manifest.get("run_id"),
+        job_id=manifest.get("job_id"),
+        graph_function_id=manifest.get("graph_function_id"),
+        materialization_id=manifest.get("materialization_id"),
+        call_id=manifest.get("call_id"),
+        vector_id=manifest.get("vector_id"),
+        aggregate_type="graph_call",
+        aggregate_id=manifest.get("call_id"),
+        correlation_id=manifest.get("call_id"),
     )
 
     assessment_evaluators = [

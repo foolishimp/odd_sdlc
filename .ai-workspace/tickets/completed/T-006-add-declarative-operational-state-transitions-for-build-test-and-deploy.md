@@ -3,11 +3,11 @@
 - id: T-006
 - title: Add declarative operational state transitions for build, test execution, deployment, and returned evidence in odd_sdlc without changing GTL or ABG
 - type: feature
-- status: active
+- status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: high
 - created_at: 2026-04-14
-- updated_at: 2026-04-16
+- updated_at: 2026-04-17
 - dependencies: T-004, B-005
 
 ## Triage
@@ -251,28 +251,28 @@ operational work.
 - [x] Reprice `PRODUCT.md` and the active odd_sdlc requirement surfaces so
   operational state transitions are explicit domain capability rather than
   ambient future work.
-- [ ] Decide whether `build_execution_contract` must be added as a first-class
+- [x] Decide whether `build_execution_contract` must be added as a first-class
   tenant capability beside the existing execution/deployment/runtime-observation
   contracts.
-- [ ] Reprice the active graph boundary so operational transitions are modeled
+- [x] Reprice the active graph boundary so operational transitions are modeled
   as declarative state changes from release into command-side transition,
   admitted-result/evidence, and current projected operational state.
-- [ ] Publish new odd_sdlc asset surfaces for build execution, test execution,
+- [x] Publish new odd_sdlc asset surfaces for build execution, test execution,
   deployment result, and returned evidence where needed, keeping command-side,
   result-side, and current-state roles explicit and typed.
-- [ ] Publish graph functions for generic build/test/deploy transitions without
+- [x] Publish graph functions for generic build/test/deploy transitions without
   changing GTL or ABG.
-- [ ] Define the substrate-binding model explicitly so bindings such as local,
+- [x] Define the substrate-binding model explicitly so bindings such as local,
   GitHub Actions, and AWS-native execution are contract values, not special
   engines.
-- [ ] Declare the bounded operational saga states and their admission/reopen
+- [x] Declare the bounded operational saga states and their admission/reopen
   semantics explicitly so pending, failed, retried, deferred, reopened, and
   compensated work remains queryable.
-- [ ] Prove at least one concrete operational binding end to end, preferably
+- [x] Prove at least one concrete operational binding end to end, preferably
   starting with `local_scala_sbt` on an installed workspace.
-- [ ] Prove that returned execution/runtime evidence is admitted back into the
+- [x] Prove that returned execution/runtime evidence is admitted back into the
   graph as governed truth rather than ambient logs.
-- [ ] Keep all provider/tool-specific realization in odd_sdlc/domain/operator
+- [x] Keep all provider/tool-specific realization in odd_sdlc/domain/operator
   surfaces rather than inventing bespoke builder families.
 
 ## Acceptance

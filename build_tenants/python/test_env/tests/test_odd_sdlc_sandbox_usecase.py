@@ -9,11 +9,13 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import textwrap
 
 import pytest
 
 from odd_sdlc.workspace_assets import asset_path
 from sandbox_runtime import (
+    assert_installed_genesis_runtime,
     complete_bootstrap_chain,
     install_kernel_sandbox,
     read_events,
@@ -23,12 +25,15 @@ from sandbox_runtime import (
     run_installed_odd_sdlc,
     run_installed_self_test,
     seed_canonical_spec_surface,
-    seed_local_genesis_runtime,
     seed_odd_sdlc_package,
 )
 
 
 pytestmark = pytest.mark.usecase_id("canonical_sandbox_repeatability")
+APPS_ROOT = Path(__file__).resolve().parents[5]
+ABI_TRANSPORT_PATH = (
+    APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "genesis" / "transport.py"
+)
 
 EXPECTED_BOOTSTRAP_STEPS = (
     "derive_intent_surface",
@@ -79,13 +84,23 @@ EXPECTED_FUNCTIONS = (
     "derive_deployed_environment_surface",
     "derive_runtime_observation_surface",
     "derive_retrofit_plan_surface",
+    "review_subject_consensus_round",
+    "review_subject_by_consensus",
+    "review_design_consensus_round",
+    "review_design_by_consensus",
+    "review_comment_consensus_round",
+    "review_comment_by_consensus",
 )
 
 EXPECTED_GRAPH_FUNCTIONS = (
     "bootstrap_release_self_test",
     "release_operational_cycle",
+    "review_subject_consensus_round",
+    "review_subject_by_consensus",
     "review_design_consensus_round",
     "review_design_by_consensus",
+    "review_comment_consensus_round",
+    "review_comment_by_consensus",
 )
 EXPECTED_OPERATIONAL_STEPS = (
     "prepare_build_execution_surface",
@@ -197,7 +212,7 @@ def _validate_generated_hello_world_app(workspace: Path) -> dict[str, object]:
 
 def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     install_kernel_sandbox(workspace, archive=run_archive)
-    seed_local_genesis_runtime(workspace)
+    assert_installed_genesis_runtime(workspace)
     seed_odd_sdlc_package(workspace)
     seed_canonical_spec_surface(workspace)
     refresh_analysis = json.loads(
@@ -210,6 +225,108 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     )
     run_archive.capture_json("refresh-analysis.json", refresh_analysis)
     run_archive.note("sandbox_prepared", workspace=str(workspace))
+
+
+def test_sandbox_preparation_preserves_installer_owned_abg_runtime(run_archive) -> None:
+    workspace = run_archive.workspace
+    install_kernel_sandbox(workspace, archive=run_archive)
+    transport_before = (workspace / ".genesis" / "genesis" / "transport.py").read_text(encoding="utf-8")
+    seed_odd_sdlc_package(workspace)
+    seed_canonical_spec_surface(workspace)
+    transport_after = (workspace / ".genesis" / "genesis" / "transport.py").read_text(encoding="utf-8")
+    source_transport = ABI_TRANSPORT_PATH.read_text(encoding="utf-8")
+
+    assert transport_before == transport_after
+    assert transport_after == source_transport
+
+
+def _rewrite_project_contracts(
+    workspace: Path,
+    *,
+    build_execution_contract: str,
+    test_execution_contract: str,
+    deployment_contract: str,
+    runtime_observation_contract: str,
+) -> None:
+    path = workspace / ".ai-workspace" / "context" / "project_constraints.yml"
+    original_lines = path.read_text(encoding="utf-8").splitlines()
+    replacements = {
+        "build_execution_contract": build_execution_contract,
+        "test_execution_contract": test_execution_contract,
+        "deployment_contract": deployment_contract,
+        "runtime_observation_contract": runtime_observation_contract,
+    }
+    rewritten: list[str] = []
+    for line in original_lines:
+        stripped = line.strip()
+        replaced = False
+        for key, value in replacements.items():
+            if stripped.startswith(f"{key}:"):
+                indent = line[: len(line) - len(line.lstrip())]
+                rewritten.append(f'{indent}{key}: "{value}"')
+                replaced = True
+                break
+        if not replaced:
+            rewritten.append(line)
+    path.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+
+
+def _seed_operational_dispatch_scripts(workspace: Path) -> None:
+    ops_root = workspace / ".odd_sdlc_ops"
+    ops_root.mkdir(parents=True, exist_ok=True)
+    code_root_relative = asset_path(workspace, "code_surface").relative_to(workspace).as_posix()
+    build_script = textwrap.dedent(
+        """
+        from pathlib import Path
+
+        dist_root = Path("dist")
+        target_root = Path("target")
+        dist_root.mkdir(parents=True, exist_ok=True)
+        target_root.mkdir(parents=True, exist_ok=True)
+        (dist_root / "build.txt").write_text("build completed\\n", encoding="utf-8")
+        (target_root / "build.txt").write_text("target completed\\n", encoding="utf-8")
+        """
+    ).strip()
+    test_script = textwrap.dedent(
+        f"""
+        from pathlib import Path
+
+        report_root = Path({code_root_relative!r}) / "test-reports"
+        report_root.mkdir(parents=True, exist_ok=True)
+        report_root.joinpath("junit-dispatch.xml").write_text(
+        \"\"\"<testsuite name="dispatch" tests="2" failures="0" errors="0" skipped="0"></testsuite>\"\"\",
+            encoding="utf-8",
+        )
+        """
+    ).strip()
+    deploy_script = textwrap.dedent(
+        """
+        from pathlib import Path
+
+        deploy_root = Path("docs")
+        deploy_root.mkdir(parents=True, exist_ok=True)
+        deploy_root.joinpath("deployment-evidence.txt").write_text(
+            "deployment completed\\n",
+            encoding="utf-8",
+        )
+        """
+    ).strip()
+    observe_script = textwrap.dedent(
+        """
+        from pathlib import Path
+
+        observe_root = Path("docs")
+        observe_root.mkdir(parents=True, exist_ok=True)
+        observe_root.joinpath("runtime-observation.txt").write_text(
+            "runtime observation projected from deployment result\\n",
+            encoding="utf-8",
+        )
+        """
+    ).strip()
+    (ops_root / "build.py").write_text(build_script + "\n", encoding="utf-8")
+    (ops_root / "test.py").write_text(test_script + "\n", encoding="utf-8")
+    (ops_root / "deploy.py").write_text(deploy_script + "\n", encoding="utf-8")
+    (ops_root / "observe.py").write_text(observe_script + "\n", encoding="utf-8")
 
 
 def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) -> None:
@@ -260,16 +377,23 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert catalog["graph_functions"][1]["job_names"] == ["release_operational_cycle_job"]
     assert [vector["name"] for vector in catalog["graph_functions"][1]["vectors"]] == list(EXPECTED_OPERATIONAL_STEPS)
     assert catalog["graph_functions"][2]["job_names"] == []
-    assert [vector["name"] for vector in catalog["graph_functions"][2]["vectors"]] == list(EXPECTED_CONSENSUS_STEPS)
+    assert catalog["graph_functions"][2]["plugin_kind"] == "shared_consensus_plugin"
+    assert catalog["graph_functions"][2]["template_kind"] == "symbolic"
+    assert catalog["graph_functions"][2]["vectors"] == []
     assert catalog["graph_functions"][3]["template_kind"] == "symbolic"
     assert catalog["graph_functions"][3]["vectors"] == []
+    assert [vector["name"] for vector in catalog["graph_functions"][4]["vectors"]] == list(EXPECTED_CONSENSUS_STEPS)
+    assert catalog["graph_functions"][5]["template_kind"] == "symbolic"
+    assert catalog["graph_functions"][5]["vectors"] == []
+    assert catalog["graph_functions"][6]["host_binding_kind"] == "comment_review"
+    assert catalog["graph_functions"][7]["host_binding_kind"] == "comment_review"
 
     gaps = json.loads(
         run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps").stdout
     )
     run_archive.capture_json("gaps.json", gaps)
     assert gaps["converged"] is False
-    assert len(gaps["gaps"]) == 21
+    assert len(gaps["gaps"]) == 27
 
     chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
     run_archive.capture_json("chain.json", chain)
@@ -568,18 +692,11 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
         ).stdout
     )
     assert consensus_gaps["converged"] is True
+    assert consensus_gaps["jobs_considered"] == len(EXPECTED_CONSENSUS_HARNESS_STEPS)
+    assert consensus_gaps["total_delta"] == 0.0
+    assert consensus_gaps["open_frames"] == 0
     assert [entry["edge"] for entry in consensus_gaps["gaps"]] == list(EXPECTED_CONSENSUS_HARNESS_STEPS)
     assert all(entry["delta"] == 0 for entry in consensus_gaps["gaps"])
-    assert len(consensus_gaps["refinement_gaps"]) == 1
-    refinement_gap = consensus_gaps["refinement_gaps"][0]
-    assert refinement_gap["edge"] == "review_design_by_consensus"
-    assert refinement_gap["graph_function"] == "review_design_by_consensus"
-    assert refinement_gap["scope"] == "refinement_parent_contract"
-    assert refinement_gap["termination_evaluator"] == "design_consensus_terminated"
-    assert refinement_gap["delta"] == 0
-    assert refinement_gap["failing"] == []
-    assert "design_consensus_terminated" in refinement_gap["passing"]
-    assert len(refinement_gap["child_keys"]) == len(EXPECTED_CONSENSUS_HARNESS_STEPS)
 
     events = read_events(workspace)
     consensus_graph_calls = [
@@ -794,6 +911,109 @@ def test_operational_cycle_projects_deployment_runtime_and_retrofit_surfaces(run
         and event["data"]["asset_id"] in EXPECTED_OPERATIONAL_UPDATED_ASSETS
     ]
     assert [event["data"]["asset_id"] for event in operational_updates] == list(EXPECTED_OPERATIONAL_UPDATED_ASSETS)
+
+
+def test_dispatch_operational_runs_declared_local_bindings_end_to_end(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    _seed_operational_dispatch_scripts(workspace)
+    _rewrite_project_contracts(
+        workspace,
+        build_execution_contract="python .odd_sdlc_ops/build.py",
+        test_execution_contract="python .odd_sdlc_ops/test.py",
+        deployment_contract="python .odd_sdlc_ops/deploy.py",
+        runtime_observation_contract="python .odd_sdlc_ops/observe.py",
+    )
+    refresh_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="odd_sdlc refresh-analysis operational dispatch",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.operational_dispatch.json", refresh_payload)
+
+    bootstrap_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="dispatch_bootstrap")
+    assert [step["start"]["edge"] for step in bootstrap_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
+
+    first = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "dispatch-operational",
+            archive=run_archive,
+            label="odd_sdlc dispatch-operational build",
+            timeout=120,
+        ).stdout
+    )
+    second = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "dispatch-operational",
+            archive=run_archive,
+            label="odd_sdlc dispatch-operational test",
+            timeout=120,
+        ).stdout
+    )
+    third = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "dispatch-operational",
+            archive=run_archive,
+            label="odd_sdlc dispatch-operational deploy",
+            timeout=120,
+        ).stdout
+    )
+    run_archive.capture_json("dispatch-operational.build.json", first)
+    run_archive.capture_json("dispatch-operational.test.json", second)
+    run_archive.capture_json("dispatch-operational.deploy.json", third)
+
+    dispatch_register = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-operational-dispatch.json").read_text(encoding="utf-8")
+    )
+    run_archive.capture_json("operational-dispatch-register.json", dispatch_register)
+
+    assert first["status"] == "ok"
+    assert first["final_state"]["edge"] == "prepare_test_execution_surface"
+    assert [step["kind"] for step in first["completed_steps"]] == ["prepare", "dispatch"]
+    assert first["completed_steps"][-1]["dispatch"]["lane"] == "build"
+    assert second["status"] == "ok"
+    assert second["final_state"]["edge"] == "prepare_deployment_surface"
+    assert [step["kind"] for step in second["completed_steps"]] == ["prepare", "dispatch"]
+    assert second["completed_steps"][-1]["dispatch"]["lane"] == "test"
+    assert third["status"] == "ok"
+    assert third["final_state"]["status"] == "converged"
+    assert [step["edge"] for step in third["completed_steps"]] == [
+        "prepare_deployment_surface",
+        "derive_deployment_result_surface",
+        "derive_deployed_environment_surface",
+        "derive_runtime_observation_surface",
+        "derive_retrofit_plan_surface",
+    ]
+    assert third["gap_snapshot"]["converged"] is True
+
+    assert dispatch_register["lanes"]["build"]["status"] == "succeeded"
+    assert dispatch_register["lanes"]["test"]["status"] == "succeeded"
+    assert dispatch_register["lanes"]["deployment"]["status"] == "succeeded"
+
+    build_text = asset_path(workspace, "build_execution_surface").read_text(encoding="utf-8")
+    build_result_text = asset_path(workspace, "build_execution_result_surface").read_text(encoding="utf-8")
+    test_result_text = asset_path(workspace, "test_execution_result_surface").read_text(encoding="utf-8")
+    deployment_result_text = asset_path(workspace, "deployment_result_surface").read_text(encoding="utf-8")
+    deployed_environment_text = asset_path(workspace, "deployed_environment_surface").read_text(encoding="utf-8")
+    runtime_text = asset_path(workspace, "runtime_observation_surface").read_text(encoding="utf-8")
+    retrofit_text = asset_path(workspace, "retrofit_plan_surface").read_text(encoding="utf-8")
+
+    assert "- substrate_binding: `local_python_command`" in build_text
+    assert "- status: result_admitted" in build_result_text
+    assert "- dispatch_exit_code: 0" in build_result_text
+    assert "- parsed reports: 1" in test_result_text
+    assert "- tests observed: 2" in test_result_text
+    assert "- status: result_admitted" in deployment_result_text
+    assert "- status: deployment_result_admitted" in deployed_environment_text
+    assert "- status: result_admitted" in runtime_text
+    assert "- completion_state: deployment_result_recorded" in runtime_text
+    assert "## Planned Next Actions" in retrofit_text
 
 
 def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive) -> None:
