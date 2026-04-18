@@ -22,8 +22,8 @@ from .function_catalog import FUNCTION_CATALOG
 from .gtl_module import module as odd_sdlc_module
 from .program_catalog import PROGRAM_CATALOG
 from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
-from .span_analysis import span_gap_analysis
-from .traceability import current_requirement_executability_gap
+from .span_analysis import aggregate_edge_gap_truth, canonical_edge_gaps, span_gap_analysis
+from .traceability import collect_declared_obligation_gaps
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
@@ -39,6 +39,24 @@ class AppConfig:
 
 def _app_module(config: AppConfig):
     return config.domain_module or odd_sdlc_module(config.workspace_root)
+
+
+def _decl_value(value: Any) -> Any:
+    return value.to_dict() if hasattr(value, "to_dict") else value
+
+
+def _declared_obligation_specs(app: "OddSdlcApp") -> list[tuple[str, dict[str, Any] | Any]]:
+    declarations: list[tuple[str, dict[str, Any] | Any]] = []
+    for function in app.scope().module.graph_functions:
+        graph = function.template.graph
+        if graph is None:
+            continue
+        for vector in graph.vectors:
+            declaration = vector.declarations.get("obligation_ledger")
+            if declaration is None:
+                continue
+            declarations.append((vector.name, declaration))
+    return declarations
 
 
 @dataclass
@@ -109,9 +127,6 @@ def catalog(app: OddSdlcApp) -> dict:
         if isinstance(name, str):
             function_intent_by_name[name] = intent or ""
 
-    def _decl_value(value: Any) -> Any:
-        return value.to_dict() if hasattr(value, "to_dict") else value
-
     def _node_contract(node) -> dict[str, Any]:
         return {
             "name": node.name,
@@ -154,6 +169,7 @@ def catalog(app: OddSdlcApp) -> dict:
                 "host_binding_kind": function.declarations.get("host_binding_kind"),
                 "host_subject_asset": function.declarations.get("host_subject_asset"),
                 "host_reviewed_asset": function.declarations.get("host_reviewed_asset"),
+                "obligation_ledger": _decl_value(function.declarations.get("obligation_ledger")),
                 "template_kind": function.template.kind,
                 "tags": list(function.tags),
                 "inputs": [node.name for node in function.inputs],
@@ -177,6 +193,7 @@ def catalog(app: OddSdlcApp) -> dict:
                             )
                         ],
                         "target": vector.target.name,
+                        "obligation_ledger": _decl_value(vector.declarations.get("obligation_ledger")),
                     }
                     for vector in (
                         function.template.graph.vectors
@@ -232,10 +249,32 @@ def gaps(
         runtime_config=app.config.runtime_config,
         publish=True,
     )
-    global_gap = current_requirement_executability_gap(app.config.workspace_root)
-    payload["global_requirement_executability"] = global_gap
-    payload["overall_delta"] = payload.get("total_delta", 0.0) + global_gap["delta"]
-    payload["converged"] = bool(payload.get("converged")) and bool(global_gap["converged"])
+    raw_graph_gaps = [
+        dict(gap)
+        for gap in payload.get("gaps", ())
+        if isinstance(gap, dict)
+    ]
+    declared_obligation_ledgers = collect_declared_obligation_gaps(
+        app.config.workspace_root,
+        _declared_obligation_specs(app),
+    )
+    canonical_gaps = canonical_edge_gaps(
+        edge_names=[entry[0] for entry in _declared_obligation_specs(app)],
+        raw_graph_gaps=raw_graph_gaps,
+        ledger_gaps=declared_obligation_ledgers,
+    )
+    summary = aggregate_edge_gap_truth(canonical_gaps)
+    payload["gaps"] = canonical_gaps
+    payload["graph_total_delta"] = summary["graph_total_delta"]
+    payload["direct_graph_delta"] = summary["direct_graph_delta"]
+    payload["carry_delta"] = summary["carry_delta"]
+    payload["fulfillment_delta"] = summary["fulfillment_delta"]
+    payload["combined_delta"] = summary["combined_delta"]
+    payload["total_delta"] = summary["total_delta"]
+    payload["graph_converged"] = summary["graph_converged"]
+    payload["carry_converged"] = summary["carry_converged"]
+    payload["fulfillment_converged"] = summary["fulfillment_converged"]
+    payload["converged"] = summary["converged"]
     return payload
 
 
@@ -250,10 +289,32 @@ def gap_snapshot(app: OddSdlcApp) -> dict:
         runtime_config=app.config.runtime_config,
         publish=False,
     )
-    global_gap = current_requirement_executability_gap(app.config.workspace_root)
-    payload["global_requirement_executability"] = global_gap
-    payload["overall_delta"] = payload.get("total_delta", 0.0) + global_gap["delta"]
-    payload["converged"] = bool(payload.get("converged")) and bool(global_gap["converged"])
+    raw_graph_gaps = [
+        dict(gap)
+        for gap in payload.get("gaps", ())
+        if isinstance(gap, dict)
+    ]
+    declared_obligation_ledgers = collect_declared_obligation_gaps(
+        app.config.workspace_root,
+        _declared_obligation_specs(app),
+    )
+    canonical_gaps = canonical_edge_gaps(
+        edge_names=[entry[0] for entry in _declared_obligation_specs(app)],
+        raw_graph_gaps=raw_graph_gaps,
+        ledger_gaps=declared_obligation_ledgers,
+    )
+    summary = aggregate_edge_gap_truth(canonical_gaps)
+    payload["gaps"] = canonical_gaps
+    payload["graph_total_delta"] = summary["graph_total_delta"]
+    payload["direct_graph_delta"] = summary["direct_graph_delta"]
+    payload["carry_delta"] = summary["carry_delta"]
+    payload["fulfillment_delta"] = summary["fulfillment_delta"]
+    payload["combined_delta"] = summary["combined_delta"]
+    payload["total_delta"] = summary["total_delta"]
+    payload["graph_converged"] = summary["graph_converged"]
+    payload["carry_converged"] = summary["carry_converged"]
+    payload["fulfillment_converged"] = summary["fulfillment_converged"]
+    payload["converged"] = summary["converged"]
     return payload
 
 

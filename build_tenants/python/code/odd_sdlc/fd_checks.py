@@ -14,14 +14,17 @@ from pathlib import Path
 from typing import Any
 
 from .fd_contracts import FD_EVALUATOR_CONTRACTS_BY_CLI_NAME
+from .gtl_module import module as load_gtl_module
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
 from .traceability import (
+    _expected_implementation_code_requirement_ids,
     missing_code_traceability_ids,
     missing_intent_ids_from_goals,
     missing_planned_test_traceability_ids,
     missing_realized_test_traceability_ids,
     missing_requirement_ids_from_current_surface,
     missing_test_traceability_ids,
+    obligation_gap_from_declaration,
     traceability_scan,
     unexpected_planned_test_traceability_ids,
     unexpected_realized_test_traceability_ids,
@@ -143,9 +146,8 @@ CHECK_RULES: dict[str, CheckRule] = {
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["realized-test-traceability-present"].cli_name: CheckRule(
         required_generated_assets=("test_module_surface", "code_surface"),
     ),
-    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-traceability-present"].cli_name: CheckRule(
-        required_generated_assets=("test_module_surface", "code_surface"),
-    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["obligation-ledger-carry-converged"].cli_name: CheckRule(),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["obligation-ledger-fulfillment-sufficient"].cli_name: CheckRule(),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("release_surface",),
         required_profile_fields=("test_execution_contract",),
@@ -371,7 +373,60 @@ def _realized_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
     }
 
 
-def _failure_detail(check_name: str, workspace_root: Path) -> dict[str, Any]:
+def _declared_obligation_declaration(workspace_root: Path, edge_name: str) -> Any | None:
+    declared_module = load_gtl_module(workspace_root)
+    for function in declared_module.graph_functions:
+        graph = function.template.graph
+        if graph is None:
+            continue
+        for vector in graph.vectors:
+            if vector.name != edge_name:
+                continue
+            return vector.declarations.get("obligation_ledger")
+    return None
+
+
+def _obligation_ledger_carry_detail(workspace_root: Path, edge_name: str) -> dict[str, Any]:
+    declaration = _declared_obligation_declaration(workspace_root, edge_name)
+    if declaration is None:
+        return {
+            "check": "obligation-ledger-carry-converged",
+            "failure_kind": "missing_obligation_ledger_declaration",
+            "workspace_root": str(workspace_root),
+            "edge": edge_name,
+            "suggested_repair": "Publish an obligation_ledger declaration on the GTL edge before using deterministic carry gating.",
+        }
+    gap = obligation_gap_from_declaration(
+        workspace_root,
+        declaration,
+        edge_name=edge_name,
+    )
+    detail = dict(gap)
+    detail["check"] = "obligation-ledger-carry-converged"
+    return detail
+
+
+def _obligation_ledger_fulfillment_detail(workspace_root: Path, edge_name: str) -> dict[str, Any]:
+    declaration = _declared_obligation_declaration(workspace_root, edge_name)
+    if declaration is None:
+        return {
+            "check": "obligation-ledger-fulfillment-sufficient",
+            "failure_kind": "missing_obligation_ledger_declaration",
+            "workspace_root": str(workspace_root),
+            "edge": edge_name,
+            "suggested_repair": "Publish an obligation_ledger declaration on the GTL edge before using deterministic fulfillment gating.",
+        }
+    gap = obligation_gap_from_declaration(
+        workspace_root,
+        declaration,
+        edge_name=edge_name,
+    )
+    detail = dict(gap)
+    detail["check"] = "obligation-ledger-fulfillment-sufficient"
+    return detail
+
+
+def _failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | None = None) -> dict[str, Any]:
     if check_name == "goal-surface-authority-validated":
         return _goal_surface_authority_detail(workspace_root)
     if check_name == "requirement-scope-complete":
@@ -380,11 +435,12 @@ def _failure_detail(check_name: str, workspace_root: Path) -> dict[str, Any]:
         return _code_traceability_detail(workspace_root)
     if check_name == "planned-test-traceability-present":
         return _planned_test_traceability_detail(workspace_root)
-    if check_name in {"realized-test-traceability-present", "test-traceability-present"}:
-        detail = _realized_test_traceability_detail(workspace_root)
-        if check_name == "test-traceability-present":
-            detail["check"] = check_name
-        return detail
+    if check_name == "realized-test-traceability-present":
+        return _realized_test_traceability_detail(workspace_root)
+    if check_name == "obligation-ledger-carry-converged" and edge_name:
+        return _obligation_ledger_carry_detail(workspace_root, edge_name)
+    if check_name == "obligation-ledger-fulfillment-sufficient" and edge_name:
+        return _obligation_ledger_fulfillment_detail(workspace_root, edge_name)
     return _generic_failure_detail(check_name, workspace_root)
 
 
@@ -476,8 +532,11 @@ def code_dependency_surfaces_present(workspace_root: Path) -> int:
 
 def code_traceability_present(workspace_root: Path) -> int:
     scan = traceability_scan(workspace_root)
+    expected_ids = set(_expected_implementation_code_requirement_ids(workspace_root))
     if scan["code_file_count"] == 0:
         return 1
+    if not expected_ids:
+        return 0
     return 0 if not missing_code_traceability_ids(workspace_root) and not scan["orphan_code_files"] else 1
 
 
@@ -506,14 +565,26 @@ def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def realized_test_traceability_present(workspace_root: Path) -> int:
-    scan = traceability_scan(workspace_root)
-    if scan["test_file_count"] == 0:
+    return (
+        0
+        if not missing_realized_test_traceability_ids(workspace_root)
+        and not unexpected_realized_test_traceability_ids(workspace_root)
+        else 1
+    )
+
+
+def obligation_ledger_carry_converged(workspace_root: Path, edge_name: str | None = None) -> int:
+    if not edge_name:
         return 1
-    return 0 if not missing_realized_test_traceability_ids(workspace_root) and not unexpected_realized_test_traceability_ids(workspace_root) and not scan["orphan_test_files"] else 1
+    detail = _obligation_ledger_carry_detail(workspace_root, edge_name)
+    return 0 if bool(detail.get("carry_converged")) else 1
 
 
-def test_traceability_present(workspace_root: Path) -> int:
-    return realized_test_traceability_present(workspace_root)
+def obligation_ledger_fulfillment_sufficient(workspace_root: Path, edge_name: str | None = None) -> int:
+    if not edge_name:
+        return 1
+    detail = _obligation_ledger_fulfillment_detail(workspace_root, edge_name)
+    return 0 if bool(detail.get("fulfillment_converged")) else 1
 
 
 def deployment_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -532,16 +603,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="odd_sdlc.fd_checks")
     parser.add_argument("check", choices=tuple(CHECK_RULES))
     parser.add_argument("--workspace", default=".")
+    parser.add_argument("--edge")
     args = parser.parse_args(argv)
     workspace_root = Path(args.workspace).resolve()
     function_name = args.check.replace("-", "_")
     check_function = globals().get(function_name)
     if callable(check_function):
-        exit_code = int(check_function(workspace_root))
+        if args.edge is not None:
+            exit_code = int(check_function(workspace_root, args.edge))
+        else:
+            exit_code = int(check_function(workspace_root))
     else:
         exit_code = _run_check(args.check, workspace_root)
     if exit_code != 0:
-        print(json.dumps(_failure_detail(args.check, workspace_root), indent=2, sort_keys=True))
+        print(json.dumps(_failure_detail(args.check, workspace_root, edge_name=args.edge), indent=2, sort_keys=True))
     return exit_code
 
 

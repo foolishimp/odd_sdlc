@@ -85,6 +85,8 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     workspace_root = app.config.workspace_root
     steps: list[dict[str, Any]] = []
     step_index = 0
+    pending_retries_for_step = 0
+    yielded_retries_for_step = 0
 
     while step_index < len(program.steps):
         expected_edge = program.steps[step_index]
@@ -92,6 +94,7 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
         start_result = start(app)
         status = start_result.get("status")
         actual_edge = start_result.get("edge")
+        manifest_path = start_result.get("fp_manifest_path")
         if not steps and status == "converged":
             return _program_completed_without_iteration(
                 app,
@@ -116,6 +119,32 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                         program_payload=program_payload,
                         final_state=start_result,
                     )
+        if (
+            status == "pending"
+            and isinstance(actual_edge, str)
+            and actual_edge in program.steps
+            and isinstance(manifest_path, str)
+            and manifest_path
+        ):
+            resumed_index = program.steps.index(actual_edge)
+            if resumed_index != step_index:
+                step_index = resumed_index
+                expected_edge = program.steps[step_index]
+            status = "iterated"
+        if status == "pending" and actual_edge == expected_edge:
+            if pending_retries_for_step < 1:
+                pending_retries_for_step += 1
+                continue
+            raise RuntimeError(
+                f"executive program {program.name!r} remained pending on {expected_edge!r} "
+                "after retry"
+            )
+        if status == "pending" and isinstance(actual_edge, str) and actual_edge in program.steps:
+            resumed_index = program.steps.index(actual_edge)
+            if resumed_index != step_index:
+                step_index = resumed_index
+                pending_retries_for_step = 0
+                continue
         if status != "iterated":
             raise RuntimeError(
                 f"executive program {program.name!r} expected {expected_edge!r} "
@@ -136,12 +165,11 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                     if resumed_index > step_index:
                         step_index = resumed_index
                         expected_edge = program.steps[step_index]
-            if actual_edge != expected_edge:
-                raise RuntimeError(
-                    f"executive program {program.name!r} expected {expected_edge!r} "
-                    f"but start selected {actual_edge!r}"
-                )
-        manifest_path = start_result.get("fp_manifest_path")
+                if actual_edge != expected_edge:
+                    raise RuntimeError(
+                        f"executive program {program.name!r} expected {expected_edge!r} "
+                        f"but start selected {actual_edge!r}"
+                    )
         if not isinstance(manifest_path, str) or not manifest_path:
             raise RuntimeError(
                 f"executive program {program.name!r} step {expected_edge!r} "
@@ -157,7 +185,23 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                 "assessed": assessed_result,
             }
         )
+        if assessed_result.get("status") == "yield":
+            yielded_retries_for_step += 1
+            if yielded_retries_for_step > 4:
+                raise RuntimeError(
+                    f"executive program {program.name!r} remained yielded on {expected_edge!r} "
+                    "after repeated same-edge re-entry"
+                )
+            pending_retries_for_step = 0
+            continue
+        if assessed_result.get("status") != "ok":
+            raise RuntimeError(
+                f"executive program {program.name!r} expected admitted result on {expected_edge!r} "
+                f"but assess-result returned {assessed_result.get('status')!r}"
+            )
         step_index += 1
+        pending_retries_for_step = 0
+        yielded_retries_for_step = 0
 
     final_state = start(app)
     context = _program_runtime_context(

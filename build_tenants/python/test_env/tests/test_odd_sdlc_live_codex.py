@@ -170,7 +170,46 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     assert_installed_genesis_runtime(workspace)
     seed_odd_sdlc_package(workspace)
     seed_canonical_spec_surface(workspace)
+    refresh_analysis = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="odd_sdlc refresh-analysis live codex",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.json", refresh_analysis)
     run_archive.note("sandbox_prepared", workspace=str(workspace), transport_agent="codex")
+
+
+def _expected_fulfillment_ids(manifest: dict[str, object]) -> list[str]:
+    obligations = manifest.get("fulfillment_obligations")
+    if not isinstance(obligations, list) or not obligations:
+        raise AssertionError("manifest must include non-empty fulfillment_obligations")
+    ids = [
+        str(obligation["id"])
+        for obligation in obligations
+        if isinstance(obligation, dict)
+        and isinstance(obligation.get("id"), str)
+        and obligation["id"]
+    ]
+    if not ids:
+        raise AssertionError("manifest fulfillment_obligations must expose stable ids")
+    return ids
+
+
+def _fulfillment_assessments_by_id(result_payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_assessments = result_payload.get("fulfillment_assessments")
+    if not isinstance(raw_assessments, list) or not raw_assessments:
+        raise AssertionError("assessment result JSON must contain fulfillment_assessments")
+    entries = {
+        str(item["id"]): item
+        for item in raw_assessments
+        if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]
+    }
+    if not entries:
+        raise AssertionError("fulfillment_assessments must expose stable ids")
+    return entries
 
 
 def _validate_intent_delivery(workspace: Path, *, manifest: dict[str, object]) -> list[str]:
@@ -204,19 +243,24 @@ def _validate_intent_delivery(workspace: Path, *, manifest: dict[str, object]) -
             failures.append("constructor attestation must target intent_surface")
         if attestation.get("contract_satisfied") is not True:
             failures.append("constructor attestation must mark the intent surface contract as satisfied")
-    assessments = result_payload.get("assessments")
-    if not isinstance(assessments, list) or not assessments:
-        failures.append("assessment result JSON must contain at least one assessment")
+    try:
+        expected_ids = _expected_fulfillment_ids(manifest)
+        assessments = _fulfillment_assessments_by_id(result_payload)
+    except AssertionError as exc:
+        failures.append(str(exc))
         return failures
-    matching = [
-        item
-        for item in assessments
-        if isinstance(item, dict) and item.get("evaluator") == EVALUATOR_NAME
-    ]
-    if not matching:
-        failures.append("assessment result JSON is missing the intent_surface evaluator record")
-    elif matching[0].get("result") != "pass":
-        failures.append("assessment result JSON must mark the intent_surface evaluator as pass")
+    missing_ids = [obligation_id for obligation_id in expected_ids if obligation_id not in assessments]
+    if missing_ids:
+        failures.append(
+            "assessment result JSON is missing fulfillment obligations: " + ", ".join(sorted(missing_ids))
+        )
+        return failures
+    for obligation_id in expected_ids:
+        assessment = assessments[obligation_id]
+        if assessment.get("fulfillment_status") != "fulfilled":
+            failures.append(
+                f"assessment result JSON must mark fulfillment obligation {obligation_id!r} as fulfilled"
+            )
     return failures
 
 
@@ -323,19 +367,24 @@ def _validate_code_delivery(workspace: Path, *, manifest: dict[str, object]) -> 
             failures.append("constructor attestation must target code_surface")
         if attestation.get("contract_satisfied") is not True:
             failures.append("constructor attestation must mark the code surface contract as satisfied")
-    assessments = result_payload.get("assessments")
-    if not isinstance(assessments, list) or not assessments:
-        failures.append("assessment result JSON must contain at least one assessment")
+    try:
+        expected_ids = _expected_fulfillment_ids(manifest)
+        assessments = _fulfillment_assessments_by_id(result_payload)
+    except AssertionError as exc:
+        failures.append(str(exc))
         return failures
-    matching = [
-        item
-        for item in assessments
-        if isinstance(item, dict) and item.get("evaluator") == CODE_EVALUATOR_NAME
-    ]
-    if not matching:
-        failures.append("assessment result JSON is missing the code_surface evaluator record")
-    elif matching[0].get("result") != "pass":
-        failures.append("assessment result JSON must mark the code_surface evaluator as pass")
+    missing_ids = [obligation_id for obligation_id in expected_ids if obligation_id not in assessments]
+    if missing_ids:
+        failures.append(
+            "assessment result JSON is missing fulfillment obligations: " + ", ".join(sorted(missing_ids))
+        )
+        return failures
+    for obligation_id in expected_ids:
+        assessment = assessments[obligation_id]
+        if assessment.get("fulfillment_status") != "fulfilled":
+            failures.append(
+                f"assessment result JSON must mark fulfillment obligation {obligation_id!r} as fulfilled"
+            )
     return failures
 
 
@@ -549,19 +598,25 @@ def _write_consensus_result_payload(
     edge_name: str,
 ) -> Path:
     result_path = Path(str(manifest["result_path"]))
+    obligation_ids = _expected_fulfillment_ids(manifest)
+    fulfilled = all(review["verdict"] == "pass" for review in reviews)
+    detail = " | ".join(
+        f"{review['reviewer_id']}: {review['summary']} | " + "; ".join(review["proposed_deltas"])
+        for review in reviews
+    )
     result_payload = {
         "edge": edge_name,
         "actor": "codex.consensus_harness",
-        "assessments": [
+        "fulfillment_assessments": [
             {
+                "id": obligation_id,
                 "evaluator": CONSENSUS_REVIEW_EVALUATOR,
-                "result": review["verdict"],
-                "evidence": (
-                    f"{review['reviewer_id']}: {review['summary']} | "
-                    + "; ".join(review["proposed_deltas"])
-                ),
+                "fulfillment_status": "fulfilled" if fulfilled else "blocked",
+                "fulfillment_detail": detail,
+                "blocking_reasons": [] if fulfilled else ["consensus_review_failed"],
+                "evidence_refs": [asset_relative_path("review_assessment_surface")],
             }
-            for review in reviews
+            for obligation_id in obligation_ids
         ],
     }
     result_path.write_text(json.dumps(result_payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -654,7 +709,7 @@ def _run_consensus_live_lane(
         ).stdout
     )
     assert assessed["status"] == "ok"
-    assert len(assessed["assessments"]) == 2
+    assert len(assessed["fulfillment_assessments"]) == len(_expected_fulfillment_ids(manifest))
 
     for edge in (decision_edge, reviewed_edge):
         start = _start_consensus_edge(workspace, edge=edge, module_ref=module_ref, run_archive=run_archive)
@@ -694,8 +749,7 @@ def _run_consensus_live_lane(
         ).stdout
     )
     assert final_gaps["converged"] is True
-    assert [entry["edge"] for entry in final_gaps["gaps"]] == list(expected_steps)
-    assert all(entry["delta"] == 0 for entry in final_gaps["gaps"])
+    assert final_gaps["gaps"] == []
 
     events = read_events(workspace)
     graph_call_events = [
@@ -711,11 +765,12 @@ def _run_consensus_live_lane(
         if event["event_type"] == "assessed"
         and event["data"]["edge"] == review_edge
     ]
-    assert len(assessed_events) == 2
-    assert sorted(event["data"]["evidence"] for event in assessed_events) == sorted(
+    expected_evidence = " | ".join(
         f"{review['reviewer_id']}: {review['summary']} | " + "; ".join(review["proposed_deltas"])
         for review in reviews
     )
+    assert len(assessed_events) == len(_expected_fulfillment_ids(manifest))
+    assert all(event["data"]["evidence"] == expected_evidence for event in assessed_events)
     run_archive.update_summary(
         converged_consensus=True,
         consensus_graph_function=graph_function_name,
@@ -726,6 +781,15 @@ def _run_consensus_live_lane(
 
 def _advance_to_edge(workspace: Path, *, run_archive, expected_steps: tuple[str, ...]) -> None:
     for edge in expected_steps:
+        refresh_analysis = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "refresh-analysis",
+                archive=run_archive,
+                label=f"odd_sdlc refresh-analysis {edge}",
+            ).stdout
+        )
+        run_archive.capture_json(f"refresh-analysis.{edge}.json", refresh_analysis)
         start_result = json.loads(
             run_installed_odd_sdlc(
                 workspace,

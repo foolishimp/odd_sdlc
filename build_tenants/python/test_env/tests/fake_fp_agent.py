@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-RESULT_PATH_PATTERN = re.compile(r"Write assessment JSON to:\s*(.+)")
+RESULT_PATH_PATTERN = re.compile(r"Write fulfillment assessment JSON to:\s*(.+)")
 
 
 def _extract_result_path(prompt: str) -> Path:

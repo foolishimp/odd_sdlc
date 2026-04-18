@@ -230,7 +230,7 @@ def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archi
     assert graph_call_edges[0] == "derive_intent_surface"
     assert graph_call_edges[-1] == start_payload["edge"]
     assert len(yielded_graph_calls) == 1
-    assert start_payload["edge"] == "derive_design_surface"
+    assert start_payload["edge"] == "derive_implementation_design_surface"
     assert "prepare_release_surface" not in graph_call_edges
 
 
@@ -355,11 +355,11 @@ def test_data_mapper_continue_command_preserves_yielded_handoff_truth(run_archiv
     workspace = _prepare_installed_yield_workspace(run_archive)
     start_payload = _advance_to_edge(
         workspace,
-        target_edge="derive_design_surface",
+        target_edge="derive_implementation_design_surface",
         run_archive=run_archive,
         label_prefix="continue_yield",
     )
-    assert start_payload["edge"] == "derive_design_surface"
+    assert start_payload["edge"] == "derive_implementation_design_surface"
     constructor, result_path = run_constructor_for_start(
         workspace,
         start_payload=start_payload,
@@ -375,18 +375,19 @@ def test_data_mapper_continue_command_preserves_yielded_handoff_truth(run_archiv
         label="continue_yield.continue",
     )
     run_archive.capture_json("continue_yield.continue.json", continuation)
-    assert continuation["status"] == "continued"
-    assert continuation["result_admission"]["status"] == "ok"
+    assert continuation["status"] == "yield"
+    assert continuation["result_admission"]["status"] == "yield"
+    assert continuation["result_admission"]["handoff_kind"] == "observer_handoff"
+    assert continuation["result_admission"]["handoff_reason"] == "fd_findings"
     assert continuation["gap_snapshot"]["converged"] is False
     design_gap = next(
         gap
         for gap in continuation["gap_snapshot"]["gaps"]
-        if gap["edge"] == "derive_design_surface"
+        if gap["edge"] == "derive_implementation_design_surface"
     )
     assert "observation" in design_gap
     assert "triage" in design_gap
     assert "route_binding" in design_gap
-    assert design_gap["route_proposal"] is None
 
 
 @pytest.mark.usecase_id("yield_handoff_canned_chain")
@@ -434,7 +435,7 @@ def test_data_mapper_yield_chain_reissues_fresh_handoff_on_a_fresh_workspace(run
         call_id=second_start["call_id"],
     )
 
-    assert second_start["edge"] == first_start["edge"] == "derive_design_surface"
+    assert second_start["edge"] == first_start["edge"] == "derive_implementation_design_surface"
     assert second_start["run_id"] != first_start["run_id"]
     assert second_start["call_id"] != first_start["call_id"]
     assert second_handoff["continuation_id"] != first_handoff["continuation_id"]

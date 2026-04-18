@@ -141,6 +141,7 @@ def _write_fake_transport_contract(workspace: Path) -> Path:
                 fake_agent,
                 "{prompt}",
             ],
+            "output_mode": "stdout",
             "retry_count": 0,
             "retry_backoff": 0,
             "probe_timeout": 5,
@@ -795,6 +796,10 @@ def test_requirement_closure_register_preserves_carry_forward_and_traceability(t
     )
     (workspace / "build_tenants" / "python" / "test_env" / "tests" / "40-generated-test-modules.md").write_text(
         "# Generated Test Modules\n\n- test lane validates REQ-CORE-001\n",
+        encoding="utf-8",
+    )
+    (workspace / "build_tenants" / "python" / "test_env" / "50-generated-run-archive.md").write_text(
+        "# Generated Run Archive\n\n- executed validation for REQ-CORE-001\n",
         encoding="utf-8",
     )
     (workspace / "specification" / "scenarios" / "30-generated-testcase-authority.md").write_text(

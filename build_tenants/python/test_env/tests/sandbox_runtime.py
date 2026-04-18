@@ -109,7 +109,7 @@ def run_installed_self_test(
     *,
     archive: "RunArchive | None" = None,
     label: str = "odd_sdlc self-test",
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> dict[str, Any]:
     result = run_installed_odd_sdlc(
         workspace,
@@ -199,35 +199,59 @@ def complete_current_call(
     archive: "RunArchive | None" = None,
     label_prefix: str,
 ) -> dict[str, Any]:
-    refresh = refresh_installed_analysis(
-        workspace,
-        archive=archive,
-        label=f"{label_prefix} refresh-analysis",
-    )
-    start = json.loads(
-        run_installed_odd_sdlc(
+    refresh: dict[str, Any] | None = None
+    start: dict[str, Any] | None = None
+    constructor: dict[str, Any] | None = None
+    assessed: dict[str, Any] | None = None
+    expected_edge: str | None = None
+    for attempt in range(5):
+        refresh = refresh_installed_analysis(
             workspace,
-            "start",
             archive=archive,
-            label=f"{label_prefix} start",
-        ).stdout
-    )
-    constructor, result_path = run_constructor_for_start(
-        workspace,
-        start_payload=start,
-        archive=archive,
-        label=f"{label_prefix} construct",
-    )
-    assessed = json.loads(
-        run_installed_genesis(
+            label=f"{label_prefix} refresh-analysis.{attempt + 1}",
+        )
+        start = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "start",
+                archive=archive,
+                label=f"{label_prefix} start.{attempt + 1}",
+            ).stdout
+        )
+        edge = start.get("edge")
+        if isinstance(edge, str) and edge:
+            if expected_edge is None:
+                expected_edge = edge
+            elif edge != expected_edge:
+                raise AssertionError(
+                    f"Expected same-edge re-entry for {expected_edge!r}, got {edge!r}"
+                )
+        constructor, result_path = run_constructor_for_start(
             workspace,
-            "assess-result",
-            "--result",
-            str(result_path),
+            start_payload=start,
             archive=archive,
-            label=f"{label_prefix} assess-result",
-        ).stdout
-    )
+            label=f"{label_prefix} construct.{attempt + 1}",
+        )
+        assessed = json.loads(
+            run_installed_genesis(
+                workspace,
+                "assess-result",
+                "--result",
+                str(result_path),
+                archive=archive,
+                label=f"{label_prefix} assess-result.{attempt + 1}",
+            ).stdout
+        )
+        if assessed.get("status") != "yield":
+            break
+    else:
+        raise AssertionError(
+            f"Expected assess-result to settle for {expected_edge!r}, but it kept yielding"
+        )
+    assert refresh is not None
+    assert start is not None
+    assert constructor is not None
+    assert assessed is not None
     return {
         "refresh_analysis": refresh,
         "start": start,

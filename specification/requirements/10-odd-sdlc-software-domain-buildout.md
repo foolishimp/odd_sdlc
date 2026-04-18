@@ -182,6 +182,10 @@ runtime.
 - AC-4: operator-facing gap analysis may lawfully zoom over a bounded span
   between two graph points, including dependent realizing structure, without
   redefining runtime truth or forcing unconditional whole-graph solving
+- AC-5: when span gap analysis aggregates dependent requirement-realization
+  truth, it preserves separate carry and fulfillment judgments rather than
+  collapsing them back into one blended closure signal; any combined scalar is
+  derivative only
 
 ### REQ-F-ODDSDLC-021 — odd_sdlc publishes the current executive GTL carrier over its active software-domain graph
 
@@ -332,6 +336,14 @@ unresolved live requirements as active future pressure across bounded waves.
   until they are explicitly realized, withdrawn, or superseded
 - AC-4: wave-level completion is distinguished from full closure of the live
   requirement inventory
+- AC-5: the closure register preserves a deterministic per-requirement
+  obligation ledger for the current wave: which live requirements are in scope,
+  which are carried forward, and which remain incomplete
+- AC-6: traceability and delivery completion remain separate judgments in that
+  ledger; a tagged requirement may still be incomplete
+- AC-7: the active ledger publishes per-requirement carry and fulfillment
+  judgments explicitly enough that downstream span or operator views can reuse
+  them without re-inferring them from one blended status
 
 ### REQ-F-ODDSDLC-030 — generated source and test surfaces carry explicit trace authority
 
@@ -362,6 +374,12 @@ to verify the req -> design -> module -> code or test traceability chain.
   satisfy the current traceability contract
 - AC-4: deterministic checks identify orphan generated source or test files
   that carry no governing trace authority
+- AC-5: gap analysis over the active requirement set does not collapse
+  traceability integrity into delivery completeness; requirements that remain
+  behaviorally shallow stay open even when their trace tags are present
+- AC-6: any derived scalar delta published for operator convenience remains a
+  projection over separate carry and fulfillment truth and is not the governing
+  closure law
 
 ### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
 

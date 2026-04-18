@@ -160,10 +160,15 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
         cli_name="realized-test-traceability-present",
         description="The archive-stage developer-test realization carries explicit Validates traces for the requirements claimed by the planned developer-test branch and contains no orphan generated test files.",
     ),
-    "test_traceability_present": FdEvaluatorContract(
-        evaluator_name="test_traceability_present",
-        cli_name="test-traceability-present",
-        description="Compatibility alias for the realized test traceability rule while the split planning/realized test branch is being adopted.",
+    "obligation_ledger_carry_converged": FdEvaluatorContract(
+        evaluator_name="obligation_ledger_carry_converged",
+        cli_name="obligation-ledger-carry-converged",
+        description="The declared edge obligation ledger closes deterministic carry and accounting truth for the targeted edge without silently dropping or inventing obligations.",
+    ),
+    "obligation_ledger_fulfillment_sufficient": FdEvaluatorContract(
+        evaluator_name="obligation_ledger_fulfillment_sufficient",
+        cli_name="obligation-ledger-fulfillment-sufficient",
+        description="The declared edge obligation ledger does not expose deterministic fulfillment insufficiency for the targeted edge; this blocks obvious under-realization without certifying semantic fulfillment.",
     ),
     "test_execution_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="test_execution_dependency_surfaces_present",

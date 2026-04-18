@@ -680,8 +680,15 @@ def test_query_domain_exposes_published_analysis_manifest(tmp_path: Path) -> Non
         "requirement_closure_prompt_context",
     }
     assert payload["gaps"]["analysis_current"] is True
-    assert payload["gaps"]["gaps"][0]["observation"]["observed_signal"] == "unresolved_gap_pressure"
-    assert payload["gaps"]["gaps"][0]["route_binding"]["state"] in {"unresolved", "suppressed_by_mode"}
+    assert payload["gaps"]["gaps"]
+    assert any(
+        gap["observation"]["observed_signal"] in {"unresolved_gap_pressure", "missing_required_bindings"}
+        for gap in payload["gaps"]["gaps"]
+    )
+    assert any(
+        gap["route_binding"]["state"] in {"unresolved", "suppressed_by_mode", "advance_fixed_vector"}
+        for gap in payload["gaps"]["gaps"]
+    )
 
 
 def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> None:
@@ -760,12 +767,72 @@ def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: p
     )
     monkeypatch.setattr(
         span_analysis_module,
-        "current_requirement_executability_gap",
-        lambda _workspace_root: {
-            "delta": 0.75,
-            "converged": False,
-            "summary": "requirements still lack executable proof",
-        },
+        "collect_declared_obligation_gaps",
+        lambda _workspace_root, _declarations: [
+            {
+                "edge": "derive_code_surface",
+                "combined_delta": 0.5,
+                "carry_delta": 0.0,
+                "fulfillment_delta": 0.5,
+                "carry_converged": True,
+                "fulfillment_converged": False,
+                "edge_converged": False,
+                "expected_count": 2,
+                "carried_count": 2,
+                "fulfilled_count": 1,
+                "partial_count": 1,
+                "missing_count": 0,
+                "extra_count": 0,
+                "unfulfilled_count": 1,
+                "blocking_count": 1,
+                "blocking_reasons": ["behavioral_realization_missing"],
+                "summary": "code still lacks behavioral realization",
+                "signal_key": "derive_code_surface",
+                "declared_edges": ["derive_code_surface"],
+            },
+            {
+                "edge": "derive_test_design_surface",
+                "combined_delta": 0.25,
+                "carry_delta": 0.25,
+                "fulfillment_delta": 0.0,
+                "carry_converged": False,
+                "fulfillment_converged": True,
+                "edge_converged": False,
+                "expected_count": 2,
+                "carried_count": 1,
+                "fulfilled_count": 1,
+                "partial_count": 0,
+                "missing_count": 1,
+                "extra_count": 0,
+                "unfulfilled_count": 0,
+                "blocking_count": 1,
+                "blocking_reasons": ["missing_planned_test_coverage"],
+                "summary": "planned test coverage still drops obligations",
+                "signal_key": "derive_test_design_surface",
+                "declared_edges": ["derive_test_design_surface"],
+            },
+            {
+                "edge": "derive_test_module_surface",
+                "combined_delta": 0.0,
+                "carry_delta": 0.0,
+                "fulfillment_delta": 0.0,
+                "carry_converged": True,
+                "fulfillment_converged": True,
+                "edge_converged": True,
+                "expected_count": 2,
+                "carried_count": 2,
+                "fulfilled_count": 2,
+                "partial_count": 0,
+                "missing_count": 0,
+                "extra_count": 0,
+                "unfulfilled_count": 0,
+                "blocking_count": 0,
+                "blocking_reasons": [],
+                "summary": "test module obligations currently close",
+                "signal_key": "derive_test_module_surface",
+                "declared_edges": ["derive_test_module_surface"],
+            },
+        ],
     )
 
     payload = gaps(
@@ -791,20 +858,57 @@ def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: p
         "select_test_stack_profile",
         "derive_test_module_surface",
     ]
-    assert {gap["edge"] for gap in payload["coarse"]["gaps"]} == {
+    assert {gap["edge"] for gap in payload["graph_view"]["gaps"]} == {
         "derive_requirement_surface",
         "derive_code_surface",
         "derive_test_module_surface",
     }
-    assert payload["dependent_gaps"] == [
-        {
-            "delta": 0.75,
-            "converged": False,
-            "summary": "requirements still lack executable proof",
-        }
+    assert [gap["edge"] for gap in payload["gaps"]] == [
+        "derive_requirement_surface",
+        "derive_code_surface",
+        "derive_test_design_surface",
+        "derive_test_module_surface",
     ]
-    assert payload["combined"]["converged"] is False
-    assert payload["combined"]["total_delta"] == pytest.approx(2.25)
+    canonical_gaps = {gap["edge"]: gap for gap in payload["gaps"]}
+    assert canonical_gaps["derive_requirement_surface"]["gap_kind"] == "graph_edge_gap"
+    assert canonical_gaps["derive_requirement_surface"]["graph_delta"] == pytest.approx(0.5)
+    assert canonical_gaps["derive_requirement_surface"]["total_delta"] == pytest.approx(0.5)
+    assert canonical_gaps["derive_code_surface"]["gap_kind"] == "declared_obligation_edge_gap"
+    assert canonical_gaps["derive_code_surface"]["carry_converged"] is True
+    assert canonical_gaps["derive_code_surface"]["fulfillment_converged"] is False
+    assert canonical_gaps["derive_code_surface"]["graph_delta"] == pytest.approx(0.5)
+    assert canonical_gaps["derive_code_surface"]["combined_delta"] == pytest.approx(0.5)
+    assert canonical_gaps["derive_code_surface"]["total_delta"] == pytest.approx(1.0)
+    assert canonical_gaps["derive_code_surface"]["signal_key"] == "derive_code_surface"
+    assert canonical_gaps["derive_test_design_surface"]["carry_converged"] is False
+    assert canonical_gaps["derive_test_design_surface"]["fulfillment_converged"] is True
+    assert canonical_gaps["derive_test_design_surface"]["graph_delta"] == pytest.approx(0.0)
+    assert canonical_gaps["derive_test_design_surface"]["combined_delta"] == pytest.approx(0.25)
+    assert canonical_gaps["derive_test_design_surface"]["total_delta"] == pytest.approx(0.25)
+    assert canonical_gaps["derive_test_design_surface"]["signal_key"] == "derive_test_design_surface"
+    assert canonical_gaps["derive_test_module_surface"]["carry_converged"] is True
+    assert canonical_gaps["derive_test_module_surface"]["fulfillment_converged"] is True
+    assert canonical_gaps["derive_test_module_surface"]["graph_delta"] == pytest.approx(0.5)
+    assert canonical_gaps["derive_test_module_surface"]["combined_delta"] == pytest.approx(0.0)
+    assert canonical_gaps["derive_test_module_surface"]["total_delta"] == pytest.approx(0.5)
+    assert payload["summary"]["converged"] is False
+    assert payload["summary"]["carry_converged"] is False
+    assert payload["summary"]["fulfillment_converged"] is False
+    assert payload["summary"]["span_converged"] is False
+    assert payload["summary"]["graph_total_delta"] == pytest.approx(1.5)
+    assert payload["summary"]["direct_graph_delta"] == pytest.approx(1.5)
+    assert payload["summary"]["carry_delta"] == pytest.approx(0.25)
+    assert payload["summary"]["fulfillment_delta"] == pytest.approx(0.5)
+    assert payload["summary"]["combined_delta"] == pytest.approx(0.75)
+    assert payload["summary"]["total_delta"] == pytest.approx(2.25)
+    assert payload["summary"]["expected_count"] == 6
+    assert payload["summary"]["fulfilled_count"] == 4
+    assert payload["summary"]["partial_count"] == 1
+    assert payload["summary"]["missing_count"] == 1
+    assert payload["summary"]["blocking_reasons"] == [
+        "behavioral_realization_missing",
+        "missing_planned_test_coverage",
+    ]
 
 
 def test_gaps_rejects_inverted_span_order(tmp_path: Path) -> None:
@@ -1707,9 +1811,24 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         "recursive": True,
     }
     assert consensus_round["vectors"] == [
-        {"name": "derive_review_assessment_surface", "source": ["design_surface"], "target": "review_assessment_surface"},
-        {"name": "derive_consensus_decision_surface", "source": ["review_assessment_surface"], "target": "consensus_decision_surface"},
-        {"name": "derive_reviewed_design_surface", "source": ["design_surface", "consensus_decision_surface"], "target": "reviewed_design_surface"},
+        {
+            "name": "derive_review_assessment_surface",
+            "source": ["design_surface"],
+            "target": "review_assessment_surface",
+            "obligation_ledger": None,
+        },
+        {
+            "name": "derive_consensus_decision_surface",
+            "source": ["review_assessment_surface"],
+            "target": "consensus_decision_surface",
+            "obligation_ledger": None,
+        },
+        {
+            "name": "derive_reviewed_design_surface",
+            "source": ["design_surface", "consensus_decision_surface"],
+            "target": "reviewed_design_surface",
+            "obligation_ledger": None,
+        },
     ]
     assert consensus_round["job_names"] == []
     consensus_library = result["graph_functions"][5]
@@ -1982,6 +2101,45 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         BOOTSTRAP_RELEASE_SELF_TEST_STEPS
     )
     assert [vector["name"] for vector in graph_functions["release_operational_cycle"]["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+    bootstrap_vectors = {vector["name"]: vector for vector in graph_functions["bootstrap_release_self_test"]["vectors"]}
+    assert bootstrap_vectors["derive_code_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_code_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "implementation_code_projection",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "behavioral_code_realization",
+        "evidence_policy": "behavioral_code_evidence",
+    }
+    assert bootstrap_vectors["derive_implementation_design_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_implementation_design_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "implementation_design_projection",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "implementation_design_surface_coverage",
+        "evidence_policy": "implementation_design_traceability",
+    }
+    assert bootstrap_vectors["derive_test_design_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_test_design_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "validation_design_projection",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "test_design_surface_coverage",
+        "evidence_policy": "planned_test_design_coverage",
+    }
+    assert bootstrap_vectors["derive_requirement_surface"]["obligation_ledger"] is None
+    assert bootstrap_vectors["select_test_stack_profile"]["obligation_ledger"] is None
     assert [vector["name"] for vector in graph_functions["review_design_consensus_round"]["vectors"]] == [
         "derive_review_assessment_surface",
         "derive_consensus_decision_surface",

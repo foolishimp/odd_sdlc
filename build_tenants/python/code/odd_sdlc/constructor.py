@@ -46,6 +46,11 @@ _GENERIC_TITLE_HEADINGS = {"intent", "product", "goals", "requirements"}
 _OPERATIONAL_DISPATCH_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-operational-dispatch.json")
 
 
+def _is_concrete_requirement_id(requirement_id: str) -> bool:
+    parts = requirement_id.upper().split("-")
+    return any(any(char.isdigit() for char in part) for part in parts[1:])
+
+
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
@@ -75,6 +80,29 @@ def _optional_asset_text(workspace_root: Path, asset_id: str, *parts: str) -> st
 
 def _code_surface_root(workspace_root: Path) -> Path:
     return asset_path(workspace_root, "code_surface")
+
+
+def _proving_subset_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
+    current_ids = tuple(
+        sorted(
+            requirement_id
+            for requirement_id in current_requirement_refs(workspace_root)
+            if _is_concrete_requirement_id(requirement_id)
+        )
+    )
+    if current_ids:
+        return current_ids
+    return tuple(
+        sorted(
+            requirement_id
+            for requirement_id in authority_requirement_refs(workspace_root)
+            if _is_concrete_requirement_id(requirement_id)
+        )
+    )
+
+
+def _tag_lines(tag: str, requirement_ids: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(f"# {tag}: {requirement_id}" for requirement_id in requirement_ids)
 
 
 def _build_artifact_summary(workspace_root: Path) -> dict[str, Any]:
@@ -1218,9 +1246,10 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
     implementation_stack = _asset_text(workspace_root, "implementation_stack_profile")
     code_summary = summarize_code_surface(workspace_root)
     proving_subset_requirement_ids = (
-        "REQ-F-ODDSDLC-003",
-        "REQ-F-ODDSDLC-004",
-    ) if load_project_profile(workspace_root).realization_mode == "generated_proving_subset" else ()
+        _proving_subset_requirement_ids(workspace_root)
+        if load_project_profile(workspace_root).realization_mode == "generated_proving_subset"
+        else ()
+    )
     claimed_requirement_lines = (
         (f"- claimed requirement ids: {', '.join(proving_subset_requirement_ids)}",)
         if proving_subset_requirement_ids
@@ -1263,12 +1292,14 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         return _construct_planned_software_tree(workspace_root)
     code_marker = asset_marker("code_surface")
     hello_message = "Hello from odd_sdlc proving subset."
+    requirement_ids = _proving_subset_requirement_ids(workspace_root)
+    implements_lines = _tag_lines("Implements", requirement_ids)
+    validates_lines = _tag_lines("Validates", requirement_ids)
     init_text = "\n".join(
         (
             '"""Generated odd_sdlc proving-subset implementation package."""',
             "",
-            "# Implements: REQ-F-ODDSDLC-003",
-            "# Implements: REQ-F-ODDSDLC-004",
+            *implements_lines,
             f"# {code_marker}",
             "",
             "from .app import hello_message, main",
@@ -1282,7 +1313,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated hello-world application for the odd_sdlc proving subset."""',
             "",
-            "# Implements: REQ-F-ODDSDLC-003",
+            *implements_lines,
             f"HELLO_MESSAGE = {hello_message!r}",
             "",
             "def hello_message() -> str:",
@@ -1303,7 +1334,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Package entry point for the generated odd_sdlc proving application."""',
             "",
-            "# Implements: REQ-F-ODDSDLC-003",
+            *implements_lines,
             "from .app import main",
             "",
             'if __name__ == "__main__":',
@@ -1315,7 +1346,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated implementation workflow helpers for the odd_sdlc proving subset."""',
             "",
-            "# Implements: REQ-F-ODDSDLC-004",
+            *implements_lines,
             f"CODE_MARKER = {code_marker!r}",
             "",
             "def implementation_summary() -> dict[str, object]:",
@@ -1352,7 +1383,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated proving-subset test coverage for the retained odd_sdlc application."""',
             "",
-            "# Validates: REQ-F-ODDSDLC-003",
+            *validates_lines,
             "from odd_sdlc_proving_impl.app import hello_message",
             "",
             "def test_hello_message() -> None:",
@@ -1365,7 +1396,7 @@ def _construct_code_surface(workspace_root: Path) -> dict[str, str]:
         (
             '"""Generated proving-subset test coverage for the retained odd_sdlc workflow summary."""',
             "",
-            "# Validates: REQ-F-ODDSDLC-004",
+            *validates_lines,
             "from odd_sdlc_proving_impl.workflow import implementation_summary",
             "",
             "def test_implementation_summary_contains_traceable_branch() -> None:",
@@ -1904,10 +1935,7 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
         )
     test_design = _asset_text(workspace_root, "test_design_surface")
     test_stack = _asset_text(workspace_root, "test_stack_profile")
-    planned_requirement_ids = (
-        "REQ-F-ODDSDLC-003",
-        "REQ-F-ODDSDLC-004",
-    )
+    planned_requirement_ids = _proving_subset_requirement_ids(workspace_root)
     return "\n".join(
         (
             "# Generated Test Modules",
@@ -2099,13 +2127,10 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
 
     target_asset = manifest.get("target_asset")
     result_path = manifest.get("result_path")
-    failing_evaluators = manifest.get("failing_evaluators", [])
     if not isinstance(target_asset, str) or not target_asset:
         raise ValueError("manifest must provide target_asset")
     if not isinstance(result_path, str) or not result_path:
         raise ValueError("manifest must provide result_path")
-    if not isinstance(failing_evaluators, list) or not failing_evaluators:
-        raise ValueError("manifest must provide failing_evaluators")
 
     target_path = _workspace_asset_path(workspace, target_asset)
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2203,14 +2228,16 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         correlation_id=manifest.get("call_id"),
     )
 
-    assessment_evaluators = [
-        evaluator["name"]
-        for evaluator in failing_evaluators
-        if isinstance(evaluator, dict) and isinstance(evaluator.get("name"), str) and evaluator["name"]
+    fulfillment_obligations = [
+        obligation
+        for obligation in manifest.get("fulfillment_obligations", ())
+        if isinstance(obligation, dict)
+        and isinstance(obligation.get("id"), str)
+        and obligation["id"]
     ]
-    if not assessment_evaluators:
-        raise ValueError("manifest failing_evaluators must include evaluator names")
-    primary_evaluator = assessment_evaluators[0]
+    if not fulfillment_obligations:
+        raise ValueError("manifest must include fulfillment_obligations with stable ids")
+    primary_evaluator = str(fulfillment_obligations[0]["id"])
     evidence = (
         f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
         "and satisfied the generated-asset contract"
@@ -2220,13 +2247,20 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         "actor": "odd_sdlc_constructor",
         "attestation": attestation,
         "work_report": work_report,
-        "assessments": [
+        "fulfillment_assessments": [
             {
-                "evaluator": evaluator_name,
-                "result": "pass",
-                "evidence": evidence,
+                "id": str(obligation["id"]),
+                "evaluator": (
+                    str(obligation.get("evaluator"))
+                    if isinstance(obligation.get("evaluator"), str) and obligation.get("evaluator")
+                    else str(obligation["id"])
+                ),
+                "fulfillment_status": "fulfilled",
+                "fulfillment_detail": evidence,
+                "blocking_reasons": [],
+                "evidence_refs": [str(target_path.relative_to(workspace))],
             }
-            for evaluator_name in assessment_evaluators
+            for obligation in fulfillment_obligations
         ],
     }
     result_file = Path(result_path)

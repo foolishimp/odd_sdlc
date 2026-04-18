@@ -23,10 +23,15 @@ from odd_sdlc.fd_checks import (
     code_traceability_present,
     goal_surface_authority_validated,
     requirement_scope_complete,
-    test_traceability_present as fd_test_traceability_present,
+    realized_test_traceability_present as fd_test_traceability_present,
 )
 from odd_sdlc.normalization import normalize_workspace
-from odd_sdlc.project_profile import tenant_design_relative_path, tenant_output_dir, tenant_test_env_tests_relative_path
+from odd_sdlc.project_profile import (
+    tenant_design_relative_path,
+    tenant_output_dir,
+    tenant_test_env_relative_path,
+    tenant_test_env_tests_relative_path,
+)
 from odd_sdlc.query import query_domain
 from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
 from odd_sdlc.workspace_assets import asset_marker
@@ -211,12 +216,12 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
     assert goal_surface_authority_validated(workspace) == 0
     assert requirement_scope_complete(workspace) == 1
     assert code_traceability_present(workspace) == 0
-    assert fd_test_traceability_present(workspace) == 0
+    assert fd_test_traceability_present(workspace) == 1
     assert initial_domain["query_contract"]["version"] == "v10"
     assert "analysis_manifest" in initial_domain["query_contract"]["top_level_keys"]
     assert initial_domain["requirement_closure_register"]["summary"]["missing_intent_ids_from_goals"] == 0
     assert initial_domain["requirement_closure_register"]["summary"]["missing_from_current_requirement_surface"] == 1
-    assert initial_entries["REQ-CORE-001"]["status"] == "realized"
+    assert initial_entries["REQ-CORE-001"]["status"] == "partially_realized"
     assert initial_entries["REQ-CORE-002"]["status"] == "missing_from_current_requirement_surface"
 
     _write(
@@ -259,9 +264,9 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
     assert goal_surface_authority_validated(workspace) == 0
     assert requirement_scope_complete(workspace) == 0
     assert code_traceability_present(workspace) == 0
-    assert fd_test_traceability_present(workspace) == 0
+    assert fd_test_traceability_present(workspace) == 1
     assert carried_domain["requirement_closure_register"]["summary"]["missing_from_current_requirement_surface"] == 0
-    assert carried_entries["REQ-CORE-001"]["status"] == "realized"
+    assert carried_entries["REQ-CORE-001"]["status"] == "partially_realized"
     assert carried_entries["REQ-CORE-002"]["status"] == "specified"
 
     _write(
@@ -332,6 +337,18 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
                 "",
                 "def test_recover() -> None:",
                 "    assert True",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_test_env_relative_path("python", "50-generated-run-archive.md"),
+        "\n".join(
+            (
+                "# Generated Test Run Archive",
+                "",
+                "- REQ-CORE-001",
+                "- REQ-CORE-002",
                 "",
             )
         ),
