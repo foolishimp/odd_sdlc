@@ -11,6 +11,7 @@ from .analysis import refresh_analysis
 from .app import OddSdlcApp, active_programs, start
 from .constructor import construct_manifest
 from .homeostatic_loop import run_homeostatic_self_check
+from .install_topology import installed_product_code_root
 from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name, program_for_edge
 
 
@@ -221,7 +222,7 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
 
 
 def _emit_boundary_check(workspace_root: Path) -> dict[str, Any]:
-    code_root = workspace_root / ".odd_sdlc" / "python" / "code" / "odd_sdlc"
+    code_root = installed_product_code_root(workspace_root) / "odd_sdlc"
     if not code_root.exists():
         code_root = Path(__file__).resolve().parent
     allowed_emit_import_paths = {"runtime_effects.py"}

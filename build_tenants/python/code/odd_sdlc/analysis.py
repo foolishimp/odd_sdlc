@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .install_topology import INSTALLED_RUNTIME_CONTRACT_RELATIVE
 from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
 from .project_profile import (
     ANALYSIS_MANIFEST_PATH,
@@ -28,7 +29,7 @@ from .traceability import (
 
 
 def _workspace_mode(workspace_root: Path) -> str:
-    if (workspace_root / ".odd_sdlc" / "release" / "genesis.yml").exists():
+    if (workspace_root / INSTALLED_RUNTIME_CONTRACT_RELATIVE).exists():
         return "installed_target"
     if is_source_domain_repo_workspace(workspace_root):
         return "source_domain_repo"
@@ -119,7 +120,7 @@ def _artifact_kind_for_path(path: Path) -> str:
 def _input_kind_for_path(relative_path: str) -> str:
     if relative_path == PROJECT_CONSTRAINTS_PATH.as_posix():
         return "project_constraints"
-    if relative_path == ".odd_sdlc/release/genesis.yml":
+    if relative_path == INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix():
         return "runtime_contract"
     if relative_path.startswith("specification/requirements/"):
         return "requirement_surface"

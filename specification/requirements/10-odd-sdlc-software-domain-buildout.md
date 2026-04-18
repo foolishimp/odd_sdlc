@@ -391,8 +391,12 @@ installed shape must be conformant:
 
 - project-owned constitutional `WHAT` remains under `specification/`
 - project-owned realization `HOW` lands under `build_tenants/<tenant>/`
-- immutable released `odd_sdlc` runtime/software remains under `.odd_sdlc/`
+- immutable installed substrate and installed odd-product payloads remain under
+  `.genesis/`
+- released `odd_sdlc` install payload remains under `.genesis/odd_sdlc/`
   rather than inside the project tenant topology
+- mutable named instances, when used, live beneath
+  `build_tenants/<tenant>/workspaces/<name>/`
 
 **Acceptance Criteria**:
 - AC-1: downstream install and normalization project broad bootstrap input into
@@ -401,7 +405,12 @@ installed shape must be conformant:
 - AC-2: downstream generated design, implementation, test, and traceability
   surfaces bind to the active project tenant root rather than to
   `build_tenants/common/` or `build_tenants/odd_sdlc/` by default
-- AC-3: released `odd_sdlc` install payload is carried under `.odd_sdlc/` and
-  does not masquerade as a project realization tenant in downstream workspaces
+- AC-3: released `odd_sdlc` install payload is carried under
+  `.genesis/odd_sdlc/` and does not masquerade as a project realization tenant
+  in downstream workspaces
 - AC-4: reset/replay and subsequent bounded traversals continue to operate
   against the tenant-rooted downstream workspace shape
+- AC-5: mutable named downstream instances, when used, are explicit tenant
+  `workspaces/` and not ad hoc competing topology roots
+- AC-6: stack-local environment tools remain subordinate within a named
+  workspace rather than defining the installed topology

@@ -110,7 +110,7 @@ REPO_ROOT = ODD_ROOT
 LIVE_CODEX_PROBE_CONFIG = {
     "transport_contract": {
         "codex": {
-            "probe_timeout": 10,
+            "probe_timeout": 30,
             "retry_count": 0,
             "retry_backoff": 0,
         }

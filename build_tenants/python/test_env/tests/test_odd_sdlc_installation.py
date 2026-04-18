@@ -47,6 +47,12 @@ if str(TESTS_DIR) not in sys.path:
 from odd_sdlc.analysis import load_analysis_manifest, load_workspace_state  # noqa: E402
 import odd_sdlc.__main__ as odd_sdlc_cli  # noqa: E402
 from odd_sdlc.app import bootstrap, initialize  # noqa: E402
+from odd_sdlc.install_topology import (  # noqa: E402
+    INSTALLED_PRODUCT_CODE_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_ROOT_RELATIVE,
+    INSTALLED_RUNTIME_CONTRACT_RELATIVE,
+)
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
     ANALYSIS_MANIFEST_PATH,
@@ -120,7 +126,7 @@ def _seed_data_mapper_template_workspace(path: Path) -> None:
 
 
 def _write_fake_transport_contract(workspace: Path) -> Path:
-    contract_path = workspace / ".odd_sdlc" / "release" / "test_transport_contract.json"
+    contract_path = workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE.parent / "test_transport_contract.json"
     fake_agent = str(TESTS_DIR / "fake_fp_agent.py")
     payload = {
         "codex": {
@@ -153,7 +159,7 @@ def _write_fake_transport_contract(workspace: Path) -> Path:
 
 
 def _append_runtime_contract_overrides(workspace: Path, *, transport_contract: Path) -> None:
-    runtime_contract = workspace / ".odd_sdlc" / "release" / "genesis.yml"
+    runtime_contract = workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE
     text = runtime_contract.read_text(encoding="utf-8").rstrip()
     additions = (
         f"transport_contract: {transport_contract.relative_to(workspace).as_posix()}",
@@ -417,19 +423,19 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     assert payload["status"] == "installed"
     assert payload["platform"] == "scala_spark"
     assert payload["normalization"]["platform"] == "scala_spark"
-    assert payload["runtime_contract"] == ".odd_sdlc/release/genesis.yml"
+    assert payload["runtime_contract"] == INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()
     assert payload["agents_md"] in {"prepended", "updated", "created"}
     assert payload["claude_md"] in {"prepended", "updated", "created"}
-    assert (workspace / ".odd_sdlc" / "release" / "genesis.yml").exists()
-    assert (workspace / ".odd_sdlc" / "python" / "code" / "odd_sdlc" / "__main__.py").exists()
-    assert (workspace / ".odd_sdlc" / "python" / "design" / "fp" / "STATEFUL_ITERATOR_CONTROL_FRAME.md").exists()
-    assert (workspace / ".odd_sdlc" / "python" / "design" / "fp" / "REALIZATION_DEEPENING_CONTROL_FRAME.md").exists()
+    assert (workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE).exists()
+    assert (workspace / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE / "odd_sdlc" / "__main__.py").exists()
+    assert (workspace / INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE / "fp" / "STATEFUL_ITERATOR_CONTROL_FRAME.md").exists()
+    assert (workspace / INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE / "fp" / "REALIZATION_DEEPENING_CONTROL_FRAME.md").exists()
     assert not (workspace / "build_tenants" / "odd_sdlc").exists()
     kernel_text = (workspace / ".genesis" / "genesis.yml").read_text(encoding="utf-8")
-    assert "runtime_contract: .odd_sdlc/release/genesis.yml" in kernel_text
-    runtime_contract_text = (workspace / ".odd_sdlc" / "release" / "genesis.yml").read_text(encoding="utf-8")
+    assert f"runtime_contract: {INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}" in kernel_text
+    runtime_contract_text = (workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE).read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
-    assert "  - .odd_sdlc/python/code" in runtime_contract_text
+    assert f"  - {INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()}" in runtime_contract_text
     workspace_state = load_workspace_state(workspace)
     assert workspace_state is not None
     assert workspace_state["ready"] is True
@@ -453,7 +459,7 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`" in text
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`" in text
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`" in text
-        assert "`workspace://.odd_sdlc/release/genesis.yml`" in text
+        assert f"`workspace://{INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}`" in text
         assert "- platform: `scala_spark`" in text
         assert "## 4. Start Here" in text
         assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in text
@@ -470,7 +476,7 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     env["PYTHONPATH"] = os.pathsep.join(
         (
             str(workspace / ".genesis"),
-            str(workspace / ".odd_sdlc" / "python" / "code"),
+            str(workspace / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE),
         )
     )
     env.pop("PYTEST_CURRENT_TEST", None)
@@ -596,7 +602,7 @@ def test_sandbox_runtime_helpers_delegate_to_product_surfaces(
 def test_sandbox_observation_and_reset_are_queryable_product_surfaces(tmp_path: Path) -> None:
     workspace = tmp_path / "sandbox.observe"
     (workspace / ".genesis" / "genesis").mkdir(parents=True, exist_ok=True)
-    (workspace / ".odd_sdlc" / "python" / "code" / "odd_sdlc").mkdir(parents=True, exist_ok=True)
+    (workspace / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE / "odd_sdlc").mkdir(parents=True, exist_ok=True)
     events_path = workspace / ".ai-workspace" / "events" / "events.jsonl"
     events_path.parent.mkdir(parents=True, exist_ok=True)
     events_path.write_text(
@@ -1006,7 +1012,7 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     assert start_payload["handoff_kind"] == "observer_handoff"
     assert start_payload["handoff_reason"] == "fd_findings"
 
-    runtime_contract_text = (workspace / ".odd_sdlc" / "release" / "genesis.yml").read_text(encoding="utf-8")
+    runtime_contract_text = (workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE).read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
 
     final_gaps_payload = json.loads(
@@ -1098,7 +1104,7 @@ def test_install_release_keeps_downstream_common_out_of_default_project_topology
     )
 
     assert payload["status"] == "installed"
-    assert (workspace / ".odd_sdlc").exists()
+    assert (workspace / INSTALLED_PRODUCT_ROOT_RELATIVE).exists()
     assert not (workspace / "build_tenants" / "common").exists()
     assert not (workspace / "build_tenants" / "odd_sdlc").exists()
 

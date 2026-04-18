@@ -10,6 +10,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .install_topology import (
+    INSTALLED_PRODUCT_CODE_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_ROOT_RELATIVE,
+)
+
 
 _CODE_DIR = Path(__file__).resolve().parent
 _TENANT_ROOT = _CODE_DIR.parents[1]
@@ -32,8 +38,8 @@ def install_kernel_sandbox(target: Path) -> dict[str, Any]:
 
 
 def seed_odd_sdlc_package(target: Path) -> None:
-    package_root = target / ".odd_sdlc" / "python" / "code"
-    design_root = target / ".odd_sdlc" / "python" / "design"
+    package_root = target / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE
+    design_root = target / INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE
     package_root.mkdir(parents=True, exist_ok=True)
     design_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(_PACKAGE_ROOT, package_root / "odd_sdlc", dirs_exist_ok=True)
@@ -44,9 +50,15 @@ def assert_installed_genesis_runtime(target: Path) -> None:
     runtime_root = target / ".genesis"
     genesis_root = runtime_root / "genesis"
     gtl_root = runtime_root / "gtl"
+    required_paths = (
+        runtime_root,
+        genesis_root,
+        gtl_root,
+        gtl_root / "obligation_ledger.py",
+    )
     missing = [
         path.relative_to(target).as_posix()
-        for path in (runtime_root, genesis_root, gtl_root)
+        for path in required_paths
         if not path.exists()
     ]
     if missing:
@@ -118,7 +130,7 @@ def prepare_sandbox(target: Path) -> dict[str, Any]:
         "workspace_root": str(target),
         "install": install_payload,
         "runtime_root": ".genesis",
-        "product_root": ".odd_sdlc",
+        "product_root": INSTALLED_PRODUCT_ROOT_RELATIVE.as_posix(),
     }
 
 
@@ -149,7 +161,7 @@ def observe_sandbox(target: Path) -> dict[str, Any]:
         "event_count": len(events),
         "latest_event_type": None if not events else events[-1]["event_type"],
         "installer_runtime_present": (target / ".genesis" / "genesis").exists(),
-        "product_package_present": (target / ".odd_sdlc" / "python" / "code" / "odd_sdlc").exists(),
+        "product_package_present": (target / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE / "odd_sdlc").exists(),
         "runtime_state_present": (target / ".ai-workspace").exists(),
     }
 
@@ -159,7 +171,7 @@ def sandbox_env(workspace: Path) -> dict[str, str]:
     env["PYTHONPATH"] = os.pathsep.join(
         (
             str(workspace / ".genesis"),
-            str(workspace / ".odd_sdlc" / "python" / "code"),
+            str(workspace / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE),
         )
     )
     env.pop("PYTEST_CURRENT_TEST", None)

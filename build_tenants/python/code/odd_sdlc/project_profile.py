@@ -13,6 +13,8 @@ import json
 import os
 from pathlib import Path
 
+from .install_topology import INSTALLED_RUNTIME_CONTRACT_RELATIVE
+
 
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
 WORKSPACE_STATE_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-state.json")
@@ -241,7 +243,7 @@ def _tracked_workspace_input_entries(workspace_root: Path | str) -> list[dict[st
     tracked: list[dict[str, str | bool]] = []
     explicit_paths = (
         PROJECT_CONSTRAINTS_PATH,
-        Path(".odd_sdlc/release/genesis.yml"),
+        INSTALLED_RUNTIME_CONTRACT_RELATIVE,
     )
     seen: set[str] = set()
     for relative_path in explicit_paths:
@@ -302,7 +304,7 @@ def current_workspace_input_fingerprint(workspace_root: Path | str) -> str:
 def is_source_domain_repo_workspace(workspace_root: Path | str) -> bool:
     root = Path(workspace_root).resolve()
     return (
-        not (root / ".odd_sdlc" / "release" / "genesis.yml").exists()
+        not (root / INSTALLED_RUNTIME_CONTRACT_RELATIVE).exists()
         and (root / SOURCE_DOMAIN_PRODUCT_ROOT).exists()
         and (root / SOURCE_SERVICE_PRODUCT_ROOT).exists()
         and (root / SOURCE_SERVICE_SPEC_PATH).exists()

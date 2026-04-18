@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     env = os.environ.copy()
     pythonpath_entries = [
         str(workspace / ".genesis"),
-        str(workspace / ".odd_sdlc" / "python" / "code"),
+        str(workspace / ".genesis" / "odd_sdlc" / "python" / "code"),
     ]
     existing_pythonpath = env.get("PYTHONPATH")
     if existing_pythonpath:

@@ -3,12 +3,83 @@
 - id: T-013
 - title: Define `.genesis` as the immutable installed root for GTL/ABG and installed ODD products, and define tenant-local `workspaces/` as the mutable instance layer
 - type: feature
-- status: backlog
+- status: completed
 - goal: topology-and-installed-runtime-governance
 - priority: high
 - created_at: 2026-04-17
-- updated_at: 2026-04-17
+- updated_at: 2026-04-18
+- completed_at: 2026-04-18
 - dependencies: B-013, T-012
+
+## Closeout Authority
+
+`T-013` closes as a topology reprice and authority reorganization ticket.
+
+It does **not** claim that the current runtime/install code already implements
+the new topology law.
+
+What this ticket now owns and closes:
+
+- repricing the authoritative `odd_sdlc` product and requirement surfaces so
+  they define one source-vs-installed-vs-instance split
+- repricing downstream installed topology around `.genesis/` as the immutable
+  installed root
+- repricing tenant-local `workspaces/` as the mutable instance layer beneath
+  source realization tenants
+- routing the actual filesystem/runtime migration to a follow-on implementation
+  ticket
+
+The concrete implementation move remains follow-on work:
+
+- installed `odd_sdlc` still lives under `.odd_sdlc/` in the current runtime
+  code
+- that implementation migration is now owned by
+  [T-015](/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-015-implement-genesis-root-installed-product-topology-and-tenant-workspaces.md)
+
+This ticket therefore supersedes the older `.odd_sdlc/`-centric topology
+reading without pretending the filesystem/runtime migration is already done.
+
+## Delivered
+
+1. The authoritative topology reading is now:
+   - `specification/` is constitutional source authority
+   - `build_tenants/<tenant>/` is source realization law
+   - `.genesis/` is the immutable installed root for substrate and installed
+     odd products
+   - `build_tenants/<tenant>/workspaces/<name>/` is the mutable instance layer
+2. Installed odd products are repriced to live under `.genesis/<odd_product>`
+   rather than separate dotted roots beside `.genesis/`.
+3. Sandbox/dev/test are repriced as workspace flavors, not competing topology
+   roots.
+4. Repo-root `.genesis/` in a source repository is repriced as operational for
+   that workspace only, not as a hidden development seed for downstream
+   installs.
+5. The authoritative `odd_sdlc` product and requirement surfaces now carry the
+   new topology reading.
+6. The concrete filesystem/runtime move is routed explicitly to follow-on
+   implementation work instead of being left implicit.
+
+## Specification Surfaces Updated
+
+- [PRODUCT.md](/Users/jim/src/apps/odd_sdlc/specification/PRODUCT.md)
+- [05-realization-topology.md](/Users/jim/src/apps/odd_sdlc/specification/requirements/05-realization-topology.md)
+- [10-odd-sdlc-software-domain-buildout.md](/Users/jim/src/apps/odd_sdlc/specification/requirements/10-odd-sdlc-software-domain-buildout.md)
+- [04-tenant-realization-topology.md](/Users/jim/src/apps/odd_sdlc/specification/scenarios/04-tenant-realization-topology.md)
+
+## Follow-On Implementation
+
+This ticket intentionally leaves the current implementation/code migration open.
+
+The main code/runtime follow-on is:
+
+- move installed `odd_sdlc` payload from `.odd_sdlc/` to `.genesis/odd_sdlc/`
+- rewire runtime contracts, normalization, analysis, sandbox helpers, and
+  proving lanes accordingly
+- introduce/support tenant-local `workspaces/` mechanics where the runtime and
+  proving lanes actually need them
+
+That work is now owned by
+[T-015](/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-015-implement-genesis-root-installed-product-topology-and-tenant-workspaces.md).
 
 ## Triage
 
@@ -190,18 +261,20 @@ This topology is meant to solve:
 
 ## Task List
 
-- [ ] Reprice odd_sdlc product and topology requirements around the new
+- [x] Reprice odd_sdlc product and topology requirements around the new
   installed-root and tenant-workspace split.
-- [ ] Define the installed `.genesis` root as immutable installed payload
+- [x] Define the installed `.genesis` root as immutable installed payload
   topology for substrate and odd products.
-- [ ] Define tenant `workspaces/` as the mutable instance layer beneath source
+- [x] Define tenant `workspaces/` as the mutable instance layer beneath source
   realization tenants.
-- [ ] Define the relationship between tenant workspaces and stack-local
+- [x] Define the relationship between tenant workspaces and stack-local
   environment tooling such as `.venv`.
-- [ ] Reprice sandbox/dev/test language so they become workspace flavors, not
+- [x] Reprice sandbox/dev/test language so they become workspace flavors, not
   competing topologies.
-- [ ] Decide whether any source-repo root `.genesis` usage must be renamed,
+- [x] Decide whether any source-repo root `.genesis` usage must be renamed,
   constrained, or documented more sharply as operational-only.
+- [x] Route the concrete filesystem/runtime move into a follow-on
+  implementation ticket instead of leaving it implicit.
 - [ ] Prove one clean odd_sdlc instance flow using the resulting topology.
 - [ ] Propagate the result into shared method authority if ratified as a
   cross-project standard for future `odd_*` products.
@@ -225,11 +298,12 @@ This topology is meant to solve:
 
 This is a context-defining topology ticket.
 
+Its implementation follow-on now sits in `T-015`.
+
 It should orient later implementation work such as:
 
-- sandbox/worksite promotion into the carrier (`T-012`)
-- install/runtime packaging cleanup
-- tenant-local workspace support
+- install/runtime packaging cleanup (`T-015`)
+- tenant-local workspace support (`T-015`)
 - eventual shared-method topology ratification
 
 The point of this ticket is to hold the whole concept in one place so the work
@@ -240,6 +314,8 @@ can be followed through without the context drifting across multiple bug notes.
 - sandbox runtime-surface correction:
   `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/B-013-stop-sandbox-proof-from-overwriting-installer-owned-abg-runtime.md`
 - sandbox lifecycle promotion:
-  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/backlog/T-012-promote-sandbox-worksite-lifecycle-into-the-first-class-odd-sdlc-carrier.md`
+  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-012-promote-sandbox-worksite-lifecycle-into-the-first-class-odd-sdlc-carrier.md`
+- implementation follow-on:
+  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/T-015-implement-genesis-root-installed-product-topology-and-tenant-workspaces.md`
 - governing process method:
   `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`

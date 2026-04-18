@@ -73,3 +73,40 @@ should not become accidental constitutional authority.
   `specification/` or `build_tenants/`
 - AC-3: supporting documentation can accumulate without polluting the
   constitutional or realization-law surfaces
+
+### REQ-F-REALIZATION-005 — Tenant-local `workspaces/` are the mutable instance layer beneath source realization
+
+Source realization tenants may carry mutable named instances, but those
+instances do not become source authority.
+
+In short:
+
+- `build_tenants/<tenant>/` remains source realization law
+- `build_tenants/<tenant>/workspaces/<name>/` is the mutable instance layer
+
+**Acceptance Criteria**:
+- AC-1: when tenant-local mutable instances are used, they live beneath
+  `build_tenants/<tenant>/workspaces/<name>/`
+- AC-2: sandbox, dev, test, and other local proving flavors are treated as
+  named workspaces rather than as competing topology roots
+- AC-3: nothing beneath tenant `workspaces/` is treated as constitutional or
+  source realization authority
+- AC-4: stack-local tools such as `.venv` remain subordinate within a named
+  workspace rather than defining the topology itself
+
+### REQ-F-REALIZATION-006 — Repo-root `.genesis/` is operational for the current source workspace only
+
+The source repository may carry a repo-root `.genesis/` for the current
+workspace’s operational runtime, but that surface is not a hidden development
+seed for other workspaces or downstream installs.
+
+**Acceptance Criteria**:
+- AC-1: source-repo topology language describes repo-root `.genesis/` as an
+  operational runtime surface for the current workspace only
+- AC-2: no source-topology surface describes repo-root `.genesis/` as a
+  development seed to be copied into other workspaces
+- AC-3: downstream or proving workspaces receive installed `.genesis/` by
+  install, not by copying another workspace’s runtime payload
+- AC-4: installed odd-product payloads are described as living under
+  `.genesis/<odd_product>/` rather than as separate dotted roots beside
+  `.genesis/`

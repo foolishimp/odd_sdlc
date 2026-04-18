@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .analysis import refresh_analysis
+from .install_topology import INSTALLED_PRODUCT_ROOT_RELATIVE
 from .project_profile import (
     _parse_constraints_lines,
     canonical_tenant_name,
@@ -851,7 +852,7 @@ def normalize_workspace(
             )
         )
 
-    if (root / ".odd_sdlc").exists():
+    if (root / INSTALLED_PRODUCT_ROOT_RELATIVE).exists() or (root / ".odd_sdlc").exists():
         _remove_legacy_root_readme(root, actions=actions)
 
     project_bootstrap = root / PROJECT_BOOTSTRAP_PATH

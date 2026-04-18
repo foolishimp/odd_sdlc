@@ -15,6 +15,11 @@ from typing import Any
 
 from odd_sdlc.analysis import refresh_analysis
 from odd_sdlc.ambiguity import AMBIGUITY_REGISTER_PATH
+from odd_sdlc.install_topology import (
+    INSTALLED_PRODUCT_CODE_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE,
+    INSTALLED_RUNTIME_CONTRACT_RELATIVE,
+)
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
 from odd_sdlc.project_profile import canonical_tenant_name
 from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
@@ -24,13 +29,12 @@ SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
 SOURCE_PYTHON_ROOT = Path(__file__).resolve().parents[3]
 APPS_ROOT = Path(__file__).resolve().parents[6]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
-RUNTIME_CONTRACT_RELATIVE = Path(".odd_sdlc/release/genesis.yml")
 _ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->"
 _ODD_SDLC_BOOTLOADER_END = "<!-- ODD_SDLC_BOOTLOADER_END -->"
 
 
 def _copy_package(target_root: Path) -> Path:
-    package_root = target_root / ".odd_sdlc" / "python" / "code"
+    package_root = target_root / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE
     package_root.mkdir(parents=True, exist_ok=True)
     destination = package_root / "odd_sdlc"
     # Source-workspace self-install must not try to copy the package onto itself.
@@ -47,7 +51,7 @@ def _copy_package(target_root: Path) -> Path:
 
 def _copy_domain_design_assets(target_root: Path) -> Path:
     source = SOURCE_PYTHON_ROOT / "design" / "fp"
-    destination = target_root / ".odd_sdlc" / "python" / "design" / "fp"
+    destination = target_root / INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE / "fp"
     if destination.resolve() == source.resolve():
         return destination
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -105,13 +109,13 @@ def _runtime_contract_lines() -> tuple[str, ...]:
         f"asset_binding_contract: {asset_binding_contract}",
         "pythonpath:",
         "  - .genesis",
-        "  - .odd_sdlc/python/code",
+        f"  - {INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()}",
         "",
     )
 
 
 def _write_runtime_contract(target_root: Path) -> Path:
-    contract_path = target_root / RUNTIME_CONTRACT_RELATIVE
+    contract_path = target_root / INSTALLED_RUNTIME_CONTRACT_RELATIVE
     contract_path.parent.mkdir(parents=True, exist_ok=True)
     contract_path.write_text("\n".join(_runtime_contract_lines()), encoding="utf-8")
     return contract_path
@@ -121,7 +125,7 @@ def _wire_kernel_contract(target_root: Path) -> None:
     kernel_path = target_root / ".genesis" / "genesis.yml"
     if not kernel_path.exists():
         return
-    desired = f"runtime_contract: {RUNTIME_CONTRACT_RELATIVE.as_posix()}"
+    desired = f"runtime_contract: {INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}"
     text = kernel_path.read_text(encoding="utf-8")
     if desired in text:
         return
@@ -144,7 +148,7 @@ def _workspace_instruction_bootloader(
     ambiguity_register = f"workspace://{AMBIGUITY_REGISTER_PATH.as_posix()}"
     requirement_closure_register = f"workspace://{REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix()}"
     project_bootstrap = "workspace://.ai-workspace/context/project_bootstrap.md"
-    runtime_contract = f"workspace://{RUNTIME_CONTRACT_RELATIVE.as_posix()}"
+    runtime_contract = f"workspace://{INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}"
     authority_candidates = (
         "specification/INTENT.md",
         "specification/REQUIREMENTS.md",

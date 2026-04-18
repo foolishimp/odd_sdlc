@@ -404,8 +404,10 @@ separately by `REQ-F-ODDSDLC-032`.
 Downstream installed workspaces are governed separately by
 `REQ-F-ODDSDLC-032`: their constitutional `WHAT` remains under
 `specification/`, their project-owned realization `HOW` lands under
-`build_tenants/<tenant>/`, and released `odd_sdlc` runtime/software remains
-under `.odd_sdlc/`.
+`build_tenants/<tenant>/`, immutable installed substrate and odd-product
+payloads live under `.genesis/`, installed `odd_sdlc` lives under
+`.genesis/odd_sdlc/`, and mutable named instances may live beneath
+`build_tenants/<tenant>/workspaces/<name>/`.
 
 1. install `odd_sdlc` clean as a GTL/ABG-native product
 2. author project-owned intent, product, and requirements surfaces

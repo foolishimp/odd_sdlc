@@ -10,7 +10,7 @@ The target project may be imported, partial, stale, or still underdefined.
 - workspace: `odd_sdlc`
 - project slug: `odd_sdlc`
 - platform: `python`
-- active runtime contract: `workspace://.odd_sdlc/release/genesis.yml`
+- active runtime contract: `workspace://.genesis/odd_sdlc/release/genesis.yml`
 - normalization report: `workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
 - ambiguity register: `workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`
 - requirement closure register: `workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`
@@ -33,7 +33,7 @@ The target project may be imported, partial, stale, or still underdefined.
 - `workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
 - `workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`
 - `workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`
-- `workspace://.odd_sdlc/release/genesis.yml`
+- `workspace://.genesis/odd_sdlc/release/genesis.yml`
 - `workspace://.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`
 
 ## 4. Start Here

@@ -8,7 +8,7 @@
 - priority: high
 - created_at: 2026-04-17
 - updated_at: 2026-04-17
-- dependencies: T-012, T-013
+- dependencies: T-012, T-013, T-015
 - change_intent: Promote odd_sdlc source development from a partly special-cased source workspace into a conformant odd_sdlc-governed development project using released/installed odd_sdlc products over explicit worksite topology.
 - change_class: product_reprice
 - re_entry_point: product
@@ -142,13 +142,15 @@ The implementation must preserve:
 ## Relationship To Existing Tickets
 
 - `T-012` promotes sandbox/worksite lifecycle into the first-class carrier.
-- `T-013` defines `.genesis` and tenant `workspaces/` topology.
+- `T-013` reprices `.genesis` and tenant `workspaces/` topology.
+- `T-015` implements that repriced install/workspace topology in code.
 
 This ticket depends on those because self-induction needs:
 
 - a lawful mutable worksite layer
 - a lawful immutable install layer
 - first-class sandbox/worksite behavior
+- an implemented install/workspace topology rather than reprice-only authority
 
 Only then can odd_sdlc govern odd_sdlc development in the same way it governs
 downstream odd projects.
@@ -207,6 +209,7 @@ It becomes worth pulling once:
 
 - sandbox/worksite lifecycle is first-class (`T-012`)
 - install/root/workspace topology is repriced (`T-013`)
+- install/root/workspace topology is implemented (`T-015`)
 
 At that point it becomes the clean next step in making odd_sdlc development
 itself conform to odd_sdlc project law.
@@ -220,6 +223,6 @@ itself conform to odd_sdlc project law.
 - shared ODD constitutional method:
   `/Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md`
 - topology context:
-  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/backlog/T-013-reprice-installed-topology-around-genesis-root-and-tenant-workspaces.md`
+  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-013-reprice-installed-topology-around-genesis-root-and-tenant-workspaces.md`
 - sandbox/worksite promotion:
-  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/backlog/T-012-promote-sandbox-worksite-lifecycle-into-the-first-class-odd-sdlc-carrier.md`
+  `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-012-promote-sandbox-worksite-lifecycle-into-the-first-class-odd-sdlc-carrier.md`
