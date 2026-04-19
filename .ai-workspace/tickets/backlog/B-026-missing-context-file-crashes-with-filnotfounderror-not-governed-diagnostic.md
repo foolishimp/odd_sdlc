@@ -5,8 +5,10 @@ type: bug
 status: backlog
 goal: odd_sdlc runtime gives actionable diagnostic when required context files are absent
 change_intent: Detect missing context file paths before F_P dispatch and emit a governed failure event with the missing file name and fix instruction
-change_class: realization_refactor
-re_entry_point: genesis/binding.py bind_fp context resolution
+change_class: requirement_reprice
+re_entry_point: requirements
+affected_boundary: genesis/interpret.py dispatch path
+triage_note: upward propagation check — no live requirement governs "runtime MUST validate context paths before emitting run_started"; re-entry is requirements, not code
 priority: medium
 triaged_at: 2026-04-19
 created_at: 2026-04-19

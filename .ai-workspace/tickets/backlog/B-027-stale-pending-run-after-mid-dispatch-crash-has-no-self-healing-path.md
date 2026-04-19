@@ -5,8 +5,10 @@ type: bug
 status: backlog
 goal: genesis start --auto recovers from stale pending runs without manual operator intervention
 change_intent: Detect stale pending run (run_started with no fp_dispatched) at iteration start and auto-reset rather than failing with policy_config_defect
-change_class: realization_refactor
-re_entry_point: genesis/interpret.py _iterated_outcome pending-run check
+change_class: requirement_reprice
+re_entry_point: requirements
+affected_boundary: genesis/interpret.py _iterated_outcome pending-run check
+triage_note: upward propagation check — no live requirement governs "genesis MUST self-heal from stale pending runs"; re-entry is requirements, not code
 priority: medium
 triaged_at: 2026-04-19
 created_at: 2026-04-19
