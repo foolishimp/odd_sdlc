@@ -147,7 +147,6 @@ CHECK_RULES: dict[str, CheckRule] = {
         required_generated_assets=("test_module_surface", "code_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["obligation-ledger-carry-converged"].cli_name: CheckRule(),
-    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["obligation-ledger-fulfillment-sufficient"].cli_name: CheckRule(),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("release_surface",),
         required_profile_fields=("test_execution_contract",),
@@ -406,26 +405,6 @@ def _obligation_ledger_carry_detail(workspace_root: Path, edge_name: str) -> dic
     return detail
 
 
-def _obligation_ledger_fulfillment_detail(workspace_root: Path, edge_name: str) -> dict[str, Any]:
-    declaration = _declared_obligation_declaration(workspace_root, edge_name)
-    if declaration is None:
-        return {
-            "check": "obligation-ledger-fulfillment-sufficient",
-            "failure_kind": "missing_obligation_ledger_declaration",
-            "workspace_root": str(workspace_root),
-            "edge": edge_name,
-            "suggested_repair": "Publish an obligation_ledger declaration on the GTL edge before using deterministic fulfillment gating.",
-        }
-    gap = obligation_gap_from_declaration(
-        workspace_root,
-        declaration,
-        edge_name=edge_name,
-    )
-    detail = dict(gap)
-    detail["check"] = "obligation-ledger-fulfillment-sufficient"
-    return detail
-
-
 def _failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | None = None) -> dict[str, Any]:
     if check_name == "goal-surface-authority-validated":
         return _goal_surface_authority_detail(workspace_root)
@@ -439,8 +418,6 @@ def _failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | N
         return _realized_test_traceability_detail(workspace_root)
     if check_name == "obligation-ledger-carry-converged" and edge_name:
         return _obligation_ledger_carry_detail(workspace_root, edge_name)
-    if check_name == "obligation-ledger-fulfillment-sufficient" and edge_name:
-        return _obligation_ledger_fulfillment_detail(workspace_root, edge_name)
     return _generic_failure_detail(check_name, workspace_root)
 
 
@@ -578,13 +555,6 @@ def obligation_ledger_carry_converged(workspace_root: Path, edge_name: str | Non
         return 1
     detail = _obligation_ledger_carry_detail(workspace_root, edge_name)
     return 0 if bool(detail.get("carry_converged")) else 1
-
-
-def obligation_ledger_fulfillment_sufficient(workspace_root: Path, edge_name: str | None = None) -> int:
-    if not edge_name:
-        return 1
-    detail = _obligation_ledger_fulfillment_detail(workspace_root, edge_name)
-    return 0 if bool(detail.get("fulfillment_converged")) else 1
 
 
 def deployment_dependency_surfaces_present(workspace_root: Path) -> int:

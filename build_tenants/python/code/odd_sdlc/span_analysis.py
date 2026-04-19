@@ -85,7 +85,6 @@ def _graph_projection(edge_name: str, graph_gap: dict[str, Any] | None) -> tuple
     passing = [str(item) for item in graph_gap.get("passing", ()) if str(item)]
     obligation_evaluator_names = {
         f"{edge_name}_obligation_ledger_carry_converged",
-        f"{edge_name}_obligation_ledger_fulfillment_converged",
     }
     residual_failing = [item for item in failing if item not in obligation_evaluator_names]
     if not failing:

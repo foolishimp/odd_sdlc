@@ -1464,9 +1464,16 @@ def collect_declared_obligation_gaps(
     declarations_by_edge: list[tuple[str, dict[str, Any] | Any]],
 ) -> list[dict[str, Any]]:
     gaps: list[dict[str, Any]] = []
+    supported_adapters = {
+        _REQUIREMENT_EXECUTION_ADAPTER_REF,
+        _DECLARED_REQUIREMENT_EDGE_ADAPTER_REF,
+    }
     for edge_name, declaration in declarations_by_edge:
         payload = _coerce_obligation_declaration(declaration)
         if not payload:
+            continue
+        adapter_ref = str(payload.get("adapter_ref") or "")
+        if adapter_ref not in supported_adapters:
             continue
         gap = obligation_gap_from_declaration(
             workspace_root,

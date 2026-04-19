@@ -83,6 +83,32 @@ from genesis.cli_adapter import _emit_event_cmd  # noqa: E402
 from genesis.events import emit  # noqa: E402
 
 
+def _generic_fp_obligation_ledger(
+    vector_name: str,
+    evaluator_name: str,
+    description: str,
+    *,
+    evaluator_index: int = 1,
+) -> dict[str, object]:
+    return {
+        "obligation_source_kind": "vector_declared_fp_evaluators",
+        "obligation_source_ref": f"vector://{vector_name}#obligation_ledger",
+        "obligation_kind": "fp_evaluator_obligation",
+        "carry_rule": "declared_fulfillment_obligation_set_totality",
+        "fulfillment_rule": "per_obligation_fp_assessment",
+        "evidence_policy": "agent_supplied_evidence_refs",
+        "obligations": [
+            {
+                "id": evaluator_name,
+                "evaluator": evaluator_name,
+                "statement": description,
+                "source_kind": "vector_declared_fp_evaluators",
+                "source_refs": [f"vector://{vector_name}#evaluator/{evaluator_index}"],
+            }
+        ],
+    }
+
+
 def _seed_workspace(path: Path) -> None:
     (path / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
     (path / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
@@ -1815,19 +1841,31 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
             "name": "derive_review_assessment_surface",
             "source": ["design_surface"],
             "target": "review_assessment_surface",
-            "obligation_ledger": None,
+            "obligation_ledger": _generic_fp_obligation_ledger(
+                "derive_review_assessment_surface",
+                "review_assessment_surface_semantically_converged",
+                "The review assessment surface is semantically converged for the current design under review.",
+            ),
         },
         {
             "name": "derive_consensus_decision_surface",
             "source": ["review_assessment_surface"],
             "target": "consensus_decision_surface",
-            "obligation_ledger": None,
+            "obligation_ledger": _generic_fp_obligation_ledger(
+                "derive_consensus_decision_surface",
+                "consensus_decision_surface_semantically_converged",
+                "The consensus decision surface is semantically converged for the current review assessment round.",
+            ),
         },
         {
             "name": "derive_reviewed_design_surface",
             "source": ["design_surface", "consensus_decision_surface"],
             "target": "reviewed_design_surface",
-            "obligation_ledger": None,
+            "obligation_ledger": _generic_fp_obligation_ledger(
+                "derive_reviewed_design_surface",
+                "reviewed_design_surface_semantically_converged",
+                "The reviewed design surface is semantically converged for the current design and consensus decision state.",
+            ),
         },
     ]
     assert consensus_round["job_names"] == []
@@ -2138,8 +2176,17 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "fulfillment_rule": "test_design_surface_coverage",
         "evidence_policy": "planned_test_design_coverage",
     }
-    assert bootstrap_vectors["derive_requirement_surface"]["obligation_ledger"] is None
-    assert bootstrap_vectors["select_test_stack_profile"]["obligation_ledger"] is None
+    assert bootstrap_vectors["derive_requirement_surface"]["obligation_ledger"] == _generic_fp_obligation_ledger(
+        "derive_requirement_surface",
+        "requirement_surface_semantically_converged",
+        "The requirement family surface is semantically converged for the current workspace input set.",
+        evaluator_index=2,
+    )
+    assert bootstrap_vectors["select_test_stack_profile"]["obligation_ledger"] == _generic_fp_obligation_ledger(
+        "select_test_stack_profile",
+        "test_stack_profile_semantically_converged",
+        "The test stack profile is semantically converged for the current generated test design.",
+    )
     assert [vector["name"] for vector in graph_functions["review_design_consensus_round"]["vectors"]] == [
         "derive_review_assessment_surface",
         "derive_consensus_decision_surface",

@@ -15,6 +15,14 @@ CandidateFamily, Operator, Evaluator, Rule, Job, Role, Module.
 ContractRef, ModuleImport, Attr, Attrs, and TemplateRef are structural helpers.
 """
 from .graph import Attr, Attrs, Graph, Node, GraphVector, Context
+from .obligation_ledger import (
+    OBLIGATION_LEDGER_DECLARATION_KEY,
+    coerce_obligation_ledger_declaration,
+    declared_fulfillment_graph_vector,
+    declared_fulfillment_obligation,
+    declared_fp_evaluator_obligation_ledger,
+    obligation_ledger_declarations,
+)
 from .operator_model import (
     Regime, F_D, F_P, F_H,
     Operator, Evaluator, Rule,
@@ -26,6 +34,12 @@ from .module_model import Module, ModuleImport
 __all__ = [
     # Graph structure (prime)
     "Attr", "Attrs", "Graph", "Node", "GraphVector", "Context",
+    "OBLIGATION_LEDGER_DECLARATION_KEY",
+    "coerce_obligation_ledger_declaration",
+    "declared_fulfillment_graph_vector",
+    "declared_fulfillment_obligation",
+    "declared_fp_evaluator_obligation_ledger",
+    "obligation_ledger_declarations",
     # Operator model (prime)
     "Regime", "F_D", "F_P", "F_H",
     "Operator", "Evaluator", "Rule",

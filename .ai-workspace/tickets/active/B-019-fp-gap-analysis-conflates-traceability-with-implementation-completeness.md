@@ -9,7 +9,7 @@
 - priority: critical
 - created_at: 2026-04-17
 - updated_at: 2026-04-18
-- dependencies: abiogenesis B-014 completed; `odd_sdlc` must now migrate fully onto that published fulfillment-truth ABI
+- dependencies: abiogenesis B-014 completed for the typed fulfillment carrier; abiogenesis B-013 active for `obligation_ledger` declaration-contract alignment across source and installed runtime
 
 ## Triage
 
@@ -743,6 +743,44 @@ convergence model and the target per-edge obligation-ledger model.
 That bridge state is no longer acceptable as a completion point. It must be
 treated as temporary migration scaffolding and removed.
 
+### Current Active-Wave Authority
+
+This section is the operative reading for the current migration wave.
+
+`B-019` is:
+
+- still `active`
+- no longer blocked on the substrate carrier dependency from `abiogenesis`
+- still incomplete on the `odd_sdlc` side because domain migration is not yet
+  reduced to one final truth model
+
+The smallest non-overlapping active defect set is now:
+
+1. **Consumer alignment and proof are not complete**
+   - `start()` still delegates to runtime closure through `gen_start(...)`
+   - `gaps()` publishes canonical ledger truth by overriding raw graph gaps
+   - the migration is not complete until runtime, reporting, sandbox, live, and
+     self-test all prove the same closure law
+   - the current installed-runtime blocker is concrete:
+     - substrate dispatch now expects a generic `obligation_ledger` policy with
+       a static `obligations` list for any `F_P` edge
+     - converted `odd_sdlc` edges still publish adapter-driven
+       requirement-ledger declarations for dynamic requirement obligation sets
+     - this mismatch must be resolved without collapsing converted edges back to
+       evaluator-level fulfillment truth
+     - the upstream substrate fix is now tracked in
+       [abiogenesis B-013](/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/B-013-publish-first-class-obligation-ledger-traversal-declarations-in-abg-gtl.md)
+   - bridge-state harness assumptions are still migration work, not evidence
+
+2. **Declared subset law still needs final hardening**
+   - every lawful projected subset must be explicit in GTL derivation rules
+   - no helper may silently narrow obligation scope outside that declaration
+   - hidden narrowing remains the main seam that could recreate false closure
+     after the ledger migration
+
+Everything else in the divergence list below should be read as detail, evidence,
+or routing under one of those two active defects.
+
 ### Migration Classification Rule
 
 Every remaining divergence from the target model must be classified as exactly
@@ -767,26 +805,28 @@ acceptance.
   stage-specific derivation rules rather than hidden merged branch helpers
 - archive-governed realized validation is now the intended carried truth for
   realized test evidence
+- converted edges no longer ship deterministic `F_D` fulfillment gates; `F_D`
+  now closes only carry/accounting truth while fulfillment closure is owned by
+  the typed `F_P` carrier and admitted runtime ledger
 - root `gaps()` and span analysis exclude converted-edge raw graph gaps from
   canonical convergence and consume canonical edge-ledger truth for those edges
+- the workspace-level `current_requirement_executability_gap(...)` surface is
+  retained as a canonical workspace-level projection over the same ledger
+  builder used by declared edge obligation gaps
+- diagnostic `fulfillment_detail` / `blocking_status_counts` taxonomy is
+  retained as ledger-derived projection data, not as an independent closure law
 - `abiogenesis` `B-014` is complete and provides the typed fulfillment carrier,
   published fulfillment-truth surface, and runtime certification path this
   migration depends on
 
 ### Remaining Divergences From The Target
 
-1. **`replace` — Fulfillment ownership is still bridge-state**
-   - current code still uses deterministic `F_D` fulfillment evaluators as
-     runtime closure gates for converted edges
-   - this is stronger than the old model, but it is not the final model
-   - final target:
-     - `F_D` materializes and validates ledger skeleton/accounting
-     - `F_P` emits a typed fulfillment assessment artifact keyed by obligation
-       id
-     - `F_H` admits that fulfillment assessment where required
-     - `F_D` merges the admitted fulfillment assessment into the published
-       ledger
-     - runtime closure consumes that merged ledger
+1. **`replace` satisfied — Fulfillment ownership is no longer bridge-state**
+   - converted edges no longer use deterministic `F_D` fulfillment evaluators
+     as runtime closure gates
+   - `F_D` now closes carry/accounting only for the converted edge set
+   - fulfillment closure is owned by the typed `F_P` carrier and admitted
+     runtime ledger
 
 2. **`re-authorize` satisfied — Substrate fulfillment carrier dependency**
    - [abiogenesis B-014](/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/B-014-persist-and-promote-typed-fp-fulfillment-assessments-into-admitted-ledger-truth.md)
@@ -800,25 +840,22 @@ acceptance.
      evaluator-shaped `F_P` result payloads or reintroduce substrate-local
      fulfillment truth
 
-3. **`replace` — Workspace-level requirement executability remains a transitional surface**
-   - the workspace-level `current_requirement_executability_gap(...)` is still
-     present and still used by tests and some reporting flows
-   - this must either:
-     - become an explicitly retained canonical workspace-level projection over
-       the ledger family
-     - or be removed in favor of ledger-derived edge/span/root projections
-   - it must not remain an unexamined parallel truth surface
+3. **`re-authorize` satisfied — Workspace-level requirement executability is a canonical projection**
+   - the workspace-level `current_requirement_executability_gap(...)` is now
+     treated as an explicitly retained workspace-level projection over the same
+     ledger builder used by declared edge obligation gaps
+   - it remains useful for direct workspace-level requirement closure and does
+     not constitute a second runtime truth source
 
-4. **`replace` — Diagnostic taxonomy is still mixed into closure publication**
+4. **`re-authorize` satisfied — Diagnostic taxonomy remains projection-only**
    - `fulfillment_detail` values such as `planned`, `traceable_stub`,
-     `implemented_without_realized_tests`, and `specified` remain published
-     alongside canonical fulfillment truth
-   - these are useful diagnostics, but they must not become a second implicit
-     closure vocabulary
+     `implemented_without_realized_tests`, and `specified` remain published as
+     diagnostic vocabulary over the ledger lineage
    - canonical closure truth remains:
      - `carry_status`
      - `fulfillment_status`
      - convergence booleans and counts
+   - diagnostic detail must not be used as an independent closure law
 
 5. **`replace` — Runtime and reporting still need final alignment proof**
    - migration is not complete until:
@@ -827,6 +864,14 @@ acceptance.
      - sandbox execution proves that canonical truth under installed runtime
      - live execution proves the same truth under transport
      - self-test and operator `gaps()` emit no legacy closure assumptions
+   - current concrete blocker:
+     - installed runtime expects generic static `obligation_ledger.obligations`
+       on all `F_P` edges
+     - converted requirement-ledger edges still declare dynamic
+       adapter-driven obligation sets
+     - this is the next active migration seam
+     - substrate-side declaration-contract work is now tracked in
+       [abiogenesis B-013](/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/B-013-publish-first-class-obligation-ledger-traversal-declarations-in-abg-gtl.md)
 
 6. **`remove` — Proof harnesses still contain bridge assumptions**
    - no harness may assume:
@@ -843,6 +888,17 @@ acceptance.
      not already declared and authorized
    - this is a critical bridge seam because hidden narrowing can recreate false
      closure even when the ledger structure itself is correct
+
+### Deduped Mapping
+
+To avoid duplicate issue tracking:
+
+- remaining divergences `5` and `6` map to active defect `1`
+- remaining divergence `7` maps to active defect `2`
+- remaining divergence `1` is satisfied migration state, not an active defect
+- remaining divergence `2` is satisfied dependency state, not an active defect
+- remaining divergences `3` and `4` are satisfied re-authorized projection
+  state, not active defects
 
 ### Migration Target
 

@@ -424,19 +424,6 @@ def _obligation_carry_fd(edge_name: str) -> Evaluator:
     )
 
 
-def _obligation_fulfillment_fd(edge_name: str) -> Evaluator:
-    contract = fd_contract("obligation_ledger_fulfillment_sufficient")
-    return Evaluator(
-        name=f"{edge_name}_obligation_ledger_fulfillment_converged",
-        regime=F_D,
-        description=f"{contract.description} Target edge: {edge_name}.",
-        binding=(
-            f"exec://python -m odd_sdlc.fd_checks {contract.cli_name} "
-            f"--workspace . --edge {edge_name}"
-        ),
-    )
-
-
 _bootstrap_fd = _fd_evaluator("bootstrap_input_set_present")
 _product_fd = _fd_evaluator("product_dependency_surfaces_present")
 _goal_fd = _fd_evaluator("goal_dependency_surfaces_present")
@@ -473,21 +460,13 @@ _deployed_environment_fd = _fd_evaluator("deployed_environment_dependency_surfac
 _runtime_observation_fd = _fd_evaluator("runtime_observation_dependency_surfaces_present")
 _retrofit_plan_fd = _fd_evaluator("retrofit_plan_dependency_surfaces_present")
 _testcase_authority_obligation_fd = _obligation_carry_fd("qualify_testcase_authority")
-_testcase_authority_fulfillment_fd = _obligation_fulfillment_fd("qualify_testcase_authority")
 _implementation_design_obligation_fd = _obligation_carry_fd("derive_implementation_design_surface")
-_implementation_design_fulfillment_fd = _obligation_fulfillment_fd("derive_implementation_design_surface")
 _implementation_module_obligation_fd = _obligation_carry_fd("derive_implementation_module_surface")
-_implementation_module_fulfillment_fd = _obligation_fulfillment_fd("derive_implementation_module_surface")
 _code_obligation_fd = _obligation_carry_fd("derive_code_surface")
-_code_fulfillment_fd = _obligation_fulfillment_fd("derive_code_surface")
 _test_design_obligation_fd = _obligation_carry_fd("derive_test_design_surface")
-_test_design_fulfillment_fd = _obligation_fulfillment_fd("derive_test_design_surface")
 _test_module_obligation_fd = _obligation_carry_fd("derive_test_module_surface")
-_test_module_fulfillment_fd = _obligation_fulfillment_fd("derive_test_module_surface")
 _test_run_archive_obligation_fd = _obligation_carry_fd("derive_test_run_archive_surface")
-_test_run_archive_fulfillment_fd = _obligation_fulfillment_fd("derive_test_run_archive_surface")
 _release_obligation_fd = _obligation_carry_fd("prepare_release_surface")
-_release_fulfillment_fd = _obligation_fulfillment_fd("prepare_release_surface")
 _intent_fp = Evaluator(
     name="intent_surface_semantically_converged",
     regime=F_P,
@@ -648,6 +627,43 @@ _retrofit_plan_fp = Evaluator(
 _FP_DISPATCH_TIMEOUT_SECONDS = 1800
 
 
+def _declared_fp_evaluator_obligation_ledger(
+    *,
+    vector_name: str,
+    evaluators: tuple[Evaluator, ...],
+    declarations: Attrs,
+) -> Attrs:
+    obligations: list[dict[str, object]] = []
+    for index, evaluator in enumerate(evaluators[1:], start=1):
+        if evaluator.regime != F_P:
+            continue
+        obligations.append(
+            {
+                "id": evaluator.name,
+                "evaluator": evaluator.name,
+                "statement": evaluator.description,
+                "source_kind": "vector_declared_fp_evaluators",
+                "source_refs": [f"vector://{vector_name}#evaluator/{index}"],
+            }
+        )
+    if not obligations:
+        return declarations
+    return Attrs.coerce(
+        {
+            **declarations.to_dict(),
+            "obligation_ledger": {
+                "obligation_source_kind": "vector_declared_fp_evaluators",
+                "obligation_source_ref": f"vector://{vector_name}#obligation_ledger",
+                "obligation_kind": "fp_evaluator_obligation",
+                "carry_rule": "declared_fulfillment_obligation_set_totality",
+                "fulfillment_rule": "per_obligation_fp_assessment",
+                "evidence_policy": "agent_supplied_evidence_refs",
+                "obligations": obligations,
+            },
+        }
+    )
+
+
 def _graph_function(
     *,
     name: str,
@@ -675,8 +691,20 @@ def _graph_function(
         ("closure", Attrs(entries=(("ref", "genesis.policy_defaults:closure_require_resolution_or_fh"),))),
         ("implements", tuple(req_refs)),
     ]
+    declarations = Attrs(entries=tuple(vector_declarations))
     if obligation_ledger is not None:
-        vector_declarations.append(("obligation_ledger", Attrs.coerce(obligation_ledger)))
+        declarations = Attrs.coerce(
+            {
+                **declarations.to_dict(),
+                "obligation_ledger": Attrs.coerce(obligation_ledger),
+            }
+        )
+    else:
+        declarations = _declared_fp_evaluator_obligation_ledger(
+            vector_name=name,
+            evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
+            declarations=declarations,
+        )
     vector = GraphVector(
         name=name,
         source=source,
@@ -684,7 +712,7 @@ def _graph_function(
         operators=(_builder,),
         evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
         contexts=published_contexts,
-        declarations=Attrs(entries=tuple(vector_declarations)),
+        declarations=declarations,
     )
     source_nodes = source if isinstance(source, tuple) else (source,)
     graph = Graph(
@@ -881,7 +909,7 @@ GF_QUALIFY_TESTCASE_AUTHORITY = _graph_function(
     target=_testcase_authority_surface,
     fd_evaluator=_testcase_authority_fd,
     fp_evaluator=_testcase_authority_fp,
-    extra_fd_evaluators=(_testcase_authority_obligation_fd, _testcase_authority_fulfillment_fd),
+    extra_fd_evaluators=(_testcase_authority_obligation_fd,),
     contexts=(_requirement_closure_context,),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="qualify_testcase_authority",
@@ -905,7 +933,7 @@ GF_DERIVE_IMPLEMENTATION_DESIGN = _graph_function(
     target=_implementation_design_surface,
     fd_evaluator=_implementation_design_fd,
     fp_evaluator=_implementation_design_fp,
-    extra_fd_evaluators=(_implementation_design_obligation_fd, _implementation_design_fulfillment_fd),
+    extra_fd_evaluators=(_implementation_design_obligation_fd,),
     contexts=(_requirement_closure_context,),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_implementation_design_surface",
@@ -929,7 +957,7 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
     target=_implementation_module_surface,
     fd_evaluator=_implementation_module_fd,
     fp_evaluator=_implementation_module_fp,
-    extra_fd_evaluators=(_implementation_module_obligation_fd, _implementation_module_fulfillment_fd),
+    extra_fd_evaluators=(_implementation_module_obligation_fd,),
     contexts=(_requirement_closure_context, _realization_deepening_context),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_implementation_module_surface",
@@ -945,7 +973,7 @@ GF_DERIVE_CODE = _graph_function(
     target=_code_surface,
     fd_evaluator=_code_fd,
     fp_evaluator=_code_fp,
-    extra_fd_evaluators=(_code_traceability_fd, _code_obligation_fd, _code_fulfillment_fd),
+    extra_fd_evaluators=(_code_traceability_fd, _code_obligation_fd),
     contexts=(_requirement_closure_context, _realization_deepening_context),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_code_surface",
@@ -961,7 +989,7 @@ GF_DERIVE_TEST_DESIGN = _graph_function(
     target=_test_design_surface,
     fd_evaluator=_test_design_fd,
     fp_evaluator=_test_design_fp,
-    extra_fd_evaluators=(_test_design_obligation_fd, _test_design_fulfillment_fd),
+    extra_fd_evaluators=(_test_design_obligation_fd,),
     contexts=(_requirement_closure_context,),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_design_surface",
@@ -985,7 +1013,7 @@ GF_DERIVE_TEST_MODULE = _graph_function(
     target=_test_module_surface,
     fd_evaluator=_test_module_fd,
     fp_evaluator=_test_module_fp,
-    extra_fd_evaluators=(_planned_test_traceability_fd, _test_module_obligation_fd, _test_module_fulfillment_fd),
+    extra_fd_evaluators=(_planned_test_traceability_fd, _test_module_obligation_fd),
     contexts=(_requirement_closure_context, _realization_deepening_context),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_module_surface",
@@ -1001,7 +1029,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     target=_test_run_archive_surface,
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
-    extra_fd_evaluators=(_test_run_archive_obligation_fd, _test_run_archive_fulfillment_fd),
+    extra_fd_evaluators=(_test_run_archive_obligation_fd,),
     contexts=(_requirement_closure_context, _realized_test_source_context),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_run_archive_surface",
@@ -1024,7 +1052,7 @@ GF_PREPARE_RELEASE = _graph_function(
     target=_release_surface,
     fd_evaluator=_release_fd,
     fp_evaluator=_release_fp,
-    extra_fd_evaluators=(_release_obligation_fd, _release_fulfillment_fd),
+    extra_fd_evaluators=(_release_obligation_fd,),
     contexts=(_requirement_closure_context,),
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="prepare_release_surface",

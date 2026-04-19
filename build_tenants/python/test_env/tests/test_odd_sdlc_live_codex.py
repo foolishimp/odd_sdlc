@@ -110,6 +110,17 @@ REPO_ROOT = ODD_ROOT
 LIVE_CODEX_PROBE_CONFIG = {
     "transport_contract": {
         "codex": {
+            "command": sys.executable,
+            "args": [
+                str(TESTS_DIR / "codex_live_wrapper.py"),
+                "exec",
+                "--ephemeral",
+                "--full-auto",
+                "--skip-git-repo-check",
+                "-o",
+                "{output_path}",
+                "{prompt}",
+            ],
             "probe_timeout": 30,
             "retry_count": 0,
             "retry_backoff": 0,
@@ -132,6 +143,10 @@ def _probe_config_for(agent: str) -> dict[str, object] | None:
     if agent == "claude":
         return LIVE_CLAUDE_PROBE_CONFIG
     return None
+
+
+def _transport_config_for(agent: str) -> dict[str, object] | None:
+    return _probe_config_for(agent)
 
 
 def _live_enabled() -> bool:
@@ -278,6 +293,7 @@ def _call_codex_with_single_repair(
         agent="codex",
         timeout=timeout,
         retries=1,
+        config=_transport_config_for("codex"),
     )
     run_archive.capture_text("raw_response.txt", response)
 
@@ -302,6 +318,7 @@ def _call_codex_with_single_repair(
         agent="codex",
         timeout=timeout,
         retries=1,
+        config=_transport_config_for("codex"),
     )
     run_archive.capture_text("raw_response_repair.txt", repair_response)
     return repair_response, _validate_intent_delivery(workspace, manifest=manifest)
@@ -402,6 +419,7 @@ def _call_codex_for_code_with_single_repair(
         agent="codex",
         timeout=timeout,
         retries=1,
+        config=_transport_config_for("codex"),
     )
     run_archive.capture_text("raw_response.code.txt", response)
 
@@ -427,6 +445,7 @@ def _call_codex_for_code_with_single_repair(
         agent="codex",
         timeout=timeout,
         retries=1,
+        config=_transport_config_for("codex"),
     )
     run_archive.capture_text("raw_response.code_repair.txt", repair_response)
     return repair_response, _validate_code_delivery(workspace, manifest=manifest)
@@ -506,6 +525,7 @@ def _call_consensus_reviewer(
         agent=CONSENSUS_LIVE_AGENT,
         timeout=timeout,
         retries=1,
+        config=_transport_config_for(CONSENSUS_LIVE_AGENT),
     )
     run_archive.capture_text(f"raw_response.{slug}.txt", response)
     payload = _load_review_json(response)
@@ -530,6 +550,7 @@ def _call_consensus_reviewer(
         agent=CONSENSUS_LIVE_AGENT,
         timeout=timeout,
         retries=1,
+        config=_transport_config_for(CONSENSUS_LIVE_AGENT),
     )
     run_archive.capture_text(f"raw_response.{slug}.repair.txt", repair_response)
     repair_payload = _load_review_json(repair_response)
