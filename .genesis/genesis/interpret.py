@@ -1590,6 +1590,26 @@ def _iterated_outcome(
             work_key=runtime.work_key,
         )
         if pending is not None:
+            # B-027: stale run — started but never dispatched (pre-dispatch crash).
+            # Auto-recover: close the stale run and fall through to a fresh dispatch.
+            if pending.manifest_id is None:
+                _emit_event(
+                    runtime.stream,
+                    "run_failed",
+                    {
+                        "edge": vector.name,
+                        "run_id": pending.run_id,
+                        "failure_class": "stale_pending_run_recovered",
+                        "reason": (
+                            "run was started but never dispatched (pre-dispatch crash); "
+                            "auto-recovering with fresh dispatch"
+                        ),
+                    },
+                    context=_event_context(runtime, run_id=pending.run_id, active_frame=active_frame),
+                )
+                pending = None  # fall through to fresh dispatch
+
+        if pending is not None:
             manifest_path = None
             if pending.manifest_id:
                 candidate = (
@@ -1657,6 +1677,25 @@ def _iterated_outcome(
                 ),
                 result=result,
             )
+
+    # B-026: guard missing contexts before emitting run_started.
+    # Raising FileNotFoundError after run_started leaves a stale pending run (B-027).
+    if dispatch_requires_fp and pre.missing_contexts:
+        missing = ", ".join(pre.missing_contexts)
+        return TraversalOutcome(
+            surface=surface,
+            result={
+                "status": "error",
+                "stopped_by": "fp_runtime_failure",
+                "failure_class": "missing_context",
+                "reason": (
+                    f"Cannot dispatch F_P: required context(s) not found: {missing}. "
+                    "Fix the context locators or provide the missing files before iterating."
+                ),
+                "edge": vector.name,
+                "missing_contexts": list(pre.missing_contexts),
+            },
+        )
 
     run_id, call_id, active_frame = _ensure_public_runtime_open(runtime)
     event_context = _event_context(runtime, run_id=run_id, active_frame=active_frame)
