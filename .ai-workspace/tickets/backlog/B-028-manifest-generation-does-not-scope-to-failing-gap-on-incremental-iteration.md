@@ -1,57 +1,86 @@
 ---
 id: B-028
-title: Manifest generation sends full output contract on incremental iteration instead of scoping to failing gap
+title: Stateful builder axiom not sufficiently governing incremental iteration behavior
 type: bug
 status: backlog
-goal: incremental iteration manifests are proportionate to the actual gap, not a full cold-derivation prompt
-change_intent: Scope manifest content to failing evaluators + relevant asset section when the target asset already exists
+goal: LLM makes targeted improvements to existing assets rather than full regeneration on incremental iteration
+change_intent: Strengthen the stateful builder control frame axioms so the LLM is governed to observe the current asset state and make the minimum necessary change, regardless of how much context is present in the manifest
 change_class: requirement_reprice
 re_entry_point: requirements
-affected_boundary: genesis/binding.py _assemble_prompt / OUTPUT CONTRACT section
+affected_boundary: odd_sdlc_stateful_builder_control_frame.md — axiom strength; genesis/binding.py — control frame injection
 priority: high
 triaged_at: 2026-04-19
-created_at: 2026-04-19
 updated_at: 2026-04-19
-triage_note: upward propagation check — no live requirement distinguishes cold-derivation manifests from incremental gap-closing manifests; re-entry is requirements
+created_at: 2026-04-19
+triage_note: upward propagation check — no live requirement governs the axiomatic constraint that the LLM must treat each dispatch as observation-then-targeted-improvement over a persistent asset; re-entry is requirements
 intake_source: dmt.test35_r001 derive_test_run_archive_surface manifest — 2026-04-19
 ---
 
 ## Observation
 
-`derive_test_run_archive_surface` manifest is 49,491 chars (~14k tokens) on an
-**incremental iteration** where the target asset already exists and only 3
-evaluators are failing. Prompt section breakdown:
+On incremental iteration where the target asset already exists and only specific
+evaluators are failing, the LLM regenerates the full asset from scratch rather than
+making targeted improvements to the existing artifact.
 
-| Section | Size | Needed for incremental? |
-|---|---|---|
-| `[GAP]` | 6,835 chars | Yes |
-| `[DETERMINISTIC FAILURES]` | 6,010 chars | Yes |
-| `[CONTEXT]` control frame | 3,998 chars | Yes (brief) |
-| `[SOURCE ASSET SNAPSHOT]` | 8,280 chars | Partial — only failing-evaluator-relevant sections |
-| `[ENVIRONMENT]` full spec | 5,305 chars | No — asset exists; upstream hasn't changed |
-| `[OUTPUT CONTRACT]` 83 req list | 16,216 chars | No — asset exists; only failing checks matter |
+## Reframed Root Cause
 
-The `[OUTPUT CONTRACT]` section lists all 83 requirement fulfillment obligations
-regardless of how many are already satisfied. For a gap-closing iteration this
-is noise that drives the LLM to re-derive the full asset instead of fixing the
-specific gap.
+The original diagnosis — "manifest sends too much context" — was wrong.
 
-## Required Distinction
+Full context (full OUTPUT CONTRACT, full ENVIRONMENT, full source asset snapshot) is not
+the problem. The model is correct: the LLM is working on a **persistent asset** and should
+observe the current state, understand what is failing, and make the minimum necessary
+improvement. Full context supports this — the LLM needs to understand all obligations to
+know what is already satisfied and what is not.
 
-| Mode | Condition | Manifest scope |
-|---|---|---|
-| Cold derivation | target asset does not exist | Full output contract, full environment |
-| Incremental iteration | target asset exists, N evaluators failing | Failing evaluators + current asset + relevant asset sections only |
+The actual problem is that the **stateful builder axiom is not strong enough**. The control
+frame does not sufficiently govern the LLM to behave as a stateful observer-and-improver.
+Without a forceful axiomatic constraint, the LLM defaults to its training behavior: treat
+the manifest as a specification and generate a complete artifact from scratch.
 
-## Cost Impact
+## Correct Mental Model
 
-- Incremental manifest as built: ~14k tokens → ~$0.21/dispatch
-- Scoped incremental manifest (estimated): ~3–5k tokens → ~$0.05–0.08/dispatch
-- For an edge that iterates 3–5 times to converge, this is 3–4× cost reduction
+The manifest is not a from-scratch specification. It is a **governance frame** over a
+persistent workspace asset. The LLM's job is:
 
-## Fix Direction (for requirements phase)
+1. Observe the current asset state
+2. Identify what the failing evaluators require
+3. Make the minimum change that closes the gap
+4. Preserve everything else
 
-Requirement to add to odd_sdlc: "When the target asset already exists and
-only specific evaluators are failing, the manifest MUST scope `[OUTPUT CONTRACT]`
-to the failing evaluators only, and MUST omit `[ENVIRONMENT]` surfaces that
-have not changed since the asset was last produced."
+This model handles all cases correctly — from a cold-start (asset doesn't exist, all
+evaluators failing, full generation is the minimum change) to a one-line fix (asset
+exists, one evaluator failing, change one field). No manifest scoping or mode switching
+is needed. The axiom is the control surface.
+
+## Required Requirement
+
+The `[CONTEXT]` section of every manifest injects the stateful builder control frame.
+This frame must assert as an axiomatic constraint:
+
+> "You are acting as a governed stateful builder over a persistent workspace asset.
+> The asset already exists. Your sole obligation is to observe its current state,
+> identify what the failing evaluators require, and make the minimum targeted change
+> that closes the gap. Do not regenerate the asset from scratch. Do not rewrite sections
+> that are not implicated by the failing evaluators. The OUTPUT CONTRACT lists all
+> obligations — use it to understand what is already satisfied, not as a prompt to
+> re-derive everything. Treat preservation of existing correct content as a hard
+> constraint, not a preference."
+
+The requirement to add to odd_sdlc: "The stateful builder control frame MUST assert
+as an axiomatic constraint that the LLM preserves existing correct asset content and
+makes only the minimum change required to close the failing evaluator gap. This axiom
+MUST be present regardless of manifest size or iteration mode."
+
+## Why Not Context Scoping
+
+Context scoping (reducing OUTPUT CONTRACT to failing evaluators only) was the original
+fix direction. It is a workaround, not a fix:
+
+- It deprives the LLM of the context it needs to know what is already satisfied
+- It creates a mode-switching requirement (cold vs incremental) with no clear boundary
+- It addresses the symptom (large manifest triggers full regeneration) not the cause
+  (missing axiom that constrains the LLM to targeted improvement)
+- A well-governed stateful builder should handle full context correctly by design
+
+Cost reduction follows naturally from correct behavior: targeted improvements are
+smaller outputs, not smaller inputs.
