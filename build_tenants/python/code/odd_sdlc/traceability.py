@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Callable
@@ -20,6 +21,8 @@ from .project_profile import (
     profile_test_env_relative_path,
     profile_test_env_tests_relative_path,
 )
+from .traceability_index import build_requirement_traceability_index
+from .traceability_report import build_requirement_closure_prompt_context_from_register
 
 
 REQUIREMENT_CLOSURE_REGISTER_KIND = "odd_sdlc.requirement_closure_register"
@@ -35,6 +38,7 @@ _GENERATED_TEST_RUN_ARCHIVE_PATH_NAME = "50-generated-run-archive.md"
 _TESTCASE_AUTHORITY_MATRIX_PATH = Path("specification/scenarios/TESTCASE_AUTHORITY.md")
 _TESTCASE_AUTHORITY_FAMILY_RE = re.compile(r"`((?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*-\*)`")
 _MARKDOWN_FILE_TOKEN_RE = re.compile(r"`([^`]+\.md)`")
+_MARKDOWN_HEADER_FIELD_RE = re.compile(r"^\*\*(?P<field>[^*]+)\*\*:\s*(?P<value>.*)$")
 _SOURCE_DOMAIN_CODE_ROOT = Path("build_tenants/python")
 _COMMENT_PREFIXES = ("#", "//", "*")
 _STRUCTURAL_LINE_PATTERNS = (
@@ -57,12 +61,29 @@ _BEHAVIORAL_KEYWORDS = (
     "catch",
     "except",
 )
+TRACEABILITY_SCAN_IGNORED_DIR_NAMES = {
+    ".ai-workspace",
+    ".genesis",
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "dist",
+    "node_modules",
+    "target",
+    "test_install",
+    "test_runs",
+    "venv",
+    ".venv",
+}
 _REQUIREMENT_EXECUTION_ADAPTER_REF = (
     "odd_sdlc.traceability:current_requirement_executability_gap"
 )
 _DECLARED_REQUIREMENT_EDGE_ADAPTER_REF = (
     "odd_sdlc.traceability:declared_requirement_edge_gap"
 )
+_ACTIVE_STATUS = "active"
+_REQUIREMENT_CARRIES_FIELD = "Carries Forward From"
+_REQUIREMENT_AUTHORING_DESIGN_FIELD = "Authoring Design"
 
 
 def _read_text(path: Path) -> str:
@@ -101,6 +122,26 @@ def _collect_requirement_ids(path: Path) -> set[str]:
         for requirement_id in _collect_ids(path, _REQUIREMENT_ID_RE)
         if _is_concrete_requirement_id(requirement_id)
     }
+
+
+def _markdown_header_fields(path: Path) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for raw_line in _read_text(path).splitlines():
+        match = _MARKDOWN_HEADER_FIELD_RE.match(raw_line.strip())
+        if match is None:
+            continue
+        fields[match.group("field").strip()] = match.group("value").strip()
+    return fields
+
+
+def _markdown_path_field_refs(raw_value: str) -> tuple[list[str], bool]:
+    value = raw_value.strip()
+    if not value:
+        return [], False
+    if value.lower() == "none":
+        return [], True
+    refs = [Path(token).as_posix() for token in _MARKDOWN_FILE_TOKEN_RE.findall(value)]
+    return refs, bool(refs)
 
 
 def _collect_requirement_statement_map(paths: tuple[Path, ...]) -> dict[str, list[str]]:
@@ -254,6 +295,10 @@ def _requirement_evidence_refs(entry: dict[str, Any]) -> list[str]:
     if edge_refs:
         return edge_refs
     return _unique_sequence(
+        list(entry.get("feature_decomp_claim_refs", ())),
+        list(entry.get("uat_testcases_claim_refs", ())),
+        list(entry.get("design_surface_claim_refs", ())),
+        list(entry.get("scenario_claim_refs", ())),
         list(entry.get("implementation_design_claim_refs", ())),
         list(entry.get("implementation_module_claim_refs", ())),
         list(entry.get("implementation_claim_refs", ())),
@@ -275,6 +320,10 @@ def _build_requirement_register_entry(
     current_refs: dict[str, list[str]],
     authority_statements: dict[str, list[str]],
     current_statements: dict[str, list[str]],
+    feature_decomp_refs: dict[str, list[str]],
+    uat_testcases_refs: dict[str, list[str]],
+    design_surface_refs: dict[str, list[str]],
+    scenario_refs: dict[str, list[str]],
     implementation_design_refs: dict[str, list[str]],
     implementation_module_refs: dict[str, list[str]],
     implementation_refs: dict[str, list[str]],
@@ -289,6 +338,10 @@ def _build_requirement_register_entry(
 ) -> dict[str, Any]:
     in_authority = requirement_id in authority_refs
     in_current = requirement_id in current_refs
+    feature_decomp_files = feature_decomp_refs.get(requirement_id, [])
+    uat_testcases_files = uat_testcases_refs.get(requirement_id, [])
+    design_surface_files = design_surface_refs.get(requirement_id, [])
+    scenario_files = scenario_refs.get(requirement_id, [])
     implementation_design_files = implementation_design_refs.get(requirement_id, [])
     implementation_module_files = implementation_module_refs.get(requirement_id, [])
     implementation_files = implementation_refs.get(requirement_id, [])
@@ -356,6 +409,10 @@ def _build_requirement_register_entry(
         "current_requirement_refs": current_refs.get(requirement_id, []),
         "authority_statements": authority_statements.get(requirement_id, []),
         "current_requirement_statements": current_statements.get(requirement_id, []),
+        "feature_decomp_claim_refs": feature_decomp_files,
+        "uat_testcases_claim_refs": uat_testcases_files,
+        "design_surface_claim_refs": design_surface_files,
+        "scenario_claim_refs": scenario_files,
         "implementation_design_claim_refs": implementation_design_files,
         "implementation_module_claim_refs": implementation_module_files,
         "implementation_claim_refs": implementation_files,
@@ -573,20 +630,137 @@ def _current_requirement_paths(workspace_root: Path) -> tuple[Path, ...]:
     return _authority_requirement_paths(workspace_root)
 
 
+def _published_requirement_family_paths(workspace_root: Path) -> tuple[Path, ...]:
+    req_root = workspace_root / "specification" / "requirements"
+    if not req_root.exists():
+        return ()
+    paths: list[Path] = []
+    for path in sorted(req_root.glob("*.md")):
+        if path.name in {"README.md", "00-imported-sources.md", _GENERATED_REQUIREMENT_SURFACE_PATH.name}:
+            continue
+        paths.append(path)
+    return tuple(paths)
+
+
+def _active_requirement_family_paths(workspace_root: Path) -> tuple[Path, ...]:
+    active_paths: list[Path] = []
+    for path in _published_requirement_family_paths(workspace_root):
+        status = _markdown_header_fields(path).get("Status", "").strip().lower()
+        if status == _ACTIVE_STATUS:
+            active_paths.append(path)
+    return tuple(active_paths)
+
+
+def _design_ref_backlinks_requirement_family(
+    *,
+    workspace_root: Path,
+    design_ref: str,
+    requirement_family_ref: str,
+    requirement_ids: set[str],
+) -> bool:
+    design_path = workspace_root / design_ref
+    if not design_path.exists():
+        return False
+    design_text = _read_text(design_path)
+    if requirement_family_ref in design_text:
+        return True
+    return bool(_collect_requirement_ids(design_path) & requirement_ids)
+
+
+def requirement_family_traceability_scan(workspace_root: Path) -> dict[str, Any]:
+    families: list[dict[str, Any]] = []
+    missing_carry_publication_count = 0
+    missing_authoring_design_publication_count = 0
+    invalid_carry_ref_count = 0
+    invalid_authoring_design_ref_count = 0
+    missing_authoring_design_backlink_count = 0
+
+    for path in _active_requirement_family_paths(workspace_root):
+        fields = _markdown_header_fields(path)
+        family_ref = _relative(path, workspace_root=workspace_root)
+        requirement_ids = _collect_requirement_ids(path)
+        missing_fields: list[str] = []
+        invalid_format_fields: list[str] = []
+        carries_forward_refs: list[str] = []
+        authoring_design_refs: list[str] = []
+        invalid_carry_refs: list[str] = []
+        invalid_authoring_design_refs: list[str] = []
+        missing_authoring_design_backlinks: list[str] = []
+
+        carries_raw = fields.get(_REQUIREMENT_CARRIES_FIELD)
+        if carries_raw is None:
+            missing_fields.append(_REQUIREMENT_CARRIES_FIELD)
+        else:
+            carries_forward_refs, carries_valid = _markdown_path_field_refs(carries_raw)
+            if not carries_valid:
+                invalid_format_fields.append(_REQUIREMENT_CARRIES_FIELD)
+
+        design_raw = fields.get(_REQUIREMENT_AUTHORING_DESIGN_FIELD)
+        if design_raw is None:
+            missing_fields.append(_REQUIREMENT_AUTHORING_DESIGN_FIELD)
+        else:
+            authoring_design_refs, design_valid = _markdown_path_field_refs(design_raw)
+            if not design_valid:
+                invalid_format_fields.append(_REQUIREMENT_AUTHORING_DESIGN_FIELD)
+
+        for ref in carries_forward_refs:
+            if not (workspace_root / ref).exists():
+                invalid_carry_refs.append(ref)
+
+        for ref in authoring_design_refs:
+            if not (workspace_root / ref).exists():
+                invalid_authoring_design_refs.append(ref)
+                continue
+            if not _design_ref_backlinks_requirement_family(
+                workspace_root=workspace_root,
+                design_ref=ref,
+                requirement_family_ref=family_ref,
+                requirement_ids=requirement_ids,
+            ):
+                missing_authoring_design_backlinks.append(ref)
+
+        if _REQUIREMENT_CARRIES_FIELD in missing_fields:
+            missing_carry_publication_count += 1
+        if _REQUIREMENT_AUTHORING_DESIGN_FIELD in missing_fields:
+            missing_authoring_design_publication_count += 1
+        invalid_carry_ref_count += len(invalid_carry_refs)
+        invalid_authoring_design_ref_count += len(invalid_authoring_design_refs)
+        missing_authoring_design_backlink_count += len(missing_authoring_design_backlinks)
+
+        families.append(
+            {
+                "requirement_family_ref": family_ref,
+                "family_pattern": fields.get("Family", ""),
+                "status": fields.get("Status", ""),
+                "carries_forward_refs": carries_forward_refs,
+                "authoring_design_refs": authoring_design_refs,
+                "missing_fields": missing_fields,
+                "invalid_format_fields": invalid_format_fields,
+                "invalid_carry_refs": invalid_carry_refs,
+                "invalid_authoring_design_refs": invalid_authoring_design_refs,
+                "missing_authoring_design_backlinks": missing_authoring_design_backlinks,
+            }
+        )
+
+    return {
+        "families": families,
+        "summary": {
+            "active_requirement_family_count": len(families),
+            "missing_carry_publication_count": missing_carry_publication_count,
+            "missing_authoring_design_publication_count": missing_authoring_design_publication_count,
+            "invalid_carry_ref_count": invalid_carry_ref_count,
+            "invalid_authoring_design_ref_count": invalid_authoring_design_ref_count,
+            "missing_authoring_design_backlink_count": missing_authoring_design_backlink_count,
+        },
+    }
+
+
 def authority_requirement_refs(workspace_root: Path) -> dict[str, list[str]]:
-    refs: dict[str, list[str]] = {}
-    for path in _authority_requirement_paths(workspace_root):
-        for requirement_id in sorted(_collect_requirement_ids(path)):
-            refs.setdefault(requirement_id, []).append(_relative(path, workspace_root=workspace_root))
-    return refs
+    return build_requirement_traceability_index(workspace_root).authority_refs
 
 
 def current_requirement_refs(workspace_root: Path) -> dict[str, list[str]]:
-    refs: dict[str, list[str]] = {}
-    for path in _current_requirement_paths(workspace_root):
-        for requirement_id in sorted(_collect_requirement_ids(path)):
-            refs.setdefault(requirement_id, []).append(_relative(path, workspace_root=workspace_root))
-    return refs
+    return build_requirement_traceability_index(workspace_root).current_refs
 
 
 def missing_requirement_ids_from_current_surface(workspace_root: Path) -> tuple[str, ...]:
@@ -667,6 +841,28 @@ def _implementation_design_trace_paths(workspace_root: Path) -> tuple[Path, ...]
     )
 
 
+def _feature_decomp_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    profile = load_project_profile(workspace_root)
+    return (
+        Path(profile_design_relative_path(profile, "20-generated-feature-decomp.md")),
+    )
+
+
+def _uat_testcase_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    return (Path("specification/scenarios/20-generated-uat-testcases.md"),)
+
+
+def _design_surface_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    profile = load_project_profile(workspace_root)
+    return (
+        Path(profile_design_relative_path(profile, "30-generated-odd-design.md")),
+    )
+
+
+def _scenario_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
+    return (Path("specification/scenarios/40-generated-scenarios.md"),)
+
+
 def _implementation_module_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
     profile = load_project_profile(workspace_root)
     return (
@@ -703,47 +899,57 @@ def _test_run_archive_trace_paths(workspace_root: Path) -> tuple[Path, ...]:
 
 
 def implementation_design_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _implementation_design_trace_paths(workspace_root))
+    return build_requirement_traceability_index(workspace_root).refs_for("implementation_design")
+
+
+def feature_decomp_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("feature_decomp")
+
+
+def uat_testcases_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("uat_testcases")
+
+
+def design_surface_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("design_surface")
+
+
+def scenario_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("scenario")
 
 
 def implementation_module_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _implementation_module_trace_paths(workspace_root))
+    return build_requirement_traceability_index(workspace_root).refs_for("implementation_module")
 
 
 def implementation_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _implementation_trace_paths(workspace_root))
-
-
-def planned_test_design_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _planned_test_design_trace_paths(workspace_root))
-
-
-def planned_test_module_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _planned_test_module_trace_paths(workspace_root))
-
-
-def planned_test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _planned_test_trace_paths(workspace_root))
-
-
-def testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
-    refs: dict[str, list[str]] = {}
-    _merge_requirement_refs(
-        refs,
-        _surface_requirement_refs(
-            workspace_root,
-            (
-                _GENERATED_TESTCASE_AUTHORITY_PATH,
-                *_written_testcase_authority_paths(workspace_root),
-            ),
-        ),
-    )
-    _merge_requirement_refs(refs, _matrix_testcase_authority_refs(workspace_root))
+    index = build_requirement_traceability_index(workspace_root)
+    refs = dict(index.implementation_refs)
+    _merge_requirement_refs(refs, _surface_requirement_refs(workspace_root, _implementation_trace_paths(workspace_root)))
     return refs
 
 
+def planned_test_design_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("planned_test_design")
+
+
+def planned_test_module_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).refs_for("planned_test_module")
+
+
+def planned_test_claim_refs(workspace_root: Path) -> dict[str, list[str]]:
+    index = build_requirement_traceability_index(workspace_root)
+    refs = dict(index.planned_validation_refs)
+    _merge_requirement_refs(refs, _surface_requirement_refs(workspace_root, _planned_test_trace_paths(workspace_root)))
+    return refs
+
+
+def testcase_authority_refs(workspace_root: Path) -> dict[str, list[str]]:
+    return build_requirement_traceability_index(workspace_root).testcase_authority_refs
+
+
 def test_run_archive_refs(workspace_root: Path) -> dict[str, list[str]]:
-    return _surface_requirement_refs(workspace_root, _test_run_archive_trace_paths(workspace_root))
+    return build_requirement_traceability_index(workspace_root).test_run_archive_refs
 
 
 def _is_source_file(path: Path, *, code_root: Path) -> bool:
@@ -753,6 +959,19 @@ def _is_source_file(path: Path, *, code_root: Path) -> bool:
         and not any(part in IGNORE_ROOTS for part in relative_parts)
         and "target" not in {part.lower() for part in relative_parts}
     )
+
+
+def _iter_traceability_source_files(code_root: Path):
+    for current_root, dirnames, filenames in os.walk(code_root):
+        dirnames[:] = sorted(
+            dirname
+            for dirname in dirnames
+            if dirname not in TRACEABILITY_SCAN_IGNORED_DIR_NAMES
+        )
+        for filename in sorted(filenames):
+            path = Path(current_root) / filename
+            if path.is_file() and _is_source_file(path, code_root=code_root):
+                yield path
 
 
 def _is_test_file(path: Path, *, code_root: Path) -> bool:
@@ -826,7 +1045,7 @@ def traceability_scan(workspace_root: Path) -> dict[str, Any]:
             "test_file_count": 0,
         }
 
-    for path in sorted(item for item in code_root.rglob("*") if item.is_file() and _is_source_file(item, code_root=code_root)):
+    for path in _iter_traceability_source_files(code_root):
         rel = _relative(path, workspace_root=workspace_root)
         if _is_test_file(path, code_root=code_root):
             test_file_count += 1
@@ -938,27 +1157,42 @@ def _expected_implementation_code_requirement_ids(workspace_root: Path) -> set[s
 
 
 def build_requirement_closure_register(workspace_root: Path, *, stage: str = "workspace_scan") -> dict[str, Any]:
-    authority_refs = authority_requirement_refs(workspace_root)
-    current_refs = current_requirement_refs(workspace_root)
-    authority_statements = _collect_requirement_statement_map(_authority_requirement_paths(workspace_root))
-    current_statements = _collect_requirement_statement_map(_current_requirement_paths(workspace_root))
-    implementation_design_refs = implementation_design_claim_refs(workspace_root)
-    implementation_module_refs = implementation_module_claim_refs(workspace_root)
-    implementation_refs = _merge_requirement_refs({}, implementation_design_refs)
-    _merge_requirement_refs(implementation_refs, implementation_module_refs)
-    planned_test_design_refs = planned_test_design_claim_refs(workspace_root)
-    planned_test_module_refs = planned_test_module_claim_refs(workspace_root)
-    planned_validation_refs = _merge_requirement_refs({}, planned_test_design_refs)
-    _merge_requirement_refs(planned_validation_refs, planned_test_module_refs)
-    uat_validation_refs = testcase_authority_refs(workspace_root)
-    run_archive_refs = test_run_archive_refs(workspace_root)
+    index = build_requirement_traceability_index(workspace_root)
+    authority_refs = index.authority_refs
+    current_refs = index.current_refs
+    requirement_family_publication = requirement_family_traceability_scan(workspace_root)
+    authority_statements = index.authority_statements
+    current_statements = index.current_statements
+    feature_decomp_refs = index.refs_for("feature_decomp")
+    uat_testcases_refs = index.refs_for("uat_testcases")
+    design_surface_refs = index.refs_for("design_surface")
+    scenario_refs = index.refs_for("scenario")
+    implementation_design_refs = index.refs_for("implementation_design")
+    implementation_module_refs = index.refs_for("implementation_module")
+    implementation_refs = index.implementation_refs
+    planned_test_design_refs = index.refs_for("planned_test_design")
+    planned_test_module_refs = index.refs_for("planned_test_module")
+    planned_validation_refs = index.planned_validation_refs
+    uat_validation_refs = index.testcase_authority_refs
+    run_archive_refs = index.test_run_archive_refs
     scan = traceability_scan(workspace_root)
     code_refs = scan["code_refs"]
     test_refs = scan["test_refs"]
+    missing_requirement_ids = missing_requirement_ids_from_current_surface(workspace_root)
+    missing_goal_intent_ids = missing_intent_ids_from_goals(workspace_root)
+    missing_code_ids = missing_code_traceability_ids(workspace_root)
+    missing_planned_test_ids = missing_planned_test_traceability_ids(workspace_root)
+    unexpected_planned_test_ids = unexpected_planned_test_traceability_ids(workspace_root)
+    missing_realized_test_ids = missing_realized_test_traceability_ids(workspace_root)
+    unexpected_realized_test_ids = unexpected_realized_test_traceability_ids(workspace_root)
 
     all_ids = sorted(
         set(authority_refs)
         | set(current_refs)
+        | set(feature_decomp_refs)
+        | set(uat_testcases_refs)
+        | set(design_surface_refs)
+        | set(scenario_refs)
         | set(implementation_refs)
         | set(planned_validation_refs)
         | set(uat_validation_refs)
@@ -979,6 +1213,10 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
             current_refs=current_refs,
             authority_statements=authority_statements,
             current_statements=current_statements,
+            feature_decomp_refs=feature_decomp_refs,
+            uat_testcases_refs=uat_testcases_refs,
+            design_surface_refs=design_surface_refs,
+            scenario_refs=scenario_refs,
             implementation_design_refs=implementation_design_refs,
             implementation_module_refs=implementation_module_refs,
             implementation_refs=implementation_refs,
@@ -999,19 +1237,25 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
 
     return {
         "register_kind": REQUIREMENT_CLOSURE_REGISTER_KIND,
-        "schema_version": "v1",
+        "schema_version": "v2",
         "workspace_root": str(workspace_root),
         "stage": stage,
         "project_profile": load_project_profile(workspace_root).to_dict(),
         "summary": {
             "total_live_requirements": len(requirements),
-            "missing_from_current_requirement_surface": len(missing_requirement_ids_from_current_surface(workspace_root)),
-            "missing_intent_ids_from_goals": len(missing_intent_ids_from_goals(workspace_root)),
-            "requirements_missing_code_traceability": len(missing_code_traceability_ids(workspace_root)),
-            "requirements_missing_planned_test_traceability": len(missing_planned_test_traceability_ids(workspace_root)),
-            "requirements_with_unexpected_planned_test_traceability": len(unexpected_planned_test_traceability_ids(workspace_root)),
-            "requirements_missing_test_traceability": len(missing_realized_test_traceability_ids(workspace_root)),
-            "requirements_with_unexpected_realized_test_traceability": len(unexpected_realized_test_traceability_ids(workspace_root)),
+            "missing_from_current_requirement_surface": len(missing_requirement_ids),
+            "missing_intent_ids_from_goals": len(missing_goal_intent_ids),
+            "requirements_missing_code_traceability": len(missing_code_ids),
+            "requirements_missing_planned_test_traceability": len(missing_planned_test_ids),
+            "requirements_with_unexpected_planned_test_traceability": len(unexpected_planned_test_ids),
+            "requirements_missing_test_traceability": len(missing_realized_test_ids),
+            "requirements_with_unexpected_realized_test_traceability": len(unexpected_realized_test_ids),
+            "active_requirement_families": requirement_family_publication["summary"]["active_requirement_family_count"],
+            "requirement_families_missing_carry_publication": requirement_family_publication["summary"]["missing_carry_publication_count"],
+            "requirement_families_missing_authoring_design_publication": requirement_family_publication["summary"]["missing_authoring_design_publication_count"],
+            "requirement_family_invalid_carry_refs": requirement_family_publication["summary"]["invalid_carry_ref_count"],
+            "requirement_family_invalid_authoring_design_refs": requirement_family_publication["summary"]["invalid_authoring_design_ref_count"],
+            "requirement_family_missing_design_backlinks": requirement_family_publication["summary"]["missing_authoring_design_backlink_count"],
             "orphan_code_files": len(scan["orphan_code_files"]),
             "orphan_test_files": len(scan["orphan_test_files"]),
             "status_counts": status_counts,
@@ -1019,7 +1263,17 @@ def build_requirement_closure_register(workspace_root: Path, *, stage: str = "wo
             "fulfillment_detail_counts": fulfillment_detail_counts,
             "fulfillment_counts": fulfillment_counts,
         },
+        "traceability_gaps": {
+            "missing_requirement_ids_from_current_surface": list(missing_requirement_ids),
+            "missing_intent_ids_from_goals": list(missing_goal_intent_ids),
+            "missing_code_traceability_ids": list(missing_code_ids),
+            "missing_planned_test_traceability_ids": list(missing_planned_test_ids),
+            "unexpected_planned_test_traceability_ids": list(unexpected_planned_test_ids),
+            "missing_realized_test_traceability_ids": list(missing_realized_test_ids),
+            "unexpected_realized_test_traceability_ids": list(unexpected_realized_test_ids),
+        },
         "traceability": scan,
+        "requirement_family_traceability": requirement_family_publication,
         "requirements": requirements,
     }
 
@@ -1079,6 +1333,14 @@ def _declared_requirement_extra_ids(
     *,
     fulfillment_rule: str,
 ) -> set[str]:
+    if fulfillment_rule == "feature_decomp_surface_coverage":
+        return set(feature_decomp_claim_refs(workspace_root))
+    if fulfillment_rule == "uat_testcases_surface_coverage":
+        return set(uat_testcases_claim_refs(workspace_root))
+    if fulfillment_rule == "design_surface_coverage":
+        return set(design_surface_claim_refs(workspace_root))
+    if fulfillment_rule == "scenario_surface_coverage":
+        return set(scenario_claim_refs(workspace_root))
     if fulfillment_rule == "implementation_design_surface_coverage":
         return set(implementation_design_claim_refs(workspace_root))
     if fulfillment_rule == "implementation_module_surface_coverage":
@@ -1141,6 +1403,14 @@ def _declared_requirement_carried_ids(
     *,
     fulfillment_rule: str,
 ) -> set[str]:
+    if fulfillment_rule == "feature_decomp_surface_coverage":
+        return set(feature_decomp_claim_refs(workspace_root))
+    if fulfillment_rule == "uat_testcases_surface_coverage":
+        return set(uat_testcases_claim_refs(workspace_root))
+    if fulfillment_rule == "design_surface_coverage":
+        return set(design_surface_claim_refs(workspace_root))
+    if fulfillment_rule == "scenario_surface_coverage":
+        return set(scenario_claim_refs(workspace_root))
     if fulfillment_rule == "implementation_design_surface_coverage":
         return set(implementation_design_claim_refs(workspace_root))
     if fulfillment_rule == "implementation_module_surface_coverage":
@@ -1172,6 +1442,21 @@ def _edge_requirement_evidence_refs(
     *,
     fulfillment_rule: str,
 ) -> list[str]:
+    if fulfillment_rule == "feature_decomp_surface_coverage":
+        return list(entry.get("feature_decomp_claim_refs", ()))
+    if fulfillment_rule == "uat_testcases_surface_coverage":
+        return list(entry.get("uat_testcases_claim_refs", ()))
+    if fulfillment_rule == "design_surface_coverage":
+        return _unique_sequence(
+            list(entry.get("design_surface_claim_refs", ())),
+            list(entry.get("feature_decomp_claim_refs", ())),
+        )
+    if fulfillment_rule == "scenario_surface_coverage":
+        return _unique_sequence(
+            list(entry.get("scenario_claim_refs", ())),
+            list(entry.get("design_surface_claim_refs", ())),
+            list(entry.get("uat_testcases_claim_refs", ())),
+        )
     if fulfillment_rule == "implementation_design_surface_coverage":
         return list(entry.get("implementation_design_claim_refs", ()))
     if fulfillment_rule == "implementation_module_surface_coverage":
@@ -1220,6 +1505,10 @@ def _declared_requirement_fulfillment(
     implementation_design_claim_refs = list(entry.get("implementation_design_claim_refs", ()))
     implementation_module_claim_refs = list(entry.get("implementation_module_claim_refs", ()))
     implementation_claim_refs = list(entry.get("implementation_claim_refs", ()))
+    feature_decomp_claim_refs = list(entry.get("feature_decomp_claim_refs", ()))
+    uat_testcases_claim_refs = list(entry.get("uat_testcases_claim_refs", ()))
+    design_surface_claim_refs = list(entry.get("design_surface_claim_refs", ()))
+    scenario_claim_refs = list(entry.get("scenario_claim_refs", ()))
     planned_test_design_claim_refs = list(entry.get("planned_test_design_claim_refs", ()))
     planned_test_module_claim_refs = list(entry.get("planned_test_module_claim_refs", ()))
     planned_test_claim_refs = list(entry.get("planned_test_claim_refs", ()))
@@ -1228,6 +1517,30 @@ def _declared_requirement_fulfillment(
     code_refs = list(entry.get("code_refs", ()))
     behavioral_code_refs = list(entry.get("behavioral_code_refs", ()))
     test_refs = list(entry.get("test_refs", ()))
+
+    if fulfillment_rule == "feature_decomp_surface_coverage":
+        if feature_decomp_claim_refs:
+            return "fulfilled", []
+        return "specified", ["missing_feature_decomp_coverage"]
+
+    if fulfillment_rule == "uat_testcases_surface_coverage":
+        if uat_testcases_claim_refs:
+            return "fulfilled", []
+        return "specified", ["missing_uat_testcase_coverage"]
+
+    if fulfillment_rule == "design_surface_coverage":
+        if design_surface_claim_refs:
+            return "fulfilled", []
+        if feature_decomp_claim_refs:
+            return "planned", ["missing_design_surface_coverage"]
+        return "specified", ["missing_design_surface_coverage"]
+
+    if fulfillment_rule == "scenario_surface_coverage":
+        if scenario_claim_refs:
+            return "fulfilled", []
+        if design_surface_claim_refs or uat_testcases_claim_refs:
+            return "planned", ["missing_scenario_surface_coverage"]
+        return "specified", ["missing_scenario_surface_coverage"]
 
     if fulfillment_rule == "implementation_design_surface_coverage":
         if implementation_design_claim_refs:
@@ -1486,78 +1799,19 @@ def collect_declared_obligation_gaps(
     return gaps
 
 
-def _format_id_lines(
-    label: str,
-    ids: tuple[str, ...],
-    *,
-    max_items: int = 12,
-) -> list[str]:
-    if not ids:
-        return [f"- {label}: none"]
-    shown = ids[:max_items]
-    suffix = ""
-    if len(ids) > max_items:
-        suffix = f" (+{len(ids) - max_items} more)"
-    return [f"- {label}: {', '.join(shown)}{suffix}"]
-
-
 def build_requirement_closure_prompt_context(
     workspace_root: Path,
     *,
     register: dict[str, Any] | None = None,
 ) -> str:
     payload = register or build_requirement_closure_register(workspace_root, stage="workspace_scan")
-    summary = payload["summary"]
-    missing_requirement_ids = missing_requirement_ids_from_current_surface(workspace_root)
-    missing_goal_intent_ids = missing_intent_ids_from_goals(workspace_root)
-    missing_code_ids = missing_code_traceability_ids(workspace_root)
-    missing_planned_test_ids = missing_planned_test_traceability_ids(workspace_root)
-    unexpected_planned_test_ids = unexpected_planned_test_traceability_ids(workspace_root)
-    missing_realized_test_ids = missing_realized_test_traceability_ids(workspace_root)
-    unexpected_realized_test_ids = unexpected_realized_test_traceability_ids(workspace_root)
-    full_register_path = REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix()
-    generated_surface_path = _GENERATED_REQUIREMENT_SURFACE_PATH.as_posix()
-
-    lines = [
-        "# odd_sdlc Requirement Closure Builder Context",
-        "",
-        "Use this as a compact builder-facing summary of the live requirement closure state.",
-        "Treat the generated requirement surface as the target asset under construction.",
-        "Use the full closure register only when you need per-id detail.",
-        "",
-        "## Working Boundary",
-        f"- target generated requirement surface: `{generated_surface_path}`",
-        f"- full closure register for on-demand inspection: `{full_register_path}`",
-        "- preserve authority ids and imported source boundaries; do not rewrite authority files to hide closure defects",
-        "- reduce requirement-scope gaps in the generated requirement surface before asking for assessment",
-        "",
-        "## Summary",
-        f"- total live requirements: {summary['total_live_requirements']}",
-        f"- missing from current requirement surface: {summary['missing_from_current_requirement_surface']}",
-        f"- missing intent ids from goals: {summary['missing_intent_ids_from_goals']}",
-        f"- requirements missing code traceability: {summary['requirements_missing_code_traceability']}",
-        f"- requirements missing planned test traceability: {summary['requirements_missing_planned_test_traceability']}",
-        f"- requirements with unexpected planned test traceability: {summary['requirements_with_unexpected_planned_test_traceability']}",
-        f"- requirements missing realized test traceability: {summary['requirements_missing_test_traceability']}",
-        f"- requirements with unexpected realized test traceability: {summary['requirements_with_unexpected_realized_test_traceability']}",
-        f"- orphan code files: {summary['orphan_code_files']}",
-        f"- orphan test files: {summary['orphan_test_files']}",
-        "",
-        "## Immediate Repair Signal",
-        *_format_id_lines("missing from current requirement surface", missing_requirement_ids),
-        *_format_id_lines("intent ids still missing from goals", missing_goal_intent_ids),
-        *_format_id_lines("requirement ids still missing code traceability", missing_code_ids),
-        *_format_id_lines("requirement ids still missing planned test traceability", missing_planned_test_ids),
-        *_format_id_lines("unexpected requirement ids claimed by planned tests", unexpected_planned_test_ids),
-        *_format_id_lines("requirement ids still missing realized test traceability", missing_realized_test_ids),
-        *_format_id_lines("unexpected requirement ids claimed by realized tests", unexpected_realized_test_ids),
-        "",
-        "## Builder Law",
-        "- inspect the current generated requirement surface first",
-        "- continue from the current workspace state rather than restating the whole imported authority",
-        "- use the full closure register only when the compact summary is insufficient for the next repair step",
-    ]
-    return "\n".join(lines) + "\n"
+    return build_requirement_closure_prompt_context_from_register(
+        payload,
+        register_path=REQUIREMENT_CLOSURE_REGISTER_PATH,
+        generated_requirement_surface_path=_GENERATED_REQUIREMENT_SURFACE_PATH,
+        carries_field=_REQUIREMENT_CARRIES_FIELD,
+        authoring_design_field=_REQUIREMENT_AUTHORING_DESIGN_FIELD,
+    )
 
 
 def refresh_requirement_closure_register(workspace_root: Path, *, stage: str = "workspace_scan") -> dict[str, Any]:

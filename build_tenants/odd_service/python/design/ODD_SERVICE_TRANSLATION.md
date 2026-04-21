@@ -108,8 +108,8 @@ It does not invent a second execution law.
 The canonical local path remains:
 
 ```bash
-PYTHONPATH=.genesis python -m genesis gaps --workspace .
-PYTHONPATH=.genesis python -m genesis start --auto --human-proxy --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc gaps --scope workspace --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc start --scope workspace --target next --until converged --workspace .
 ```
 
 The service should drive the same runtime contract and the same ABG

@@ -30,7 +30,7 @@ from sandbox_runtime import (  # noqa: E402
     complete_current_call,
     read_events,
     refresh_installed_analysis,
-    run_installed_genesis,
+    run_installed_substrate,
     run_installed_odd_sdlc,
     sandbox_env,
 )
@@ -109,7 +109,7 @@ def _complete_current_call_with_agent(
         check=True,
     )
     assessed = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "assess-result",
             "--result",
@@ -143,7 +143,7 @@ def data_mapper_template_requirement_replay(tmp_path_factory: pytest.TempPathFac
         label_prefix="test28_requirement_first",
     )
 
-    reset = run_installed_genesis(
+    reset = run_installed_substrate(
         workspace,
         "emit-event",
         "--type",
@@ -304,7 +304,7 @@ def test_second_pass_code_replay_can_deepen_an_existing_shallow_realization(tmp_
     assert first_code_pass["start"]["edge"] == "derive_code_surface"
     assert target_path.read_text(encoding="utf-8") == before_first_pass
 
-    reset = run_installed_genesis(
+    reset = run_installed_substrate(
         workspace,
         "emit-event",
         "--type",

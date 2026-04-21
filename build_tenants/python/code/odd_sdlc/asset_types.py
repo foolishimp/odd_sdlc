@@ -226,6 +226,22 @@ ASSET_TYPES: dict[str, AssetTypeProfile] = {
         library_level="generic",
         proof_hints=("post_mortem_event_audit",),
     ),
+    "execution_contract_surface": AssetTypeProfile(
+        name="execution_contract_surface",
+        description="Generic admitted execution-contract surface for one active dispatch.",
+        semantic_facets=(
+            "authority_surface",
+            "worksite_surface",
+            "machine_readable_surface",
+            "lifecycle_surface",
+        ),
+        fd_evaluator="generic.execution-contract-present",
+        fp_gap_description="The execution-contract surface is not yet admitted for the active dispatch.",
+        fp_descriptive_framing="An execution-contract surface records the admitted current execution basis for one bounded dispatch so prompt, closure, and later review consume the same authority surface.",
+        library_level="generic",
+        proof_hints=("post_mortem_event_audit",),
+        closure_hints=("admitted_execution_contract_surface",),
+    ),
     "build_artifact_surface": AssetTypeProfile(
         name="build_artifact_surface",
         description="Generic generated build or package artifact surface.",

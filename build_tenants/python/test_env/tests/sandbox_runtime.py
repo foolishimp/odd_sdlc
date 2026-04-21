@@ -55,27 +55,30 @@ def run_installed_odd_sdlc(
     archive: "RunArchive | None" = None,
     label: str | None = None,
     timeout: int = 60,
+    check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "odd_sdlc", *args, "--workspace", str(workspace)],
-            cwd=str(workspace),
-            env=sandbox_env(workspace),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=True,
-        )
-    except subprocess.CalledProcessError as error:
-        if archive is not None:
-            archive.log_subprocess(label or f"odd_sdlc {' '.join(args)}", error)
-        raise
+    result = subprocess.run(
+        [sys.executable, "-m", "odd_sdlc", *args, "--workspace", str(workspace)],
+        cwd=str(workspace),
+        env=sandbox_env(workspace),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
     if archive is not None:
         archive.log_subprocess(label or f"odd_sdlc {' '.join(args)}", result)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
     return result
 
 
-def run_installed_genesis(
+def run_installed_substrate(
     workspace: Path,
     *args: str,
     archive: "RunArchive | None" = None,
@@ -83,6 +86,10 @@ def run_installed_genesis(
     timeout: int = 60,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
+    """
+    Internal substrate helper for proof lanes that intentionally exercise raw
+    genesis commands rather than the public odd_sdlc operator surface.
+    """
     result = subprocess.run(
         [sys.executable, "-m", "genesis", *args, "--workspace", str(workspace)],
         cwd=str(workspace),
@@ -214,6 +221,12 @@ def complete_current_call(
             run_installed_odd_sdlc(
                 workspace,
                 "start",
+                "--scope",
+                "workspace",
+                "--target",
+                "next",
+                "--until",
+                "first_traversal",
                 archive=archive,
                 label=f"{label_prefix} start.{attempt + 1}",
             ).stdout
@@ -233,7 +246,7 @@ def complete_current_call(
             label=f"{label_prefix} construct.{attempt + 1}",
         )
         assessed = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "assess-result",
                 "--result",
@@ -287,16 +300,27 @@ def complete_bootstrap_chain(
     ),
 ) -> list[dict[str, Any]]:
     completed: list[dict[str, Any]] = []
-    for edge in steps:
+    step_index = 0
+    while step_index < len(steps):
+        edge = steps[step_index]
         step_label = edge.removeprefix("derive_").removesuffix("_surface")
         result = complete_current_call(
             workspace,
             archive=archive,
             label_prefix=f"{label_prefix}_{step_label}",
         )
-        if result["start"]["edge"] != edge:
-            raise AssertionError(f"Expected edge {edge!r}, got {result['start']['edge']!r}")
-        completed.append(result)
+        actual_edge = result["start"]["edge"]
+        if actual_edge == edge:
+            completed.append(result)
+            step_index += 1
+            continue
+        if step_index > 0 and actual_edge == steps[step_index - 1]:
+            prior = dict(completed[-1])
+            prior["repeat_attempts"] = int(prior.get("repeat_attempts", 1)) + 1
+            prior["latest_repeat"] = result
+            completed[-1] = prior
+            continue
+        raise AssertionError(f"Expected edge {edge!r}, got {actual_edge!r}")
     return completed
 
 

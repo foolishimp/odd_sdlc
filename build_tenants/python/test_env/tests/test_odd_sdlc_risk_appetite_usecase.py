@@ -9,7 +9,7 @@ import pytest
 
 from odd_sdlc.normalization import normalize_workspace
 from odd_sdlc.release.install import install as install_release
-from sandbox_runtime import read_events, run_installed_genesis, run_installed_odd_sdlc
+from sandbox_runtime import read_events, run_installed_odd_sdlc
 from test_odd_sdlc_installation import (
     _append_runtime_contract_overrides,
     _seed_data_mapper_template_workspace,
@@ -81,6 +81,17 @@ def _query_ambiguity_register(workspace: Path) -> dict:
     return payload["ambiguity_register"]
 
 
+def _query_start_target_catalog(workspace: Path) -> list[dict]:
+    payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "query-domain",
+            label="odd_sdlc query-domain",
+        ).stdout
+    )
+    return list(payload["start_target_catalog"])
+
+
 @pytest.mark.usecase_id("ambiguity_register_disambiguation_pipeline")
 def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     workspace = run_archive.workspace
@@ -88,21 +99,37 @@ def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     _set_ambiguity_risk_appetite(workspace, "low")
     normalize_workspace(workspace, project_slug="data_mapper", platform="spark_scala")
 
-    start_result = run_installed_genesis(
+    start_result = run_installed_odd_sdlc(
         workspace,
         "start",
-        "--auto",
+        "--scope",
+        "workspace",
+        "--target",
+        "graph_function:select_implementation_stack_profile",
+        "--until",
+        "converged",
         archive=run_archive,
         label="low risk appetite start",
         timeout=180,
         check=False,
     )
     run_archive.capture_text("low_risk.start.stdout.txt", start_result.stdout)
+    run_archive.capture_text("low_risk.start.stderr.txt", start_result.stderr)
     payload = json.loads(start_result.stdout)
     run_archive.capture_json("low_risk.start.json", payload)
     assert start_result.returncode == 3
     assert payload["stopped_by"] == "fh_gate"
     assert payload["edge"] == "select_implementation_stack_profile"
+
+    start_target_catalog = _query_start_target_catalog(workspace)
+    run_archive.capture_json("low_risk.start_target_catalog.json", start_target_catalog)
+    target_entry = next(
+        entry
+        for entry in start_target_catalog
+        if entry["handle"] == "select_implementation_stack_profile"
+    )
+    assert target_entry["start_addressable"] is True
+    assert target_entry["execution_binding"] == "target_injected_job"
 
     ambiguity_register = _query_ambiguity_register(workspace)
     run_archive.capture_json("low_risk.ambiguity_register.json", ambiguity_register)
@@ -110,7 +137,13 @@ def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     assert entries["multiple-realization-roots"]["policy_action"] == "escalate_fh"
     assert entries["multiple-realization-roots"]["status"] == "fh_required"
     assert entries["multiple-realization-roots"]["blocking"] is True
-    assert "declared-root-vs-realized-root-mismatch" not in entries
+    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "escalate_fh"
+    assert entries["declared-root-vs-realized-root-mismatch"]["status"] == "fh_required"
+    assert entries["declared-root-vs-realized-root-mismatch"]["blocking"] is True
+    assert (
+        entries["declared-root-vs-realized-root-mismatch"]["expected_resolving_edge"]
+        == "select_implementation_stack_profile"
+    )
 
     events = read_events(workspace)
     run_archive.capture_json("low_risk.events.json", events)
@@ -129,21 +162,29 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     _set_ambiguity_risk_appetite(workspace, "high")
     normalize_workspace(workspace, project_slug="data_mapper", platform="spark_scala")
 
-    start_payload = json.loads(
-        run_installed_genesis(
-            workspace,
-            "start",
-            "--auto",
-            archive=run_archive,
-            label="high risk appetite start",
-            timeout=180,
-            check=False,
-        ).stdout
+    start_result = run_installed_odd_sdlc(
+        workspace,
+        "start",
+        "--scope",
+        "workspace",
+        "--target",
+        "graph_function:select_implementation_stack_profile",
+        "--until",
+        "converged",
+        archive=run_archive,
+        label="high risk appetite start",
+        timeout=180,
+        check=False,
     )
+    run_archive.capture_text("high_risk.start.stdout.txt", start_result.stdout)
+    run_archive.capture_text("high_risk.start.stderr.txt", start_result.stderr)
+    start_payload = json.loads(start_result.stdout)
     run_archive.capture_json("high_risk.start.json", start_payload)
+    assert start_result.returncode == 0
     assert start_payload["status"] in {"pending", "error"}
     assert start_payload["stopped_by"] != "fh_gate"
-    assert start_payload["edge"] != "select_implementation_stack_profile"
+    assert start_payload["edge"] == "select_implementation_stack_profile"
+    assert start_payload["blocking_reason"] == "fp_dispatch"
     if start_payload["status"] == "error":
         assert start_payload["failure_class"] == "transport_failure"
         assert start_payload["stopped_by"] == "fp_runtime_failure"
@@ -152,11 +193,13 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     run_archive.capture_json("high_risk.ambiguity_register.json", ambiguity_register)
     entries = {entry["ambiguity_id"]: entry for entry in ambiguity_register["ambiguities"]}
     assert entries["multiple-realization-roots"]["policy_action"] == "fp_decide"
-    assert entries["multiple-realization-roots"]["decision_owner"] == "F_P"
-    assert entries["multiple-realization-roots"]["decision_status"] == "fp_decided"
-    assert entries["multiple-realization-roots"]["status"] == "carried"
+    assert entries["multiple-realization-roots"]["decision_status"] == "pending_fp"
+    assert entries["multiple-realization-roots"]["status"] == "open"
     assert entries["multiple-realization-roots"]["blocking"] is False
-    assert "declared-root-vs-realized-root-mismatch" not in entries
+    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "fp_decide"
+    assert entries["declared-root-vs-realized-root-mismatch"]["decision_status"] == "pending_fp"
+    assert entries["declared-root-vs-realized-root-mismatch"]["status"] == "open"
+    assert entries["declared-root-vs-realized-root-mismatch"]["blocking"] is False
 
     events = read_events(workspace)
     run_archive.capture_json("high_risk.events.json", events)

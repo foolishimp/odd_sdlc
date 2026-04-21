@@ -3,6 +3,8 @@
 **Family**: REQ-F-ODDSDLC-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: `specification/requirements/08-odd-sdlc-first-slice.md`
+**Authoring Design**: `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
 
 This family defines the build-out of `odd_sdlc` from the first realization slice
 into the generic software-domain package on the `odd_sdlc` line.
@@ -380,6 +382,12 @@ to verify the req -> design -> module -> code or test traceability chain.
 - AC-6: any derived scalar delta published for operator convenience remains a
   projection over separate carry and fulfillment truth and is not the governing
   closure law
+- AC-7: active requirement families publish explicit `Carries Forward From:`
+  and `Authoring Design:` header fields instead of relying on file archaeology
+  to infer upstream carry or authoring design law
+- AC-8: requirement-side `Authoring Design:` publication is reciprocal with
+  ratified design-surface `Implements:` and `Derives From:` publication so the
+  requirement/design link is queryable in both directions
 
 ### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
 
@@ -414,3 +422,41 @@ installed shape must be conformant:
   `workspaces/` and not ad hoc competing topology roots
 - AC-6: stack-local environment tools remain subordinate within a named
   workspace rather than defining the installed topology
+
+### REQ-F-ODDSDLC-033 — imported-project feature, UAT, and design readback is materially useful on the first generated cut
+
+For imported software projects, the first generated intermediate surfaces are
+already a useful readback of the project rather than a near-generic shell.
+
+**Acceptance Criteria**:
+- AC-1: generated feature decomposition, UAT testcase, and design surfaces read
+  back live imported authority rather than only generic odd_sdlc boilerplate
+- AC-2: those first cuts carry forward current requirement authority explicitly
+  enough that an operator can refine them without reconstructing the source
+  project from scratch
+- AC-3: the generated design-family surfaces name the current governed module
+  boundaries and current proof/query shape when the imported workspace already
+  exposes them
+- AC-4: imported-project proving shows at least one installed workspace where
+  the first generated feature, UAT, and design cuts are materially reviewable
+  without wholesale replacement
+
+### REQ-F-ODDSDLC-034 — released odd_sdlc can govern mutable odd_sdlc source development without boundary collapse
+
+`odd_sdlc` may govern its own next mutable source line through an installed
+worksite lane, but that self-induction does not collapse source project,
+released product, installed payload, and mutable worksite identity.
+
+**Acceptance Criteria**:
+- AC-1: live product and design surfaces explicitly state that released
+  odd_sdlc may govern mutable odd_sdlc source development through installed
+  operator surfaces
+- AC-2: installed self-induction keeps the installed payload under
+  `.genesis/odd_sdlc/` and keeps the mutable source realization under its
+  declared `build_tenants/...` output root
+- AC-3: installed query/gap or comparable operator proof over an
+  odd_sdlc-like mutable source workspace attributes source code and
+  requirement traceability to the source realization root rather than to the
+  installed payload
+- AC-4: self-induction proving preserves the same source/install/product/worksite
+  split that odd_sdlc requires for downstream governed projects

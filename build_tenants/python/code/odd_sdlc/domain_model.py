@@ -77,7 +77,8 @@ class Asset:
     uri: str
     declared_type: str
     kind: str = "asset"
-    metadata: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
+    generated_asset_contract: dict[str, object] | None = None
     provenance: AssetProvenance | None = None
     checkpoint: AssetCheckpoint | None = None
 
@@ -88,6 +89,9 @@ class Asset:
             "declared_type": self.declared_type,
             "kind": self.kind,
             "metadata": dict(self.metadata),
+            "generated_asset_contract": (
+                None if self.generated_asset_contract is None else dict(self.generated_asset_contract)
+            ),
             "provenance": None if self.provenance is None else self.provenance.to_dict(),
             "checkpoint": None if self.checkpoint is None else self.checkpoint.to_dict(),
         }

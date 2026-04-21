@@ -3,6 +3,8 @@
 **Family**: REQ-F-UPSTREAM-*
 **Status**: Active
 **Category**: Governance
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines how `odd_sdlc` handles carried-forward source material on
 the current constitutional line.

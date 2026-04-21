@@ -109,6 +109,22 @@ This means:
   satisfied construction boundary rather than through false operational
   convergence
 
+## Self-Induction Boundary
+
+Released `odd_sdlc` may govern mutable odd_sdlc source development through an
+installed worksite lane, but the boundary remains the same one imposed on
+downstream governed projects:
+
+- released odd_sdlc product is the governing installed payload
+- installed payload remains under `.genesis/odd_sdlc/`
+- mutable odd_sdlc source realization remains under its declared
+  `build_tenants/...` output root
+- query, gaps, start, and traceability must attribute source truth to that
+  declared realization root rather than to the installed payload
+
+This is not a special self-host shortcut. It is the same source/install/product
+/worksite law applied to odd_sdlc’s own next source line.
+
 ## Asset Families
 
 The first-slice shared translation already covers bootstrap, design,
@@ -522,6 +538,9 @@ Its redesign obligation is:
 - preserve substrate ownership boundaries
 - adopt or import existing implementation truth honestly
 - stop manufacturing false generated defaults
+- make the first generated feature, UAT, and design cuts materially useful by
+  reading back live requirement authority, current module boundaries, and
+  current proof/query shape instead of placeholder shells
 
 ### Reusable Consensus Harness
 

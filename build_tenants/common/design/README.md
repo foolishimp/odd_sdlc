@@ -3,8 +3,8 @@
 This root holds shared realization/design law adopted across more than one
 `odd_sdlc` tenant.
 
-Use `.genesis/docs/standards/SPEC_METHOD.md` as the governing method reference
-when writing or revising these files.
+Use `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
+as the governing method reference when writing or revising these files.
 
 ## Current Scope
 

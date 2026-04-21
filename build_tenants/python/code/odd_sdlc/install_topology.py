@@ -4,12 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 
 
+LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE = Path(".odd_sdlc")
 INSTALLED_PRODUCT_ROOT_RELATIVE = Path(".genesis") / "odd_sdlc"
 INSTALLED_PRODUCT_PYTHON_ROOT_RELATIVE = INSTALLED_PRODUCT_ROOT_RELATIVE / "python"
 INSTALLED_PRODUCT_CODE_ROOT_RELATIVE = INSTALLED_PRODUCT_PYTHON_ROOT_RELATIVE / "code"
 INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE = INSTALLED_PRODUCT_PYTHON_ROOT_RELATIVE / "design"
 INSTALLED_PRODUCT_RELEASE_ROOT_RELATIVE = INSTALLED_PRODUCT_ROOT_RELATIVE / "release"
 INSTALLED_RUNTIME_CONTRACT_RELATIVE = INSTALLED_PRODUCT_RELEASE_ROOT_RELATIVE / "genesis.yml"
+TENANT_WORKSPACES_DIR_NAME = "workspaces"
 
 
 def installed_product_root(workspace_root: Path) -> Path:
@@ -30,3 +32,11 @@ def installed_product_release_root(workspace_root: Path) -> Path:
 
 def installed_runtime_contract_path(workspace_root: Path) -> Path:
     return workspace_root / INSTALLED_RUNTIME_CONTRACT_RELATIVE
+
+
+def tenant_workspace_root_relative(tenant_name: str, workspace_name: str) -> Path:
+    return Path("build_tenants") / tenant_name / TENANT_WORKSPACES_DIR_NAME / workspace_name
+
+
+def tenant_workspace_root(workspace_root: Path, tenant_name: str, workspace_name: str) -> Path:
+    return workspace_root / tenant_workspace_root_relative(tenant_name, workspace_name)

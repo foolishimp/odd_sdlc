@@ -178,7 +178,16 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
     )
     run_archive.capture_json("install.payload.json", install_payload)
 
-    gaps = json.loads(run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="test19 gaps").stdout)
+    gaps = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="test19 gaps",
+        ).stdout
+    )
     run_archive.capture_json("gaps.initial.json", gaps)
     assert gaps["converged"] is False
 

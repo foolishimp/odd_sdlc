@@ -3,6 +3,8 @@
 **Family**: REQ-F-GFUNC-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines graph functions as the primary constructive carrier in
 `odd_sdlc`.

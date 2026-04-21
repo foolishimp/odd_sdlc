@@ -25,6 +25,7 @@ from .traceability import (
     missing_requirement_ids_from_current_surface,
     missing_test_traceability_ids,
     obligation_gap_from_declaration,
+    requirement_family_traceability_scan,
     traceability_scan,
     unexpected_planned_test_traceability_ids,
     unexpected_realized_test_traceability_ids,
@@ -63,23 +64,24 @@ CHECK_RULES: dict[str, CheckRule] = {
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["requirement-scope-complete"].cli_name: CheckRule(
         required_generated_assets=("requirement_surface",),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["requirement-family-traceability-published"].cli_name: CheckRule(),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["feature-decomp-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("requirement_surface",),
-    ),
-    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["uat-testcases-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("requirement_surface",),
-    ),
-    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["design-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("requirement_surface", "feature_decomp_surface"),
     ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["uat-testcases-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("requirement_surface", "uat_testcases_surface"),
+    ),
+    FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["design-dependency-surfaces-present"].cli_name: CheckRule(
+        required_generated_assets=("requirement_surface", "feature_decomp_surface", "design_surface"),
+    ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["review-assessment-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("design_surface",),
+        required_generated_assets=("design_surface", "review_assessment_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["consensus-decision-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("review_assessment_surface",),
+        required_generated_assets=("review_assessment_surface", "consensus_decision_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["reviewed-design-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("design_surface", "consensus_decision_surface"),
+        required_generated_assets=("design_surface", "consensus_decision_surface", "reviewed_design_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["design-consensus-terminated"].cli_name: CheckRule(
         required_generated_assets=(
@@ -93,16 +95,16 @@ CHECK_RULES: dict[str, CheckRule] = {
         required_generated_assets=("uat_testcases_surface", "scenario_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["scenario-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("requirement_surface", "design_surface"),
+        required_generated_assets=("requirement_surface", "design_surface", "scenario_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["implementation-design-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("design_surface", "scenario_surface"),
+        required_generated_assets=("design_surface", "scenario_surface", "implementation_design_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["implementation-stack-profile-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("implementation_design_surface",),
+        required_generated_assets=("implementation_design_surface", "implementation_stack_profile"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["implementation-module-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("implementation_design_surface", "implementation_stack_profile"),
+        required_generated_assets=("implementation_design_surface", "implementation_stack_profile", "implementation_module_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["code-dependency-surfaces-present"].cli_name: CheckRule(
         required_generated_assets=("implementation_module_surface", "implementation_stack_profile"),
@@ -121,61 +123,64 @@ CHECK_RULES: dict[str, CheckRule] = {
         ),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["build-execution-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("release_surface",),
+        required_generated_assets=("release_surface", "build_execution_surface"),
         required_profile_fields=("build_execution_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["build-execution-result-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("build_execution_surface",),
+        required_generated_assets=("build_execution_surface", "build_execution_result_surface"),
         required_profile_fields=("build_execution_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-design-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("design_surface", "scenario_surface"),
+        required_generated_assets=("design_surface", "scenario_surface", "test_design_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-stack-profile-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_design_surface", "implementation_design_surface", "implementation_stack_profile"),
+        required_generated_assets=("test_design_surface", "implementation_design_surface", "implementation_stack_profile", "test_stack_profile"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-module-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_design_surface", "test_stack_profile", "implementation_module_surface"),
+        required_generated_assets=("test_design_surface", "test_stack_profile", "implementation_module_surface", "test_module_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["planned-test-traceability-present"].cli_name: CheckRule(
         required_generated_assets=("test_module_surface", "implementation_module_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-run-archive-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_module_surface", "test_stack_profile"),
+        required_generated_assets=("test_module_surface", "test_stack_profile", "test_run_archive_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["realized-test-traceability-present"].cli_name: CheckRule(
         required_generated_assets=("test_module_surface", "code_surface"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["obligation-ledger-carry-converged"].cli_name: CheckRule(),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("release_surface",),
+        required_generated_assets=("release_surface", "test_execution_surface"),
         required_profile_fields=("test_execution_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["test-execution-result-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("test_execution_surface", "test_run_archive_surface"),
+        required_generated_assets=("test_execution_surface", "test_run_archive_surface", "test_execution_result_surface"),
         required_profile_fields=("test_execution_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("release_surface",),
+        required_generated_assets=("release_surface", "deployment_surface"),
         required_profile_fields=("deployment_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployment-result-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("deployment_surface",),
+        required_generated_assets=("deployment_surface", "deployment_result_surface"),
         required_profile_fields=("deployment_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["deployed-environment-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("deployment_result_surface",),
+        required_generated_assets=("deployment_result_surface", "deployed_environment_surface"),
         required_profile_fields=("deployment_contract",),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["runtime-observation-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("deployment_result_surface", "test_run_archive_surface"),
+        required_generated_assets=("deployment_result_surface", "test_run_archive_surface", "runtime_observation_surface"),
         required_profile_fields=("deployment_contract", "runtime_observation_contract"),
     ),
     FD_EVALUATOR_CONTRACTS_BY_CLI_NAME["retrofit-plan-dependency-surfaces-present"].cli_name: CheckRule(
-        required_generated_assets=("runtime_observation_surface", "release_surface"),
+        required_generated_assets=("runtime_observation_surface", "release_surface", "retrofit_plan_surface"),
         required_profile_fields=("deployment_contract", "runtime_observation_contract"),
     ),
 }
+_CLI_FAILURE_MAX_ITEMS = 8
+_CLI_FAILURE_MAX_STRING_CHARS = 800
+_CLI_FAILURE_MAX_DEPTH = 5
 
 
 def _require_exists(path: Path) -> bool:
@@ -288,6 +293,70 @@ def _requirement_scope_detail(workspace_root: Path) -> dict[str, Any]:
         "missing_materialization_assets": missing_materialization_assets,
         "generated_contract_failures": generated_contract_failures,
         "suggested_repair": suggested_repair,
+    }
+
+
+def _requirement_family_traceability_detail(workspace_root: Path) -> dict[str, Any]:
+    publication = requirement_family_traceability_scan(workspace_root)
+    families = publication["families"]
+    missing_carry_fields = [
+        entry["requirement_family_ref"]
+        for entry in families
+        if "Carries Forward From" in entry["missing_fields"]
+    ]
+    missing_authoring_design_fields = [
+        entry["requirement_family_ref"]
+        for entry in families
+        if "Authoring Design" in entry["missing_fields"]
+    ]
+    invalid_format_families = [
+        {
+            "requirement_family_ref": entry["requirement_family_ref"],
+            "invalid_format_fields": entry["invalid_format_fields"],
+        }
+        for entry in families
+        if entry["invalid_format_fields"]
+    ]
+    invalid_carry_refs = [
+        {
+            "requirement_family_ref": entry["requirement_family_ref"],
+            "invalid_carry_refs": entry["invalid_carry_refs"],
+        }
+        for entry in families
+        if entry["invalid_carry_refs"]
+    ]
+    invalid_authoring_design_refs = [
+        {
+            "requirement_family_ref": entry["requirement_family_ref"],
+            "invalid_authoring_design_refs": entry["invalid_authoring_design_refs"],
+        }
+        for entry in families
+        if entry["invalid_authoring_design_refs"]
+    ]
+    missing_backlinks = [
+        {
+            "requirement_family_ref": entry["requirement_family_ref"],
+            "missing_authoring_design_backlinks": entry["missing_authoring_design_backlinks"],
+        }
+        for entry in families
+        if entry["missing_authoring_design_backlinks"]
+    ]
+    return {
+        "check": "requirement-family-traceability-published",
+        "failure_kind": "traceability_publication_gap",
+        "workspace_root": str(workspace_root),
+        "summary": publication["summary"],
+        "missing_carry_fields": missing_carry_fields,
+        "missing_authoring_design_fields": missing_authoring_design_fields,
+        "invalid_format_families": invalid_format_families,
+        "invalid_carry_refs": invalid_carry_refs,
+        "invalid_authoring_design_refs": invalid_authoring_design_refs,
+        "missing_authoring_design_backlinks": missing_backlinks,
+        "suggested_repair": (
+            "Publish explicit `Carries Forward From:` and `Authoring Design:` fields on every active requirement family, "
+            "use backticked .md refs or `None`, and ensure each referenced design surface reciprocally points back "
+            "through `Implements:` requirement ids or `Derives From:` family refs."
+        ),
     }
 
 
@@ -410,6 +479,8 @@ def _failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | N
         return _goal_surface_authority_detail(workspace_root)
     if check_name == "requirement-scope-complete":
         return _requirement_scope_detail(workspace_root)
+    if check_name == "requirement-family-traceability-published":
+        return _requirement_family_traceability_detail(workspace_root)
     if check_name == "code-traceability-present":
         return _code_traceability_detail(workspace_root)
     if check_name == "planned-test-traceability-present":
@@ -419,6 +490,42 @@ def _failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | N
     if check_name == "obligation-ledger-carry-converged" and edge_name:
         return _obligation_ledger_carry_detail(workspace_root, edge_name)
     return _generic_failure_detail(check_name, workspace_root)
+
+
+def _bounded_cli_value(value: Any, *, depth: int = 0) -> Any:
+    if depth >= _CLI_FAILURE_MAX_DEPTH:
+        if isinstance(value, dict):
+            return {"type": "object", "field_count": len(value)}
+        if isinstance(value, (list, tuple)):
+            return {"type": "list", "total_count": len(value)}
+        if isinstance(value, str) and len(value) > _CLI_FAILURE_MAX_STRING_CHARS:
+            return f"{value[:_CLI_FAILURE_MAX_STRING_CHARS]}...[truncated]"
+        return value
+    if isinstance(value, dict):
+        return {
+            str(key): _bounded_cli_value(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        bounded_items = [
+            _bounded_cli_value(item, depth=depth + 1)
+            for item in list(value)[:_CLI_FAILURE_MAX_ITEMS]
+        ]
+        if len(value) <= _CLI_FAILURE_MAX_ITEMS:
+            return bounded_items
+        return {
+            "items": bounded_items,
+            "total_count": len(value),
+            "omitted_count": len(value) - _CLI_FAILURE_MAX_ITEMS,
+        }
+    if isinstance(value, str) and len(value) > _CLI_FAILURE_MAX_STRING_CHARS:
+        return f"{value[:_CLI_FAILURE_MAX_STRING_CHARS]}...[truncated]"
+    return value
+
+
+def _cli_failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | None = None) -> dict[str, Any]:
+    detail = _failure_detail(check_name, workspace_root, edge_name=edge_name)
+    return _bounded_cli_value(detail)
 
 
 def bootstrap_input_set_present(workspace_root: Path) -> int:
@@ -453,6 +560,17 @@ def requirement_scope_complete(workspace_root: Path) -> int:
         and not missing_requirement_ids_from_current_surface(workspace_root)
         else 1
     )
+
+
+def requirement_family_traceability_published(workspace_root: Path) -> int:
+    summary = requirement_family_traceability_scan(workspace_root)["summary"]
+    return 0 if (
+        summary["missing_carry_publication_count"] == 0
+        and summary["missing_authoring_design_publication_count"] == 0
+        and summary["invalid_carry_ref_count"] == 0
+        and summary["invalid_authoring_design_ref_count"] == 0
+        and summary["missing_authoring_design_backlink_count"] == 0
+    ) else 1
 
 
 def feature_decomp_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -586,7 +704,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         exit_code = _run_check(args.check, workspace_root)
     if exit_code != 0:
-        print(json.dumps(_failure_detail(args.check, workspace_root, edge_name=args.edge), indent=2, sort_keys=True))
+        print(json.dumps(_cli_failure_detail(args.check, workspace_root, edge_name=args.edge), indent=2, sort_keys=True))
     return exit_code
 
 

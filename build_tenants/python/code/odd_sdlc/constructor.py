@@ -7,12 +7,11 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 
 from .asset_types import ASSET_TYPES
-from .project_profile import SOURCE_EXTENSIONS, load_project_profile
+from .project_profile import load_project_profile
 from .runtime_effects import publish_workspace_runtime_event
 from .traceability import (
     authority_requirement_refs,
@@ -44,6 +43,16 @@ _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _GENERATED_TEST_CODE_MARKER = "Generated governed test code for the odd_sdlc test_code_surface."
 _GENERIC_TITLE_HEADINGS = {"intent", "product", "goals", "requirements"}
 _OPERATIONAL_DISPATCH_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-operational-dispatch.json")
+_CODE_SURFACE_PRESERVED_ROOTS = {
+    ".ai-workspace",
+    ".genesis",
+    ".git",
+    "design",
+    "docs",
+    "specification",
+    "test_env",
+    "workspaces",
+}
 
 
 def _is_concrete_requirement_id(requirement_id: str) -> bool:
@@ -301,6 +310,25 @@ def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
     )
 
 
+def _module_boundary_lines(workspace_root: Path) -> tuple[str, ...]:
+    modules = _module_names(workspace_root)
+    if not modules:
+        return ("- no declared module branches yet",)
+    return tuple(
+        f"- `{module_name}`: governed module branch under `{load_project_profile(workspace_root).code_relative_path()}`"
+        for module_name in modules
+    )
+
+
+def _proof_and_query_shape_lines(workspace_root: Path) -> tuple[str, ...]:
+    profile = load_project_profile(workspace_root)
+    return (
+        f"- qualification evidence is projected through `{profile.test_runner or 'unspecified'}` over `{profile.code_relative_path()}`",
+        "- `odd_sdlc query-domain` publishes machine-readable asset, target-routing, and gap views over the same governed worksite",
+        "- release, deployment, runtime observation, and retrofit remain governed projections over the same branch and evidence base",
+    )
+
+
 def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
     profile = load_project_profile(workspace_root)
     language = (profile.language or "").strip().lower()
@@ -537,19 +565,51 @@ def _render_generated_test_source(
     )
 
 
-def _clear_generated_test_code_files(workspace_root: Path) -> None:
-    code_root = _code_surface_root(workspace_root)
-    if not code_root.exists() or not code_root.is_dir():
-        return
-    for path in sorted(code_root.rglob("*")):
-        if not path.is_file() or path.suffix not in SOURCE_EXTENSIONS:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        if _GENERATED_TEST_CODE_MARKER in text:
-            path.unlink()
+def _preserve_existing_test_code_files(workspace_root: Path) -> None:
+    _ = workspace_root
+    return
+
+
+def _replace_generated_code_surface(
+    *,
+    workspace_root: Path,
+    target_path: Path,
+    content: dict[str, str],
+) -> dict[str, object]:
+    if target_path.resolve() == workspace_root.resolve():
+        raise RuntimeError("code_surface generation cannot target the workspace root")
+
+    existing_entries: list[str] = []
+    written_entries: list[str] = []
+    if target_path.exists():
+        if not target_path.is_dir():
+            raise RuntimeError(
+                f"code_surface target {target_path.relative_to(workspace_root)!s} exists but is not a directory"
+            )
+        else:
+            for child in sorted(target_path.iterdir()):
+                existing_entries.append(child.relative_to(workspace_root).as_posix())
+
+    target_path.mkdir(parents=True, exist_ok=True)
+    for relative_path, file_content in content.items():
+        relative = Path(relative_path)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"code surface member path must be workspace-relative: {relative_path!r}")
+        if relative.parts and relative.parts[0] in _CODE_SURFACE_PRESERVED_ROOTS:
+            raise ValueError(f"code surface member cannot target governance root: {relative_path!r}")
+        file_path = target_path / relative
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(file_content, encoding="utf-8")
+        written_entries.append(file_path.relative_to(workspace_root).as_posix())
+
+    return {
+        "replacement_scope": "generated_code_surface_members",
+        "target_relative_path": target_path.relative_to(workspace_root).as_posix(),
+        "delete_policy": "no_existing_entries_deleted",
+        "preserved_existing_entries": existing_entries,
+        "removed_entries": [],
+        "written_entries": written_entries,
+    }
 
 
 def _planned_generated_test_files(workspace_root: Path) -> tuple[dict[str, object], ...]:
@@ -719,6 +779,7 @@ def _build_work_report(
     current_checkpoint,
     attestation: dict[str, Any],
     operation: str,
+    materialization_report: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     project_profile = load_project_profile(workspace_root)
     report = {
@@ -734,6 +795,8 @@ def _build_work_report(
     }
     if target_asset == "code_surface":
         report["governed_code_summary"] = summarize_code_surface(workspace_root)
+        if materialization_report is not None:
+            report["materialization_report"] = materialization_report
     if target_asset in {
         "test_run_archive_surface",
         "release_surface",
@@ -926,13 +989,14 @@ def _construct_requirements(workspace_root: Path) -> str:
             "",
             asset_marker("requirement_surface"),
             "",
-            "The retained odd_sdlc proving subset must remain installable, runnable, auditable, and resettable.",
+            "## Generated Requirement Set",
+            "- REQ-ODD-BOOT-001: the retained odd_sdlc proving subset remains installable and runnable.",
+            "- REQ-ODD-BOOT-002: the installed sandbox opens the intent, product, goal, and requirement graph calls in lawful dependency order.",
+            "- REQ-ODD-BOOT-003: each bounded constructor turn records attributable asset mutation and assess-result closure.",
+            "- REQ-ODD-BOOT-004: reset clears runtime state without corrupting the workspace or archived evidence.",
             "",
-            "## Generated Expectations",
-            "- the installed sandbox opens the intent, product, and goal graph calls in dependency order",
-            "- each bounded constructor turn records attributable asset mutation",
-            "- assess-result closes each call lawfully",
-            "- reset clears runtime state without corrupting the workspace",
+            "## Requirement Authority Carry-Forward",
+            *_authority_requirement_lines(workspace_root),
             "",
             "## Derived Sources",
             intent,
@@ -947,7 +1011,6 @@ def _construct_requirements(workspace_root: Path) -> str:
 
 def _construct_feature_decomp(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
-        module_lines = tuple(f"- `{module_name}`" for module_name in _module_names(workspace_root))
         return "\n".join(
             (
                 "# Generated Feature Decomposition",
@@ -955,12 +1018,25 @@ def _construct_feature_decomp(workspace_root: Path) -> str:
                 asset_marker("feature_decomp_surface"),
                 "",
                 "## Software-Domain Feature Families",
-                "- imported authority preservation and normalization",
-                "- governed implementation branch materialization",
-                "- qualification, release, deployment, runtime-return, and retrofit projection",
+                "- preserve imported project authority and requirement carry-forward through normalization and iteration",
+                "- materialize governed implementation branches over the declared module boundaries",
+                "- qualify, release, deploy, observe, and retrofit over governed evidence rather than ambient repository state",
+                "- expose machine-readable query, start-target, and gap views over the same governed worksite",
+                "",
+                "## Requirement Authority Carry-Forward",
+                *_authority_requirement_lines(workspace_root),
                 "",
                 "## Declared Module Branches",
-                *module_lines,
+                *_module_boundary_lines(workspace_root),
+                "",
+                "## Proof And Query Shape",
+                *_proof_and_query_shape_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
                 "",
             )
         )
@@ -985,6 +1061,7 @@ def _construct_feature_decomp(workspace_root: Path) -> str:
 def _construct_uat_testcases(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
         profile = load_project_profile(workspace_root)
+        module_names = ", ".join(_module_names(workspace_root)) or "declared module branches"
         return "\n".join(
             (
                 "# Generated UAT Testcases",
@@ -992,10 +1069,23 @@ def _construct_uat_testcases(workspace_root: Path) -> str:
                 asset_marker("uat_testcases_surface"),
                 "",
                 "## Canonical Software-Domain Acceptance Cases",
-                "1. preserve imported project identity and authority after install and traversal",
-                f"2. materialize the governed implementation branch at `{profile.code_relative_path()}`",
-                f"3. keep qualification aligned to the declared test runner `{profile.test_runner or 'unspecified'}`",
-                "4. project release and downstream lifecycle surfaces over the governed branch",
+                "1. preserve imported project identity, product intent, and requirement authority after install and traversal",
+                f"2. materialize the governed implementation branch at `{profile.code_relative_path()}` across `{module_names}`",
+                f"3. keep qualification aligned to the declared test runner `{profile.test_runner or 'unspecified'}` and publish the resulting evidence on the governed worksite",
+                "4. keep query-domain, target routing, and gap observation aligned to the same governed branch",
+                "5. project release, deployment, runtime-return, and retrofit surfaces over governed evidence without losing imported authority",
+                "",
+                "## Requirement Authority Carry-Forward",
+                *_authority_requirement_lines(workspace_root),
+                "",
+                "## Proof And Query Shape",
+                *_proof_and_query_shape_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
                 "",
             )
         )
@@ -1031,6 +1121,18 @@ def _construct_design(workspace_root: Path) -> str:
                 "- odd_sdlc acts as the software-domain worksite supervisor over imported project authority",
                 "- GTL/ABG remains the execution substrate while odd_sdlc owns the SDLC asset graph and branch bindings",
                 "- the declared tenant root is the active implementation branch, not ambient repository context",
+                "",
+                "## Requirement Authority Carry-Forward",
+                *_authority_requirement_lines(workspace_root),
+                "",
+                "## Major Module Boundaries",
+                *_module_boundary_lines(workspace_root),
+                "",
+                "## Proof And Query Shape",
+                *_proof_and_query_shape_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
@@ -1160,6 +1262,18 @@ def _construct_scenarios(workspace_root: Path) -> str:
                 "1. adopt imported authority and derive the active software-domain surfaces without collapsing project identity",
                 "2. materialize the governed implementation branch and align qualification to it",
                 "3. project release, deployment, runtime-return, and retrofit over the governed branch",
+                "",
+                "## Requirement Authority Carry-Forward",
+                *_authority_requirement_lines(workspace_root),
+                "",
+                "## Proof And Query Shape",
+                *_proof_and_query_shape_lines(workspace_root),
+                "",
+                "## Imported Authority",
+                *_imported_authority_lines(workspace_root),
+                "",
+                "## Governed Project Position",
+                *_governed_summary_lines(workspace_root),
                 "",
             )
         )
@@ -2147,6 +2261,7 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     preserve_authority = _should_preserve_authoritative_surface(workspace, target_asset)
     if preserve_authority:
         operation = "adopt"
+    materialization_report: dict[str, object] | None = None
     if target_asset == "code_surface" and project_profile.realization_mode == "selected_output_tree":
         if not target_path.exists():
             raise RuntimeError(
@@ -2156,16 +2271,14 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     elif not preserve_authority:
         if target_asset == "code_surface":
             content = _constructed_content(target_asset, workspace)
-            if target_path.exists():
-                shutil.rmtree(target_path)
-            target_path.mkdir(parents=True, exist_ok=True)
-            for relative_path, file_content in content.items():
-                file_path = target_path / relative_path
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(file_content, encoding="utf-8")
+            materialization_report = _replace_generated_code_surface(
+                workspace_root=workspace,
+                target_path=target_path,
+                content=content,
+            )
         else:
             if target_asset == "test_run_archive_surface":
-                _clear_generated_test_code_files(workspace)
+                _preserve_existing_test_code_files(workspace)
                 for entry in _planned_generated_test_files(workspace):
                     file_path = _code_surface_root(workspace) / str(entry["relative_path"])
                     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2197,6 +2310,7 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         current_checkpoint=current_checkpoint,
         attestation=attestation,
         operation=operation,
+        materialization_report=materialization_report,
     )
 
     declared_asset_type = asset_declared_type(target_asset)

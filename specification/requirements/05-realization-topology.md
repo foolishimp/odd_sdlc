@@ -3,6 +3,8 @@
 **Family**: REQ-F-REALIZATION-*
 **Status**: Active
 **Category**: Governance
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the standard realization topology for the `odd_sdlc`
 source repository.
@@ -94,17 +96,18 @@ In short:
 - AC-4: stack-local tools such as `.venv` remain subordinate within a named
   workspace rather than defining the topology itself
 
-### REQ-F-REALIZATION-006 — Repo-root `.genesis/` is operational for the current source workspace only
+### REQ-F-REALIZATION-006 — Repo-root `.genesis/` is not source truth
 
-The source repository may carry a repo-root `.genesis/` for the current
-workspace’s operational runtime, but that surface is not a hidden development
-seed for other workspaces or downstream installs.
+The source repository shall not depend on a repo-root `.genesis/` runtime as
+authoritative source or proving substrate. ABG source is consumed from its
+own source/release line, while installed `.genesis/` payloads are created only
+inside downstream target workspaces and test sandboxes.
 
 **Acceptance Criteria**:
-- AC-1: source-repo topology language describes repo-root `.genesis/` as an
-  operational runtime surface for the current workspace only
-- AC-2: no source-topology surface describes repo-root `.genesis/` as a
-  development seed to be copied into other workspaces
+- AC-1: source-repo topology language does not describe repo-root `.genesis/`
+  as source authority or a required source-workspace runtime
+- AC-2: source commands bind explicitly to the ABG source/release substrate and
+  the active `odd_sdlc` source realization
 - AC-3: downstream or proving workspaces receive installed `.genesis/` by
   install, not by copying another workspace’s runtime payload
 - AC-4: installed odd-product payloads are described as living under

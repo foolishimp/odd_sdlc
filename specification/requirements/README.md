@@ -2,8 +2,8 @@
 
 Project-specific requirement families live in this folder.
 
-Use `.genesis/docs/standards/` as the governing method reference when writing
-or revising these files.
+Use `/Users/jim/src/apps/specification_methodology/specification/standards/`
+as the governing method reference when writing or revising these files.
 
 ## Rules
 
@@ -12,3 +12,14 @@ or revising these files.
 - Make lifecycle status and category explicit in each family header.
 - Treat carried-forward material as non-authoritative until it is explicitly
   re-adopted here.
+- Active requirement families must publish `**Carries Forward From**:` as either
+  `None` or one or more backticked `*.md` source references.
+- Active requirement families must publish `**Authoring Design**:` as either
+  `None` or one or more backticked ratified design or ADR paths.
+- `Carries Forward From:` is the explicit carried-source publication field. It
+  replaces reliance on grep history or reviewer memory for whether the family
+  is a fresh authored line or a re-adopted one.
+- `Authoring Design:` is the requirement-side link in the bidirectional
+  requirement/design traceability chain.
+- Ratified design remains the reciprocal side of that chain through its own
+  `**Implements**:` requirement identifiers and `**Derives From**:` references.

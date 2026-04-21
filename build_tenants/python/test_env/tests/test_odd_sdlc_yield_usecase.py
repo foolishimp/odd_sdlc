@@ -16,7 +16,6 @@ from sandbox_runtime import (
     continue_installed_result,
     read_events,
     run_constructor_for_start,
-    run_installed_genesis,
     run_installed_odd_sdlc,
 )
 from test_odd_sdlc_installation import (
@@ -24,6 +23,8 @@ from test_odd_sdlc_installation import (
     _seed_data_mapper_template_workspace,
     _write_fake_transport_contract,
 )
+
+EXPECTED_YIELD_EDGE = "derive_code_surface"
 
 
 def _prepare_installed_yield_workspace(
@@ -47,6 +48,12 @@ def _prepare_installed_yield_workspace(
         transport_contract,
         dest_name=f"{artifact_prefix}.transport_contract.test_transport_contract.json",
     )
+    run_installed_odd_sdlc(
+        workspace,
+        "refresh-analysis",
+        archive=run_archive,
+        label=f"{artifact_prefix}.refresh_analysis",
+    )
     return workspace
 
 
@@ -56,10 +63,17 @@ def _run_start_auto_expect_yield(
     run_archive,
     label: str,
 ) -> dict[str, Any]:
-    start_result = run_installed_genesis(
+    start_result = run_installed_odd_sdlc(
         workspace,
         "start",
-        "--auto",
+        "--scope",
+        "workspace",
+        "--target",
+        "next",
+        "--until",
+        "converged",
+        "--fh-mode",
+        "human-proxy",
         archive=run_archive,
         label=label,
         timeout=180,
@@ -95,9 +109,15 @@ def _observe_runtime(workspace: Path, *, run_archive, label: str) -> dict[str, A
 
 def _manual_start(workspace: Path, *, run_archive, label: str) -> dict[str, Any]:
     payload = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             archive=run_archive,
             label=label,
         ).stdout
@@ -122,18 +142,15 @@ def _advance_to_edge(workspace: Path, *, target_edge: str, run_archive, label_pr
             label=f"{label_prefix}.{start_payload['edge']}.construct",
         )
         run_archive.capture_json(f"{label_prefix}.{start_payload['edge']}.construct.json", constructor)
-        assessed = json.loads(
-            run_installed_genesis(
-                workspace,
-                "assess-result",
-                "--result",
-                str(result_path),
-                archive=run_archive,
-                label=f"{label_prefix}.{start_payload['edge']}.assess-result",
-            ).stdout
+        assessed = continue_installed_result(
+            workspace,
+            result_path=result_path,
+            archive=run_archive,
+            label=f"{label_prefix}.{start_payload['edge']}.continue",
         )
         run_archive.capture_json(f"{label_prefix}.{start_payload['edge']}.assess-result.json", assessed)
-        assert assessed["status"] == "ok"
+        assert assessed["status"] in {"continued", "converged"}
+        assert assessed["result_admission"]["status"] == "ok"
 
 
 def _yielded_run_projection(observed: dict[str, Any], *, run_id: str) -> dict[str, Any]:
@@ -170,16 +187,19 @@ def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archi
     workspace = _prepare_installed_yield_workspace(run_archive)
 
     initial_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="yield_chain.initial_gaps",
         ).stdout
     )
     run_archive.capture_json("yield_chain.initial_gaps.json", initial_gaps)
     assert initial_gaps["converged"] is False
-    assert len(initial_gaps["gaps"]) == 18
+    assert initial_gaps["summary"]["gap_count"] == len(initial_gaps["dossiers"])
+    assert initial_gaps["summary"]["gap_count"] >= 18
 
     start_payload = _run_start_auto_expect_yield(
         workspace,
@@ -230,7 +250,7 @@ def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archi
     assert graph_call_edges[0] == "derive_intent_surface"
     assert graph_call_edges[-1] == start_payload["edge"]
     assert len(yielded_graph_calls) == 1
-    assert start_payload["edge"] == "derive_implementation_design_surface"
+    assert start_payload["edge"] == EXPECTED_YIELD_EDGE
     assert "prepare_release_surface" not in graph_call_edges
 
 
@@ -300,9 +320,11 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
     assert handoff["status"] == "open"
 
     raw_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="yield_projection.raw_gaps",
         ).stdout
@@ -310,12 +332,14 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
     run_archive.capture_json("yield_projection.raw_gaps.json", raw_gaps)
     assert raw_gaps["converged"] is False
     assert raw_gaps["total_delta"] > 0
-    assert raw_gaps["gaps"]
+    assert raw_gaps["dossiers"]
 
     domain_gaps = json.loads(
         run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="yield_projection.domain_gaps",
             timeout=120,
@@ -324,11 +348,11 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
     run_archive.capture_json("yield_projection.domain_gaps.json", domain_gaps)
     assert domain_gaps["converged"] is False
     assert any(
-        "observation" in gap
-        and "triage" in gap
-        and "route_proposal" in gap
-        and "route_binding" in gap
-        for gap in domain_gaps["gaps"]
+        "observation" in dossier
+        and "triage" in dossier
+        and "route_binding" in dossier
+        and "gap_truth" in dossier
+        for dossier in domain_gaps["dossiers"]
     )
 
     observed_after = _observe_runtime(
@@ -355,11 +379,11 @@ def test_data_mapper_continue_command_preserves_yielded_handoff_truth(run_archiv
     workspace = _prepare_installed_yield_workspace(run_archive)
     start_payload = _advance_to_edge(
         workspace,
-        target_edge="derive_implementation_design_surface",
+        target_edge=EXPECTED_YIELD_EDGE,
         run_archive=run_archive,
         label_prefix="continue_yield",
     )
-    assert start_payload["edge"] == "derive_implementation_design_surface"
+    assert start_payload["edge"] == EXPECTED_YIELD_EDGE
     constructor, result_path = run_constructor_for_start(
         workspace,
         start_payload=start_payload,
@@ -382,8 +406,8 @@ def test_data_mapper_continue_command_preserves_yielded_handoff_truth(run_archiv
     assert continuation["gap_snapshot"]["converged"] is False
     design_gap = next(
         gap
-        for gap in continuation["gap_snapshot"]["gaps"]
-        if gap["edge"] == "derive_implementation_design_surface"
+        for gap in continuation["gap_snapshot"]["dossiers"]
+        if gap["edge"] == EXPECTED_YIELD_EDGE
     )
     assert "observation" in design_gap
     assert "triage" in design_gap
@@ -435,7 +459,7 @@ def test_data_mapper_yield_chain_reissues_fresh_handoff_on_a_fresh_workspace(run
         call_id=second_start["call_id"],
     )
 
-    assert second_start["edge"] == first_start["edge"] == "derive_implementation_design_surface"
+    assert second_start["edge"] == first_start["edge"] == EXPECTED_YIELD_EDGE
     assert second_start["run_id"] != first_start["run_id"]
     assert second_start["call_id"] != first_start["call_id"]
     assert second_handoff["continuation_id"] != first_handoff["continuation_id"]

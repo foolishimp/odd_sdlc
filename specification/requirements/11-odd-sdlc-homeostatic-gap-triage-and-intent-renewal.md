@@ -3,6 +3,8 @@
 **Family**: REQ-F-ODDSDLC-*
 **Status**: Active
 **Category**: Governance
+**Carries Forward From**: None
+**Authoring Design**: `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`, `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
 
 This family defines the homeostatic reverse path for the active `odd_sdlc`
 software-domain package.

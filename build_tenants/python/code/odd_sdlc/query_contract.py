@@ -6,15 +6,17 @@ from __future__ import annotations
 
 
 QUERY_DOMAIN_CONTRACT_NAME = "odd_sdlc.query-domain"
-QUERY_DOMAIN_CONTRACT_VERSION = "v10"
+QUERY_DOMAIN_CONTRACT_VERSION = "v15"
 QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "query_contract",
     "workspace_root",
-    "analysis_manifest",
     "semantic_facets",
     "asset_types",
     "asset_families",
     "assets",
+    "start_target_catalog",
+    "asset_ownership_index",
+    "operational_capabilities",
     "ambiguity_register",
     "requirement_closure_register",
     "collections",
@@ -25,7 +27,7 @@ QUERY_DOMAIN_TOP_LEVEL_KEYS = (
     "jobs",
     "graph_functions",
     "bindings",
-    "gaps",
+    "gap_dossier",
 )
 
 

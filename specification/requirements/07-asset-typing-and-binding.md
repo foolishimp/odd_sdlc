@@ -3,6 +3,8 @@
 **Family**: REQ-F-ASSETMODEL-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the first live ODD asset model.
 

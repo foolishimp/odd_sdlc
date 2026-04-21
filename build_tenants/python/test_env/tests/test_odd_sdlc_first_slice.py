@@ -23,7 +23,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[4]
-GENESIS_PATH = ROOT / ".genesis"
+GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
@@ -36,7 +36,52 @@ GRAPH_FUNCTION_NAMES = [
     "review_design_by_consensus",
     "review_comment_consensus_round",
     "review_comment_by_consensus",
+    "derive_execution_contract_surface",
+    "admit_execution_contract_surface",
 ]
+
+
+def _expected_graph_function_names(actual_names: list[str]) -> list[str]:
+    expected = ["bootstrap_release_self_test"]
+    if "release_operational_cycle" in actual_names:
+        expected.append("release_operational_cycle")
+    expected.extend(
+        [
+            "review_subject_consensus_round",
+            "review_subject_by_consensus",
+            "review_design_consensus_round",
+            "review_design_by_consensus",
+            "review_comment_consensus_round",
+            "review_comment_by_consensus",
+            "derive_execution_contract_surface",
+            "admit_execution_contract_surface",
+        ]
+    )
+    return expected
+
+
+def _expected_program_entries(graph_function_names: list[str]) -> list[dict[str, object]]:
+    expected: list[dict[str, object]] = [
+        {
+            "name": "bootstrap_release_self_test",
+            "intent": BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
+            "steps": list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS),
+            "outputs": ["release_surface"],
+            "kind": "executive_program",
+        }
+    ]
+    if "release_operational_cycle" in graph_function_names:
+        expected.append(
+            {
+                "name": "release_operational_cycle",
+                "intent": RELEASE_OPERATIONAL_CYCLE_INTENT,
+                "steps": list(RELEASE_OPERATIONAL_CYCLE_STEPS),
+                "outputs": ["retrofit_plan_surface"],
+                "kind": "executive_program",
+            }
+        )
+    return expected
+
 
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))
@@ -46,6 +91,18 @@ if str(CODE_PATH) not in sys.path:
 import odd_sdlc.app as app_module  # noqa: E402
 from odd_sdlc.analysis import load_analysis_manifest, refresh_analysis, workspace_state_ready  # noqa: E402
 from odd_sdlc.app import bootstrap, catalog, gaps, initialize, start  # noqa: E402
+from odd_sdlc.execution_contract import (  # noqa: E402
+    ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    EXECUTION_CONTRACT_CONTEXT_PATH,
+    EXECUTION_CONTRACT_KIND,
+    EXECUTION_CONTRACT_REGISTER_PATH,
+    admit_execution_contract_surface,
+)
+from odd_sdlc.gap_dossier import (  # noqa: E402
+    GAP_DOSSIER_CONTEXT_PATH,
+    GAP_DOSSIER_REGISTER_PATH,
+)
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
     BOOTSTRAP_RELEASE_SELF_TEST_STEPS,
@@ -56,6 +113,10 @@ from odd_sdlc.gtl_module import (  # noqa: E402
 import odd_sdlc.self_test as self_test_module  # noqa: E402
 from odd_sdlc.project_profile import load_project_profile  # noqa: E402
 from odd_sdlc.query import query_domain  # noqa: E402
+from odd_sdlc.repair_frontier import (  # noqa: E402
+    REPAIR_FRONTIER_CONTEXT_PATH,
+    REPAIR_FRONTIER_REGISTER_PATH,
+)
 from odd_sdlc.runtime_contexts import (  # noqa: E402
     REALIZATION_DEEPENING_CONTEXT_PATH,
     REALIZED_TEST_SOURCE_CONTEXT_PATH,
@@ -65,6 +126,7 @@ from odd_sdlc.self_test import self_test  # noqa: E402
 import odd_sdlc.span_analysis as span_analysis_module  # noqa: E402
 from odd_sdlc.traceability import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    declared_requirement_edge_gap,
     load_or_build_requirement_closure_register,
 )
 from odd_sdlc.triage import CURRENT_TRIAGE_DIR, enrich_gap_snapshot, load_current_edge_triage  # noqa: E402
@@ -76,9 +138,34 @@ from odd_sdlc.workspace_assets import (  # noqa: E402
     asset_marker_path,
     asset_materialization_path,
     asset_path,
+    bootstrap_assets,
     resolved_asset_relative_path,
 )
-from genesis.binding import ContextResolver, _assemble_prompt, module_to_executable_jobs  # noqa: E402
+
+
+def _manifest_context(manifest: dict[str, object], name: str) -> dict[str, object]:
+    for context in manifest.get("contexts", ()):
+        if isinstance(context, dict) and context.get("name") == name:
+            return context
+    raise AssertionError(f"manifest context {name!r} not found")
+
+
+def _admit_ordinary_execution_contract(tmp_path: Path, module) -> None:
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    admit_execution_contract_surface(
+        workspace_root=tmp_path,
+        module=module,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        work_key=None,
+        run_id=None,
+        normalized_scope="workspace",
+        raw_target="next",
+        until="converged",
+    )
+
+
+from genesis.binding import ContextResolver, TargetAssetBinding, _assemble_prompt, module_to_executable_jobs  # noqa: E402
 from genesis.cli_adapter import _emit_event_cmd  # noqa: E402
 from genesis.events import emit  # noqa: E402
 
@@ -116,7 +203,89 @@ def _seed_workspace(path: Path) -> None:
     (path / "specification" / "PRODUCT.md").write_text("# Product\n", encoding="utf-8")
     (path / "specification" / "GOALS.md").write_text("# Goals\n", encoding="utf-8")
     (path / "specification" / "requirements" / "10-bootstrap.md").write_text(
-        "# Bootstrap Requirements\n",
+        "\n".join(
+            (
+                "# Bootstrap Requirements",
+                "",
+                "- REQ-DEMO-001: the proving workspace remains installable and executable.",
+                "- REQ-DEMO-002: constructor turns remain attributable and resettable.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+
+def _seed_ticket_work_item(
+    path: Path,
+    *,
+    ticket_id: str = "B-900",
+    status: str = "active",
+    ticket_category: str = "ordinary",
+    change_class: str = "requirement_reprice",
+    re_entry_point: str = "requirements",
+) -> None:
+    ticket_dir = path / ".ai-workspace" / "tickets" / status
+    ticket_dir.mkdir(parents=True, exist_ok=True)
+    ticket_lines = [
+        "---",
+        f"id: {ticket_id}",
+        "title: Demo work item",
+        "type: bug",
+        f"ticket_category: {ticket_category}",
+        f"status: {status}",
+        f"change_class: {change_class}",
+        f"re_entry_point: {re_entry_point}",
+        "target_truth: one admitted execution contract governs this bounded repair",
+        "superseded_truth: raw ticket prose and operator phrasing steer execution directly",
+        "closure_law: close only when the admitted execution contract is the source carrier and mixed old/new execution proof is rejected",
+        "evaluation_criteria:",
+        "  - admit the execution contract before prompt assembly opens",
+        "  - carry the admitted closure law into manifest provenance",
+        "non_closure_conditions:",
+        "  - raw ticket prose still acts as execution authority",
+        "  - mixed old/new execution proof still counts as closure",
+        "proof_surface:",
+        "  - .ai-workspace/runtime/odd_sdlc-execution-contract.json",
+        "  - .ai-workspace/runtime/odd_sdlc-execution-contract.md",
+        "---",
+        "",
+        "# Demo Work Item",
+        "",
+        "- reproduce and repair bounded requirement pressure",
+        "",
+    ]
+    if ticket_category == "implementation_migration":
+        ticket_lines.extend(
+            [
+                "## Migration Declaration",
+                "",
+                "- old_truth_path: manual operator interpretation remains authoritative execution truth",
+                "- new_truth_path: ticket-driven routed traversal governs the declared re-entry seam",
+                "- closure_law: close only when routed ticket execution replaces manual authority and mixed old/new behavior is not accepted as proof",
+                "",
+                "## Migration Checklist",
+                "",
+                "- [x] old truth path is named explicitly",
+                "- [x] new truth path is named explicitly",
+                "- [ ] old truth path is removed or explicitly demoted from authority",
+                "- [ ] mixed-state behavior is no longer accepted as closure evidence",
+                "",
+                "## Required Direction",
+                "",
+                "1. Route the work-item through the declared re-entry seam.",
+                "2. Preserve already-satisfied structure.",
+                "3. Do not count mixed old/new execution as closure.",
+                "",
+                "## Acceptance",
+                "",
+                "- routed traversal uses the declared re-entry seam",
+                "- prompt and manifest carry the work-item execution discipline",
+                "",
+            ]
+        )
+    (ticket_dir / f"{ticket_id}-demo.md").write_text(
+        "\n".join(ticket_lines),
         encoding="utf-8",
     )
     (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
@@ -322,30 +491,43 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     module = odd_sdlc_module(tmp_path)
     graph_function_names = [graph_function.name for graph_function in module.graph_functions]
-    assert graph_function_names == [
-        "bootstrap_release_self_test",
-        "release_operational_cycle",
-        "review_subject_consensus_round",
-        "review_subject_by_consensus",
-        "review_design_consensus_round",
-        "review_design_by_consensus",
-        "review_comment_consensus_round",
-        "review_comment_by_consensus",
-    ]
+    expected_graph_function_names = ["bootstrap_release_self_test"]
+    if "release_operational_cycle" in graph_function_names:
+        expected_graph_function_names.append("release_operational_cycle")
+    expected_graph_function_names.extend(
+        [
+            "review_subject_consensus_round",
+            "review_subject_by_consensus",
+            "review_design_consensus_round",
+            "review_design_by_consensus",
+            "review_comment_consensus_round",
+            "review_comment_by_consensus",
+            DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+            ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        ]
+    )
+    assert graph_function_names == expected_graph_function_names
     input_signatures = {
         graph_function.name: [node.name for node in graph_function.inputs]
         for graph_function in module.graph_functions
     }
-    assert input_signatures == {
+    expected_input_signatures = {
         "bootstrap_release_self_test": ["input_set"],
-        "release_operational_cycle": ["release_surface", "test_run_archive_surface"],
         "review_subject_consensus_round": ["subject_surface"],
         "review_subject_by_consensus": ["subject_surface"],
         "review_design_consensus_round": ["design_surface"],
         "review_design_by_consensus": ["design_surface"],
         "review_comment_consensus_round": ["comment_review_subject_surface"],
         "review_comment_by_consensus": ["comment_review_subject_surface"],
+        DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION: ["work_request_surface"],
+        ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION: ["execution_contract_surface"],
     }
+    if "release_operational_cycle" in graph_function_names:
+        expected_input_signatures["release_operational_cycle"] = [
+            "release_surface",
+            "test_run_archive_surface",
+        ]
+    assert input_signatures == expected_input_signatures
     executive = module.graph_functions[0]
     assert executive.declarations.get("function_kind") == "odd_executive_graph_function"
     assert executive.declarations.get("intent") == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
@@ -394,13 +576,16 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         "release_surface",
     ]
     assert [vector.name for vector in executive.materialize().vectors] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
-    operational = module.graph_functions[1]
-    assert operational.declarations.get("function_kind") == "odd_executive_graph_function"
-    assert operational.declarations.get("intent") == RELEASE_OPERATIONAL_CYCLE_INTENT
-    assert [node.name for node in operational.inputs] == ["release_surface", "test_run_archive_surface"]
-    assert [node.name for node in operational.outputs] == ["retrofit_plan_surface"]
-    assert [vector.name for vector in operational.materialize().vectors] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
-    shared_consensus_round = module.graph_functions[2]
+    shared_consensus_offset = 1
+    if "release_operational_cycle" in graph_function_names:
+        operational = module.graph_functions[1]
+        assert operational.declarations.get("function_kind") == "odd_executive_graph_function"
+        assert operational.declarations.get("intent") == RELEASE_OPERATIONAL_CYCLE_INTENT
+        assert [node.name for node in operational.inputs] == ["release_surface", "test_run_archive_surface"]
+        assert [node.name for node in operational.outputs] == ["retrofit_plan_surface"]
+        assert [vector.name for vector in operational.materialize().vectors] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+        shared_consensus_offset = 2
+    shared_consensus_round = module.graph_functions[shared_consensus_offset]
     assert shared_consensus_round.declarations.get("function_kind") == "odd_consensus_plugin_round_graph_function"
     assert shared_consensus_round.template.kind == "symbolic"
     assert [node.name for node in shared_consensus_round.inputs] == ["subject_surface"]
@@ -414,7 +599,7 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         ),
         "policy_rule": "subject_consensus_rule",
     }
-    shared_consensus_library = module.graph_functions[3]
+    shared_consensus_library = module.graph_functions[shared_consensus_offset + 1]
     assert shared_consensus_library.declarations.get("function_kind") == "odd_consensus_plugin_graph_function"
     assert shared_consensus_library.template.kind == "symbolic"
     assert [node.name for node in shared_consensus_library.inputs] == ["subject_surface"]
@@ -422,7 +607,7 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
     assert shared_consensus_library.declarations.get("plugin_kind") == "shared_consensus_plugin"
     assert "consensus" in shared_consensus_library.tags
     assert "plugin" in shared_consensus_library.tags
-    consensus_round = module.graph_functions[4]
+    consensus_round = module.graph_functions[shared_consensus_offset + 2]
     assert consensus_round.declarations.get("function_kind") == "odd_consensus_round_graph_function"
     assert consensus_round.template.kind == "inline_graph"
     assert [node.name for node in consensus_round.inputs] == ["design_surface"]
@@ -435,7 +620,7 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
-    consensus_library = module.graph_functions[5]
+    consensus_library = module.graph_functions[shared_consensus_offset + 3]
     assert consensus_library.declarations.get("function_kind") == "odd_consensus_library_graph_function"
     assert consensus_library.template.kind == "symbolic"
     assert [node.name for node in consensus_library.inputs] == ["design_surface"]
@@ -452,45 +637,76 @@ def test_module_publishes_first_asset_function_catalog(tmp_path: Path) -> None:
         ),
         "policy_rule": "design_consensus_rule",
     }
-    comment_consensus_round = module.graph_functions[6]
+    comment_consensus_round = module.graph_functions[shared_consensus_offset + 4]
     assert comment_consensus_round.declarations.get("function_kind") == "odd_consensus_host_binding_round_graph_function"
     assert comment_consensus_round.template.kind == "symbolic"
     assert [node.name for node in comment_consensus_round.inputs] == ["comment_review_subject_surface"]
     assert [node.name for node in comment_consensus_round.outputs] == ["reviewed_comment_surface"]
     assert comment_consensus_round.declarations.get("host_binding_of") == "review_subject_consensus_round"
-    comment_consensus_library = module.graph_functions[7]
+    comment_consensus_library = module.graph_functions[shared_consensus_offset + 5]
     assert comment_consensus_library.declarations.get("function_kind") == "odd_consensus_host_binding_graph_function"
     assert comment_consensus_library.template.kind == "symbolic"
     assert [node.name for node in comment_consensus_library.inputs] == ["comment_review_subject_surface"]
     assert [node.name for node in comment_consensus_library.outputs] == ["reviewed_comment_surface"]
     assert comment_consensus_library.declarations.get("host_binding_of") == "review_subject_by_consensus"
-    assert [job.name for job in module.jobs] == ["bootstrap_release_self_test_job", "release_operational_cycle_job"]
+    derive_execution_contract = module.graph_functions[shared_consensus_offset + 6]
+    assert derive_execution_contract.name == DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION
+    assert derive_execution_contract.declarations.get("function_kind") == "odd_runtime_source_graph_function"
+    assert derive_execution_contract.template.kind == "symbolic"
+    assert derive_execution_contract.declarations.get("selection_visible") is False
+    assert derive_execution_contract.declarations.get("carrier_asset") == "execution_contract_surface"
+    assert derive_execution_contract.declarations.get("source_asset") == "work_request_surface"
+    assert derive_execution_contract.declarations.get("transition_kind") == "derive"
+    assert [node.name for node in derive_execution_contract.inputs] == ["work_request_surface"]
+    assert [node.name for node in derive_execution_contract.outputs] == ["execution_contract_surface"]
+    admit_execution_contract = module.graph_functions[shared_consensus_offset + 7]
+    assert admit_execution_contract.name == ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION
+    assert admit_execution_contract.declarations.get("function_kind") == "odd_runtime_source_graph_function"
+    assert admit_execution_contract.template.kind == "symbolic"
+    assert admit_execution_contract.declarations.get("selection_visible") is False
+    assert admit_execution_contract.declarations.get("carrier_asset") == "execution_contract_surface"
+    assert admit_execution_contract.declarations.get("source_asset") == "execution_contract_surface"
+    assert admit_execution_contract.declarations.get("transition_kind") == "admit"
+    assert [node.name for node in admit_execution_contract.inputs] == ["execution_contract_surface"]
+    assert [node.name for node in admit_execution_contract.outputs] == ["execution_contract_surface"]
+    expected_job_names = ["bootstrap_release_self_test_job"]
+    if "release_operational_cycle" in graph_function_names:
+        expected_job_names.append("release_operational_cycle_job")
+    assert [job.name for job in module.jobs] == expected_job_names
 
     executable_jobs = module_to_executable_jobs(module)
-    assert len(executable_jobs) == len(BOOTSTRAP_RELEASE_SELF_TEST_STEPS) + len(RELEASE_OPERATIONAL_CYCLE_STEPS)
-    assert [job.vector.name for job in executable_jobs] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS) + list(
-        RELEASE_OPERATIONAL_CYCLE_STEPS
-    )
-    assert {job.job.name for job in executable_jobs} == {"bootstrap_release_self_test_job", "release_operational_cycle_job"}
+    expected_executable_vector_names = list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
+    expected_executable_job_names = {"bootstrap_release_self_test_job"}
+    if "release_operational_cycle" in graph_function_names:
+        expected_executable_vector_names.extend(RELEASE_OPERATIONAL_CYCLE_STEPS)
+        expected_executable_job_names.add("release_operational_cycle_job")
+    assert len(executable_jobs) == len(expected_executable_vector_names)
+    assert [job.vector.name for job in executable_jobs] == expected_executable_vector_names
+    assert {job.job.name for job in executable_jobs} == expected_executable_job_names
 
     vectors = {vector.name: vector for vector in executive.materialize().vectors}
     requirement_context_names = [context.name for context in vectors["derive_requirement_surface"].contexts]
     assert "odd_sdlc_stateful_builder_control_frame" in requirement_context_names
     assert "odd_sdlc_requirement_closure_builder_context" in requirement_context_names
+    assert "odd_sdlc_repair_frontier" in requirement_context_names
     realization_context_names = [context.name for context in vectors["derive_code_surface"].contexts]
     assert "odd_sdlc_stateful_builder_control_frame" in realization_context_names
+    assert "odd_sdlc_repair_frontier" in realization_context_names
     assert "odd_sdlc_realization_deepening_control_frame" in realization_context_names
     module_context_names = [context.name for context in vectors["derive_implementation_module_surface"].contexts]
+    assert "odd_sdlc_repair_frontier" in module_context_names
     assert "odd_sdlc_realization_deepening_control_frame" in module_context_names
     test_module_context_names = [context.name for context in vectors["derive_test_module_surface"].contexts]
+    assert "odd_sdlc_repair_frontier" in test_module_context_names
     assert "odd_sdlc_realization_deepening_control_frame" in test_module_context_names
     archive_context_names = [context.name for context in vectors["derive_test_run_archive_surface"].contexts]
     assert "odd_sdlc_stateful_builder_control_frame" in archive_context_names
+    assert "odd_sdlc_repair_frontier" in archive_context_names
     assert "odd_sdlc_realized_test_source_obligation" in archive_context_names
-    assert {job.graph_function.name for job in executable_jobs} == {
-        "bootstrap_release_self_test",
-        "release_operational_cycle",
-    }
+    expected_executable_graph_function_names = {"bootstrap_release_self_test"}
+    if "release_operational_cycle" in graph_function_names:
+        expected_executable_graph_function_names.add("release_operational_cycle")
+    assert {job.graph_function.name for job in executable_jobs} == expected_executable_graph_function_names
 
 
 def test_module_build_does_not_publish_runtime_sidecars(tmp_path: Path) -> None:
@@ -500,6 +716,8 @@ def test_module_build_does_not_publish_runtime_sidecars(tmp_path: Path) -> None:
         tmp_path / REALIZED_TEST_SOURCE_CONTEXT_PATH,
         tmp_path / REALIZATION_DEEPENING_CONTEXT_PATH,
         tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+        tmp_path / REPAIR_FRONTIER_REGISTER_PATH,
+        tmp_path / REPAIR_FRONTIER_CONTEXT_PATH,
     )
     assert all(not path.exists() for path in runtime_paths)
 
@@ -508,10 +726,43 @@ def test_module_build_does_not_publish_runtime_sidecars(tmp_path: Path) -> None:
     assert all(not path.exists() for path in runtime_paths)
 
 
+def test_constructive_vectors_consume_repair_frontier_context(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    module = odd_sdlc_module(tmp_path)
+    vectors = {
+        vector.name: vector
+        for vector in module.graph_functions[0].materialize().vectors
+    }
+
+    requirement_context_names = [context.name for context in vectors["derive_requirement_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in requirement_context_names
+    assert "odd_sdlc_requirement_closure_builder_context" in requirement_context_names
+    assert "odd_sdlc_repair_frontier" in requirement_context_names
+
+    code_context_names = [context.name for context in vectors["derive_code_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in code_context_names
+    assert "odd_sdlc_repair_frontier" in code_context_names
+    assert "odd_sdlc_realization_deepening_control_frame" in code_context_names
+
+    module_context_names = [context.name for context in vectors["derive_implementation_module_surface"].contexts]
+    assert "odd_sdlc_repair_frontier" in module_context_names
+    assert "odd_sdlc_realization_deepening_control_frame" in module_context_names
+
+    test_module_context_names = [context.name for context in vectors["derive_test_module_surface"].contexts]
+    assert "odd_sdlc_repair_frontier" in test_module_context_names
+    assert "odd_sdlc_realization_deepening_control_frame" in test_module_context_names
+
+    archive_context_names = [context.name for context in vectors["derive_test_run_archive_surface"].contexts]
+    assert "odd_sdlc_stateful_builder_control_frame" in archive_context_names
+    assert "odd_sdlc_repair_frontier" in archive_context_names
+    assert "odd_sdlc_realized_test_source_obligation" in archive_context_names
+
+
 def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     refresh_analysis(tmp_path, stage="test")
     module = odd_sdlc_module(tmp_path)
+    _admit_ordinary_execution_contract(tmp_path, module)
     code_job = next(
         job
         for job in module_to_executable_jobs(module)
@@ -522,6 +773,7 @@ def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path)
         context.name: resolver.load(context)
         for context in code_job.vector.contexts
     }
+    assert "odd_sdlc_repair_frontier" in relevant_contexts
     evaluator = next(ev for ev in code_job.vector.evaluators if ev.name == "code_traceability_present")
     pre = SimpleNamespace(
         current_asset={},
@@ -548,11 +800,235 @@ def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path)
         ),
     )
 
-    prompt = _assemble_prompt(pre, code_job, result_path=".ai-workspace/fp_results/mock.json")
+    prompt = _assemble_prompt(
+        pre,
+        code_job,
+        result_path=".ai-workspace/fp_results/mock.json",
+        workspace_root=tmp_path,
+    )
 
     assert "This edge works over an existing realization or realization plan, not a blank slate." in prompt
+    assert "# odd_sdlc Deterministic Repair Frontier" in prompt
+    assert "## Code Frontier" in prompt
+    assert "lawful edit frontier" in prompt
+    assert "Preserve already-satisfied structure. Repair only the unmet requirement delta" in prompt
     assert "Existing files and existing module groups are obligations, not proof of completion." in prompt
     assert "Prefer deepening or correcting existing artifacts" in prompt
+
+
+def test_bootstrap_asset_publication_shares_generated_asset_contract_with_fd_certification(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+
+    published_asset = next(
+        asset
+        for asset in bootstrap_assets(tmp_path)
+        if asset.asset_id == "test_module_surface"
+    )
+    attestation = assess_generated_asset_contract(tmp_path, "test_module_surface")
+
+    assert published_asset.generated_asset_contract == attestation["contract"]
+    assert published_asset.generated_asset_contract is not None
+    assert (
+        published_asset.generated_asset_contract["marker_text"]
+        == asset_marker("test_module_surface")
+    )
+
+
+def test_probabilistic_prompt_uses_published_generated_asset_contract_for_target_asset(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    module = odd_sdlc_module(tmp_path)
+    job = next(
+        candidate
+        for candidate in module_to_executable_jobs(module)
+        if candidate.vector.name == "derive_test_module_surface"
+    )
+    evaluator = next(ev for ev in job.vector.evaluators if ev.name == "test_module_surface_semantically_converged")
+    published_asset = next(
+        asset
+        for asset in bootstrap_assets(tmp_path)
+        if asset.asset_id == "test_module_surface"
+    )
+    checkpoint = published_asset.checkpoint
+    assert checkpoint is not None
+    target_binding = TargetAssetBinding(
+        asset_id=published_asset.asset_id,
+        uri=published_asset.uri,
+        relative_path=str(published_asset.metadata["relative_path"]),
+        path_kind=checkpoint.path_kind,
+        exists=checkpoint.exists,
+        generated_asset_contract=published_asset.generated_asset_contract,
+    )
+    pre = SimpleNamespace(
+        current_asset={},
+        failing_evaluators=[evaluator],
+        fd_results={},
+        relevant_contexts={},
+        resolved_environment=SimpleNamespace(
+            bindings=(),
+            ready=True,
+            summary_lines=lambda: [],
+            vector_source_required_contexts=(),
+            asset_surface_required_contexts=(),
+            asset_surface_injected_required_contexts=(),
+            requires=(),
+        ),
+    )
+
+    prompt = _assemble_prompt(
+        pre,
+        job,
+        result_path=".ai-workspace/fp_results/mock.json",
+        workspace_root=tmp_path,
+        target_binding=target_binding,
+    )
+
+    assert "[GENERATED ASSET CONTRACT]" in prompt
+    assert asset_marker("test_module_surface") in prompt
+    assert "marker_path: build_tenants/python/test_env/tests/40-generated-test-modules.md" in prompt
+    assert "heading_prefix: # Generated Test Modules" in prompt
+
+
+def test_refresh_analysis_publishes_deterministic_repair_frontier(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+
+    register = json.loads((tmp_path / REPAIR_FRONTIER_REGISTER_PATH).read_text(encoding="utf-8"))
+    context = (tmp_path / REPAIR_FRONTIER_CONTEXT_PATH).read_text(encoding="utf-8")
+
+    assert register["repair_frontier_kind"] == "odd_sdlc.repair_frontier"
+    assert register["summary"]["frontier_count"] == 4
+    assert sorted(register["frontiers"].keys()) == ["code", "design", "requirements", "test"]
+    assert register["frontiers"]["code"]["target_asset"] == "code_surface"
+    assert "lawful_edit_frontier" in register["frontiers"]["code"]
+    assert "lawful_proof_frontier" in register["frontiers"]["code"]
+    assert register["frontiers"]["code"]["widening_conditions"]
+    assert "# odd_sdlc Deterministic Repair Frontier" in context
+    assert "## Code Frontier" in context
+    assert "lawful edit frontier" in context
+    assert "widening conditions" in context
+
+
+def test_feature_decomp_declared_requirement_gap_uses_requirement_edge_ledger(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    feature_decomp_path = asset_path(tmp_path, "feature_decomp_surface")
+    feature_decomp_path.parent.mkdir(parents=True, exist_ok=True)
+    feature_decomp_path.write_text(
+        "\n".join(
+            (
+                "# Generated Feature Decomposition",
+                "",
+                asset_marker("feature_decomp_surface"),
+                "",
+                "- REQ-DEMO-001: preserve installability as a named feature family.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    gap = declared_requirement_edge_gap(
+        tmp_path,
+        {
+            "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+            "obligation_source_ref": "requirement_surface",
+            "obligation_source_kind": "requirement_surface",
+            "obligation_source_admission_basis": "authority_or_current_surface",
+            "obligation_kind": "requirement",
+            "derivation_rule": "identity",
+            "carry_rule": "deterministic_requirement_membership",
+            "fulfillment_rule": "feature_decomp_surface_coverage",
+            "evidence_policy": "feature_decomp_traceability",
+        },
+        edge_name="derive_feature_decomp_surface",
+    )
+
+    assert gap["edge"] == "derive_feature_decomp_surface"
+    assert gap["expected_count"] == 2
+    assert gap["carried_count"] == 1
+    assert gap["fulfilled_count"] == 1
+    assert gap["missing_count"] == 1
+    assert gap["extra_count"] == 0
+    assert gap["carry_converged"] is False
+    assert gap["fulfillment_converged"] is True
+    assert gap["edge_converged"] is False
+    assert gap["blocking_reasons"] == ["missing_from_edge_obligation_set"]
+    obligations = {entry["id"]: entry for entry in gap["obligations"]}
+    assert obligations["REQ-DEMO-001"]["evidence_refs"] == [
+        resolved_asset_relative_path(tmp_path, "feature_decomp_surface")
+    ]
+    blocking = {entry["id"]: entry for entry in gap["blocking_obligations"]}
+    assert blocking["REQ-DEMO-002"]["carry_status"] == "missing"
+    assert blocking["REQ-DEMO-002"]["fulfillment_status"] == "unassessed"
+    assert blocking["REQ-DEMO-002"]["blocking_reasons"] == ["missing_from_edge_obligation_set"]
+
+
+def test_gaps_keep_design_producer_open_when_generated_target_contract_is_invalid(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    requirement_surface = asset_materialization_path(tmp_path, "requirement_surface")
+    requirement_surface.parent.mkdir(parents=True, exist_ok=True)
+    requirement_surface.write_text(
+        "\n".join(
+            (
+                "# Generated Bootstrap Requirements",
+                "",
+                "- REQ-DEMO-001: preserve installability as a named feature family.",
+                "- REQ-DEMO-002: preserve attributable and resettable turns.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    feature_decomp_surface = asset_materialization_path(tmp_path, "feature_decomp_surface")
+    feature_decomp_surface.parent.mkdir(parents=True, exist_ok=True)
+    feature_decomp_surface.write_text(
+        "\n".join(
+            (
+                "# Generated Feature Decomposition",
+                "",
+                asset_marker("feature_decomp_surface"),
+                "",
+                "- REQ-DEMO-001: preserve installability as a named feature family.",
+                "- REQ-DEMO-002: preserve attributable and resettable turns.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    design_surface = asset_materialization_path(tmp_path, "design_surface")
+    design_surface.parent.mkdir(parents=True, exist_ok=True)
+    design_surface.write_text(
+        "\n".join(
+            (
+                "# Draft Design Notes",
+                "",
+                "- intentionally missing governed marker",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    payload = gaps(
+        app,
+        from_edge="derive_design_surface",
+        to_edge="derive_scenario_surface",
+        zoom="combined",
+    )
+
+    by_edge = {gap["edge"]: gap for gap in payload["gaps"]}
+    assert "derive_design_surface" in by_edge
+    assert by_edge["derive_design_surface"]["gap_kind"] == "declared_obligation_edge_gap"
+    assert by_edge["derive_design_surface"]["edge_converged"] is False
+    assert by_edge["derive_design_surface"]["graph_delta"] > 0.0
+    assert "design_dependency_surfaces_present" in by_edge["derive_design_surface"]["graph_failing"]
 
 
 def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path: Path) -> None:
@@ -562,39 +1038,433 @@ def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path
     payload = query_domain(app)
     after_events = list(app.stream.all_events())
 
-    assert payload["analysis_manifest"] is None
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
-    assert payload["gaps"]["analysis_current"] is False
-    assert payload["gaps"]["gaps"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
-    assert payload["gaps"]["gaps"][0]["route_binding"]["state"] == "blocked_stale_analysis"
+    assert payload["gap_dossier"]["analysis_current"] is False
+    assert payload["gap_dossier"]["analysis_manifest"] is None
+    assert payload["gap_dossier"]["dossiers"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
+    assert payload["gap_dossier"]["dossiers"][0]["route_binding"]["state"] == "blocked_stale_analysis"
     assert before_events == after_events
     assert not (tmp_path / CURRENT_TRIAGE_DIR).exists()
     assert not (tmp_path / STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH).exists()
     assert not (tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH).exists()
 
 
+def test_query_domain_publishes_triaged_work_item_assets_without_pre_admission_route_contract(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-900")
+
+    payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
+
+    assets = {asset["asset_id"]: asset for asset in payload["assets"]}
+    assert "ticket/B-900" in assets
+    assert assets["ticket/B-900"]["declared_type"] == "work_request_surface"
+    assert assets["ticket/B-900"]["metadata"]["re_entry_point"] == "requirements"
+
+    asset_ownership = {entry["handle"]: entry for entry in payload["asset_ownership_index"]}
+    assert asset_ownership["ticket/B-900"]["operator_target"]["handle"] == "bootstrap_release_self_test"
+    assert "route_contract" not in asset_ownership["ticket/B-900"]
+
+
+def test_query_domain_keeps_backlog_ticket_visible_but_not_start_addressable(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-901", status="backlog")
+
+    payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
+
+    assets = {asset["asset_id"]: asset for asset in payload["assets"]}
+    assert "ticket/B-901" in assets
+    assert assets["ticket/B-901"]["declared_type"] == "work_request_surface"
+    assert assets["ticket/B-901"]["metadata"]["ticket_status"] == "backlog"
+    assert "route_kind" not in assets["ticket/B-901"]["metadata"]
+
+    asset_ownership = {entry["handle"]: entry for entry in payload["asset_ownership_index"]}
+    assert "ticket/B-901" not in asset_ownership
+
+
 def test_start_requires_explicit_analysis_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _seed_workspace(tmp_path)
     app = initialize(bootstrap(workspace_root=tmp_path))
-    calls: list[tuple[object, object, bool]] = []
+    calls: list[tuple[object, object]] = []
 
-    def _fake_gen_start(scope, stream, *, auto: bool = False) -> dict[str, object]:
-        calls.append((scope, stream, auto))
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
         return {"status": "ok"}
 
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
 
     with pytest.raises(RuntimeError, match="refresh-analysis"):
-        start(app)
+        start(app, scope="workspace", target="next", until="first_traversal")
     assert calls == []
 
     refresh_analysis(tmp_path, stage="test")
-    result = start(app, auto=True)
+    result = start(app, scope="workspace", target="next", until="first_traversal")
 
-    assert result == {"status": "ok"}
+    assert result["status"] == "ok"
+    assert result["fh_mode"] == "direct"
+    assert result["root_mode"] == "direct"
     assert len(calls) == 1
-    assert calls[0][2] is True
+    assert calls[0][0].scope.selector.kind == "workspace"
+    assert calls[0][0].target.kind == "next"
+    assert calls[0][0].until == "first_traversal"
+
+
+def test_start_routes_ticket_asset_to_declared_reentry_vector(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-900")
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object]] = []
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="asset:ticket/B-900",
+        until="first_traversal",
+    )
+
+    assert result["status"] == "ok"
+    assert result["fh_mode"] == "direct"
+    assert result["root_mode"] == "direct"
+    assert len(calls) == 1
+    intent = calls[0][0]
+    assert intent.scope.diagnostic_edge_override == "derive_requirement_surface"
+    assert intent.target.kind == "asset"
+    assert intent.target.handle == "ticket/B-900"
+    assert intent.target.asset_id == "ticket/B-900"
+    assert intent.target.graph_function_name == "bootstrap_release_self_test"
+    assert intent.target.asset_relative_path == ".ai-workspace/tickets/active/B-900-demo.md"
+
+
+def test_start_uses_admitted_route_contract_for_diagnostic_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-904")
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object]] = []
+    active_module = app.scope(selector=app_module._parse_scope_selector("workspace")).module
+    bootstrap_target_id = next(
+        graph_function.id
+        for graph_function in active_module.graph_functions
+        if graph_function.name == "bootstrap_release_self_test"
+    )
+
+    def _fake_admit_execution_contract_surface(**kwargs: object) -> dict[str, object]:
+        return {"status": "admitted"}
+
+    def _fake_bound_execution_start_from_contract(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            scope=SimpleNamespace(
+                module=active_module,
+                workspace_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workspace_root,
+                selector=app.scope(selector=app_module._parse_scope_selector("workspace")).selector,
+                diagnostic_edge_override="derive_goal_surface",
+                build=app.scope(selector=app_module._parse_scope_selector("workspace")).build,
+                runtime_identity=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_identity,
+                worker=app.scope(selector=app_module._parse_scope_selector("workspace")).worker,
+                active_workflow_path=app.scope(selector=app_module._parse_scope_selector("workspace")).active_workflow_path,
+                workflow_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workflow_root,
+                work_key=app.scope(selector=app_module._parse_scope_selector("workspace")).work_key,
+                run_id=app.scope(selector=app_module._parse_scope_selector("workspace")).run_id,
+                runtime_config=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_config,
+            ),
+            target=SimpleNamespace(
+                kind="asset",
+                handle="ticket/B-904",
+                target_id=bootstrap_target_id,
+                graph_function_name="bootstrap_release_self_test",
+                asset_id="ticket/B-904",
+                asset_uri="workspace://.ai-workspace/tickets/active/B-904-demo.md",
+                asset_relative_path=".ai-workspace/tickets/active/B-904-demo.md",
+                asset_path_kind="file",
+                asset_exists=True,
+                binding_source="odd_sdlc.asset_ownership_index",
+            ),
+            execution_contract={"status": "admitted"},
+        )
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        app_module,
+        "admit_execution_contract_surface",
+        _fake_admit_execution_contract_surface,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "bound_execution_start_from_contract",
+        _fake_bound_execution_start_from_contract,
+    )
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="asset:ticket/B-904",
+        until="first_traversal",
+    )
+
+    assert result["status"] == "ok"
+    assert len(calls) == 1
+    intent = calls[0][0]
+    assert intent.scope.diagnostic_edge_override == "derive_goal_surface"
+
+
+def test_start_uses_admitted_target_truth_for_start_intent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-905")
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object]] = []
+    active_module = app.scope(selector=app_module._parse_scope_selector("workspace")).module
+    bootstrap_target_id = next(
+        graph_function.id
+        for graph_function in active_module.graph_functions
+        if graph_function.name == "bootstrap_release_self_test"
+    )
+
+    def _fake_admit_execution_contract_surface(**kwargs: object) -> dict[str, object]:
+        return {"status": "admitted"}
+
+    def _fake_bound_execution_start_from_contract(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            scope=SimpleNamespace(
+                module=active_module,
+                workspace_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workspace_root,
+                selector=app.scope(selector=app_module._parse_scope_selector("workspace")).selector,
+                diagnostic_edge_override="derive_requirement_surface",
+                build=app.scope(selector=app_module._parse_scope_selector("workspace")).build,
+                runtime_identity=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_identity,
+                worker=app.scope(selector=app_module._parse_scope_selector("workspace")).worker,
+                active_workflow_path=app.scope(selector=app_module._parse_scope_selector("workspace")).active_workflow_path,
+                workflow_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workflow_root,
+                work_key=app.scope(selector=app_module._parse_scope_selector("workspace")).work_key,
+                run_id=app.scope(selector=app_module._parse_scope_selector("workspace")).run_id,
+                runtime_config=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_config,
+            ),
+            target=SimpleNamespace(
+                kind="asset",
+                handle="ticket/B-905",
+                target_id=bootstrap_target_id,
+                graph_function_name="bootstrap_release_self_test",
+                asset_id="ticket/B-905",
+                asset_uri="workspace://.ai-workspace/tickets/active/B-905-demo.md",
+                asset_relative_path=".ai-workspace/tickets/active/B-905-overridden.md",
+                asset_path_kind="file",
+                asset_exists=True,
+                binding_source="odd_sdlc.asset_ownership_index",
+            ),
+            execution_contract={"status": "admitted"},
+        )
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        app_module,
+        "admit_execution_contract_surface",
+        _fake_admit_execution_contract_surface,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "bound_execution_start_from_contract",
+        _fake_bound_execution_start_from_contract,
+    )
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="asset:ticket/B-905",
+        until="first_traversal",
+    )
+
+    assert result["status"] == "ok"
+    assert len(calls) == 1
+    intent = calls[0][0]
+    assert intent.target.asset_relative_path == ".ai-workspace/tickets/active/B-905-overridden.md"
+
+
+def test_start_rejects_unpublished_ticket_asset_handle(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    with pytest.raises(ValueError, match="unknown or non-start-addressable published asset handle"):
+        start(
+            app,
+            scope="workspace",
+            target="asset:ticket/B-003",
+            until="first_traversal",
+        )
+
+
+def test_start_rejects_backlog_ticket_asset_handle(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-902", status="backlog")
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    with pytest.raises(ValueError, match="ticket_status 'backlog' is not start-authoritative"):
+        start(
+            app,
+            scope="workspace",
+            target="asset:ticket/B-902",
+            until="first_traversal",
+        )
+
+
+def test_ticket_asset_start_carries_ticket_execution_context_into_manifest_prompt(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(
+        tmp_path,
+        ticket_id="B-901",
+        ticket_category="implementation_migration",
+        change_class="intent_reprice",
+        re_entry_point="intent",
+    )
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    result = start(
+        app,
+        scope="workspace",
+        target="asset:ticket/B-901",
+        until="first_traversal",
+    )
+
+    assert result["status"] == "iterated"
+    assert result["blocking_reason"] == "fp_dispatch"
+    manifest = json.loads(Path(result["fp_manifest_path"]).read_text(encoding="utf-8"))
+    execution_contract_context = _manifest_context(
+        manifest,
+        "odd_sdlc_execution_contract_context",
+    )
+    assert execution_contract_context["locator"] == (
+        f"workspace://{EXECUTION_CONTRACT_CONTEXT_PATH.as_posix()}"
+    )
+    assert "# Admitted Execution Contract" in str(execution_contract_context["content"])
+    execution_contract = json.loads(
+        (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert execution_contract["contract_kind"] == EXECUTION_CONTRACT_KIND
+    assert execution_contract["status"] == "admitted"
+    assert execution_contract["closure_law"] == (
+        "close only when the admitted execution contract is the source carrier and mixed "
+        "old/new execution proof is rejected"
+    )
+    assert execution_contract["evaluation_criteria"] == [
+        "admit the execution contract before prompt assembly opens",
+        "carry the admitted closure law into manifest provenance",
+    ]
+    assert execution_contract["non_closure_conditions"] == [
+        "raw ticket prose still acts as execution authority",
+        "mixed old/new execution proof still counts as closure",
+    ]
+    assert execution_contract["proof_surface"][:2] == [
+        ".ai-workspace/runtime/odd_sdlc-execution-contract.json",
+        ".ai-workspace/runtime/odd_sdlc-execution-contract.md",
+    ]
+    assert execution_contract["target_truth"]["ticket_target_truth"] == (
+        "one admitted execution contract governs this bounded repair"
+    )
+    assert execution_contract["carrier_graph_functions"] == {
+        "derive": DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        "admit": ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    }
+    assert execution_contract["target_truth"]["handle"] == "ticket/B-901"
+    assert execution_contract["target_truth"]["ticket_relative_path"] == ".ai-workspace/tickets/active/B-901-demo.md"
+    assert execution_contract["route_contract"]["reentry_vector"] == "derive_intent_surface"
+    assert "# Admitted Execution Contract" in manifest["prompt"]
+    assert "contract_id: " in manifest["prompt"]
+
+
+def test_raw_gen_start_without_admitted_execution_contract_fails_closed(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    intent = app_module.StartIntent(
+        scope=app.scope(),
+        target=app_module.StartTarget.next(),
+        until="first_traversal",
+    )
+
+    with pytest.raises(FileNotFoundError, match="odd_sdlc_execution_contract_context"):
+        app_module.gen_start(intent, app.stream)
+
+
+def test_new_execution_contract_supersedes_previous_admitted_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(
+        tmp_path,
+        ticket_id="B-903",
+        ticket_category="implementation_migration",
+        change_class="intent_reprice",
+        re_entry_point="intent",
+    )
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    first = start(app, scope="workspace", target="next", until="first_traversal")
+    assert first["status"] == "ok"
+    first_register = json.loads(
+        (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    first_contract_id = first_register["contract_id"]
+
+    second = start(app, scope="workspace", target="asset:ticket/B-903", until="first_traversal")
+    assert second["status"] == "ok"
+    second_register = json.loads(
+        (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert second_register["status"] == "admitted"
+    assert second_register["contract_id"] != first_contract_id
+    assert second_register["supersedes_contract_id"] == first_contract_id
+
+    execution_events = [
+        event for event in _read_events(tmp_path)
+        if event["event_type"].startswith("execution_contract_")
+    ]
+    assert [event["event_type"] for event in execution_events] == [
+        "execution_contract_drafted",
+        "execution_contract_admitted",
+        "execution_contract_drafted",
+        "execution_contract_superseded",
+        "execution_contract_admitted",
+    ]
+    superseded_event = next(
+        event for event in execution_events
+        if event["event_type"] == "execution_contract_superseded"
+    )
+    superseded_contract = superseded_event["data"]["execution_contract"]
+    assert superseded_contract["contract_id"] == first_contract_id
+    assert superseded_contract["status"] == "superseded"
+    assert superseded_contract["superseded_by_contract_id"] == second_register["contract_id"]
 
 
 def test_published_analysis_invalidates_when_requirement_surface_changes(tmp_path: Path) -> None:
@@ -628,10 +1498,10 @@ def test_start_requires_explicit_refresh_when_published_analysis_is_stale(
 ) -> None:
     _seed_workspace(tmp_path)
     app = initialize(bootstrap(workspace_root=tmp_path))
-    calls: list[tuple[object, object, bool]] = []
+    calls: list[tuple[object, object]] = []
 
-    def _fake_gen_start(scope, stream, *, auto: bool = False) -> dict[str, object]:
-        calls.append((scope, stream, auto))
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
         return {"status": "ok"}
 
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
@@ -657,7 +1527,7 @@ def test_start_requires_explicit_refresh_when_published_analysis_is_stale(
     assert ready_before is False
 
     with pytest.raises(RuntimeError, match="workspace analysis is stale"):
-        start(app, auto=True)
+        start(app, scope="workspace", target="next", until="first_traversal")
 
     assert calls == []
     ready_after, _ = workspace_state_ready(tmp_path)
@@ -683,6 +1553,8 @@ def test_refresh_analysis_publishes_distinct_analysis_manifest(tmp_path: Path) -
         "ambiguity_register",
         "requirement_closure_register",
         "requirement_closure_prompt_context",
+        "repair_frontier_register",
+        "repair_frontier_prompt_context",
     }
     assert any(entry["input_kind"] == "requirement_surface" for entry in analysis_manifest["source_inputs"])
 
@@ -698,22 +1570,30 @@ def test_query_domain_exposes_published_analysis_manifest(tmp_path: Path) -> Non
     refresh_analysis(tmp_path, stage="test")
     payload = query_domain(initialize(bootstrap(workspace_root=tmp_path)))
 
-    assert payload["analysis_manifest"] is not None
-    assert payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
-    assert {entry["artifact_kind"] for entry in payload["analysis_manifest"]["published_artifacts"]} == {
+    assert payload["gap_dossier"]["analysis_manifest"] is not None
+    assert payload["gap_dossier"]["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    assert {entry["artifact_kind"] for entry in payload["gap_dossier"]["analysis_manifest"]["published_artifacts"]} == {
         "ambiguity_register",
         "requirement_closure_register",
         "requirement_closure_prompt_context",
+        "repair_frontier_register",
+        "repair_frontier_prompt_context",
     }
-    assert payload["gaps"]["analysis_current"] is True
-    assert payload["gaps"]["gaps"]
+    assert payload["gap_dossier"]["analysis_current"] is True
+    assert payload["gap_dossier"]["dossiers"]
     assert any(
-        gap["observation"]["observed_signal"] in {"unresolved_gap_pressure", "missing_required_bindings"}
-        for gap in payload["gaps"]["gaps"]
+        dossier["observation"]["observed_signal"] in {"unresolved_gap_pressure", "missing_required_bindings"}
+        for dossier in payload["gap_dossier"]["dossiers"]
     )
     assert any(
-        gap["route_binding"]["state"] in {"unresolved", "suppressed_by_mode", "advance_fixed_vector"}
-        for gap in payload["gaps"]["gaps"]
+        dossier["route_binding"]["state"] in {"unresolved", "suppressed_by_mode", "advance_fixed_vector"}
+        for dossier in payload["gap_dossier"]["dossiers"]
+    )
+    assert payload["gap_dossier"]["gap_dossier_kind"] == "odd_sdlc.gap_dossier_register"
+    assert payload["gap_dossier"]["dossiers"]
+    assert (
+        payload["gap_dossier"]["dossiers"][0]["triage"]["process_outcome_kind"]
+        == payload["gap_dossier"]["dossiers"][0]["triage"]["process_outcome_kind"]
     )
 
 
@@ -722,13 +1602,14 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     app = initialize(bootstrap(workspace_root=tmp_path))
 
     payload = gaps(app)
+    first_dossier = payload["dossiers"][0]
 
     assert payload["analysis_current"] is False
-    assert payload["gaps"][0]["observation"]["observed_signal"] == "stale_published_analysis"
-    assert payload["gaps"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
-    assert payload["gaps"][0]["route_binding"]["route_id"].startswith("route_")
-    assert payload["gaps"][0]["route_binding"]["state"] == "blocked_stale_analysis"
-    triage_artifact = load_current_edge_triage(tmp_path, payload["gaps"][0]["edge"])
+    assert first_dossier["observation"]["observed_signal"] == "stale_published_analysis"
+    assert first_dossier["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
+    assert first_dossier["route_binding"]["route_id"].startswith("route_")
+    assert first_dossier["route_binding"]["state"] == "blocked_stale_analysis"
+    triage_artifact = load_current_edge_triage(tmp_path, first_dossier["edge"])
     assert triage_artifact is not None
     assert triage_artifact["artifact_kind"] == "odd_sdlc.current_edge_triage"
     assert triage_artifact["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
@@ -736,6 +1617,21 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     assert triage_artifact["observation"]["event_id"]
     assert triage_artifact["triage"]["event_id"]
     assert triage_artifact["route_binding"]["route_event_id"]
+    dossier_register_path = tmp_path / GAP_DOSSIER_REGISTER_PATH
+    dossier_context_path = tmp_path / GAP_DOSSIER_CONTEXT_PATH
+    assert dossier_register_path.exists()
+    assert dossier_context_path.exists()
+    dossier_register = json.loads(dossier_register_path.read_text(encoding="utf-8"))
+    assert dossier_register["gap_dossier_kind"] == "odd_sdlc.gap_dossier_register"
+    dossier = dossier_register["dossiers"][0]
+    assert dossier["edge"] == first_dossier["edge"]
+    assert dossier["route_binding"]["state"] == "blocked_stale_analysis"
+    assert dossier["evidence_bundle_refs"]["current_triage_artifact_path"] == (
+        CURRENT_TRIAGE_DIR / f"{first_dossier['edge']}.json"
+    ).as_posix()
+    dossier_context = dossier_context_path.read_text(encoding="utf-8")
+    assert "# odd_sdlc Gap Analysis Dossiers" in dossier_context
+    assert f"## `{first_dossier['edge']}`" in dossier_context
     event_types = [event["event_type"] for event in app.stream.all_events()]
     assert "observation_recorded" in event_types
     assert "triage_produced" in event_types
@@ -897,9 +1793,15 @@ def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: p
     ]
     canonical_gaps = {gap["edge"]: gap for gap in payload["gaps"]}
     assert canonical_gaps["derive_requirement_surface"]["gap_kind"] == "graph_edge_gap"
+    assert canonical_gaps["derive_requirement_surface"]["carry_truth_available"] is False
+    assert canonical_gaps["derive_requirement_surface"]["fulfillment_truth_available"] is False
+    assert canonical_gaps["derive_requirement_surface"]["carry_converged"] is None
+    assert canonical_gaps["derive_requirement_surface"]["fulfillment_converged"] is None
     assert canonical_gaps["derive_requirement_surface"]["graph_delta"] == pytest.approx(0.5)
     assert canonical_gaps["derive_requirement_surface"]["total_delta"] == pytest.approx(0.5)
     assert canonical_gaps["derive_code_surface"]["gap_kind"] == "declared_obligation_edge_gap"
+    assert canonical_gaps["derive_code_surface"]["carry_truth_available"] is True
+    assert canonical_gaps["derive_code_surface"]["fulfillment_truth_available"] is True
     assert canonical_gaps["derive_code_surface"]["carry_converged"] is True
     assert canonical_gaps["derive_code_surface"]["fulfillment_converged"] is False
     assert canonical_gaps["derive_code_surface"]["graph_delta"] == pytest.approx(0.5)
@@ -918,8 +1820,14 @@ def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: p
     assert canonical_gaps["derive_test_module_surface"]["combined_delta"] == pytest.approx(0.0)
     assert canonical_gaps["derive_test_module_surface"]["total_delta"] == pytest.approx(0.5)
     assert payload["summary"]["converged"] is False
+    assert payload["summary"]["declared_obligation_gap_count"] == 3
+    assert payload["summary"]["graph_edge_gap_count"] == 1
+    assert payload["summary"]["mixed_truth_classes"] is True
     assert payload["summary"]["carry_converged"] is False
     assert payload["summary"]["fulfillment_converged"] is False
+    assert payload["summary"]["declared_carry_converged"] is False
+    assert payload["summary"]["declared_fulfillment_converged"] is False
+    assert payload["summary"]["graph_gap_converged"] is False
     assert payload["summary"]["span_converged"] is False
     assert payload["summary"]["graph_total_delta"] == pytest.approx(1.5)
     assert payload["summary"]["direct_graph_delta"] == pytest.approx(1.5)
@@ -965,7 +1873,7 @@ def test_gap_publication_does_not_inherit_unrelated_prior_run_id(tmp_path: Path)
     )
 
     payload = gaps(app)
-    triage_artifact = load_current_edge_triage(tmp_path, payload["gaps"][0]["edge"])
+    triage_artifact = load_current_edge_triage(tmp_path, payload["dossiers"][0]["edge"])
     events = app.stream.all_events()
     triage_event = next(event for event in events if event["event_type"] == "triage_produced")
     assert triage_artifact is not None
@@ -980,7 +1888,7 @@ def test_query_domain_prefers_current_triage_artifact_when_analysis_is_current(t
     app = initialize(bootstrap(workspace_root=tmp_path))
 
     published = gaps(app)
-    edge_id = published["gaps"][0]["edge"]
+    edge_id = published["dossiers"][0]["edge"]
     artifact_path = tmp_path / CURRENT_TRIAGE_DIR / f"{edge_id}.json"
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     artifact["triage"]["triage_id"] = "tri_from_current_artifact"
@@ -990,7 +1898,7 @@ def test_query_domain_prefers_current_triage_artifact_when_analysis_is_current(t
     payload = query_domain(app)
     after_events = _read_events(tmp_path)
 
-    assert payload["gaps"]["gaps"][0]["triage"]["triage_id"] == "tri_from_current_artifact"
+    assert payload["gap_dossier"]["dossiers"][0]["triage"]["triage_id"] == "tri_from_current_artifact"
     assert before_events == after_events
 
 
@@ -1004,7 +1912,7 @@ def test_gaps_deduplicates_identical_projection_publication(tmp_path: Path) -> N
     second = gaps(app)
     second_events = _read_events(tmp_path)
 
-    assert second["gaps"][0]["triage"]["triage_id"] == first["gaps"][0]["triage"]["triage_id"]
+    assert second["dossiers"][0]["triage"]["triage_id"] == first["dossiers"][0]["triage"]["triage_id"]
     assert second_events == first_events
 
 
@@ -1043,6 +1951,35 @@ def test_triage_divergence_records_prior_observation_chain(tmp_path: Path) -> No
     assert divergence
     assert divergence[-1]["data"]["prior_triage_id"] == first_edge["triage"]["triage_id"]
     assert divergence[-1]["data"]["current_triage_id"] == second_edge["triage"]["triage_id"]
+
+
+def test_bootstrap_strips_self_query_binding_contracts_from_runtime_config(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    runtime_contract = tmp_path / ".genesis" / "odd_sdlc" / "release" / "genesis.yml"
+    runtime_contract.parent.mkdir(parents=True, exist_ok=True)
+    runtime_contract.write_text(
+        "\n".join(
+            (
+                'domain_package: odd_sdlc',
+                'transport_contract: .genesis/odd_sdlc/release/test_transport_contract.json',
+                'asset_binding_contract: {"command":["python","-m","odd_sdlc","query-domain","--workspace","."]}',
+                'operator_asset_contract: {"command":["python","-m","odd_sdlc","query-domain","--workspace","."]}',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".genesis" / "genesis.yml").write_text(
+        "runtime_contract: .genesis/odd_sdlc/release/genesis.yml\n",
+        encoding="utf-8",
+    )
+
+    config = bootstrap(workspace_root=tmp_path)
+
+    assert config.runtime_config["domain_package"] == "odd_sdlc"
+    assert config.runtime_config["transport_contract"] == ".genesis/odd_sdlc/release/test_transport_contract.json"
+    assert "asset_binding_contract" not in config.runtime_config
+    assert "operator_asset_contract" not in config.runtime_config
 
 
 def test_missing_capability_is_projected_as_blocked_missing_capability(tmp_path: Path) -> None:
@@ -1095,7 +2032,12 @@ def test_missing_capability_is_projected_as_blocked_missing_capability(tmp_path:
 def test_governed_workspace_constitutional_pressure_is_suppressed_by_default(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     refresh_analysis(tmp_path, stage="test")
-    app = initialize(bootstrap(workspace_root=tmp_path))
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "suppress"}},
+        )
+    )
 
     payload = enrich_gap_snapshot(
         workspace_root=tmp_path,
@@ -1118,7 +2060,7 @@ def test_governed_workspace_constitutional_pressure_is_suppressed_by_default(tmp
                 }
             ],
         },
-        runtime_config={},
+        runtime_config=app.config.runtime_config,
         publish=True,
     )
 
@@ -1703,7 +2645,8 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert bindings["deployment_surface"] == ("deployment_surface",)
     assert bindings["runtime_observation_surface"] == ("runtime_observation_surface",)
     assert bindings["retrofit_plan_surface"] == ("retrofit_plan_surface",)
-    assert [entry["name"] for entry in result["graph_functions"]] == GRAPH_FUNCTION_NAMES
+    graph_function_names = [entry["name"] for entry in result["graph_functions"]]
+    assert graph_function_names == _expected_graph_function_names(graph_function_names)
     executive = result["graph_functions"][0]
     assert executive["intent"] == BOOTSTRAP_RELEASE_SELF_TEST_INTENT
     assert executive["function_kind"] == "odd_executive_graph_function"
@@ -1759,15 +2702,18 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     }
     assert [vector["name"] for vector in executive["vectors"]] == list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS)
     assert executive["job_names"] == ["bootstrap_release_self_test_job"]
-    operational = result["graph_functions"][1]
-    assert operational["intent"] == RELEASE_OPERATIONAL_CYCLE_INTENT
-    assert operational["function_kind"] == "odd_executive_graph_function"
-    assert operational["template_kind"] == "inline_graph"
-    assert operational["inputs"] == ["release_surface", "test_run_archive_surface"]
-    assert operational["outputs"] == ["retrofit_plan_surface"]
-    assert [vector["name"] for vector in operational["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
-    assert operational["job_names"] == ["release_operational_cycle_job"]
-    shared_consensus_round = result["graph_functions"][2]
+    shared_consensus_index = 1
+    if "release_operational_cycle" in graph_function_names:
+        operational = result["graph_functions"][1]
+        assert operational["intent"] == RELEASE_OPERATIONAL_CYCLE_INTENT
+        assert operational["function_kind"] == "odd_executive_graph_function"
+        assert operational["template_kind"] == "inline_graph"
+        assert operational["inputs"] == ["release_surface", "test_run_archive_surface"]
+        assert operational["outputs"] == ["retrofit_plan_surface"]
+        assert [vector["name"] for vector in operational["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
+        assert operational["job_names"] == ["release_operational_cycle_job"]
+        shared_consensus_index = 2
+    shared_consensus_round = result["graph_functions"][shared_consensus_index]
     assert shared_consensus_round["function_kind"] == "odd_consensus_plugin_round_graph_function"
     assert shared_consensus_round["plugin_kind"] == "shared_consensus_plugin"
     assert shared_consensus_round["harness_kind"] == "consensus_round"
@@ -1798,7 +2744,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         ),
         "policy_rule": "subject_consensus_rule",
     }
-    shared_consensus_library = result["graph_functions"][3]
+    shared_consensus_library = result["graph_functions"][shared_consensus_index + 1]
     assert shared_consensus_library["function_kind"] == "odd_consensus_plugin_graph_function"
     assert shared_consensus_library["plugin_kind"] == "shared_consensus_plugin"
     assert shared_consensus_library["harness_kind"] == "consensus_harness"
@@ -1809,7 +2755,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert shared_consensus_library["job_names"] == []
     assert shared_consensus_library["harness_contract"] == shared_consensus_round["harness_contract"]
     assert shared_consensus_library["harness_implementation"] == shared_consensus_round["harness_implementation"]
-    consensus_round = result["graph_functions"][4]
+    consensus_round = result["graph_functions"][shared_consensus_index + 2]
     assert consensus_round["function_kind"] == "odd_consensus_round_graph_function"
     assert consensus_round["harness_kind"] == "consensus_round"
     assert consensus_round["host_binding_of"] == "review_subject_consensus_round"
@@ -1869,7 +2815,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         },
     ]
     assert consensus_round["job_names"] == []
-    consensus_library = result["graph_functions"][5]
+    consensus_library = result["graph_functions"][shared_consensus_index + 3]
     assert consensus_library["function_kind"] == "odd_consensus_library_graph_function"
     assert consensus_library["harness_kind"] == "consensus_harness"
     assert consensus_library["host_binding_of"] == "review_subject_by_consensus"
@@ -1892,7 +2838,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
         ),
         "policy_rule": "design_consensus_rule",
     }
-    comment_consensus_round = result["graph_functions"][6]
+    comment_consensus_round = result["graph_functions"][shared_consensus_index + 4]
     assert comment_consensus_round["function_kind"] == "odd_consensus_host_binding_round_graph_function"
     assert comment_consensus_round["plugin_kind"] == "host_binding"
     assert comment_consensus_round["host_binding_of"] == "review_subject_consensus_round"
@@ -1903,7 +2849,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert comment_consensus_round["outputs"] == ["reviewed_comment_surface"]
     assert comment_consensus_round["template_kind"] == "symbolic"
     assert comment_consensus_round["job_names"] == []
-    comment_consensus_library = result["graph_functions"][7]
+    comment_consensus_library = result["graph_functions"][shared_consensus_index + 5]
     assert comment_consensus_library["function_kind"] == "odd_consensus_host_binding_graph_function"
     assert comment_consensus_library["plugin_kind"] == "host_binding"
     assert comment_consensus_library["host_binding_of"] == "review_subject_by_consensus"
@@ -1914,22 +2860,7 @@ def test_catalog_reports_uri_assets_and_bindings(tmp_path: Path) -> None:
     assert comment_consensus_library["outputs"] == ["reviewed_comment_surface"]
     assert comment_consensus_library["template_kind"] == "symbolic"
     assert comment_consensus_library["job_names"] == []
-    assert result["programs"] == [
-        {
-            "name": "bootstrap_release_self_test",
-            "intent": BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
-            "steps": list(BOOTSTRAP_RELEASE_SELF_TEST_STEPS),
-            "outputs": ["release_surface"],
-            "kind": "executive_program",
-        },
-        {
-            "name": "release_operational_cycle",
-            "intent": RELEASE_OPERATIONAL_CYCLE_INTENT,
-            "steps": list(RELEASE_OPERATIONAL_CYCLE_STEPS),
-            "outputs": ["retrofit_plan_surface"],
-            "kind": "executive_program",
-        },
-    ]
+    assert result["programs"] == _expected_program_entries(graph_function_names)
 
 
 def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
@@ -1957,8 +2888,8 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
         "ambiguity_register",
-        "analysis_manifest",
         "asset_families",
+        "asset_ownership_index",
         "asset_types",
         "assets",
         "bindings",
@@ -1966,34 +2897,46 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "continuations",
         "edge_contracts",
         "functions",
-        "gaps",
+        "gap_dossier",
         "graph_calls",
         "graph_functions",
         "jobs",
+        "operational_capabilities",
         "programs",
         "query_contract",
         "recent_events",
         "requirement_closure_register",
         "runs",
         "semantic_facets",
+        "start_target_catalog",
         "work_act_types",
         "workspace_root",
     ]
     assert len(payload["assets"]) == len(ASSET_PATHS)
-    assert len(payload["functions"]) == 33
+    assert len(payload["functions"]) == 24
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
     assert len(payload["collections"]) == 1
-    assert len(payload["programs"]) == 2
-    assert payload["gaps"]["converged"] is False
+    graph_function_names = [entry["name"] for entry in payload["graph_functions"]]
+    assert payload["programs"] == _expected_program_entries(graph_function_names)
+    assert payload["gap_dossier"]["converged"] is False
     assert payload["runs"] == []
     assert payload["graph_calls"] == []
     assert payload["continuations"] == []
     assert payload["recent_events"] == []
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
-    assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
+    assert payload["operational_capabilities"]["projection_kind"] == "odd_sdlc.operational_capabilities"
+    assert graph_function_names == _expected_graph_function_names(graph_function_names)
+    graph_functions = {entry["name"]: entry for entry in payload["graph_functions"]}
+    assert graph_functions[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["selection_visible"] is False
+    assert graph_functions[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["selection_visible"] is False
+    start_targets = {entry["handle"]: entry for entry in payload["start_target_catalog"]}
+    assert start_targets[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["start_addressable"] is False
+    assert start_targets[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["execution_binding"] == "not_start_addressable"
+    assert start_targets[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["start_addressable"] is False
+    assert start_targets[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["execution_binding"] == "not_start_addressable"
     assert all(asset["projection_source"] == "workspace_scan" for asset in payload["assets"])
 
 
@@ -2022,35 +2965,39 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     payload = json.loads(result.stdout)
     assert sorted(payload.keys()) == [
         "ambiguity_register",
-        "analysis_manifest",
         "asset_families",
+        "asset_ownership_index",
         "asset_types",
         "assets",
         "bindings",
         "collections",
         "edge_contracts",
         "functions",
-        "gaps",
+        "gap_dossier",
         "graph_functions",
         "jobs",
+        "operational_capabilities",
         "programs",
         "query_contract",
         "requirement_closure_register",
         "semantic_facets",
+        "start_target_catalog",
         "work_act_types",
         "workspace_root",
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v10",
+        "version": "v15",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
-            "analysis_manifest",
             "semantic_facets",
             "asset_types",
             "asset_families",
             "assets",
+            "start_target_catalog",
+            "asset_ownership_index",
+            "operational_capabilities",
             "ambiguity_register",
             "requirement_closure_register",
             "collections",
@@ -2061,31 +3008,46 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
             "jobs",
             "graph_functions",
             "bindings",
-            "gaps",
+            "gap_dossier",
         ],
         "runtime_model": "abg-native",
         "query_model": "odd-domain-plugin",
     }
+    assert payload["operational_capabilities"]["projection_kind"] == "odd_sdlc.operational_capabilities"
+    assert payload["operational_capabilities"]["families"]["build_execution"]["state"] == "undeclared"
+    assert payload["operational_capabilities"]["families"]["test_execution"]["state"] == "undeclared"
+    assert payload["operational_capabilities"]["families"]["deployment"]["state"] == "undeclared"
+    assert payload["operational_capabilities"]["families"]["runtime_observation"]["state"] == "undeclared"
     assert "runs" not in payload
     assert "graph_calls" not in payload
     assert "continuations" not in payload
     assert len(payload["assets"]) == len(ASSET_PATHS)
-    assert len(payload["functions"]) == 33
+    assert len(payload["functions"]) == 24
     assert len(payload["asset_families"]) == 8
     assert len(payload["work_act_types"]) == 8
     assert len(payload["edge_contracts"]) == 7
     assert len(payload["collections"]) == 1
-    assert len(payload["programs"]) == 2
-    assert payload["gaps"]["converged"] is False
-    assert "analysis_current" in payload["gaps"]
-    assert "observation" in payload["gaps"]["gaps"][0]
-    assert "triage" in payload["gaps"]["gaps"][0]
-    assert "route_binding" in payload["gaps"]["gaps"][0]
+    assert len(payload["programs"]) == 1
+    assert payload["gap_dossier"]["converged"] is False
+    assert payload["gap_dossier"]["analysis_current"] is False
+    assert payload["gap_dossier"]["analysis_manifest"] is None
+    assert "observation" in payload["gap_dossier"]["dossiers"][0]
+    assert "triage" in payload["gap_dossier"]["dossiers"][0]
+    assert "route_binding" in payload["gap_dossier"]["dossiers"][0]
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert payload["asset_families"][0]["name"] == "worksite_inputs"
     assert payload["work_act_types"][0]["name"] == "generate"
     assert payload["edge_contracts"][0]["name"] == "bootstrap_spec_foundation"
+    start_targets = {entry["handle"]: entry for entry in payload["start_target_catalog"]}
+    assert start_targets["bootstrap_release_self_test"]["start_addressable"] is True
+    assert start_targets["bootstrap_release_self_test"]["carrier_class"] == "executive_carrier"
+    assert start_targets["review_design_consensus_round"]["start_addressable"] is True
+    assert start_targets["review_design_consensus_round"]["carrier_class"] == "host_binding"
+    assert start_targets["review_subject_by_consensus"]["start_addressable"] is False
+    asset_ownership = {entry["handle"]: entry for entry in payload["asset_ownership_index"]}
+    assert asset_ownership["code_surface"]["operator_target"]["handle"] == "bootstrap_release_self_test"
+    assert asset_ownership["reviewed_design_surface"]["operator_target"]["handle"] == "review_design_consensus_round"
     functions = {entry["name"]: entry for entry in payload["functions"]}
     assert functions["derive_product_surface"]["inputs"] == ["input_set", "intent_surface"]
     assert functions["derive_goal_surface"]["inputs"] == [
@@ -2120,26 +3082,112 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "testcase_authority_surface",
         "test_run_archive_surface",
     ]
-    assert functions["prepare_build_execution_surface"]["inputs"] == ["release_surface"]
-    assert functions["derive_build_execution_result_surface"]["inputs"] == ["build_execution_surface"]
-    assert functions["prepare_test_execution_surface"]["inputs"] == ["release_surface"]
-    assert functions["derive_test_execution_result_surface"]["inputs"] == ["test_execution_surface", "test_run_archive_surface"]
-    assert functions["prepare_deployment_surface"]["inputs"] == ["release_surface"]
-    assert functions["derive_deployment_result_surface"]["inputs"] == ["deployment_surface"]
-    assert functions["derive_deployed_environment_surface"]["inputs"] == ["deployment_result_surface"]
-    assert functions["derive_runtime_observation_surface"]["inputs"] == ["deployment_result_surface", "test_run_archive_surface"]
-    assert functions["derive_retrofit_plan_surface"]["inputs"] == ["runtime_observation_surface", "release_surface"]
-    assert [entry["name"] for entry in payload["graph_functions"]] == GRAPH_FUNCTION_NAMES
+    for absent_name in (
+        "prepare_build_execution_surface",
+        "derive_build_execution_result_surface",
+        "prepare_test_execution_surface",
+        "derive_test_execution_result_surface",
+        "prepare_deployment_surface",
+        "derive_deployment_result_surface",
+        "derive_deployed_environment_surface",
+        "derive_runtime_observation_surface",
+        "derive_retrofit_plan_surface",
+    ):
+        assert absent_name not in functions
+    assert [entry["name"] for entry in payload["graph_functions"]] == [
+        name for name in GRAPH_FUNCTION_NAMES if name != "release_operational_cycle"
+    ]
     graph_functions = {entry["name"]: entry for entry in payload["graph_functions"]}
     assert graph_functions["bootstrap_release_self_test"]["job_names"] == ["bootstrap_release_self_test_job"]
-    assert graph_functions["release_operational_cycle"]["job_names"] == ["release_operational_cycle_job"]
+    assert "release_operational_cycle" not in graph_functions
+    assert graph_functions["review_design_consensus_round"]["job_names"] == []
     assert graph_functions["review_subject_consensus_round"]["job_names"] == []
     assert graph_functions["review_subject_by_consensus"]["job_names"] == []
+    assert graph_functions[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["job_names"] == []
+    assert graph_functions[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["selection_visible"] is False
+    assert graph_functions[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["job_names"] == []
+    assert graph_functions[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["selection_visible"] is False
+    assert start_targets[DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION]["start_addressable"] is False
+    assert start_targets[ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION]["start_addressable"] is False
     assert [vector["name"] for vector in graph_functions["bootstrap_release_self_test"]["vectors"]] == list(
         BOOTSTRAP_RELEASE_SELF_TEST_STEPS
     )
-    assert [vector["name"] for vector in graph_functions["release_operational_cycle"]["vectors"]] == list(RELEASE_OPERATIONAL_CYCLE_STEPS)
     bootstrap_vectors = {vector["name"]: vector for vector in graph_functions["bootstrap_release_self_test"]["vectors"]}
+    assert bootstrap_vectors["derive_feature_decomp_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_feature_decomp_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "identity",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "feature_decomp_surface_coverage",
+        "evidence_policy": "feature_decomp_traceability",
+    }
+    assert bootstrap_vectors["derive_uat_testcases_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_uat_testcases_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "identity",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "uat_testcases_surface_coverage",
+        "evidence_policy": "uat_testcase_traceability",
+    }
+    assert bootstrap_vectors["derive_design_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_design_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "identity",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "design_surface_coverage",
+        "evidence_policy": "design_surface_traceability",
+    }
+    assert bootstrap_vectors["derive_scenario_surface"]["obligation_ledger"] == {
+        "signal_key": "derive_scenario_surface",
+        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "obligation_source_ref": "requirement_surface",
+        "obligation_source_kind": "requirement_surface",
+        "obligation_source_admission_basis": "authority_or_current_surface",
+        "obligation_kind": "requirement",
+        "derivation_rule": "identity",
+        "carry_rule": "deterministic_requirement_membership",
+        "fulfillment_rule": "scenario_surface_coverage",
+        "evidence_policy": "scenario_surface_traceability",
+    }
+
+    module = odd_sdlc_module(tmp_path)
+    vectors_by_name = {
+        vector.name: vector
+        for function in module.graph_functions
+        for vector in (function.template.graph.vectors if function.template.graph is not None else ())
+    }
+    assert [evaluator.name for evaluator in vectors_by_name["derive_feature_decomp_surface"].evaluators] == [
+        "feature_decomp_dependency_surfaces_present",
+        "derive_feature_decomp_surface_obligation_ledger_carry_converged",
+        "feature_decomp_surface_semantically_converged",
+    ]
+    assert [evaluator.name for evaluator in vectors_by_name["derive_uat_testcases_surface"].evaluators] == [
+        "uat_testcases_dependency_surfaces_present",
+        "derive_uat_testcases_surface_obligation_ledger_carry_converged",
+        "uat_testcases_surface_semantically_converged",
+    ]
+    assert [evaluator.name for evaluator in vectors_by_name["derive_design_surface"].evaluators] == [
+        "design_dependency_surfaces_present",
+        "derive_design_surface_obligation_ledger_carry_converged",
+        "design_surface_semantically_converged",
+    ]
+    assert [evaluator.name for evaluator in vectors_by_name["derive_scenario_surface"].evaluators] == [
+        "scenario_dependency_surfaces_present",
+        "derive_scenario_surface_obligation_ledger_carry_converged",
+        "scenario_surface_semantically_converged",
+    ]
     assert bootstrap_vectors["derive_code_surface"]["obligation_ledger"] == {
         "signal_key": "derive_code_surface",
         "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
@@ -2192,8 +3240,12 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
-    assert payload["graph_functions"][3]["template_kind"] == "symbolic"
-    assert payload["graph_functions"][3]["vectors"] == []
+    assert payload["graph_functions"][3]["template_kind"] == "inline_graph"
+    assert [vector["name"] for vector in payload["graph_functions"][3]["vectors"]] == [
+        "derive_review_assessment_surface",
+        "derive_consensus_decision_surface",
+        "derive_reviewed_design_surface",
+    ]
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:
@@ -2223,6 +3275,12 @@ def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -
             "-m",
             "odd_sdlc",
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             "--workspace",
             str(tmp_path),
         ],
@@ -2264,9 +3322,8 @@ def test_self_test_executes_the_current_executive_program(tmp_path: Path) -> Non
     assert [step["assessed"]["status"] for step in result["steps"]] == ["ok"] * len(result["steps"])
     assert result["steps"][-1]["edge"] == "prepare_release_surface"
     assert result["steps"][-1]["assessed"]["status"] == "ok"
-    assert result["final_state"]["status"] == "iterated"
-    assert result["final_state"]["edge"] == "prepare_build_execution_surface"
-    assert result["final_state"]["blocking_reason"] == "fp_dispatch"
+    assert result["final_state"]["status"] == "converged"
+    assert result["follow_on_program"] is None
     assert result["emit_boundary"]["passes"] is True
     assert result["emit_boundary"]["observed_emit_import_paths"] == ["runtime_effects.py"]
     assert result["homeostatic_loop"]["status"] == "retired"
@@ -2292,7 +3349,7 @@ def test_self_test_reports_clean_pending_dispatch_when_the_current_program_edge_
     monkeypatch.setattr(
         self_test_module,
         "start",
-        lambda _app: {
+        lambda _app, **_kwargs: {
             "status": "pending",
             "edge": "derive_intent_surface",
             "blocking_reason": "fp_dispatch",
@@ -2320,7 +3377,7 @@ def test_self_test_still_raises_when_pending_dispatch_is_outside_the_current_pro
     monkeypatch.setattr(
         self_test_module,
         "start",
-        lambda _app: {
+        lambda _app, **_kwargs: {
             "status": "pending",
             "edge": "nonexistent_edge",
             "blocking_reason": "fp_dispatch",

@@ -3,6 +3,8 @@
 **Family**: REQ-F-ODDSDLC-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the operational-transition model for the active `odd_sdlc`
 software-domain package.

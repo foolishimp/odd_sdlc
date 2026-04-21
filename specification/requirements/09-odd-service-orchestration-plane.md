@@ -3,6 +3,8 @@
 **Family**: REQ-F-ODDSVC-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the `odd_service` incubation line inside `odd_sdlc`.
 
@@ -45,9 +47,11 @@ convergence, lineage, or provenance.
 direct local CLI operation.
 
 **Acceptance Criteria**:
-- AC-1: direct local execution through `PYTHONPATH=.genesis python -m genesis
-  start --auto --workspace .` or the installed odd_sdlc equivalent remains
-  valid without the service
+- AC-1: direct local execution through the published `odd_sdlc start --scope
+  workspace --target next|graph_function:<published_handle>|asset:<published_handle> --until converged`
+  operator contract remains valid without the service; any lower-level
+  substrate command path is internal runtime realization, not co-equal
+  product/operator truth
 - AC-2: local service execution drives the same underlying runtime contract and
   does not create a parallel traversal loop with different semantics
 - AC-3: resumability, pending F_P dispatch, and assessed-result ingestion

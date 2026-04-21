@@ -14,8 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from .analysis import refresh_analysis
-from .install_topology import INSTALLED_PRODUCT_ROOT_RELATIVE
+from .install_topology import (
+    INSTALLED_PRODUCT_CODE_ROOT_RELATIVE,
+    INSTALLED_PRODUCT_ROOT_RELATIVE,
+    LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE,
+)
 from .project_profile import (
+    _strip_quotes,
     _parse_constraints_lines,
     canonical_tenant_name,
     load_project_profile,
@@ -36,6 +41,20 @@ TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("runtime_observation_contract", '""'),
 )
 TENANT_REGISTRY_PATH = Path("build_tenants/TENANT_REGISTRY.md")
+
+
+def _is_conformant_selected_output_dir(output_dir: str) -> bool:
+    normalized = output_dir.strip().strip("/")
+    if not normalized:
+        return False
+    parts = Path(normalized).parts
+    if len(parts) < 2 or parts[0] != "build_tenants":
+        return False
+    if normalized == "build_tenants/common" or normalized.startswith("build_tenants/common/"):
+        return False
+    if normalized.startswith(".genesis/"):
+        return False
+    return True
 
 
 def default_project_slug(workspace_root: Path) -> str:
@@ -271,9 +290,8 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
             "",
             "## Installed Runtime Start Surface",
-            "- inspect current gaps with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
-            "- trigger bounded odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --workspace .`",
-            "- add `--human-proxy` only when you expect an explicit F_H approval lane; it does not proxy F_P transport failures",
+            f"- inspect current gaps with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc gaps --scope workspace --workspace .`",
+            f"- advance odd_sdlc graph/worksite state with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc start --scope workspace --target next --until converged --workspace .`",
             "- deployment, runtime-return, and similar side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
             "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
             "- when release/deployment/runtime remain at `pending_evidence` with no returned execution data, treat the converged boundary as `construction_complete_pending_execution`",
@@ -303,12 +321,158 @@ def _remove_legacy_root_readme(workspace_root: Path, *, actions: list[dict[str, 
     )
 
 
+def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    if "build_tenants:" not in text:
+        return None
+
+    project: dict[str, str] = {}
+    registry: dict[str, dict[str, object]] = {}
+    top_level: dict[str, str] = {}
+    section = ""
+    current_tenant: dict[str, object] | None = None
+    current_list_key: str | None = None
+
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip())
+        if indent == 0 and stripped == "project:":
+            section = "project"
+            current_tenant = None
+            current_list_key = None
+            continue
+        if indent == 0 and stripped == "build_tenants:":
+            section = "build_tenants"
+            current_tenant = None
+            current_list_key = None
+            continue
+        if indent == 0 and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            top_level[key.strip()] = _strip_quotes(value)
+            section = ""
+            current_tenant = None
+            current_list_key = None
+            continue
+        if section == "project" and indent == 2 and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            project[key.strip()] = _strip_quotes(value)
+            continue
+        if section != "build_tenants":
+            continue
+        if indent == 2 and stripped.endswith(":"):
+            tenant_name = stripped[:-1].strip()
+            current_tenant = {}
+            registry[tenant_name] = current_tenant
+            current_list_key = None
+            continue
+        if current_tenant is None:
+            continue
+        if indent == 4 and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            key = key.strip()
+            value = value.strip()
+            if not value:
+                current_tenant[key] = []
+                current_list_key = key
+            else:
+                current_tenant[key] = _strip_quotes(value)
+                current_list_key = None
+            continue
+        if indent >= 6 and stripped.startswith("- ") and current_list_key:
+            current_tenant.setdefault(current_list_key, []).append(_strip_quotes(stripped[2:]))
+
+    if not registry:
+        return None
+    return {
+        "project": project,
+        "top_level": top_level,
+        "build_tenants": registry,
+    }
+
+
+def _canonical_constraints_from_legacy_build_tenants(
+    *,
+    workspace_root: Path,
+    canonical_platform: str,
+    canonical_output: str,
+    legacy: dict[str, object],
+) -> str:
+    project = dict(legacy.get("project") or {})
+    top_level = dict(legacy.get("top_level") or {})
+    registry = dict(legacy.get("build_tenants") or {})
+    selected_name = canonical_tenant_name(
+        str(top_level.get("active_tenant") or canonical_platform)
+    )
+    selected = dict(registry.get(selected_name) or {})
+    if not selected and registry:
+        first_name, first_payload = next(iter(registry.items()))
+        selected_name = canonical_tenant_name(first_name)
+        selected = dict(first_payload if isinstance(first_payload, dict) else {})
+
+    language = str(project.get("language") or selected.get("language") or "")
+    test_runner = str(project.get("test_runner") or selected.get("test_runner") or "")
+    ambiguity_risk_appetite = str(top_level.get("ambiguity_risk_appetite") or "medium")
+    root_code_policy = str(top_level.get("root_code_policy") or "reject")
+    description = str(
+        selected.get("description")
+        or "Normalized project realization tenant for odd_sdlc operation"
+    )
+    output_dir = str(selected.get("output_dir") or canonical_output)
+    module_structure = selected.get("module_structure")
+    module_structure_value = (
+        f'"({", ".join(str(item) for item in module_structure)})"'
+        if isinstance(module_structure, list) and module_structure
+        else '"(app-core)"'
+    )
+
+    return "\n".join(
+        (
+            f"# Project Constraints — {workspace_root.name}",
+            "# Normalized by odd_sdlc from imported build_tenants registry",
+            "",
+            "project:",
+            f'  name: "{workspace_root.name}"',
+            f'  kind: "{project.get("kind") or "software-project"}"',
+            f'  language: "{language}"',
+            f'  test_runner: "{test_runner}"',
+            f'  ambiguity_risk_appetite: "{ambiguity_risk_appetite}"',
+            "",
+            "constraints: {}",
+            "",
+            "structure:",
+            "  design_tenants:",
+            f'    - name: "{selected_name or canonical_platform}"',
+            f'      output_dir: "{output_dir}"',
+            f'      description: "{description}"',
+            f"      module_structure: {module_structure_value}",
+            '      build_execution_contract: ""',
+            '      test_execution_contract: ""',
+            '      deployment_contract: ""',
+            '      runtime_observation_contract: ""',
+            f"  root_code_policy: {root_code_policy}",
+            "",
+        )
+    )
+
+
 def _validate_existing_project_constraints(path: Path) -> None:
     if not path.exists():
         return
     text = path.read_text(encoding="utf-8")
     if not text.strip():
         raise ValueError("project_constraints.yml exists but is empty; normalization will not silently replace it")
+
+    legacy_build_tenants = _parse_legacy_build_tenant_constraints(path)
+    if legacy_build_tenants is not None:
+        if not legacy_build_tenants.get("build_tenants"):
+            raise ValueError(
+                "project_constraints.yml is malformed; build_tenants registry is empty"
+            )
+        return
 
     missing_sections = [
         section
@@ -439,6 +603,25 @@ def _normalize_project_constraints(
         )
         return
 
+    legacy_build_tenants = _parse_legacy_build_tenant_constraints(path)
+    if legacy_build_tenants is not None:
+        normalized = _canonical_constraints_from_legacy_build_tenants(
+            workspace_root=workspace_root,
+            canonical_platform=canonical_platform,
+            canonical_output=canonical_output,
+            legacy=legacy_build_tenants,
+        )
+        original = path.read_text(encoding="utf-8")
+        if normalized != original:
+            _write_text(
+                path,
+                normalized,
+                kind="normalize_project_constraints",
+                detail="projected imported build_tenants registry into the current canonical design_tenants constraint surface",
+                actions=actions,
+            )
+        return
+
     _validate_existing_project_constraints(path)
     original = path.read_text(encoding="utf-8")
     lines = original.splitlines()
@@ -556,7 +739,11 @@ def _normalize_project_constraints(
             tenant_fields_seen.add(field_name)
             tenant_field_indent = line[: len(line) - len(line.lstrip())]
         if first_design_tenant_scope and stripped.startswith("output_dir:") and design_tenant_seen:
-            updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
+            existing_output = _strip_quotes(stripped.partition(":")[2].strip())
+            if _is_conformant_selected_output_dir(existing_output):
+                updated.append(f'{tenant_field_indent}output_dir: "{existing_output}"')
+            else:
+                updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
             tenant_output_written = True
         else:
             updated.append(line)
@@ -852,7 +1039,7 @@ def normalize_workspace(
             )
         )
 
-    if (root / INSTALLED_PRODUCT_ROOT_RELATIVE).exists() or (root / ".odd_sdlc").exists():
+    if (root / INSTALLED_PRODUCT_ROOT_RELATIVE).exists() or (root / LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE).exists():
         _remove_legacy_root_readme(root, actions=actions)
 
     project_bootstrap = root / PROJECT_BOOTSTRAP_PATH
@@ -896,7 +1083,9 @@ def normalize_workspace(
     )
     _migrate_legacy_realization_root(
         root,
-        legacy_output_dir=legacy_output_dir,
+        legacy_output_dir=""
+        if _is_conformant_selected_output_dir(legacy_output_dir)
+        else legacy_output_dir,
         canonical_output_dir=tenant_output_dir(resolved_platform),
         actions=actions,
     )

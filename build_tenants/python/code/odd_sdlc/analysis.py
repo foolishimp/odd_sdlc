@@ -1,4 +1,7 @@
 """Explicit analysis publication and workspace readiness for odd_sdlc."""
+# Implements: REQ-F-ODDSDLC-027
+# Implements: REQ-F-ODDSDLC-028
+# Implements: REQ-F-ODDSDLC-029
 from __future__ import annotations
 
 import hashlib
@@ -12,12 +15,19 @@ from .project_profile import (
     ANALYSIS_MANIFEST_PATH,
     PROJECT_CONSTRAINTS_PATH,
     WORKSPACE_STATE_PATH,
+    build_operational_capability_projection,
     current_workspace_inputs,
     current_workspace_input_fingerprint,
     is_source_domain_repo_workspace,
     load_published_analysis_manifest,
     published_analysis_is_current,
     resolve_project_profile,
+)
+from .repair_frontier import (
+    REPAIR_FRONTIER_CONTEXT_PATH,
+    REPAIR_FRONTIER_REGISTER_PATH,
+    build_repair_frontier_prompt_context,
+    build_repair_frontier_register,
 )
 from .runtime_contexts import publish_runtime_contexts
 from .traceability import (
@@ -114,6 +124,10 @@ def _artifact_kind_for_path(path: Path) -> str:
         return "requirement_closure_register"
     if name == REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH.name:
         return "requirement_closure_prompt_context"
+    if name == REPAIR_FRONTIER_REGISTER_PATH.name:
+        return "repair_frontier_register"
+    if name == REPAIR_FRONTIER_CONTEXT_PATH.name:
+        return "repair_frontier_prompt_context"
     return "analysis_artifact"
 
 
@@ -152,6 +166,8 @@ def build_analysis_manifest(
         root / AMBIGUITY_REGISTER_PATH,
         root / REQUIREMENT_CLOSURE_REGISTER_PATH,
         root / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+        root / REPAIR_FRONTIER_REGISTER_PATH,
+        root / REPAIR_FRONTIER_CONTEXT_PATH,
     )
     published_artifacts: list[dict[str, Any]] = []
     for artifact_path in published_paths:
@@ -228,6 +244,7 @@ def write_workspace_state(
         "analysis_fingerprint": analysis_fingerprint,
         "analysis_manifest_path": analysis_manifest_path,
         "project_profile": profile.to_dict(),
+        "operational_capabilities": build_operational_capability_projection(root, profile=profile),
         "selected_output_dir": profile.output_dir,
         "declared_output_dir": profile.declared_output_dir,
         "resolution_reason": profile.resolution_reason,
@@ -274,6 +291,32 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
             create_kind="create_requirement_closure_prompt_context",
             update_kind="update_requirement_closure_prompt_context",
             detail="published compact requirement closure builder context for odd_sdlc execution",
+        )
+    )
+    repair_frontier = build_repair_frontier_register(
+        root,
+        requirement_register=requirement_payload,
+    )
+    actions.extend(
+        _write_json_if_changed(
+            root / REPAIR_FRONTIER_REGISTER_PATH,
+            repair_frontier,
+            create_kind="create_repair_frontier_register",
+            update_kind="update_repair_frontier_register",
+            detail="published deterministic repair-frontier register for odd_sdlc builder execution",
+        )
+    )
+    repair_frontier_context = build_repair_frontier_prompt_context(
+        root,
+        repair_frontier=repair_frontier,
+    )
+    actions.extend(
+        _write_text_if_changed(
+            root / REPAIR_FRONTIER_CONTEXT_PATH,
+            repair_frontier_context,
+            create_kind="create_repair_frontier_prompt_context",
+            update_kind="update_repair_frontier_prompt_context",
+            detail="published deterministic repair-frontier builder context for odd_sdlc execution",
         )
     )
     analysis_manifest, analysis_manifest_actions = write_analysis_manifest(root, stage=stage)

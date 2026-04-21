@@ -156,7 +156,12 @@ def _current_operational_dispatch_step(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     workspace_root = app.config.workspace_root
     completed: list[dict[str, Any]] = []
-    current = start(app)
+    current = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="first_traversal",
+    )
     while current.get("edge") in _PROJECTION_ONLY_EDGES:
         manifest_path = current.get("fp_manifest_path")
         if not isinstance(manifest_path, str) or not manifest_path:
@@ -173,7 +178,12 @@ def _current_operational_dispatch_step(
             }
         )
         refresh_analysis(workspace_root, stage="operational_dispatch")
-        current = start(app)
+        current = start(
+            app,
+            scope="workspace",
+            target="next",
+            until="first_traversal",
+        )
     if expected_edge is not None and current.get("edge") != expected_edge:
         raise RuntimeError(
             f"expected operational edge {expected_edge!r} but current edge is {current.get('edge')!r}"
@@ -185,7 +195,12 @@ def dispatch_operational(app: OddSdlcApp) -> dict[str, Any]:
     workspace_root = app.config.workspace_root
     refresh_analysis(workspace_root, stage="operational_dispatch")
 
-    initial = start(app)
+    initial = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="first_traversal",
+    )
     steps: list[dict[str, Any]] = []
     current = initial
 

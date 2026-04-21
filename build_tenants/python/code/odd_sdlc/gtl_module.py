@@ -16,16 +16,26 @@ from pathlib import Path
 from typing import Any
 
 from gtl.algebra import compose, recurse
-from gtl.function_model import EnvRef, GraphFunction, RefinementBoundary
+from gtl.function_model import CandidateFamily, EnvRef, GraphFunction, RefinementBoundary
 from gtl.graph import Attrs, Context, Graph, GraphVector, Node
 from gtl.module_model import Module
 from gtl.operator_model import Evaluator, Rule, F_D, F_H, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
 
 from .ambiguity import load_or_build_ambiguity_register
+from .execution_contract import (
+    ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    EXECUTION_CONTRACT_CONTEXT_PATH,
+    DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+)
 from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
-from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
+from .project_profile import (
+    PROJECT_CONSTRAINTS_PATH,
+    load_project_profile,
+    operational_capability_projection_for_profile,
+)
+from .repair_frontier import REPAIR_FRONTIER_CONTEXT_PATH
 from .runtime_contexts import (
     REALIZATION_DEEPENING_CONTEXT_PATH as _REALIZATION_DEEPENING_CONTEXT_PATH,
     REALIZED_TEST_SOURCE_CONTEXT_PATH as _REALIZED_TEST_SOURCE_CONTEXT_PATH,
@@ -296,6 +306,19 @@ _release_surface = _asset_node(
     ),
     output_contract_refs=("release_surface_present",),
 )
+_work_request_surface = _asset_node(
+    "work_request_surface",
+    schema="odd.asset.work_request_surface",
+    kind="work_request_surface",
+    output_contract_refs=("work_request_surface_present",),
+)
+_execution_contract_surface = _asset_node(
+    "execution_contract_surface",
+    schema="odd.asset.execution_contract_surface",
+    kind="execution_contract_surface",
+    required_contexts=("work_request_surface",),
+    output_contract_refs=("admitted_execution_contract_surface",),
+)
 _build_execution_surface = _asset_node(
     "build_execution_surface",
     schema="odd.asset.build_execution_surface",
@@ -388,9 +411,17 @@ _stateful_builder_control_context = _workspace_context(
     "odd_sdlc_stateful_builder_control_frame",
     _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
 )
+_execution_contract_context = _workspace_context(
+    "odd_sdlc_execution_contract_context",
+    EXECUTION_CONTRACT_CONTEXT_PATH,
+)
 _requirement_closure_context = _workspace_context(
     "odd_sdlc_requirement_closure_builder_context",
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+)
+_repair_frontier_context = _workspace_context(
+    "odd_sdlc_repair_frontier",
+    REPAIR_FRONTIER_CONTEXT_PATH,
 )
 _realized_test_source_context = _workspace_context(
     "odd_sdlc_realized_test_source_obligation",
@@ -399,6 +430,20 @@ _realized_test_source_context = _workspace_context(
 _realization_deepening_context = _workspace_context(
     "odd_sdlc_realization_deepening_control_frame",
     _REALIZATION_DEEPENING_CONTEXT_PATH,
+)
+_requirement_builder_contexts = (
+    _requirement_closure_context,
+    _repair_frontier_context,
+)
+_realization_builder_contexts = (
+    _requirement_closure_context,
+    _repair_frontier_context,
+    _realization_deepening_context,
+)
+_realized_test_builder_contexts = (
+    _requirement_closure_context,
+    _repair_frontier_context,
+    _realized_test_source_context,
 )
 
 def _fd_evaluator(name: str) -> Evaluator:
@@ -460,6 +505,10 @@ _deployed_environment_fd = _fd_evaluator("deployed_environment_dependency_surfac
 _runtime_observation_fd = _fd_evaluator("runtime_observation_dependency_surfaces_present")
 _retrofit_plan_fd = _fd_evaluator("retrofit_plan_dependency_surfaces_present")
 _testcase_authority_obligation_fd = _obligation_carry_fd("qualify_testcase_authority")
+_feature_decomp_obligation_fd = _obligation_carry_fd("derive_feature_decomp_surface")
+_uat_testcases_obligation_fd = _obligation_carry_fd("derive_uat_testcases_surface")
+_design_obligation_fd = _obligation_carry_fd("derive_design_surface")
+_scenario_obligation_fd = _obligation_carry_fd("derive_scenario_surface")
 _implementation_design_obligation_fd = _obligation_carry_fd("derive_implementation_design_surface")
 _implementation_module_obligation_fd = _obligation_carry_fd("derive_implementation_module_surface")
 _code_obligation_fd = _obligation_carry_fd("derive_code_surface")
@@ -676,7 +725,11 @@ def _graph_function(
     contexts: tuple[Context, ...] = (),
     obligation_ledger: Attrs | dict[str, object] | None = None,
 ) -> GraphFunction:
-    published_contexts = (_stateful_builder_control_context, *contexts)
+    published_contexts = (
+        _stateful_builder_control_context,
+        _execution_contract_context,
+        *contexts,
+    )
     vector_declarations: list[tuple[str, object]] = [
         (
             "dispatch",
@@ -852,7 +905,7 @@ GF_DERIVE_REQUIREMENTS = _graph_function(
     fd_evaluator=_requirements_fd,
     fp_evaluator=_requirements_fp,
     extra_fd_evaluators=(_requirement_scope_fd,),
-    contexts=(_requirement_closure_context,),
+    contexts=_requirement_builder_contexts,
     req_refs=("REQ-F-ASSET-003", "REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_FEATURE_DECOMP = _graph_function(
@@ -861,6 +914,13 @@ GF_DERIVE_FEATURE_DECOMP = _graph_function(
     target=_feature_decomp_surface,
     fd_evaluator=_feature_decomp_fd,
     fp_evaluator=_feature_decomp_fp,
+    extra_fd_evaluators=(_feature_decomp_obligation_fd,),
+    contexts=_requirement_builder_contexts,
+    obligation_ledger=_requirement_edge_obligation_ledger(
+        signal_key="derive_feature_decomp_surface",
+        fulfillment_rule="feature_decomp_surface_coverage",
+        evidence_policy="feature_decomp_traceability",
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_UAT_TESTCASES = _graph_function(
@@ -869,6 +929,13 @@ GF_DERIVE_UAT_TESTCASES = _graph_function(
     target=_uat_testcases_surface,
     fd_evaluator=_uat_testcases_fd,
     fp_evaluator=_uat_testcases_fp,
+    extra_fd_evaluators=(_uat_testcases_obligation_fd,),
+    contexts=_requirement_builder_contexts,
+    obligation_ledger=_requirement_edge_obligation_ledger(
+        signal_key="derive_uat_testcases_surface",
+        fulfillment_rule="uat_testcases_surface_coverage",
+        evidence_policy="uat_testcase_traceability",
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_DESIGN = _graph_function(
@@ -877,6 +944,13 @@ GF_DERIVE_DESIGN = _graph_function(
     target=_design_surface,
     fd_evaluator=_design_fd,
     fp_evaluator=_design_fp,
+    extra_fd_evaluators=(_design_obligation_fd,),
+    contexts=_requirement_builder_contexts,
+    obligation_ledger=_requirement_edge_obligation_ledger(
+        signal_key="derive_design_surface",
+        fulfillment_rule="design_surface_coverage",
+        evidence_policy="design_surface_traceability",
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_REVIEW_ASSESSMENT = _graph_function(
@@ -910,7 +984,7 @@ GF_QUALIFY_TESTCASE_AUTHORITY = _graph_function(
     fd_evaluator=_testcase_authority_fd,
     fp_evaluator=_testcase_authority_fp,
     extra_fd_evaluators=(_testcase_authority_obligation_fd,),
-    contexts=(_requirement_closure_context,),
+    contexts=_requirement_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="qualify_testcase_authority",
         derivation_rule="validation_authority_projection",
@@ -925,6 +999,13 @@ GF_DERIVE_SCENARIOS = _graph_function(
     target=_scenario_surface,
     fd_evaluator=_scenario_fd,
     fp_evaluator=_scenario_fp,
+    extra_fd_evaluators=(_scenario_obligation_fd,),
+    contexts=_requirement_builder_contexts,
+    obligation_ledger=_requirement_edge_obligation_ledger(
+        signal_key="derive_scenario_surface",
+        fulfillment_rule="scenario_surface_coverage",
+        evidence_policy="scenario_surface_traceability",
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_IMPLEMENTATION_DESIGN = _graph_function(
@@ -934,7 +1015,7 @@ GF_DERIVE_IMPLEMENTATION_DESIGN = _graph_function(
     fd_evaluator=_implementation_design_fd,
     fp_evaluator=_implementation_design_fp,
     extra_fd_evaluators=(_implementation_design_obligation_fd,),
-    contexts=(_requirement_closure_context,),
+    contexts=_requirement_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_implementation_design_surface",
         derivation_rule="implementation_design_projection",
@@ -958,7 +1039,7 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
     fd_evaluator=_implementation_module_fd,
     fp_evaluator=_implementation_module_fp,
     extra_fd_evaluators=(_implementation_module_obligation_fd,),
-    contexts=(_requirement_closure_context, _realization_deepening_context),
+    contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_implementation_module_surface",
         derivation_rule="implementation_module_projection",
@@ -974,7 +1055,7 @@ GF_DERIVE_CODE = _graph_function(
     fd_evaluator=_code_fd,
     fp_evaluator=_code_fp,
     extra_fd_evaluators=(_code_traceability_fd, _code_obligation_fd),
-    contexts=(_requirement_closure_context, _realization_deepening_context),
+    contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_code_surface",
         derivation_rule="implementation_code_projection",
@@ -990,7 +1071,7 @@ GF_DERIVE_TEST_DESIGN = _graph_function(
     fd_evaluator=_test_design_fd,
     fp_evaluator=_test_design_fp,
     extra_fd_evaluators=(_test_design_obligation_fd,),
-    contexts=(_requirement_closure_context,),
+    contexts=_requirement_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_design_surface",
         derivation_rule="validation_design_projection",
@@ -1014,7 +1095,7 @@ GF_DERIVE_TEST_MODULE = _graph_function(
     fd_evaluator=_test_module_fd,
     fp_evaluator=_test_module_fp,
     extra_fd_evaluators=(_planned_test_traceability_fd, _test_module_obligation_fd),
-    contexts=(_requirement_closure_context, _realization_deepening_context),
+    contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_module_surface",
         derivation_rule="validation_module_projection",
@@ -1030,7 +1111,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
     extra_fd_evaluators=(_test_run_archive_obligation_fd,),
-    contexts=(_requirement_closure_context, _realized_test_source_context),
+    contexts=_realized_test_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_run_archive_surface",
         derivation_rule="realized_validation_projection",
@@ -1053,7 +1134,7 @@ GF_PREPARE_RELEASE = _graph_function(
     fd_evaluator=_release_fd,
     fp_evaluator=_release_fp,
     extra_fd_evaluators=(_release_obligation_fd,),
-    contexts=(_requirement_closure_context,),
+    contexts=_requirement_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="prepare_release_surface",
         fulfillment_rule="release_readiness",
@@ -1132,6 +1213,57 @@ GF_DERIVE_RETROFIT_PLAN = _graph_function(
     fd_evaluator=_retrofit_plan_fd,
     fp_evaluator=_retrofit_plan_fp,
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002", "REQ-F-ODDSDLC-038", "REQ-F-ODDSDLC-039"),
+)
+
+EXECUTION_CONTRACT_SOURCE_INTENT = (
+    "Derive one execution-contract source carrier from one bounded work request so prompt, "
+    "closure, and later gap consumers can read one current execution basis."
+)
+EXECUTION_CONTRACT_ADMISSION_INTENT = (
+    "Admit or reject one execution-contract source carrier before odd_sdlc work executes, "
+    "keeping raw operator phrasing and ticket markdown as input evidence rather than runtime authority."
+)
+
+GF_DERIVE_EXECUTION_CONTRACT = _annotate_graph_function(
+    _symbolic_graph_function(
+        name=DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        ref="odd_sdlc.execution_contract:derive_execution_contract_surface",
+        inputs=(_work_request_surface,),
+        outputs=(_execution_contract_surface,),
+        declarations=Attrs(entries=(("selection_visible", False),)),
+        tags=("runtime", "source_carrier"),
+    ),
+    function_kind="odd_runtime_source_graph_function",
+    intent=EXECUTION_CONTRACT_SOURCE_INTENT,
+    extra_declarations={
+        "selection_visible": False,
+        "carrier_asset": "execution_contract_surface",
+        "source_asset": "work_request_surface",
+        "transition_kind": "derive",
+        "host_binding_kind": "execution_contract_surface",
+    },
+    tags=("internal",),
+)
+
+GF_ADMIT_EXECUTION_CONTRACT = _annotate_graph_function(
+    _symbolic_graph_function(
+        name=ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        ref="odd_sdlc.execution_contract:admit_execution_contract_surface",
+        inputs=(_execution_contract_surface,),
+        outputs=(_execution_contract_surface,),
+        declarations=Attrs(entries=(("selection_visible", False),)),
+        tags=("runtime", "source_carrier"),
+    ),
+    function_kind="odd_runtime_source_graph_function",
+    intent=EXECUTION_CONTRACT_ADMISSION_INTENT,
+    extra_declarations={
+        "selection_visible": False,
+        "carrier_asset": "execution_contract_surface",
+        "source_asset": "execution_contract_surface",
+        "transition_kind": "admit",
+        "host_binding_kind": "execution_contract_surface",
+    },
+    tags=("internal",),
 )
 
 REVIEW_DESIGN_CONSENSUS_ROUND_INTENT = (
@@ -1517,6 +1649,10 @@ CATALOG_VISIBLE_LIBRARY_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
     GF_REVIEW_COMMENT_CONSENSUS_ROUND,
     GF_REVIEW_COMMENT_BY_CONSENSUS,
 )
+INTERNAL_SOURCE_CARRIER_GRAPH_FUNCTIONS: tuple[GraphFunction, ...] = (
+    GF_DERIVE_EXECUTION_CONTRACT,
+    GF_ADMIT_EXECUTION_CONTRACT,
+)
 
 BOOTSTRAP_RELEASE_SELF_TEST_INTENT = (
     "Act as the current top-level GTL executive over the odd_sdlc bootstrap, "
@@ -1622,19 +1758,30 @@ def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
 def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[GraphFunction, ...]:
     if not _workspace_declares_project_constraints(workspace_root):
         return ()
-    profile = load_project_profile(workspace_root)
+    capability_projection = operational_capability_projection_for_profile(
+        load_project_profile(workspace_root),
+        workspace_root=workspace_root,
+    )
+    capability_families = capability_projection.get("families")
+    if not isinstance(capability_families, dict):
+        capability_families = {}
+
+    def _declared(family: str) -> bool:
+        payload = capability_families.get(family)
+        return bool(isinstance(payload, dict) and payload.get("declared"))
+
     active: list[GraphFunction] = []
-    if profile.has_build_execution_capability():
+    if _declared("build_execution"):
         active.append(GF_PREPARE_BUILD_EXECUTION)
         active.append(GF_DERIVE_BUILD_EXECUTION_RESULT)
-    if profile.has_test_execution_capability():
+    if _declared("test_execution"):
         active.append(GF_PREPARE_TEST_EXECUTION)
         active.append(GF_DERIVE_TEST_EXECUTION_RESULT)
-    if profile.has_deployment_capability():
+    if _declared("deployment"):
         active.append(GF_PREPARE_DEPLOYMENT)
         active.append(GF_DERIVE_DEPLOYMENT_RESULT)
         active.append(GF_DERIVE_DEPLOYED_ENVIRONMENT)
-    if profile.has_deployment_capability() and profile.has_runtime_observation_capability():
+    if _declared("deployment") and _declared("runtime_observation"):
         active.append(GF_DERIVE_RUNTIME_OBSERVATION)
         active.append(GF_DERIVE_RETROFIT_PLAN)
     return tuple(active)
@@ -1712,20 +1859,27 @@ def _ambiguity_fh_evaluator(edge_name: str, entries: tuple[dict[str, Any], ...])
 
 def _configured_leaf_graph_functions(
     workspace_root: Path,
-) -> tuple[tuple[GraphFunction, ...], tuple[Evaluator, ...], dict[str, list[dict[str, Any]]], dict[str, Any]]:
+) -> tuple[
+    tuple[GraphFunction, ...],
+    tuple[Evaluator, ...],
+    dict[str, list[dict[str, Any]]],
+    dict[str, list[dict[str, Any]]],
+    dict[str, Any],
+]:
     ambiguity_register = load_or_build_ambiguity_register(workspace_root)
+    ambiguity_by_edge: dict[str, list[dict[str, Any]]] = {}
     fh_required_by_edge: dict[str, list[dict[str, Any]]] = {}
     for entry in ambiguity_register.get("ambiguities", []):
         if not isinstance(entry, dict):
             continue
         if str(entry.get("status") or "") in {"resolved", "superseded"}:
             continue
-        if str(entry.get("policy_action") or "") != "escalate_fh":
-            continue
         edge = str(entry.get("expected_resolving_edge") or "")
         if not edge:
             continue
-        fh_required_by_edge.setdefault(edge, []).append(entry)
+        ambiguity_by_edge.setdefault(edge, []).append(entry)
+        if str(entry.get("policy_action") or "") == "escalate_fh":
+            fh_required_by_edge.setdefault(edge, []).append(entry)
     configured: list[GraphFunction] = []
     dynamic_fh_evaluators: list[Evaluator] = []
 
@@ -1761,12 +1915,68 @@ def _configured_leaf_graph_functions(
             )
         )
 
-    return tuple(configured), tuple(dynamic_fh_evaluators), fh_required_by_edge, ambiguity_register
+    return (
+        tuple(configured),
+        tuple(dynamic_fh_evaluators),
+        fh_required_by_edge,
+        ambiguity_by_edge,
+        ambiguity_register,
+    )
+
+
+def _ambiguity_policy_start_functions(
+    active_leaf_functions: tuple[GraphFunction, ...],
+    ambiguity_by_edge: dict[str, list[dict[str, Any]]],
+) -> tuple[GraphFunction, ...]:
+    policy_edges = set(ambiguity_by_edge)
+    return tuple(
+        graph_function
+        for graph_function in active_leaf_functions
+        if graph_function.name in policy_edges
+    )
+
+
+def _ambiguity_policy_candidate_families(
+    start_functions: tuple[GraphFunction, ...],
+) -> tuple[CandidateFamily, ...]:
+    return tuple(
+        CandidateFamily(
+            name=f"{graph_function.name}_ambiguity_gate_candidates",
+            inputs=graph_function.inputs,
+            outputs=graph_function.outputs,
+            candidates=(graph_function,),
+            policy_hints=Attrs.coerce(
+                {
+                    "selection_source": "odd_sdlc.ambiguity_register",
+                    "selection_reason": "ambiguity_fh_gate",
+                }
+            ),
+            tags=("ambiguity_gate",),
+        )
+        for graph_function in start_functions
+    )
 
 
 def _build_module(workspace_root: Path) -> Module:
-    active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
+    (
+        active_leaf_functions,
+        dynamic_fh_evaluators,
+        fh_required_by_edge,
+        ambiguity_by_edge,
+        ambiguity_register,
+    ) = _configured_leaf_graph_functions(workspace_root)
+    ambiguity_policy_start_functions = _ambiguity_policy_start_functions(
+        active_leaf_functions,
+        ambiguity_by_edge,
+    )
+    ambiguity_policy_candidate_families = _ambiguity_policy_candidate_families(
+        ambiguity_policy_start_functions,
+    )
     active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
+    operational_capabilities = operational_capability_projection_for_profile(
+        load_project_profile(workspace_root),
+        workspace_root=workspace_root,
+    )
     active_operational_executive = _build_release_operational_cycle(active_operational_functions)
     bootstrap_executive = _executive_graph_function(
         name="bootstrap_release_self_test",
@@ -1779,12 +1989,14 @@ def _build_module(workspace_root: Path) -> Module:
 
     graph_functions = [
         *executive_graph_functions,
+        *ambiguity_policy_start_functions,
         GF_REVIEW_SUBJECT_CONSENSUS_ROUND,
         GF_REVIEW_SUBJECT_BY_CONSENSUS,
         GF_REVIEW_DESIGN_CONSENSUS_ROUND,
         GF_REVIEW_DESIGN_BY_CONSENSUS,
         GF_REVIEW_COMMENT_CONSENSUS_ROUND,
         GF_REVIEW_COMMENT_BY_CONSENSUS,
+        *INTERNAL_SOURCE_CARRIER_GRAPH_FUNCTIONS,
     ]
     refinement_vectors = [
         *bootstrap_executive.materialize().vectors,
@@ -1807,6 +2019,7 @@ def _build_module(workspace_root: Path) -> Module:
             if function.template.graph is not None
         ),
         graph_functions=tuple(graph_functions),
+        candidate_families=ambiguity_policy_candidate_families,
         refinement_boundaries=tuple(
             RefinementBoundary(
                 name=vector.name,
@@ -1914,11 +2127,16 @@ def _build_module(workspace_root: Path) -> Module:
                 ("function_catalog", _active_function_catalog(active_operational_functions)),
                 ("executive_graph_function", bootstrap_executive.name),
                 ("executive_graph_functions", tuple(function.name for function in executive_graph_functions)),
+                ("ambiguity_policy_start_functions", tuple(function.name for function in ambiguity_policy_start_functions)),
+                ("ambiguity_policy_candidate_families", tuple(family.name for family in ambiguity_policy_candidate_families)),
                 ("library_graph_functions", (
                     GF_REVIEW_SUBJECT_CONSENSUS_ROUND.name,
                     GF_REVIEW_SUBJECT_BY_CONSENSUS.name,
                     GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
                     GF_REVIEW_DESIGN_BY_CONSENSUS.name,
+                )),
+                ("internal_source_graph_functions", (
+                    *(function.name for function in INTERNAL_SOURCE_CARRIER_GRAPH_FUNCTIONS),
                 )),
                 ("host_binding_graph_functions", (
                     GF_REVIEW_DESIGN_CONSENSUS_ROUND.name,
@@ -1927,8 +2145,10 @@ def _build_module(workspace_root: Path) -> Module:
                     GF_REVIEW_COMMENT_BY_CONSENSUS.name,
                 )),
                 ("operational_capability_gated", True),
+                ("operational_capabilities", operational_capabilities),
                 ("ambiguity_risk_appetite", ambiguity_register.get("project_profile", {}).get("ambiguity_risk_appetite", "")),
                 ("ambiguity_fh_required_edges", tuple(sorted(fh_required_by_edge))),
+                ("ambiguity_policy_edges", tuple(sorted(ambiguity_by_edge))),
                 ("active_operational_steps", tuple(function.name for function in active_operational_functions)),
                 ("domain_package", "odd_sdlc"),
             )

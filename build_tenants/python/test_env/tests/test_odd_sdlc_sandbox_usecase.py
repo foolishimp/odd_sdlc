@@ -21,7 +21,7 @@ from sandbox_runtime import (
     read_events,
     reset_sandbox_runtime_state,
     run_constructor_for_start,
-    run_installed_genesis,
+    run_installed_substrate,
     run_installed_odd_sdlc,
     run_installed_self_test,
     seed_canonical_spec_surface,
@@ -389,11 +389,18 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert catalog["graph_functions"][7]["host_binding_kind"] == "comment_review"
 
     gaps = json.loads(
-        run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps").stdout
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="odd_sdlc gaps",
+        ).stdout
     )
     run_archive.capture_json("gaps.json", gaps)
     assert gaps["converged"] is False
-    assert len(gaps["gaps"]) == 27
+    assert gaps["summary"]["gap_count"] == 27
 
     chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="bootstrap_chain")
     run_archive.capture_json("chain.json", chain)
@@ -459,34 +466,38 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     run_archive.capture_json("query-domain.json", domain_query)
     assert sorted(domain_query.keys()) == [
         "ambiguity_register",
-        "analysis_manifest",
         "asset_families",
         "asset_types",
+        "asset_ownership_index",
         "assets",
         "bindings",
         "collections",
         "edge_contracts",
         "functions",
-        "gaps",
+        "gap_dossier",
         "graph_functions",
         "jobs",
+        "operational_capabilities",
         "programs",
         "query_contract",
         "requirement_closure_register",
         "semantic_facets",
+        "start_target_catalog",
         "work_act_types",
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v10"
+    assert domain_query["query_contract"]["version"] == "v15"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
-        "analysis_manifest",
         "semantic_facets",
         "asset_types",
         "asset_families",
         "assets",
+        "start_target_catalog",
+        "asset_ownership_index",
+        "operational_capabilities",
         "ambiguity_register",
         "requirement_closure_register",
         "collections",
@@ -497,10 +508,13 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "jobs",
         "graph_functions",
         "bindings",
-        "gaps",
+        "gap_dossier",
     ]
     assert domain_query["query_contract"]["runtime_model"] == "abg-native"
     assert domain_query["query_contract"]["query_model"] == "odd-domain-plugin"
+    assert domain_query["operational_capabilities"]["projection_kind"] == "odd_sdlc.operational_capabilities"
+    assert "analysis_manifest" not in domain_query
+    assert "analysis_manifest" in domain_query["gap_dossier"]
     assert "runs" not in domain_query
     assert "graph_calls" not in domain_query
     assert "continuations" not in domain_query
@@ -553,7 +567,7 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
     completed_round: list[dict[str, object]] = []
     for edge in EXPECTED_CONSENSUS_STEPS:
         start = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "start",
                 "--module",
@@ -571,7 +585,7 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
             label=f"{edge} construct",
         )
         assessed = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "assess-result",
                 "--result",
@@ -594,7 +608,7 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
         _assert_constructor_attestation(step["constructor"])
 
     consensus_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "gaps",
             "--module",
@@ -641,7 +655,7 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
     completed_round: list[dict[str, object]] = []
     for edge in EXPECTED_CONSENSUS_HARNESS_STEPS:
         start = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "start",
                 "--module",
@@ -659,7 +673,7 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
             label=f"{edge} harness construct",
         )
         assessed = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "assess-result",
                 "--result",
@@ -682,7 +696,7 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
         _assert_constructor_attestation(step["constructor"])
 
     consensus_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "gaps",
             "--module",
@@ -811,7 +825,7 @@ def test_installed_self_test_reports_clean_pending_dispatch_when_bootstrap_edge_
     )
 
     pending_start = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "start",
             "--module",
@@ -1043,7 +1057,15 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     assert first_snapshot_events.exists()
 
     second_gaps = json.loads(
-        run_installed_odd_sdlc(workspace, "gaps", archive=run_archive, label="odd_sdlc gaps second", timeout=120).stdout
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="odd_sdlc gaps second",
+            timeout=120,
+        ).stdout
     )
     assert second_gaps["converged"] is False
     second_refresh = json.loads(

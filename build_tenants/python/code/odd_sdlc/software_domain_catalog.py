@@ -17,7 +17,13 @@ ASSET_FAMILIES: tuple[AssetFamilyDescriptor, ...] = (
         name="worksite_inputs",
         description="Operator-supplied and constitutional inputs that open a bounded software-domain wave of work.",
         lifecycle_role="entry",
-        representative_asset_types=("intent_doc", "product_doc", "goal_surface", "requirement_surface"),
+        representative_asset_types=(
+            "intent_doc",
+            "product_doc",
+            "goal_surface",
+            "requirement_surface",
+            "work_request_surface",
+        ),
         realization_status="active_first_slice",
     ),
     AssetFamilyDescriptor(

@@ -217,8 +217,9 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
     assert requirement_scope_complete(workspace) == 1
     assert code_traceability_present(workspace) == 0
     assert fd_test_traceability_present(workspace) == 1
-    assert initial_domain["query_contract"]["version"] == "v10"
-    assert "analysis_manifest" in initial_domain["query_contract"]["top_level_keys"]
+    assert initial_domain["query_contract"]["version"] == "v15"
+    assert "analysis_manifest" not in initial_domain["query_contract"]["top_level_keys"]
+    assert "analysis_manifest" in initial_domain["gap_dossier"]
     assert initial_domain["requirement_closure_register"]["summary"]["missing_intent_ids_from_goals"] == 0
     assert initial_domain["requirement_closure_register"]["summary"]["missing_from_current_requirement_surface"] == 1
     assert initial_entries["REQ-CORE-001"]["status"] == "partially_realized"

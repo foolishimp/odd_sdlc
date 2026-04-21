@@ -37,8 +37,10 @@ from odd_sdlc.traceability import (
     build_requirement_closure_register,
     current_requirement_executability_gap,
     missing_requirement_ids_from_current_surface,
+    requirement_family_traceability_scan,
     traceability_scan,
 )  # noqa: E402
+from odd_sdlc.workspace_assets import asset_marker, asset_materialization_path  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -114,6 +116,12 @@ def _seed_traceability_workspace(workspace: Path) -> None:
             (
                 "# Live Requirements",
                 "",
+                "**Family**: REQ-TRACE-*",
+                "**Status**: Active",
+                "**Category**: Capability",
+                "**Carries Forward From**: None",
+                "**Authoring Design**: `build_tenants/scala_spark/design/TRACEABILITY_LAW.md`",
+                "",
                 "- REQ-TRACE-001: Carry a realized implementation path.",
                 "- REQ-TRACE-002: Carry a second realized implementation path.",
                 "",
@@ -127,6 +135,21 @@ def _seed_traceability_workspace(workspace: Path) -> None:
                 "# Generated Bootstrap Requirements",
                 "",
                 "- REQ-TRACE-001: Carry a realized implementation path.",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "build_tenants" / "scala_spark" / "design" / "TRACEABILITY_LAW.md",
+        "\n".join(
+            (
+                "# Traceability Law",
+                "",
+                "**Status**: Active",
+                "**Implements**: REQ-TRACE-001, REQ-TRACE-002",
+                "**Derives From**: `specification/requirements/01-live.md`",
+                "",
+                "- Keep the requirement family and generated design chain explicitly linked.",
                 "",
             )
         ),
@@ -524,6 +547,48 @@ def test_fd_checks_emit_generic_dependency_gap_detail_for_testcase_authority(tmp
     assert missing_assets == {"scenario_surface", "uat_testcases_surface"}
 
 
+def test_fd_checks_fail_on_invalid_current_produced_design_surface(tmp_path: Path) -> None:
+    workspace = tmp_path / "fd-evidence-producer-contract"
+    _seed_traceability_workspace(workspace)
+    _write(
+        asset_materialization_path(workspace, "feature_decomp_surface"),
+        "\n".join(
+            (
+                "# Generated Feature Decomposition",
+                "",
+                asset_marker("feature_decomp_surface"),
+                "",
+                "- REQ-TRACE-001: feature alpha",
+                "- REQ-TRACE-002: feature beta",
+                "",
+            )
+        ),
+    )
+    _write(
+        asset_materialization_path(workspace, "design_surface"),
+        "\n".join(
+            (
+                "# Draft Design Notes",
+                "",
+                "- missing governed marker on purpose",
+                "",
+            )
+        ),
+    )
+
+    exit_code, payload, _ = _run_fd_check("design-dependency-surfaces-present", workspace)
+
+    assert exit_code == 1
+    assert payload["check"] == "design-dependency-surfaces-present"
+    generated_failures = {
+        item["asset_id"]: item
+        for item in payload["generated_contract_failures"]
+    }
+    assert "design_surface" in generated_failures
+    assert generated_failures["design_surface"]["contract_satisfied"] is False
+    assert generated_failures["design_surface"]["marker_present"] is False
+
+
 def test_prompt_assembly_carries_structured_fd_stdout_into_deterministic_failures(tmp_path: Path) -> None:
     workspace = tmp_path / "fd-evidence-prompt"
     _seed_traceability_workspace(workspace)
@@ -552,6 +617,7 @@ def test_prompt_assembly_carries_structured_fd_stdout_into_deterministic_failure
                 asset_surface=asset_surface,
             ),
         ),
+        evaluators=(),
     )
     pre = SimpleNamespace(
         current_asset={},
@@ -974,3 +1040,132 @@ def test_constructor_carries_live_requirement_authority_into_generated_bootstrap
         exit_code = main(["requirement-scope-complete", "--workspace", str(workspace)])
     assert exit_code == 0
     assert buffer.getvalue().strip() == ""
+
+
+def test_code_surface_construction_does_not_delete_tenant_governance_surfaces(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-code-preserves-governance"
+    tenant_name = "scala_spark"
+    _write(
+        workspace / ".ai-workspace" / "context" / "project_constraints.yml",
+        "\n".join(
+            (
+                "project:",
+                '  name: "fd-evidence-code-preserves-governance"',
+                '  kind: "software-project"',
+                '  language: "Scala"',
+                '  test_runner: "sbt test"',
+                '  module_structure: "multi_module(app-core)"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "scala_spark"',
+                '      output_dir: "build_tenants/scala_spark/"',
+                '      description: "scala traceability lane"',
+                '      test_execution_contract: "sbt test"',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / "specification" / "INTENT.md",
+        "\n".join(("# Intent", "", "**Project**: fd-evidence-code-preserves-governance", "")),
+    )
+    _write(
+        workspace / "specification" / "requirements" / "01-live.md",
+        "\n".join(("# Live Requirements", "", "- REQ-TRACE-001: Preserve governance surfaces.", "")),
+    )
+    feature_decomp = workspace / tenant_design_relative_path(tenant_name, "20-generated-feature-decomp.md")
+    _write(
+        feature_decomp,
+        "\n".join(
+            (
+                "# Generated Feature Decomposition",
+                "",
+                asset_marker("feature_decomp_surface"),
+                "",
+                "- REQ-TRACE-001",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-modules.md"),
+        "\n".join(("# Generated Implementation Modules", "", "- app-core realizes REQ-TRACE-001", "")),
+    )
+    _write(
+        workspace / tenant_design_relative_path(tenant_name, "40-generated-implementation-stack.md"),
+        "\n".join(("# Generated Implementation Stack Profile", "", "- Scala", "- sbt", "")),
+    )
+    manifest_path = _write_manifest(
+        workspace / ".ai-workspace" / "fp_manifests" / "derive_code_surface_test.json",
+        target_asset="code_surface",
+        evaluator_name="code_surface_semantically_converged",
+    )
+
+    constructor_result = construct_manifest(manifest_path, workspace_root=workspace)
+
+    assert constructor_result["target_asset"] == "code_surface"
+    assert feature_decomp.read_text(encoding="utf-8").startswith("# Generated Feature Decomposition")
+    assert (workspace / "build_tenants" / "scala_spark" / "build.sbt").is_file()
+    materialization = constructor_result["work_report"]["materialization_report"]
+    assert materialization["delete_policy"] == "no_existing_entries_deleted"
+    assert materialization["removed_entries"] == []
+    assert "build_tenants/scala_spark/design" in materialization["preserved_existing_entries"]
+
+
+def test_requirement_family_traceability_publication_is_projected_into_closure_register(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-family-traceability"
+    _seed_traceability_workspace(workspace)
+
+    publication = requirement_family_traceability_scan(workspace)
+    assert publication["summary"]["active_requirement_family_count"] == 1
+    assert publication["summary"]["missing_carry_publication_count"] == 0
+    assert publication["summary"]["missing_authoring_design_publication_count"] == 0
+    assert publication["summary"]["invalid_carry_ref_count"] == 0
+    assert publication["summary"]["invalid_authoring_design_ref_count"] == 0
+    assert publication["summary"]["missing_authoring_design_backlink_count"] == 0
+
+    register = build_requirement_closure_register(workspace)
+    assert register["summary"]["requirement_families_missing_carry_publication"] == 0
+    assert register["summary"]["requirement_families_missing_authoring_design_publication"] == 0
+    assert register["summary"]["requirement_family_invalid_authoring_design_refs"] == 0
+    assert register["summary"]["requirement_family_missing_design_backlinks"] == 0
+
+
+def test_requirement_family_traceability_check_fails_when_authoring_design_publication_is_missing(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-family-traceability-missing-design"
+    _seed_traceability_workspace(workspace)
+    _write(
+        workspace / "specification" / "requirements" / "01-live.md",
+        "\n".join(
+            (
+                "# Live Requirements",
+                "",
+                "**Family**: REQ-TRACE-*",
+                "**Status**: Active",
+                "**Category**: Capability",
+                "**Carries Forward From**: None",
+                "",
+                "- REQ-TRACE-001: Carry a realized implementation path.",
+                "- REQ-TRACE-002: Carry a second realized implementation path.",
+                "",
+            )
+        ),
+    )
+
+    exit_code, payload, _ = _run_fd_check("requirement-family-traceability-published", workspace)
+
+    assert exit_code == 1
+    assert payload["failure_kind"] == "traceability_publication_gap"
+    assert payload["missing_authoring_design_fields"] == [
+        "specification/requirements/01-live.md"
+    ]

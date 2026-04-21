@@ -3,6 +3,7 @@
 # Validates: REQ-F-ODDSDLC-022
 # Validates: REQ-F-ODDSDLC-027
 # Validates: REQ-F-ODDSDLC-032
+# Validates: REQ-F-ODDSDLC-034
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[4]
-GENESIS_PATH = ROOT / ".genesis"
+GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 TESTS_DIR = Path(__file__).resolve().parent
 
@@ -41,6 +42,14 @@ if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))
 if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
+
+from odd_sdlc.execution_contract import (  # noqa: E402
+    ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    EXECUTION_CONTRACT_CONTEXT_PATH,
+    EXECUTION_CONTRACT_KIND,
+    EXECUTION_CONTRACT_REGISTER_PATH,
+)
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
@@ -52,6 +61,7 @@ from odd_sdlc.install_topology import (  # noqa: E402
     INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE,
     INSTALLED_PRODUCT_ROOT_RELATIVE,
     INSTALLED_RUNTIME_CONTRACT_RELATIVE,
+    tenant_workspace_root_relative,
 )
 from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
@@ -61,6 +71,15 @@ from odd_sdlc.project_profile import (  # noqa: E402
     load_project_profile,
     realization_candidates_for_declared_root,
 )
+
+
+def _manifest_context(manifest: dict[str, object], name: str) -> dict[str, object]:
+    for context in manifest.get("contexts", ()):
+        if isinstance(context, dict) and context.get("name") == name:
+            return context
+    raise AssertionError(f"manifest context {name!r} not found")
+
+
 from odd_sdlc.query import query_domain  # noqa: E402
 from odd_sdlc.release.install import install as install_release  # noqa: E402
 from odd_sdlc.sandbox_lifecycle import observe_sandbox, reset_sandbox_runtime_state  # noqa: E402
@@ -71,7 +90,13 @@ from odd_sdlc.traceability import (  # noqa: E402
 )
 from odd_sdlc.workspace_assets import summarize_test_evidence  # noqa: E402
 import sandbox_runtime  # noqa: E402
-from sandbox_runtime import read_events, run_installed_genesis, run_installed_odd_sdlc  # noqa: E402
+from sandbox_runtime import (  # noqa: E402
+    complete_bootstrap_chain,
+    read_events,
+    refresh_installed_analysis,
+    run_installed_odd_sdlc,
+    run_installed_substrate,
+)
 
 
 def _legacy_project_constraints(workspace_name: str) -> str:
@@ -117,6 +142,126 @@ def _seed_imported_workspace(path: Path) -> None:
     )
     (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
         _legacy_project_constraints(path.name),
+        encoding="utf-8",
+    )
+
+
+def _seed_source_style_odd_sdlc_workspace(path: Path) -> None:
+    (path / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
+    (path / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
+    (path / "specification" / "INTENT.md").write_text(
+        "# Intent\n\n- INT-001: Keep source-style tenant realization attributable.\n",
+        encoding="utf-8",
+    )
+    (path / "specification" / "GOALS.md").write_text(
+        "# Goals\n\n- INT-001: Keep source-style tenant realization attributable.\n",
+        encoding="utf-8",
+    )
+    (path / "specification" / "PRODUCT.md").write_text(
+        "# Product\n\n- Treat the source line as a governed software project under released odd_sdlc.\n",
+        encoding="utf-8",
+    )
+    (path / "specification" / "requirements" / "10-generated-bootstrap.md").write_text(
+        "# Generated Bootstrap Requirements\n\n- REQ-CORE-001: Preserve source-style declared realization roots.\n",
+        encoding="utf-8",
+    )
+    (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "odd_sdlc_source_like"',
+                '  kind: "software-project"',
+                '  language: "Python"',
+                '  test_runner: "pytest"',
+                '  ambiguity_risk_appetite: "medium"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "python"',
+                '      output_dir: "build_tenants/odd_sdlc/python/"',
+                '      description: "Source-style tenant root"',
+                '      test_execution_contract: "pytest"',
+                '      deployment_contract: ""',
+                '      runtime_observation_contract: ""',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    code_path = path / "build_tenants" / "odd_sdlc" / "python" / "src" / "main" / "logic.py"
+    code_path.parent.mkdir(parents=True, exist_ok=True)
+    code_path.write_text(
+        "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
+        encoding="utf-8",
+    )
+
+
+def _seed_ticket_work_item(
+    workspace: Path,
+    *,
+    ticket_id: str = "B-900",
+    status: str = "active",
+    ticket_category: str = "implementation_migration",
+    change_class: str = "requirement_reprice",
+    re_entry_point: str = "requirements",
+) -> None:
+    ticket_dir = workspace / ".ai-workspace" / "tickets" / status
+    ticket_dir.mkdir(parents=True, exist_ok=True)
+    ticket_lines = [
+        "---",
+        f"id: {ticket_id}",
+        "title: Installed demo work item",
+        "type: bug",
+        f"ticket_category: {ticket_category}",
+        f"status: {status}",
+        f"change_class: {change_class}",
+        f"re_entry_point: {re_entry_point}",
+        "target_truth: one admitted execution contract governs this installed repair",
+        "superseded_truth: raw ticket prose and operator phrasing steer execution directly",
+        "closure_law: close only when the admitted execution contract is the source carrier and mixed old/new execution proof is rejected",
+        "evaluation_criteria:",
+        "  - admit the execution contract before prompt assembly opens",
+        "  - carry the admitted closure law into manifest provenance",
+        "non_closure_conditions:",
+        "  - raw ticket prose still acts as execution authority",
+        "  - mixed old/new execution proof still counts as closure",
+        "proof_surface:",
+        "  - .ai-workspace/runtime/odd_sdlc-execution-contract.json",
+        "  - .ai-workspace/runtime/odd_sdlc-execution-contract.md",
+        "---",
+        "",
+        "# Installed Demo Work Item",
+        "",
+        "## Migration Declaration",
+        "",
+        "- old_truth_path: manual operator interpretation remains authoritative execution truth",
+        "- new_truth_path: ticket-routed traversal governs the declared re-entry seam",
+        "- closure_law: close only when routed ticket execution replaces manual authority and mixed old/new behavior is not accepted as proof",
+        "",
+        "## Migration Checklist",
+        "",
+        "- [x] old truth path is named explicitly",
+        "- [x] new truth path is named explicitly",
+        "- [ ] old truth path is removed or explicitly demoted from authority",
+        "- [ ] mixed-state behavior is no longer accepted as closure evidence",
+        "",
+        "## Required Direction",
+        "",
+        "1. Route the work-item through the declared re-entry seam.",
+        "2. Preserve already-satisfied structure.",
+        "3. Do not count mixed old/new execution as closure.",
+        "",
+        "## Acceptance",
+        "",
+        "- routed traversal uses the declared re-entry seam",
+        "- prompt and manifest carry the admitted execution contract",
+        "",
+    ]
+    (ticket_dir / f"{ticket_id}-demo.md").write_text(
+        "\n".join(ticket_lines) + "\n",
         encoding="utf-8",
     )
 
@@ -294,6 +439,8 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_ambiguity_register",
         "create_requirement_closure_register",
         "create_requirement_closure_prompt_context",
+        "create_repair_frontier_register",
+        "create_repair_frontier_prompt_context",
         "create_analysis_manifest",
         "create_workspace_state",
     ]
@@ -320,8 +467,8 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert ".ai-workspace/runtime/odd_sdlc-ambiguity-register.json" in project_bootstrap
     assert ".ai-workspace/runtime/odd_sdlc-requirement-closure.json" in project_bootstrap
     assert "## Installed Runtime Start Surface" in project_bootstrap
-    assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in project_bootstrap
-    assert "it does not proxy F_P transport failures" in project_bootstrap
+    assert "python -m odd_sdlc gaps --scope workspace --workspace ." in project_bootstrap
+    assert "python -m odd_sdlc start --scope workspace --target next --until converged --workspace ." in project_bootstrap
     assert "deployment, runtime-return, and similar side-effect stages only traverse" in project_bootstrap
     assert "construction_complete_pending_execution" in project_bootstrap
     assert "treat legacy bootstrap instructions" in project_bootstrap
@@ -360,6 +507,8 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert workspace_state["workspace_mode"] == "governed_workspace"
     assert workspace_state["project_profile"]["tenant_name"] == "scala_spark"
     assert workspace_state["analysis_manifest_path"] == ANALYSIS_MANIFEST_PATH.as_posix()
+    assert workspace_state["operational_capabilities"]["projection_kind"] == "odd_sdlc.operational_capabilities"
+    assert workspace_state["operational_capabilities"]["families"]["deployment"]["state"] == "undeclared"
     analysis_manifest = load_analysis_manifest(workspace)
     assert analysis_manifest is not None
     assert analysis_manifest["manifest_kind"] == "odd_sdlc.analysis_manifest"
@@ -368,6 +517,8 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "ambiguity_register",
         "requirement_closure_register",
         "requirement_closure_prompt_context",
+        "repair_frontier_register",
+        "repair_frontier_prompt_context",
     }
     assert any(entry["input_kind"] == "project_constraints" for entry in analysis_manifest["source_inputs"])
     assert report["workspace_state_path"] == WORKSPACE_STATE_PATH.as_posix()
@@ -410,7 +561,7 @@ def test_normalize_workspace_fails_closed_for_malformed_project_constraints(tmp_
         )
 
 
-def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Path) -> None:
+def test_install_deploys_runtime_contract_and_enables_odd_sdlc_gaps(tmp_path: Path) -> None:
     workspace = tmp_path / "data_mapper.test18"
     _seed_imported_workspace(workspace)
 
@@ -462,8 +613,8 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
         assert f"`workspace://{INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}`" in text
         assert "- platform: `scala_spark`" in text
         assert "## 4. Start Here" in text
-        assert "PYTHONPATH=.genesis python -m genesis start --auto --workspace ." in text
-        assert "it does not proxy F_P transport failures" in text
+        assert "python -m odd_sdlc gaps --scope workspace --workspace ." in text
+        assert "python -m odd_sdlc start --scope workspace --target next --until converged --workspace ." in text
         assert "deployment, runtime-return, and other side-effect stages only traverse" in text
         assert "unresolved live requirements remain active future pressure across iterations" in text
         assert "construction_complete_pending_execution" in text
@@ -481,7 +632,16 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     )
     env.pop("PYTEST_CURRENT_TEST", None)
     result = subprocess.run(
-        [sys.executable, "-m", "genesis", "gaps", "--workspace", str(workspace)],
+        [
+            sys.executable,
+            "-m",
+            "odd_sdlc",
+            "gaps",
+            "--scope",
+            "workspace",
+            "--workspace",
+            str(workspace),
+        ],
         cwd=str(workspace),
         env=env,
         capture_output=True,
@@ -491,7 +651,270 @@ def test_install_deploys_runtime_contract_and_enables_genesis_gaps(tmp_path: Pat
     )
     payload = json.loads(result.stdout)
     assert payload["converged"] is False
-    assert len(payload["gaps"]) == 18
+    assert payload["summary"]["gap_count"] == (
+        payload["declared_obligation_gap_count"] + payload["graph_edge_gap_count"]
+    )
+    assert payload["declared_obligation_gap_count"] > 0
+    assert payload["graph_edge_gap_count"] > 0
+    assert payload["mixed_truth_classes"] is True
+    assert payload["dossiers"][0]["edge"] == "derive_intent_surface"
+
+
+def test_install_exposes_public_odd_sdlc_start_contract(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.test18.start_contract"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    start_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc start public contract",
+        ).stdout
+    )
+
+    assert start_payload["fh_mode"] == "direct"
+    assert start_payload["root_mode"] == "direct"
+    assert isinstance(start_payload.get("edge"), str) and start_payload["edge"]
+
+
+def test_install_query_domain_publishes_start_target_catalog_and_asset_ownership_index(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.test18.target_catalog"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    query_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "query-domain",
+            label="odd_sdlc query-domain target catalog",
+        ).stdout
+    )
+
+    start_targets = {entry["handle"]: entry for entry in query_payload["start_target_catalog"]}
+    assert start_targets["bootstrap_release_self_test"]["start_addressable"] is True
+    assert start_targets["bootstrap_release_self_test"]["carrier_class"] == "executive_carrier"
+    assert start_targets["review_design_consensus_round"]["start_addressable"] is True
+    assert start_targets["review_subject_by_consensus"]["start_addressable"] is False
+
+    asset_ownership = {entry["handle"]: entry for entry in query_payload["asset_ownership_index"]}
+    assert asset_ownership["code_surface"]["operator_target"]["handle"] == "bootstrap_release_self_test"
+    assert asset_ownership["reviewed_design_surface"]["operator_target"]["handle"] == "review_design_consensus_round"
+
+
+def test_install_exposes_public_odd_sdlc_graph_function_and_asset_targets(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.test18.start_targets"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    graph_function_target = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "graph_function:review_design_consensus_round",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc start graph_function target",
+        ).stdout
+    )
+    assert graph_function_target["target"] == "graph_function:review_design_consensus_round"
+    assert graph_function_target["graph_function_name"] == "review_design_consensus_round"
+    assert graph_function_target["edge"] == "derive_review_assessment_surface"
+
+    asset_target = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "asset:reviewed_design_surface",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc start asset target",
+        ).stdout
+    )
+    assert asset_target["target"] == "asset:reviewed_design_surface"
+    assert asset_target["graph_function_name"] == "review_design_consensus_round"
+    assert asset_target["asset_id"] == "reviewed_design_surface"
+    assert asset_target["asset_exists"] is False
+    assert asset_target["edge"] == "derive_review_assessment_surface"
+    assert asset_target["asset_binding_source"] == "odd_sdlc.asset_ownership_index"
+
+
+def test_install_query_domain_publishes_triaged_work_item_asset_without_pre_admission_route_contract(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "data_mapper.test18.ticket_target_catalog"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    _seed_ticket_work_item(workspace, ticket_id="B-900")
+    refresh_installed_analysis(workspace)
+
+    query_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "query-domain",
+            label="odd_sdlc query-domain ticket target catalog",
+        ).stdout
+    )
+
+    assets = {entry["asset_id"]: entry for entry in query_payload["assets"]}
+    assert assets["ticket/B-900"]["declared_type"] == "work_request_surface"
+
+    asset_ownership = {entry["handle"]: entry for entry in query_payload["asset_ownership_index"]}
+    assert asset_ownership["ticket/B-900"]["operator_target"]["handle"] == "bootstrap_release_self_test"
+    assert "route_contract" not in asset_ownership["ticket/B-900"]
+
+
+def test_install_query_domain_keeps_backlog_ticket_visible_but_not_start_addressable(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.test18.backlog_ticket_target_catalog"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    _seed_ticket_work_item(workspace, ticket_id="B-902", status="backlog")
+    refresh_installed_analysis(workspace)
+
+    query_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "query-domain",
+            label="odd_sdlc query-domain backlog ticket catalog",
+        ).stdout
+    )
+
+    assets = {entry["asset_id"]: entry for entry in query_payload["assets"]}
+    assert assets["ticket/B-902"]["declared_type"] == "work_request_surface"
+    assert assets["ticket/B-902"]["metadata"]["ticket_status"] == "backlog"
+    assert "route_kind" not in assets["ticket/B-902"]["metadata"]
+
+    asset_ownership = {entry["handle"]: entry for entry in query_payload["asset_ownership_index"]}
+    assert "ticket/B-902" not in asset_ownership
+
+
+def test_install_start_routes_ticket_asset_without_manual_upstream_edit(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.test18.ticket_start"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    _seed_ticket_work_item(
+        workspace,
+        ticket_id="B-901",
+        change_class="intent_reprice",
+        re_entry_point="intent",
+    )
+    refresh_installed_analysis(workspace)
+
+    start_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "asset:ticket/B-901",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc start ticket asset target",
+        ).stdout
+    )
+
+    assert start_payload["target"] == "asset:ticket/B-901"
+    assert start_payload["graph_function_name"] == "bootstrap_release_self_test"
+    assert start_payload["asset_id"] == "ticket/B-901"
+    assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["status"] == "iterated"
+    assert start_payload["blocking_reason"] == "fp_dispatch"
+    assert start_payload["asset_relative_path"] == ".ai-workspace/tickets/active/B-901-demo.md"
+    assert Path(start_payload["fp_manifest_path"]).exists()
+    manifest = json.loads(Path(start_payload["fp_manifest_path"]).read_text(encoding="utf-8"))
+    execution_contract_context = _manifest_context(
+        manifest,
+        "odd_sdlc_execution_contract_context",
+    )
+    assert execution_contract_context["locator"] == (
+        f"workspace://{EXECUTION_CONTRACT_CONTEXT_PATH.as_posix()}"
+    )
+    assert "# Admitted Execution Contract" in str(execution_contract_context["content"])
+    execution_contract = json.loads(
+        (workspace / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert execution_contract["contract_kind"] == EXECUTION_CONTRACT_KIND
+    assert execution_contract["status"] == "admitted"
+    assert execution_contract["closure_law"] == (
+        "close only when the admitted execution contract is the source carrier and mixed "
+        "old/new execution proof is rejected"
+    )
+    assert execution_contract["evaluation_criteria"] == [
+        "admit the execution contract before prompt assembly opens",
+        "carry the admitted closure law into manifest provenance",
+    ]
+    assert execution_contract["non_closure_conditions"] == [
+        "raw ticket prose still acts as execution authority",
+        "mixed old/new execution proof still counts as closure",
+    ]
+    assert execution_contract["proof_surface"][:2] == [
+        ".ai-workspace/runtime/odd_sdlc-execution-contract.json",
+        ".ai-workspace/runtime/odd_sdlc-execution-contract.md",
+    ]
+    assert execution_contract["target_truth"]["ticket_target_truth"] == (
+        "one admitted execution contract governs this installed repair"
+    )
+    assert execution_contract["carrier_graph_functions"] == {
+        "derive": DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        "admit": ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    }
+    assert execution_contract["target_truth"]["handle"] == "ticket/B-901"
+    assert execution_contract["route_contract"]["reentry_vector"] == "derive_intent_surface"
+    assert execution_contract["ticket_id"] == "B-901"
+    assert execution_contract["target_truth"]["ticket_relative_path"] == ".ai-workspace/tickets/active/B-901-demo.md"
+    assert "# Admitted Execution Contract" in manifest["prompt"]
 
 
 def test_sandbox_lifecycle_cli_commands_bypass_bootstrap_and_publish_results(
@@ -716,9 +1139,16 @@ def test_query_domain_uses_explicit_workspace_root_when_called_outside_workspace
     )
     payload = json.loads(result.stdout)
 
+    assert payload["operational_capabilities"]["projection_kind"] == "odd_sdlc.operational_capabilities"
+    assert payload["operational_capabilities"]["families"]["deployment"]["state"] == "undeclared"
     assert "release_operational_cycle" not in [entry["name"] for entry in payload["programs"]]
     assert "prepare_deployment_surface" not in [entry["name"] for entry in payload["functions"]]
     assert "prepare_deployment_surface" not in [entry["name"] for entry in payload["graph_functions"]]
+    gap_edges = {entry["edge"]: entry for entry in payload["gap_dossier"]["dossiers"]}
+    assert (
+        "missing_deployment_capability"
+        in gap_edges["prepare_deployment_surface"]["gap_truth"]["failing"]
+    )
 
 
 def test_ungoverned_test_reports_are_not_counted_as_governed_evidence(tmp_path: Path) -> None:
@@ -738,6 +1168,7 @@ def test_ungoverned_test_reports_are_not_counted_as_governed_evidence(tmp_path: 
     assert summary["tests"] == 0
     assert summary["ungoverned_report_file_count"] == 1
     assert summary["ungoverned_report_paths"] == ["imp_scala_spark/target/test-reports/TEST-fake.xml"]
+    assert summary["governing_capability"]["state"] == "undeclared"
 
 
 def test_requirement_closure_register_preserves_carry_forward_and_traceability(tmp_path: Path) -> None:
@@ -942,9 +1373,15 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
     assert payload["status"] == "installed"
 
     start_payload = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             timeout=60,
         ).stdout
     )
@@ -953,12 +1390,88 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
     assert start_payload["edge"] == "derive_intent_surface"
 
     manifest = json.loads(Path(start_payload["fp_manifest_path"]).read_text(encoding="utf-8"))
-    assert manifest["selected_backend"] == "claude"
-    assert manifest["backend_id"] == "claude"
     assert manifest["resolved_policy"]["dispatch"]["config"]["timeout"] == 1800
+    execution_contract_context = _manifest_context(
+        manifest,
+        "odd_sdlc_execution_contract_context",
+    )
+    assert execution_contract_context["locator"] == (
+        f"workspace://{EXECUTION_CONTRACT_CONTEXT_PATH.as_posix()}"
+    )
+    assert "# Admitted Execution Contract" in str(execution_contract_context["content"])
+    execution_contract = json.loads(
+        (workspace / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert execution_contract["contract_kind"] == EXECUTION_CONTRACT_KIND
+    assert execution_contract["status"] == "admitted"
+    assert execution_contract["carrier_graph_functions"] == {
+        "derive": DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+        "admit": ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
+    }
+    assert manifest["execution_basis"]["edge"] == "derive_intent_surface"
+    assert execution_contract["source_kind"] == "operator_request"
     assert "stateful workspace asset under construction" in manifest["prompt"]
+    assert "# Admitted Execution Contract" in manifest["prompt"]
     assert "Do not treat the edge like a one-shot pure function call over serialized state." in manifest["prompt"]
     assert (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-realization-deepening-control-frame.md").exists()
+
+
+def test_imported_workspace_first_generated_readback_is_materially_specific(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.imported_readback"
+    _seed_data_mapper_template_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    assert payload["status"] == "installed"
+
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+
+    completed = complete_bootstrap_chain(
+        workspace,
+        label_prefix="imported_readback",
+        steps=(
+            "derive_intent_surface",
+            "derive_product_surface",
+            "derive_goal_surface",
+            "derive_requirement_surface",
+            "derive_feature_decomp_surface",
+            "derive_uat_testcases_surface",
+            "derive_design_surface",
+        ),
+    )
+
+    assert [step["start"]["edge"] for step in completed] == [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_feature_decomp_surface",
+        "derive_uat_testcases_surface",
+        "derive_design_surface",
+    ]
+
+    feature_text = (
+        workspace / "build_tenants" / "scala_spark" / "design" / "20-generated-feature-decomp.md"
+    ).read_text(encoding="utf-8")
+    uat_text = (
+        workspace / "specification" / "scenarios" / "20-generated-uat-testcases.md"
+    ).read_text(encoding="utf-8")
+    design_text = (
+        workspace / "build_tenants" / "scala_spark" / "design" / "30-generated-odd-design.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Requirement Authority Carry-Forward" in feature_text
+    assert "## Proof And Query Shape" in feature_text
+    assert "## Imported Authority" in feature_text
+    assert "## Requirement Authority Carry-Forward" in uat_text
+    assert "`odd_sdlc query-domain` publishes machine-readable asset, target-routing, and gap views" in uat_text
+    assert "## Major Module Boundaries" in design_text
+    assert "## Proof And Query Shape" in design_text
+    assert "project: `Categorical Data Mapping & Computation Engine (CDME)`" in design_text
 
 
 @pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
@@ -982,7 +1495,7 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
 
     gaps_payload = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "gaps",
             archive=run_archive,
@@ -991,12 +1504,19 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_json("gaps.initial.json", gaps_payload)
     assert gaps_payload["converged"] is False
-    assert len(gaps_payload["gaps"]) == 18
+    assert gaps_payload["summary"]["gap_count"] == 18
 
-    start_result = run_installed_genesis(
+    start_result = run_installed_substrate(
         workspace,
         "start",
-        "--auto",
+        "--scope",
+        "workspace",
+        "--target",
+        "next",
+        "--until",
+        "converged",
+        "--fh-mode",
+        "human-proxy",
         archive=run_archive,
         label="data_mapper start",
         timeout=180,
@@ -1016,7 +1536,7 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     assert "runtime_backend: claude" in runtime_contract_text
 
     final_gaps_payload = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "gaps",
             archive=run_archive,
@@ -1025,7 +1545,10 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_json("gaps.final.json", final_gaps_payload)
     assert final_gaps_payload["converged"] is False
-    assert any(gap["edge"] == "derive_test_run_archive_surface" for gap in final_gaps_payload["gaps"])
+    assert any(
+        dossier["edge"] == "derive_test_run_archive_surface"
+        for dossier in final_gaps_payload["dossiers"]
+    )
 
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
@@ -1083,7 +1606,7 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     assert not (workspace / "docs" / "60-generated-runtime-observation.md").exists()
 
     run_archive.update_summary(
-        initial_gap_count=len(gaps_payload["gaps"]),
+        initial_gap_count=gaps_payload["summary"]["gap_count"],
         final_total_delta=final_gaps_payload["total_delta"],
         graph_call_edges=graph_call_edges,
         preserved_project_identity=True,
@@ -1119,6 +1642,51 @@ def test_install_release_keeps_downstream_common_out_of_default_project_topology
     assert "`build_tenants/scala_spark/`" in tenant_registry
     assert "`common`" not in tenant_registry
     assert "`odd_sdlc`" not in tenant_registry
+
+
+def test_named_tenant_workspace_is_a_mutable_instance_not_source_authority(tmp_path: Path) -> None:
+    source_root = tmp_path / "data_mapper.source_topology"
+    _seed_data_mapper_template_workspace(source_root)
+
+    tenant_workspace = source_root / tenant_workspace_root_relative("scala_spark", "dev")
+    _seed_imported_workspace(tenant_workspace)
+
+    payload = install_release(
+        tenant_workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    assert (tenant_workspace / INSTALLED_PRODUCT_ROOT_RELATIVE).exists()
+    assert not (source_root / INSTALLED_PRODUCT_ROOT_RELATIVE).exists()
+
+    query_payload = json.loads(
+        run_installed_odd_sdlc(
+            tenant_workspace,
+            "query-domain",
+            label="odd_sdlc query-domain in named tenant workspace",
+        ).stdout
+    )
+    assert query_payload["workspace_root"] == str(tenant_workspace)
+
+    gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            tenant_workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            label="odd_sdlc gaps in named tenant workspace",
+        ).stdout
+    )
+    assert "gaps" in gaps_payload
+    assert "declared_obligation_gap_count" in gaps_payload
+
+    candidates = realization_candidates_for_declared_root(source_root)
+    assert all(
+        "workspaces/" not in str(candidate["relative_path"])
+        for candidate in candidates
+    )
 
 
 def test_normalize_workspace_preserves_onboarded_secondary_tenant_without_topology_migration(tmp_path: Path) -> None:
@@ -1171,52 +1739,7 @@ def test_normalize_workspace_preserves_onboarded_secondary_tenant_without_topolo
 
 def test_load_project_profile_preserves_realized_declared_output_root_for_source_style_workspace(tmp_path: Path) -> None:
     workspace = tmp_path / "odd_sdlc.source_like"
-    (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
-    (workspace / "specification" / "requirements").mkdir(parents=True, exist_ok=True)
-    (workspace / "specification" / "INTENT.md").write_text(
-        "# Intent\n\n- INT-001: Keep source-style tenant realization attributable.\n",
-        encoding="utf-8",
-    )
-    (workspace / "specification" / "GOALS.md").write_text(
-        "# Goals\n\n- INT-001: Keep source-style tenant realization attributable.\n",
-        encoding="utf-8",
-    )
-    (workspace / "specification" / "requirements" / "10-generated-bootstrap.md").write_text(
-        "# Generated Bootstrap Requirements\n\n- REQ-CORE-001: Preserve source-style declared realization roots.\n",
-        encoding="utf-8",
-    )
-    (workspace / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
-        "\n".join(
-            (
-                "project:",
-                '  name: "odd_sdlc_source_like"',
-                '  kind: "software-project"',
-                '  language: "Python"',
-                '  test_runner: "pytest"',
-                '  ambiguity_risk_appetite: "medium"',
-                "",
-                "constraints: {}",
-                "",
-                "structure:",
-                "  design_tenants:",
-                '    - name: "python"',
-                '      output_dir: "build_tenants/odd_sdlc/python/"',
-                '      description: "Source-style tenant root"',
-                '      test_execution_contract: "pytest"',
-                '      deployment_contract: ""',
-                '      runtime_observation_contract: ""',
-                "  root_code_policy: reject",
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
-    code_path = workspace / "build_tenants" / "odd_sdlc" / "python" / "src" / "main" / "logic.py"
-    code_path.parent.mkdir(parents=True, exist_ok=True)
-    code_path.write_text(
-        "# Implements: REQ-CORE-001\n\ndef run() -> int:\n    return 1\n",
-        encoding="utf-8",
-    )
+    _seed_source_style_odd_sdlc_workspace(workspace)
 
     profile = load_project_profile(workspace)
     assert profile.output_dir == "build_tenants/odd_sdlc/python/"
@@ -1228,12 +1751,63 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
     assert entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
-    assert queried["analysis_manifest"] is None
+    assert queried["gap_dossier"]["analysis_manifest"] is None
     queried_entries = {
         entry["requirement_id"]: entry
         for entry in queried["requirement_closure_register"]["requirements"]
     }
     assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
+
+
+def test_install_release_governs_source_style_odd_sdlc_workspace_without_boundary_collapse(tmp_path: Path) -> None:
+    workspace = tmp_path / "odd_sdlc.self_induction"
+    _seed_source_style_odd_sdlc_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="odd_sdlc",
+        platform="python",
+    )
+    assert payload["status"] == "installed"
+
+    query_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "query-domain",
+            label="odd_sdlc query-domain self induction",
+        ).stdout
+    )
+    gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            label="odd_sdlc gaps self induction",
+        ).stdout
+    )
+
+    assert (workspace / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE / "odd_sdlc" / "__main__.py").exists()
+    constraints = (workspace / ".ai-workspace" / "context" / "project_constraints.yml").read_text(encoding="utf-8")
+    assert '      output_dir: "build_tenants/odd_sdlc/python/"' in constraints
+    assert '      output_dir: "build_tenants/python/"' not in constraints
+
+    queried_entries = {
+        entry["requirement_id"]: entry
+        for entry in query_payload["requirement_closure_register"]["requirements"]
+    }
+    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
+    assert all(
+        not ref.startswith(".genesis/odd_sdlc/")
+        for ref in queried_entries["REQ-CORE-001"]["code_refs"]
+    )
+
+    workspace_state = load_workspace_state(workspace)
+    assert workspace_state is not None
+    assert query_payload["gap_dossier"]["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    assert workspace_state["project_profile"]["output_dir"] == "build_tenants/odd_sdlc/python/"
+    assert gaps_payload["converged"] is False
+    assert isinstance(gaps_payload["dossiers"], list) and gaps_payload["dossiers"]
 
 
 @pytest.mark.skip(
@@ -1409,7 +1983,7 @@ def test_load_project_profile_ignores_builder_product_neighbors_in_source_repo(t
     }.isdisjoint({"multiple_realization_roots", "declared_root_vs_realized_root_mismatch"})
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
-    assert queried["analysis_manifest"] is None
+    assert queried["gap_dossier"]["analysis_manifest"] is None
     assert queried["requirement_closure_register"]["traceability"]["code_root"] == "build_tenants/python"
     queried_entries = {
         entry["requirement_id"]: entry

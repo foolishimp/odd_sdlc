@@ -20,6 +20,7 @@ surfaces under `build_tenants/`.
   caveats and known limitations for the active `odd_sdlc` wave
 - [ODD_SDLC_RC_RELEASE_NOTE.md](./ODD_SDLC_RC_RELEASE_NOTE.md) records the
   current `odd_sdlc` release-candidate shipment summary and verification footer
-- [OODD_future_strategy.md](./OODD_future_strategy.md) records a supplemental
-  future strategy for `OODD` as an organisational operating model built on
-  `odd_sdlc`
+
+OODD (Organisation Outcome-Driven Development) is methodology-layer material
+above `odd_sdlc` and lives in the methodology repo at
+`specification_methodology/strategy/OODD_future_strategy.md`.

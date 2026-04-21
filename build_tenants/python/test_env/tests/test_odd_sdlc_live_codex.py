@@ -40,7 +40,7 @@ from sandbox_runtime import (  # noqa: E402
     run_constructor_for_start,
     install_kernel_sandbox,
     read_events,
-    run_installed_genesis,
+    run_installed_substrate,
     run_installed_odd_sdlc,
     seed_canonical_spec_surface,
     seed_odd_sdlc_package,
@@ -646,7 +646,7 @@ def _write_consensus_result_payload(
 
 def _start_consensus_edge(workspace: Path, *, edge: str, module_ref: str, run_archive) -> dict[str, Any]:
     start = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "start",
             "--module",
@@ -720,7 +720,7 @@ def _run_consensus_live_lane(
     assert consensus_decision_dependency_surfaces_present(workspace) == 0
 
     assessed = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "assess-result",
             "--result",
@@ -742,7 +742,7 @@ def _run_consensus_live_lane(
         )
         assert constructor["status"] == "constructed"
         assessed_step = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "assess-result",
                 "--result",
@@ -760,7 +760,7 @@ def _run_consensus_live_lane(
     assert reviewed_design_dependency_surfaces_present(workspace) == 0
 
     final_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "gaps",
             "--module",
@@ -829,7 +829,7 @@ def _advance_to_edge(workspace: Path, *, run_archive, expected_steps: tuple[str,
         )
         assert constructor_result["status"] == "constructed"
         assessed = json.loads(
-            run_installed_genesis(
+            run_installed_substrate(
                 workspace,
                 "assess-result",
                 "--result",
@@ -888,7 +888,7 @@ def test_installed_executive_first_edge_live_codex_qualification(run_archive) ->
     assert failures == [], failures
 
     assessed = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "assess-result",
             "--result",
@@ -973,7 +973,7 @@ def test_installed_executive_code_edge_live_codex_qualification(run_archive) -> 
     assert failures == [], failures
 
     assessed = json.loads(
-        run_installed_genesis(
+        run_installed_substrate(
             workspace,
             "assess-result",
             "--result",

@@ -15,8 +15,26 @@ This root holds the executable asset/function slice:
 Run the tenant from the repo root with:
 
 ```bash
-PYTHONPATH=.genesis:build_tenants/python/code python -m odd_sdlc catalog --workspace .
-PYTHONPATH=.genesis:build_tenants/python/code python -m odd_sdlc query-domain --workspace .
-PYTHONPATH=.genesis:build_tenants/python/code python -m odd_sdlc gaps --workspace .
-PYTHONPATH=.genesis:build_tenants/python/code python -m odd_sdlc start --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc catalog --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc query-domain --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc gaps --scope workspace --workspace .
+PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc start --scope workspace --target next --until converged --workspace .
 ```
+
+The source repository does not depend on repo-root `.genesis/`. Installed
+`.genesis/` payloads are produced only inside downstream or sandbox workspaces.
+
+Public operator contract:
+
+- `odd_sdlc gaps --scope ...` observes current graph/worksite truth
+- `odd_sdlc start --scope ... --target next|graph_function:<published_handle>|asset:<published_handle> --until ...`
+  advances the governed graph/worksite state through one published target
+  contract
+- `odd_sdlc query-domain` publishes the governing `start_target_catalog` and
+  `asset_ownership_index` surfaces consumed by `graph_function:` and `asset:`
+  target handles
+- triaged ticket/work-item starts reuse the same `asset:` family as
+  `asset:ticket/<ticket_id>` when that handle is published in
+  `asset_ownership_index`
+- typed sandbox/build/test/deployment commands remain separate operational
+  surfaces rather than alternate graph-advancement verbs

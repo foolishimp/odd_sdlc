@@ -113,8 +113,9 @@ def test_normalization_publishes_and_reduces_major_ambiguity(run_archive) -> Non
     app = initialize(bootstrap(workspace_root=workspace))
     initial_domain = query_domain(app)
     run_archive.capture_json("query_domain.initial.json", initial_domain)
-    assert initial_domain["query_contract"]["version"] == "v10"
-    assert "analysis_manifest" in initial_domain["query_contract"]["top_level_keys"]
+    assert initial_domain["query_contract"]["version"] == "v15"
+    assert "analysis_manifest" not in initial_domain["query_contract"]["top_level_keys"]
+    assert "analysis_manifest" in initial_domain["gap_dossier"]
     assert "ambiguity_register" in initial_domain["query_contract"]["top_level_keys"]
     assert "requirement_closure_register" in initial_domain["query_contract"]["top_level_keys"]
     assert any(asset["asset_id"] == "ambiguity_register_surface" for asset in initial_domain["assets"])

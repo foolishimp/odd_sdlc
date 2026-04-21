@@ -13,7 +13,11 @@ import json
 import os
 from pathlib import Path
 
-from .install_topology import INSTALLED_RUNTIME_CONTRACT_RELATIVE
+from .install_topology import (
+    INSTALLED_RUNTIME_CONTRACT_RELATIVE,
+    LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE,
+    TENANT_WORKSPACES_DIR_NAME,
+)
 
 
 PROJECT_CONSTRAINTS_PATH = Path(".ai-workspace/context/project_constraints.yml")
@@ -52,7 +56,7 @@ SOURCE_EXTENSIONS = {
 FINGERPRINT_IGNORED_DIR_NAMES = {
     ".ai-workspace",
     ".genesis",
-    ".odd_sdlc",
+    LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE.name,
     ".pytest_cache",
     "__pycache__",
     "dist",
@@ -64,7 +68,7 @@ FINGERPRINT_IGNORED_DIR_NAMES = {
 IGNORE_ROOTS = {
     ".ai-workspace",
     ".genesis",
-    ".odd_sdlc",
+    LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE.name,
     "build_tenants",
     "docs",
     "specification",
@@ -77,10 +81,74 @@ NON_REALIZATION_TENANT_NAMES = {
     "odd_sdlc",
     "odd_service",
 }
+OPERATIONAL_CAPABILITY_SPECS: tuple[dict[str, object], ...] = (
+    {
+        "family": "build_execution",
+        "field_name": "build_execution_contract",
+        "cue": "build_execution",
+        "affected_assets": (
+            "build_execution_surface",
+            "build_execution_result_surface",
+            "release_surface",
+        ),
+        "expected_resolving_edges": (
+            "prepare_build_execution_surface",
+            "derive_build_execution_result_surface",
+        ),
+        "resolution_text": "Declare the build execution contract before treating build execution as a governed operational transition.",
+    },
+    {
+        "family": "test_execution",
+        "field_name": "test_execution_contract",
+        "cue_attr": "test_runner",
+        "affected_assets": (
+            "test_execution_surface",
+            "test_execution_result_surface",
+            "test_run_archive_surface",
+            "release_surface",
+        ),
+        "expected_resolving_edges": (
+            "prepare_test_execution_surface",
+            "derive_test_execution_result_surface",
+        ),
+        "resolution_text": "Declare the test execution contract before treating test execution as governed evidence.",
+    },
+    {
+        "family": "deployment",
+        "field_name": "deployment_contract",
+        "cue": "deployment",
+        "affected_assets": (
+            "deployment_surface",
+            "deployment_result_surface",
+            "deployed_environment_surface",
+            "release_surface",
+        ),
+        "expected_resolving_edges": (
+            "prepare_deployment_surface",
+            "derive_deployment_result_surface",
+            "derive_deployed_environment_surface",
+        ),
+        "resolution_text": "Declare the deployment contract before treating deployment as an admissible governed stage.",
+    },
+    {
+        "family": "runtime_observation",
+        "field_name": "runtime_observation_contract",
+        "cue": "runtime_observation",
+        "affected_assets": (
+            "runtime_observation_surface",
+            "retrofit_plan_surface",
+        ),
+        "expected_resolving_edges": (
+            "derive_runtime_observation_surface",
+            "derive_retrofit_plan_surface",
+        ),
+        "resolution_text": "Declare the runtime observation contract before treating runtime return as governed evidence.",
+    },
+)
 SUMMARY_IGNORED_DIR_NAMES = {
     ".ai-workspace",
     ".genesis",
-    ".odd_sdlc",
+    LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE.name,
     ".pytest_cache",
     "__pycache__",
     "design",
@@ -362,6 +430,84 @@ def load_published_project_profile(workspace_root: Path | str) -> ProjectProfile
     return ProjectProfile.from_dict({key: str(value) for key, value in profile_payload.items()})
 
 
+def operational_capability_projection_for_profile(
+    profile: ProjectProfile,
+    *,
+    workspace_root: Path | str | None = None,
+) -> dict[str, object]:
+    root = Path(workspace_root).resolve() if workspace_root is not None else None
+    families: dict[str, dict[str, object]] = {}
+    for spec in OPERATIONAL_CAPABILITY_SPECS:
+        family = str(spec["family"])
+        field_name = str(spec["field_name"])
+        contract_value = str(getattr(profile, field_name, "") or "")
+        cue_attr = str(spec.get("cue_attr") or "")
+        cue_value = (
+            str(getattr(profile, cue_attr, "") or "")
+            if cue_attr
+            else str(spec.get("cue") or "")
+        )
+        declared = bool(contract_value.strip())
+        expected_resolving_edges = tuple(
+            str(edge_name)
+            for edge_name in spec.get("expected_resolving_edges", ())
+            if str(edge_name)
+        )
+        families[family] = {
+            "family": family,
+            "field_name": field_name,
+            "cue": cue_value,
+            "in_scope": bool(cue_value.strip()),
+            "declared_value": contract_value,
+            "declared": declared,
+            "state": "declared" if declared else "undeclared",
+            "affected_assets": list(spec.get("affected_assets", ())),
+            "expected_resolving_edges": list(expected_resolving_edges),
+            "primary_edge": expected_resolving_edges[0] if expected_resolving_edges else "",
+            "resolution_text": str(spec.get("resolution_text") or ""),
+        }
+    return {
+        "projection_kind": "odd_sdlc.operational_capabilities",
+        "schema_version": "v1",
+        "workspace_root": str(root) if root is not None else "",
+        "families": families,
+    }
+
+
+def build_operational_capability_projection(
+    workspace_root: Path | str,
+    *,
+    profile: ProjectProfile | None = None,
+) -> dict[str, object]:
+    root = Path(workspace_root).resolve()
+    current_profile = profile or load_project_profile(root)
+    return operational_capability_projection_for_profile(
+        current_profile,
+        workspace_root=root,
+    )
+
+
+def load_published_operational_capability_projection(
+    workspace_root: Path | str,
+) -> dict[str, object] | None:
+    payload = load_published_workspace_state(workspace_root)
+    if payload is None:
+        return None
+    if not published_analysis_is_current(workspace_root):
+        return None
+    projection = payload.get("operational_capabilities")
+    return projection if isinstance(projection, dict) else None
+
+
+def load_or_build_operational_capability_projection(
+    workspace_root: Path | str,
+) -> dict[str, object]:
+    published = load_published_operational_capability_projection(workspace_root)
+    if published is not None:
+        return published
+    return build_operational_capability_projection(workspace_root)
+
+
 def realization_candidates_for_declared_root(workspace_root: Path) -> list[dict[str, object]]:
     profile = load_project_profile(workspace_root)
     selected_relative = Path(profile.declared_output_dir.strip("/")) if profile.declared_output_dir else None
@@ -381,6 +527,10 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
     selected_root = workspace_root / profile.output_dir if profile.output_dir else workspace_root / DEFAULT_PROVING_CODE_RELATIVE_PATH
     selected_summary = _code_root_summary(selected_root)
     candidates = realization_candidates_for_declared_root(workspace_root)
+    capability_projection = build_operational_capability_projection(workspace_root, profile=profile)
+    capability_families = capability_projection.get("families")
+    if not isinstance(capability_families, dict):
+        capability_families = {}
     entries: list[dict[str, object]] = []
 
     if profile.declared_output_dir and candidates:
@@ -442,46 +592,23 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
             }
         )
 
-    capability_specs = (
-        (
-            "missing-build-execution-capability",
-            "build_execution",
-            profile.has_build_execution_capability(),
-            "build_execution_contract",
-            "build_execution_surface",
-            "Declare the build execution contract before treating build execution as a governed operational transition.",
-        ),
-        (
-            "missing-test-execution-capability",
-            profile.test_runner.strip(),
-            profile.has_test_execution_capability(),
-            "test_execution_contract",
-            "test_run_archive_surface",
-            "Declare the test execution contract before treating test execution as governed evidence.",
-        ),
-        (
-            "missing-deployment-capability",
-            "deployment",
-            profile.has_deployment_capability(),
-            "deployment_contract",
-            "deployment_surface",
-            "Declare the deployment contract before treating deployment as an admissible governed stage.",
-        ),
-        (
-            "missing-runtime-observation-capability",
-            "runtime_observation",
-            profile.has_runtime_observation_capability(),
-            "runtime_observation_contract",
-            "runtime_observation_surface",
-            "Declare the runtime observation contract before treating runtime return as governed evidence.",
-        ),
-    )
-    for ambiguity_id, cue, declared, field_name, affected_asset, resolution_text in capability_specs:
-        if not cue or declared:
+    for family_name, family in capability_families.items():
+        if not isinstance(family, dict):
             continue
+        if not bool(family.get("in_scope")) or bool(family.get("declared")):
+            continue
+        field_name = str(family.get("field_name") or "")
+        resolution_text = str(family.get("resolution_text") or "")
+        expected_resolving_edges = family.get("expected_resolving_edges")
+        primary_edge = str(family.get("primary_edge") or "")
+        affected_assets = [
+            str(asset_id)
+            for asset_id in family.get("affected_assets", ())
+            if str(asset_id)
+        ]
         entries.append(
             {
-                "ambiguity_id": ambiguity_id,
+                "ambiguity_id": f"missing-{family_name.replace('_', '-')}-capability",
                 "class": "execution_stage_without_declared_capability",
                 "title": f"Required capability `{field_name}` is not declared",
                 "description": "A later executional or operational stage is in the domain model but its governing technology capability is not declared in the active build tenant.",
@@ -489,19 +616,16 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
                 "status": "pending_capability",
                 "hard_stop": True,
                 "invariant_refs": ["REQ-F-ODDSDLC-026", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
-                "affected_assets": [affected_asset, "ambiguity_register_surface"],
+                "affected_assets": [*affected_assets, "ambiguity_register_surface"],
                 "introduced_by": stage,
-                "expected_resolving_edge": {
-                    "build_execution_contract": "prepare_build_execution_surface",
-                    "test_execution_contract": "derive_test_run_archive_surface",
-                    "deployment_contract": "prepare_deployment_surface",
-                    "runtime_observation_contract": "derive_runtime_observation_surface",
-                }.get(field_name),
+                "expected_resolving_edge": primary_edge,
                 "current_resolution": resolution_text,
                 "observed_state": {
+                    "family": family_name,
                     "field_name": field_name,
-                    "declared_value": getattr(profile, field_name, ""),
+                    "declared_value": str(family.get("declared_value") or ""),
                     "tenant_name": profile.tenant_name,
+                    "expected_resolving_edges": expected_resolving_edges if isinstance(expected_resolving_edges, list) else [],
                 },
                 "competing_interpretations": [
                     f"construction-only lane with no declared {field_name}",
@@ -510,8 +634,12 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
                 "evidence_refs": [".ai-workspace/context/project_constraints.yml"],
             }
         )
-
-    if selected_summary["test_report_file_count"] and not profile.has_test_execution_capability():
+    test_capability = capability_families.get("test_execution")
+    if (
+        isinstance(test_capability, dict)
+        and not bool(test_capability.get("declared"))
+        and int(selected_summary.get("test_report_file_count") or 0) > 0
+    ):
         entries.append(
             {
                 "ambiguity_id": "execution-evidence-without-declared-capability",
@@ -524,11 +652,12 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
                 "invariant_refs": ["REQ-F-ODDSDLC-026", "REQ-F-ODDSDLC-027", "REQ-F-ODDSDLC-028"],
                 "affected_assets": ["test_run_archive_surface", "release_surface", "ambiguity_register_surface"],
                 "introduced_by": stage,
-                "expected_resolving_edge": "derive_test_run_archive_surface",
+                "expected_resolving_edge": str(test_capability.get("primary_edge") or "prepare_test_execution_surface"),
                 "current_resolution": "Either declare the test execution contract or classify the observed reports as imported/adopted external evidence.",
                 "observed_state": {
                     "resolved_output_dir": profile.output_dir,
-                    "test_report_file_count": int(selected_summary["test_report_file_count"]),
+                    "test_report_file_count": int(selected_summary.get("test_report_file_count") or 0),
+                    "field_name": str(test_capability.get("field_name") or ""),
                 },
                 "competing_interpretations": [
                     "ungoverned side-effect execution happened outside declared tenant capability",
@@ -659,6 +788,8 @@ def _build_tenant_realization_candidates(workspace_root: Path, *, selected_relat
 
         for child in sorted(tenant_root.iterdir(), key=lambda item: item.name):
             if not child.is_dir():
+                continue
+            if child.name == TENANT_WORKSPACES_DIR_NAME:
                 continue
             candidate = _candidate_entry(workspace_root, child)
             if candidate is None:

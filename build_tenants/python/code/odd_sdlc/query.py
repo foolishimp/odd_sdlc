@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 from .app import OddSdlcApp, catalog, gap_snapshot
-from .analysis import load_analysis_manifest
 from .ambiguity import load_or_build_ambiguity_register
 from .query_contract import query_domain_contract
 from .traceability import load_or_build_requirement_closure_register
@@ -62,6 +61,14 @@ def query_assets(app: OddSdlcApp) -> list[dict[str, Any]]:
     return _project_assets(app)
 
 
+def query_asset_bindings(app: OddSdlcApp) -> dict[str, Any]:
+    return {
+        "query_contract": "odd_sdlc.query-assets",
+        "workspace_root": str(app.config.workspace_root),
+        "assets": query_assets(app),
+    }
+
+
 def query_functions(app: OddSdlcApp) -> list[dict[str, Any]]:
     return catalog(app)["functions"]
 
@@ -84,14 +91,17 @@ def query_requirement_closure_register(app: OddSdlcApp) -> dict[str, Any]:
 
 def query_domain(app: OddSdlcApp) -> dict[str, Any]:
     catalog_payload = catalog(app)
+    gap_dossier = gap_snapshot(app)
     return {
         "query_contract": query_domain_contract(),
         "workspace_root": str(app.config.workspace_root),
-        "analysis_manifest": load_analysis_manifest(app.config.workspace_root),
         "semantic_facets": catalog_payload["semantic_facets"],
         "asset_types": catalog_payload["asset_types"],
         "asset_families": catalog_payload["asset_families"],
         "assets": query_assets(app),
+        "start_target_catalog": catalog_payload["start_target_catalog"],
+        "asset_ownership_index": catalog_payload["asset_ownership_index"],
+        "operational_capabilities": catalog_payload["operational_capabilities"],
         "ambiguity_register": query_ambiguity_register(app),
         "requirement_closure_register": query_requirement_closure_register(app),
         "collections": catalog_payload["collections"],
@@ -102,5 +112,5 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
         "jobs": catalog_payload["jobs"],
         "graph_functions": catalog_payload["graph_functions"],
         "bindings": catalog_payload["bindings"],
-        "gaps": gap_snapshot(app),
+        "gap_dossier": gap_dossier,
     }

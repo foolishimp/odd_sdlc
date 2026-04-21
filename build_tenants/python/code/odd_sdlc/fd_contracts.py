@@ -45,6 +45,11 @@ FD_EVALUATOR_CONTRACTS: dict[str, FdEvaluatorContract] = {
         cli_name="requirement-scope-complete",
         description="The generated requirement surface carries forward the full live requirement inventory rather than silently narrowing scope.",
     ),
+    "requirement_family_traceability_published": FdEvaluatorContract(
+        evaluator_name="requirement_family_traceability_published",
+        cli_name="requirement-family-traceability-published",
+        description="Active requirement families publish explicit carries and authoring-design trace fields, and published design refs reciprocally point back to the governing family.",
+    ),
     "feature_decomp_dependency_surfaces_present": FdEvaluatorContract(
         evaluator_name="feature_decomp_dependency_surfaces_present",
         cli_name="feature-decomp-dependency-surfaces-present",

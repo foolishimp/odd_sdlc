@@ -3,6 +3,8 @@
 **Family**: REQ-F-ODDSDLC-*
 **Status**: Superseded
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 **Superseded By**: `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 
 This family records the original first real `odd_sdlc` tenant slice.

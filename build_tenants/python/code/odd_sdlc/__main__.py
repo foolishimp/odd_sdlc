@@ -12,7 +12,7 @@ from .constructor import construct_manifest
 from .normalization import normalize_workspace
 from .observer import observe
 from .operational_dispatch import dispatch_operational
-from .query import query_domain
+from .query import query_asset_bindings, query_domain
 from .release.install import install as install_release
 from .sandbox_lifecycle import observe_sandbox, prepare_sandbox, reset_sandbox_runtime_state
 from .self_test import programs, self_test
@@ -28,14 +28,27 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("catalog", parents=[common])
     subparsers.add_parser("programs", parents=[common])
     subparsers.add_parser("observe", parents=[common])
+    subparsers.add_parser("query-assets", parents=[common])
     subparsers.add_parser("query-domain", parents=[common])
     subparsers.add_parser("refresh-analysis", parents=[common])
-    gaps_parser = subparsers.add_parser("gaps", parents=[common])
+    gaps_parser = subparsers.add_parser(
+        "gaps",
+        parents=[common],
+        help="Public odd_sdlc graph/worksite observation command",
+        description="Public odd_sdlc graph/worksite observation command. Observe the current governed graph/worksite state without advancing traversal.",
+    )
+    gaps_parser.add_argument("--scope", required=True)
     gaps_parser.add_argument("--from-edge")
     gaps_parser.add_argument("--to-edge")
     gaps_parser.add_argument("--zoom", choices=["coarse", "refined", "combined"], default="combined")
     gaps_parser.add_argument("--include-dependent", action="store_true")
-    subparsers.add_parser("iterate", parents=[common])
+    iterate_parser = subparsers.add_parser(
+        "iterate",
+        parents=[common],
+        help="Internal traversal primitive",
+        description="Internal traversal primitive. Not part of the public odd_sdlc operator workflow.",
+    )
+    iterate_parser.add_argument("--scope", default="workspace")
     subparsers.add_parser("dispatch-operational", parents=[common])
     subparsers.add_parser("self-test", parents=[common])
     subparsers.add_parser("prepare-sandbox", parents=[common])
@@ -48,12 +61,37 @@ def main(argv: list[str] | None = None) -> int:
     normalize_parser.add_argument("--platform")
     construct_parser = subparsers.add_parser("construct", parents=[common])
     construct_parser.add_argument("--manifest", required=True)
-    start_parser = subparsers.add_parser("start", parents=[common])
-    start_parser.add_argument("--auto", action="store_true")
+    start_parser = subparsers.add_parser(
+        "start",
+        parents=[common],
+        help="Public odd_sdlc graph/worksite advancement command",
+        description="Public odd_sdlc graph/worksite advancement command. Advance the governed graph from the declared scope toward the declared target until the declared stopping condition is reached.",
+    )
+    start_parser.add_argument("--scope", required=True)
+    start_parser.add_argument(
+        "--target",
+        required=True,
+        help=(
+            "Public target selector: next, graph_function:<published_handle>, "
+            "or asset:<published_handle> from odd_sdlc query-domain"
+        ),
+    )
+    start_parser.add_argument(
+        "--until",
+        required=True,
+        choices=["first_traversal", "blocked", "converged"],
+    )
+    start_parser.add_argument("--fh-mode", choices=["direct", "human-proxy"], default="direct")
+    start_parser.add_argument("--root-mode", choices=["direct", "supervised"], default="direct")
     install_parser = subparsers.add_parser("install")
     install_parser.add_argument("--target", required=True)
     install_parser.add_argument("--project-slug")
     install_parser.add_argument("--platform", default="python")
+
+    hidden_top_level = {"iterate"}
+    subparsers._choices_actions = [
+        action for action in subparsers._choices_actions if getattr(action, "dest", None) not in hidden_top_level
+    ]
 
     args = parser.parse_args(argv)
 
@@ -99,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
         }
     elif args.command == "observe":
         result = observe(app)
+    elif args.command == "query-assets":
+        result = query_asset_bindings(app)
     elif args.command == "query-domain":
         result = query_domain(app)
     elif args.command == "refresh-analysis":
@@ -106,13 +146,14 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "gaps":
         result = gaps(
             app,
+            scope=args.scope,
             from_edge=args.from_edge,
             to_edge=args.to_edge,
             zoom=args.zoom,
             include_dependent=args.include_dependent,
         )
     elif args.command == "iterate":
-        result = iterate(app)
+        result = iterate(app, scope=args.scope)
     elif args.command == "dispatch-operational":
         result = dispatch_operational(app)
     elif args.command == "self-test":
@@ -122,9 +163,20 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "construct":
         result = construct_manifest(args.manifest, workspace_root=args.workspace)
     else:
-        result = start(app, auto=args.auto)
+        result = start(
+            app,
+            scope=args.scope,
+            target=args.target,
+            until=args.until,
+            fh_mode=args.fh_mode,
+            root_mode=args.root_mode,
+        )
 
     print(json.dumps(result, indent=2, sort_keys=True))
+    if args.command == "start" and result.get("stopped_by") == "fh_gate":
+        return 3
+    if args.command == "start" and result.get("stopped_by") == "yield":
+        return 6
     return 0
 
 

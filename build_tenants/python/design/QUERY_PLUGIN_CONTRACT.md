@@ -38,7 +38,8 @@ It is intended to answer:
 - what semantic types they carry
 - what functions and bindings exist
 - what the current domain gap picture is, including current analysis freshness,
-  edge-scoped observation, triage, route, and gated constitutional state
+  edge-scoped observation, triage, route, gated constitutional state, and one
+  reviewable gap-analysis dossier per current edge
 
 It is not intended to answer:
 
@@ -57,10 +58,22 @@ Those remain ABG-native.
 - `workspace_root`
 - `semantic_facets`
 - `asset_types`
+- `asset_families`
 - `assets`
+- `start_target_catalog`
+- `asset_ownership_index`
+- `operational_capabilities`
+- `ambiguity_register`
+- `requirement_closure_register`
+- `collections`
 - `functions`
+- `edge_contracts`
+- `programs`
+- `work_act_types`
+- `jobs`
+- `graph_functions`
 - `bindings`
-- `gaps`
+- `gap_dossier`
 
 ## Field Meaning
 
@@ -97,17 +110,21 @@ The domain function catalog.
 
 The current asset-node binding surface.
 
-### `gaps`
+### `gap_dossier`
 
-The current domain gap picture for the tenant.
+The singular downstream gap-review surface for the tenant.
 
-At minimum this field must be rich enough to expose:
+At minimum this field exposes:
 
 - current analysis identity and freshness state
+- the current analysis-manifest evidence bundle as dossier input, not as a
+  separate top-level review surface
 - current edge-scoped observation state
 - current edge-scoped triage state
 - current route binding or unresolved-route state
 - current gated constitutional proposal state where applicable
+- one edge-scoped dossier surface that packages those current states together
+  with the canonical gap row and evidence references
 
 This remains current-state domain projection.
 

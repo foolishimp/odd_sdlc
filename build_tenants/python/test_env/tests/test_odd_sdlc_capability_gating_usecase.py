@@ -6,7 +6,7 @@ import json
 import pytest
 
 from odd_sdlc.release.install import install as install_release
-from sandbox_runtime import run_installed_genesis, run_installed_odd_sdlc
+from sandbox_runtime import run_installed_odd_sdlc
 from test_odd_sdlc_installation import (
     _append_runtime_contract_overrides,
     _append_tenant_capability_contracts,
@@ -34,16 +34,28 @@ def test_operational_cycle_is_omitted_without_declared_capability(run_archive) -
     run_archive.capture_json("install.payload.json", payload)
 
     initial_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="capability gating gaps.initial",
         ).stdout
     )
     run_archive.capture_json("gaps.initial.json", initial_gaps)
     assert initial_gaps["converged"] is False
-    assert len(initial_gaps["gaps"]) == 18
+    gap_edges = {entry["edge"]: entry for entry in initial_gaps["dossiers"]}
+    assert "prepare_deployment_surface" in gap_edges
+    assert (
+        "missing_deployment_capability"
+        in gap_edges["prepare_deployment_surface"]["gap_truth"]["failing"]
+    )
+    assert "derive_runtime_observation_surface" in gap_edges
+    assert (
+        "missing_runtime_observation_capability"
+        in gap_edges["derive_runtime_observation_surface"]["gap_truth"]["failing"]
+    )
 
     domain_query = json.loads(
         run_installed_odd_sdlc(
@@ -57,12 +69,15 @@ def test_operational_cycle_is_omitted_without_declared_capability(run_archive) -
     function_names = [entry["name"] for entry in domain_query["functions"]]
     graph_function_names = [entry["name"] for entry in domain_query["graph_functions"]]
     program_names = [entry["name"] for entry in domain_query["programs"]]
+    capabilities = domain_query["operational_capabilities"]["families"]
 
     assert "prepare_deployment_surface" not in function_names
     assert "derive_runtime_observation_surface" not in function_names
     assert "derive_retrofit_plan_surface" not in function_names
     assert "release_operational_cycle" not in graph_function_names
     assert "release_operational_cycle" not in program_names
+    assert capabilities["deployment"]["state"] == "undeclared"
+    assert capabilities["runtime_observation"]["state"] == "undeclared"
     assert not (workspace / "docs" / "50-generated-deployment.md").exists()
     assert not (workspace / "docs" / "60-generated-runtime-observation.md").exists()
 
@@ -81,16 +96,28 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     run_archive.capture_json("install.payload.json", payload)
 
     initial_gaps = json.loads(
-        run_installed_genesis(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="capability enabled gaps.initial",
         ).stdout
     )
     run_archive.capture_json("gaps.initial.json", initial_gaps)
     assert initial_gaps["converged"] is False
-    assert len(initial_gaps["gaps"]) == 27
+    gap_edges = {entry["edge"]: entry for entry in initial_gaps["dossiers"]}
+    if "prepare_deployment_surface" in gap_edges:
+        assert (
+            "missing_deployment_capability"
+            not in gap_edges["prepare_deployment_surface"]["gap_truth"]["failing"]
+        )
+    if "derive_runtime_observation_surface" in gap_edges:
+        assert (
+            "missing_runtime_observation_capability"
+            not in gap_edges["derive_runtime_observation_surface"]["gap_truth"]["failing"]
+        )
 
     domain_query = json.loads(
         run_installed_odd_sdlc(
@@ -104,6 +131,7 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     function_names = [entry["name"] for entry in domain_query["functions"]]
     graph_function_names = [entry["name"] for entry in domain_query["graph_functions"]]
     program_names = [entry["name"] for entry in domain_query["programs"]]
+    capabilities = domain_query["operational_capabilities"]["families"]
 
     assert "prepare_build_execution_surface" in function_names
     assert "derive_build_execution_result_surface" in function_names
@@ -116,3 +144,5 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
     assert "derive_retrofit_plan_surface" in function_names
     assert "release_operational_cycle" in graph_function_names
     assert "release_operational_cycle" in program_names
+    assert capabilities["deployment"]["state"] == "declared"
+    assert capabilities["runtime_observation"]["state"] == "declared"

@@ -3,6 +3,8 @@
 **Family**: REQ-F-RUNTIME-*
 **Status**: Active
 **Category**: Governance
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the runtime boundary between ABG as substrate and `odd_sdlc` as
 configured domain product.

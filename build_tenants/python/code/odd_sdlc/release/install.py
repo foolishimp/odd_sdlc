@@ -27,6 +27,7 @@ from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
 
 SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
 SOURCE_PYTHON_ROOT = Path(__file__).resolve().parents[3]
+SOURCE_REPO_ROOT = Path(__file__).resolve().parents[5]
 APPS_ROOT = Path(__file__).resolve().parents[6]
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 _ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->"
@@ -64,6 +65,15 @@ def _copy_domain_design_assets(target_root: Path) -> Path:
     return destination
 
 
+def _ensure_installed_genesis_runtime(target_root: Path) -> Path:
+    destination_root = target_root / ".genesis"
+    if not (destination_root / "genesis").exists() or not (destination_root / "gtl").exists():
+        raise FileNotFoundError(
+            "abiogenesis install did not provide .genesis/genesis and .genesis/gtl"
+        )
+    return destination_root
+
+
 def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, Any]:
     if not ABI_INSTALLER.exists():
         raise FileNotFoundError(f"abiogenesis installer not found at {ABI_INSTALLER}")
@@ -89,7 +99,7 @@ def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: 
 def _runtime_contract_lines() -> tuple[str, ...]:
     asset_binding_contract = json.dumps(
         {
-            "command": ["python", "-m", "odd_sdlc", "query-domain", "--workspace", "."],
+            "command": ["python", "-m", "odd_sdlc", "query-assets", "--workspace", "."],
             "assets_key": "assets",
             "asset_id_key": "asset_id",
             "uri_key": "uri",
@@ -199,9 +209,8 @@ def _workspace_instruction_bootloader(
             "- `workspace://.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`",
             "",
             "## 4. Start Here",
-            "- inspect the current pipeline state with `PYTHONPATH=.genesis python -m genesis gaps --workspace .`",
-            "- trigger bounded odd_sdlc traversal with `PYTHONPATH=.genesis python -m genesis start --auto --workspace .`",
-            "- add `--human-proxy` only when you expect an explicit F_H approval lane; it does not proxy F_P transport failures",
+            f"- inspect the current pipeline state with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc gaps --scope workspace --workspace .`",
+            f"- advance odd_sdlc graph/worksite state with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc start --scope workspace --target next --until converged --workspace .`",
             "- deployment, runtime-return, and other side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
             "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
             "- unresolved live requirements remain active future pressure across iterations; inspect the requirement closure register before claiming completion on a partial wave",
@@ -261,6 +270,7 @@ def install(
     abiogenesis_result = _run_abiogenesis_install(root, project_slug=slug, platform=canonical_platform)
     package_path = _copy_package(root)
     _copy_domain_design_assets(root)
+    genesis_root = _ensure_installed_genesis_runtime(root)
     normalization = normalize_workspace(root, project_slug=slug, platform=canonical_platform)
     contract_path = _write_runtime_contract(root)
     _wire_kernel_contract(root)
@@ -284,6 +294,7 @@ def install(
         "platform": canonical_platform,
         "abiogenesis": abiogenesis_result,
         "package_path": str(package_path.relative_to(root)),
+        "genesis_root": str(genesis_root.relative_to(root)),
         "runtime_contract": str(contract_path.relative_to(root)),
         "normalization": normalization,
         "analysis": analysis,

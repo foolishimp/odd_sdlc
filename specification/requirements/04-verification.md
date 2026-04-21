@@ -3,6 +3,8 @@
 **Family**: REQ-F-VERIFY-*
 **Status**: Active
 **Category**: Verification
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the proving obligations for the new `odd_sdlc` line.
 

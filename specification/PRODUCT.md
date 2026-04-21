@@ -3,7 +3,7 @@
 **Status**: Active
 **Derived From**: [GOALS.md](./GOALS.md),
 [INTENT.md](./INTENT.md),
-`.genesis/docs/standards/SPEC_METHOD.md`
+`/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 **Purpose**: Define the current product realization and product terms for
 `odd_sdlc`
 
@@ -165,11 +165,15 @@ one bounded wave.
 
 ### Trace Authority
 
-The explicit requirement and design references carried by generated source files
-and generated test files.
+The explicit requirement and design references published across requirement
+families, ratified design surfaces, generated source files, and generated test
+files.
 
 At minimum this includes:
 
+- `Carries Forward From:` publication on active requirement-family headers
+- `Authoring Design:` publication on active requirement-family headers
+- `Implements:` requirement identifiers on ratified design surfaces
 - `Implements:` tags for generated source files
 - `Validates:` tags for generated test files
 
@@ -401,6 +405,10 @@ The source-repository realization rules below do not redefine downstream
 installed-workspace topology. Downstream project topology is governed
 separately by `REQ-F-ODDSDLC-032`.
 
+The source repository does not carry repo-root `.genesis/` as source truth.
+Source commands bind explicitly to the sibling ABG source/release substrate and
+the active `odd_sdlc` source realization.
+
 Downstream installed workspaces are governed separately by
 `REQ-F-ODDSDLC-032`: their constitutional `WHAT` remains under
 `specification/`, their project-owned realization `HOW` lands under
@@ -408,6 +416,17 @@ Downstream installed workspaces are governed separately by
 payloads live under `.genesis/`, installed `odd_sdlc` lives under
 `.genesis/odd_sdlc/`, and mutable named instances may live beneath
 `build_tenants/<tenant>/workspaces/<name>/`.
+
+That same law also governs odd_sdlc self-induction when the target project is a
+mutable odd_sdlc source line:
+
+- released odd_sdlc governs the mutable source project through installed
+  operator surfaces
+- the installed payload remains under `.genesis/odd_sdlc/`
+- the mutable project realization remains under its declared
+  `build_tenants/...` root
+- source project, released product, installed payload, and mutable worksite do
+  not collapse into one filesystem identity
 
 1. install `odd_sdlc` clean as a GTL/ABG-native product
 2. author project-owned intent, product, and requirements surfaces
@@ -454,6 +473,9 @@ The current product definition of `odd_sdlc` is:
   generic software-domain package on the line
 - treating an ODD project as an active SDLC worksite with build, qualify,
   launch, return, retrofit, and relaunch acts
+- supporting self-induction as a governed installed-worksite lane where
+  released odd_sdlc can supervise mutable odd_sdlc source development without
+  taking ownership of the source realization root
 - expanding the first-slice asset model toward request, implementation,
   qualification, release, deployment, runtime-return, and maintenance assets
 - moving toward explicit per-edge transform dependency, configured `F_P`, and
@@ -470,6 +492,9 @@ The current product definition of `odd_sdlc` is:
   carriers rather than as hidden product-local engines
 - able to install itself into an imported workspace and normalize the canonical
   bootstrap surfaces it needs for operation
+- able to generate materially useful first imported-project feature, UAT, and
+  design cuts that read back live authority, requirement carry-forward, module
+  boundaries, and proof/query shape instead of placeholder shells
 - incubating `odd_service` as the next product line for orchestration,
   session, worker, and client coordination above `odd_sdlc`
 - explicit in adoption of any carried-forward truth
@@ -521,7 +546,32 @@ It acts as the current runtime authority above the leaf asset functions:
 The current product also exposes bounded operator inspection and proving
 surfaces around that carrier:
 
-- `odd_sdlc gaps --from-edge ... --to-edge ... --zoom ...` for lawful
+- `odd_sdlc gaps --scope ...` for lawful worksite-scoped observation over the
+  current governed graph state
+- the current `gaps` / `query-domain` projection publishes one edge-scoped
+  gap-analysis dossier per open edge so observation, triage, route binding, and
+  constitutional pressure are reviewable as one current contract rather than as
+  manually reconstructed partial read models
+- `odd_sdlc start --scope ... --target next|graph_function:<published_handle>|asset:<published_handle> --until ...`
+  for lawful worksite-scoped graph advancement through the same governed graph
+  state
+- current constructive `F_P` dispatches use the ABG 3.2 prompt and manifest
+  shape; odd_sdlc contributes domain execution truth through declared prompt
+  contexts rather than through a separate prompt-template authority surface
+- the current execution basis for one bounded dispatch is carried through one
+  admitted `execution_contract_surface`, and the current source-carrier graph
+  functions for that basis are `derive_execution_contract_surface` and
+  `admit_execution_contract_surface`; those graph functions are internal source
+  carriers, not new public `start` targets; ABG manifests carry this basis via
+  the `odd_sdlc_execution_contract_context` entry in their `contexts` array
+- `odd_sdlc query-domain` for the current machine-readable
+  `start_target_catalog` and `asset_ownership_index` surfaces that govern
+  `graph_function:` and `asset:` target resolution
+- triaged ticket/work-item intake is now live through the same `asset:` family
+  as `asset:ticket/<ticket_id>` when `query-domain` publishes that handle in
+  `asset_ownership_index`; the published route contract governs re-entry and
+  keeps ticket metadata out of manual side-channels
+- `odd_sdlc gaps --scope ... --from-edge ... --to-edge ... --zoom ...` for lawful
   bounded span analysis over direct and dependent gap structure
 - `odd_sdlc prepare-sandbox` for first-class installed-dev sandbox preparation
 - `odd_sdlc observe-sandbox` for current sandbox evidence/observation summary

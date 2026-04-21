@@ -3,6 +3,8 @@
 **Family**: REQ-F-ASSET-*
 **Status**: Active
 **Category**: Capability
+**Carries Forward From**: None
+**Authoring Design**: None
 
 This family defines the bootstrap asset set and the first recursive graph
 contracts on the `odd_sdlc` line.

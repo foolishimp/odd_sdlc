@@ -92,7 +92,12 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     while step_index < len(program.steps):
         expected_edge = program.steps[step_index]
         refresh_analysis(workspace_root, stage="self_test")
-        start_result = start(app)
+        start_result = start(
+            app,
+            scope="workspace",
+            target="next",
+            until="first_traversal",
+        )
         status = start_result.get("status")
         actual_edge = start_result.get("edge")
         manifest_path = start_result.get("fp_manifest_path")
@@ -171,6 +176,11 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                         f"executive program {program.name!r} expected {expected_edge!r} "
                         f"but start selected {actual_edge!r}"
                     )
+            if actual_edge != expected_edge:
+                raise RuntimeError(
+                    f"executive program {program.name!r} expected {expected_edge!r} "
+                    f"but start selected {actual_edge!r}"
+                )
         if not isinstance(manifest_path, str) or not manifest_path:
             raise RuntimeError(
                 f"executive program {program.name!r} step {expected_edge!r} "
@@ -204,7 +214,12 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
         pending_retries_for_step = 0
         yielded_retries_for_step = 0
 
-    final_state = start(app)
+    final_state = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="first_traversal",
+    )
     context = _program_runtime_context(
         app,
         current_program_name=program.name,

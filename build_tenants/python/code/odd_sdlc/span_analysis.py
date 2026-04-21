@@ -4,10 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from genesis.services import gen_gaps
-
+from genesis.services import ScopeSelector, gen_gaps
+from .project_profile import load_or_build_operational_capability_projection
 from .traceability import collect_declared_obligation_gaps
 from .triage import enrich_gap_snapshot
+
+
+def _parse_scope_selector(raw_scope: str) -> ScopeSelector:
+    value = (raw_scope or "").strip()
+    if value == "workspace":
+        return ScopeSelector(kind="workspace")
+    prefix = "work_key:"
+    if value.startswith(prefix):
+        work_key = value[len(prefix):].strip()
+        if work_key:
+            return ScopeSelector(kind="work_key", work_key=work_key)
+    raise ValueError("scope must be 'workspace' or 'work_key:<id>'")
 
 
 def _active_edge_order(app) -> list[str]:
@@ -21,6 +33,47 @@ def _active_edge_order(app) -> list[str]:
             continue
         order.append(backing)
     return order
+
+
+def _capability_gap_entries(workspace_root, *, edge_names: list[str]) -> list[dict[str, Any]]:
+    capability_projection = load_or_build_operational_capability_projection(workspace_root)
+    capability_families = capability_projection.get("families")
+    if not isinstance(capability_families, dict):
+        return []
+    selected_edges = set(edge_names)
+    entries: list[dict[str, Any]] = []
+    for family in capability_families.values():
+        if not isinstance(family, dict):
+            continue
+        if not bool(family.get("in_scope")) or bool(family.get("declared")):
+            continue
+        family_edges = [
+            str(edge_name)
+            for edge_name in family.get("expected_resolving_edges", ())
+            if str(edge_name)
+        ]
+        if not any(edge_name in selected_edges for edge_name in family_edges):
+            continue
+        target_edge = next(
+            edge_name for edge_name in family_edges if edge_name in selected_edges
+        )
+        family_name = str(family.get("family") or "")
+        field_name = str(family.get("field_name") or "")
+        entries.append(
+            {
+                "edge": target_edge,
+                "delta": 1.0,
+                "failing": [f"missing_{family_name}_capability"],
+                "passing": [],
+                "delta_summary": (
+                    f"operational capability `{field_name}` is not declared; "
+                    f"`{target_edge}` remains gated until the governing capability is published"
+                ),
+                "environment_ready": True,
+                "operational_capability": dict(family),
+            }
+        )
+    return entries
 
 
 def _vector_by_name(app) -> dict[str, Any]:
@@ -105,12 +158,14 @@ def _canonical_graph_gap(graph_gap: dict[str, Any]) -> dict[str, Any]:
             "gap_kind": "graph_edge_gap",
             "graph_delta": graph_delta,
             "graph_converged": graph_converged,
-            "carry_delta": 0.0,
-            "fulfillment_delta": 0.0,
-            "combined_delta": 0.0,
+            "carry_truth_available": False,
+            "fulfillment_truth_available": False,
+            "carry_delta": None,
+            "fulfillment_delta": None,
+            "combined_delta": None,
             "total_delta": graph_delta,
-            "carry_converged": True,
-            "fulfillment_converged": True,
+            "carry_converged": None,
+            "fulfillment_converged": None,
             "edge_converged": graph_converged,
             "failing": failing,
             "passing": passing,
@@ -148,6 +203,8 @@ def _canonical_declared_gap(
             "gap_kind": "declared_obligation_edge_gap",
             "graph_delta": graph_delta,
             "graph_converged": graph_converged,
+            "carry_truth_available": True,
+            "fulfillment_truth_available": True,
             "graph_failing": residual_failing,
             "graph_passing": graph_passing,
             "combined_delta": deterministic_combined_delta,
@@ -197,10 +254,16 @@ def canonical_edge_gaps(
 
 
 def aggregate_edge_gap_truth(gaps: list[dict[str, Any]]) -> dict[str, Any]:
+    declared_gaps = [
+        gap for gap in gaps if str(gap.get("gap_kind") or "") == "declared_obligation_edge_gap"
+    ]
+    graph_only_gaps = [
+        gap for gap in gaps if str(gap.get("gap_kind") or "") == "graph_edge_gap"
+    ]
     graph_total_delta = sum(float(gap.get("graph_delta") or 0.0) for gap in gaps)
-    carry_delta = sum(float(gap.get("carry_delta") or 0.0) for gap in gaps)
-    fulfillment_delta = sum(float(gap.get("fulfillment_delta") or 0.0) for gap in gaps)
-    combined_delta = sum(float(gap.get("combined_delta") or 0.0) for gap in gaps)
+    carry_delta = sum(float(gap.get("carry_delta") or 0.0) for gap in declared_gaps)
+    fulfillment_delta = sum(float(gap.get("fulfillment_delta") or 0.0) for gap in declared_gaps)
+    combined_delta = sum(float(gap.get("combined_delta") or 0.0) for gap in declared_gaps)
     total_delta = sum(float(gap.get("total_delta") or 0.0) for gap in gaps)
     blocking_reasons = sorted(
         {
@@ -209,6 +272,39 @@ def aggregate_edge_gap_truth(gaps: list[dict[str, Any]]) -> dict[str, Any]:
             for reason in gap.get("blocking_reasons", ())
         }
     )
+    declared_carry_converged = (
+        None
+        if not declared_gaps
+        else all(bool(gap.get("carry_converged")) for gap in declared_gaps)
+    )
+    declared_fulfillment_converged = (
+        None
+        if not declared_gaps
+        else all(bool(gap.get("fulfillment_converged")) for gap in declared_gaps)
+    )
+    graph_gap_converged = (
+        None
+        if not graph_only_gaps
+        else all(bool(gap.get("graph_converged")) for gap in graph_only_gaps)
+    )
+    carry_converged = (
+        True
+        if not gaps
+        else (
+            False
+            if graph_only_gaps
+            else all(bool(gap.get("carry_converged")) for gap in declared_gaps)
+        )
+    )
+    fulfillment_converged = (
+        True
+        if not gaps
+        else (
+            False
+            if graph_only_gaps
+            else all(bool(gap.get("fulfillment_converged")) for gap in declared_gaps)
+        )
+    )
     return {
         "graph_total_delta": graph_total_delta,
         "direct_graph_delta": graph_total_delta,
@@ -216,18 +312,24 @@ def aggregate_edge_gap_truth(gaps: list[dict[str, Any]]) -> dict[str, Any]:
         "fulfillment_delta": fulfillment_delta,
         "combined_delta": combined_delta,
         "total_delta": total_delta,
-        "expected_count": sum(int(gap.get("expected_count") or 0) for gap in gaps),
-        "carried_count": sum(int(gap.get("carried_count") or 0) for gap in gaps),
-        "fulfilled_count": sum(int(gap.get("fulfilled_count") or 0) for gap in gaps),
-        "partial_count": sum(int(gap.get("partial_count") or 0) for gap in gaps),
-        "missing_count": sum(int(gap.get("missing_count") or 0) for gap in gaps),
-        "extra_count": sum(int(gap.get("extra_count") or 0) for gap in gaps),
-        "unfulfilled_count": sum(int(gap.get("unfulfilled_count") or 0) for gap in gaps),
-        "blocking_count": sum(int(gap.get("blocking_count") or 0) for gap in gaps),
+        "declared_obligation_gap_count": len(declared_gaps),
+        "graph_edge_gap_count": len(graph_only_gaps),
+        "mixed_truth_classes": bool(declared_gaps and graph_only_gaps),
+        "expected_count": sum(int(gap.get("expected_count") or 0) for gap in declared_gaps),
+        "carried_count": sum(int(gap.get("carried_count") or 0) for gap in declared_gaps),
+        "fulfilled_count": sum(int(gap.get("fulfilled_count") or 0) for gap in declared_gaps),
+        "partial_count": sum(int(gap.get("partial_count") or 0) for gap in declared_gaps),
+        "missing_count": sum(int(gap.get("missing_count") or 0) for gap in declared_gaps),
+        "extra_count": sum(int(gap.get("extra_count") or 0) for gap in declared_gaps),
+        "unfulfilled_count": sum(int(gap.get("unfulfilled_count") or 0) for gap in declared_gaps),
+        "blocking_count": sum(int(gap.get("blocking_count") or 0) for gap in declared_gaps),
         "blocking_reasons": blocking_reasons,
         "graph_converged": all(bool(gap.get("graph_converged")) for gap in gaps),
-        "carry_converged": all(bool(gap.get("carry_converged")) for gap in gaps),
-        "fulfillment_converged": all(bool(gap.get("fulfillment_converged")) for gap in gaps),
+        "carry_converged": carry_converged,
+        "fulfillment_converged": fulfillment_converged,
+        "declared_carry_converged": declared_carry_converged,
+        "declared_fulfillment_converged": declared_fulfillment_converged,
+        "graph_gap_converged": graph_gap_converged,
         "converged": not gaps,
     }
 
@@ -235,6 +337,7 @@ def aggregate_edge_gap_truth(gaps: list[dict[str, Any]]) -> dict[str, Any]:
 def span_gap_analysis(
     app,
     *,
+    scope: str = "workspace",
     from_edge: str,
     to_edge: str,
     zoom: str = "combined",
@@ -243,8 +346,8 @@ def span_gap_analysis(
     if zoom not in {"coarse", "refined", "combined"}:
         raise ValueError(f"invalid zoom {zoom!r}; expected coarse, refined, or combined")
 
-    scope = app.scope()
-    raw_payload = gen_gaps(scope, app.stream)
+    resolved_scope = app.scope(selector=_parse_scope_selector(scope))
+    raw_payload = gen_gaps(resolved_scope, app.stream)
     order = _active_edge_order(app)
     span_edges = _slice_span_edges(order, from_edge, to_edge)
     all_direct_span_gaps = [
@@ -252,6 +355,13 @@ def span_gap_analysis(
         for gap in raw_payload.get("gaps", ())
         if isinstance(gap, dict) and str(gap.get("edge") or "") in span_edges
     ]
+    seen_edges = {str(gap.get("edge") or "") for gap in all_direct_span_gaps}
+    for entry in _capability_gap_entries(app.config.workspace_root, edge_names=span_edges):
+        edge_name = str(entry.get("edge") or "")
+        if edge_name in seen_edges:
+            continue
+        seen_edges.add(edge_name)
+        all_direct_span_gaps.append(entry)
     dependent_gaps = (
         collect_declared_obligation_gaps(
             app.config.workspace_root,
@@ -275,7 +385,7 @@ def span_gap_analysis(
     refined_payload = enrich_gap_snapshot(
         workspace_root=app.config.workspace_root,
         stream=app.stream,
-        workflow_version=scope.workflow_version,
+        workflow_version=resolved_scope.workflow_version,
         raw_gap_payload=span_raw_payload,
         runtime_config=app.config.runtime_config,
         publish=False,

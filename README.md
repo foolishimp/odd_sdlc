@@ -10,11 +10,14 @@ Start with these surfaces:
 
 - `AGENTS.md`
 - `CLAUDE.md`
-- `.genesis/docs/standards/SPEC_METHOD.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - `specification/INTENT.md`
 - `specification/PRODUCT.md`
 - `specification/GOALS.md`
 - `specification/requirements/`
 - `build_tenants/README.md`
 - `build_tenants/TENANT_REGISTRY.md`
-- `.genesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`
+
+The source repo does not carry a repo-root `.genesis/` runtime. Installed
+`.genesis/` directories belong to downstream target workspaces and test
+sandboxes.

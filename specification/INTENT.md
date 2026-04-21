@@ -52,8 +52,8 @@ The project must deliver:
 
 The project is constrained by these rules:
 
-- `.genesis/docs/standards/SPEC_METHOD.md` is the governing process
-  constitution
+- `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
+  is the governing process constitution
 - `specification/` remains the sole authoritative `WHAT` surface
 - `build_tenants/` remains realization `HOW` and does not outrank
   `specification/`
