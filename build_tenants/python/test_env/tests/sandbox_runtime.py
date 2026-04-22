@@ -107,6 +107,36 @@ def run_installed_substrate(
             result.args,
             output=result.stdout,
             stderr=result.stderr,
+    )
+    return result
+
+
+def run_installed_python(
+    workspace: Path,
+    code: str,
+    *,
+    archive: "RunArchive | None" = None,
+    label: str | None = None,
+    timeout: int = 60,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=str(workspace),
+        env=sandbox_env(workspace),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+    if archive is not None:
+        archive.log_subprocess(label or "installed python", result)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
         )
     return result
 

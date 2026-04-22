@@ -4,39 +4,17 @@
 """Explicit proposal-application and loopback helpers for the odd_sdlc homeostatic lane."""
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 from typing import Any
 
 from .analysis import load_workspace_state, refresh_analysis
 from .app import OddSdlcApp
+from .constitutional_surface import (
+    constitutional_surface_digest,
+    proposal_application_block,
+)
 from .runtime_effects import publish_workspace_runtime_event
 from .triage import enrich_gap_snapshot, load_current_edge_triage
-
-
-def _surface_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _proposal_application_block(
-    *,
-    edge: str,
-    proposal_id: str,
-    target_surface: str,
-    actor: str,
-) -> str:
-    return "\n".join(
-        (
-            "",
-            f"<!-- odd_sdlc constitutional proposal applied: {proposal_id} -->",
-            "## Applied Constitutional Proposal",
-            f"- proposal_id: `{proposal_id}`",
-            f"- originating_edge: `{edge}`",
-            f"- target_surface: `{target_surface}`",
-            f"- applied_by: `{actor}`",
-            "",
-        )
-    )
 
 
 def apply_constitutional_proposal(
@@ -63,7 +41,7 @@ def apply_constitutional_proposal(
     if not target_path.exists():
         raise RuntimeError(f"constitutional target surface {target_surface!r} does not exist")
 
-    application_block = _proposal_application_block(
+    application_block = proposal_application_block(
         edge=edge,
         proposal_id=proposal_id,
         target_surface=target_surface,
@@ -73,7 +51,7 @@ def apply_constitutional_proposal(
     if proposal_id not in target_text:
         target_path.write_text(target_text.rstrip() + application_block + "\n", encoding="utf-8")
 
-    surface_digest = _surface_digest(target_path)
+    surface_digest = constitutional_surface_digest(target_path)
     approval_event = publish_workspace_runtime_event(
         workspace_root=root,
         event_type="constitutional_proposal_approved_with_edits",
@@ -125,7 +103,7 @@ def loopback_homeostatic_gap(
 ) -> dict[str, Any]:
     workspace_root = app.config.workspace_root
     target_path = workspace_root / target_surface
-    surface_digest = _surface_digest(target_path)
+    surface_digest = constitutional_surface_digest(target_path)
     workspace_state = load_workspace_state(workspace_root) or {}
     run_id = str(workspace_state.get("active_run_id") or "") or None
 

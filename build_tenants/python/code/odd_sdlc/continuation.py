@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from genesis.result_ingest import ingest_fp_result
+from genesis.services import ScopeSelector
 
 from .analysis import refresh_analysis
-from .app import OddSdlcApp, active_programs, gap_snapshot
+from .app import OddSdlcApp, active_programs, publish_gap_surface
 
 
 def continue_with_result(app: OddSdlcApp, *, result_path: str | Path) -> dict[str, Any]:
@@ -16,7 +17,10 @@ def continue_with_result(app: OddSdlcApp, *, result_path: str | Path) -> dict[st
     resolved_result_path = Path(result_path).resolve()
     result_admission = ingest_fp_result(resolved_result_path, workspace_root)
     analysis = refresh_analysis(workspace_root, stage="result_admission")
-    snapshot = gap_snapshot(app)
+    snapshot = publish_gap_surface(
+        app,
+        selector=ScopeSelector(kind="workspace"),
+    )
 
     status = result_admission.get("status")
     if status == "ok":

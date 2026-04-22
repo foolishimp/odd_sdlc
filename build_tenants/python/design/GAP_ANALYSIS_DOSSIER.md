@@ -69,11 +69,13 @@ correlated event ids so dossier review remains replayable.
 
 ## Runtime Rule
 
-`odd_sdlc gaps` and `query-domain` must consume the same dossier builder.
+`odd_sdlc gaps`, `query-domain`, and public `start --target next` must consume
+the same dossier builder.
 
 That means:
 
 - operator gap rows and query-domain gap rows remain one current story
+- public `start --target next` does not invent a rival head-edge authority path
 - dossier publication is not a side-channel beside those operator surfaces
 - future prompt-bearing gap handling consumes the dossier rather than scraping
   multiple runtime files
@@ -86,7 +88,8 @@ That means:
 
 This design is only behaving lawfully when:
 
-- `gaps` and `query-domain` no longer reconstruct the edge story independently
+- `gaps`, `query-domain`, and public `start --target next` no longer
+  reconstruct the edge story independently
 - the dossier is sufficient for "why is this edge open" review
 - the dossier remains derived from current gap, triage, and analysis truth
   rather than becoming a rival tracker

@@ -21,18 +21,36 @@ from genesis.identity import RuntimeIdentity
 from genesis.install import workspace_bootstrap
 from genesis.services import Scope, ScopeSelector, StartIntent, StartTarget, gen_gaps, gen_iterate, gen_start
 
-from .analysis import ensure_workspace_ready
+from .analysis import ensure_workspace_ready, refresh_analysis
 from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
 from .ambiguity import load_or_build_ambiguity_register
 from .execution_contract import admit_bound_execution_start, load_admitted_execution_contract_projection
 from .function_catalog import FUNCTION_CATALOG
 from .gap_dossier import (
+    PublicNextStartBlock,
+    PublicNextStartDirective,
     build_gap_dossier_register,
+    load_gap_dossier_read_model,
+    PendingConstitutionalStartGate,
+    project_public_next_start_resolution,
     project_gap_dossier_input,
     project_gap_dossier_surface,
     publish_gap_dossier_surfaces,
 )
 from .gtl_module import module as odd_sdlc_module
+from .public_start import (
+    PublicStartDispatchRequired,
+    PublicStartAdmissionDirective,
+    PublicStartHumanGateRequired,
+    PublicStartRepublishAndContinue,
+    PublicStartReturn,
+    emit_public_start_human_proxy_approval,
+    project_public_start_admission_for_explicit,
+    project_public_start_admission_for_next,
+    project_public_start_dispatch_outcome,
+    project_public_start_gen_start_outcome,
+    resolve_public_start_result_policy,
+)
 from .project_profile import load_or_build_operational_capability_projection
 from .program_catalog import PROGRAM_CATALOG
 from .runtime_contract import query_assets_binding_contract
@@ -53,6 +71,7 @@ from .start_targeting import (
     published_start_target_catalog,
 )
 from .requirement_closure import collect_declared_obligation_gaps
+from .runtime_effects import publish_runtime_event
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
@@ -325,8 +344,16 @@ def gaps(
     return _build_gap_surface(app, selector=selector, publish=True)
 
 
-def gap_snapshot(app: OddSdlcApp) -> dict:
-    return _build_gap_surface(app, selector=ScopeSelector(kind="workspace"), publish=False)
+def gap_snapshot(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector | None = None,
+) -> dict:
+    return _build_gap_surface(
+        app,
+        selector=selector or ScopeSelector(kind="workspace"),
+        publish=False,
+    )
 
 
 def _build_gap_surface(
@@ -400,11 +427,373 @@ def _build_gap_surface(
         app.config.workspace_root,
         gap_input=gap_input,
         dossier_register=dossier_register,
+        published=publish,
     )
 
 
 def iterate(app: OddSdlcApp, *, scope: str = "workspace") -> dict:
     return gen_iterate(app.scope(selector=parse_gap_scope_selector(scope)), app.stream)
+
+
+def _publish_pending_constitutional_start_gate(
+    app: OddSdlcApp,
+    *,
+    gate: PendingConstitutionalStartGate,
+    workflow_version: str,
+    work_key: str | None,
+    run_id: str | None,
+) -> None:
+    publish_runtime_event(
+        stream=app.stream,
+        event_type="fh_gate_pending",
+        data=gate.fh_gate_payload(),
+        workflow_version=workflow_version,
+        work_key=work_key,
+        run_id=run_id,
+        aggregate_type="edge_triage",
+        aggregate_id=gate.edge,
+        causation_event_id=gate.constitutional_event_id,
+    )
+
+
+def _apply_pending_constitutional_human_proxy(
+    app: OddSdlcApp,
+    *,
+    edge: str,
+    proposal_id: str,
+) -> dict[str, Any]:
+    from .homeostatic_loop import apply_constitutional_proposal
+
+    return apply_constitutional_proposal(
+        app.config.workspace_root,
+        edge=edge,
+        proposal_id=proposal_id,
+        actor="human-proxy",
+    )
+
+
+def _attach_public_next_result_metadata(
+    result: dict[str, Any],
+    *,
+    public_target: str = "next",
+    resolved_raw_target: str | None = None,
+    next_edge_override: str | None = None,
+    fh_mode: str,
+    root_mode: str,
+) -> dict[str, Any]:
+    result["target"] = public_target
+    if resolved_raw_target and resolved_raw_target != "next":
+        result["resolved_target"] = resolved_raw_target
+    elif next_edge_override:
+        result["resolved_edge"] = next_edge_override
+    result["fh_mode"] = fh_mode
+    result["root_mode"] = root_mode
+    return result
+
+
+def publish_gap_surface(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+) -> dict[str, Any]:
+    return _build_gap_surface(app, selector=selector, publish=True)
+
+
+def republish_gap_surface(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+    stage: str,
+) -> dict[str, Any]:
+    refresh_analysis(app.config.workspace_root, stage=stage)
+    return publish_gap_surface(app, selector=selector)
+
+
+def _public_next_gap_surface(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+) -> dict[str, Any]:
+    return load_gap_dossier_read_model(app.config.workspace_root, scope=selector)
+
+
+def _resolve_public_start_admission(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+    target: str,
+    normalized_scope: str,
+    until: str,
+    fh_mode: str,
+    root_mode: str,
+) -> tuple[PublicStartAdmissionDirective | None, Any | None, dict[str, Any] | None]:
+    resolved_scope = app.scope(selector=selector)
+    gap_surface = _public_next_gap_surface(app, selector=selector)
+    head_resolution = project_public_next_start_resolution(gap_surface)
+    value = (target or "").strip()
+    if value == "next":
+        admission_resolution = project_public_start_admission_for_next(head_resolution)
+    else:
+        admission_resolution = project_public_start_admission_for_explicit(
+            raw_target=value,
+            head_resolution=head_resolution,
+        )
+
+    if isinstance(admission_resolution, PendingConstitutionalStartGate):
+        _publish_pending_constitutional_start_gate(
+            app,
+            gate=admission_resolution,
+            workflow_version=resolved_scope.workflow_version,
+            work_key=resolved_scope.work_key,
+            run_id=resolved_scope.run_id,
+        )
+        blocked_result = admission_resolution.to_start_result()
+        blocked_result["target"] = value
+        return None, None, _attach_public_next_result_metadata(
+            blocked_result,
+            public_target=value,
+            fh_mode=fh_mode,
+            root_mode=root_mode,
+        )
+
+    if isinstance(admission_resolution, PublicNextStartBlock):
+        return None, None, _attach_public_next_result_metadata(
+            admission_resolution.to_start_result(),
+            public_target=value,
+            fh_mode=fh_mode,
+            root_mode=root_mode,
+        )
+
+    bound_start = admit_bound_execution_start(
+        scope=resolved_scope,
+        workspace_root=app.config.workspace_root,
+        module=resolved_scope.module,
+        stream=app.stream,
+        workflow_version=resolved_scope.workflow_version,
+        work_key=resolved_scope.work_key,
+        run_id=resolved_scope.run_id,
+        normalized_scope=normalized_scope,
+        raw_target=admission_resolution.raw_target,
+        until=until,
+        next_edge_override=admission_resolution.edge_override,
+        next_route_state=admission_resolution.route_state,
+        next_binding_source=admission_resolution.binding_source,
+    )
+    return admission_resolution, bound_start, None
+
+
+def _resolve_public_next_iteration(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+    normalized_scope: str,
+    until: str,
+    fh_mode: str,
+    root_mode: str,
+) -> tuple[PublicNextStartDirective | None, Any | None, dict[str, Any] | None]:
+    directive, bound_start, blocked_result = _resolve_public_start_admission(
+        app,
+        selector=selector,
+        target="next",
+        normalized_scope=normalized_scope,
+        until=until,
+        fh_mode=fh_mode,
+        root_mode=root_mode,
+    )
+    if blocked_result is not None:
+        return None, None, blocked_result
+    if directive is None or not isinstance(directive, PublicStartAdmissionDirective):
+        raise RuntimeError("public next start admission failed to produce an admitted directive")
+    return PublicNextStartDirective(
+        edge=str(directive.edge_override or ""),
+        route_state=str(directive.route_state or ""),
+        raw_target=directive.raw_target,
+        edge_override=directive.edge_override,
+        binding_source=directive.binding_source,
+        triage_artifact_path=directive.triage_artifact_path,
+        gap_dossier_register_path=directive.gap_dossier_register_path,
+        gap_dossier_context_path=directive.gap_dossier_context_path,
+    ), bound_start, None
+
+
+def _run_public_next_start(
+    app: OddSdlcApp,
+    *,
+    selector: ScopeSelector,
+    normalized_scope: str,
+    until: Literal["first_traversal", "blocked", "converged"],
+    fh_mode: Literal["direct", "human-proxy"],
+    root_mode: Literal["direct", "supervised"],
+) -> dict[str, Any]:
+    from genesis.dispatch_runtime import auto_dispatch_from_result
+    from genesis.proof_hold import project_proof_hold
+
+    max_iterations = 50
+    auto_applied_constitutional_proposals: set[str] = set()
+    result: dict[str, Any] = {}
+
+    for _ in range(max_iterations):
+        directive, bound_start, blocked_result = _resolve_public_next_iteration(
+            app,
+            selector=selector,
+            normalized_scope=normalized_scope,
+            until=until,
+            fh_mode=fh_mode,
+            root_mode=root_mode,
+        )
+        if blocked_result is not None:
+            if (
+                fh_mode == "human-proxy"
+                and blocked_result.get("blocking_reason") == "fh_gate"
+            ):
+                proposal = blocked_result.get("constitutional_proposal")
+                edge = str(blocked_result.get("edge") or "").strip()
+                proposal_id = (
+                    str(proposal.get("proposal_id") or "").strip()
+                    if isinstance(proposal, dict)
+                    else ""
+                )
+                if edge and proposal_id:
+                    if proposal_id in auto_applied_constitutional_proposals:
+                        blocked_result["human_proxy_error"] = (
+                            "constitutional proposal remained pending after human-proxy application"
+                        )
+                        return blocked_result
+                    auto_applied_constitutional_proposals.add(proposal_id)
+                    _apply_pending_constitutional_human_proxy(
+                        app,
+                        edge=edge,
+                        proposal_id=proposal_id,
+                    )
+                    republish_gap_surface(
+                        app,
+                        selector=selector,
+                        stage="public_start_next_human_proxy",
+                    )
+                    continue
+            return blocked_result
+        if directive is None or bound_start is None:
+            raise RuntimeError("public next start resolution failed to produce an admitted basis")
+
+        intent = StartIntent(scope=bound_start.scope, target=bound_start.target, until=until)
+        result = gen_start(intent, app.stream)
+        _attach_public_next_result_metadata(
+            result,
+            resolved_raw_target=directive.raw_target,
+            next_edge_override=directive.edge_override,
+            fh_mode=fh_mode,
+            root_mode=root_mode,
+        )
+
+        if until == "first_traversal":
+            return result
+
+        iteration_outcome = project_public_start_gen_start_outcome(
+            result,
+            until=until,
+        )
+        if isinstance(iteration_outcome, PublicStartRepublishAndContinue):
+            republish_gap_surface(
+                app,
+                selector=selector,
+                stage=iteration_outcome.republish_stage,
+            )
+            continue
+        if isinstance(iteration_outcome, PublicStartHumanGateRequired):
+            if fh_mode != "human-proxy":
+                return iteration_outcome.result
+            edge = str(
+                iteration_outcome.result.get("edge")
+                or iteration_outcome.result.get("fh_gate", {}).get("edge")
+                or ""
+            ).strip()
+            if not edge:
+                result.update(iteration_outcome.result)
+                result["stopped_by"] = "fh_gate"
+                result["human_proxy_error"] = "missing edge for fh_gate approval"
+                return result
+            emit_public_start_human_proxy_approval(
+                app.config.workspace_root,
+                edge=edge,
+                workflow_version=str(bound_start.scope.workflow_version),
+                work_key=bound_start.scope.work_key,
+                run_id=bound_start.scope.run_id,
+            )
+            republish_gap_surface(
+                app,
+                selector=selector,
+                stage="public_start_next_human_proxy",
+            )
+            continue
+        if isinstance(iteration_outcome, PublicStartReturn):
+            return iteration_outcome.result
+        if isinstance(iteration_outcome, PublicStartDispatchRequired):
+            resolved_policy = resolve_public_start_result_policy(
+                iteration_outcome.result,
+                app.config.workspace_root,
+            )
+            proof_hold = project_proof_hold(
+                app.config.workspace_root,
+                edge=(
+                    iteration_outcome.result.get("edge")
+                    if isinstance(iteration_outcome.result.get("edge"), str)
+                    else None
+                ),
+                work_key=(
+                    iteration_outcome.result.get("work_key")
+                    if isinstance(iteration_outcome.result.get("work_key"), str)
+                    else None
+                ),
+                spec_hash=(
+                    iteration_outcome.result.get("spec_hash")
+                    if isinstance(iteration_outcome.result.get("spec_hash"), str)
+                    else None
+                ),
+                workflow_version=(
+                    iteration_outcome.result.get("workflow_version")
+                    if isinstance(iteration_outcome.result.get("workflow_version"), str)
+                    else None
+                ),
+                resolved_policy=resolved_policy,
+            )
+            proof_hold_outcome = project_public_start_gen_start_outcome(
+                iteration_outcome.result,
+                until=until,
+                proof_hold=proof_hold,
+            )
+            if isinstance(proof_hold_outcome, PublicStartReturn):
+                return proof_hold_outcome.result
+            dispatch_result = auto_dispatch_from_result(
+                iteration_outcome.result,
+                app.config.workspace_root,
+                config=dict(bound_start.scope.runtime_config),
+            )
+            dispatch_outcome = project_public_start_dispatch_outcome(dispatch_result)
+            if isinstance(dispatch_outcome, PublicStartRepublishAndContinue):
+                republish_gap_surface(
+                    app,
+                    selector=selector,
+                    stage=dispatch_outcome.republish_stage,
+                )
+                continue
+            if not isinstance(dispatch_outcome, PublicStartReturn):
+                raise RuntimeError("public next dispatch outcome failed to project a terminal result")
+            result.update(dispatch_outcome.result)
+            _attach_public_next_result_metadata(
+                result,
+                resolved_raw_target=directive.raw_target,
+                next_edge_override=directive.edge_override,
+                fh_mode=fh_mode,
+                root_mode=root_mode,
+            )
+            return result
+        raise RuntimeError("public next start outcome failed to classify the iteration")
+
+    return _attach_public_next_result_metadata(
+        result,
+        fh_mode=fh_mode,
+        root_mode=root_mode,
+    ) | {"stopped_by": "max_iterations"}
 
 
 def start(
@@ -417,29 +806,39 @@ def start(
     root_mode: Literal["direct", "supervised"] = "direct",
 ) -> dict:
     ensure_workspace_ready(app.config.workspace_root)
-    selector = parse_gap_scope_selector(scope)
-    resolved_scope = app.scope(selector=selector)
-    bound_start = admit_bound_execution_start(
-        scope=resolved_scope,
-        workspace_root=app.config.workspace_root,
-        module=resolved_scope.module,
-        stream=app.stream,
-        workflow_version=resolved_scope.workflow_version,
-        work_key=resolved_scope.work_key,
-        run_id=resolved_scope.run_id,
-        normalized_scope=scope,
-        raw_target=target,
-        until=until,
-    )
-    resolved_target = bound_start.target
-    resolved_scope = bound_start.scope
-    runtime_config = dict(resolved_scope.runtime_config)
-    intent = StartIntent(scope=resolved_scope, target=resolved_target, until=until)
-
     if until != "converged" and fh_mode != "direct":
         raise ValueError("fh_mode is only lawful when until='converged'")
     if until != "converged" and root_mode != "direct":
         raise ValueError("root_mode is only lawful when until='converged'")
+
+    selector = parse_gap_scope_selector(scope)
+    if (target or "").strip() == "next":
+        return _run_public_next_start(
+            app,
+            selector=selector,
+            normalized_scope=scope,
+            until=until,
+            fh_mode=fh_mode,
+            root_mode=root_mode,
+        )
+
+    directive, bound_start, blocked_result = _resolve_public_start_admission(
+        app,
+        selector=selector,
+        target=target,
+        normalized_scope=scope,
+        until=until,
+        fh_mode=fh_mode,
+        root_mode=root_mode,
+    )
+    if blocked_result is not None:
+        return blocked_result
+    if directive is None or bound_start is None:
+        raise RuntimeError("public start admission failed to produce an admitted basis")
+    resolved_target = bound_start.target
+    resolved_scope = bound_start.scope
+    runtime_config = dict(resolved_scope.runtime_config)
+    intent = StartIntent(scope=resolved_scope, target=resolved_target, until=until)
 
     if until == "converged":
         if root_mode == "supervised":

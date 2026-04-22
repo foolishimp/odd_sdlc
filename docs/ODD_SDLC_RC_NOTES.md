@@ -1,7 +1,7 @@
 # odd_sdlc RC Notes
 
 This note records accepted RC-scoped behavior and caveats for
-`v1.0.0-rc.1`.
+`v1.0.0-rc.2`.
 
 ## Accepted RC Behavior
 
@@ -63,9 +63,52 @@ That means:
   than flattening into generic runtime failure
 - explicit blocker-class conditions still fail closed
 
+### Public Start Is Published-Carrier-Governed
+
+The current RC treats public start admission as a published homeostatic-carrier
+decision, not as a controller-local fallback.
+
+That means:
+
+- `target=next`, explicit `graph_function:` targets, and start-addressable
+  `asset:` targets all consult the published head-gap carrier before admission
+- published `pending_fh` on the head edge stops public start at `fh_gate`
+  before execution-contract admission or constructive run events
+- unpublished or stale public gap carriers fail closed before admission
+
+This is intentional. Public start no longer carries a fresh-install shortcut or
+an explicit-target bypass around published constitutional truth.
+
+### Scope-Owned Gap Dossier Publication Is Intentional
+
+The current RC keeps workspace and `work_key:<id>` gap publication distinct.
+
+That means:
+
+- `gaps --scope work_key:<id>` publishes to a scoped dossier carrier
+- workspace `query-domain` and workspace `start` continue to consume workspace
+  dossier truth
+- scope-specific publication does not overwrite workspace gating truth
+
+This is intentional. It keeps one carrier story per scope instead of letting
+scoped publication poison workspace read models.
+
+### Public Continue And Public Start Share One Published Re-Entry Story
+
+The current RC accepts only one workspace re-entry carrier between `continue`
+and the next public `start`.
+
+That means:
+
+- `continue` refreshes analysis and republishes the workspace gap-dossier
+  carrier
+- the next public `start(next)` consumes that same published workspace carrier
+- proof-driven continuation-opened states remain lawful `yield`; they are not
+  flattened into operator-facing runtime failure
+
 ## RC Qualification Boundary
 
-The `v1.0.0-rc.1` qualification bundle is the deterministic source/install/yield
+The `v1.0.0-rc.2` qualification bundle is the deterministic source/install/yield
 bundle listed in
 [ODD_SDLC_RC_RELEASE_NOTE.md](/Users/jim/src/apps/odd_sdlc/docs/ODD_SDLC_RC_RELEASE_NOTE.md).
 

@@ -9,11 +9,13 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import textwrap
 
 import pytest
 
 from odd_sdlc.workspace_assets import asset_path
+from odd_sdlc.release.install import install as install_release
 from sandbox_runtime import (
     assert_installed_genesis_runtime,
     complete_bootstrap_chain,
@@ -34,6 +36,23 @@ APPS_ROOT = Path(__file__).resolve().parents[5]
 ABI_TRANSPORT_PATH = (
     APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "genesis" / "transport.py"
 )
+
+
+def _resolve_data_mapper_template() -> Path:
+    local_projects_root = APPS_ROOT / "ai_sdlc_examples" / "local_projects"
+    candidates = (
+        local_projects_root / "data_mapper" / "data_mapper.template",
+        local_projects_root / "data_mapper.template",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "unable to locate data_mapper.template under ai_sdlc_examples/local_projects"
+    )
+
+
+DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
 
 EXPECTED_BOOTSTRAP_STEPS = (
     "derive_intent_surface",
@@ -227,6 +246,101 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
     )
     run_archive.capture_json("refresh-analysis.json", refresh_analysis)
     run_archive.note("sandbox_prepared", workspace=str(workspace))
+
+
+@pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
+def test_sandbox_forensic_public_start_stops_before_constructive_events_at_published_fh_gate(
+    run_archive,
+) -> None:
+    workspace = run_archive.workspace
+    shutil.copytree(DATA_MAPPER_TEMPLATE, workspace, dirs_exist_ok=True)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    run_archive.capture_json("install.forensic_gate.payload.json", payload)
+    assert payload["status"] == "installed"
+
+    refresh_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="forensic_gate.refresh-analysis",
+        ).stdout
+    )
+    run_archive.capture_json("forensic_gate.refresh-analysis.json", refresh_payload)
+    assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+
+    gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="forensic_gate.gaps",
+        ).stdout
+    )
+    run_archive.capture_json("forensic_gate.gaps.json", gaps_payload)
+    assert gaps_payload["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert gaps_payload["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
+    assert gaps_payload["dossiers"][0]["route_binding"]["state"] == "await_fh_resolution"
+
+    start_result = run_installed_odd_sdlc(
+        workspace,
+        "start",
+        "--scope",
+        "workspace",
+        "--target",
+        "next",
+        "--until",
+        "converged",
+        archive=run_archive,
+        label="forensic_gate.start",
+        timeout=180,
+        check=False,
+    )
+    run_archive.capture_text("forensic_gate.start.stdout.txt", start_result.stdout)
+    run_archive.capture_text("forensic_gate.start.stderr.txt", start_result.stderr)
+    assert start_result.returncode == 3
+    start_payload = json.loads(start_result.stdout)
+    run_archive.capture_json("forensic_gate.start.json", start_payload)
+    assert start_payload["status"] == "pending"
+    assert start_payload["blocking_reason"] == "fh_gate"
+    assert start_payload["stopped_by"] == "fh_gate"
+    assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["constitutional_proposal"]["state"] == "pending_fh"
+
+    events = read_events(workspace)
+    run_archive.capture_json("forensic_gate.events.json", events)
+    event_types = [event["event_type"] for event in events]
+    assert "constitutional_proposal_recorded" in event_types
+    assert "fh_gate_pending" in event_types
+    assert event_types.index("constitutional_proposal_recorded") < event_types.index("fh_gate_pending")
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "run_bound" not in event_types
+    assert "run_started" not in event_types
+    assert "graph_call_opened" not in event_types
+    assert "vector_started" not in event_types
+    assert "worker_turn_started" not in event_types
+    assert "fp_dispatched" not in event_types
+    assert "assessed" not in event_types
+    assert "found" not in event_types
+    assert "run_failed" not in event_types
+    assert "run_yielded" not in event_types
+    assert not any(
+        event["event_type"] in {
+            "approved",
+            "revoked",
+            "constitutional_proposal_approved_with_edits",
+            "proposal_applied",
+        }
+        for event in events
+    )
 
 
 def test_sandbox_preparation_preserves_installer_owned_abg_runtime(run_archive) -> None:

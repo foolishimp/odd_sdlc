@@ -55,15 +55,25 @@ class NextExecutionTarget:
     public_target: str
     normalized_scope: str
     until: str
+    edge_override: str | None = None
+    route_state: str | None = None
+    binding_source: str | None = None
     kind: Literal["next"] = "next"
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "normalized_scope": self.normalized_scope,
             "public_target": self.public_target,
             "until": self.until,
             "kind": self.kind,
         }
+        if self.edge_override:
+            payload["edge_override"] = self.edge_override
+        if self.route_state:
+            payload["route_state"] = self.route_state
+        if self.binding_source:
+            payload["binding_source"] = self.binding_source
+        return payload
 
     def to_start_target(self) -> Any:
         from genesis.services import StartTarget
@@ -363,6 +373,8 @@ def _admitted_execution_contract_projection_from_payload(
         errors.append("target_truth is required")
     elif target_kind not in _EXECUTION_CONTRACT_TARGET_KINDS:
         errors.append("target_truth.kind is not an admitted execution target variant")
+    elif target_kind == "next" and not str(target_truth.get("edge_override") or "").strip():
+        errors.append("next target_truth requires edge_override")
     if source_kind == "ticket_work_item":
         route_contract = payload.get("route_contract")
         target_route_contract = (
@@ -462,6 +474,9 @@ def _execution_target_from_resolved(
     until: str,
     resolved_target: Any,
     route_contract: WorkItemRouteContract | None,
+    next_edge_override: str | None = None,
+    next_route_state: str | None = None,
+    next_binding_source: str | None = None,
     ticket_id: str | None = None,
     ticket_relative_path: str | None = None,
     ticket_target_truth: str | None = None,
@@ -472,6 +487,9 @@ def _execution_target_from_resolved(
             public_target=raw_target,
             normalized_scope=normalized_scope,
             until=until,
+            edge_override=next_edge_override,
+            route_state=next_route_state,
+            binding_source=next_binding_source,
         )
     if kind == "graph_function":
         return GraphFunctionExecutionTarget(
@@ -511,6 +529,9 @@ def _ordinary_execution_contract(
     until: str,
     resolved_target: Any,
     route_contract: WorkItemRouteContract | None,
+    next_edge_override: str | None = None,
+    next_route_state: str | None = None,
+    next_binding_source: str | None = None,
 ) -> tuple[OperatorExecutionSource, ExecutionTarget]:
     target = _execution_target_from_resolved(
         raw_target=raw_target,
@@ -518,15 +539,18 @@ def _ordinary_execution_contract(
         until=until,
         resolved_target=resolved_target,
         route_contract=route_contract,
+        next_edge_override=next_edge_override,
+        next_route_state=next_route_state,
+        next_binding_source=next_binding_source,
     )
     source = OperatorExecutionSource(
         ticket_category="ordinary",
         change_class="realization_refactor",
         re_entry_point="realization_surface",
-        affected_boundary="odd_sdlc start dispatch over published graph-function target truth",
+        affected_boundary="odd_sdlc start dispatch over admitted published start-target truth",
         closure_law=(
-            "Dispatch stays open until the selected graph-function edge advances under published "
-            "deterministic failure law, output contract law, and later proof/gap-analysis review."
+            "Dispatch stays open until the admitted published start target advances under "
+            "published deterministic failure law, output contract law, and later proof/gap-analysis review."
         ),
         evaluation_criteria=(
             "scope, target, and until are normalized before dispatch",
@@ -641,12 +665,15 @@ def _ticket_execution_contract(
 def _validate_execution_contract(contract: DraftExecutionContract) -> list[str]:
     errors: list[str] = []
     source = contract.source
+    target = contract.target
     if not source.closure_law.strip():
         errors.append("closure_law is required")
     if not source.evaluation_criteria:
         errors.append("evaluation_criteria is required")
     if not source.proof_surface:
         errors.append("proof_surface is required")
+    if isinstance(target, NextExecutionTarget) and not target.edge_override:
+        errors.append("next execution contract requires admitted edge_override")
     if isinstance(source, TicketWorkItemExecutionSource):
         if source.ticket_status not in STARTABLE_WORK_ITEM_STATUSES:
             errors.append(f"ticket_status {source.ticket_status!r} is not start-authoritative")
@@ -775,9 +802,16 @@ def derive_execution_contract_surface(
     normalized_scope: str,
     raw_target: str,
     until: str,
+    next_edge_override: str | None = None,
+    next_route_state: str | None = None,
+    next_binding_source: str | None = None,
 ) -> DraftExecutionContract:
     from .runtime_effects import publish_runtime_event
 
+    if (raw_target or "").strip() == "next" and not next_edge_override:
+        raise ValueError(
+            "raw target 'next' is not start-authoritative; resolve the published head gap route before admitting an execution contract"
+        )
     resolved = resolve_start_target(workspace_root, module, raw_target)
     resolved_target = resolved.target
     if _is_ticket_work_item_target(resolved_target):
@@ -796,6 +830,9 @@ def derive_execution_contract_surface(
             until=until,
             resolved_target=resolved_target,
             route_contract=resolved.route_contract,
+            next_edge_override=next_edge_override,
+            next_route_state=next_route_state,
+            next_binding_source=next_binding_source,
         )
     draft = _draft_execution_contract(source, target)
     publish_runtime_event(
@@ -822,6 +859,9 @@ def admit_execution_contract_surface(
     normalized_scope: str,
     raw_target: str,
     until: str,
+    next_edge_override: str | None = None,
+    next_route_state: str | None = None,
+    next_binding_source: str | None = None,
 ) -> AdmittedExecutionContract:
     from .runtime_effects import publish_runtime_event
 
@@ -835,6 +875,9 @@ def admit_execution_contract_surface(
         normalized_scope=normalized_scope,
         raw_target=raw_target,
         until=until,
+        next_edge_override=next_edge_override,
+        next_route_state=next_route_state,
+        next_binding_source=next_binding_source,
     )
     errors = _validate_execution_contract(draft)
     register_path = workspace_root / EXECUTION_CONTRACT_REGISTER_PATH
@@ -951,6 +994,11 @@ def bound_execution_start_from_contract(
 
     if not isinstance(execution_contract, AdmittedExecutionContract):
         raise TypeError("bound execution start requires AdmittedExecutionContract carrier")
+    next_edge_override = (
+        execution_contract.target.edge_override
+        if isinstance(execution_contract.target, NextExecutionTarget)
+        else None
+    )
     match execution_contract.target:
         case NextExecutionTarget() as admitted_target:
             resolved_target = admitted_target.to_start_target()
@@ -989,7 +1037,7 @@ def bound_execution_start_from_contract(
             module=scope.module,
             workspace_root=scope.workspace_root,
             selector=scope.selector,
-            diagnostic_edge_override=scope.diagnostic_edge_override,
+            diagnostic_edge_override=next_edge_override or scope.diagnostic_edge_override,
             build=scope.build,
             runtime_identity=scope.runtime_identity,
             worker=scope.worker,
@@ -1018,6 +1066,9 @@ def admit_bound_execution_start(
     normalized_scope: str,
     raw_target: str,
     until: str,
+    next_edge_override: str | None = None,
+    next_route_state: str | None = None,
+    next_binding_source: str | None = None,
 ) -> BoundExecutionStart:
     contract = admit_execution_contract_surface(
         workspace_root=workspace_root,
@@ -1029,6 +1080,9 @@ def admit_bound_execution_start(
         normalized_scope=normalized_scope,
         raw_target=raw_target,
         until=until,
+        next_edge_override=next_edge_override,
+        next_route_state=next_route_state,
+        next_binding_source=next_binding_source,
     )
     return bound_execution_start_from_contract(
         scope=scope,

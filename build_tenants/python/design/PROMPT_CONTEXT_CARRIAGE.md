@@ -24,8 +24,14 @@ For execution-contract admission, the current prompt-bearing carrier is:
 
 ## Provenance Rule
 
-Every `odd_sdlc start` dispatch admits the execution contract before ABG opens
-constructive `F_P` dispatch.
+Every constructive `odd_sdlc start` dispatch that lawfully reaches ABG admits
+the execution contract before ABG opens constructive `F_P` dispatch.
+
+Public `odd_sdlc start --target next` may stop earlier at the published
+homeostatic constitutional gate. When the head dossier carries
+`route_binding.state=await_fh_resolution` together with
+`constitutional_proposal.state=pending_fh`, no execution contract is admitted
+and no constructive run opens.
 
 The ABG 3.2 manifest records that source truth through its `contexts` array.
 The manifest must include a context entry with:
@@ -44,7 +50,10 @@ runtime truth for `odd_sdlc`.
 
 This surface is lawful only when:
 
-- public `odd_sdlc start` admits the execution contract before dispatch
+- public `odd_sdlc start` admits the execution contract before constructive
+  dispatch
+- public `odd_sdlc start --target next` can stop before execution-contract
+  admission when the homeostatic constitutional gate is still pending
 - the GTL graph functions declare `odd_sdlc_execution_contract_context` as a
   constructive context
 - ABG manifests carry that context in `contexts`

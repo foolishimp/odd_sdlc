@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .app import OddSdlcApp, catalog, gap_snapshot
+from .app import OddSdlcApp, catalog
 from .ambiguity import load_or_build_ambiguity_register
+from .gap_dossier import load_gap_dossier_read_model
 from .query_contract import query_domain_contract
 from .requirement_closure import load_requirement_closure_register_read_model
 from .workspace_assets import bootstrap_assets
@@ -91,7 +92,7 @@ def query_requirement_closure_register(app: OddSdlcApp) -> dict[str, Any]:
 
 def query_domain(app: OddSdlcApp) -> dict[str, Any]:
     catalog_payload = catalog(app)
-    gap_dossier = gap_snapshot(app)
+    gap_dossier = load_gap_dossier_read_model(app.config.workspace_root, scope="workspace")
     return {
         "query_contract": query_domain_contract(),
         "workspace_root": str(app.config.workspace_root),

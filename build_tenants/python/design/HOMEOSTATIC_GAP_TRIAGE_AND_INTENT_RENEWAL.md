@@ -84,6 +84,16 @@ This design keeps the outer process boundary total:
 - missing dynamic candidates become explicit `no_lawful_route`
 - no branch may fall through into silent retry or ambient repair
 
+Identity and divergence law:
+
+- constitutional proposal identity stays stable across lawful reprojection when
+  the governing constitutional surface has not materially changed
+- constitutional proposal identity must mint a new proposal when the governing
+  constitutional surface materially changes
+- `triage_divergence` is semantic drift telemetry, not per-refresh noise;
+  fingerprint-only refreshes must not emit divergence when current observation
+  and triage meaning are unchanged
+
 ## Observation
 
 Observation is the first-class disturbance signal.
@@ -195,6 +205,28 @@ Suppressed governed fixtures may carry the recommendation without applying it.
 
 Deferred proposals remain pending until they are approved, rejected, or
 superseded.
+
+## Public Start Gate
+
+Public `odd_sdlc start --target next` is downstream of the same current
+homeostatic truth that `gaps` publishes.
+
+That means public start must consume the current head gap dossier before any
+execution-contract admission.
+
+When the head dossier carries:
+
+- `route_binding.state=await_fh_resolution`
+- `constitutional_proposal.state=pending_fh`
+
+public start must:
+
+- stop with `fh_gate`
+- emit no execution-contract admission
+- emit no constructive run events
+
+Lawful constructive dispatch can resume only after a recorded constitutional
+resolution changes that current gate state.
 
 ## Freshness And Resumption
 

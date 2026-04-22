@@ -3,9 +3,9 @@
 ## RC Identity
 
 - product: `odd_sdlc`
-- candidate: `v1.0.0-rc.1`
+- candidate: `v1.0.0-rc.2`
 - RC branch: `rc/1.0.0`
-- release state: first published release candidate for the `1.0.0` line
+- release state: second published release candidate for the `1.0.0` line
 
 This RC publishes the current odd_sdlc source cut after the inside-out repair
 wave that:
@@ -14,71 +14,70 @@ wave that:
 - moved requirement and obligation truth onto a traceability-index /
   requirement-closure carrier family
 - collapsed duplicate helper families under one prime owner per semantic job
+- hardened public-start and continuation behavior around one published
+  homeostatic carrier story
 
 ## What Shipped
 
-### Typed Execution-Contract Runtime Binding
+### Public-Start Carrier Hardening
 
-- source bootstrap now publishes explicit `query-assets` asset-binding truth
-  for the source line instead of inventing runtime authority from
-  `runtime_config.domain_package`
-- work-item `route_contract` is published on the asset ownership carrier and
-  consumed from there by execution-contract admission
-- `execution_contract_surface` now uses typed execution-contract carrier
-  variants rather than normal-execution `dict[str, Any]` payloads
-- public `start` binds from admitted execution-contract carrier truth rather
-  than reconstructing target law from local controller branches
-- query/read-model surfaces publish execution-contract projection from the
-  runtime contract and fail closed when admitted execution truth is absent
+- public `start` now consumes the published homeostatic gap carrier before
+  admission for:
+  - `target=next`
+  - explicit `graph_function:` targets
+  - explicit `asset:` targets
+- published `pending_fh` on the head edge now stops public start at `fh_gate`
+  before `execution_contract_drafted`, `run_bound`, or `fp_dispatched`
+- explicit public starts no longer use a narrow pending-FH intercept plus a
+  direct admission fallback; they now consume the same published head-gap
+  resolution family as `next`
+- fresh or stale public-start entry now fails closed when the published gap
+  carrier is unavailable
 
-### Requirement Closure And Traceability Carrier Split
+### Yielded Continuation And Re-Entry Alignment
 
-- `RequirementTraceabilityIndex` is now the load-bearing source carrier for
-  requirement refs and source-scan publication
-- `requirement_closure.py` owns the requirement-closure register and declared
-  obligation projection family
-- `fd_checks.py`, constructor selection, prompt/report context, query-domain,
-  and gap-analysis surfaces consume the carrier or a single projection family
-  rather than raw helper rescans
-- source-line read paths no longer rebuild current requirement truth on demand;
-  missing publication returns an unavailable read model or fails closed
+- public yielded continuation now projects through one `odd_sdlc`-owned
+  `public_start` carrier instead of controller-local `status` string logic
+- `continue` now refreshes analysis, republishes the workspace gap-dossier
+  carrier, and returns the same published workspace story that the next public
+  `start(next)` consumes
+- proof-driven continuation-opened states now remain lawful `yield`; true
+  no-continuation failure remains failure
 
-### Prime-Law Helper Consolidation
+### Constitutional Surface And Identity Stabilization
 
-- duplicate helper families were collapsed into one owner per semantic job
-  across:
-  - operational dispatch classification and register loading
-  - project-profile parsing, quote stripping, default slugging, and
-    project-constraints interpretation
-  - workspace-mode detection
-  - write-if-changed publication
-  - gap scope selector, declared-obligation spec extraction, and capability-gap
-    projection
-- constructor-side rescans of `project_constraints.yml` for module, tool, and
-  version interpretation were removed in favor of `ProjectProfile`
+- shared constitutional-surface normalization and digest law now lives in
+  `odd_sdlc.constitutional_surface`
+- constitutional proposal identity is now stable across wording-only
+  reprojection, scope-sensitive where it should be, and renewed when the
+  governing constitutional surface changes materially
+- `constitutional_proposal_recorded` now emits `identity_hash` and
+  `target_surface_digest` for event-level auditability
 
-### Source/Install Boundary Hygiene
+### Scope-Owned Gap-Dossier Publication
 
-- the source repo no longer relies on a source-local `.odd_sdlc/release`
-  runtime mirror as release authority
-- installed runtime truth remains a downstream `.genesis/odd_sdlc/release`
-  concern created by install/reinstall flows, not by source-repo mirroring
+- `gaps --scope work_key:<id>` now publishes a scope-owned dossier carrier
+  instead of overwriting the workspace-global dossier register
+- workspace `query-domain` and workspace `start(next)` continue to consume the
+  workspace dossier carrier explicitly
+- work-key scope publication no longer poisons workspace public-start or query
+  truth
 
 ## Qualification Bundle
 
-This RC was qualified on the exact source cut published as `v1.0.0-rc.1`.
+This RC was qualified on the exact source cut published as `v1.0.0-rc.2`.
 
-- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'query_domain_is_read_only_when_analysis_has_not_been_published or requirement_closure_prompt_context_requires_explicit_register or span_analysis_projects_typed_canonical_gap_carriers or t021_gap_support_helpers_have_one_authoritative_owner or refresh_analysis_publishes_deterministic_repair_frontier or refresh_analysis_publishes_distinct_analysis_manifest or execution_contract_projection_carries_route_contract_for_ticket_target or start_projection_fails_closed_without_admitted_execution_contract_surface or query_domain_publishes_execution_contract_surface_from_runtime_contract_projection or execution_contract_surface_rebuild_fails_closed_without_published_runtime_contract'`
-- result: `6 passed, 63 deselected in 3.03s`
+- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'explicit_public_start_requires_published_gap_dossier_before_admission or explicit_public_start_targets_stop_at_published_constitutional_head_gate or start_routes_ticket_asset_to_declared_reentry_vector or start_uses_admitted_route_contract_for_diagnostic_override or start_uses_admitted_target_truth_for_start_intent or start_rejects_unpublished_ticket_asset_handle or start_rejects_backlog_ticket_asset_handle or start_rejects_ticket_asset_without_published_route_contract or ticket_asset_start_carries_ticket_execution_context_into_manifest_prompt or new_execution_contract_supersedes_previous_admitted_contract'`
+- result: `12 passed, 73 deselected in 48.22s`
 
-- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_fd_evidence.py -q -k 't020_fd_and_closure_fail_closed_when_traceability_index_carrier_is_unavailable or constructor_bootstrap or code_surface_construction_does_not_delete_tenant_governance_surfaces or t020_fd_and_closure_do_not_fallback_to_traceability_facade or fd_evaluator_reports_expected_requirement_gap_details or fd_evaluator_reports_expected_traceability_family_details or fd_evaluator_reports_expected_orphan_code_details'`
-- result: `3 passed, 24 deselected in 0.08s`
+- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q -k 'project_public_start_gen_start_outcome_projects_proof_hold_before_dispatch or start_next_converged_surfaces_yielded_dispatch_contract or start_next_converged_preserves_true_runtime_failure_without_continuation or continue_with_result_publishes_workspace_gap_surface_and_uses_published_status'`
+- result: `4 passed, 79 deselected`
 
-- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'installed_query_domain_is_read_only_when_analysis_has_not_been_published or installed_normalize_workspace_without_platform_preserves_existing_active_tenant or normalize_workspace_preserves_onboarded_secondary_tenant_without_topology_migration or normalize_workspace_fails_closed_for_malformed_project_constraints or load_project_profile_preserves_realized_declared_output_root_for_source_style_workspace or data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence or installed_live_fp_retry_uses_query_assets_contract'`
-- result: `5 passed, 27 deselected in 22.25s`
+- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'install_exposes_public_odd_sdlc_start_contract or install_exposes_public_odd_sdlc_graph_function_and_asset_targets or install_start_routes_ticket_asset_without_manual_upstream_edit or default_claude_manifest_declares_domain_dispatch_timeout or install_explicit_asset_start_also_stops_at_published_constitutional_fh_gate or install_public_next_varies_only_with_published_carrier_truth_between_pristine_and_progressed_workspaces'`
+- result: `6 passed, 29 deselected in 43.96s`
 
-- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_yield_usecase.py -q`
-- result: `5 passed in 122.36s (0:02:02)`
+- `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py -q -k 'sandbox_forensic_public_start_stops_before_constructive_events_at_published_fh_gate'`
+- result: `1 passed, 12 deselected in 4.67s`
 
 ## RC Scope
 

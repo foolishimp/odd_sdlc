@@ -15,6 +15,7 @@ from typing import Any
 from genesis.events import EventStream
 
 from .analysis import load_analysis_manifest, load_workspace_state, workspace_state_ready
+from .constitutional_surface import constitutional_surface_digest
 from .runtime_effects import publish_runtime_event
 from .workspace_assets import asset_path
 
@@ -22,7 +23,6 @@ from .workspace_assets import asset_path
 CURRENT_TRIAGE_DIR = Path(".ai-workspace/runtime/triage")
 CURRENT_TRIAGE_ARTIFACT_KIND = "odd_sdlc.current_edge_triage"
 CURRENT_TRIAGE_SCHEMA_VERSION = "v2"
-
 _EDGE_LAYER_BY_NAME = {
     "derive_intent_surface": "intent",
     "derive_product_surface": "product",
@@ -103,6 +103,13 @@ def load_current_edge_triage(workspace_root: Path | str, edge_id: str) -> dict[s
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:16]}"
+
+
+def _constitutional_target_surface_digest(*, workspace_root: Path, target_surface: str) -> str:
+    target_path = workspace_root / target_surface
+    if not target_path.exists():
+        return "missing"
+    return constitutional_surface_digest(target_path)
 
 
 def _gap_snapshot_run_id(*, analysis_fingerprint: str | None, work_key: str | None) -> str:
@@ -403,7 +410,6 @@ def _build_edge_projection(
     semantic_hash = _semantic_hash(
         {
             "edge_id": edge_id,
-            "analysis_fingerprint": analysis_fingerprint,
             "observation": {
                 "observed_boundary": observation["observed_boundary"],
                 "observed_signal": observation["observed_signal"],
@@ -416,7 +422,11 @@ def _build_edge_projection(
                 "process_outcome_kind": triage["process_outcome_kind"],
                 "reentry_layer": triage["reentry_layer"],
                 "resumption_trigger": triage["resumption_trigger"],
-                "authority_basis": triage["authority_basis"],
+                "authority_basis": {
+                    key: value
+                    for key, value in triage["authority_basis"].items()
+                    if key != "analysis_fingerprint"
+                },
                 "realized_basis": triage["realized_basis"],
                 "evidence": triage["evidence"],
                 "asset_findings": triage["asset_findings"],
@@ -426,12 +436,12 @@ def _build_edge_projection(
         }
     )
     constitutional_proposal = _build_constitutional_proposal(
+        workspace_root=workspace_root,
         entry=entry,
         triage=triage,
         workspace_state=workspace_state,
         runtime_config=runtime_config,
         all_events=all_events,
-        semantic_hash=semantic_hash,
     )
     observation["observation_id"] = _new_id("obs")
     triage["triage_id"] = _new_id("tri")
@@ -953,12 +963,12 @@ def _binding_layer(binding: str) -> str:
 
 def _build_constitutional_proposal(
     *,
+    workspace_root: Path,
     entry: dict[str, Any],
     triage: dict[str, Any],
     workspace_state: dict[str, Any],
     runtime_config: dict[str, Any],
     all_events: list[dict[str, Any]],
-    semantic_hash: str,
 ) -> dict[str, Any] | None:
     if triage["process_outcome_kind"] != "propose_constitutional_reprice":
         return None
@@ -966,27 +976,43 @@ def _build_constitutional_proposal(
     if reentry_layer not in {"goals", "intent"}:
         return None
 
+    edge_id = str(entry["edge"])
+    work_key = str(entry.get("work_key") or "") or None
+    target_surface = "specification/GOALS.md" if reentry_layer == "goals" else "specification/INTENT.md"
+    proposal_kind = "goal_reprice" if reentry_layer == "goals" else "intent_reprice"
+    target_surface_digest = _constitutional_target_surface_digest(
+        workspace_root=workspace_root,
+        target_surface=target_surface,
+    )
+    proposal_identity_hash = _constitutional_proposal_identity_hash(
+        edge_id=edge_id,
+        work_key=work_key,
+        reentry_layer=str(reentry_layer),
+        proposal_kind=proposal_kind,
+        target_surface=target_surface,
+        target_surface_digest=target_surface_digest,
+    )
     mode = _constitutional_policy_mode(
         workspace_state=workspace_state,
         runtime_config=runtime_config,
     )
-    proposal_id = f"const_{semantic_hash[:16]}"
+    proposal_id = f"const_{proposal_identity_hash[:16]}"
     resolution = _constitutional_resolution(
-        edge_id=str(entry["edge"]),
+        edge_id=edge_id,
         proposal_id=proposal_id,
         all_events=all_events,
     )
     state = "suppressed" if mode == "suppress" else "pending_fh"
     if resolution is not None:
         state = resolution["state"]
-    target_surface = "specification/GOALS.md" if reentry_layer == "goals" else "specification/INTENT.md"
-    proposal_kind = "goal_reprice" if reentry_layer == "goals" else "intent_reprice"
     return {
         "proposal_id": proposal_id,
+        "identity_hash": proposal_identity_hash,
         "state": state,
         "policy_mode": mode,
         "proposal_kind": proposal_kind,
         "target_surface": target_surface,
+        "target_surface_digest": target_surface_digest,
         "reentry_layer": reentry_layer,
         "resumption_trigger": "approved_or_revoked" if state in {"pending_fh", "defer"} else None,
         "evidence": list(triage["evidence"]),
@@ -1145,9 +1171,11 @@ def _publish_edge_projection(
                 "triage_id": projection["triage"]["triage_id"],
                 "analysis_fingerprint": projection.get("analysis_fingerprint"),
                 "state": projection["constitutional_proposal"]["state"],
+                "identity_hash": projection["constitutional_proposal"]["identity_hash"],
                 "policy_mode": projection["constitutional_proposal"]["policy_mode"],
                 "proposal_kind": projection["constitutional_proposal"]["proposal_kind"],
                 "target_surface": projection["constitutional_proposal"]["target_surface"],
+                "target_surface_digest": projection["constitutional_proposal"]["target_surface_digest"],
                 "reentry_layer": projection["constitutional_proposal"]["reentry_layer"],
             },
             workflow_version=workflow_version,
@@ -1191,6 +1219,33 @@ def _semantic_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def _constitutional_proposal_identity_hash(
+    *,
+    edge_id: str,
+    work_key: str | None,
+    reentry_layer: str,
+    proposal_kind: str,
+    target_surface: str,
+    target_surface_digest: str,
+) -> str:
+    # Today reentry_layer, proposal_kind, and target_surface are effectively 1:1
+    # for constitutional reprices. Keep all three in the basis so future fan-out
+    # stays identity-visible. The target-surface digest is computed after stripping
+    # prior applied-proposal marker blocks so lawful approval/republication does not
+    # mint a new proposal id by itself.
+    return _semantic_hash(
+        {
+            "basis_kind": "constitutional_proposal_identity",
+            "edge_id": edge_id,
+            "work_key": work_key,
+            "reentry_layer": reentry_layer,
+            "proposal_kind": proposal_kind,
+            "target_surface": target_surface,
+            "target_surface_digest": target_surface_digest,
+        }
+    )
 
 
 def _build_route_binding(

@@ -89,8 +89,10 @@ if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
 
 import odd_sdlc.app as app_module  # noqa: E402
+import odd_sdlc.continuation as continuation_module  # noqa: E402
 from odd_sdlc.analysis import load_analysis_manifest, refresh_analysis, workspace_state_ready  # noqa: E402
 from odd_sdlc.app import bootstrap, catalog, gaps, initialize, start  # noqa: E402
+from odd_sdlc.continuation import continue_with_result  # noqa: E402
 from odd_sdlc.execution_contract import (  # noqa: E402
     ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
     DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
@@ -102,9 +104,11 @@ from odd_sdlc.execution_contract import (  # noqa: E402
     bound_execution_start_from_contract,
     execution_contract_payload,
 )
+from odd_sdlc.homeostatic_loop import apply_constitutional_proposal  # noqa: E402
 from odd_sdlc.gap_dossier import (  # noqa: E402
     GAP_DOSSIER_CONTEXT_PATH,
     GAP_DOSSIER_REGISTER_PATH,
+    load_gap_dossier_read_model,
     project_gap_dossier_input,
 )
 from odd_sdlc.gtl_module import (  # noqa: E402
@@ -117,6 +121,11 @@ from odd_sdlc.gtl_module import (  # noqa: E402
 from odd_sdlc.query import query_domain  # noqa: E402
 import odd_sdlc.self_test as self_test_module  # noqa: E402
 from odd_sdlc.project_profile import load_project_profile  # noqa: E402
+from odd_sdlc.public_start import (  # noqa: E402
+    PublicStartDispatchRequired,
+    PublicStartReturn,
+    project_public_start_gen_start_outcome,
+)
 from odd_sdlc.repair_frontier import (  # noqa: E402
     REPAIR_FRONTIER_CONTEXT_PATH,
     REPAIR_FRONTIER_REGISTER_PATH,
@@ -167,7 +176,7 @@ def _admit_ordinary_execution_contract(tmp_path: Path, module) -> None:
         work_key=None,
         run_id=None,
         normalized_scope="workspace",
-        raw_target="next",
+        raw_target="graph_function:bootstrap_release_self_test",
         until="converged",
     )
 
@@ -335,7 +344,37 @@ def _read_events(workspace_root: Path) -> list[dict]:
     ]
 
 
-def _goal_gap_payload(delta_summary: str = "goal surface remains insufficient under the current constitution") -> dict[str, object]:
+def _prime_workspace_for_explicit_public_start(
+    workspace_root: Path,
+    app,
+) -> dict[str, object]:
+    published = gaps(app, scope="workspace")
+    dossiers = published.get("dossiers") if isinstance(published, dict) else None
+    if not isinstance(dossiers, list) or not dossiers:
+        return published
+    head = dossiers[0]
+    if not isinstance(head, dict):
+        return published
+    proposal = head.get("constitutional_proposal")
+    if not isinstance(proposal, dict):
+        return published
+    if str(proposal.get("state") or "") != "pending_fh":
+        return published
+    approved = apply_constitutional_proposal(
+        workspace_root,
+        edge=str(head.get("edge") or ""),
+        proposal_id=str(proposal.get("proposal_id") or ""),
+        actor="test",
+    )
+    assert approved["status"] == "applied"
+    return gaps(app, scope="workspace")
+
+
+def _goal_gap_payload(
+    delta_summary: str = "goal surface remains insufficient under the current constitution",
+    *,
+    work_key: str | None = None,
+) -> dict[str, object]:
     return {
         "scope": {},
         "jobs_considered": 1,
@@ -350,6 +389,7 @@ def _goal_gap_payload(delta_summary: str = "goal surface remains insufficient un
                 "passing": [],
                 "delta_summary": delta_summary,
                 "environment_ready": True,
+                "work_key": work_key,
             }
         ],
     }
@@ -1052,10 +1092,11 @@ def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path
     assert payload["requirement_closure_register"]["published"] is False
     assert payload["requirement_closure_register"]["unavailable_reason"] == "workspace_state_unpublished"
     assert payload["requirement_closure_register"]["requirements"] == []
+    assert payload["gap_dossier"]["published"] is False
+    assert payload["gap_dossier"]["unavailable_reason"] == "workspace_state_unpublished"
     assert payload["gap_dossier"]["analysis_current"] is False
     assert payload["gap_dossier"]["analysis_manifest"] is None
-    assert payload["gap_dossier"]["dossiers"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
-    assert payload["gap_dossier"]["dossiers"][0]["route_binding"]["state"] == "blocked_stale_analysis"
+    assert payload["gap_dossier"]["dossiers"] == []
     assert before_events == after_events
     assert not (tmp_path / CURRENT_TRIAGE_DIR).exists()
     assert not (tmp_path / STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH).exists()
@@ -1097,7 +1138,10 @@ def test_query_domain_keeps_backlog_ticket_visible_but_not_start_addressable(tmp
     assert "ticket/B-901" not in asset_ownership
 
 
-def test_start_requires_explicit_analysis_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_requires_published_gap_dossier_for_public_next(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _seed_workspace(tmp_path)
     app = initialize(bootstrap(workspace_root=tmp_path))
     calls: list[tuple[object, object]] = []
@@ -1108,20 +1152,682 @@ def test_start_requires_explicit_analysis_publication(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
 
-    with pytest.raises(RuntimeError, match="refresh-analysis"):
-        start(app, scope="workspace", target="next", until="first_traversal")
+    with pytest.raises(RuntimeError, match="analysis has not been published"):
+        start(
+            app,
+            scope="workspace",
+            target="next",
+            until="first_traversal",
+        )
     assert calls == []
 
     refresh_analysis(tmp_path, stage="test")
+    second = start(app, scope="workspace", target="next", until="first_traversal")
+    assert second["status"] == "pending"
+    assert second["blocking_reason"] == "published_gap_dossier_unavailable"
+    assert second["stopped_by"] == "published_gap_dossier"
+    assert second["unavailable_reason"] == "gap_dossier_unpublished"
+    assert calls == []
+
+    published_gaps = gaps(app, scope="workspace")
+    assert published_gaps["published"] is True
+    result = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert result["status"] == "pending"
+    assert result["blocking_reason"] == "fh_gate"
+    assert result["fh_mode"] == "direct"
+    assert result["root_mode"] == "direct"
+    assert len(calls) == 0
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "graph_function:bootstrap_release_self_test",
+        "asset:reviewed_design_surface",
+    ],
+)
+def test_explicit_public_start_requires_published_gap_dossier_before_admission(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    def _should_not_admit(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("explicit public start must not admit before the published gap carrier exists")
+
+    def _should_not_start(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("explicit public start must not dispatch before the published gap carrier exists")
+
+    monkeypatch.setattr(app_module, "admit_bound_execution_start", _should_not_admit)
+    monkeypatch.setattr(app_module, "gen_start", _should_not_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target=target,
+        until="first_traversal",
+    )
+
+    assert result["status"] == "pending"
+    assert result["target"] == target
+    assert result["blocking_reason"] == "published_gap_dossier_unavailable"
+    assert result["stopped_by"] == "published_gap_dossier"
+    assert result["unavailable_reason"] == "gap_dossier_unpublished"
+    assert not (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+
+def test_start_next_stops_before_execution_contract_when_head_gap_is_pending_constitutional_fh(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    def _should_not_start(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("gen_start must not run while the head edge is pending_fh")
+
+    monkeypatch.setattr(app_module, "gen_start", _should_not_start)
+    published_gaps = gaps(app, scope="workspace")
+    head = published_gaps["dossiers"][0]
+
+    result = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert result["status"] == "pending"
+    assert result["target"] == "next"
+    assert result["edge"] == "derive_intent_surface"
+    assert result["blocking_reason"] == "fh_gate"
+    assert result["stop_predicate"] == "human_gate_required"
+    assert result["stopped_by"] == "fh_gate"
+    assert result["fh_gate"]["evaluators"] == ["constitutional_pending_fh"]
+    assert result["constitutional_proposal"]["proposal_id"] == head["constitutional_proposal"]["proposal_id"]
+    assert result["constitutional_proposal"]["state"] == "pending_fh"
+    assert result["route_binding"]["state"] == "await_fh_resolution"
+    assert result["triage_artifact_path"] == head["evidence_bundle_refs"]["current_triage_artifact_path"]
+    assert result["fh_mode"] == "direct"
+    assert result["root_mode"] == "direct"
+    assert not (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    event_types = [event["event_type"] for event in _read_events(tmp_path)]
+    assert "fh_gate_pending" in event_types
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "run_bound" not in event_types
+    assert "worker_turn_started" not in event_types
+    assert "fp_dispatched" not in event_types
+
+
+def test_start_next_admits_execution_contract_from_published_head_gap_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object]] = []
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    initial_gaps = gaps(app, scope="workspace")
+    proposal_id = initial_gaps["dossiers"][0]["constitutional_proposal"]["proposal_id"]
+    assert proposal_id
+
+    approved = apply_constitutional_proposal(
+        tmp_path,
+        edge="derive_intent_surface",
+        proposal_id=proposal_id,
+        actor="human",
+    )
+    assert approved["status"] == "applied"
+
+    refreshed_gaps = gaps(app, scope="workspace")
+    assert refreshed_gaps["dossiers"][0]["route_binding"]["state"] == "constitutional_reprice_approved"
+    assert refreshed_gaps["dossiers"][0]["constitutional_proposal"]["proposal_id"] == proposal_id
+
     result = start(app, scope="workspace", target="next", until="first_traversal")
 
     assert result["status"] == "ok"
+    assert result["target"] == "next"
+    assert result["resolved_edge"] == "derive_intent_surface"
     assert result["fh_mode"] == "direct"
     assert result["root_mode"] == "direct"
     assert len(calls) == 1
-    assert calls[0][0].scope.selector.kind == "workspace"
     assert calls[0][0].target.kind == "next"
-    assert calls[0][0].until == "first_traversal"
+    assert calls[0][0].scope.diagnostic_edge_override == "derive_intent_surface"
+    execution_contract = json.loads(
+        (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert execution_contract["target_truth"]["kind"] == "next"
+    assert execution_contract["target_truth"]["public_target"] == "next"
+    assert execution_contract["target_truth"]["edge_override"] == "derive_intent_surface"
+    assert execution_contract["target_truth"]["route_state"] == "constitutional_reprice_approved"
+    assert execution_contract["target_truth"]["binding_source"] == "odd_sdlc.gap_dossier_register"
+
+
+def test_start_next_human_proxy_auto_applies_constitutional_gate_and_advances(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    initial_gaps = gaps(app, scope="workspace")
+    assert initial_gaps["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
+    calls: list[tuple[object, object]] = []
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "converged", "edge": "derive_intent_surface"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="converged",
+        fh_mode="human-proxy",
+    )
+
+    assert result["status"] == "converged"
+    assert result["target"] == "next"
+    assert result["resolved_edge"] == "derive_intent_surface"
+    assert len(calls) == 1
+    assert calls[0][0].target.kind == "next"
+    assert calls[0][0].scope.diagnostic_edge_override == "derive_intent_surface"
+
+    events = _read_events(tmp_path)
+    event_types = [event["event_type"] for event in events]
+    assert "fh_gate_pending" in event_types
+    assert "constitutional_proposal_approved_with_edits" in event_types
+    assert "proposal_applied" in event_types
+    assert not any(
+        event["event_type"] == "approved"
+        and event.get("data", {}).get("kind") == "fh_review"
+        for event in events
+    )
+
+
+def test_continue_with_result_publishes_workspace_gap_surface_and_uses_published_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    published_selectors: list[object] = []
+
+    monkeypatch.setattr(
+        continuation_module,
+        "ingest_fp_result",
+        lambda result_path, workspace_root: {
+            "status": "ok",
+            "result_path": str(result_path),
+            "workspace_root": str(workspace_root),
+        },
+    )
+    monkeypatch.setattr(
+        continuation_module,
+        "refresh_analysis",
+        lambda workspace_root, stage: {
+            "ready": True,
+            "stage": stage,
+            "workspace_root": str(workspace_root),
+        },
+    )
+
+    def _fake_publish_gap_surface(_app, *, selector):
+        published_selectors.append(selector)
+        return {
+            "published": True,
+            "scope": "workspace",
+            "converged": False,
+            "gap_dossier_register_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.json",
+        }
+
+    monkeypatch.setattr(continuation_module, "publish_gap_surface", _fake_publish_gap_surface)
+    monkeypatch.setattr(
+        continuation_module,
+        "active_programs",
+        lambda _app: [{"name": "bootstrap_release_self_test"}],
+    )
+
+    payload = continue_with_result(app, result_path=tmp_path / "result.json")
+
+    assert payload["status"] == "continued"
+    assert payload["analysis"]["stage"] == "result_admission"
+    assert payload["gap_snapshot"]["published"] is True
+    assert payload["gap_snapshot"]["scope"] == "workspace"
+    assert payload["active_programs"] == [{"name": "bootstrap_release_self_test"}]
+    assert len(published_selectors) == 1
+    assert getattr(published_selectors[0], "kind", None) == "workspace"
+
+
+def test_start_next_work_key_scope_uses_scoped_gap_surface_not_workspace_head(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    calls: list[tuple[object, object]] = []
+
+    def _fake_load_gap_dossier_read_model(_workspace_root: Path, *, scope=None) -> dict[str, object]:
+        if getattr(scope, "kind", None) == "work_key":
+            assert scope.work_key == "demo"
+            return {
+                "published": True,
+                "scope": "work_key:demo",
+                "summary": {"gap_count": 1},
+                "gap_dossier_register_path": ".ai-workspace/runtime/scoped_gap_dossiers/odd_sdlc-gap-dossiers.work-key-demo.demo.json",
+                "gap_dossier_context_path": ".ai-workspace/runtime/scoped_gap_dossiers/odd_sdlc-gap-dossiers.work-key-demo.demo.md",
+                "dossiers": [
+                    {
+                        "edge": "derive_product_surface",
+                        "route_binding": {"state": "constitutional_reprice_approved"},
+                        "constitutional_proposal": {
+                            "proposal_id": "const-work",
+                            "proposal_kind": "product_reprice",
+                            "state": "approve_with_edits",
+                            "target_surface": "specification/PRODUCT.md",
+                        },
+                        "evidence_bundle_refs": {
+                            "current_triage_artifact_path": ".ai-workspace/runtime/triage/derive_product_surface.json",
+                        },
+                    }
+                ],
+            }
+        return {
+            "published": True,
+            "scope": "workspace",
+            "summary": {"gap_count": 1},
+            "gap_dossier_register_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.json",
+            "gap_dossier_context_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.md",
+            "dossiers": [
+                {
+                    "edge": "derive_intent_surface",
+                    "route_binding": {"state": "await_fh_resolution"},
+                    "constitutional_proposal": {
+                        "proposal_id": "const-workspace",
+                        "proposal_kind": "intent_reprice",
+                        "state": "pending_fh",
+                        "target_surface": "specification/INTENT.md",
+                    },
+                    "evidence_bundle_refs": {
+                        "current_triage_artifact_path": ".ai-workspace/runtime/triage/derive_intent_surface.json",
+                    },
+                }
+            ],
+        }
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok", "edge": intent.scope.diagnostic_edge_override}
+
+    monkeypatch.setattr(app_module, "load_gap_dossier_read_model", _fake_load_gap_dossier_read_model)
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="work_key:demo",
+        target="next",
+        until="first_traversal",
+    )
+
+    assert result["status"] == "ok"
+    assert result["target"] == "next"
+    assert result["resolved_edge"] == "derive_product_surface"
+    assert len(calls) == 1
+    assert calls[0][0].scope.selector.work_key == "demo"
+    assert calls[0][0].scope.diagnostic_edge_override == "derive_product_surface"
+
+
+def test_work_key_gap_publication_does_not_overwrite_workspace_gap_dossier_truth(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    def _fake_gen_gaps(scope, _stream) -> dict[str, object]:
+        if scope.selector.kind == "work_key":
+            return {
+                "scope": "work_key:demo",
+                "jobs_considered": 1,
+                "total_delta": 0.5,
+                "open_frames": 0,
+                "converged": False,
+                "gaps": [
+                    {
+                        "edge": "derive_product_surface",
+                        "delta": 0.5,
+                        "failing": ["product_surface_semantically_converged"],
+                        "passing": [],
+                        "delta_summary": "scoped product surface remains insufficient",
+                        "environment_ready": True,
+                        "work_key": "demo",
+                    }
+                ],
+            }
+        return {
+            "scope": "workspace",
+            "jobs_considered": 1,
+            "total_delta": 0.5,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "derive_intent_surface",
+                    "delta": 0.5,
+                    "failing": ["intent_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "workspace intent surface remains insufficient",
+                    "environment_ready": True,
+                    "work_key": None,
+                }
+            ],
+        }
+
+    def _fake_declared_obligation_specs(_app):
+        return [
+            ("derive_intent_surface", {}),
+            ("derive_product_surface", {}),
+        ]
+
+    def _should_not_start(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("workspace start(next) must still stop on the workspace constitutional head gate")
+
+    monkeypatch.setattr(app_module, "gen_gaps", _fake_gen_gaps)
+    monkeypatch.setattr(app_module, "declared_obligation_specs", _fake_declared_obligation_specs)
+    monkeypatch.setattr(app_module, "collect_declared_obligation_gaps", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(app_module, "gen_start", _should_not_start)
+
+    workspace_payload = gaps(app, scope="workspace")
+    work_payload = gaps(app, scope="work_key:demo")
+    workspace_read_model = load_gap_dossier_read_model(tmp_path, scope="workspace")
+    work_read_model = load_gap_dossier_read_model(tmp_path, scope="work_key:demo")
+    queried = query_domain(app)
+    workspace_start = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert workspace_payload["scope"] == "workspace"
+    assert workspace_payload["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert work_payload["scope"] == "work_key:demo"
+    assert work_payload["dossiers"][0]["edge"] == "derive_product_surface"
+    assert work_payload["gap_dossier_register_path"] != workspace_payload["gap_dossier_register_path"]
+    assert work_payload["gap_dossier_register_path"] is not None
+    assert workspace_payload["gap_dossier_register_path"] == GAP_DOSSIER_REGISTER_PATH.as_posix()
+    assert workspace_read_model["scope"] == "workspace"
+    assert workspace_read_model["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert work_read_model["scope"] == "work_key:demo"
+    assert work_read_model["dossiers"][0]["edge"] == "derive_product_surface"
+    assert queried["gap_dossier"]["scope"] == "workspace"
+    assert queried["gap_dossier"]["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert workspace_start["blocking_reason"] == "fh_gate"
+    assert workspace_start["edge"] == "derive_intent_surface"
+
+
+def test_start_next_until_blocked_reacquires_published_head_gap_between_traversals(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    published_surfaces = iter(
+        (
+            {
+                "published": True,
+                "converged": False,
+                "summary": {"gap_count": 1},
+                "gap_dossier_register_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.json",
+                "gap_dossier_context_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.md",
+                "dossiers": [
+                    {
+                        "edge": "derive_intent_surface",
+                        "route_binding": {"state": "constitutional_reprice_approved"},
+                        "constitutional_proposal": {
+                            "proposal_id": "const-intent",
+                            "proposal_kind": "intent_reprice",
+                            "state": "approved",
+                            "target_surface": "specification/INTENT.md",
+                        },
+                        "evidence_bundle_refs": {
+                            "current_triage_artifact_path": ".ai-workspace/runtime/triage/derive_intent_surface.json",
+                        },
+                    }
+                ],
+            },
+            {
+                "published": True,
+                "converged": False,
+                "summary": {"gap_count": 1},
+                "gap_dossier_register_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.json",
+                "gap_dossier_context_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.md",
+                "dossiers": [
+                    {
+                        "edge": "derive_product_surface",
+                        "route_binding": {"state": "advance_fixed_vector"},
+                        "constitutional_proposal": None,
+                        "evidence_bundle_refs": {
+                            "current_triage_artifact_path": ".ai-workspace/runtime/triage/derive_product_surface.json",
+                        },
+                    }
+                ],
+            },
+            {
+                "published": True,
+                "converged": True,
+                "summary": {"gap_count": 0},
+                "gap_dossier_register_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.json",
+                "gap_dossier_context_path": ".ai-workspace/runtime/odd_sdlc-gap-dossiers.md",
+                "dossiers": [],
+            },
+        )
+    )
+    rebound_edges: list[str | None] = []
+    refresh_stages: list[str] = []
+    published_rebuilds: list[str] = []
+
+    def _fake_load_gap_dossier_read_model(_workspace_root: Path, *, scope=None) -> dict[str, object]:
+        return next(published_surfaces)
+
+    def _fake_refresh_analysis(_workspace_root: Path, *, stage: str = "refresh_analysis") -> dict[str, object]:
+        refresh_stages.append(stage)
+        return {"status": "ok", "stage": stage}
+
+    def _fake_build_gap_surface(*args: object, **kwargs: object) -> dict[str, object]:
+        if kwargs.get("publish") is True:
+            published_rebuilds.append("published")
+        return {"published": bool(kwargs.get("publish"))}
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        rebound_edges.append(intent.scope.diagnostic_edge_override)
+        return {
+            "status": "in_progress",
+            "edge": intent.scope.diagnostic_edge_override,
+            "workflow_version": "test-workflow",
+        }
+
+    monkeypatch.setattr(app_module, "load_gap_dossier_read_model", _fake_load_gap_dossier_read_model)
+    monkeypatch.setattr(app_module, "refresh_analysis", _fake_refresh_analysis)
+    monkeypatch.setattr(app_module, "_build_gap_surface", _fake_build_gap_surface)
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="blocked",
+    )
+
+    assert result["status"] == "converged"
+    assert result["target"] == "next"
+    assert rebound_edges == ["derive_intent_surface", "derive_product_surface"]
+    assert refresh_stages == [
+        "public_start_next_traversal",
+        "public_start_next_traversal",
+    ]
+    assert published_rebuilds == ["published", "published"]
+
+
+def _prepare_public_next_dispatch_app(tmp_path: Path):
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    initial_gaps = gaps(app, scope="workspace")
+    proposal_id = initial_gaps["dossiers"][0]["constitutional_proposal"]["proposal_id"]
+    approved = apply_constitutional_proposal(
+        tmp_path,
+        edge="derive_intent_surface",
+        proposal_id=proposal_id,
+        actor="human",
+    )
+    assert approved["status"] == "applied"
+    refreshed_gaps = gaps(app, scope="workspace")
+    assert refreshed_gaps["dossiers"][0]["route_binding"]["state"] == "constitutional_reprice_approved"
+    return app
+
+
+def test_project_public_start_gen_start_outcome_projects_proof_hold_before_dispatch() -> None:
+    outcome = project_public_start_gen_start_outcome(
+        {
+            "status": "pending",
+            "blocking_reason": "fp_dispatch",
+            "edge": "derive_code_surface",
+        },
+        until="converged",
+    )
+    assert isinstance(outcome, PublicStartDispatchRequired)
+
+    proof_hold_outcome = project_public_start_gen_start_outcome(
+        {
+            "status": "pending",
+            "blocking_reason": "fp_dispatch",
+            "edge": "derive_code_surface",
+        },
+        until="converged",
+        proof_hold={
+            "held": True,
+            "reason": "policy_wait",
+        },
+    )
+    assert isinstance(proof_hold_outcome, PublicStartReturn)
+    assert proof_hold_outcome.reason == "proof_hold"
+    assert proof_hold_outcome.result["status"] == "pending"
+    assert proof_hold_outcome.result["stopped_by"] == "proof_hold"
+    assert proof_hold_outcome.result["proof_hold_active"] is True
+
+
+def test_start_next_converged_surfaces_yielded_dispatch_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _prepare_public_next_dispatch_app(tmp_path)
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        return {
+            "status": "pending",
+            "blocking_reason": "fp_dispatch",
+            "edge": intent.scope.diagnostic_edge_override,
+            "run_id": "run-yield",
+            "call_id": "call-yield",
+            "workflow_version": "wf-yield",
+            "spec_hash": "spec-yield",
+        }
+
+    def _fake_project_proof_hold(*args: object, **kwargs: object) -> dict[str, object]:
+        return {"held": False}
+
+    def _fake_auto_dispatch(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "status": "yield",
+            "stopped_by": "yield",
+            "continuation_id": "cont-yield",
+            "handoff_kind": "repair",
+            "handoff_reason": "proof_incomplete",
+            "failure_class": "proof_failure",
+        }
+
+    import genesis.dispatch_runtime as dispatch_runtime_module
+    import genesis.proof_hold as proof_hold_module
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+    monkeypatch.setattr(proof_hold_module, "project_proof_hold", _fake_project_proof_hold)
+    monkeypatch.setattr(dispatch_runtime_module, "auto_dispatch_from_result", _fake_auto_dispatch)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="converged",
+    )
+
+    assert result["status"] == "yield"
+    assert result["stopped_by"] == "yield"
+    assert result["continuation_id"] == "cont-yield"
+    assert result["handoff_kind"] == "repair"
+    assert result["handoff_reason"] == "proof_incomplete"
+    assert result["failure_class"] == "proof_failure"
+    assert result["target"] == "next"
+    assert result["resolved_edge"] == "derive_intent_surface"
+
+
+def test_start_next_converged_preserves_true_runtime_failure_without_continuation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _prepare_public_next_dispatch_app(tmp_path)
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        return {
+            "status": "pending",
+            "blocking_reason": "fp_dispatch",
+            "edge": intent.scope.diagnostic_edge_override,
+            "run_id": "run-failure",
+            "call_id": "call-failure",
+            "workflow_version": "wf-failure",
+            "spec_hash": "spec-failure",
+        }
+
+    def _fake_project_proof_hold(*args: object, **kwargs: object) -> dict[str, object]:
+        return {"held": False}
+
+    def _fake_auto_dispatch(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "status": "error",
+            "failure_class": "transport_failure",
+            "reason": "transport_failure",
+        }
+
+    import genesis.dispatch_runtime as dispatch_runtime_module
+    import genesis.proof_hold as proof_hold_module
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+    monkeypatch.setattr(proof_hold_module, "project_proof_hold", _fake_project_proof_hold)
+    monkeypatch.setattr(dispatch_runtime_module, "auto_dispatch_from_result", _fake_auto_dispatch)
+
+    result = start(
+        app,
+        scope="workspace",
+        target="next",
+        until="converged",
+    )
+
+    assert result["status"] == "error"
+    assert result["stopped_by"] == "fp_runtime_failure"
+    assert result["failure_class"] == "transport_failure"
+    assert result["reason"] == "transport_failure"
+    assert result["target"] == "next"
+    assert result["resolved_edge"] == "derive_intent_surface"
 
 
 def test_start_routes_ticket_asset_to_declared_reentry_vector(
@@ -1132,6 +1838,15 @@ def test_start_routes_ticket_asset_to_declared_reentry_vector(
     _seed_ticket_work_item(tmp_path, ticket_id="B-900")
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    published = _prime_workspace_for_explicit_public_start(tmp_path, app)
+    assert published["dossiers"][0]["constitutional_proposal"]["state"] in {
+        "approve_with_edits",
+        "suppressed",
+    }
+    assert published["dossiers"][0]["route_binding"]["state"] in {
+        "constitutional_reprice_approved",
+        "suppressed_by_mode",
+    }
     calls: list[tuple[object, object]] = []
 
     def _fake_gen_start(intent, stream) -> dict[str, object]:
@@ -1168,6 +1883,7 @@ def test_start_uses_admitted_route_contract_for_diagnostic_override(
     _seed_ticket_work_item(tmp_path, ticket_id="B-904")
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
     calls: list[tuple[object, object]] = []
     active_module = app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).module
     bootstrap_target_id = next(
@@ -1235,6 +1951,7 @@ def test_start_uses_admitted_target_truth_for_start_intent(
     _seed_ticket_work_item(tmp_path, ticket_id="B-905")
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
     calls: list[tuple[object, object]] = []
     active_module = app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).module
     bootstrap_target_id = next(
@@ -1294,10 +2011,72 @@ def test_start_uses_admitted_target_truth_for_start_intent(
     assert intent.target.asset_relative_path == ".ai-workspace/tickets/active/B-905-overridden.md"
 
 
+@pytest.mark.parametrize(
+    ("target", "ticket_id"),
+    [
+        ("graph_function:bootstrap_release_self_test", None),
+        ("asset:ticket/B-907", "B-907"),
+    ],
+)
+def test_explicit_public_start_targets_stop_at_published_constitutional_head_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+    ticket_id: str | None,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    published = gaps(app, scope="workspace")
+    assert published["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
+    if ticket_id is not None:
+        _seed_ticket_work_item(
+            tmp_path,
+            ticket_id=ticket_id,
+            change_class="intent_reprice",
+            re_entry_point="intent",
+        )
+
+    def _should_not_admit(*args: object, **kwargs: object) -> SimpleNamespace:
+        raise AssertionError("explicit public start must stop before execution-contract admission when head gate is pending_fh")
+
+    def _should_not_start(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("gen_start must not run while the published constitutional head gate is pending_fh")
+
+    monkeypatch.setattr(app_module, "ensure_workspace_ready", lambda workspace_root: {"analysis_current": True})
+    monkeypatch.setattr(app_module, "load_gap_dossier_read_model", lambda workspace_root, scope: dict(published))
+    monkeypatch.setattr(app_module, "admit_bound_execution_start", _should_not_admit)
+    monkeypatch.setattr(app_module, "gen_start", _should_not_start)
+
+    result = start(
+        app,
+        scope="workspace",
+        target=target,
+        until="first_traversal",
+    )
+
+    assert result["status"] == "pending"
+    assert result["blocking_reason"] == "fh_gate"
+    assert result["stopped_by"] == "fh_gate"
+    assert result["target"] == target
+    assert result["edge"] == "derive_intent_surface"
+    assert result["constitutional_proposal"]["state"] == "pending_fh"
+    assert result["route_binding"]["state"] == "await_fh_resolution"
+    assert not (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    event_types = [event["event_type"] for event in _read_events(tmp_path)]
+    assert "fh_gate_pending" in event_types
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "run_bound" not in event_types
+    assert "worker_turn_started" not in event_types
+
+
 def test_start_rejects_unpublished_ticket_asset_handle(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
 
     with pytest.raises(ValueError, match="unknown or non-start-addressable published asset handle"):
         start(
@@ -1313,6 +2092,7 @@ def test_start_rejects_backlog_ticket_asset_handle(tmp_path: Path) -> None:
     _seed_ticket_work_item(tmp_path, ticket_id="B-902", status="backlog")
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
 
     with pytest.raises(ValueError, match="ticket_status 'backlog' is not start-authoritative"):
         start(
@@ -1328,6 +2108,7 @@ def test_start_rejects_ticket_asset_without_published_route_contract(tmp_path: P
     _seed_ticket_work_item(tmp_path, ticket_id="B-906", re_entry_point="unknown_surface")
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
 
     with pytest.raises(ValueError, match="unknown or non-start-addressable published asset handle"):
         start(
@@ -1338,7 +2119,9 @@ def test_start_rejects_ticket_asset_without_published_route_contract(tmp_path: P
         )
 
 
-def test_ticket_asset_start_carries_ticket_execution_context_into_manifest_prompt(tmp_path: Path) -> None:
+def test_ticket_asset_start_carries_ticket_execution_context_into_manifest_prompt(
+    tmp_path: Path,
+) -> None:
     _seed_workspace(tmp_path)
     _seed_ticket_work_item(
         tmp_path,
@@ -1349,7 +2132,8 @@ def test_ticket_asset_start_carries_ticket_execution_context_into_manifest_promp
     )
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
-
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
+    app.config.runtime_config.pop("asset_binding_contract", None)
     result = start(
         app,
         scope="workspace",
@@ -1525,13 +2309,14 @@ def test_new_execution_contract_supersedes_previous_admitted_contract(tmp_path: 
     )
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
+    _prime_workspace_for_explicit_public_start(tmp_path, app)
 
     def _fake_gen_start(intent, stream) -> dict[str, object]:
         return {"status": "ok"}
 
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
 
-    first = start(app, scope="workspace", target="next", until="first_traversal")
+    first = start(app, scope="workspace", target="graph_function:bootstrap_release_self_test", until="first_traversal")
     assert first["status"] == "ok"
     first_register = json.loads(
         (tmp_path / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
@@ -2358,8 +3143,13 @@ def test_governed_workspace_constitutional_pressure_is_suppressed_by_default(tmp
     assert edge["constitutional_proposal"]["state"] == "suppressed"
     assert edge["constitutional_proposal"]["policy_mode"] == "suppress"
     assert edge["route_binding"]["state"] == "suppressed_by_mode"
-    event_types = [event["event_type"] for event in app.stream.all_events()]
+    events = list(app.stream.all_events())
+    event_types = [event["event_type"] for event in events]
     assert "constitutional_proposal_recorded" in event_types
+    constitutional_event = next(
+        event for event in events if event["event_type"] == "constitutional_proposal_recorded"
+    )
+    assert constitutional_event["data"]["identity_hash"] == edge["constitutional_proposal"]["identity_hash"]
 
 
 def test_constitutional_pressure_can_be_gated_to_fh_and_deferred(tmp_path: Path) -> None:
@@ -2425,7 +3215,7 @@ def test_constitutional_pressure_can_be_gated_to_fh_and_deferred(tmp_path: Path)
     assert deferred["gaps"][0]["route_binding"]["state"] == "deferred"
 
 
-def test_constitutional_resolution_uses_matching_proposal_id(tmp_path: Path) -> None:
+def test_constitutional_resolution_uses_stable_constitutional_proposal_identity(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     refresh_analysis(tmp_path, stage="test")
     app = initialize(
@@ -2464,9 +3254,98 @@ def test_constitutional_resolution_uses_matching_proposal_id(tmp_path: Path) -> 
     )
 
     second_edge = second["gaps"][0]
+    assert second_edge["constitutional_proposal"]["proposal_id"] == first_proposal
+    assert second_edge["constitutional_proposal"]["state"] == "defer"
+    assert second_edge["route_binding"]["state"] == "deferred"
+
+
+def test_constitutional_resolution_mints_new_identity_after_material_target_surface_change(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+
+    first = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload(),
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+    first_proposal = first["gaps"][0]["constitutional_proposal"]["proposal_id"]
+    emit(
+        "constitutional_proposal_deferred",
+        {
+            "edge": "derive_goal_surface",
+            "proposal_id": first_proposal,
+            "reason": "operator deferred earlier constitutional decision",
+        },
+        stream=app.stream,
+    )
+
+    goals_path = tmp_path / "specification" / "GOALS.md"
+    goals_path.write_text(
+        goals_path.read_text(encoding="utf-8")
+        + "\n\n## Material Change\n- newly introduced constitutional direction.\n",
+        encoding="utf-8",
+    )
+    refresh_analysis(tmp_path, stage="material_surface_change")
+
+    second = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload(),
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    second_edge = second["gaps"][0]
     assert second_edge["constitutional_proposal"]["proposal_id"] != first_proposal
     assert second_edge["constitutional_proposal"]["state"] == "pending_fh"
     assert second_edge["route_binding"]["state"] == "await_fh_resolution"
+
+
+def test_constitutional_proposal_identity_diverges_across_work_key_scope(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=tmp_path,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+
+    workspace_scope = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload(),
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+    work_scope = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload=_goal_gap_payload(work_key="work::demo"),
+        runtime_config=app.config.runtime_config,
+        publish=False,
+    )
+
+    workspace_proposal = workspace_scope["gaps"][0]["constitutional_proposal"]
+    work_proposal = work_scope["gaps"][0]["constitutional_proposal"]
+    assert workspace_proposal["proposal_id"] != work_proposal["proposal_id"]
+    assert workspace_proposal["identity_hash"] != work_proposal["identity_hash"]
+    assert workspace_proposal["state"] == "pending_fh"
+    assert work_proposal["state"] == "pending_fh"
 
 
 def test_invalid_constitutional_policy_mode_fails_closed(tmp_path: Path) -> None:
@@ -3320,12 +4199,12 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     assert len(payload["edge_contracts"]) == 7
     assert len(payload["collections"]) == 1
     assert len(payload["programs"]) == 1
+    assert payload["gap_dossier"]["published"] is False
+    assert payload["gap_dossier"]["unavailable_reason"] == "workspace_state_unpublished"
     assert payload["gap_dossier"]["converged"] is False
     assert payload["gap_dossier"]["analysis_current"] is False
     assert payload["gap_dossier"]["analysis_manifest"] is None
-    assert "observation" in payload["gap_dossier"]["dossiers"][0]
-    assert "triage" in payload["gap_dossier"]["dossiers"][0]
-    assert "route_binding" in payload["gap_dossier"]["dossiers"][0]
+    assert payload["gap_dossier"]["dossiers"] == []
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
     assert payload["asset_families"][0]["name"] == "worksite_inputs"

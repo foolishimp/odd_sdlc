@@ -91,10 +91,12 @@ from odd_sdlc.requirement_closure import (  # noqa: E402
 from odd_sdlc.workspace_assets import summarize_test_evidence  # noqa: E402
 import sandbox_runtime  # noqa: E402
 from sandbox_runtime import (  # noqa: E402
+    complete_current_call,
     complete_bootstrap_chain,
     read_events,
     refresh_installed_analysis,
     run_installed_odd_sdlc,
+    run_installed_python,
     run_installed_substrate,
 )
 
@@ -313,6 +315,55 @@ def _append_runtime_contract_overrides(workspace: Path, *, transport_contract: P
         if line not in text:
             text += f"\n{line}"
     runtime_contract.write_text(text + "\n", encoding="utf-8")
+
+
+def _prime_installed_workspace_for_explicit_public_start(
+    workspace: Path,
+    *,
+    label_prefix: str,
+) -> dict[str, object]:
+    refresh_payload = refresh_installed_analysis(workspace)
+    assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    initial_gaps = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            label=f"{label_prefix}.initial_gaps",
+        ).stdout
+    )
+    dossiers = initial_gaps.get("dossiers") if isinstance(initial_gaps, dict) else None
+    if not isinstance(dossiers, list) or not dossiers:
+        return initial_gaps
+    head = dossiers[0]
+    if not isinstance(head, dict):
+        return initial_gaps
+    proposal = head.get("constitutional_proposal")
+    if not isinstance(proposal, dict) or str(proposal.get("state") or "") != "pending_fh":
+        return initial_gaps
+    approval_code = (
+        "import json\n"
+        "from odd_sdlc.homeostatic_loop import apply_constitutional_proposal\n"
+        f"payload = apply_constitutional_proposal('.', edge={str(head.get('edge') or '')!r}, "
+        f"proposal_id={str(proposal.get('proposal_id') or '')!r}, actor='installation_test')\n"
+        "print(json.dumps(payload))\n"
+    )
+    approval = run_installed_python(
+        workspace,
+        approval_code,
+        label=f"{label_prefix}.apply_constitutional_proposal",
+    )
+    assert json.loads(approval.stdout)["status"] == "applied"
+    return json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            label=f"{label_prefix}.republished_gaps",
+        ).stdout
+    )
 
 
 def _append_tenant_capability_contracts(
@@ -682,12 +733,82 @@ def test_install_exposes_public_odd_sdlc_start_contract(tmp_path: Path) -> None:
             "--until",
             "first_traversal",
             label="odd_sdlc start public contract",
+            check=False,
         ).stdout
     )
 
+    assert start_payload["status"] == "pending"
+    assert start_payload["blocking_reason"] == "published_gap_dossier_unavailable"
+    assert start_payload["stopped_by"] == "published_gap_dossier"
+    assert start_payload["unavailable_reason"] == "gap_dossier_unpublished"
+    assert not (workspace / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    explicit_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "graph_function:review_design_consensus_round",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc explicit start public contract",
+            check=False,
+        ).stdout
+    )
+
+    assert explicit_payload["status"] == "pending"
+    assert explicit_payload["target"] == "graph_function:review_design_consensus_round"
+    assert explicit_payload["blocking_reason"] == "published_gap_dossier_unavailable"
+    assert explicit_payload["stopped_by"] == "published_gap_dossier"
+    assert explicit_payload["unavailable_reason"] == "gap_dossier_unpublished"
+    assert not (workspace / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            label="odd_sdlc gaps public contract",
+        ).stdout
+    )
+    assert gaps_payload["published"] is True
+
+    start_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
+            label="odd_sdlc start public contract after published gaps",
+            check=False,
+        ).stdout
+    )
+
+    assert start_payload["status"] == "pending"
+    assert start_payload["stopped_by"] == "fh_gate"
+    assert start_payload["blocking_reason"] == "fh_gate"
     assert start_payload["fh_mode"] == "direct"
     assert start_payload["root_mode"] == "direct"
-    assert isinstance(start_payload.get("edge"), str) and start_payload["edge"]
+    assert start_payload["target"] == "next"
+    assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["constitutional_proposal"]["state"] == "pending_fh"
+    assert start_payload["route_binding"]["state"] == "await_fh_resolution"
+    assert not (workspace / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    events = read_events(workspace)
+    event_types = [event["event_type"] for event in events]
+    assert "fh_gate_pending" in event_types
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "run_bound" not in event_types
+    assert "worker_turn_started" not in event_types
 
 
 def test_install_query_domain_publishes_start_target_catalog_and_asset_ownership_index(tmp_path: Path) -> None:
@@ -731,6 +852,11 @@ def test_install_exposes_public_odd_sdlc_graph_function_and_asset_targets(tmp_pa
     )
 
     assert payload["status"] == "installed"
+    published = _prime_installed_workspace_for_explicit_public_start(
+        workspace,
+        label_prefix="explicit_targets",
+    )
+    assert published["dossiers"][0]["route_binding"]["state"] == "constitutional_reprice_approved"
     graph_function_target = json.loads(
         run_installed_odd_sdlc(
             workspace,
@@ -850,7 +976,11 @@ def test_install_start_routes_ticket_asset_without_manual_upstream_edit(tmp_path
         change_class="intent_reprice",
         re_entry_point="intent",
     )
-    refresh_installed_analysis(workspace)
+    published = _prime_installed_workspace_for_explicit_public_start(
+        workspace,
+        label_prefix="ticket_asset_start",
+    )
+    assert published["dossiers"][0]["route_binding"]["state"] == "constitutional_reprice_approved"
 
     start_payload = json.loads(
         run_installed_odd_sdlc(
@@ -1145,11 +1275,9 @@ def test_query_domain_uses_explicit_workspace_root_when_called_outside_workspace
     assert "release_operational_cycle" not in [entry["name"] for entry in payload["programs"]]
     assert "prepare_deployment_surface" not in [entry["name"] for entry in payload["functions"]]
     assert "prepare_deployment_surface" not in [entry["name"] for entry in payload["graph_functions"]]
-    gap_edges = {entry["edge"]: entry for entry in payload["gap_dossier"]["dossiers"]}
-    assert (
-        "missing_deployment_capability"
-        in gap_edges["prepare_deployment_surface"]["gap_truth"]["failing"]
-    )
+    assert payload["gap_dossier"]["published"] is False
+    assert payload["gap_dossier"]["unavailable_reason"] == "workspace_state_unpublished"
+    assert payload["gap_dossier"]["dossiers"] == []
 
 
 def test_ungoverned_test_reports_are_not_counted_as_governed_evidence(tmp_path: Path) -> None:
@@ -1372,6 +1500,17 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
         platform="spark_scala",
     )
     assert payload["status"] == "installed"
+    _seed_ticket_work_item(
+        workspace,
+        ticket_id="B-904",
+        change_class="intent_reprice",
+        re_entry_point="intent",
+    )
+    published = _prime_installed_workspace_for_explicit_public_start(
+        workspace,
+        label_prefix="ticket_asset_timeout",
+    )
+    assert published["dossiers"][0]["route_binding"]["state"] == "constitutional_reprice_approved"
 
     start_payload = json.loads(
         run_installed_odd_sdlc(
@@ -1380,7 +1519,7 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
             "--scope",
             "workspace",
             "--target",
-            "next",
+            "asset:ticket/B-904",
             "--until",
             "first_traversal",
             timeout=60,
@@ -1389,6 +1528,7 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
     assert start_payload["status"] == "iterated"
     assert start_payload["blocking_reason"] == "fp_dispatch"
     assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["target"] == "asset:ticket/B-904"
 
     manifest = json.loads(Path(start_payload["fp_manifest_path"]).read_text(encoding="utf-8"))
     assert manifest["resolved_policy"]["dispatch"]["config"]["timeout"] == 1800
@@ -1410,7 +1550,7 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
         "admit": ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
     }
     assert manifest["execution_basis"]["edge"] == "derive_intent_surface"
-    assert execution_contract["source_kind"] == "operator_request"
+    assert execution_contract["source_kind"] == "ticket_work_item"
     assert "stateful workspace asset under construction" in manifest["prompt"]
     assert "# Admitted Execution Contract" in manifest["prompt"]
     assert "Do not treat the edge like a one-shot pure function call over serialized state." in manifest["prompt"]
@@ -1476,7 +1616,7 @@ def test_imported_workspace_first_generated_readback_is_materially_specific(tmp_
 
 
 @pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
-def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_auto_convergence(run_archive) -> None:
+def test_data_mapper_template_as_is_stops_public_next_start_at_published_constitutional_fh_gate(run_archive) -> None:
     workspace = run_archive.workspace
     _seed_data_mapper_template_workspace(workspace)
 
@@ -1524,6 +1664,20 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_json("refresh-analysis.payload.json", refresh_payload)
     assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    refreshed_gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="data_mapper gaps.refreshed",
+        ).stdout
+    )
+    run_archive.capture_json("gaps.refreshed.json", refreshed_gaps_payload)
+    assert refreshed_gaps_payload["converged"] is False
+    assert refreshed_gaps_payload["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert refreshed_gaps_payload["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
 
     start_result = run_installed_odd_sdlc(
         workspace,
@@ -1534,8 +1688,6 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
         "next",
         "--until",
         "converged",
-        "--fh-mode",
-        "human-proxy",
         archive=run_archive,
         label="data_mapper start",
         timeout=180,
@@ -1543,13 +1695,16 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_text("start.stdout.txt", start_result.stdout)
     run_archive.capture_text("start.stderr.txt", start_result.stderr)
-    assert start_result.returncode == 6
+    assert start_result.returncode == 3
     start_payload = json.loads(start_result.stdout)
     run_archive.capture_json("start.payload.json", start_payload)
-    assert start_payload["status"] == "yield"
-    assert start_payload["stopped_by"] == "yield"
-    assert start_payload["handoff_kind"] == "observer_handoff"
-    assert start_payload["handoff_reason"] == "fd_findings"
+    assert start_payload["status"] == "pending"
+    assert start_payload["stopped_by"] == "fh_gate"
+    assert start_payload["blocking_reason"] == "fh_gate"
+    assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["constitutional_proposal"]["state"] == "pending_fh"
+    assert start_payload["constitutional_proposal"]["proposal_kind"] == "intent_reprice"
+    assert start_payload["route_binding"]["state"] == "await_fh_resolution"
 
     runtime_contract_text = (workspace / INSTALLED_RUNTIME_CONTRACT_RELATIVE).read_text(encoding="utf-8")
     assert "runtime_backend: claude" in runtime_contract_text
@@ -1566,61 +1721,45 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
     run_archive.capture_json("gaps.final.json", final_gaps_payload)
     assert final_gaps_payload["converged"] is False
-    assert any(
-        dossier["edge"] == "derive_test_run_archive_surface"
-        for dossier in final_gaps_payload["dossiers"]
-    )
+    assert final_gaps_payload["analysis_fingerprint"] == refreshed_gaps_payload["analysis_fingerprint"]
+    assert final_gaps_payload["total_delta"] == refreshed_gaps_payload["total_delta"]
+    assert final_gaps_payload["summary"]["gap_count"] == refreshed_gaps_payload["summary"]["gap_count"]
+    assert final_gaps_payload["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert final_gaps_payload["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
 
     events = read_events(workspace)
     run_archive.capture_json("events.completed.json", events)
     event_types = [event["event_type"] for event in events]
-    assert "worker_turn_started" in event_types
-    assert ("assessed" in event_types) or ("found" in event_types)
-    assert "graph_call_closed" in event_types
-    assert "continuation_opened" in event_types
-    assert "run_yielded" in event_types
+    assert "constitutional_proposal_recorded" in event_types
+    assert "fh_gate_pending" in event_types
+    assert "worker_turn_started" not in event_types
+    assert "run_bound" not in event_types
+    assert "run_started" not in event_types
+    assert "graph_call_opened" not in event_types
+    assert "vector_started" not in event_types
+    assert "fp_dispatched" not in event_types
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "graph_call_closed" not in event_types
+    assert "continuation_opened" not in event_types
+    assert "run_yielded" not in event_types
     assert "run_failed" not in event_types
     assert all(event.get("data", {}).get("failure_class") != "policy_config_defect" for event in events)
     assert not any(event["event_type"] == "graph_call_failed" for event in events)
-    assert any(
-        event["event_type"] == "found"
-        and event.get("data", {}).get("kind") == "fd_findings"
-        for event in events
-    )
-    graph_call_edges = [
-        event["data"]["edge"]
-        for event in events
-        if event["event_type"] == "graph_call_opened"
-    ]
-    yielded_graph_calls = [
-        event
-        for event in events
-        if event["event_type"] == "graph_call_opened"
-        and event["data"].get("edge") == start_payload["edge"]
-        and event["data"].get("run_id") == start_payload["run_id"]
-        and event["data"].get("call_id") == start_payload["call_id"]
-    ]
-    assert graph_call_edges[0] == "derive_intent_surface"
-    assert len(yielded_graph_calls) == 1
-    assert len(graph_call_edges) >= 1
-    assert "prepare_release_surface" not in graph_call_edges
-    assert "prepare_deployment_surface" not in graph_call_edges
-    assert "derive_runtime_observation_surface" not in graph_call_edges
-    assert "derive_retrofit_plan_surface" not in graph_call_edges
-    assert any(event["event_type"] == "found" for event in events)
+    assert not any(event["event_type"] == "found" for event in events)
 
     manifest_dir = workspace / ".ai-workspace" / "fp_manifests"
     result_dir = workspace / ".ai-workspace" / "fp_results"
-    assert any(manifest_dir.iterdir())
-    assert result_dir.exists()
-    first_manifest = json.loads(sorted(manifest_dir.iterdir())[0].read_text(encoding="utf-8"))
-    assert first_manifest["resolved_policy"]["dispatch"]["config"]["timeout"] == 1800
+    assert not (workspace / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+    assert not manifest_dir.exists() or not any(manifest_dir.iterdir())
+    assert not result_dir.exists() or not any(result_dir.iterdir())
 
     intent_text = (workspace / "specification" / "INTENT.md").read_text(encoding="utf-8")
     product_text = (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8")
     assert "Categorical Data Mapping & Computation Engine (CDME)" in intent_text
     assert "`odd_sdlc` exists to prove" not in intent_text
-    assert "generated software-domain read model over the imported project authority" in product_text
+    assert "# workspace Product" in product_text
+    assert "generated software-domain read model over the imported project authority" not in product_text
     assert "toy app" not in product_text
     assert not (workspace / "docs" / "40-generated-release.md").exists()
     assert not (workspace / "docs" / "50-generated-deployment.md").exists()
@@ -1629,12 +1768,292 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     run_archive.update_summary(
         initial_gap_count=gaps_payload["summary"]["gap_count"],
         final_total_delta=final_gaps_payload["total_delta"],
-        graph_call_edges=graph_call_edges,
+        graph_call_edges=[],
         preserved_project_identity=True,
-        governed_code_root="build_tenants/scala_spark/",
+        governed_code_root="none_dispatched_due_to_constitutional_fh_gate",
         release_status="not_reached",
         active_operational_steps=[],
     )
+
+
+@pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
+def test_install_explicit_asset_start_also_stops_at_published_constitutional_fh_gate(
+    run_archive,
+) -> None:
+    workspace = run_archive.workspace
+    _seed_data_mapper_template_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    run_archive.capture_json("install.explicit_asset.payload.json", payload)
+    assert payload["status"] == "installed"
+
+    _seed_ticket_work_item(
+        workspace,
+        ticket_id="B-907",
+        change_class="intent_reprice",
+        re_entry_point="intent",
+    )
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+    run_archive.copy_file(
+        transport_contract,
+        dest_name="transport_contract.explicit_asset.test_transport_contract.json",
+    )
+
+    refresh_payload = refresh_installed_analysis(workspace)
+    run_archive.capture_json("refresh-analysis.explicit_asset.payload.json", refresh_payload)
+    assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+
+    gaps_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="data_mapper gaps.explicit_asset",
+        ).stdout
+    )
+    run_archive.capture_json("gaps.explicit_asset.json", gaps_payload)
+    assert gaps_payload["dossiers"][0]["edge"] == "derive_intent_surface"
+    assert gaps_payload["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
+
+    start_result = run_installed_odd_sdlc(
+        workspace,
+        "start",
+        "--scope",
+        "workspace",
+        "--target",
+        "asset:ticket/B-907",
+        "--until",
+        "first_traversal",
+        archive=run_archive,
+        label="data_mapper start.explicit_asset",
+        timeout=180,
+        check=False,
+    )
+    run_archive.capture_text("start.explicit_asset.stdout.txt", start_result.stdout)
+    run_archive.capture_text("start.explicit_asset.stderr.txt", start_result.stderr)
+    assert start_result.returncode == 3
+    start_payload = json.loads(start_result.stdout)
+    run_archive.capture_json("start.explicit_asset.payload.json", start_payload)
+    assert start_payload["status"] == "pending"
+    assert start_payload["blocking_reason"] == "fh_gate"
+    assert start_payload["stopped_by"] == "fh_gate"
+    assert start_payload["target"] == "asset:ticket/B-907"
+    assert start_payload["edge"] == "derive_intent_surface"
+    assert start_payload["constitutional_proposal"]["state"] == "pending_fh"
+    assert start_payload["route_binding"]["state"] == "await_fh_resolution"
+    assert not (workspace / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    events = read_events(workspace)
+    run_archive.capture_json("events.explicit_asset.completed.json", events)
+    event_types = [event["event_type"] for event in events]
+    assert "fh_gate_pending" in event_types
+    assert "execution_contract_drafted" not in event_types
+    assert "execution_contract_admitted" not in event_types
+    assert "run_bound" not in event_types
+    assert "run_started" not in event_types
+    assert "worker_turn_started" not in event_types
+    assert "fp_dispatched" not in event_types
+    assert "graph_call_failed" not in event_types
+
+
+def test_install_public_next_varies_only_with_published_carrier_truth_between_pristine_and_progressed_workspaces(
+    tmp_path: Path,
+) -> None:
+    pristine = tmp_path / "data_mapper.test35_36.pristine"
+    progressed = tmp_path / "data_mapper.test35_36.progressed"
+    _seed_data_mapper_template_workspace(pristine)
+    _seed_data_mapper_template_workspace(progressed)
+
+    pristine_payload = install_release(
+        pristine,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    progressed_payload = install_release(
+        progressed,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    assert pristine_payload["status"] == "installed"
+    assert progressed_payload["status"] == "installed"
+
+    pristine_refresh = refresh_installed_analysis(pristine)
+    assert pristine_refresh["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+    pristine_gaps = json.loads(
+        run_installed_odd_sdlc(
+            pristine,
+            "gaps",
+            "--scope",
+            "workspace",
+            label="comparison.pristine.gaps",
+        ).stdout
+    )
+    assert pristine_gaps["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
+
+    pristine_start_result = run_installed_odd_sdlc(
+        pristine,
+        "start",
+        "--scope",
+        "workspace",
+        "--target",
+        "next",
+        "--until",
+        "first_traversal",
+        label="comparison.pristine.start",
+        check=False,
+    )
+    assert pristine_start_result.returncode == 3
+    pristine_start = json.loads(pristine_start_result.stdout)
+    assert pristine_start["status"] == "pending"
+    assert pristine_start["blocking_reason"] == "fh_gate"
+    assert pristine_start["stopped_by"] == "fh_gate"
+    assert not (pristine / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    pristine_events = read_events(pristine)
+    pristine_event_types = [event["event_type"] for event in pristine_events]
+    assert "fh_gate_pending" in pristine_event_types
+    assert "execution_contract_drafted" not in pristine_event_types
+    assert "execution_contract_admitted" not in pristine_event_types
+    assert "run_bound" not in pristine_event_types
+    assert "fp_dispatched" not in pristine_event_types
+
+    transport_contract = _write_fake_transport_contract(progressed)
+    _append_runtime_contract_overrides(progressed, transport_contract=transport_contract)
+    published = _prime_installed_workspace_for_explicit_public_start(
+        progressed,
+        label_prefix="comparison.progressed",
+    )
+    assert published["dossiers"][0]["constitutional_proposal"]["state"] in {
+        "approve_with_edits",
+        "suppressed",
+    }
+    assert published["dossiers"][0]["route_binding"]["state"] in {
+        "constitutional_reprice_approved",
+        "suppressed_by_mode",
+    }
+    progressed_events_before_start = read_events(progressed)
+
+    progressed_call = complete_current_call(
+        progressed,
+        label_prefix="comparison_progressed",
+    )
+    progressed_start = progressed_call["start"]
+    assert progressed_start["target"] == "next"
+    assert progressed_start["blocking_reason"] == "fp_dispatch"
+    assert progressed_start["edge"] == "derive_intent_surface"
+    assert Path(progressed_start["fp_manifest_path"]).exists()
+    assert (progressed / EXECUTION_CONTRACT_REGISTER_PATH).exists()
+
+    progressed_events = read_events(progressed)
+    progressed_new_events = progressed_events[len(progressed_events_before_start) :]
+    progressed_event_types = [event["event_type"] for event in progressed_new_events]
+    assert "fh_gate_pending" not in progressed_event_types
+    assert "execution_contract_drafted" in progressed_event_types
+    assert "execution_contract_admitted" in progressed_event_types
+    assert "run_bound" in progressed_event_types
+    assert "fp_dispatched" in progressed_event_types
+
+    assert pristine_start["target"] == progressed_start["target"] == "next"
+    assert pristine_start["blocking_reason"] == "fh_gate"
+    assert progressed_start["blocking_reason"] == "fp_dispatch"
+
+
+@pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
+def test_data_mapper_template_installed_constitutional_approval_republishes_stable_head_gate_identity(
+    run_archive,
+) -> None:
+    workspace = run_archive.workspace
+    _seed_data_mapper_template_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    run_archive.capture_json("install.approval_probe.payload.json", payload)
+    assert payload["status"] == "installed"
+
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+    run_archive.copy_file(
+        transport_contract,
+        dest_name="transport_contract.approval_probe.test_transport_contract.json",
+    )
+
+    refresh_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="approval_probe.refresh_analysis",
+        ).stdout
+    )
+    run_archive.capture_json("approval_probe.refresh_analysis.json", refresh_payload)
+    assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+
+    initial_gaps = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="approval_probe.initial_gaps",
+        ).stdout
+    )
+    run_archive.capture_json("approval_probe.initial_gaps.json", initial_gaps)
+    head = initial_gaps["dossiers"][0]
+    proposal = head["constitutional_proposal"]
+    assert head["edge"] == "derive_intent_surface"
+    assert proposal["state"] == "pending_fh"
+
+    approval_code = (
+        "import json\n"
+        "from odd_sdlc.homeostatic_loop import apply_constitutional_proposal\n"
+        f"payload = apply_constitutional_proposal('.', edge={head['edge']!r}, "
+        f"proposal_id={proposal['proposal_id']!r}, actor='installation_probe')\n"
+        "print(json.dumps(payload))\n"
+    )
+    approval = run_installed_python(
+        workspace,
+        approval_code,
+        archive=run_archive,
+        label="approval_probe.apply_constitutional_proposal",
+    )
+    run_archive.capture_text("approval_probe.apply_constitutional_proposal.stdout.txt", approval.stdout)
+    applied_payload = json.loads(approval.stdout)
+    assert applied_payload["status"] == "applied"
+
+    republished_gaps = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "gaps",
+            "--scope",
+            "workspace",
+            archive=run_archive,
+            label="approval_probe.republished_gaps",
+        ).stdout
+    )
+    run_archive.capture_json("approval_probe.republished_gaps.json", republished_gaps)
+    republished_head = republished_gaps["dossiers"][0]
+    republished_proposal = republished_head["constitutional_proposal"]
+    assert republished_head["edge"] == head["edge"]
+    assert republished_proposal["proposal_id"] == proposal["proposal_id"]
+    assert republished_proposal["state"] == "approve_with_edits"
+    assert republished_head["route_binding"]["state"] == "constitutional_reprice_approved"
+
+    events = read_events(workspace)
+    run_archive.capture_json("approval_probe.events.json", events)
+    event_types = [event["event_type"] for event in events]
+    assert "constitutional_proposal_approved_with_edits" in event_types
+    assert "proposal_applied" in event_types
 
 
 def test_install_release_keeps_downstream_common_out_of_default_project_topology(tmp_path: Path) -> None:
