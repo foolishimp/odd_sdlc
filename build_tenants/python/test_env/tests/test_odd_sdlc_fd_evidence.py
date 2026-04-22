@@ -33,12 +33,12 @@ from odd_sdlc.project_profile import (  # noqa: E402
     tenant_test_env_relative_path,
     tenant_test_env_tests_relative_path,
 )
-from odd_sdlc.traceability import (
+from odd_sdlc.requirement_closure import (
     build_requirement_closure_register,
     current_requirement_executability_gap,
-    missing_requirement_ids_from_current_surface,
-    requirement_family_traceability_scan,
-    traceability_scan,
+)  # noqa: E402
+from odd_sdlc.traceability_index import (
+    build_requirement_traceability_index,
 )  # noqa: E402
 from odd_sdlc.workspace_assets import asset_marker, asset_materialization_path  # noqa: E402
 
@@ -644,7 +644,7 @@ def test_prompt_assembly_carries_structured_fd_stdout_into_deterministic_failure
         ),
     )
 
-    prompt = _assemble_prompt(pre, job, result_path=".ai-workspace/fp_results/mock.json")
+    prompt = _assemble_prompt(pre, job, result_path=".ai-workspace/fp_results/mock.json").prompt
 
     assert "[DETERMINISTIC FAILURES]" in prompt
     assert "missing_requirement_ids" in prompt
@@ -667,7 +667,7 @@ def test_traceability_scan_treats_scala_main_spec_as_code_not_orphan_test(tmp_pa
         ),
     )
 
-    scan = traceability_scan(workspace)
+    scan = build_requirement_traceability_index(workspace).traceability_scan()
 
     assert "build_tenants/scala_spark/src/main/scala/pkg/LookupSpec.scala" not in scan["orphan_test_files"]
     assert scan["code_refs"]["REQ-TRACE-002"] == [
@@ -679,10 +679,73 @@ def test_traceability_scan_counts_governed_code_and_test_files(tmp_path: Path) -
     workspace = tmp_path / "fd-evidence-counts"
     _seed_traceability_workspace(workspace)
 
-    scan = traceability_scan(workspace)
+    scan = build_requirement_traceability_index(workspace).traceability_scan()
 
     assert scan["code_file_count"] == 2
     assert scan["test_file_count"] == 2
+
+
+def test_t020_runtime_code_does_not_import_traceability_facade() -> None:
+    code_root = ROOT / "build_tenants" / "python" / "code" / "odd_sdlc"
+    offenders: list[str] = []
+    for path in sorted(code_root.rglob("*.py")):
+        if path.name == "traceability.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if (
+            "from .traceability import" in text
+            or "from odd_sdlc.traceability import" in text
+            or "odd_sdlc.traceability:" in text
+        ):
+            offenders.append(path.relative_to(ROOT).as_posix())
+    assert offenders == []
+
+
+def test_t020_fd_and_closure_do_not_fallback_to_traceability_facade(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import odd_sdlc.traceability as legacy_traceability
+
+    workspace = tmp_path / "fd-evidence-no-legacy-fallback"
+    _seed_traceability_workspace(workspace)
+
+    def _fail_legacy(*_args, **_kwargs):
+        raise AssertionError("legacy traceability facade was used as authority")
+
+    monkeypatch.setattr(legacy_traceability, "build_requirement_traceability_index", _fail_legacy)
+    monkeypatch.setattr(legacy_traceability, "build_requirement_closure_register", _fail_legacy)
+
+    register = build_requirement_closure_register(workspace)
+    assert register["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert code_traceability_present(workspace) == 1
+
+
+def test_t020_fd_and_closure_fail_closed_when_traceability_index_carrier_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import odd_sdlc.fd_checks as fd_checks_module
+    import odd_sdlc.requirement_closure as requirement_closure_module
+
+    workspace = tmp_path / "fd-evidence-carrier-unavailable"
+    _seed_traceability_workspace(workspace)
+
+    def _fail_carrier(*_args, **_kwargs):
+        raise RuntimeError("traceability index carrier unavailable")
+
+    monkeypatch.setattr(fd_checks_module, "build_requirement_traceability_index", _fail_carrier)
+    monkeypatch.setattr(
+        requirement_closure_module,
+        "build_requirement_traceability_index",
+        _fail_carrier,
+    )
+
+    with pytest.raises(RuntimeError, match="traceability index carrier unavailable"):
+        build_requirement_closure_register(workspace)
+
+    with pytest.raises(RuntimeError, match="traceability index carrier unavailable"):
+        code_traceability_present(workspace)
 
 
 @pytest.mark.parametrize(
@@ -721,7 +784,8 @@ def test_two_digit_imported_requirement_ids_remain_trace_equivalent_after_normal
         for entry in register["requirements"]
     }
 
-    assert missing_requirement_ids_from_current_surface(workspace) == ()
+    index = build_requirement_traceability_index(workspace)
+    assert index.missing_requirement_ids_from_current_surface() == ()
     assert code_traceability_present(workspace) == 0
     assert realized_test_traceability_present(workspace) == 0
     assert entries["REQ-IMP-001"]["present_in_authority"] is True
@@ -1124,7 +1188,7 @@ def test_requirement_family_traceability_publication_is_projected_into_closure_r
     workspace = tmp_path / "fd-evidence-family-traceability"
     _seed_traceability_workspace(workspace)
 
-    publication = requirement_family_traceability_scan(workspace)
+    publication = build_requirement_traceability_index(workspace).requirement_family_traceability_scan()
     assert publication["summary"]["active_requirement_family_count"] == 1
     assert publication["summary"]["missing_carry_publication_count"] == 0
     assert publication["summary"]["missing_authoring_design_publication_count"] == 0

@@ -13,6 +13,7 @@ Tenant-local design law:
 
 - `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
 - `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
+- `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`
 - `build_tenants/python/design/EXECUTION_CONTRACT_SOURCE_CARRIER.md`
 - `build_tenants/python/design/GAP_ANALYSIS_DOSSIER.md`
 - `build_tenants/python/design/PROMPT_CONTEXT_CARRIAGE.md`
@@ -24,6 +25,12 @@ Tenant-local design law:
 `SOFTWARE_DOMAIN_BUILDOUT.md` and
 `HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md` are the current operative
 tenant-local design surfaces for `odd_sdlc`.
+
+`REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md` adopts the
+design-module method for the requirement-closure, traceability, gap, query,
+and prompt/report boundary. It names the current carrier modules, semantic
+kernel modules, projection modules, fail-closed read rule, and the remaining
+prime-law consolidation surfaces for T-020.
 
 `EXECUTION_CONTRACT_SOURCE_CARRIER.md` defines the current upstream admitted
 execution basis for prompt-bearing and review-bearing odd_sdlc work.

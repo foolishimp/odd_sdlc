@@ -88,6 +88,12 @@ def _complete_current_call_with_agent(
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             label=f"{label_prefix} start",
         ).stdout
     )
@@ -191,8 +197,26 @@ def data_mapper_template_code_pass(tmp_path_factory: pytest.TempPathFactory) -> 
 
     manifests = _run_chain(
         workspace,
-        steps=CHAIN_TO_CODE,
+        steps=CHAIN_TO_PRE_CODE,
         label_prefix="test28_code",
+    )
+    refresh_installed_analysis(workspace, label="test28_code refresh-analysis.derive_code_surface")
+    code_start = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
+            label="test28_code derive_code_surface start",
+        ).stdout
+    )
+    assert code_start["edge"] == "derive_code_surface"
+    manifests["derive_code_surface"] = json.loads(
+        Path(code_start["fp_manifest_path"]).read_text(encoding="utf-8")
     )
     events = read_events(workspace)
     return {
@@ -349,6 +373,12 @@ def test_second_pass_code_replay_can_deepen_an_existing_shallow_realization(tmp_
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             label="test28_deepening_post_second_code",
         ).stdout
     )

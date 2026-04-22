@@ -22,7 +22,8 @@ from odd_sdlc.install_topology import (
 )
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
 from odd_sdlc.project_profile import canonical_tenant_name
-from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
+from odd_sdlc.runtime_contract import runtime_contract_lines
+from odd_sdlc.requirement_closure import REQUIREMENT_CLOSURE_REGISTER_PATH
 
 
 SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
@@ -96,38 +97,10 @@ def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: 
     return json.loads(result.stdout)
 
 
-def _runtime_contract_lines() -> tuple[str, ...]:
-    asset_binding_contract = json.dumps(
-        {
-            "command": ["python", "-m", "odd_sdlc", "query-assets", "--workspace", "."],
-            "assets_key": "assets",
-            "asset_id_key": "asset_id",
-            "uri_key": "uri",
-            "relative_path_key": "metadata.relative_path",
-            "path_kind_key": "checkpoint.path_kind",
-            "exists_key": "checkpoint.exists",
-        },
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-    return (
-        "# odd_sdlc runtime contract",
-        "module: odd_sdlc.gtl_module:MODULE",
-        "package: odd_sdlc.gtl_module:MODULE",
-        "domain_package: odd_sdlc",
-        "runtime_backend: claude",
-        f"asset_binding_contract: {asset_binding_contract}",
-        "pythonpath:",
-        "  - .genesis",
-        f"  - {INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()}",
-        "",
-    )
-
-
 def _write_runtime_contract(target_root: Path) -> Path:
     contract_path = target_root / INSTALLED_RUNTIME_CONTRACT_RELATIVE
     contract_path.parent.mkdir(parents=True, exist_ok=True)
-    contract_path.write_text("\n".join(_runtime_contract_lines()), encoding="utf-8")
+    contract_path.write_text("\n".join(runtime_contract_lines()), encoding="utf-8")
     return contract_path
 
 

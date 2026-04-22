@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Implements**: REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-035
-**Derives From**: `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`, `build_tenants/python/design/fp/STATEFUL_ITERATOR_CONTROL_FRAME.md`, `build_tenants/python/design/fp/REALIZATION_DEEPENING_CONTROL_FRAME.md`
+**Derives From**: `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`, `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`, `build_tenants/python/design/fp/STATEFUL_ITERATOR_CONTROL_FRAME.md`, `build_tenants/python/design/fp/REALIZATION_DEEPENING_CONTROL_FRAME.md`
 
 ## Position
 
@@ -32,6 +32,11 @@ The repair frontier is derived from existing domain truth:
 
 It is not hand-authored in prompt assembly and it is not inferred from agent
 output after the fact.
+
+The frontier remains downstream of the requirement-closure carrier boundary.
+
+It must not reconstruct requirement carry, fulfillment, or closure semantics
+through independent helper scans.
 
 ## Published Surfaces
 
@@ -84,3 +89,5 @@ This design is only behaving lawfully when:
   pressure
 - widening beyond the published frontier is justified by one named widening
   condition rather than by ambient rewrite behavior
+- the frontier consumes the same requirement-closure carrier and prompt-context
+  truth used by F_D checks, query surfaces, and dossier publication

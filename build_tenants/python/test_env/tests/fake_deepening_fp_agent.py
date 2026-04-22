@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-RESULT_PATH_PATTERN = re.compile(r"Write assessment JSON to:\s*(.+)")
+RESULT_PATH_PATTERN = re.compile(r"Write (?:fulfillment )?assessment JSON to:\s*(.+)")
 REQUIRED_PROMPT_SIGNAL = "Existing files and existing module groups are obligations, not proof of completion."
 
 

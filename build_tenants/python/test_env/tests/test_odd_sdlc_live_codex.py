@@ -649,6 +649,12 @@ def _start_consensus_edge(workspace: Path, *, edge: str, module_ref: str, run_ar
         run_installed_substrate(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             "--module",
             module_ref,
             archive=run_archive,
@@ -763,6 +769,8 @@ def _run_consensus_live_lane(
         run_installed_substrate(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             "--module",
             module_ref,
             archive=run_archive,
@@ -815,6 +823,12 @@ def _advance_to_edge(workspace: Path, *, run_archive, expected_steps: tuple[str,
             run_installed_odd_sdlc(
                 workspace,
                 "start",
+                "--scope",
+                "workspace",
+                "--target",
+                "next",
+                "--until",
+                "first_traversal",
                 archive=run_archive,
                 label=f"odd_sdlc start {edge}",
             ).stdout
@@ -851,6 +865,12 @@ def test_installed_executive_first_edge_live_codex_qualification(run_archive) ->
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             archive=run_archive,
             label="odd_sdlc start live codex",
         ).stdout
@@ -903,6 +923,12 @@ def test_installed_executive_first_edge_live_codex_qualification(run_archive) ->
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             archive=run_archive,
             label="odd_sdlc start post-live-codex",
         ).stdout
@@ -940,6 +966,12 @@ def test_installed_executive_code_edge_live_codex_qualification(run_archive) -> 
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             archive=run_archive,
             label="odd_sdlc start live codex code edge",
         ).stdout
@@ -988,6 +1020,12 @@ def test_installed_executive_code_edge_live_codex_qualification(run_archive) -> 
         run_installed_odd_sdlc(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             archive=run_archive,
             label="odd_sdlc start post-live-codex code edge",
         ).stdout

@@ -83,7 +83,7 @@ def _manifest_context(manifest: dict[str, object], name: str) -> dict[str, objec
 from odd_sdlc.query import query_domain  # noqa: E402
 from odd_sdlc.release.install import install as install_release  # noqa: E402
 from odd_sdlc.sandbox_lifecycle import observe_sandbox, reset_sandbox_runtime_state  # noqa: E402
-from odd_sdlc.traceability import (  # noqa: E402
+from odd_sdlc.requirement_closure import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
     build_requirement_closure_register,
     refresh_requirement_closure_register,
@@ -769,7 +769,7 @@ def test_install_exposes_public_odd_sdlc_graph_function_and_asset_targets(tmp_pa
     assert asset_target["asset_binding_source"] == "odd_sdlc.asset_ownership_index"
 
 
-def test_install_query_domain_publishes_triaged_work_item_asset_without_pre_admission_route_contract(
+def test_install_query_domain_publishes_triaged_work_item_asset_with_route_contract(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "data_mapper.test18.ticket_target_catalog"
@@ -798,7 +798,8 @@ def test_install_query_domain_publishes_triaged_work_item_asset_without_pre_admi
 
     asset_ownership = {entry["handle"]: entry for entry in query_payload["asset_ownership_index"]}
     assert asset_ownership["ticket/B-900"]["operator_target"]["handle"] == "bootstrap_release_self_test"
-    assert "route_contract" not in asset_ownership["ticket/B-900"]
+    assert asset_ownership["ticket/B-900"]["route_contract"]["reentry_vector"] == "derive_requirement_surface"
+    assert asset_ownership["ticket/B-900"]["route_contract"]["binding_source"] == "odd_sdlc.work_item_route_contract"
 
 
 def test_install_query_domain_keeps_backlog_ticket_visible_but_not_start_addressable(tmp_path: Path) -> None:
@@ -1495,18 +1496,36 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     )
 
     gaps_payload = json.loads(
-        run_installed_substrate(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="data_mapper gaps.initial",
         ).stdout
     )
     run_archive.capture_json("gaps.initial.json", gaps_payload)
     assert gaps_payload["converged"] is False
-    assert gaps_payload["summary"]["gap_count"] == 18
+    assert gaps_payload["summary"]["declared_obligation_gap_count"] == 12
+    assert gaps_payload["summary"]["graph_edge_gap_count"] == 10
+    assert gaps_payload["summary"]["gap_count"] == (
+        gaps_payload["summary"]["declared_obligation_gap_count"]
+        + gaps_payload["summary"]["graph_edge_gap_count"]
+    )
 
-    start_result = run_installed_substrate(
+    refresh_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="data_mapper refresh-analysis",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.payload.json", refresh_payload)
+    assert refresh_payload["analysis_manifest"]["manifest_kind"] == "odd_sdlc.analysis_manifest"
+
+    start_result = run_installed_odd_sdlc(
         workspace,
         "start",
         "--scope",
@@ -1536,9 +1555,11 @@ def test_data_mapper_template_as_is_requires_scope_and_traceability_work_before_
     assert "runtime_backend: claude" in runtime_contract_text
 
     final_gaps_payload = json.loads(
-        run_installed_substrate(
+        run_installed_odd_sdlc(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             archive=run_archive,
             label="data_mapper gaps.final",
         ).stdout
@@ -1679,7 +1700,8 @@ def test_named_tenant_workspace_is_a_mutable_instance_not_source_authority(tmp_p
             label="odd_sdlc gaps in named tenant workspace",
         ).stdout
     )
-    assert "gaps" in gaps_payload
+    assert "dossiers" in gaps_payload
+    assert "graph_edge_gap_count" in gaps_payload
     assert "declared_obligation_gap_count" in gaps_payload
 
     candidates = realization_candidates_for_declared_root(source_root)
@@ -1752,11 +1774,9 @@ def test_load_project_profile_preserves_realized_declared_output_root_for_source
 
     queried = query_domain(initialize(bootstrap(workspace_root=workspace)))
     assert queried["gap_dossier"]["analysis_manifest"] is None
-    queried_entries = {
-        entry["requirement_id"]: entry
-        for entry in queried["requirement_closure_register"]["requirements"]
-    }
-    assert queried_entries["REQ-CORE-001"]["code_refs"] == ["build_tenants/odd_sdlc/python/src/main/logic.py"]
+    assert queried["requirement_closure_register"]["published"] is False
+    assert queried["requirement_closure_register"]["unavailable_reason"] == "workspace_state_unpublished"
+    assert queried["requirement_closure_register"]["requirements"] == []
 
 
 def test_install_release_governs_source_style_odd_sdlc_workspace_without_boundary_collapse(tmp_path: Path) -> None:

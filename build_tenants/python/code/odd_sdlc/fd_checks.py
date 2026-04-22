@@ -16,20 +16,8 @@ from typing import Any
 from .fd_contracts import FD_EVALUATOR_CONTRACTS_BY_CLI_NAME
 from .gtl_module import module as load_gtl_module
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
-from .traceability import (
-    _expected_implementation_code_requirement_ids,
-    missing_code_traceability_ids,
-    missing_intent_ids_from_goals,
-    missing_planned_test_traceability_ids,
-    missing_realized_test_traceability_ids,
-    missing_requirement_ids_from_current_surface,
-    missing_test_traceability_ids,
-    obligation_gap_from_declaration,
-    requirement_family_traceability_scan,
-    traceability_scan,
-    unexpected_planned_test_traceability_ids,
-    unexpected_realized_test_traceability_ids,
-)
+from .traceability_index import build_requirement_traceability_index
+from .requirement_closure import obligation_gap_from_declaration
 from .workspace_assets import assess_generated_asset_contract, asset_materialization_path, asset_path
 
 
@@ -183,6 +171,10 @@ _CLI_FAILURE_MAX_STRING_CHARS = 800
 _CLI_FAILURE_MAX_DEPTH = 5
 
 
+def _traceability_index(workspace_root: Path):
+    return build_requirement_traceability_index(workspace_root)
+
+
 def _require_exists(path: Path) -> bool:
     return path.exists()
 
@@ -246,7 +238,8 @@ def _generic_failure_detail(check_name: str, workspace_root: Path) -> dict[str, 
 
 
 def _goal_surface_authority_detail(workspace_root: Path) -> dict[str, Any]:
-    missing_ids = list(missing_intent_ids_from_goals(workspace_root))
+    index = _traceability_index(workspace_root)
+    missing_ids = list(index.missing_intent_ids_from_goals())
     generic = _generic_failure_detail("goal-surface-authority-validated", workspace_root)
     generated_contract_failures = list(generic["generated_contract_failures"])
     missing_root_assets = list(generic["missing_root_assets"])
@@ -272,7 +265,8 @@ def _goal_surface_authority_detail(workspace_root: Path) -> dict[str, Any]:
 
 
 def _requirement_scope_detail(workspace_root: Path) -> dict[str, Any]:
-    missing_ids = list(missing_requirement_ids_from_current_surface(workspace_root))
+    index = _traceability_index(workspace_root)
+    missing_ids = list(index.missing_requirement_ids_from_current_surface())
     generic = _generic_failure_detail("requirement-scope-complete", workspace_root)
     generated_contract_failures = list(generic["generated_contract_failures"])
     missing_root_assets = list(generic["missing_root_assets"])
@@ -297,7 +291,7 @@ def _requirement_scope_detail(workspace_root: Path) -> dict[str, Any]:
 
 
 def _requirement_family_traceability_detail(workspace_root: Path) -> dict[str, Any]:
-    publication = requirement_family_traceability_scan(workspace_root)
+    publication = _traceability_index(workspace_root).requirement_family_traceability_scan()
     families = publication["families"]
     missing_carry_fields = [
         entry["requirement_family_ref"]
@@ -361,7 +355,8 @@ def _requirement_family_traceability_detail(workspace_root: Path) -> dict[str, A
 
 
 def _code_traceability_detail(workspace_root: Path) -> dict[str, Any]:
-    scan = traceability_scan(workspace_root)
+    index = _traceability_index(workspace_root)
+    scan = index.traceability_scan()
     zero_surface = scan["code_file_count"] == 0
     return {
         "check": "code-traceability-present",
@@ -371,7 +366,7 @@ def _code_traceability_detail(workspace_root: Path) -> dict[str, Any]:
         "code_file_count": scan["code_file_count"],
         "test_file_count": scan["test_file_count"],
         "surface_failure_reason": "governed_code_surface_empty" if zero_surface else "",
-        "missing_requirement_ids": list(missing_code_traceability_ids(workspace_root)),
+        "missing_requirement_ids": list(index.missing_code_traceability_ids()),
         "orphan_code_files": list(scan["orphan_code_files"]),
         "suggested_repair": (
             "Materialize at least one governed source artifact under the selected code root before certifying implementation traceability."
@@ -382,8 +377,9 @@ def _code_traceability_detail(workspace_root: Path) -> dict[str, Any]:
 
 
 def _planned_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
-    missing_ids = list(missing_planned_test_traceability_ids(workspace_root))
-    unexpected_ids = list(unexpected_planned_test_traceability_ids(workspace_root))
+    index = _traceability_index(workspace_root)
+    missing_ids = list(index.missing_planned_test_traceability_ids())
+    unexpected_ids = list(index.unexpected_planned_test_traceability_ids())
     return {
         "check": "planned-test-traceability-present",
         "failure_kind": "planned_test_gap",
@@ -417,9 +413,10 @@ def _expected_realized_test_roots(workspace_root: Path) -> list[str]:
 
 
 def _realized_test_traceability_detail(workspace_root: Path) -> dict[str, Any]:
-    scan = traceability_scan(workspace_root)
-    missing_ids = list(missing_realized_test_traceability_ids(workspace_root))
-    unexpected_ids = list(unexpected_realized_test_traceability_ids(workspace_root))
+    index = _traceability_index(workspace_root)
+    scan = index.traceability_scan()
+    missing_ids = list(index.missing_realized_test_traceability_ids())
+    unexpected_ids = list(index.unexpected_realized_test_traceability_ids())
     zero_surface = scan["test_file_count"] == 0
     return {
         "check": "realized-test-traceability-present",
@@ -541,10 +538,11 @@ def goal_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def goal_surface_authority_validated(workspace_root: Path) -> int:
+    index = _traceability_index(workspace_root)
     return (
         0
         if _run_check("goal-surface-authority-validated", workspace_root) == 0
-        and not missing_intent_ids_from_goals(workspace_root)
+        and not index.missing_intent_ids_from_goals()
         else 1
     )
 
@@ -554,16 +552,17 @@ def requirements_boundary_sources_present(workspace_root: Path) -> int:
 
 
 def requirement_scope_complete(workspace_root: Path) -> int:
+    index = _traceability_index(workspace_root)
     return (
         0
         if _run_check("requirement-scope-complete", workspace_root) == 0
-        and not missing_requirement_ids_from_current_surface(workspace_root)
+        and not index.missing_requirement_ids_from_current_surface()
         else 1
     )
 
 
 def requirement_family_traceability_published(workspace_root: Path) -> int:
-    summary = requirement_family_traceability_scan(workspace_root)["summary"]
+    summary = _traceability_index(workspace_root).requirement_family_traceability_scan()["summary"]
     return 0 if (
         summary["missing_carry_publication_count"] == 0
         and summary["missing_authoring_design_publication_count"] == 0
@@ -626,13 +625,14 @@ def code_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def code_traceability_present(workspace_root: Path) -> int:
-    scan = traceability_scan(workspace_root)
-    expected_ids = set(_expected_implementation_code_requirement_ids(workspace_root))
+    index = _traceability_index(workspace_root)
+    scan = index.traceability_scan()
+    expected_ids = set(index.expected_implementation_code_requirement_ids())
     if scan["code_file_count"] == 0:
         return 1
     if not expected_ids:
         return 0
-    return 0 if not missing_code_traceability_ids(workspace_root) and not scan["orphan_code_files"] else 1
+    return 0 if not index.missing_code_traceability_ids() and not scan["orphan_code_files"] else 1
 
 
 def release_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -652,7 +652,8 @@ def test_module_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def planned_test_traceability_present(workspace_root: Path) -> int:
-    return 0 if not missing_planned_test_traceability_ids(workspace_root) and not unexpected_planned_test_traceability_ids(workspace_root) else 1
+    index = _traceability_index(workspace_root)
+    return 0 if not index.missing_planned_test_traceability_ids() and not index.unexpected_planned_test_traceability_ids() else 1
 
 
 def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
@@ -660,10 +661,11 @@ def test_run_archive_dependency_surfaces_present(workspace_root: Path) -> int:
 
 
 def realized_test_traceability_present(workspace_root: Path) -> int:
+    index = _traceability_index(workspace_root)
     return (
         0
-        if not missing_realized_test_traceability_ids(workspace_root)
-        and not unexpected_realized_test_traceability_ids(workspace_root)
+        if not index.missing_realized_test_traceability_ids()
+        and not index.unexpected_realized_test_traceability_ids()
         else 1
     )
 

@@ -565,8 +565,10 @@ surfaces around that carrier:
   carriers, not new public `start` targets; ABG manifests carry this basis via
   the `odd_sdlc_execution_contract_context` entry in their `contexts` array
 - `odd_sdlc query-domain` for the current machine-readable
-  `start_target_catalog` and `asset_ownership_index` surfaces that govern
-  `graph_function:` and `asset:` target resolution
+  `start_target_catalog`, `asset_ownership_index`, and admitted
+  `execution_contract_surface` projection that govern `graph_function:` /
+  `asset:` target resolution and expose the current execution basis when one
+  has been admitted
 - triaged ticket/work-item intake is now live through the same `asset:` family
   as `asset:ticket/<ticket_id>` when `query-domain` publishes that handle in
   `asset_ownership_index`; the published route contract governs re-entry and

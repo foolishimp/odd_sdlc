@@ -11,9 +11,8 @@ from .project_profile import (
     profile_test_env_relative_path,
     profile_test_env_tests_relative_path,
 )
-from .traceability import (
+from .requirement_closure import (
     REQUIREMENT_CLOSURE_REGISTER_PATH,
-    build_requirement_closure_register,
 )
 
 
@@ -66,10 +65,10 @@ def _format_path_lines(label: str, paths: list[str]) -> list[str]:
 def build_repair_frontier_register(
     workspace_root: Path | str,
     *,
-    requirement_register: dict[str, Any] | None = None,
+    requirement_register: dict[str, Any],
 ) -> dict[str, Any]:
     root = Path(workspace_root).resolve()
-    register = requirement_register or build_requirement_closure_register(root, stage="workspace_scan")
+    register = requirement_register
     requirements = [
         dict(entry)
         for entry in register.get("requirements", ())
@@ -240,9 +239,9 @@ def build_repair_frontier_register(
 def build_repair_frontier_prompt_context(
     workspace_root: Path | str,
     *,
-    repair_frontier: dict[str, Any] | None = None,
+    repair_frontier: dict[str, Any],
 ) -> str:
-    frontier = repair_frontier or build_repair_frontier_register(workspace_root)
+    frontier = repair_frontier
     summary = dict(frontier.get("summary") or {})
     frontiers = dict(frontier.get("frontiers") or {})
     lines = [

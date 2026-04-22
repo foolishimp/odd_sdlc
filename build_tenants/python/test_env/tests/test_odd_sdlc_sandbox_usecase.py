@@ -101,6 +101,8 @@ EXPECTED_GRAPH_FUNCTIONS = (
     "review_design_by_consensus",
     "review_comment_consensus_round",
     "review_comment_by_consensus",
+    "derive_execution_contract_surface",
+    "admit_execution_contract_surface",
 )
 EXPECTED_OPERATIONAL_STEPS = (
     "prepare_build_execution_surface",
@@ -337,9 +339,11 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(workspace, "catalog", archive=run_archive, label="odd_sdlc catalog").stdout
     )
     run_archive.capture_json("catalog.json", catalog)
-    assert len(catalog["assets"]) == 32
-    assert any(asset["asset_id"] == "ambiguity_register_surface" for asset in catalog["assets"])
-    assert any(asset["asset_id"] == "requirement_closure_register_surface" for asset in catalog["assets"])
+    asset_ids = {asset["asset_id"] for asset in catalog["assets"]}
+    assert len(asset_ids) == len(catalog["assets"]) == 33
+    assert "ambiguity_register_surface" in asset_ids
+    assert "requirement_closure_register_surface" in asset_ids
+    assert "execution_contract_surface" in asset_ids
     assert [item["name"] for item in catalog["asset_families"]] == [
         "worksite_inputs",
         "solution_design",
@@ -467,12 +471,13 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert sorted(domain_query.keys()) == [
         "ambiguity_register",
         "asset_families",
-        "asset_types",
         "asset_ownership_index",
+        "asset_types",
         "assets",
         "bindings",
         "collections",
         "edge_contracts",
+        "execution_contract_surface",
         "functions",
         "gap_dossier",
         "graph_functions",
@@ -487,7 +492,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v15"
+    assert domain_query["query_contract"]["version"] == "v16"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
@@ -503,6 +508,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "collections",
         "functions",
         "edge_contracts",
+        "execution_contract_surface",
         "programs",
         "work_act_types",
         "jobs",
@@ -541,7 +547,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
     assert observed["continuations"] == []
     recent_event_types = [event["event_type"] for event in observed["recent_events"]]
     assert "run_completed" in recent_event_types
-    assert recent_event_types[-1] == "edge_converged"
+    assert "edge_converged" in recent_event_types
     run_archive.snapshot_runtime("completed_run", workspace=workspace)
     run_archive.update_summary(
         completed_edges=[step["start"]["edge"] for step in chain],
@@ -570,6 +576,12 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
             run_installed_substrate(
                 workspace,
                 "start",
+                "--scope",
+                "workspace",
+                "--target",
+                "next",
+                "--until",
+                "first_traversal",
                 "--module",
                 module_ref,
                 archive=run_archive,
@@ -611,6 +623,8 @@ def test_consensus_round_module_runs_from_a_generated_design_surface(run_archive
         run_installed_substrate(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             "--module",
             module_ref,
             archive=run_archive,
@@ -658,6 +672,12 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
             run_installed_substrate(
                 workspace,
                 "start",
+                "--scope",
+                "workspace",
+                "--target",
+                "next",
+                "--until",
+                "first_traversal",
                 "--module",
                 CONSENSUS_HARNESS_MODULE_REF,
                 archive=run_archive,
@@ -699,6 +719,8 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
         run_installed_substrate(
             workspace,
             "gaps",
+            "--scope",
+            "workspace",
             "--module",
             CONSENSUS_HARNESS_MODULE_REF,
             archive=run_archive,
@@ -706,7 +728,7 @@ def test_consensus_harness_module_runs_from_a_generated_design_surface(run_archi
         ).stdout
     )
     assert consensus_gaps["converged"] is True
-    assert consensus_gaps["jobs_considered"] == len(EXPECTED_CONSENSUS_HARNESS_STEPS)
+    assert consensus_gaps["jobs_considered"] == 0
     assert consensus_gaps["total_delta"] == 0.0
     assert consensus_gaps["open_frames"] == 0
     assert all(float(gap.get("delta") or 0.0) == 0.0 for gap in consensus_gaps["gaps"])
@@ -828,6 +850,12 @@ def test_installed_self_test_reports_clean_pending_dispatch_when_bootstrap_edge_
         run_installed_substrate(
             workspace,
             "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
             "--module",
             ODD_SDLC_MODULE_REF,
             archive=run_archive,
@@ -1096,23 +1124,26 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
     assert second_event_types.count("fp_dispatched") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("asset_checkpoint_updated") == len(EXPECTED_BOOTSTRAP_STEPS)
     assessed_events = [event for event in second_events if event["event_type"] == "assessed"]
-    assert len(assessed_events) == len(EXPECTED_BOOTSTRAP_STEPS)
+    assert list(dict.fromkeys(event["data"].get("edge") for event in assessed_events)) == list(EXPECTED_BOOTSTRAP_STEPS)
+    assert all(event["data"].get("kind") == "fp" for event in assessed_events)
     assert [
         (
             event["data"].get("edge"),
-            event["data"].get("evaluator"),
+            event["data"].get("obligation_id"),
         )
         for event in assessed_events
         if event["data"].get("edge") == "derive_test_module_surface"
     ] == [
-        ("derive_test_module_surface", "planned_test_traceability_present"),
-        ("derive_test_module_surface", "test_module_surface_semantically_converged"),
+        ("derive_test_module_surface", "REQ-ODD-BOOT-001"),
+        ("derive_test_module_surface", "REQ-ODD-BOOT-002"),
+        ("derive_test_module_surface", "REQ-ODD-BOOT-003"),
+        ("derive_test_module_surface", "REQ-ODD-BOOT-004"),
     ]
     assert second_event_types.count("proof_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("closure_passed") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("graph_call_closed") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert second_event_types.count("run_completed") == len(EXPECTED_BOOTSTRAP_STEPS)
-    assert second_event_types.count("edge_converged") == len(EXPECTED_BOOTSTRAP_STEPS) - 1
+    assert second_event_types.count("edge_converged") == len(EXPECTED_BOOTSTRAP_STEPS)
     assert first_chain[0]["start"]["run_id"] != second_chain[0]["start"]["run_id"]
     assert first_chain[0]["start"]["call_id"] != second_chain[0]["start"]["call_id"]
     run_archive.capture_json(

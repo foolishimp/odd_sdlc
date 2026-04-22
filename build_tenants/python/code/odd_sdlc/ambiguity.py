@@ -10,9 +10,9 @@ from typing import Any
 from .project_profile import (
     DEFAULT_AMBIGUITY_RISK_APPETITE,
     detect_project_profile_ambiguities,
-    load_project_profile,
     load_published_workspace_state,
     published_analysis_is_current,
+    resolve_project_profile,
 )
 
 
@@ -246,7 +246,7 @@ def _summary(entries: list[dict[str, Any]]) -> dict[str, Any]:
 def build_ambiguity_register(workspace_root: Path, *, stage: str = _DEFAULT_STAGE) -> dict[str, Any]:
     path = workspace_root / AMBIGUITY_REGISTER_PATH
     previous = _read_existing_register(path)
-    profile = load_project_profile(workspace_root)
+    profile = resolve_project_profile(workspace_root)
     risk_appetite = profile.normalized_risk_appetite() if hasattr(profile, "normalized_risk_appetite") else DEFAULT_AMBIGUITY_RISK_APPETITE
     events = _read_events(workspace_root / EVENT_STREAM_PATH)
     current_entries = [

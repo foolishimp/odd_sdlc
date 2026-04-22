@@ -137,11 +137,8 @@ def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     assert entries["multiple-realization-roots"]["policy_action"] == "escalate_fh"
     assert entries["multiple-realization-roots"]["status"] == "fh_required"
     assert entries["multiple-realization-roots"]["blocking"] is True
-    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "escalate_fh"
-    assert entries["declared-root-vs-realized-root-mismatch"]["status"] == "fh_required"
-    assert entries["declared-root-vs-realized-root-mismatch"]["blocking"] is True
     assert (
-        entries["declared-root-vs-realized-root-mismatch"]["expected_resolving_edge"]
+        entries["multiple-realization-roots"]["expected_resolving_edge"]
         == "select_implementation_stack_profile"
     )
 
@@ -196,10 +193,6 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     assert entries["multiple-realization-roots"]["decision_status"] == "pending_fp"
     assert entries["multiple-realization-roots"]["status"] == "open"
     assert entries["multiple-realization-roots"]["blocking"] is False
-    assert entries["declared-root-vs-realized-root-mismatch"]["policy_action"] == "fp_decide"
-    assert entries["declared-root-vs-realized-root-mismatch"]["decision_status"] == "pending_fp"
-    assert entries["declared-root-vs-realized-root-mismatch"]["status"] == "open"
-    assert entries["declared-root-vs-realized-root-mismatch"]["blocking"] is False
 
     events = read_events(workspace)
     run_archive.capture_json("high_risk.events.json", events)

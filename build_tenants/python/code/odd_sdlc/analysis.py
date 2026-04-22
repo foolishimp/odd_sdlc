@@ -11,6 +11,7 @@ from typing import Any
 
 from .install_topology import INSTALLED_RUNTIME_CONTRACT_RELATIVE
 from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
+from .publication_io import write_json_if_changed, write_text_if_changed
 from .project_profile import (
     ANALYSIS_MANIFEST_PATH,
     PROJECT_CONSTRAINTS_PATH,
@@ -18,9 +19,9 @@ from .project_profile import (
     build_operational_capability_projection,
     current_workspace_inputs,
     current_workspace_input_fingerprint,
-    is_source_domain_repo_workspace,
     load_published_analysis_manifest,
     published_analysis_is_current,
+    resolve_workspace_mode,
     resolve_project_profile,
 )
 from .repair_frontier import (
@@ -30,63 +31,26 @@ from .repair_frontier import (
     build_repair_frontier_register,
 )
 from .runtime_contexts import publish_runtime_contexts
-from .traceability import (
+from .requirement_closure import (
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
     REQUIREMENT_CLOSURE_REGISTER_PATH,
     build_requirement_closure_prompt_context,
     build_requirement_closure_register,
 )
-
-
-def _workspace_mode(workspace_root: Path) -> str:
-    if (workspace_root / INSTALLED_RUNTIME_CONTRACT_RELATIVE).exists():
-        return "installed_target"
-    if is_source_domain_repo_workspace(workspace_root):
-        return "source_domain_repo"
-    if (workspace_root / PROJECT_CONSTRAINTS_PATH).exists():
-        return "governed_workspace"
-    return "unclassified_workspace"
-
-
-def _write_json_if_changed(
+def _publication_actions(
     path: Path,
-    payload: dict[str, Any],
     *,
+    changed: bool,
+    existed_before: bool,
     create_kind: str,
     update_kind: str,
     detail: str,
 ) -> list[dict[str, str]]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = json.dumps(payload, indent=2, sort_keys=True)
-    existing = path.read_text(encoding="utf-8") if path.exists() else None
-    if existing == content:
+    if not changed:
         return []
-    path.write_text(content, encoding="utf-8")
     return [
         {
-            "kind": update_kind if existing is not None else create_kind,
-            "path": path.as_posix(),
-            "detail": detail,
-        }
-    ]
-
-
-def _write_text_if_changed(
-    path: Path,
-    content: str,
-    *,
-    create_kind: str,
-    update_kind: str,
-    detail: str,
-) -> list[dict[str, str]]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing = path.read_text(encoding="utf-8") if path.exists() else None
-    if existing == content:
-        return []
-    path.write_text(content, encoding="utf-8")
-    return [
-        {
-            "kind": update_kind if existing is not None else create_kind,
+            "kind": update_kind if existed_before else create_kind,
             "path": path.as_posix(),
             "detail": detail,
         }
@@ -195,7 +159,7 @@ def build_analysis_manifest(
         "schema_version": "v1",
         "workspace_root": str(root),
         "workspace_name": root.name,
-        "workspace_mode": _workspace_mode(root),
+        "workspace_mode": resolve_workspace_mode(root, prefer_published=False),
         "stage": stage,
         "selected_root": profile.output_dir,
         "declared_root": profile.declared_output_dir,
@@ -213,9 +177,12 @@ def write_analysis_manifest(
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     root = Path(workspace_root).resolve()
     payload = build_analysis_manifest(root, stage=stage)
-    actions = _write_json_if_changed(
-        root / ANALYSIS_MANIFEST_PATH,
-        payload,
+    path = root / ANALYSIS_MANIFEST_PATH
+    existed_before = path.exists()
+    actions = _publication_actions(
+        path,
+        changed=write_json_if_changed(path, payload),
+        existed_before=existed_before,
         create_kind="create_analysis_manifest",
         update_kind="update_analysis_manifest",
         detail="published odd_sdlc analysis manifest for explicit analysis identity and artifact attribution",
@@ -238,7 +205,7 @@ def write_workspace_state(
         "schema_version": "v1",
         "workspace_root": str(root),
         "workspace_name": root.name,
-        "workspace_mode": _workspace_mode(root),
+        "workspace_mode": resolve_workspace_mode(root, prefer_published=False),
         "stage": stage,
         "ready": ready,
         "analysis_fingerprint": analysis_fingerprint,
@@ -249,9 +216,12 @@ def write_workspace_state(
         "declared_output_dir": profile.declared_output_dir,
         "resolution_reason": profile.resolution_reason,
     }
-    actions = _write_json_if_changed(
-        root / WORKSPACE_STATE_PATH,
-        payload,
+    path = root / WORKSPACE_STATE_PATH
+    existed_before = path.exists()
+    actions = _publication_actions(
+        path,
+        changed=write_json_if_changed(path, payload),
+        existed_before=existed_before,
         create_kind="create_workspace_state",
         update_kind="update_workspace_state",
         detail="published odd_sdlc workspace state for explicit runtime readiness and root selection",
@@ -264,30 +234,39 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
     actions: list[dict[str, str]] = []
     actions.extend(publish_runtime_contexts(root))
     ambiguity_payload = build_ambiguity_register(root, stage=stage)
+    path = root / AMBIGUITY_REGISTER_PATH
+    existed_before = path.exists()
     actions.extend(
-        _write_json_if_changed(
-            root / AMBIGUITY_REGISTER_PATH,
-            ambiguity_payload,
+        _publication_actions(
+            path,
+            changed=write_json_if_changed(path, ambiguity_payload),
+            existed_before=existed_before,
             create_kind="create_ambiguity_register",
             update_kind="update_ambiguity_register",
             detail="published ambiguity register from deterministic normalization and topology inspection",
         )
     )
     requirement_payload = build_requirement_closure_register(root, stage=stage)
+    path = root / REQUIREMENT_CLOSURE_REGISTER_PATH
+    existed_before = path.exists()
     actions.extend(
-        _write_json_if_changed(
-            root / REQUIREMENT_CLOSURE_REGISTER_PATH,
-            requirement_payload,
+        _publication_actions(
+            path,
+            changed=write_json_if_changed(path, requirement_payload),
+            existed_before=existed_before,
             create_kind="create_requirement_closure_register",
             update_kind="update_requirement_closure_register",
             detail="published requirement closure register from deterministic traceability inspection",
         )
     )
     requirement_context = build_requirement_closure_prompt_context(root, register=requirement_payload)
+    path = root / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH
+    existed_before = path.exists()
     actions.extend(
-        _write_text_if_changed(
-            root / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
-            requirement_context,
+        _publication_actions(
+            path,
+            changed=write_text_if_changed(path, requirement_context),
+            existed_before=existed_before,
             create_kind="create_requirement_closure_prompt_context",
             update_kind="update_requirement_closure_prompt_context",
             detail="published compact requirement closure builder context for odd_sdlc execution",
@@ -297,10 +276,13 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
         root,
         requirement_register=requirement_payload,
     )
+    path = root / REPAIR_FRONTIER_REGISTER_PATH
+    existed_before = path.exists()
     actions.extend(
-        _write_json_if_changed(
-            root / REPAIR_FRONTIER_REGISTER_PATH,
-            repair_frontier,
+        _publication_actions(
+            path,
+            changed=write_json_if_changed(path, repair_frontier),
+            existed_before=existed_before,
             create_kind="create_repair_frontier_register",
             update_kind="update_repair_frontier_register",
             detail="published deterministic repair-frontier register for odd_sdlc builder execution",
@@ -310,10 +292,13 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
         root,
         repair_frontier=repair_frontier,
     )
+    path = root / REPAIR_FRONTIER_CONTEXT_PATH
+    existed_before = path.exists()
     actions.extend(
-        _write_text_if_changed(
-            root / REPAIR_FRONTIER_CONTEXT_PATH,
-            repair_frontier_context,
+        _publication_actions(
+            path,
+            changed=write_text_if_changed(path, repair_frontier_context),
+            existed_before=existed_before,
             create_kind="create_repair_frontier_prompt_context",
             update_kind="update_repair_frontier_prompt_context",
             detail="published deterministic repair-frontier builder context for odd_sdlc execution",

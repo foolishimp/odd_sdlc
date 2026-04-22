@@ -9,7 +9,10 @@ from .function_catalog import FUNCTION_CATALOG
 from .work_item_routing import (
     STARTABLE_WORK_ITEM_STATUSES,
     WORK_ITEM_ROUTE_OPERATOR_TARGET,
+    WorkItemRouteContract,
     is_work_item_handle,
+    work_item_route_contract_from_payload,
+    work_item_route_contract_from_ticket_metadata,
 )
 
 
@@ -46,7 +49,7 @@ _NON_ADDRESSABLE_INDEX_ASSET_IDS = frozenset(
 @dataclass(frozen=True)
 class ResolvedOddStartTarget:
     target: Any
-    route_contract: dict[str, Any] | None = None
+    route_contract: WorkItemRouteContract | None = None
 
 
 def _decl_value(value: Any) -> Any:
@@ -240,8 +243,16 @@ def published_asset_ownership_index(
             ticket_status = str(metadata.get("ticket_status") or "")
             if ticket_status not in STARTABLE_WORK_ITEM_STATUSES:
                 continue
+            ticket_id = str(metadata.get("ticket_id") or "").strip()
+            route_contract = work_item_route_contract_from_ticket_metadata(
+                metadata,
+                ticket_id=ticket_id,
+            )
+            if route_contract is None:
+                continue
             owner_handle = WORK_ITEM_ROUTE_OPERATOR_TARGET
         else:
+            route_contract = None
             owner_handle = _governing_target_handle_for_asset(
                 asset_id,
                 start_target_by_handle=start_target_by_handle,
@@ -252,24 +263,25 @@ def published_asset_ownership_index(
         if owner_entry is None:
             continue
         checkpoint = asset.get("checkpoint") if isinstance(asset.get("checkpoint"), dict) else {}
-        index.append(
-            {
-                "handle": asset_id,
-                "asset_id": asset_id,
-                "uri": asset.get("uri"),
-                "relative_path": metadata.get("relative_path"),
-                "path_kind": checkpoint.get("path_kind"),
-                "exists": checkpoint.get("exists"),
-                "binding_source": _ASSET_OWNERSHIP_INDEX_SOURCE,
-                "operator_target": {
-                    "kind": "graph_function",
-                    "handle": owner_entry["handle"],
-                    "target_id": owner_entry["target_id"],
-                    "graph_function_name": owner_entry["graph_function_name"],
-                    "carrier_class": owner_entry["carrier_class"],
-                },
-            }
-        )
+        entry = {
+            "handle": asset_id,
+            "asset_id": asset_id,
+            "uri": asset.get("uri"),
+            "relative_path": metadata.get("relative_path"),
+            "path_kind": checkpoint.get("path_kind"),
+            "exists": checkpoint.get("exists"),
+            "binding_source": _ASSET_OWNERSHIP_INDEX_SOURCE,
+            "operator_target": {
+                "kind": "graph_function",
+                "handle": owner_entry["handle"],
+                "target_id": owner_entry["target_id"],
+                "graph_function_name": owner_entry["graph_function_name"],
+                "carrier_class": owner_entry["carrier_class"],
+            },
+        }
+        if route_contract is not None:
+            entry["route_contract"] = route_contract.to_dict()
+        index.append(entry)
     return index
 
 
@@ -347,6 +359,14 @@ def resolve_start_target(
             f"unknown or non-start-addressable published asset handle {handle!r}"
         )
     operator_target = dict(asset_entry["operator_target"])
+    route_contract = None
+    if is_work_item_handle(handle):
+        route_payload = asset_entry.get("route_contract")
+        if not isinstance(route_payload, dict):
+            raise ValueError(f"published work-item asset handle {handle!r} missing route_contract")
+        route_contract = work_item_route_contract_from_payload(route_payload)
+        if route_contract is None:
+            raise ValueError(f"published work-item asset handle {handle!r} has invalid route_contract")
     return ResolvedOddStartTarget(
         target=StartTarget.asset(
             handle=handle,
@@ -371,5 +391,5 @@ def resolve_start_target(
             ),
             binding_source=str(asset_entry["binding_source"]),
         ),
-        route_contract=None,
+        route_contract=route_contract,
     )

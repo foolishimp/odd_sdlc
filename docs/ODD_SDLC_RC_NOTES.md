@@ -1,142 +1,73 @@
 # odd_sdlc RC Notes
 
-This note records release-candidate caveats that are understood and accepted
-for the current `odd_sdlc` wave.
+This note records accepted RC-scoped behavior and caveats for
+`v1.0.0-rc.1`.
 
-## Accepted Framework Behavior
+## Accepted RC Behavior
 
 ### Construction-First, Governed-Evidence Admission
 
-The current `odd_sdlc` release candidate intentionally permits constructive
-SDLC progress before execution capability is declared.
+The current odd_sdlc line permits constructive SDLC progress before an
+execution capability is declared.
 
 That means:
 
-- constructive test and archive surfaces may converge without a declared
-  `test_execution_contract`
-- observed execution artifacts without a declared execution contract remain
-  visible, but are not admitted as governed execution truth
-- release and qualification surfaces stay at `pending_evidence` /
+- constructive surfaces may converge before a declared execution contract
+  exists
+- undeclared execution artifacts may be visible without being admitted as
+  governed execution truth
+- release, deployment, and qualification remain at `pending_evidence` /
   `construction_complete_pending_execution` until declared capability and
   governed returned evidence exist
 
-This is intentional framework policy for the current RC. It preserves
-iteration-friendly construction while preventing false closure from ambient
-execution artifacts.
+This remains intentional framework policy for the RC line. It preserves
+iterative closure without allowing false operational truth.
 
-### Synthetic Topology Regression Repricing
+### Source-Line Query And Prompt Surfaces Are Fail-Closed
 
-The synthetic `data_mapper_test19_topology_regression` proving lane is now
-aligned to the same policy.
-
-It proves:
-
-- governed realization-root binding
-- topology guard application
-- traceability-aware adoption of imported implementation assets
-
-It does not claim governed executed-test truth unless the synthetic fixture
-declares test-execution capability.
-
-### Requirement Authority Carry-Forward on Installed Workspaces
-
-The current RC now binds the live requirement-closure register into
-`derive_requirement_surface` prompt construction and refreshes that register at
-module-build time.
-
-This closes the installed-workspace regression where imported authority IDs
-could be semantically covered but omitted literally from
-`specification/requirements/10-generated-bootstrap.md`, causing
-`requirement_scope_complete` to fail closed.
-
-The fix preserves deterministic requirement-ID carry-forward for clean
-installed runs without weakening the deterministic F_D gate.
-
-### Installed ABG Boundary Is Now Consumed Through Installer Composition
-
-The current RC consumes the released ABG runtime boundary through
-`odd_sdlc`'s installer path rather than through source-runtime mirroring.
+The current RC does not rebuild current requirement or execution truth on read
+paths when the published carrier is missing.
 
 That means:
 
-- downstream `.genesis` truth is refreshed only by installer execution
-- the `odd_sdlc` proof lanes now run against the released ABG provenance-ready
-  runtime boundary
-- unresolved non-blocking deterministic findings that remain after a
-  constructive continuation now surface as yielded observer fact truth rather
-  than as generic runtime failure or a synthetic hard-stop `fd_gap`
+- source `query-domain` may return an unavailable requirement-closure read
+  model before analysis is published
+- requirement-closure prompt context requires an explicit register rather than
+  silently rescanning current workspace truth
+- execution-contract projection is published from runtime-contract truth; it is
+  not reconstructed from stale local controller state
 
-### Installed Proof Lanes Now Expect Yielded Observer Handoff For Non-Blocking Post-F_P Findings
+This is intentional. Read-path reconstruction was removed so mixed old/new
+carrier authority cannot masquerade as healthy closure.
 
-The current RC now accepts the repriced ABG handoff envelope.
+### Installed Runtime Truth Is Downstream, Not Source-Mirrored
 
-That means:
-
-- non-blocking deterministic findings that remain after constructive
-  continuation may emit `found(kind=fd_findings)`
-- the graph call may still lawfully close
-- the enclosing run may yield rather than complete when handoff to the next
-  observer/routing layer is required
-- declared hard-stop policy, safety/config/runtime defects, and explicit
-  blocker-class conditions still fail closed
-
-This is now the correct installed-workspace proof shape for non-blocking
-post-`F_P` deterministic findings.
-
-### Public Test Branch Shape Is Preserved While Realized Test Traceability Moves Inside Archive Construction
-
-The current RC keeps the published developer-test branch shape stable:
-
-- `derive_test_module_surface`
-- `derive_test_run_archive_surface`
-- `qualify_testcase_authority`
-
-while moving realized governed developer-test source generation behind the
-archive boundary.
+The source repo does not carry an installed `.genesis` runtime at repo root.
 
 That means:
 
-- planned developer-test traceability is still checked at test-module stage
-- realized developer-test traceability is checked at archive stage
-- empty generated orphan test files are no longer created just to satisfy the
-  internal realized-test branch
-- the release-record first-slice, synthetic regression, and installed sandbox
-  lanes stay aligned to the published graph
+- source execution and qualification bind ABG through explicit source
+  `PYTHONPATH`
+- installed runtime truth is created only in downstream installs and test
+  sandboxes
+- source release publication does not rely on `.odd_sdlc/release` mirror state
 
-## Current Known Limitations
+### Yielded Observer Handoff Remains Lawful For Non-Blocking Post-F_P Findings
 
-### Traceability Path Resolution Is Still Self-Hosting-Oriented
+The current RC accepts the ABG yielded-handoff envelope for non-blocking
+deterministic findings that remain after constructive continuation.
 
-The current generated traceability and closure logic in
-[`traceability.py`](/Users/jim/src/apps/odd_sdlc/build_tenants/python/code/odd_sdlc/traceability.py)
-still resolves some design and test trace surfaces through fixed
-`build_tenants/python/...` paths.
+That means:
 
-That matches the currently published proving subset and the asset contract
-surfaces, so the current `odd_sdlc` self-hosting lane is internally
-consistent.
+- non-blocking deterministic findings may yield observer/handoff truth rather
+  than flattening into generic runtime failure
+- explicit blocker-class conditions still fail closed
 
-It is not yet the fully generalized tenant-profile model.
+## RC Qualification Boundary
 
-### Follow-up Direction
+The `v1.0.0-rc.1` qualification bundle is the deterministic source/install/yield
+bundle listed in
+[ODD_SDLC_RC_RELEASE_NOTE.md](/Users/jim/src/apps/odd_sdlc/docs/ODD_SDLC_RC_RELEASE_NOTE.md).
 
-The follow-up change should resolve generated trace path discovery through the
-active tenant profile:
-
-- `tenant_name`
-- `output_dir`
-- selected realization/test roots from `ProjectProfile`
-
-That work is a generalization step, not a blocker for the current RC.
-
-## Current Verification Footer
-
-The current release-candidate proving footer is:
-
-- `36 passed`
-- `4 skipped`
-- `542.71s`
-
-from:
-
-- `python -m pytest build_tenants/python/test_env/tests -q`
+It does not certify external live agent, OAuth-dependent, or network-dependent
+lanes as part of this offline source-cut publication.

@@ -33,7 +33,7 @@ from odd_sdlc.project_profile import (
     tenant_test_env_tests_relative_path,
 )
 from odd_sdlc.query import query_domain
-from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
+from odd_sdlc.requirement_closure import REQUIREMENT_CLOSURE_REGISTER_PATH
 from odd_sdlc.workspace_assets import asset_marker
 
 from test_odd_sdlc_installation import _seed_data_mapper_template_workspace
@@ -217,7 +217,7 @@ def test_iterative_requirement_closure_and_generated_traceability(run_archive) -
     assert requirement_scope_complete(workspace) == 1
     assert code_traceability_present(workspace) == 0
     assert fd_test_traceability_present(workspace) == 1
-    assert initial_domain["query_contract"]["version"] == "v15"
+    assert initial_domain["query_contract"]["version"] == "v16"
     assert "analysis_manifest" not in initial_domain["query_contract"]["top_level_keys"]
     assert "analysis_manifest" in initial_domain["gap_dossier"]
     assert initial_domain["requirement_closure_register"]["summary"]["missing_intent_ids_from_goals"] == 0

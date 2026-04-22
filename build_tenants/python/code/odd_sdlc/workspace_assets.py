@@ -36,7 +36,7 @@ from .project_profile import (
     profile_test_env_tests_relative_path,
     realization_candidates_for_selected_root,
 )
-from .traceability import (
+from .requirement_closure import (
     REQUIREMENT_CLOSURE_REGISTER_KIND,
     REQUIREMENT_CLOSURE_REGISTER_PATH,
 )

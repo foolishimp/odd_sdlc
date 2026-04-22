@@ -11,7 +11,7 @@ from typing import Any
 from .app import OddSdlcApp, catalog, gap_snapshot
 from .ambiguity import load_or_build_ambiguity_register
 from .query_contract import query_domain_contract
-from .traceability import load_or_build_requirement_closure_register
+from .requirement_closure import load_requirement_closure_register_read_model
 from .workspace_assets import bootstrap_assets
 
 
@@ -86,7 +86,7 @@ def query_ambiguity_register(app: OddSdlcApp) -> dict[str, Any]:
 
 
 def query_requirement_closure_register(app: OddSdlcApp) -> dict[str, Any]:
-    return load_or_build_requirement_closure_register(app.config.workspace_root)
+    return load_requirement_closure_register_read_model(app.config.workspace_root)
 
 
 def query_domain(app: OddSdlcApp) -> dict[str, Any]:
@@ -95,6 +95,7 @@ def query_domain(app: OddSdlcApp) -> dict[str, Any]:
     return {
         "query_contract": query_domain_contract(),
         "workspace_root": str(app.config.workspace_root),
+        "execution_contract_surface": catalog_payload["execution_contract_surface"],
         "semantic_facets": catalog_payload["semantic_facets"],
         "asset_types": catalog_payload["asset_types"],
         "asset_families": catalog_payload["asset_families"],

@@ -164,14 +164,14 @@ SUMMARY_IGNORED_DIR_NAMES = {
 }
 
 
-def _strip_quotes(value: str) -> str:
+def strip_scalar_quotes(value: str) -> str:
     stripped = value.strip()
     if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
         return stripped[1:-1]
     return stripped
 
 
-def _default_project_slug(workspace_root: Path) -> str:
+def default_project_slug(workspace_root: Path) -> str:
     name = workspace_root.resolve().name.strip()
     if not name:
         return "project"
@@ -233,6 +233,9 @@ class ProjectProfile:
     project_kind: str
     language: str
     test_runner: str
+    tool: str
+    version: str
+    module_structure: str
     ambiguity_risk_appetite: str
     tenant_name: str
     output_dir: str
@@ -251,6 +254,15 @@ class ProjectProfile:
     def normalized_risk_appetite(self) -> str:
         appetite = self.ambiguity_risk_appetite.strip().lower()
         return appetite if appetite in AMBIGUITY_RISK_APPETITES else DEFAULT_AMBIGUITY_RISK_APPETITE
+
+    def declared_module_names(self) -> tuple[str, ...]:
+        raw = self.module_structure
+        if "(" in raw and ")" in raw:
+            inner = raw[raw.find("(") + 1 : raw.rfind(")")]
+            modules = tuple(part.strip() for part in inner.split(",") if part.strip())
+            if modules:
+                return modules
+        return ("app-core",)
 
     def has_build_execution_capability(self) -> bool:
         return bool(self.build_execution_contract.strip())
@@ -271,6 +283,9 @@ class ProjectProfile:
             "project_kind": self.project_kind,
             "language": self.language,
             "test_runner": self.test_runner,
+            "tool": self.tool,
+            "version": self.version,
+            "module_structure": self.module_structure,
             "ambiguity_risk_appetite": self.normalized_risk_appetite(),
             "tenant_name": self.tenant_name,
             "output_dir": self.output_dir,
@@ -292,6 +307,9 @@ class ProjectProfile:
             project_kind=str(payload.get("project_kind", "")),
             language=str(payload.get("language", "")),
             test_runner=str(payload.get("test_runner", "")),
+            tool=str(payload.get("tool", "")),
+            version=str(payload.get("version", "")),
+            module_structure=str(payload.get("module_structure", "")),
             ambiguity_risk_appetite=str(payload.get("ambiguity_risk_appetite", DEFAULT_AMBIGUITY_RISK_APPETITE)),
             tenant_name=str(payload.get("tenant_name", "python")),
             output_dir=str(payload.get("output_dir", "")),
@@ -385,6 +403,27 @@ def load_published_workspace_state(workspace_root: Path | str) -> dict[str, obje
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def resolve_workspace_mode(
+    workspace_root: Path | str,
+    *,
+    prefer_published: bool = True,
+) -> str:
+    root = Path(workspace_root).resolve()
+    if prefer_published:
+        payload = load_published_workspace_state(root)
+        if isinstance(payload, dict):
+            workspace_mode = payload.get("workspace_mode")
+            if isinstance(workspace_mode, str) and workspace_mode:
+                return workspace_mode
+    if (root / INSTALLED_RUNTIME_CONTRACT_RELATIVE).exists():
+        return "installed_target"
+    if is_source_domain_repo_workspace(root):
+        return "source_domain_repo"
+    if (root / PROJECT_CONSTRAINTS_PATH).exists():
+        return "governed_workspace"
+    return "unclassified_workspace"
 
 
 def load_published_analysis_manifest(workspace_root: Path | str) -> dict[str, object] | None:
@@ -523,10 +562,11 @@ def realization_candidates_for_selected_root(workspace_root: Path) -> list[dict[
 
 
 def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> list[dict[str, object]]:
-    profile = load_project_profile(workspace_root)
+    profile = resolve_project_profile(workspace_root)
     selected_root = workspace_root / profile.output_dir if profile.output_dir else workspace_root / DEFAULT_PROVING_CODE_RELATIVE_PATH
     selected_summary = _code_root_summary(selected_root)
-    candidates = realization_candidates_for_declared_root(workspace_root)
+    selected_relative = Path(profile.declared_output_dir.strip("/")) if profile.declared_output_dir else None
+    candidates = _realization_candidates(workspace_root, selected_relative=selected_relative)
     capability_projection = build_operational_capability_projection(workspace_root, profile=profile)
     capability_families = capability_projection.get("families")
     if not isinstance(capability_families, dict):
@@ -876,14 +916,14 @@ def _parse_constraints_lines(path: Path) -> dict[str, str]:
             continue
 
         if section == "structure" and stripped.startswith("root_code_policy:"):
-            values["root_code_policy"] = _strip_quotes(stripped.partition(":")[2])
+            values["root_code_policy"] = strip_scalar_quotes(stripped.partition(":")[2])
             in_design_tenants = False
             current_tenant_scope = False
             continue
 
         if in_design_tenants and stripped.startswith("- name:"):
             if not first_design_tenant_seen:
-                values["tenant_name"] = _strip_quotes(stripped.partition(":")[2])
+                values["tenant_name"] = strip_scalar_quotes(stripped.partition(":")[2])
                 first_design_tenant_seen = True
                 current_tenant_scope = True
             else:
@@ -892,17 +932,17 @@ def _parse_constraints_lines(path: Path) -> dict[str, str]:
 
         if section == "project" and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[key.strip()] = _strip_quotes(value)
+            values[key.strip()] = strip_scalar_quotes(value)
             continue
 
         if section == "structure" and not in_design_tenants and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[key.strip()] = _strip_quotes(value)
+            values[key.strip()] = strip_scalar_quotes(value)
             continue
 
         if current_tenant_scope and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[f"tenant_{key.strip()}"] = _strip_quotes(value)
+            values[f"tenant_{key.strip()}"] = strip_scalar_quotes(value)
 
     return values
 
@@ -952,13 +992,13 @@ def parse_design_tenants(path: Path) -> list[dict[str, str]]:
         if in_design_tenants and stripped.startswith("- name:"):
             _flush_current()
             current_tenant = {
-                "name": canonical_tenant_name(_strip_quotes(stripped.partition(":")[2])),
+                "name": canonical_tenant_name(strip_scalar_quotes(stripped.partition(":")[2])),
             }
             continue
 
         if current_tenant is not None and ":" in stripped:
             key, _, value = stripped.partition(":")
-            current_tenant[key.strip()] = _strip_quotes(value)
+            current_tenant[key.strip()] = strip_scalar_quotes(value)
 
     _flush_current()
     return tenants
@@ -968,7 +1008,7 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
     workspace_root = Path(workspace_root).resolve()
     constraints = _parse_constraints_lines(workspace_root / PROJECT_CONSTRAINTS_PATH)
     workspace_name = workspace_root.resolve().name
-    project_slug = constraints.get("name") or _default_project_slug(workspace_root)
+    project_slug = constraints.get("name") or default_project_slug(workspace_root)
     tenant_name = canonical_tenant_name(constraints.get("tenant_name") or "python")
     declared_output_dir = constraints.get("tenant_output_dir", "")
     canonical_output_dir = tenant_output_dir(tenant_name)
@@ -1014,6 +1054,9 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
         project_kind=constraints.get("kind", ""),
         language=constraints.get("language", ""),
         test_runner=constraints.get("test_runner", ""),
+        tool=constraints.get("tool", ""),
+        version=constraints.get("version", ""),
+        module_structure=constraints.get("module_structure", ""),
         ambiguity_risk_appetite=constraints.get("ambiguity_risk_appetite", DEFAULT_AMBIGUITY_RISK_APPETITE),
         tenant_name=tenant_name,
         output_dir=output_dir,

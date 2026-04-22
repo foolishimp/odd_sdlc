@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -20,11 +21,12 @@ from .install_topology import (
     LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE,
 )
 from .project_profile import (
-    _strip_quotes,
     _parse_constraints_lines,
     canonical_tenant_name,
+    default_project_slug,
     load_project_profile,
     parse_design_tenants,
+    strip_scalar_quotes,
     tenant_output_dir,
 )
 
@@ -41,12 +43,54 @@ TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("runtime_observation_contract", '""'),
 )
 TENANT_REGISTRY_PATH = Path("build_tenants/TENANT_REGISTRY.md")
+REALIZATION_SOURCE_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".go",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".php",
+    ".py",
+    ".rb",
+    ".rs",
+    ".scala",
+    ".swift",
+    ".ts",
+    ".tsx",
+}
+REALIZATION_BUILD_MARKERS = {
+    "build.sbt",
+    "build.gradle",
+    "build.gradle.kts",
+    "Cargo.toml",
+    "go.mod",
+    "package.json",
+    "pom.xml",
+    "pyproject.toml",
+    "setup.py",
+}
+REALIZATION_IGNORED_DIR_NAMES = {
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "dist",
+    "node_modules",
+    "target",
+    "venv",
+    ".venv",
+}
 
 
-def _is_conformant_selected_output_dir(output_dir: str) -> bool:
+def _is_conformant_selected_output_dir(output_dir: str, *, canonical_output: str | None = None) -> bool:
     normalized = output_dir.strip().strip("/")
     if not normalized:
         return False
+    if canonical_output is not None:
+        return normalized == canonical_output.strip().strip("/")
     parts = Path(normalized).parts
     if len(parts) < 2 or parts[0] != "build_tenants":
         return False
@@ -57,11 +101,36 @@ def _is_conformant_selected_output_dir(output_dir: str) -> bool:
     return True
 
 
-def default_project_slug(workspace_root: Path) -> str:
-    name = workspace_root.resolve().name.strip()
-    if not name:
-        return "project"
-    return name.split(".", 1)[0].replace("-", "_")
+def _is_materialized_output_tree(workspace_root: Path, output_dir: str) -> bool:
+    normalized = output_dir.strip().strip("/")
+    if not _is_conformant_selected_output_dir(normalized):
+        return False
+    root = workspace_root / normalized
+    if not root.exists() or not root.is_dir():
+        return False
+    if any((root / marker).exists() for marker in REALIZATION_BUILD_MARKERS):
+        return True
+    for current_root, dirnames, filenames in os.walk(root):
+        dirnames[:] = [
+            dirname
+            for dirname in dirnames
+            if dirname not in REALIZATION_IGNORED_DIR_NAMES
+        ]
+        if any(Path(filename).suffix in REALIZATION_SOURCE_SUFFIXES for filename in filenames):
+            return True
+    return False
+
+
+def _preserve_declared_output_dir(
+    workspace_root: Path,
+    output_dir: str,
+    *,
+    canonical_output: str,
+) -> bool:
+    return (
+        _is_conformant_selected_output_dir(output_dir, canonical_output=canonical_output)
+        or _is_materialized_output_tree(workspace_root, output_dir)
+    )
 
 
 def _normalization_action(*, kind: str, path: Path, detail: str) -> dict[str, str]:
@@ -352,14 +421,14 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
             continue
         if indent == 0 and ":" in stripped:
             key, _, value = stripped.partition(":")
-            top_level[key.strip()] = _strip_quotes(value)
+            top_level[key.strip()] = strip_scalar_quotes(value)
             section = ""
             current_tenant = None
             current_list_key = None
             continue
         if section == "project" and indent == 2 and ":" in stripped:
             key, _, value = stripped.partition(":")
-            project[key.strip()] = _strip_quotes(value)
+            project[key.strip()] = strip_scalar_quotes(value)
             continue
         if section != "build_tenants":
             continue
@@ -379,11 +448,11 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
                 current_tenant[key] = []
                 current_list_key = key
             else:
-                current_tenant[key] = _strip_quotes(value)
+                current_tenant[key] = strip_scalar_quotes(value)
                 current_list_key = None
             continue
         if indent >= 6 and stripped.startswith("- ") and current_list_key:
-            current_tenant.setdefault(current_list_key, []).append(_strip_quotes(stripped[2:]))
+            current_tenant.setdefault(current_list_key, []).append(strip_scalar_quotes(stripped[2:]))
 
     if not registry:
         return None
@@ -421,7 +490,7 @@ def _canonical_constraints_from_legacy_build_tenants(
         selected.get("description")
         or "Normalized project realization tenant for odd_sdlc operation"
     )
-    output_dir = str(selected.get("output_dir") or canonical_output)
+    output_dir = canonical_output
     module_structure = selected.get("module_structure")
     module_structure_value = (
         f'"({", ".join(str(item) for item in module_structure)})"'
@@ -739,8 +808,12 @@ def _normalize_project_constraints(
             tenant_fields_seen.add(field_name)
             tenant_field_indent = line[: len(line) - len(line.lstrip())]
         if first_design_tenant_scope and stripped.startswith("output_dir:") and design_tenant_seen:
-            existing_output = _strip_quotes(stripped.partition(":")[2].strip())
-            if _is_conformant_selected_output_dir(existing_output):
+            existing_output = strip_scalar_quotes(stripped.partition(":")[2].strip())
+            if _preserve_declared_output_dir(
+                workspace_root,
+                existing_output,
+                canonical_output=canonical_output,
+            ):
                 updated.append(f'{tenant_field_indent}output_dir: "{existing_output}"')
             else:
                 updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
@@ -1084,7 +1157,11 @@ def normalize_workspace(
     _migrate_legacy_realization_root(
         root,
         legacy_output_dir=""
-        if _is_conformant_selected_output_dir(legacy_output_dir)
+        if _preserve_declared_output_dir(
+            root,
+            legacy_output_dir,
+            canonical_output=tenant_output_dir(resolved_platform),
+        )
         else legacy_output_dir,
         canonical_output_dir=tenant_output_dir(resolved_platform),
         actions=actions,

@@ -41,7 +41,7 @@ from .runtime_contexts import (
     REALIZED_TEST_SOURCE_CONTEXT_PATH as _REALIZED_TEST_SOURCE_CONTEXT_PATH,
     STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH as _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
 )
-from .traceability import (
+from .requirement_closure import (
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
 )
 
@@ -89,7 +89,7 @@ def _requirement_edge_obligation_ledger(
 ) -> Attrs:
     return _obligation_ledger_declaration(
         signal_key=signal_key,
-        adapter_ref="odd_sdlc.traceability:declared_requirement_edge_gap",
+        adapter_ref="odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         obligation_source_ref=obligation_source_ref,
         obligation_source_kind=obligation_source_kind,
         obligation_source_admission_basis=obligation_source_admission_basis,

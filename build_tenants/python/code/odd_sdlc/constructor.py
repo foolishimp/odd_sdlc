@@ -11,14 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from .asset_types import ASSET_TYPES
-from .project_profile import load_project_profile
+from .project_profile import load_project_profile, strip_scalar_quotes
 from .runtime_effects import publish_workspace_runtime_event
-from .traceability import (
-    authority_requirement_refs,
-    current_requirement_refs,
-    implementation_claim_refs,
-    planned_test_claim_refs,
-)
+from .traceability_index import build_requirement_traceability_index
 from .workspace_assets import (
     assess_generated_asset_contract,
     asset_declared_type,
@@ -42,7 +37,6 @@ PRESERVED_AUTHORITY_ASSETS = {"intent_surface", "product_surface", "goal_surface
 _REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 _GENERATED_TEST_CODE_MARKER = "Generated governed test code for the odd_sdlc test_code_surface."
 _GENERIC_TITLE_HEADINGS = {"intent", "product", "goals", "requirements"}
-_OPERATIONAL_DISPATCH_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-operational-dispatch.json")
 _CODE_SURFACE_PRESERVED_ROOTS = {
     ".ai-workspace",
     ".genesis",
@@ -92,10 +86,11 @@ def _code_surface_root(workspace_root: Path) -> Path:
 
 
 def _proving_subset_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
+    index = build_requirement_traceability_index(workspace_root)
     current_ids = tuple(
         sorted(
             requirement_id
-            for requirement_id in current_requirement_refs(workspace_root)
+            for requirement_id in index.current_refs
             if _is_concrete_requirement_id(requirement_id)
         )
     )
@@ -104,7 +99,7 @@ def _proving_subset_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
     return tuple(
         sorted(
             requirement_id
-            for requirement_id in authority_requirement_refs(workspace_root)
+            for requirement_id in index.authority_refs
             if _is_concrete_requirement_id(requirement_id)
         )
     )
@@ -124,60 +119,6 @@ def _build_artifact_summary(workspace_root: Path) -> dict[str, Any]:
         "observed_paths": observed_paths,
         "artifact_root_count": len(observed_paths),
     }
-
-
-def _load_operational_dispatch_register(workspace_root: Path) -> dict[str, Any]:
-    path = workspace_root / _OPERATIONAL_DISPATCH_REGISTER_PATH
-    if not path.exists():
-        return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return raw if isinstance(raw, dict) else {}
-
-
-def _operational_dispatch_entry(workspace_root: Path, lane: str) -> dict[str, Any]:
-    payload = _load_operational_dispatch_register(workspace_root)
-    lanes = payload.get("lanes", {})
-    if not isinstance(lanes, dict):
-        return {}
-    entry = lanes.get(lane, {})
-    return dict(entry) if isinstance(entry, dict) else {}
-
-
-def _classify_operational_binding(contract: str) -> str:
-    lowered = contract.strip().lower()
-    if not lowered:
-        return "undeclared"
-    if "sbt" in lowered:
-        return "local_scala_sbt"
-    if "pytest" in lowered:
-        return "local_python_pytest"
-    if lowered.startswith("python "):
-        return "local_python_command"
-    return "local_shell_command"
-
-
-def _strip_quotes(value: str) -> str:
-    stripped = value.strip()
-    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
-        return stripped[1:-1]
-    return stripped
-
-
-def _project_constraints_path(workspace_root: Path) -> Path:
-    return workspace_root / ".ai-workspace" / "context" / "project_constraints.yml"
-
-
-def _project_constraint_scalar(workspace_root: Path, key: str) -> str:
-    path = _project_constraints_path(workspace_root)
-    if not path.exists():
-        return ""
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        stripped = raw_line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.startswith(f"{key}:"):
-            return _strip_quotes(stripped.partition(":")[2])
-    return ""
 
 
 def _imported_authority_paths(workspace_root: Path) -> tuple[Path, ...]:
@@ -208,7 +149,7 @@ def _imported_requirement_authority_lines(workspace_root: Path) -> tuple[str, ..
 
 
 def _authority_requirement_lines(workspace_root: Path) -> tuple[str, ...]:
-    refs = authority_requirement_refs(workspace_root)
+    refs = build_requirement_traceability_index(workspace_root).authority_refs
     if not refs:
         return ("- no live REQ-* authority markers detected",)
     return tuple(
@@ -231,7 +172,7 @@ def _project_title(workspace_root: Path) -> str:
         for line in intent_path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped.lower().startswith("**project**:"):
-                return _strip_quotes(stripped.partition(":")[2]).strip()
+                return strip_scalar_quotes(stripped.partition(":")[2]).strip()
         heading = _file_heading(intent_path)
         if heading and heading.strip().lower() not in _GENERIC_TITLE_HEADINGS:
             return heading
@@ -241,16 +182,6 @@ def _project_title(workspace_root: Path) -> str:
         if heading and heading.strip().lower() not in _GENERIC_TITLE_HEADINGS:
             return heading
     return load_project_profile(workspace_root).project_slug
-
-
-def _module_names(workspace_root: Path) -> tuple[str, ...]:
-    raw = _project_constraint_scalar(workspace_root, "module_structure")
-    if "(" in raw and ")" in raw:
-        inner = raw[raw.find("(") + 1 : raw.rfind(")")]
-        modules = tuple(part.strip() for part in inner.split(",") if part.strip())
-        if modules:
-            return modules
-    return ("app-core",)
 
 
 def _software_project_mode(workspace_root: Path) -> bool:
@@ -295,8 +226,8 @@ def _module_identifier(module_name: str) -> str:
 
 def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
     profile = load_project_profile(workspace_root)
-    build_tool = _project_constraint_scalar(workspace_root, "tool") or "unspecified"
-    module_names = ", ".join(_module_names(workspace_root))
+    build_tool = profile.tool or "unspecified"
+    module_names = ", ".join(profile.declared_module_names())
     return (
         f"- project: `{_project_title(workspace_root)}`",
         f"- workspace: `{workspace_root.name}`",
@@ -311,11 +242,12 @@ def _governed_summary_lines(workspace_root: Path) -> tuple[str, ...]:
 
 
 def _module_boundary_lines(workspace_root: Path) -> tuple[str, ...]:
-    modules = _module_names(workspace_root)
+    profile = load_project_profile(workspace_root)
+    modules = profile.declared_module_names()
     if not modules:
         return ("- no declared module branches yet",)
     return tuple(
-        f"- `{module_name}`: governed module branch under `{load_project_profile(workspace_root).code_relative_path()}`"
+        f"- `{module_name}`: governed module branch under `{profile.code_relative_path()}`"
         for module_name in modules
     )
 
@@ -333,7 +265,7 @@ def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
     profile = load_project_profile(workspace_root)
     language = (profile.language or "").strip().lower()
     test_runner = (profile.test_runner or "").strip().lower()
-    build_tool = (_project_constraint_scalar(workspace_root, "tool") or "").strip().lower()
+    build_tool = (profile.tool or "").strip().lower()
     combined = " ".join(part for part in (language, test_runner, build_tool, profile.tenant_name.lower()) if part)
 
     default_family = "generic_test_harness"
@@ -413,13 +345,14 @@ def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
 
 
 def _planned_test_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
-    implementation_ids = tuple(sorted(implementation_claim_refs(workspace_root)))
+    index = build_requirement_traceability_index(workspace_root)
+    implementation_ids = tuple(sorted(index.implementation_refs))
     if implementation_ids:
         return implementation_ids
-    current_ids = tuple(sorted(current_requirement_refs(workspace_root)))
+    current_ids = tuple(sorted(index.current_refs))
     if current_ids:
         return current_ids
-    return tuple(sorted(planned_test_claim_refs(workspace_root)))
+    return tuple(sorted(index.planned_validation_refs))
 
 
 def _distributed_requirement_ids(requirement_ids: tuple[str, ...], modules: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
@@ -614,7 +547,7 @@ def _replace_generated_code_surface(
 
 def _planned_generated_test_files(workspace_root: Path) -> tuple[dict[str, object], ...]:
     stack = _selected_test_stack_defaults(workspace_root)
-    modules = _module_names(workspace_root)
+    modules = load_project_profile(workspace_root).declared_module_names()
     requirement_ids = _planned_test_requirement_ids(workspace_root)
     distributed = _distributed_requirement_ids(requirement_ids, modules)
     planned: list[dict[str, object]] = []
@@ -651,8 +584,8 @@ def _intent_authority_lines(workspace_root: Path) -> tuple[str, ...]:
 def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
     profile = load_project_profile(workspace_root)
     project_title = _project_title(workspace_root)
-    scala_version = _project_constraint_scalar(workspace_root, "version") or "2.13.12"
-    modules = _module_names(workspace_root)
+    scala_version = profile.version or "2.13.12"
+    modules = profile.declared_module_names()
     root_name = profile.project_slug.replace("_", "-")
 
     def module_project_block(module_name: str) -> str:
@@ -1061,7 +994,7 @@ def _construct_feature_decomp(workspace_root: Path) -> str:
 def _construct_uat_testcases(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
         profile = load_project_profile(workspace_root)
-        module_names = ", ".join(_module_names(workspace_root)) or "declared module branches"
+        module_names = ", ".join(load_project_profile(workspace_root).declared_module_names()) or "declared module branches"
         return "\n".join(
             (
                 "# Generated UAT Testcases",
@@ -1600,11 +1533,13 @@ def _construct_release(workspace_root: Path) -> str:
 
 
 def _construct_build_execution_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import classify_operational_binding
+
     release_surface = _asset_text(workspace_root, "release_surface")
     code_summary = summarize_code_surface(workspace_root)
     build_summary = _build_artifact_summary(workspace_root)
     project_profile = load_project_profile(workspace_root)
-    binding = _classify_operational_binding(project_profile.build_execution_contract or "")
+    binding = classify_operational_binding(project_profile.build_execution_contract or "")
     return "\n".join(
         (
             "# Generated Build Execution Surface",
@@ -1635,9 +1570,11 @@ def _construct_build_execution_surface(workspace_root: Path) -> str:
 
 
 def _construct_build_execution_result_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import latest_operational_dispatch
+
     build_execution_surface = _asset_text(workspace_root, "build_execution_surface")
     build_summary = _build_artifact_summary(workspace_root)
-    dispatch = _operational_dispatch_entry(workspace_root, "build")
+    dispatch = latest_operational_dispatch(workspace_root, "build")
     if dispatch.get("status") == "failed":
         status = "failed"
         saga_state = "failed"
@@ -1673,10 +1610,12 @@ def _construct_build_execution_result_surface(workspace_root: Path) -> str:
 
 
 def _construct_test_execution_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import classify_operational_binding
+
     release_surface = _asset_text(workspace_root, "release_surface")
     test_summary = summarize_test_evidence(workspace_root)
     project_profile = load_project_profile(workspace_root)
-    binding = _classify_operational_binding(project_profile.test_execution_contract or "")
+    binding = classify_operational_binding(project_profile.test_execution_contract or "")
     return "\n".join(
         (
             "# Generated Test Execution Surface",
@@ -1702,9 +1641,11 @@ def _construct_test_execution_surface(workspace_root: Path) -> str:
 
 
 def _construct_test_execution_result_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import latest_operational_dispatch
+
     test_execution_surface = _asset_text(workspace_root, "test_execution_surface")
     test_summary = summarize_test_evidence(workspace_root)
-    dispatch = _operational_dispatch_entry(workspace_root, "test")
+    dispatch = latest_operational_dispatch(workspace_root, "test")
     if dispatch.get("status") == "failed":
         status = "failed"
         saga_state = "failed"
@@ -1750,10 +1691,12 @@ def _construct_test_execution_result_surface(workspace_root: Path) -> str:
 
 
 def _construct_deployment_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import classify_operational_binding
+
     release_surface = _asset_text(workspace_root, "release_surface")
     project_profile = load_project_profile(workspace_root)
     test_execution_result = _optional_asset_text(workspace_root, "test_execution_result_surface")
-    binding = _classify_operational_binding(project_profile.deployment_contract or "")
+    binding = classify_operational_binding(project_profile.deployment_contract or "")
     return "\n".join(
         (
             "# Generated Deployment Surface",
@@ -1783,9 +1726,11 @@ def _construct_deployment_surface(workspace_root: Path) -> str:
 
 
 def _construct_deployment_result_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import latest_operational_dispatch
+
     deployment_surface = _asset_text(workspace_root, "deployment_surface")
     test_summary = summarize_test_evidence(workspace_root)
-    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    dispatch = latest_operational_dispatch(workspace_root, "deployment")
     if dispatch.get("status") == "failed":
         status = "failed"
         saga_state = "failed"
@@ -1821,8 +1766,10 @@ def _construct_deployment_result_surface(workspace_root: Path) -> str:
 
 
 def _construct_deployed_environment_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import latest_operational_dispatch
+
     deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
-    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    dispatch = latest_operational_dispatch(workspace_root, "deployment")
     if dispatch.get("status") == "failed":
         status = "deployment_failed"
     elif dispatch.get("status") == "succeeded":
@@ -1848,10 +1795,12 @@ def _construct_deployed_environment_surface(workspace_root: Path) -> str:
 
 
 def _construct_runtime_observation_surface(workspace_root: Path) -> str:
+    from .operational_dispatch import latest_operational_dispatch
+
     deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
-    dispatch = _operational_dispatch_entry(workspace_root, "deployment")
+    dispatch = latest_operational_dispatch(workspace_root, "deployment")
     if dispatch.get("status") == "failed":
         completion_state = "deployment_failed"
         observed_status = "failed"
@@ -1946,16 +1895,26 @@ def _construct_retrofit_plan_surface(workspace_root: Path) -> str:
 
 def _construct_test_design(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
+        planned_requirement_ids = _planned_test_requirement_ids(workspace_root)
+        requirement_lines = tuple(
+            f"- {requirement_id}: planned test-design coverage carried from governed implementation/test authority"
+            for requirement_id in planned_requirement_ids
+        ) or ("- no concrete REQ-* authority detected; generated test design cannot claim requirement closure",)
         return "\n".join(
             (
                 "# Generated Test Design",
                 "",
                 asset_marker("test_design_surface"),
                 "",
+                *_tag_lines("Validates", planned_requirement_ids),
+                "",
                 "## Governed Qualification Boundary",
                 "- qualification work is tied to the governed implementation branch, not a shadow proving subset",
                 "- archive and release projection must summarize evidence discovered under the active code root",
                 "- generated test files in the governed branch must carry `Validates:` tags for the requirements claimed by testcase authority",
+                "",
+                "## Planned Requirement Carry",
+                *requirement_lines,
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
@@ -2032,7 +1991,10 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
 def _construct_test_module_surface(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
         planned_requirement_ids = _planned_test_requirement_ids(workspace_root)
-        module_lines = tuple(f"- `{module_name}` test sources under the governed implementation branch" for module_name in _module_names(workspace_root))
+        module_lines = tuple(
+            f"- `{module_name}` test sources under the governed implementation branch"
+            for module_name in load_project_profile(workspace_root).declared_module_names()
+        )
         return "\n".join(
             (
                 "# Generated Test Modules",

@@ -10,7 +10,7 @@ The target project may be imported, partial, stale, or still underdefined.
 - workspace: `odd_sdlc`
 - project slug: `odd_sdlc`
 - platform: `python`
-- active runtime contract: `workspace://.odd_sdlc/release/genesis.yml`
+- installed runtime contract: `workspace://.genesis/odd_sdlc/release/genesis.yml`
 - normalization report: `workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
 - ambiguity register: `workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`
 - requirement closure register: `workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`
@@ -33,13 +33,13 @@ The target project may be imported, partial, stale, or still underdefined.
 - `workspace://.ai-workspace/runtime/odd_sdlc-workspace-normalization.json`
 - `workspace://.ai-workspace/runtime/odd_sdlc-ambiguity-register.json`
 - `workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`
-- `workspace://.odd_sdlc/release/genesis.yml`
+- `workspace://.genesis/odd_sdlc/release/genesis.yml`
 - `/Users/jim/src/apps/abiogenesis/docs/LLM_GTL_APP_BUILDER_GUIDE.md`
 
 ## 4. Start Here
 - inspect the current pipeline state with `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc gaps --scope workspace --workspace .`
 - advance odd_sdlc graph/worksite state with `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc start --scope workspace --target next --until converged --workspace .`
-- resolve published `graph_function:` and `asset:` targets through `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc query-domain --workspace .`, which publishes `start_target_catalog` and `asset_ownership_index`
+- resolve published `graph_function:` and `asset:` targets through `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc query-domain --workspace .`, which publishes `start_target_catalog`, `asset_ownership_index`, and the current `execution_contract_surface` projection when one has been admitted
 - deployment, runtime-return, and other side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`
 - major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite
 - unresolved live requirements remain active future pressure across iterations; inspect the requirement closure register before claiming completion on a partial wave

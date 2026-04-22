@@ -221,6 +221,9 @@ This keeps the reverse path stateful without making it ambient.
 This design keeps the top-level query contract stable while enriching the
 `gaps` payload.
 
+The `gaps` payload is a read model over the requirement-closure carrier and the
+canonical edge-gap projection boundary.
+
 The `gaps` projection must expose at least:
 
 - current analysis identity and freshness
@@ -230,6 +233,9 @@ The `gaps` projection must expose at least:
 - current constitutional proposal state where one is open
 
 This is a current-state read model.
+
+It must fail closed when the governing requirement-closure publication is
+missing or stale.
 
 It does not replace:
 

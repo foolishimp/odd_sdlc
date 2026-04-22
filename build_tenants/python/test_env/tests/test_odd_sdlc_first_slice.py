@@ -97,11 +97,15 @@ from odd_sdlc.execution_contract import (  # noqa: E402
     EXECUTION_CONTRACT_CONTEXT_PATH,
     EXECUTION_CONTRACT_KIND,
     EXECUTION_CONTRACT_REGISTER_PATH,
+    ExecutionContractSurfaceError,
     admit_execution_contract_surface,
+    bound_execution_start_from_contract,
+    execution_contract_payload,
 )
 from odd_sdlc.gap_dossier import (  # noqa: E402
     GAP_DOSSIER_CONTEXT_PATH,
     GAP_DOSSIER_REGISTER_PATH,
+    project_gap_dossier_input,
 )
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
@@ -110,12 +114,13 @@ from odd_sdlc.gtl_module import (  # noqa: E402
     RELEASE_OPERATIONAL_CYCLE_STEPS,
     module as odd_sdlc_module,
 )
+from odd_sdlc.query import query_domain  # noqa: E402
 import odd_sdlc.self_test as self_test_module  # noqa: E402
 from odd_sdlc.project_profile import load_project_profile  # noqa: E402
-from odd_sdlc.query import query_domain  # noqa: E402
 from odd_sdlc.repair_frontier import (  # noqa: E402
     REPAIR_FRONTIER_CONTEXT_PATH,
     REPAIR_FRONTIER_REGISTER_PATH,
+    build_repair_frontier_prompt_context,
 )
 from odd_sdlc.runtime_contexts import (  # noqa: E402
     REALIZATION_DEEPENING_CONTEXT_PATH,
@@ -124,10 +129,12 @@ from odd_sdlc.runtime_contexts import (  # noqa: E402
 )
 from odd_sdlc.self_test import self_test  # noqa: E402
 import odd_sdlc.span_analysis as span_analysis_module  # noqa: E402
-from odd_sdlc.traceability import (  # noqa: E402
+from odd_sdlc.requirement_closure import (  # noqa: E402
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    build_requirement_closure_prompt_context,
+    build_requirement_closure_register,
     declared_requirement_edge_gap,
-    load_or_build_requirement_closure_register,
+    load_requirement_closure_register_read_model,
 )
 from odd_sdlc.triage import CURRENT_TRIAGE_DIR, enrich_gap_snapshot, load_current_edge_triage  # noqa: E402
 from odd_sdlc.workspace_assets import (  # noqa: E402
@@ -800,12 +807,13 @@ def test_code_edge_prompt_includes_realization_deepening_context(tmp_path: Path)
         ),
     )
 
-    prompt = _assemble_prompt(
+    prompt_assembly = _assemble_prompt(
         pre,
         code_job,
         result_path=".ai-workspace/fp_results/mock.json",
         workspace_root=tmp_path,
     )
+    prompt = prompt_assembly.prompt
 
     assert "This edge works over an existing realization or realization plan, not a blank slate." in prompt
     assert "# odd_sdlc Deterministic Repair Frontier" in prompt
@@ -879,13 +887,14 @@ def test_probabilistic_prompt_uses_published_generated_asset_contract_for_target
         ),
     )
 
-    prompt = _assemble_prompt(
+    prompt_assembly = _assemble_prompt(
         pre,
         job,
         result_path=".ai-workspace/fp_results/mock.json",
         workspace_root=tmp_path,
         target_binding=target_binding,
     )
+    prompt = prompt_assembly.prompt
 
     assert "[GENERATED ASSET CONTRACT]" in prompt
     assert asset_marker("test_module_surface") in prompt
@@ -934,7 +943,7 @@ def test_feature_decomp_declared_requirement_gap_uses_requirement_edge_ledger(tm
     gap = declared_requirement_edge_gap(
         tmp_path,
         {
-            "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+            "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
             "obligation_source_ref": "requirement_surface",
             "obligation_source_kind": "requirement_surface",
             "obligation_source_admission_basis": "authority_or_current_surface",
@@ -1040,6 +1049,9 @@ def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path
 
     assert payload["ambiguity_register"]["register_kind"] == "odd_sdlc.ambiguity_register"
     assert payload["requirement_closure_register"]["register_kind"] == "odd_sdlc.requirement_closure_register"
+    assert payload["requirement_closure_register"]["published"] is False
+    assert payload["requirement_closure_register"]["unavailable_reason"] == "workspace_state_unpublished"
+    assert payload["requirement_closure_register"]["requirements"] == []
     assert payload["gap_dossier"]["analysis_current"] is False
     assert payload["gap_dossier"]["analysis_manifest"] is None
     assert payload["gap_dossier"]["dossiers"][0]["triage"]["process_outcome_kind"] == "blocked_stale_analysis"
@@ -1050,7 +1062,7 @@ def test_query_domain_is_read_only_when_analysis_has_not_been_published(tmp_path
     assert not (tmp_path / REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH).exists()
 
 
-def test_query_domain_publishes_triaged_work_item_assets_without_pre_admission_route_contract(
+def test_query_domain_publishes_triaged_work_item_assets_with_published_route_contract(
     tmp_path: Path,
 ) -> None:
     _seed_workspace(tmp_path)
@@ -1065,7 +1077,8 @@ def test_query_domain_publishes_triaged_work_item_assets_without_pre_admission_r
 
     asset_ownership = {entry["handle"]: entry for entry in payload["asset_ownership_index"]}
     assert asset_ownership["ticket/B-900"]["operator_target"]["handle"] == "bootstrap_release_self_test"
-    assert "route_contract" not in asset_ownership["ticket/B-900"]
+    assert asset_ownership["ticket/B-900"]["route_contract"]["reentry_vector"] == "derive_requirement_surface"
+    assert asset_ownership["ticket/B-900"]["route_contract"]["binding_source"] == "odd_sdlc.work_item_route_contract"
 
 
 def test_query_domain_keeps_backlog_ticket_visible_but_not_start_addressable(tmp_path: Path) -> None:
@@ -1156,31 +1169,28 @@ def test_start_uses_admitted_route_contract_for_diagnostic_override(
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
     calls: list[tuple[object, object]] = []
-    active_module = app.scope(selector=app_module._parse_scope_selector("workspace")).module
+    active_module = app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).module
     bootstrap_target_id = next(
         graph_function.id
         for graph_function in active_module.graph_functions
         if graph_function.name == "bootstrap_release_self_test"
     )
 
-    def _fake_admit_execution_contract_surface(**kwargs: object) -> dict[str, object]:
-        return {"status": "admitted"}
-
-    def _fake_bound_execution_start_from_contract(**kwargs: object) -> SimpleNamespace:
+    def _fake_admit_bound_execution_start(**kwargs: object) -> SimpleNamespace:
         return SimpleNamespace(
             scope=SimpleNamespace(
                 module=active_module,
-                workspace_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workspace_root,
-                selector=app.scope(selector=app_module._parse_scope_selector("workspace")).selector,
+                workspace_root=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).workspace_root,
+                selector=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).selector,
                 diagnostic_edge_override="derive_goal_surface",
-                build=app.scope(selector=app_module._parse_scope_selector("workspace")).build,
-                runtime_identity=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_identity,
-                worker=app.scope(selector=app_module._parse_scope_selector("workspace")).worker,
-                active_workflow_path=app.scope(selector=app_module._parse_scope_selector("workspace")).active_workflow_path,
-                workflow_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workflow_root,
-                work_key=app.scope(selector=app_module._parse_scope_selector("workspace")).work_key,
-                run_id=app.scope(selector=app_module._parse_scope_selector("workspace")).run_id,
-                runtime_config=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_config,
+                build=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).build,
+                runtime_identity=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).runtime_identity,
+                worker=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).worker,
+                active_workflow_path=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).active_workflow_path,
+                workflow_root=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).workflow_root,
+                work_key=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).work_key,
+                run_id=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).run_id,
+                runtime_config=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).runtime_config,
             ),
             target=SimpleNamespace(
                 kind="asset",
@@ -1201,16 +1211,7 @@ def test_start_uses_admitted_route_contract_for_diagnostic_override(
         calls.append((intent, stream))
         return {"status": "ok"}
 
-    monkeypatch.setattr(
-        app_module,
-        "admit_execution_contract_surface",
-        _fake_admit_execution_contract_surface,
-    )
-    monkeypatch.setattr(
-        app_module,
-        "bound_execution_start_from_contract",
-        _fake_bound_execution_start_from_contract,
-    )
+    monkeypatch.setattr(app_module, "admit_bound_execution_start", _fake_admit_bound_execution_start)
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
 
     result = start(
@@ -1235,31 +1236,28 @@ def test_start_uses_admitted_target_truth_for_start_intent(
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
     calls: list[tuple[object, object]] = []
-    active_module = app.scope(selector=app_module._parse_scope_selector("workspace")).module
+    active_module = app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).module
     bootstrap_target_id = next(
         graph_function.id
         for graph_function in active_module.graph_functions
         if graph_function.name == "bootstrap_release_self_test"
     )
 
-    def _fake_admit_execution_contract_surface(**kwargs: object) -> dict[str, object]:
-        return {"status": "admitted"}
-
-    def _fake_bound_execution_start_from_contract(**kwargs: object) -> SimpleNamespace:
+    def _fake_admit_bound_execution_start(**kwargs: object) -> SimpleNamespace:
         return SimpleNamespace(
             scope=SimpleNamespace(
                 module=active_module,
-                workspace_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workspace_root,
-                selector=app.scope(selector=app_module._parse_scope_selector("workspace")).selector,
+                workspace_root=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).workspace_root,
+                selector=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).selector,
                 diagnostic_edge_override="derive_requirement_surface",
-                build=app.scope(selector=app_module._parse_scope_selector("workspace")).build,
-                runtime_identity=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_identity,
-                worker=app.scope(selector=app_module._parse_scope_selector("workspace")).worker,
-                active_workflow_path=app.scope(selector=app_module._parse_scope_selector("workspace")).active_workflow_path,
-                workflow_root=app.scope(selector=app_module._parse_scope_selector("workspace")).workflow_root,
-                work_key=app.scope(selector=app_module._parse_scope_selector("workspace")).work_key,
-                run_id=app.scope(selector=app_module._parse_scope_selector("workspace")).run_id,
-                runtime_config=app.scope(selector=app_module._parse_scope_selector("workspace")).runtime_config,
+                build=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).build,
+                runtime_identity=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).runtime_identity,
+                worker=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).worker,
+                active_workflow_path=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).active_workflow_path,
+                workflow_root=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).workflow_root,
+                work_key=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).work_key,
+                run_id=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).run_id,
+                runtime_config=app.scope(selector=span_analysis_module.parse_gap_scope_selector("workspace")).runtime_config,
             ),
             target=SimpleNamespace(
                 kind="asset",
@@ -1280,16 +1278,7 @@ def test_start_uses_admitted_target_truth_for_start_intent(
         calls.append((intent, stream))
         return {"status": "ok"}
 
-    monkeypatch.setattr(
-        app_module,
-        "admit_execution_contract_surface",
-        _fake_admit_execution_contract_surface,
-    )
-    monkeypatch.setattr(
-        app_module,
-        "bound_execution_start_from_contract",
-        _fake_bound_execution_start_from_contract,
-    )
+    monkeypatch.setattr(app_module, "admit_bound_execution_start", _fake_admit_bound_execution_start)
     monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
 
     result = start(
@@ -1330,6 +1319,21 @@ def test_start_rejects_backlog_ticket_asset_handle(tmp_path: Path) -> None:
             app,
             scope="workspace",
             target="asset:ticket/B-902",
+            until="first_traversal",
+        )
+
+
+def test_start_rejects_ticket_asset_without_published_route_contract(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    _seed_ticket_work_item(tmp_path, ticket_id="B-906", re_entry_point="unknown_surface")
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    with pytest.raises(ValueError, match="unknown or non-start-addressable published asset handle"):
+        start(
+            app,
+            scope="workspace",
+            target="asset:ticket/B-906",
             until="first_traversal",
         )
 
@@ -1397,6 +1401,20 @@ def test_ticket_asset_start_carries_ticket_execution_context_into_manifest_promp
     assert execution_contract["route_contract"]["reentry_vector"] == "derive_intent_surface"
     assert "# Admitted Execution Contract" in manifest["prompt"]
     assert "contract_id: " in manifest["prompt"]
+    catalog_payload = catalog(app)
+    assert catalog_payload["execution_contract_surface"]["contract_id"] == execution_contract["contract_id"]
+    assert catalog_payload["execution_contract_surface"]["target_truth"]["handle"] == "ticket/B-901"
+    query_payload = query_domain(app)
+    assert query_payload["execution_contract_surface"]["contract_id"] == execution_contract["contract_id"]
+    gap_payload = gaps(app, scope="workspace")
+    assert gap_payload["execution_contract_surface"]["contract_id"] == execution_contract["contract_id"]
+    dossier_register = json.loads(
+        (tmp_path / GAP_DOSSIER_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert dossier_register["execution_contract_surface"]["contract_id"] == execution_contract["contract_id"]
+    dossier_context = (tmp_path / GAP_DOSSIER_CONTEXT_PATH).read_text(encoding="utf-8")
+    assert "## Execution Contract" in dossier_context
+    assert execution_contract["contract_id"] in dossier_context
 
 
 def test_raw_gen_start_without_admitted_execution_contract_fails_closed(tmp_path: Path) -> None:
@@ -1411,6 +1429,89 @@ def test_raw_gen_start_without_admitted_execution_contract_fails_closed(tmp_path
 
     with pytest.raises(FileNotFoundError, match="odd_sdlc_execution_contract_context"):
         app_module.gen_start(intent, app.stream)
+
+
+def test_ordinary_asset_target_uses_operator_execution_contract(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    module = odd_sdlc_module(tmp_path)
+
+    contract = admit_execution_contract_surface(
+        workspace_root=tmp_path,
+        module=module,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        work_key=None,
+        run_id=None,
+        normalized_scope="workspace",
+        raw_target="asset:reviewed_design_surface",
+        until="first_traversal",
+    )
+    contract_payload = contract.to_dict()
+
+    assert contract_payload["status"] == "admitted"
+    assert contract_payload["source_kind"] == "operator_request"
+    assert contract_payload["ticket_category"] == "ordinary"
+    assert "ticket_id" not in contract_payload
+    assert contract_payload["target_truth"]["handle"] == "reviewed_design_surface"
+    assert contract_payload["target_truth"]["asset_id"] == "reviewed_design_surface"
+    assert contract_payload["target_truth"]["asset_relative_path"].endswith(
+        "/design/35-reviewed-odd-design.md"
+    )
+    assert contract_payload["target_truth"]["asset_path_kind"] == "missing"
+    assert contract_payload["target_truth"]["asset_exists"] is False
+
+
+def test_bound_execution_start_rejects_open_dict_execution_contract_payload(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    contract = admit_execution_contract_surface(
+        workspace_root=tmp_path,
+        module=odd_sdlc_module(tmp_path),
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        work_key=None,
+        run_id=None,
+        normalized_scope="workspace",
+        raw_target="asset:reviewed_design_surface",
+        until="first_traversal",
+    )
+
+    with pytest.raises(TypeError, match="AdmittedExecutionContract carrier"):
+        bound_execution_start_from_contract(
+            scope=app.scope(),
+            execution_contract=execution_contract_payload(contract),
+        )
+
+
+def test_downstream_consumers_reject_corrupt_execution_contract_surface(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    refresh_analysis(tmp_path, stage="test")
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    register_path = tmp_path / EXECUTION_CONTRACT_REGISTER_PATH
+    register_path.parent.mkdir(parents=True, exist_ok=True)
+    register_path.write_text(
+        json.dumps(
+            {
+                "contract_kind": EXECUTION_CONTRACT_KIND,
+                "carrier_shape": "typed_execution_contract_carrier.v1",
+                "contract_id": "execution_contract/corrupt",
+                "source_kind": "operator_request",
+                "status": "drafted",
+                "target_truth": {"kind": "next"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ExecutionContractSurfaceError, match="status is not admitted"):
+        catalog(app)
+    with pytest.raises(ExecutionContractSurfaceError, match="status is not admitted"):
+        query_domain(app)
+    with pytest.raises(ExecutionContractSurfaceError, match="status is not admitted"):
+        gaps(app, scope="workspace")
 
 
 def test_new_execution_contract_supersedes_previous_admitted_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1487,9 +1588,123 @@ def test_published_analysis_invalidates_when_requirement_surface_changes(tmp_pat
     ready_after, _ = workspace_state_ready(tmp_path)
     assert ready_after is False
 
-    register = load_or_build_requirement_closure_register(tmp_path)
-    entries = {entry["requirement_id"] for entry in register["requirements"]}
+    register = load_requirement_closure_register_read_model(tmp_path)
+    assert register["published"] is False
+    assert register["unavailable_reason"] == "published_analysis_stale"
+
+    rebuilt = build_requirement_closure_register(tmp_path, stage="workspace_scan")
+    entries = {entry["requirement_id"] for entry in rebuilt["requirements"]}
     assert {"REQ-DEMO-001", "REQ-DEMO-002"} <= entries
+
+
+def test_requirement_closure_prompt_context_requires_explicit_register(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+
+    with pytest.raises(TypeError):
+        build_requirement_closure_prompt_context(tmp_path)  # type: ignore[call-arg]
+
+
+def test_repair_frontier_prompt_context_requires_explicit_frontier(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+
+    with pytest.raises(TypeError):
+        build_repair_frontier_prompt_context(tmp_path)  # type: ignore[call-arg]
+
+
+def test_span_analysis_projects_typed_canonical_gap_carriers() -> None:
+    raw_graph_gaps = span_analysis_module.project_raw_graph_gap_rows(
+        [
+            {
+                "edge": "derive_requirement_surface",
+                "delta": 0.5,
+                "failing": ["requirement_scope_complete"],
+                "passing": [],
+                "blocking_reasons": [],
+            }
+        ]
+    )
+    declared_gaps = span_analysis_module.project_declared_obligation_gap_rows(
+        [
+            {
+                "edge": "derive_code_surface",
+                "carry_delta": 0.25,
+                "fulfillment_delta": 0.5,
+                "combined_delta": 0.75,
+                "carry_converged": False,
+                "fulfillment_converged": False,
+                "edge_converged": False,
+                "blocking_reasons": ["missing_planned_test_coverage"],
+                "expected_count": 2,
+                "carried_count": 1,
+                "fulfilled_count": 0,
+                "partial_count": 1,
+                "missing_count": 1,
+                "extra_count": 0,
+                "unfulfilled_count": 1,
+                "blocking_count": 1,
+                "signal_key": "derive_code_surface",
+            }
+        ]
+    )
+
+    canonical = span_analysis_module.canonical_edge_gaps(
+        edge_names=["derive_requirement_surface", "derive_code_surface"],
+        raw_graph_gaps=raw_graph_gaps,
+        ledger_gaps=declared_gaps,
+    )
+
+    assert isinstance(canonical[0], span_analysis_module.GraphEdgeGapProjection)
+    assert isinstance(canonical[1], span_analysis_module.DeclaredObligationEdgeGapProjection)
+    assert canonical[0].to_dict()["gap_kind"] == "graph_edge_gap"
+    assert canonical[1].to_dict()["gap_kind"] == "declared_obligation_edge_gap"
+
+    summary = span_analysis_module.aggregate_edge_gap_truth(canonical)
+    assert summary.graph_edge_gap_count == 1
+    assert summary.declared_obligation_gap_count == 1
+
+
+def test_gap_dossier_projects_typed_input_from_canonical_gap_carriers() -> None:
+    raw_graph_gaps = span_analysis_module.project_raw_graph_gap_rows(
+        [
+            {
+                "edge": "derive_requirement_surface",
+                "delta": 1.0,
+                "failing": ["requirement_scope_complete"],
+                "passing": [],
+                "blocking_reasons": ["missing_requirement_surface"],
+                "observation": {"observed_signal": "unresolved_gap_pressure"},
+                "triage": {"process_outcome_kind": "blocked_stale_analysis"},
+                "route_binding": {"state": "blocked_stale_analysis"},
+                "current_work_key": "work::demo",
+            }
+        ]
+    )
+    canonical = span_analysis_module.canonical_edge_gaps(
+        edge_names=["derive_requirement_surface"],
+        raw_graph_gaps=raw_graph_gaps,
+        ledger_gaps=[],
+    )
+    summary = span_analysis_module.aggregate_edge_gap_truth(canonical)
+
+    projected = project_gap_dossier_input(
+        gap_payload={
+            "scope": "workspace",
+            "jobs_considered": 1,
+            "open_frames": 0,
+            "analysis_current": False,
+            "analysis_fingerprint": "fp::demo",
+        },
+        canonical_gaps=canonical,
+        summary=summary,
+    )
+
+    assert projected.scope == "workspace"
+    assert projected.analysis_current is False
+    assert projected.summary.graph_edge_gap_count == 1
+    assert len(projected.rows) == 1
+    assert isinstance(projected.rows[0].gap_truth, span_analysis_module.GraphEdgeGapProjection)
+    assert projected.rows[0].triage["process_outcome_kind"] == "blocked_stale_analysis"
+    assert projected.rows[0].route_binding["state"] == "blocked_stale_analysis"
 
 
 def test_start_requires_explicit_refresh_when_published_analysis_is_stale(
@@ -1643,6 +1858,26 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     assert triage_event["correlation_id"] == observation_event["event_id"]
     assert route_event["correlation_id"] == triage_event["event_id"]
     assert observation_event["data"]["run_id"].startswith("gap_snapshot::")
+
+
+def test_gaps_fail_closed_when_declared_obligation_carrier_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    def _fail_declared_gap_projection(*_args, **_kwargs):
+        raise RuntimeError("declared obligation carrier unavailable")
+
+    monkeypatch.setattr(
+        app_module,
+        "collect_declared_obligation_gaps",
+        _fail_declared_gap_projection,
+    )
+
+    with pytest.raises(RuntimeError, match="declared obligation carrier unavailable"):
+        gaps(app)
 
 
 def test_gaps_can_analyze_a_bounded_span_with_dependent_proof_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -1978,8 +2213,62 @@ def test_bootstrap_strips_self_query_binding_contracts_from_runtime_config(tmp_p
 
     assert config.runtime_config["domain_package"] == "odd_sdlc"
     assert config.runtime_config["transport_contract"] == ".genesis/odd_sdlc/release/test_transport_contract.json"
-    assert "asset_binding_contract" not in config.runtime_config
+    assert config.runtime_config["asset_binding_contract"]["command"] == [
+        "python",
+        "-m",
+        "odd_sdlc",
+        "query-assets",
+        "--workspace",
+        ".",
+    ]
     assert "operator_asset_contract" not in config.runtime_config
+
+
+def test_source_bootstrap_publishes_explicit_query_assets_contract(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+
+    config = bootstrap(workspace_root=tmp_path)
+
+    assert config.runtime_config["domain_package"] == "odd_sdlc"
+    assert config.runtime_config["asset_binding_contract"]["command"] == [
+        "python",
+        "-m",
+        "odd_sdlc",
+        "query-assets",
+        "--workspace",
+        ".",
+    ]
+
+
+def test_bootstrap_preserves_lightweight_asset_binding_contract(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    runtime_contract = tmp_path / ".genesis" / "odd_sdlc" / "release" / "genesis.yml"
+    runtime_contract.parent.mkdir(parents=True, exist_ok=True)
+    runtime_contract.write_text(
+        "\n".join(
+            (
+                'domain_package: odd_sdlc',
+                'asset_binding_contract: {"command":["python","-m","odd_sdlc","query-assets","--workspace","."]}',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".genesis" / "genesis.yml").write_text(
+        "runtime_contract: .genesis/odd_sdlc/release/genesis.yml\n",
+        encoding="utf-8",
+    )
+
+    config = bootstrap(workspace_root=tmp_path)
+
+    assert config.runtime_config["asset_binding_contract"]["command"] == [
+        "python",
+        "-m",
+        "odd_sdlc",
+        "query-assets",
+        "--workspace",
+        ".",
+    ]
 
 
 def test_missing_capability_is_projected_as_blocked_missing_capability(tmp_path: Path) -> None:
@@ -2896,6 +3185,7 @@ def test_observe_exposes_ui_steel_thread_payload(tmp_path: Path) -> None:
         "collections",
         "continuations",
         "edge_contracts",
+        "execution_contract_surface",
         "functions",
         "gap_dossier",
         "graph_calls",
@@ -2972,6 +3262,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "bindings",
         "collections",
         "edge_contracts",
+        "execution_contract_surface",
         "functions",
         "gap_dossier",
         "graph_functions",
@@ -2987,7 +3278,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     ]
     assert payload["query_contract"] == {
         "name": "odd_sdlc.query-domain",
-        "version": "v15",
+        "version": "v16",
         "top_level_keys": [
             "query_contract",
             "workspace_root",
@@ -3003,6 +3294,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
             "collections",
             "functions",
             "edge_contracts",
+            "execution_contract_surface",
             "programs",
             "work_act_types",
             "jobs",
@@ -3115,7 +3407,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     bootstrap_vectors = {vector["name"]: vector for vector in graph_functions["bootstrap_release_self_test"]["vectors"]}
     assert bootstrap_vectors["derive_feature_decomp_surface"]["obligation_ledger"] == {
         "signal_key": "derive_feature_decomp_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3127,7 +3419,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     }
     assert bootstrap_vectors["derive_uat_testcases_surface"]["obligation_ledger"] == {
         "signal_key": "derive_uat_testcases_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3139,7 +3431,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     }
     assert bootstrap_vectors["derive_design_surface"]["obligation_ledger"] == {
         "signal_key": "derive_design_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3151,7 +3443,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     }
     assert bootstrap_vectors["derive_scenario_surface"]["obligation_ledger"] == {
         "signal_key": "derive_scenario_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3190,7 +3482,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     ]
     assert bootstrap_vectors["derive_code_surface"]["obligation_ledger"] == {
         "signal_key": "derive_code_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3202,7 +3494,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     }
     assert bootstrap_vectors["derive_implementation_design_surface"]["obligation_ledger"] == {
         "signal_key": "derive_implementation_design_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3214,7 +3506,7 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
     }
     assert bootstrap_vectors["derive_test_design_surface"]["obligation_ledger"] == {
         "signal_key": "derive_test_design_surface",
-        "adapter_ref": "odd_sdlc.traceability:declared_requirement_edge_gap",
+        "adapter_ref": "odd_sdlc.requirement_closure:declared_requirement_edge_gap",
         "obligation_source_ref": "requirement_surface",
         "obligation_source_kind": "requirement_surface",
         "obligation_source_admission_basis": "authority_or_current_surface",
@@ -3246,6 +3538,56 @@ def test_query_domain_exposes_domain_views_without_runtime_duplication(tmp_path:
         "derive_consensus_decision_surface",
         "derive_reviewed_design_surface",
     ]
+
+
+def test_t021_gap_support_helpers_have_one_authoritative_owner() -> None:
+    app_source = (CODE_PATH / "odd_sdlc" / "app.py").read_text(encoding="utf-8")
+    analysis_source = (CODE_PATH / "odd_sdlc" / "analysis.py").read_text(encoding="utf-8")
+    span_source = (CODE_PATH / "odd_sdlc" / "span_analysis.py").read_text(encoding="utf-8")
+    constructor_source = (CODE_PATH / "odd_sdlc" / "constructor.py").read_text(encoding="utf-8")
+    execution_contract_source = (CODE_PATH / "odd_sdlc" / "execution_contract.py").read_text(encoding="utf-8")
+    gap_dossier_source = (CODE_PATH / "odd_sdlc" / "gap_dossier.py").read_text(encoding="utf-8")
+    normalization_source = (CODE_PATH / "odd_sdlc" / "normalization.py").read_text(encoding="utf-8")
+    operational_dispatch_source = (CODE_PATH / "odd_sdlc" / "operational_dispatch.py").read_text(encoding="utf-8")
+    publication_io_source = (CODE_PATH / "odd_sdlc" / "publication_io.py").read_text(encoding="utf-8")
+    project_profile_source = (CODE_PATH / "odd_sdlc" / "project_profile.py").read_text(encoding="utf-8")
+    traceability_index_source = (CODE_PATH / "odd_sdlc" / "traceability_index.py").read_text(encoding="utf-8")
+
+    assert "def _parse_scope_selector" not in app_source
+    assert "def _declared_obligation_specs" not in app_source
+    assert "def _capability_gap_entries" not in app_source
+
+    assert "def parse_gap_scope_selector" in span_source
+    assert "def declared_obligation_specs" in span_source
+    assert "def capability_gap_entries" in span_source
+
+    assert "def _strip_quotes" not in constructor_source
+    assert "def _project_constraints_path" not in constructor_source
+    assert "def _project_constraint_scalar" not in constructor_source
+    assert "def _module_names" not in constructor_source
+    assert "def _classify_operational_binding" not in constructor_source
+    assert "def _load_operational_dispatch_register" not in constructor_source
+    assert "_OPERATIONAL_DISPATCH_REGISTER_PATH" not in constructor_source
+    assert "from .operational_dispatch import classify_operational_binding" in constructor_source
+    assert "from .operational_dispatch import latest_operational_dispatch" in constructor_source
+    assert "def _write_json_if_changed" not in analysis_source
+    assert "def _write_text_if_changed" not in analysis_source
+    assert "def _write_json_if_changed" not in gap_dossier_source
+    assert "def _write_text_if_changed" not in gap_dossier_source
+    assert "def _write_if_changed" not in execution_contract_source
+    assert "def _workspace_mode" not in analysis_source
+    assert "def _workspace_mode" not in traceability_index_source
+    assert "def default_project_slug" not in normalization_source
+
+    assert "def strip_scalar_quotes" in project_profile_source
+    assert "def default_project_slug" in project_profile_source
+    assert "def declared_module_names" in project_profile_source
+    assert "def resolve_workspace_mode" in project_profile_source
+    assert "def classify_operational_binding" in operational_dispatch_source
+    assert "def load_operational_dispatch_register" in operational_dispatch_source
+    assert "def latest_operational_dispatch" in operational_dispatch_source
+    assert "def write_json_if_changed" in publication_io_source
+    assert "def write_text_if_changed" in publication_io_source
 
 
 def test_start_runs_through_declared_entry_and_emits_abg_facts(tmp_path: Path) -> None:
