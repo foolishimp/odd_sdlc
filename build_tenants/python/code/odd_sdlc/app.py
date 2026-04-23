@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal, Mapping, TypeGuard, cast
 
 from genesis.binding import Worker
 from genesis.cli_adapter import (
@@ -20,11 +20,17 @@ from genesis.events import EventStream
 from genesis.identity import RuntimeIdentity
 from genesis.install import workspace_bootstrap
 from genesis.services import Scope, ScopeSelector, StartIntent, StartTarget, gen_gaps, gen_iterate, gen_start
+from gtl.module_model import Module
 
 from .analysis import ensure_workspace_ready, refresh_analysis
 from .asset_types import ASSET_TYPES, SEMANTIC_FACETS
 from .ambiguity import load_or_build_ambiguity_register
-from .execution_contract import admit_bound_execution_start, load_admitted_execution_contract_projection
+from .domain_model import ExecutiveProgramEntryPayload
+from .execution_contract import (
+    BoundExecutionStart,
+    admit_bound_execution_start,
+    load_admitted_execution_contract_projection,
+)
 from .function_catalog import FUNCTION_CATALOG
 from .gap_dossier import (
     PublicNextStartBlock,
@@ -53,6 +59,12 @@ from .public_start import (
 )
 from .project_profile import load_or_build_operational_capability_projection
 from .program_catalog import PROGRAM_CATALOG
+from .public_start_contract import (
+    GapDossierReadModel,
+    PendingConstitutionalStartResult,
+    PublicStartBlockedPayload,
+    PublicStartResultPayload,
+)
 from .runtime_contract import query_assets_binding_contract
 from .software_domain_catalog import ASSET_FAMILIES, EDGE_CONTRACTS, WORK_ACT_TYPES
 from .span_analysis import (
@@ -72,30 +84,42 @@ from .start_targeting import (
 )
 from .requirement_closure import collect_declared_obligation_gaps
 from .runtime_effects import publish_runtime_event
+from .runtime_event_contract import admit_runtime_event_payload
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
 
 
 SOURCE_CODE_ROOT = Path(__file__).resolve().parents[1]
+ABIOGENESIS_SOURCE_CODE_ROOT = (
+    Path(__file__).resolve().parents[5]
+    / "abiogenesis"
+    / "build_tenants"
+    / "abiogenesis"
+    / "python"
+    / "code"
+)
+
+
+RuntimeConfig = dict[str, object]
 
 
 @dataclass(frozen=True)
 class AppConfig:
     workspace_root: Path
-    runtime_config: dict[str, Any] = field(default_factory=dict)
+    runtime_config: RuntimeConfig = field(default_factory=dict)
     build: str | None = None
     runtime_identity: RuntimeIdentity | None = None
-    domain_module: Any | None = None
+    domain_module: Module | None = None
 
 
-def _app_module(config: AppConfig):
+def _app_module(config: AppConfig) -> Module:
     return config.domain_module or odd_sdlc_module(config.workspace_root)
 
 
-def _parse_yaml_config(config_path: Path) -> dict[str, Any]:
+def _parse_yaml_config(config_path: Path) -> RuntimeConfig:
     if not config_path.exists():
         return {}
-    config: dict[str, Any] = {}
+    config: RuntimeConfig = {}
     current_list_key: str | None = None
     for line in config_path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
@@ -103,8 +127,10 @@ def _parse_yaml_config(config_path: Path) -> dict[str, Any]:
             current_list_key = None
             continue
         if current_list_key is not None and stripped.startswith("- "):
-            config[current_list_key].append(stripped[2:].strip())
-            continue
+            current_value = config.get(current_list_key)
+            if isinstance(current_value, list):
+                current_value.append(stripped[2:].strip())
+                continue
         current_list_key = None
         if ":" not in stripped:
             continue
@@ -125,7 +151,7 @@ def _parse_yaml_config(config_path: Path) -> dict[str, Any]:
     return config
 
 
-def _load_runtime_config(workspace_root: Path) -> dict[str, Any]:
+def _load_runtime_config(workspace_root: Path) -> RuntimeConfig:
     kernel_config = _parse_yaml_config(workspace_root / ".genesis" / "genesis.yml")
     contract_ref = kernel_config.get("runtime_contract")
     if isinstance(contract_ref, str) and contract_ref.strip():
@@ -142,7 +168,7 @@ _SELF_QUERY_BINDING_CONTRACT_KEYS = frozenset(
 )
 
 
-def _asset_binding_contract_invokes_query_domain(value: Any) -> bool:
+def _asset_binding_contract_invokes_query_domain(value: object) -> bool:
     contract = value
     if isinstance(contract, str):
         try:
@@ -159,7 +185,9 @@ def _asset_binding_contract_invokes_query_domain(value: Any) -> bool:
     return False
 
 
-def _sanitize_runtime_config_for_domain_commands(config: dict[str, Any]) -> dict[str, Any]:
+def _sanitize_runtime_config_for_domain_commands(
+    config: Mapping[str, object],
+) -> RuntimeConfig:
     """
     Drop self-query binding contracts from local odd_sdlc command authority.
 
@@ -168,7 +196,7 @@ def _sanitize_runtime_config_for_domain_commands(config: dict[str, Any]) -> dict
     local domain commands consume their own query surface as runtime authority and
     can recurse through `odd_sdlc query-domain` during binding.
     """
-    sanitized = dict(config)
+    sanitized: RuntimeConfig = {str(key): value for key, value in config.items()}
     for key in _SELF_QUERY_BINDING_CONTRACT_KEYS:
         sanitized.pop(key, None)
     if _asset_binding_contract_invokes_query_domain(sanitized.get("asset_binding_contract")):
@@ -176,19 +204,37 @@ def _sanitize_runtime_config_for_domain_commands(config: dict[str, Any]) -> dict
     return sanitized
 
 
+def _runtime_config_string(config: Mapping[str, object], key: str) -> str | None:
+    value = config.get(key)
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
 def _published_operational_capabilities(workspace_root: Path) -> dict[str, object]:
-    return load_or_build_operational_capability_projection(workspace_root)
+    payload = load_or_build_operational_capability_projection(workspace_root)
+    if not isinstance(payload, Mapping):
+        raise RuntimeError("operational capability projection returned a non-mapping payload")
+    return {str(key): value for key, value in payload.items()}
+
+
+def _mapping_result(payload: object, *, context: str) -> dict[str, object]:
+    if not isinstance(payload, Mapping):
+        raise RuntimeError(f"{context} returned a non-mapping payload")
+    return {str(key): value for key, value in payload.items()}
 
 
 def _augment_raw_gap_payload_with_capability_truth(
     workspace_root: Path,
-    raw_gap_payload: dict[str, Any],
+    raw_gap_payload: dict[str, object],
     *,
     edge_names: list[str] | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
+    raw_gaps = raw_gap_payload.get("gaps")
+    gap_rows = raw_gaps if isinstance(raw_gaps, (list, tuple)) else ()
     augmented_gaps = [
         dict(gap)
-        for gap in raw_gap_payload.get("gaps", ())
+        for gap in gap_rows
         if isinstance(gap, dict)
     ]
     seen_edges = {str(gap.get("edge") or "") for gap in augmented_gaps}
@@ -221,18 +267,24 @@ class OddSdlcApp:
             worker=self.worker,
             runtime_identity=self.config.runtime_identity,
             runtime_config=self.config.runtime_config,
-            active_workflow_path=self.config.runtime_config.get("active_workflow"),
-            workflow_root=self.config.runtime_config.get("workflow_root"),
+            active_workflow_path=_runtime_config_string(
+                self.config.runtime_config,
+                "active_workflow",
+            ),
+            workflow_root=_runtime_config_string(
+                self.config.runtime_config,
+                "workflow_root",
+            ),
         )
 
 
 def bootstrap(
     *,
     workspace_root: str | Path = ".",
-    runtime_config: dict[str, Any] | None = None,
+    runtime_config: Mapping[str, object] | None = None,
     build: str | None = None,
     runtime_identity: RuntimeIdentity | None = None,
-    domain_module: Any | None = None,
+    domain_module: Module | None = None,
 ) -> AppConfig:
     workspace_root = Path(workspace_root).resolve()
     bound_domain_module = domain_module or odd_sdlc_module(workspace_root)
@@ -245,9 +297,15 @@ def bootstrap(
         }
     )
     if not merged_runtime_config.get("asset_binding_contract"):
-        merged_runtime_config["asset_binding_contract"] = query_assets_binding_contract()
+        merged_runtime_config["asset_binding_contract"] = _mapping_result(
+            query_assets_binding_contract(),
+            context="query_assets_binding_contract",
+        )
     if not merged_runtime_config.get("pythonpath"):
-        merged_runtime_config["pythonpath"] = [str(SOURCE_CODE_ROOT)]
+        merged_runtime_config["pythonpath"] = [
+            str(ABIOGENESIS_SOURCE_CODE_ROOT),
+            str(SOURCE_CODE_ROOT),
+        ]
     return AppConfig(
         workspace_root=workspace_root,
         runtime_config=merged_runtime_config,
@@ -262,7 +320,7 @@ def initialize(config: AppConfig, *, worker: Worker | None = None) -> OddSdlcApp
     return OddSdlcApp(config=config, stream=stream, worker=worker)
 
 
-def active_programs(app: OddSdlcApp) -> list[dict[str, Any]]:
+def active_programs(app: OddSdlcApp) -> list[ExecutiveProgramEntryPayload]:
     module = _app_module(app.config)
     active_executive_programs = set(module.metadata.get("executive_graph_functions", ()))
     return [
@@ -272,7 +330,7 @@ def active_programs(app: OddSdlcApp) -> list[dict[str, Any]]:
     ]
 
 
-def catalog(app: OddSdlcApp) -> dict:
+def catalog(app: OddSdlcApp) -> dict[str, object]:
     module = _app_module(app.config)
     workspace_root = app.config.workspace_root
     active_function_catalog = list(module.metadata.get("function_catalog", FUNCTION_CATALOG))
@@ -328,18 +386,21 @@ def gaps(
     to_edge: str | None = None,
     zoom: str = "combined",
     include_dependent: bool = True,
-) -> dict:
+) -> dict[str, object] | GapDossierReadModel:
     selector = parse_gap_scope_selector(scope)
     if from_edge is not None or to_edge is not None:
         if not from_edge or not to_edge:
             raise ValueError("span gap analysis requires both from_edge and to_edge")
-        return span_gap_analysis(
-            app,
-            scope=scope,
-            from_edge=from_edge,
-            to_edge=to_edge,
-            zoom=zoom,
-            include_dependent=include_dependent,
+        return _mapping_result(
+            span_gap_analysis(
+                app,
+                scope=scope,
+                from_edge=from_edge,
+                to_edge=to_edge,
+                zoom=zoom,
+                include_dependent=include_dependent,
+            ),
+            context="span_gap_analysis",
         )
     return _build_gap_surface(app, selector=selector, publish=True)
 
@@ -348,7 +409,7 @@ def gap_snapshot(
     app: OddSdlcApp,
     *,
     selector: ScopeSelector | None = None,
-) -> dict:
+) -> GapDossierReadModel:
     return _build_gap_surface(
         app,
         selector=selector or ScopeSelector(kind="workspace"),
@@ -361,7 +422,7 @@ def _build_gap_surface(
     *,
     selector: ScopeSelector,
     publish: bool,
-) -> dict[str, Any]:
+) -> GapDossierReadModel:
     execution_contract = load_admitted_execution_contract_projection(app.config.workspace_root)
     resolved_scope = app.scope(selector=selector)
     raw_payload = _augment_raw_gap_payload_with_capability_truth(
@@ -431,8 +492,11 @@ def _build_gap_surface(
     )
 
 
-def iterate(app: OddSdlcApp, *, scope: str = "workspace") -> dict:
-    return gen_iterate(app.scope(selector=parse_gap_scope_selector(scope)), app.stream)
+def iterate(app: OddSdlcApp, *, scope: str = "workspace") -> dict[str, object]:
+    return _mapping_result(
+        gen_iterate(app.scope(selector=parse_gap_scope_selector(scope)), app.stream),
+        context="gen_iterate",
+    )
 
 
 def _publish_pending_constitutional_start_gate(
@@ -446,7 +510,10 @@ def _publish_pending_constitutional_start_gate(
     publish_runtime_event(
         stream=app.stream,
         event_type="fh_gate_pending",
-        data=gate.fh_gate_payload(),
+        data=admit_runtime_event_payload(
+            event_type="fh_gate_pending",
+            data=gate.fh_gate_payload(),
+        ),
         workflow_version=workflow_version,
         work_key=work_key,
         run_id=run_id,
@@ -461,26 +528,62 @@ def _apply_pending_constitutional_human_proxy(
     *,
     edge: str,
     proposal_id: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     from .homeostatic_loop import apply_constitutional_proposal
 
-    return apply_constitutional_proposal(
+    result = apply_constitutional_proposal(
         app.config.workspace_root,
         edge=edge,
         proposal_id=proposal_id,
         actor="human-proxy",
     )
+    if not isinstance(result, Mapping):
+        raise RuntimeError("apply_constitutional_proposal returned a non-mapping result")
+    return {str(key): value for key, value in result.items()}
+
+
+def _attach_public_start_block_metadata(
+    result: PublicStartBlockedPayload,
+    *,
+    public_target: str,
+    fh_mode: str,
+    root_mode: str,
+) -> PublicStartBlockedPayload:
+    result["target"] = public_target
+    if public_target != "next":
+        result["resolved_target"] = public_target
+    fh_mode_literal: Literal["direct", "human-proxy"] | None = None
+    if fh_mode in {"direct", "human-proxy"}:
+        fh_mode_literal = cast(Literal["direct", "human-proxy"], fh_mode)
+    if fh_mode_literal is not None:
+        result["fh_mode"] = fh_mode_literal
+    root_mode_literal: Literal["direct", "supervised"] | None = None
+    if root_mode in {"direct", "supervised"}:
+        root_mode_literal = cast(Literal["direct", "supervised"], root_mode)
+    if root_mode_literal is not None:
+        result["root_mode"] = root_mode_literal
+    return result
+
+
+def _is_pending_constitutional_start_result(
+    result: PublicStartBlockedPayload,
+) -> TypeGuard[PendingConstitutionalStartResult]:
+    return (
+        result["blocking_reason"] == "fh_gate"
+        and "constitutional_proposal" in result
+        and "fh_gate" in result
+    )
 
 
 def _attach_public_next_result_metadata(
-    result: dict[str, Any],
+    result: dict[str, object],
     *,
     public_target: str = "next",
     resolved_raw_target: str | None = None,
     next_edge_override: str | None = None,
     fh_mode: str,
     root_mode: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     result["target"] = public_target
     if resolved_raw_target and resolved_raw_target != "next":
         result["resolved_target"] = resolved_raw_target
@@ -495,7 +598,7 @@ def publish_gap_surface(
     app: OddSdlcApp,
     *,
     selector: ScopeSelector,
-) -> dict[str, Any]:
+) -> GapDossierReadModel:
     return _build_gap_surface(app, selector=selector, publish=True)
 
 
@@ -504,7 +607,7 @@ def republish_gap_surface(
     *,
     selector: ScopeSelector,
     stage: str,
-) -> dict[str, Any]:
+) -> GapDossierReadModel:
     refresh_analysis(app.config.workspace_root, stage=stage)
     return publish_gap_surface(app, selector=selector)
 
@@ -513,7 +616,7 @@ def _public_next_gap_surface(
     app: OddSdlcApp,
     *,
     selector: ScopeSelector,
-) -> dict[str, Any]:
+) -> GapDossierReadModel:
     return load_gap_dossier_read_model(app.config.workspace_root, scope=selector)
 
 
@@ -526,7 +629,11 @@ def _resolve_public_start_admission(
     until: str,
     fh_mode: str,
     root_mode: str,
-) -> tuple[PublicStartAdmissionDirective | None, Any | None, dict[str, Any] | None]:
+) -> tuple[
+    PublicStartAdmissionDirective | None,
+    BoundExecutionStart | None,
+    PublicStartBlockedPayload | None,
+]:
     resolved_scope = app.scope(selector=selector)
     gap_surface = _public_next_gap_surface(app, selector=selector)
     head_resolution = project_public_next_start_resolution(gap_surface)
@@ -548,8 +655,7 @@ def _resolve_public_start_admission(
             run_id=resolved_scope.run_id,
         )
         blocked_result = admission_resolution.to_start_result()
-        blocked_result["target"] = value
-        return None, None, _attach_public_next_result_metadata(
+        return None, None, _attach_public_start_block_metadata(
             blocked_result,
             public_target=value,
             fh_mode=fh_mode,
@@ -557,7 +663,7 @@ def _resolve_public_start_admission(
         )
 
     if isinstance(admission_resolution, PublicNextStartBlock):
-        return None, None, _attach_public_next_result_metadata(
+        return None, None, _attach_public_start_block_metadata(
             admission_resolution.to_start_result(),
             public_target=value,
             fh_mode=fh_mode,
@@ -590,7 +696,11 @@ def _resolve_public_next_iteration(
     until: str,
     fh_mode: str,
     root_mode: str,
-) -> tuple[PublicNextStartDirective | None, Any | None, dict[str, Any] | None]:
+) -> tuple[
+    PublicNextStartDirective | None,
+    BoundExecutionStart | None,
+    PublicStartBlockedPayload | None,
+]:
     directive, bound_start, blocked_result = _resolve_public_start_admission(
         app,
         selector=selector,
@@ -604,12 +714,14 @@ def _resolve_public_next_iteration(
         return None, None, blocked_result
     if directive is None or not isinstance(directive, PublicStartAdmissionDirective):
         raise RuntimeError("public next start admission failed to produce an admitted directive")
+    if directive.route_state is None:
+        raise RuntimeError("public next start admission directive missing typed route_state")
     return PublicNextStartDirective(
         edge=str(directive.edge_override or ""),
-        route_state=str(directive.route_state or ""),
+        route_state=directive.route_state,
         raw_target=directive.raw_target,
         edge_override=directive.edge_override,
-        binding_source=directive.binding_source,
+        binding_source=directive.binding_source or "",
         triage_artifact_path=directive.triage_artifact_path,
         gap_dossier_register_path=directive.gap_dossier_register_path,
         gap_dossier_context_path=directive.gap_dossier_context_path,
@@ -624,13 +736,13 @@ def _run_public_next_start(
     until: Literal["first_traversal", "blocked", "converged"],
     fh_mode: Literal["direct", "human-proxy"],
     root_mode: Literal["direct", "supervised"],
-) -> dict[str, Any]:
+) -> dict[str, object] | PublicStartResultPayload:
     from genesis.dispatch_runtime import auto_dispatch_from_result
     from genesis.proof_hold import project_proof_hold
 
     max_iterations = 50
     auto_applied_constitutional_proposals: set[str] = set()
-    result: dict[str, Any] = {}
+    result: dict[str, object] = {}
 
     for _ in range(max_iterations):
         directive, bound_start, blocked_result = _resolve_public_next_iteration(
@@ -642,17 +754,10 @@ def _run_public_next_start(
             root_mode=root_mode,
         )
         if blocked_result is not None:
-            if (
-                fh_mode == "human-proxy"
-                and blocked_result.get("blocking_reason") == "fh_gate"
-            ):
-                proposal = blocked_result.get("constitutional_proposal")
-                edge = str(blocked_result.get("edge") or "").strip()
-                proposal_id = (
-                    str(proposal.get("proposal_id") or "").strip()
-                    if isinstance(proposal, dict)
-                    else ""
-                )
+            if fh_mode == "human-proxy" and _is_pending_constitutional_start_result(blocked_result):
+                proposal = blocked_result["constitutional_proposal"]
+                edge = blocked_result["edge"].strip()
+                proposal_id = proposal["proposal_id"].strip()
                 if edge and proposal_id:
                     if proposal_id in auto_applied_constitutional_proposals:
                         blocked_result["human_proxy_error"] = (
@@ -702,11 +807,13 @@ def _run_public_next_start(
         if isinstance(iteration_outcome, PublicStartHumanGateRequired):
             if fh_mode != "human-proxy":
                 return iteration_outcome.result
-            edge = str(
-                iteration_outcome.result.get("edge")
-                or iteration_outcome.result.get("fh_gate", {}).get("edge")
-                or ""
-            ).strip()
+            fh_gate = iteration_outcome.result.get("fh_gate")
+            fh_gate_edge = (
+                str(fh_gate.get("edge") or "")
+                if isinstance(fh_gate, Mapping)
+                else ""
+            )
+            edge = str(iteration_outcome.result.get("edge") or fh_gate_edge or "").strip()
             if not edge:
                 result.update(iteration_outcome.result)
                 result["stopped_by"] = "fh_gate"
@@ -804,7 +911,7 @@ def start(
     until: Literal["first_traversal", "blocked", "converged"],
     fh_mode: Literal["direct", "human-proxy"] = "direct",
     root_mode: Literal["direct", "supervised"] = "direct",
-) -> dict:
+) -> dict[str, object] | PublicStartResultPayload:
     ensure_workspace_ready(app.config.workspace_root)
     if until != "converged" and fh_mode != "direct":
         raise ValueError("fh_mode is only lawful when until='converged'")
@@ -842,7 +949,7 @@ def start(
 
     if until == "converged":
         if root_mode == "supervised":
-            result = _run_start_until_converged_supervised(
+            raw_result = _run_start_until_converged_supervised(
                 intent,
                 app.stream,
                 workspace=app.config.workspace_root,
@@ -850,20 +957,22 @@ def start(
                 fh_mode=fh_mode,
             )
         else:
-            result = _run_start_until_converged(
+            raw_result = _run_start_until_converged(
                 intent,
                 app.stream,
                 workspace=app.config.workspace_root,
                 config=runtime_config,
                 fh_mode=fh_mode,
             )
-        result["root_mode"] = root_mode
-        return result
+        normalized_result = _mapping_result(raw_result, context="_run_start_until_converged")
+        normalized_result["root_mode"] = root_mode
+        return normalized_result
 
     if until == "blocked":
-        result = _run_start_until_blocked(intent, app.stream)
+        raw_result = _run_start_until_blocked(intent, app.stream)
     else:
-        result = gen_start(intent, app.stream)
-    result["fh_mode"] = fh_mode
-    result["root_mode"] = root_mode
-    return result
+        raw_result = gen_start(intent, app.stream)
+    normalized_result = _mapping_result(raw_result, context="gen_start/_run_start_until_blocked")
+    normalized_result["fh_mode"] = fh_mode
+    normalized_result["root_mode"] = root_mode
+    return normalized_result

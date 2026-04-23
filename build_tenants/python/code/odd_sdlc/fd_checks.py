@@ -16,7 +16,7 @@ from typing import Any
 from .fd_contracts import FD_EVALUATOR_CONTRACTS_BY_CLI_NAME
 from .gtl_module import module as load_gtl_module
 from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
-from .traceability_index import build_requirement_traceability_index
+from .traceability_index import RequirementTraceabilityIndex, build_requirement_traceability_index
 from .requirement_closure import obligation_gap_from_declaration
 from .workspace_assets import assess_generated_asset_contract, asset_materialization_path, asset_path
 
@@ -171,7 +171,7 @@ _CLI_FAILURE_MAX_STRING_CHARS = 800
 _CLI_FAILURE_MAX_DEPTH = 5
 
 
-def _traceability_index(workspace_root: Path):
+def _traceability_index(workspace_root: Path) -> RequirementTraceabilityIndex:
     return build_requirement_traceability_index(workspace_root)
 
 
@@ -522,7 +522,10 @@ def _bounded_cli_value(value: Any, *, depth: int = 0) -> Any:
 
 def _cli_failure_detail(check_name: str, workspace_root: Path, *, edge_name: str | None = None) -> dict[str, Any]:
     detail = _failure_detail(check_name, workspace_root, edge_name=edge_name)
-    return _bounded_cli_value(detail)
+    bounded = _bounded_cli_value(detail)
+    if not isinstance(bounded, dict):
+        raise ValueError("bounded CLI failure detail must remain a JSON object")
+    return bounded
 
 
 def bootstrap_input_set_present(workspace_root: Path) -> int:

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 from genesis.services import ScopeSelector, gen_gaps
 from .project_profile import load_or_build_operational_capability_projection
 from .requirement_closure import collect_declared_obligation_gaps
 from .triage import enrich_gap_snapshot
+
+if TYPE_CHECKING:
+    from .app import OddSdlcApp
 
 
 def parse_gap_scope_selector(raw_scope: str) -> ScopeSelector:
@@ -23,7 +27,7 @@ def parse_gap_scope_selector(raw_scope: str) -> ScopeSelector:
     raise ValueError("scope must be 'workspace' or 'work_key:<id>'")
 
 
-def _active_edge_order(app) -> list[str]:
+def _active_edge_order(app: OddSdlcApp) -> list[str]:
     catalog_entries = app.scope().module.metadata.get("function_catalog", ())
     order: list[str] = []
     for entry in catalog_entries:
@@ -37,7 +41,7 @@ def _active_edge_order(app) -> list[str]:
 
 
 def capability_gap_entries(
-    workspace_root,
+    workspace_root: Path | str,
     *,
     edge_names: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -84,7 +88,7 @@ def capability_gap_entries(
     return entries
 
 
-def _vector_by_name(app) -> dict[str, Any]:
+def _vector_by_name(app: OddSdlcApp) -> dict[str, Any]:
     vectors: dict[str, Any] = {}
     for function in app.scope().module.graph_functions:
         graph = function.template.graph
@@ -96,7 +100,7 @@ def _vector_by_name(app) -> dict[str, Any]:
 
 
 def declared_obligation_specs(
-    app,
+    app: OddSdlcApp,
     *,
     edge_names: Sequence[str] | None = None,
 ) -> list[tuple[str, dict[str, Any] | Any]]:
@@ -435,8 +439,8 @@ def _edge_order(
         edge_name = gap.edge
         if edge_name and edge_name not in ordered:
             ordered.append(edge_name)
-    for gap in ledger_gaps:
-        edge_name = gap.edge
+    for ledger_gap in ledger_gaps:
+        edge_name = ledger_gap.edge
         if edge_name and edge_name not in ordered:
             ordered.append(edge_name)
     return ordered
@@ -558,13 +562,13 @@ def canonical_edge_gaps(
         if ledger_gap is None:
             if graph_gap is None:
                 continue
-            edge_gap = _canonical_graph_gap(graph_gap)
-            if not edge_gap.graph_converged:
-                canonical.append(edge_gap)
+            graph_edge_gap = _canonical_graph_gap(graph_gap)
+            if not graph_edge_gap.graph_converged:
+                canonical.append(graph_edge_gap)
             continue
-        edge_gap = _canonical_declared_gap(edge_name, graph_gap=graph_gap, ledger_gap=ledger_gap)
-        if not edge_gap.edge_converged:
-            canonical.append(edge_gap)
+        declared_edge_gap = _canonical_declared_gap(edge_name, graph_gap=graph_gap, ledger_gap=ledger_gap)
+        if not declared_edge_gap.edge_converged:
+            canonical.append(declared_edge_gap)
     return canonical
 
 
@@ -649,7 +653,7 @@ def aggregate_edge_gap_truth(gaps: Sequence[CanonicalEdgeGap]) -> EdgeGapTruthSu
 
 
 def span_gap_analysis(
-    app,
+    app: OddSdlcApp,
     *,
     scope: str = "workspace",
     from_edge: str,

@@ -1,10 +1,14 @@
-# odd_sdlc Realization Deepening Control Frame
+# odd_sdlc Realization Continuity Rationale
 
-This edge works over an existing realization or realization plan, not a blank slate.
+This note explains why realization-family work in `odd_sdlc` is treated as work
+over an enduring asset under construction rather than as a blank-slate prompt.
 
-- Existing files and existing module groups are obligations, not proof of completion.
-- Inspect the current realization first and identify shallow or placeholder work in existing artifacts before expanding laterally.
-- Treat placeholder bodies, identity pass-throughs, constant-success paths, unused inputs, and unwired validations as unresolved realization.
-- Prefer deepening or correcting existing artifacts when the current requirement family is already present but shallow.
-- Add new files or new groups only when the gap is genuinely uncovered capability rather than incomplete existing realization.
-- When deterministic evidence names specific requirement ids or files, repair those in place before widening the surface area.
+It is rationale only. It is not a runtime-published builder control frame.
+
+The retained law is:
+
+- existing files and existing module groups are part of current state
+- preserved structure and unmet requirement pressure may be published as
+  governance truth
+- lawful edit and proof frontiers may be published as governance truth
+- builder strategy remains outside `odd_sdlc`

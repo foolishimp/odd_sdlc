@@ -6,8 +6,114 @@
 """Domain model for odd_sdlc asset, function, and software-domain descriptors."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
+
+
+class AssetSemanticFacetPayload(TypedDict):
+    name: str
+    description: str
+
+
+class AssetTypeProfilePayload(TypedDict):
+    name: str
+    description: str
+    semantic_facets: list[str]
+    fd_evaluator: str
+    fp_gap_description: str
+    fp_descriptive_framing: str
+    specializes: list[str]
+    library_level: str
+    mutable_default: bool
+    proof_hints: list[str]
+    closure_hints: list[str]
+
+
+class AssetCheckpointPayload(TypedDict):
+    exists: bool
+    path_kind: str
+    content_digest: str | None
+    bytes: int | None
+
+
+class AssetProvenancePayload(TypedDict):
+    model: str
+    source: str
+    mutable: bool
+    history_basis: str
+
+
+class AssetPayload(TypedDict):
+    asset_id: str
+    uri: str
+    declared_type: str
+    kind: str
+    metadata: dict[str, object]
+    generated_asset_contract: dict[str, object] | None
+    provenance: AssetProvenancePayload | None
+    checkpoint: AssetCheckpointPayload | None
+
+
+class AssetProjectionPayload(AssetPayload, total=False):
+    projection_source: str
+    update_count: int
+
+
+class AssetCollectionPayload(TypedDict):
+    name: str
+    assets: list[AssetPayload]
+
+
+class AssetFamilyDescriptorPayload(TypedDict):
+    name: str
+    description: str
+    lifecycle_role: str
+    representative_asset_types: list[str]
+    realization_status: str
+
+
+class AssetNodeBindingPayload(TypedDict):
+    node: str
+    asset_ids: list[str]
+
+
+class WorkActDescriptorPayload(TypedDict):
+    name: str
+    description: str
+    mutates_workspace: bool
+    produces_governed_evidence: bool
+    typical_asset_families: list[str]
+    realization_status: str
+
+
+class FunctionCatalogEntryPayload(TypedDict):
+    name: str
+    intent: str
+    inputs: list[str]
+    outputs: list[str]
+    backing_graph_function: str
+
+
+class EdgeContractDescriptorPayload(TypedDict):
+    name: str
+    description: str
+    source_asset_families: list[str]
+    target_asset_family: str
+    configured_fp_role: str
+    preflight_fd_layers: list[str]
+    postflight_fd_layers: list[str]
+    work_report_contract: str
+    representative_functions: list[str]
+    realization_status: str
+
+
+class ExecutiveProgramEntryPayload(TypedDict):
+    name: str
+    intent: str
+    steps: list[str]
+    outputs: list[str]
+    kind: str
 
 
 @dataclass(frozen=True)
@@ -15,8 +121,11 @@ class AssetSemanticFacet:
     name: str
     description: str
 
-    def to_dict(self) -> dict:
-        return asdict(self)
+    def to_dict(self) -> AssetSemanticFacetPayload:
+        return {
+            "name": self.name,
+            "description": self.description,
+        }
 
 
 @dataclass(frozen=True)
@@ -33,7 +142,7 @@ class AssetTypeProfile:
     proof_hints: tuple[str, ...] = ()
     closure_hints: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> AssetTypeProfilePayload:
         return {
             "name": self.name,
             "description": self.description,
@@ -56,8 +165,13 @@ class AssetCheckpoint:
     content_digest: str | None
     bytes: int | None
 
-    def to_dict(self) -> dict:
-        return asdict(self)
+    def to_dict(self) -> AssetCheckpointPayload:
+        return {
+            "exists": self.exists,
+            "path_kind": self.path_kind,
+            "content_digest": self.content_digest,
+            "bytes": self.bytes,
+        }
 
 
 @dataclass(frozen=True)
@@ -67,8 +181,13 @@ class AssetProvenance:
     mutable: bool
     history_basis: str
 
-    def to_dict(self) -> dict:
-        return asdict(self)
+    def to_dict(self) -> AssetProvenancePayload:
+        return {
+            "model": self.model,
+            "source": self.source,
+            "mutable": self.mutable,
+            "history_basis": self.history_basis,
+        }
 
 
 @dataclass(frozen=True)
@@ -82,7 +201,7 @@ class Asset:
     provenance: AssetProvenance | None = None
     checkpoint: AssetCheckpoint | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> AssetPayload:
         return {
             "asset_id": self.asset_id,
             "uri": self.uri,
@@ -102,7 +221,7 @@ class AssetCollection:
     name: str
     assets: tuple[Asset, ...]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> AssetCollectionPayload:
         return {
             "name": self.name,
             "assets": [asset.to_dict() for asset in self.assets],
@@ -117,7 +236,7 @@ class AssetFamilyDescriptor:
     representative_asset_types: tuple[str, ...]
     realization_status: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> AssetFamilyDescriptorPayload:
         return {
             "name": self.name,
             "description": self.description,
@@ -132,7 +251,7 @@ class AssetNodeBinding:
     node: str
     asset_ids: tuple[str, ...]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> AssetNodeBindingPayload:
         return {
             "node": self.node,
             "asset_ids": list(self.asset_ids),
@@ -148,7 +267,7 @@ class WorkActDescriptor:
     typical_asset_families: tuple[str, ...]
     realization_status: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> WorkActDescriptorPayload:
         return {
             "name": self.name,
             "description": self.description,
@@ -167,7 +286,7 @@ class FunctionCatalogEntry:
     outputs: tuple[str, ...]
     backing_graph_function: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> FunctionCatalogEntryPayload:
         return {
             "name": self.name,
             "intent": self.intent,
@@ -190,7 +309,7 @@ class EdgeContractDescriptor:
     representative_functions: tuple[str, ...]
     realization_status: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> EdgeContractDescriptorPayload:
         return {
             "name": self.name,
             "description": self.description,
@@ -213,7 +332,7 @@ class ExecutiveProgramEntry:
     outputs: tuple[str, ...]
     kind: str = "executive_program"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> ExecutiveProgramEntryPayload:
         return {
             "name": self.name,
             "intent": self.intent,

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
+from typing import Iterator, TypedDict
 from xml.etree import ElementTree
 
 from .asset_types import ASSET_TYPES
@@ -28,7 +29,9 @@ from .execution_contract import EXECUTION_CONTRACT_KIND, EXECUTION_CONTRACT_REGI
 from .install_topology import LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE
 from .project_profile import (
     DEFAULT_PROVING_CODE_RELATIVE_PATH,
+    OperationalCapabilityFamilyPayload,
     ProjectProfile,
+    RealizationCandidate,
     load_project_profile,
     operational_capability_projection_for_profile,
     profile_design_relative_path,
@@ -276,6 +279,27 @@ NODE_ASSET_TYPES = {
     "runtime_observation_surface": "runtime_observation_surface",
     "retrofit_plan_surface": "maintenance_plan_surface",
 }
+
+
+class CodeSurfaceSummary(TypedDict):
+    relative_path: str
+    build_markers: list[str]
+    source_file_count: int
+    test_source_file_count: int
+    test_report_file_count: int
+
+
+class TestEvidenceSummary(TypedDict):
+    report_file_count: int
+    parsed_report_count: int
+    tests: int
+    failures: int
+    errors: int
+    skipped: int
+    report_paths: list[str]
+    ungoverned_report_file_count: int
+    ungoverned_report_paths: list[str]
+    governing_capability: OperationalCapabilityFamilyPayload
 
 
 @dataclass(frozen=True)
@@ -674,7 +698,7 @@ def _test_report_count(root: Path) -> int:
     return len(seen)
 
 
-def _iter_realization_files(root: Path):
+def _iter_realization_files(root: Path) -> Iterator[Path]:
     for current_root, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(
             dirname
@@ -687,7 +711,7 @@ def _iter_realization_files(root: Path):
                 yield path
 
 
-def summarize_code_surface(workspace_root: Path) -> dict[str, object]:
+def summarize_code_surface(workspace_root: Path) -> CodeSurfaceSummary:
     code_root = asset_path(workspace_root, "code_surface")
     build_markers = [marker for marker in SOFTWARE_BUILD_MARKERS if (code_root / marker).is_file()]
     source_files = list(_iter_realization_files(code_root)) if code_root.exists() and code_root.is_dir() else []
@@ -705,7 +729,7 @@ def summarize_code_surface(workspace_root: Path) -> dict[str, object]:
     }
 
 
-def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
+def summarize_test_evidence(workspace_root: Path) -> TestEvidenceSummary:
     code_root = asset_path(workspace_root, "code_surface")
     profile = load_project_profile(workspace_root)
     capability_projection = operational_capability_projection_for_profile(
@@ -716,12 +740,19 @@ def summarize_test_evidence(workspace_root: Path) -> dict[str, object]:
     if not isinstance(capability_families, dict):
         capability_families = {}
     governing_capability = capability_families.get("test_execution")
-    if not isinstance(governing_capability, dict):
+    if governing_capability is None:
         governing_capability = {
             "family": "test_execution",
             "field_name": "test_execution_contract",
+            "cue": "",
+            "in_scope": False,
+            "declared_value": "",
             "declared": False,
             "state": "undeclared",
+            "affected_assets": [],
+            "expected_resolving_edges": [],
+            "primary_edge": "",
+            "resolution_text": "",
         }
     report_files: list[Path] = []
     if code_root.exists() and code_root.is_dir():
@@ -832,7 +863,7 @@ def _selected_build_tenant_root(workspace_root: Path) -> Path | None:
     return None
 
 
-def foreign_realization_candidates(workspace_root: Path) -> list[dict[str, object]]:
+def foreign_realization_candidates(workspace_root: Path) -> list[RealizationCandidate]:
     return realization_candidates_for_selected_root(workspace_root)
 
 
@@ -880,7 +911,7 @@ def assess_generated_asset_contract(workspace_root: Path, asset_id: str) -> dict
 
     materialization_kind_actual = _path_kind(materialization_path)
     marker_present = _text_contains(marker_path, marker_text)
-    code_summary: dict[str, object] | None = None
+    code_summary: CodeSurfaceSummary | None = None
     adopted_authority = False
     if asset_id in AUTHORITATIVE_FILE_HEADING_PREFIXES and materialization_kind_actual == "file" and heading_matches:
         text = materialization_path.read_text(encoding="utf-8").strip()
@@ -888,7 +919,7 @@ def assess_generated_asset_contract(workspace_root: Path, asset_id: str) -> dict
         marker_present = marker_present or adopted_authority
     if asset_id == "code_surface" and project_profile.realization_mode in {"selected_output_tree", "planned_output_tree"}:
         code_summary = summarize_code_surface(workspace_root)
-        marker_present = bool(code_summary["build_markers"]) or int(code_summary["source_file_count"]) > 0
+        marker_present = bool(code_summary["build_markers"]) or code_summary["source_file_count"] > 0
     topology_report = assess_realization_topology(workspace_root)
     topology_guard_applied = asset_id in TOPOLOGY_GUARDED_ASSETS
     topology_guard_passed = not topology_guard_applied or not topology_report["topology_diverged"]
@@ -935,7 +966,7 @@ def _digest_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _iter_checkpoint_files(path: Path):
+def _iter_checkpoint_files(path: Path) -> Iterator[Path]:
     for current_root, dirnames, filenames in os.walk(path):
         dirnames[:] = sorted(
             dirname
@@ -989,7 +1020,7 @@ def bootstrap_assets(workspace_root: Path) -> tuple[Asset, ...]:
         asset_type = asset_declared_type(node_name)
         type_profile = ASSET_TYPES[asset_type]
         checkpoint = checkpoint_for_path(path)
-        metadata = {
+        metadata: dict[str, object] = {
             "relative_path": rel_path,
             "exists": "true" if path.exists() else "false",
             "path_kind": checkpoint.path_kind,

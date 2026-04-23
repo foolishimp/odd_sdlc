@@ -53,9 +53,9 @@ from that layer rather than collapsing everything into immediate code repair.
   design, requirements, product, goals, and intent
 - AC-2: chosen route distinguishes fixed-vector repair from declared
   dynamic-family selection and resumes from the named re-entry layer
-- AC-3: when shallow existing realization is present, deepening that
-  realization is preferred over lateral expansion unless superseded by
-  stronger declared law
+- AC-3: route and triage publication may preserve current-state signals such as
+  preserved structure, unmet pressure, and route eligibility, but they must not
+  prescribe builder strategy
 - AC-4: when no lawful route exists, the system records that state explicitly
   rather than silently demoting to generic code repair
 - AC-5: once a constitutional proposal is lawfully applied, renewed derivation

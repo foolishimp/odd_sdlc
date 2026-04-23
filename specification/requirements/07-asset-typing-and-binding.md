@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Capability
 **Carries Forward From**: None
-**Authoring Design**: None
+**Authoring Design**: `build_tenants/python/design/adrs/ADR-001-maximum-enforceable-python-typing.md`
 
 This family defines the first live ODD asset model.
 

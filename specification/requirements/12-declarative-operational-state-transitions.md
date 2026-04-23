@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Capability
 **Carries Forward From**: None
-**Authoring Design**: None
+**Authoring Design**: `build_tenants/python/design/adrs/ADR-001-maximum-enforceable-python-typing.md`, `build_tenants/python/design/adrs/ADR-002-abg-continuation-authority-and-cooperative-operational-dispatch.md`, `build_tenants/python/design/EXECUTION_CONTRACT_SOURCE_CARRIER.md`
 
 This family defines the operational-transition model for the active `odd_sdlc`
 software-domain package.
@@ -43,6 +43,9 @@ ABG event truth rather than as hidden side effects.
   states
 - AC-2: ABG remains authoritative for event, continuation, and correlation
   truth while `odd_sdlc` projects domain-facing operational read models on top
+- AC-2a: tenant-local operational commands execute at most one admissible
+  operational advance per invocation and then return control to ABG for further
+  continuation
 - AC-3: missing returned evidence, failed dispatch, rejection, or unresolved
   external completion keeps the enclosing operational lane open and queryable
   rather than silently claiming success

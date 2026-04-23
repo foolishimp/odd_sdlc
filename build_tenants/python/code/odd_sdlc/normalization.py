@@ -21,10 +21,12 @@ from .install_topology import (
     LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE,
 )
 from .project_profile import (
+    UNDECLARED_EXECUTION_CONTRACT,
     _parse_constraints_lines,
     canonical_tenant_name,
     default_project_slug,
     load_project_profile,
+    normalize_execution_contract_declaration,
     parse_design_tenants,
     strip_scalar_quotes,
     tenant_output_dir,
@@ -37,11 +39,12 @@ PROJECT_POLICY_FIELDS: tuple[tuple[str, str], ...] = (
     ("ambiguity_risk_appetite", '"medium"'),
 )
 TENANT_CAPABILITY_FIELDS: tuple[tuple[str, str], ...] = (
-    ("build_execution_contract", '""'),
-    ("test_execution_contract", '""'),
-    ("deployment_contract", '""'),
-    ("runtime_observation_contract", '""'),
+    ("build_execution_contract", f'"{UNDECLARED_EXECUTION_CONTRACT}"'),
+    ("test_execution_contract", f'"{UNDECLARED_EXECUTION_CONTRACT}"'),
+    ("deployment_contract", f'"{UNDECLARED_EXECUTION_CONTRACT}"'),
+    ("runtime_observation_contract", f'"{UNDECLARED_EXECUTION_CONTRACT}"'),
 )
+_IMPORTED_REQUIREMENT_ID_RE = re.compile(r"\b(?:REQ|RF)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b")
 TENANT_REGISTRY_PATH = Path("build_tenants/TENANT_REGISTRY.md")
 REALIZATION_SOURCE_SUFFIXES = {
     ".c",
@@ -83,6 +86,38 @@ REALIZATION_IGNORED_DIR_NAMES = {
     "venv",
     ".venv",
 }
+
+
+def _object_dict(value: object) -> dict[str, object]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _normalize_requirement_id(requirement_id: str) -> str:
+    parts = requirement_id.upper().split("-")
+    if parts[0] == "RF":
+        parts[0] = "REQ"
+    normalized = [parts[0]]
+    for part in parts[1:]:
+        if part.isdigit() and len(part) < 3:
+            normalized.append(part.zfill(3))
+        else:
+            normalized.append(part)
+    return "-".join(normalized)
+
+
+def _canonical_imported_requirement_sources(workspace_root: Path) -> dict[str, tuple[str, ...]]:
+    canonical_sources: dict[str, set[str]] = {}
+    for path in _imported_requirement_sources(workspace_root):
+        text = path.read_text(encoding="utf-8")
+        for raw_requirement_id in _IMPORTED_REQUIREMENT_ID_RE.findall(text):
+            canonical_requirement_id = _normalize_requirement_id(raw_requirement_id)
+            canonical_sources.setdefault(canonical_requirement_id, set()).add(
+                path.relative_to(workspace_root).as_posix()
+            )
+    return {
+        requirement_id: tuple(sorted(source_refs))
+        for requirement_id, source_refs in canonical_sources.items()
+    }
 
 
 def _is_conformant_selected_output_dir(output_dir: str, *, canonical_output: str | None = None) -> bool:
@@ -178,9 +213,17 @@ def _imported_requirement_sources(workspace_root: Path) -> list[Path]:
 
 def _imported_sources_markdown(workspace_root: Path) -> str:
     imported = _imported_requirement_sources(workspace_root)
+    canonical_requirements = _canonical_imported_requirement_sources(workspace_root)
     bullets = (
         [f"- `{path.relative_to(workspace_root).as_posix()}`" for path in imported]
         or ["- no imported requirement-like source was detected"]
+    )
+    canonical_requirement_lines = (
+        [
+            f"- {requirement_id}: canonical authority from {', '.join(f'`{source_ref}`' for source_ref in source_refs)}"
+            for requirement_id, source_refs in canonical_requirements.items()
+        ]
+        or ["- no imported REQ-* authority markers were detected"]
     )
     return "\n".join(
         (
@@ -191,8 +234,12 @@ def _imported_sources_markdown(workspace_root: Path) -> str:
             "## Imported Sources",
             *bullets,
             "",
+            "## Canonical Requirement Authority",
+            *canonical_requirement_lines,
+            "",
             "## Purpose",
             "- establish the canonical `specification/requirements/` root required by odd_sdlc bootstrap",
+            "- publish one canonical imported requirement-id authority surface before constructive dispatch",
             "- preserve imported requirement-like authority without rewriting the original sources",
             "",
         )
@@ -452,7 +499,12 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
                 current_list_key = None
             continue
         if indent >= 6 and stripped.startswith("- ") and current_list_key:
-            current_tenant.setdefault(current_list_key, []).append(strip_scalar_quotes(stripped[2:]))
+            current_value = current_tenant.get(current_list_key)
+            item = strip_scalar_quotes(stripped[2:])
+            if isinstance(current_value, list):
+                current_value.append(item)
+            else:
+                current_tenant[current_list_key] = [item]
 
     if not registry:
         return None
@@ -470,13 +522,13 @@ def _canonical_constraints_from_legacy_build_tenants(
     canonical_output: str,
     legacy: dict[str, object],
 ) -> str:
-    project = dict(legacy.get("project") or {})
-    top_level = dict(legacy.get("top_level") or {})
-    registry = dict(legacy.get("build_tenants") or {})
+    project = _object_dict(legacy.get("project"))
+    top_level = _object_dict(legacy.get("top_level"))
+    registry = _object_dict(legacy.get("build_tenants"))
     selected_name = canonical_tenant_name(
         str(top_level.get("active_tenant") or canonical_platform)
     )
-    selected = dict(registry.get(selected_name) or {})
+    selected = _object_dict(registry.get(selected_name))
     if not selected and registry:
         first_name, first_payload = next(iter(registry.items()))
         selected_name = canonical_tenant_name(first_name)
@@ -518,10 +570,10 @@ def _canonical_constraints_from_legacy_build_tenants(
             f'      output_dir: "{output_dir}"',
             f'      description: "{description}"',
             f"      module_structure: {module_structure_value}",
-            '      build_execution_contract: ""',
-            '      test_execution_contract: ""',
-            '      deployment_contract: ""',
-            '      runtime_observation_contract: ""',
+            f'      build_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+            f'      test_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+            f'      deployment_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+            f'      runtime_observation_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
             f"  root_code_policy: {root_code_policy}",
             "",
         )
@@ -648,10 +700,10 @@ def _normalize_project_constraints(
                 f'    - name: "{canonical_platform}"',
                 f'      output_dir: "{canonical_output}"',
                 '      description: "Normalized project realization tenant for odd_sdlc operation"',
-                '      build_execution_contract: ""',
-                '      test_execution_contract: ""',
-                '      deployment_contract: ""',
-                '      runtime_observation_contract: ""',
+                f'      build_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+                f'      test_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+                f'      deployment_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+                f'      runtime_observation_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
                 "  root_code_policy: reject",
                 "",
             )
@@ -818,6 +870,25 @@ def _normalize_project_constraints(
             else:
                 updated.append(f'{tenant_field_indent}output_dir: "{canonical_output}"')
             tenant_output_written = True
+        elif (
+            first_design_tenant_scope
+            and ":" in stripped
+            and stripped.partition(":")[0].strip() in {field_name for field_name, _ in TENANT_CAPABILITY_FIELDS}
+        ):
+            field_name = stripped.partition(":")[0].strip()
+            raw_value = strip_scalar_quotes(stripped.partition(":")[2]).strip()
+            normalized_value = normalize_execution_contract_declaration(stripped.partition(":")[2])
+            updated.append(f'{tenant_field_indent}{field_name}: "{normalized_value}"')
+            if not raw_value and normalized_value == UNDECLARED_EXECUTION_CONTRACT:
+                defaults_with_provenance.append(
+                    _default_with_provenance(
+                        kind="normalize_project_constraint_field",
+                        path=path,
+                        field=field_name,
+                        value=normalized_value,
+                        detail=f"rewrote semantically empty tenant capability field `{field_name}` to explicit undeclared capability truth",
+                    )
+                )
         else:
             updated.append(line)
 
@@ -1096,10 +1167,11 @@ def normalize_workspace(
         )
 
     imported_summary = root / IMPORTED_REQUIREMENTS_PATH
+    imported_summary_content = _imported_sources_markdown(root)
     if not imported_summary.exists():
         _write_text(
             imported_summary,
-            _imported_sources_markdown(root),
+            imported_summary_content,
             kind="create_imported_requirements_summary",
             detail="captured imported requirement-like sources under the canonical requirements root",
             actions=actions,
@@ -1111,6 +1183,16 @@ def normalize_workspace(
                 detail="created imported requirement source summary because the imported workspace had no canonical requirements root",
             )
         )
+    else:
+        existing_imported_summary = imported_summary.read_text(encoding="utf-8")
+        if existing_imported_summary != imported_summary_content:
+            _write_text(
+                imported_summary,
+                imported_summary_content,
+                kind="update_imported_requirements_summary",
+                detail="reconciled imported requirement source summary to the canonical requirement-id publication",
+                actions=actions,
+            )
 
     if (root / INSTALLED_PRODUCT_ROOT_RELATIVE).exists() or (root / LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE).exists():
         _remove_legacy_root_readme(root, actions=actions)

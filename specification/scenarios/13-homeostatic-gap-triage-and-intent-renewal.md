@@ -28,7 +28,8 @@ constitutional repricing, while preserving ABG as the event-driven substrate.
 4. Use a shallow-realization proving lane, including the named
    `build_tenants/python/test_env/fixtures/test28_pass2_replay/`
    survivor fixture, and verify that triage names the affected layer, classifies
-   the mismatch, and prefers lawful deepening over lateral expansion.
+   the mismatch, and preserves route/governance truth without prescribing
+   builder strategy.
 5. Use a major-ambiguity or unroutable case and verify that triage preserves
    the ambiguity or no-lawful-route outcome explicitly rather than silently
    demoting it to generic code repair.
@@ -44,8 +45,8 @@ constitutional repricing, while preserving ABG as the event-driven substrate.
 - observation-first path: disturbance is recorded before successful triage
 - stale-analysis path: stale published analysis blocks current route truth until
   republished
-- shallow-realization path: existing shallow assets cause deepening pressure
-  rather than silent lateral expansion
+- shallow-realization path: existing shallow assets do not create a framework-
+  owned builder strategy surface
 - ambiguity pass-through path: major ambiguity is wrapped into common triage
   shape without inventing a second ambiguity regime
 - no-lawful-route path: unroutable gaps remain explicit and do not collapse into
@@ -62,7 +63,7 @@ constitutional repricing, while preserving ABG as the event-driven substrate.
 - observation, triage, route, and constitutional state remain distinct and
   correlated
 - stale analysis prevents stale current triage or route state from being served
-- shallow survivors produce lawful deepening pressure
+- shallow survivors do not cause odd_sdlc to publish builder strategy
 - ambiguity and unroutable states remain explicit rather than being hidden by
   breadth-first continuation
 - constitutional repricing never applies silently

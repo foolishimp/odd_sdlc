@@ -37,6 +37,15 @@ from .requirement_closure import (
     build_requirement_closure_prompt_context,
     build_requirement_closure_register,
 )
+
+
+def _load_json_dict(path: Path) -> dict[str, Any] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def _publication_actions(
     path: Path,
     *,
@@ -62,7 +71,7 @@ def load_workspace_state(workspace_root: Path | str) -> dict[str, Any] | None:
     path = root / WORKSPACE_STATE_PATH
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_dict(path)
 
 
 def load_analysis_manifest(workspace_root: Path | str) -> dict[str, Any] | None:
@@ -269,7 +278,7 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
             existed_before=existed_before,
             create_kind="create_requirement_closure_prompt_context",
             update_kind="update_requirement_closure_prompt_context",
-            detail="published compact requirement closure builder context for odd_sdlc execution",
+            detail="published compact requirement closure governance context for odd_sdlc execution",
         )
     )
     repair_frontier = build_repair_frontier_register(
@@ -285,7 +294,7 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
             existed_before=existed_before,
             create_kind="create_repair_frontier_register",
             update_kind="update_repair_frontier_register",
-            detail="published deterministic repair-frontier register for odd_sdlc builder execution",
+            detail="published deterministic repair-frontier register for odd_sdlc governance execution",
         )
     )
     repair_frontier_context = build_repair_frontier_prompt_context(
@@ -301,7 +310,7 @@ def refresh_analysis(workspace_root: Path | str, *, stage: str = "refresh_analys
             existed_before=existed_before,
             create_kind="create_repair_frontier_prompt_context",
             update_kind="update_repair_frontier_prompt_context",
-            detail="published deterministic repair-frontier builder context for odd_sdlc execution",
+            detail="published deterministic repair-frontier governance context for odd_sdlc execution",
         )
     )
     analysis_manifest, analysis_manifest_actions = write_analysis_manifest(root, stage=stage)

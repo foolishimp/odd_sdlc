@@ -28,6 +28,7 @@ from gtl.operator_model import F_D  # noqa: E402
 from odd_sdlc.constructor import construct_manifest  # noqa: E402
 from odd_sdlc.fd_checks import main  # noqa: E402
 from odd_sdlc.fd_checks import code_traceability_present, realized_test_traceability_present  # noqa: E402
+from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.project_profile import (  # noqa: E402
     tenant_design_relative_path,
     tenant_test_env_relative_path,
@@ -777,6 +778,11 @@ def test_fd_checks_fail_explicitly_on_zero_surface_traceability(
 def test_two_digit_imported_requirement_ids_remain_trace_equivalent_after_normalization(tmp_path: Path) -> None:
     workspace = tmp_path / "fd-evidence-two-digit"
     _seed_two_digit_equivalence_workspace(workspace)
+    normalize_workspace(
+        workspace,
+        project_slug="fd_evidence_two_digit",
+        platform="python",
+    )
 
     register = build_requirement_closure_register(workspace)
     entries = {
@@ -789,13 +795,13 @@ def test_two_digit_imported_requirement_ids_remain_trace_equivalent_after_normal
     assert code_traceability_present(workspace) == 0
     assert realized_test_traceability_present(workspace) == 0
     assert entries["REQ-IMP-001"]["present_in_authority"] is True
-    assert entries["REQ-IMP-001"]["authority_refs"] == ["specification/REQUIREMENTS.md"]
-    assert entries["REQ-IMP-001"]["code_refs"] == ["imp_two_digit/src/main/logic.py"]
-    assert entries["REQ-IMP-001"]["test_refs"] == ["imp_two_digit/src/tests/test_logic.py"]
+    assert entries["REQ-IMP-001"]["authority_refs"] == ["specification/requirements/00-imported-sources.md"]
+    assert entries["REQ-IMP-001"]["code_refs"] == ["build_tenants/python/src/main/logic.py"]
+    assert entries["REQ-IMP-001"]["test_refs"] == ["build_tenants/python/src/tests/test_logic.py"]
     assert entries["REQ-IMP-002-A"]["present_in_authority"] is True
-    assert entries["REQ-IMP-002-A"]["authority_refs"] == ["specification/REQUIREMENTS.md"]
-    assert entries["REQ-IMP-002-A"]["code_refs"] == ["imp_two_digit/src/main/logic.py"]
-    assert entries["REQ-IMP-002-A"]["test_refs"] == ["imp_two_digit/src/tests/test_logic.py"]
+    assert entries["REQ-IMP-002-A"]["authority_refs"] == ["specification/requirements/00-imported-sources.md"]
+    assert entries["REQ-IMP-002-A"]["code_refs"] == ["build_tenants/python/src/main/logic.py"]
+    assert entries["REQ-IMP-002-A"]["test_refs"] == ["build_tenants/python/src/tests/test_logic.py"]
 
 
 def test_current_requirement_executability_gap_keeps_global_convergence_open_until_requirements_are_realized(

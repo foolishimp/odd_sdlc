@@ -201,6 +201,63 @@ def refresh_installed_analysis(
     return json.loads(result.stdout)
 
 
+def publish_installed_gap_dossier(
+    workspace: Path,
+    *,
+    archive: "RunArchive | None" = None,
+    label: str = "odd_sdlc gaps",
+    timeout: int = 60,
+) -> dict[str, Any]:
+    result = run_installed_odd_sdlc(
+        workspace,
+        "gaps",
+        "--scope",
+        "workspace",
+        archive=archive,
+        label=label,
+        timeout=timeout,
+    )
+    return json.loads(result.stdout)
+
+
+def approve_installed_head_constitutional_proposal(
+    workspace: Path,
+    *,
+    gaps_payload: dict[str, Any],
+    archive: "RunArchive | None" = None,
+    label_prefix: str,
+) -> dict[str, Any]:
+    dossiers = gaps_payload.get("dossiers") if isinstance(gaps_payload, dict) else None
+    if not isinstance(dossiers, list) or not dossiers:
+        return gaps_payload
+    head = dossiers[0]
+    if not isinstance(head, dict):
+        return gaps_payload
+    proposal = head.get("constitutional_proposal")
+    if not isinstance(proposal, dict) or str(proposal.get("state") or "") != "pending_fh":
+        return gaps_payload
+    approval_code = (
+        "import json\n"
+        "from odd_sdlc.homeostatic_loop import apply_constitutional_proposal\n"
+        f"payload = apply_constitutional_proposal('.', edge={str(head.get('edge') or '')!r}, "
+        f"proposal_id={str(proposal.get('proposal_id') or '')!r}, actor='installation_test')\n"
+        "print(json.dumps(payload))\n"
+    )
+    approval = run_installed_python(
+        workspace,
+        approval_code,
+        archive=archive,
+        label=f"{label_prefix}.apply_constitutional_proposal",
+    )
+    if json.loads(approval.stdout).get("status") != "applied":
+        raise AssertionError("Expected apply_constitutional_proposal to settle as applied")
+    return publish_installed_gap_dossier(
+        workspace,
+        archive=archive,
+        label=f"{label_prefix}.republished_gaps",
+    )
+
+
 def run_constructor_for_start(
     workspace: Path,
     *,
@@ -246,6 +303,17 @@ def complete_current_call(
             workspace,
             archive=archive,
             label=f"{label_prefix} refresh-analysis.{attempt + 1}",
+        )
+        published = publish_installed_gap_dossier(
+            workspace,
+            archive=archive,
+            label=f"{label_prefix} gaps.{attempt + 1}",
+        )
+        approve_installed_head_constitutional_proposal(
+            workspace,
+            gaps_payload=published,
+            archive=archive,
+            label_prefix=f"{label_prefix}.{attempt + 1}",
         )
         start = json.loads(
             run_installed_odd_sdlc(

@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Implements**: REQ-F-ODDSDLC-029
-**Derives From**: `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/python/design/fp/REALIZATION_DEEPENING_CONTROL_FRAME.md`
+**Derives From**: `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`, `build_tenants/python/design/fp/DETERMINISTIC_REPAIR_FRONTIER.md`
 
 Generated asset production and generated asset certification must consume one
 shared contract.

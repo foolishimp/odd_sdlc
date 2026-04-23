@@ -7,17 +7,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from genesis.events import EventStream
 
 from .analysis import load_analysis_manifest, load_workspace_state, workspace_state_ready
 from .constitutional_surface import constitutional_surface_digest
+from .gtl_module import module as odd_sdlc_module
+from .public_start_contract import RealizationIterationProjection
 from .runtime_effects import publish_runtime_event
-from .workspace_assets import asset_path
+from .runtime_event_contract import admit_runtime_event_payload
 
 
 CURRENT_TRIAGE_DIR = Path(".ai-workspace/runtime/triage")
@@ -71,14 +72,6 @@ _BINDING_LAYER_BY_NAME = {
     "retrofit_plan_surface": "design",
 }
 
-_SHALLOW_FINDING_LIMIT = 8
-_SHALLOW_SOURCE_SUFFIXES = {".py", ".scala", ".java", ".kt", ".ts", ".tsx", ".js", ".jsx"}
-_TRIVIAL_PASSTHROUGH_RE = re.compile(
-    r"\b(?:val|var|let|const)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\1\b"
-)
-_HARDCODED_SUCCESS_RE = re.compile(
-    r"\b(?:isConsistent|passed|success|ok)\b[^=\n]*=\s*(?:true|True)\b"
-)
 _CONSTITUTIONAL_RESOLUTION_EVENT_TYPES = frozenset(
     {
         "approved",
@@ -94,11 +87,23 @@ def current_edge_triage_path(workspace_root: Path | str, edge_id: str) -> Path:
     return root / CURRENT_TRIAGE_DIR / f"{edge_id}.json"
 
 
+def _load_json_dict(path: Path) -> dict[str, Any] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _published_event_id(event: dict[str, Any]) -> str | None:
+    event_id = event.get("event_id")
+    return event_id if isinstance(event_id, str) and event_id else None
+
+
 def load_current_edge_triage(workspace_root: Path | str, edge_id: str) -> dict[str, Any] | None:
     path = current_edge_triage_path(workspace_root, edge_id)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_dict(path)
 
 
 def _new_id(prefix: str) -> str:
@@ -231,82 +236,6 @@ def _artifact_matches_current(
     return True
 
 
-def _line_excerpt(lines: list[str], index: int) -> str:
-    start = max(0, index - 1)
-    end = min(len(lines), index + 2)
-    return "\n".join(lines[start:end]).strip()
-
-
-def _scan_file_for_shallow_findings(path: Path) -> list[dict[str, Any]]:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return []
-    lines = text.splitlines()
-    findings: list[dict[str, Any]] = []
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if "???" in stripped:
-            findings.append(
-                {
-                    "asset_id": path.as_posix(),
-                    "finding_kind": "missing_implementation",
-                    "target_layer": "code",
-                    "path": path.as_posix(),
-                    "excerpt": _line_excerpt(lines, index),
-                    "evidence_role": "literal_stub",
-                    "line_start": index + 1,
-                    "line_end": index + 1,
-                }
-            )
-        if _TRIVIAL_PASSTHROUGH_RE.search(stripped):
-            findings.append(
-                {
-                    "asset_id": path.as_posix(),
-                    "finding_kind": "trivial_passthrough",
-                    "target_layer": "code",
-                    "path": path.as_posix(),
-                    "excerpt": _line_excerpt(lines, index),
-                    "evidence_role": "trivial_passthrough",
-                    "line_start": index + 1,
-                    "line_end": index + 1,
-                }
-            )
-        if _HARDCODED_SUCCESS_RE.search(stripped):
-            findings.append(
-                {
-                    "asset_id": path.as_posix(),
-                    "finding_kind": "hard_coded_success",
-                    "target_layer": "code",
-                    "path": path.as_posix(),
-                    "excerpt": _line_excerpt(lines, index),
-                    "evidence_role": "hard_coded_success",
-                    "line_start": index + 1,
-                    "line_end": index + 1,
-                }
-            )
-    return findings
-
-
-def _collect_shallow_findings(
-    *,
-    workspace_root: Path,
-    layer: str,
-) -> list[dict[str, Any]]:
-    asset_id = "code_surface" if layer == "code" else "test_module_surface"
-    root = asset_path(workspace_root, asset_id)
-    if not root.exists():
-        return []
-    findings: list[dict[str, Any]] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix not in _SHALLOW_SOURCE_SUFFIXES:
-            continue
-        findings.extend(_scan_file_for_shallow_findings(path))
-        if len(findings) >= _SHALLOW_FINDING_LIMIT:
-            break
-    return findings[:_SHALLOW_FINDING_LIMIT]
-
-
 def enrich_gap_snapshot(
     *,
     workspace_root: Path | str,
@@ -332,7 +261,8 @@ def enrich_gap_snapshot(
         edge_id = str(entry["edge"])
         work_key = str(entry.get("work_key") or "") or None
         prior = load_current_edge_triage(root, edge_id)
-        if not publish and _artifact_matches_current(
+        projection: dict[str, Any]
+        if not publish and prior is not None and _artifact_matches_current(
             prior,
             analysis_current=analysis_current,
             analysis_fingerprint=analysis_fingerprint,
@@ -395,6 +325,7 @@ def _build_edge_projection(
     prior: dict[str, Any] | None,
     run_id: str,
 ) -> dict[str, Any]:
+    triage: dict[str, Any]
     edge_id = str(entry["edge"])
     work_key = str(entry.get("work_key") or "") or None
     observation = _build_observation(entry=entry, analysis_current=analysis_current)
@@ -428,6 +359,7 @@ def _build_edge_projection(
                     if key != "analysis_fingerprint"
                 },
                 "realized_basis": triage["realized_basis"],
+                "realization_iteration": triage.get("realization_iteration"),
                 "evidence": triage["evidence"],
                 "asset_findings": triage["asset_findings"],
                 "route_proposal": triage["route_proposal"],
@@ -574,6 +506,69 @@ def _structured_realized_basis(
     }
 
 
+def _mapping_dict(value: object) -> dict[str, Any] | None:
+    if hasattr(value, "to_dict"):
+        value = value.to_dict()
+    if not isinstance(value, Mapping):
+        return None
+    return {str(key): item for key, item in value.items()}
+
+
+def _dispatch_index(workspace_root: Path, *, edge_id: str) -> int:
+    manifests_dir = workspace_root / ".ai-workspace" / "fp_manifests"
+    if not manifests_dir.exists():
+        return 0
+    return sum(1 for _ in manifests_dir.glob(f"{edge_id}_*.json"))
+
+
+def _edge_fp_retry_policy(
+    workspace_root: Path,
+    *,
+    edge_id: str,
+) -> dict[str, Any] | None:
+    module = odd_sdlc_module(workspace_root)
+    for graph_function in module.graph_functions:
+        if graph_function.template.graph is None:
+            continue
+        for vector in graph_function.template.graph.vectors:
+            if vector.name != edge_id:
+                continue
+            return _mapping_dict(vector.declarations.get("fp_retry_policy"))
+    return None
+
+
+def _realization_iteration_projection(
+    *,
+    workspace_root: Path,
+    entry: dict[str, Any],
+) -> RealizationIterationProjection | None:
+    edge_id = str(entry.get("edge") or "")
+    if not edge_id:
+        return None
+    policy = _edge_fp_retry_policy(workspace_root, edge_id=edge_id)
+    if policy is None:
+        return None
+    evaluator_id = str(policy.get("evaluator_id") or "")
+    if not evaluator_id:
+        return None
+    failing = {str(name) for name in (entry.get("failing") or ()) if str(name)}
+    if evaluator_id not in failing:
+        return None
+    deepening_eligible = bool(policy.get("deepening_eligible"))
+    return {
+        "edge_id": edge_id,
+        "evaluator_id": evaluator_id,
+        "classification": (
+            "deepening_eligible"
+            if deepening_eligible
+            else "structurally_terminal"
+        ),
+        "deepening_eligible": deepening_eligible,
+        "carry_delta": float(entry.get("delta") or 0.0),
+        "dispatch_index": _dispatch_index(workspace_root, edge_id=edge_id),
+    }
+
+
 def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None:
     outcome = str(triage["process_outcome_kind"])
     reentry_layer = str(triage.get("reentry_layer") or "")
@@ -594,19 +589,9 @@ def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None
     elif reentry_layer == "design":
         fixed_vector = "reopen_design"
     elif reentry_layer == "code":
-        shallow = any(
-            finding.get("finding_kind") in {"missing_implementation", "trivial_passthrough", "hard_coded_success"}
-            for finding in triage.get("asset_findings", ())
-            if isinstance(finding, dict)
-        )
-        fixed_vector = "deepen_realization" if shallow else "repair_output_contract"
+        fixed_vector = "repair_output_contract"
     elif reentry_layer == "test":
-        shallow = any(
-            finding.get("finding_kind") in {"missing_implementation", "trivial_passthrough", "hard_coded_success"}
-            for finding in triage.get("asset_findings", ())
-            if isinstance(finding, dict)
-        )
-        fixed_vector = "deepen_realization" if shallow else "realize_missing_tests"
+        fixed_vector = "realize_missing_tests"
     if fixed_vector is None:
         return None
     return {
@@ -615,6 +600,57 @@ def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None
         "dynamic_family": None,
         "selected_graphfunction": None,
         "target_assets": target_assets,
+    }
+
+
+def _build_realization_iteration_route_proposal(
+    triage: dict[str, Any],
+) -> dict[str, Any] | None:
+    if str(triage.get("process_outcome_kind") or "") != "advance_declared_graph_function":
+        return None
+    edge_id = str(((triage.get("authority_basis") or {}).get("edge")) or "")
+    iteration = triage.get("realization_iteration")
+    if not edge_id or not isinstance(iteration, Mapping):
+        return None
+    if not bool(iteration.get("deepening_eligible")):
+        return None
+    return {
+        "vector_kind": "declared_graph_function",
+        "fixed_vector": None,
+        "dynamic_family": None,
+        "selected_graphfunction": edge_id,
+        "target_assets": [],
+        "priority_source": "triage.realization_iteration",
+    }
+
+
+def _declared_head_graph_function_routes(workspace_root: Path) -> frozenset[str]:
+    declared = odd_sdlc_module(workspace_root).metadata.get("start_authoritative_head_graph_functions", ())
+    return frozenset(entry for entry in declared if isinstance(entry, str) and entry)
+
+
+def _dynamic_route_forbidden_head_graph_functions(workspace_root: Path) -> frozenset[str]:
+    declared = odd_sdlc_module(workspace_root).metadata.get(
+        "dynamic_route_forbidden_head_graph_functions",
+        (),
+    )
+    return frozenset(entry for entry in declared if isinstance(entry, str) and entry)
+
+
+def _build_declared_graph_function_route_proposal(
+    triage: dict[str, Any],
+    *,
+    workspace_root: Path,
+) -> dict[str, Any] | None:
+    edge = str(((triage.get("authority_basis") or {}).get("edge")) or "")
+    if not edge or edge not in _declared_head_graph_function_routes(workspace_root):
+        return None
+    return {
+        "vector_kind": "declared_graph_function",
+        "fixed_vector": None,
+        "dynamic_family": None,
+        "selected_graphfunction": edge,
+        "target_assets": [],
     }
 
 
@@ -697,11 +733,31 @@ def _build_dynamic_route_proposal(
 def _assign_route_proposal(
     triage: dict[str, Any],
     *,
+    workspace_root: Path,
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
+    edge = str(((triage.get("authority_basis") or {}).get("edge")) or "")
+    realization_iteration = _build_realization_iteration_route_proposal(triage)
+    if realization_iteration is not None:
+        triage["route_proposal"] = realization_iteration
+        return triage
+    declared_graph_function = _build_declared_graph_function_route_proposal(
+        triage,
+        workspace_root=workspace_root,
+    )
+    if declared_graph_function is not None:
+        triage["process_outcome_kind"] = "advance_declared_graph_function"
+        triage["route_proposal"] = declared_graph_function
+        return triage
     proposal = _build_fixed_route_proposal(triage)
     if proposal is not None:
         triage["route_proposal"] = proposal
+        return triage
+    if edge and edge in _dynamic_route_forbidden_head_graph_functions(workspace_root):
+        triage["route_proposal"] = None
+        extensions = dict(triage.get("extensions") or {})
+        extensions["no_lawful_route_reason"] = "graph_function_only_route_requires_declaration"
+        triage["extensions"] = extensions
         return triage
     dynamic_proposal, dynamic_consulted = _build_dynamic_route_proposal(
         triage,
@@ -729,6 +785,7 @@ def _build_triage(
     workspace_state: dict[str, Any],
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
+    triage: dict[str, Any]
     failing = tuple(entry.get("failing") or ())
     missing_required = tuple(entry.get("missing_required_bindings") or ())
     delta = float(entry.get("delta") or 0.0)
@@ -740,10 +797,9 @@ def _build_triage(
         reentry_layer=reentry_layer,
     )
     realized_basis = _structured_realized_basis(entry=entry, workspace_state=workspace_state)
-    shallow_findings = (
-        _collect_shallow_findings(workspace_root=workspace_root, layer=framework_layer)
-        if analysis_current and delta > 0 and framework_layer in {"code", "test"}
-        else []
+    realization_iteration = _realization_iteration_projection(
+        workspace_root=workspace_root,
+        entry=entry,
     )
 
     if not analysis_current:
@@ -810,7 +866,7 @@ def _build_triage(
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
+        triage = _assign_route_proposal(triage, workspace_root=workspace_root, runtime_config=runtime_config)
         if triage["route_proposal"] is None:
             triage["process_outcome_kind"] = "no_lawful_route"
             triage["framework_condition"] = "unroutable"
@@ -832,33 +888,6 @@ def _build_triage(
             "extensions": {},
         }
         triage["route_proposal"] = None
-        return triage
-    if delta > 0 and shallow_findings:
-        triage = {
-            "analysis_fingerprint": analysis_fingerprint,
-            "framework_layer": framework_layer,
-            "framework_condition": "shallow",
-            "gap_kind": f"{framework_layer}_gap",
-            "process_outcome_kind": "advance_fixed_vector",
-            "reentry_layer": reentry_layer,
-            "resumption_trigger": None,
-            "policy_gate": {"state": "none", "reason": None},
-            "authority_basis": authority_basis,
-            "realized_basis": realized_basis,
-            "asset_findings": shallow_findings,
-            "evidence": [
-                {
-                    "path": finding["path"],
-                    "excerpt": finding["excerpt"],
-                    "evidence_role": finding["evidence_role"],
-                    "line_start": finding.get("line_start"),
-                    "line_end": finding.get("line_end"),
-                }
-                for finding in shallow_findings
-            ],
-            "extensions": {"deepening_preferred_over_expansion": True},
-        }
-        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
         return triage
     if delta > 0 and reentry_layer in {"goals", "intent"}:
         triage = {
@@ -884,17 +913,23 @@ def _build_triage(
             "framework_layer": framework_layer,
             "framework_condition": "unproven",
             "gap_kind": f"{reentry_layer}_gap" if reentry_layer in {"requirements", "design", "code", "test"} else "unclassified_gap",
-            "process_outcome_kind": "advance_fixed_vector",
+            "process_outcome_kind": (
+                "advance_declared_graph_function"
+                if realization_iteration is not None and realization_iteration["deepening_eligible"]
+                else "advance_fixed_vector"
+            ),
             "reentry_layer": reentry_layer,
             "resumption_trigger": None,
             "policy_gate": {"state": "none", "reason": None},
             "authority_basis": authority_basis,
             "realized_basis": realized_basis,
-            "asset_findings": shallow_findings,
+            "asset_findings": [],
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
+        if realization_iteration is not None:
+            triage["realization_iteration"] = realization_iteration
+        triage = _assign_route_proposal(triage, workspace_root=workspace_root, runtime_config=runtime_config)
         if triage["route_proposal"] is None:
             triage["process_outcome_kind"] = "no_lawful_route"
             triage["framework_condition"] = "unroutable"
@@ -915,7 +950,7 @@ def _build_triage(
             "evidence": list(observation["evidence"]),
             "extensions": {},
         }
-        triage = _assign_route_proposal(triage, runtime_config=runtime_config)
+        triage = _assign_route_proposal(triage, workspace_root=workspace_root, runtime_config=runtime_config)
         return triage
     triage = {
         "analysis_fingerprint": analysis_fingerprint,
@@ -1083,16 +1118,19 @@ def _publish_edge_projection(
     observation_event = publish_runtime_event(
         stream=stream,
         event_type="observation_recorded",
-        data={
-            "kind": "odd_sdlc.homeostatic_gap",
-            "edge": edge_id,
-            "run_id": projection.get("run_id"),
-            "observation_id": projection["observation"]["observation_id"],
-            "analysis_fingerprint": projection.get("analysis_fingerprint"),
-            "observed_boundary": projection["observation"]["observed_boundary"],
-            "observed_signal": projection["observation"]["observed_signal"],
-            "evidence": projection["observation"]["evidence"],
-        },
+        data=admit_runtime_event_payload(
+            event_type="observation_recorded",
+            data={
+                "kind": "odd_sdlc.homeostatic_gap",
+                "edge": edge_id,
+                "run_id": projection.get("run_id"),
+                "observation_id": projection["observation"]["observation_id"],
+                "analysis_fingerprint": projection.get("analysis_fingerprint"),
+                "observed_boundary": projection["observation"]["observed_boundary"],
+                "observed_signal": projection["observation"]["observed_signal"],
+                "evidence": projection["observation"]["evidence"],
+            },
+        ),
         workflow_version=workflow_version,
         work_key=projection.get("current_work_key"),
         run_id=projection.get("run_id"),
@@ -1102,89 +1140,100 @@ def _publish_edge_projection(
     triage_event = publish_runtime_event(
         stream=stream,
         event_type="triage_produced",
-        data={
-            "kind": "odd_sdlc.homeostatic_gap",
-            "edge": edge_id,
-            "run_id": projection.get("run_id"),
-            "triage_id": projection["triage"]["triage_id"],
-            "observation_id": projection["observation"]["observation_id"],
-            "prior_observation_id": projection["triage"].get("prior_observation_id"),
-            "analysis_fingerprint": projection.get("analysis_fingerprint"),
-            "triage_hash": projection["triage_hash"],
-            "framework_layer": projection["triage"]["framework_layer"],
-            "framework_condition": projection["triage"]["framework_condition"],
-            "gap_kind": projection["triage"]["gap_kind"],
-            "process_outcome_kind": projection["triage"]["process_outcome_kind"],
-            "reentry_layer": projection["triage"]["reentry_layer"],
-            "resumption_trigger": projection["triage"]["resumption_trigger"],
-            "authority_basis": projection["triage"]["authority_basis"],
-            "realized_basis": projection["triage"]["realized_basis"],
-            "asset_findings": projection["triage"]["asset_findings"],
-            "evidence": projection["triage"]["evidence"],
-            "route_proposal": projection["route_proposal"],
-        },
+        data=admit_runtime_event_payload(
+            event_type="triage_produced",
+            data={
+                "kind": "odd_sdlc.homeostatic_gap",
+                "edge": edge_id,
+                "run_id": projection.get("run_id"),
+                "triage_id": projection["triage"]["triage_id"],
+                "observation_id": projection["observation"]["observation_id"],
+                "prior_observation_id": projection["triage"].get("prior_observation_id"),
+                "analysis_fingerprint": projection.get("analysis_fingerprint"),
+                "triage_hash": projection["triage_hash"],
+                "framework_layer": projection["triage"]["framework_layer"],
+                "framework_condition": projection["triage"]["framework_condition"],
+                "gap_kind": projection["triage"]["gap_kind"],
+                "process_outcome_kind": projection["triage"]["process_outcome_kind"],
+                "reentry_layer": projection["triage"]["reentry_layer"],
+                "resumption_trigger": projection["triage"]["resumption_trigger"],
+                "authority_basis": projection["triage"]["authority_basis"],
+                "realized_basis": projection["triage"]["realized_basis"],
+                "asset_findings": projection["triage"]["asset_findings"],
+                "evidence": projection["triage"]["evidence"],
+                "realization_iteration": projection["triage"].get("realization_iteration"),
+                "route_proposal": projection["route_proposal"],
+            },
+        ),
         workflow_version=workflow_version,
         work_key=projection.get("current_work_key"),
         run_id=projection.get("run_id"),
         aggregate_type="odd_sdlc.edge_triage",
         aggregate_id=edge_id,
-        correlation_id=observation_event["event_id"],
-        causation_event_id=observation_event["event_id"],
+        correlation_id=_published_event_id(observation_event),
+        causation_event_id=_published_event_id(observation_event),
     )
     route_event = publish_runtime_event(
         stream=stream,
         event_type="route_recorded",
-        data={
-            "kind": "odd_sdlc.homeostatic_gap",
-            "edge": edge_id,
-            "run_id": projection.get("run_id"),
-            "route_id": projection["route_binding"]["route_id"],
-            "triage_id": projection["triage"]["triage_id"],
-            "analysis_fingerprint": projection.get("analysis_fingerprint"),
-            "state": projection["route_binding"]["state"],
-            "vector_kind": projection["route_binding"]["vector_kind"],
-            "selected_vector": projection["route_binding"]["selected_vector"],
-            "dynamic_family": projection["route_binding"]["dynamic_family"],
-            "selected_graphfunction": projection["route_binding"]["selected_graphfunction"],
-            "target_assets": projection["route_binding"]["target_assets"],
-            "priority_source": projection["route_binding"]["priority_source"],
-            "no_lawful_route_reason": projection["route_binding"].get("no_lawful_route_reason"),
-        },
+        data=admit_runtime_event_payload(
+            event_type="route_recorded",
+            data={
+                "kind": "odd_sdlc.homeostatic_gap",
+                "edge": edge_id,
+                "run_id": projection.get("run_id"),
+                "route_id": projection["route_binding"]["route_id"],
+                "triage_id": projection["triage"]["triage_id"],
+                "analysis_fingerprint": projection.get("analysis_fingerprint"),
+                "state": projection["route_binding"]["state"],
+                "vector_kind": projection["route_binding"]["vector_kind"],
+                "selected_vector": projection["route_binding"]["selected_vector"],
+                "dynamic_family": projection["route_binding"]["dynamic_family"],
+                "selected_graphfunction": projection["route_binding"]["selected_graphfunction"],
+                "target_assets": projection["route_binding"]["target_assets"],
+                "priority_source": projection["route_binding"]["priority_source"],
+                "realization_iteration": projection["triage"].get("realization_iteration"),
+                "no_lawful_route_reason": projection["route_binding"].get("no_lawful_route_reason"),
+            },
+        ),
         workflow_version=workflow_version,
         work_key=projection.get("current_work_key"),
         run_id=projection.get("run_id"),
         aggregate_type="odd_sdlc.edge_triage",
         aggregate_id=edge_id,
-        correlation_id=triage_event["event_id"],
-        causation_event_id=triage_event["event_id"],
+        correlation_id=_published_event_id(triage_event),
+        causation_event_id=_published_event_id(triage_event),
     )
     constitutional_event = None
     if projection["constitutional_proposal"] is not None:
         constitutional_event = publish_runtime_event(
             stream=stream,
             event_type="constitutional_proposal_recorded",
-            data={
-                "kind": "odd_sdlc.homeostatic_gap",
-                "edge": edge_id,
-                "run_id": projection.get("run_id"),
-                "proposal_id": projection["constitutional_proposal"]["proposal_id"],
-                "triage_id": projection["triage"]["triage_id"],
-                "analysis_fingerprint": projection.get("analysis_fingerprint"),
-                "state": projection["constitutional_proposal"]["state"],
-                "identity_hash": projection["constitutional_proposal"]["identity_hash"],
-                "policy_mode": projection["constitutional_proposal"]["policy_mode"],
-                "proposal_kind": projection["constitutional_proposal"]["proposal_kind"],
-                "target_surface": projection["constitutional_proposal"]["target_surface"],
-                "target_surface_digest": projection["constitutional_proposal"]["target_surface_digest"],
-                "reentry_layer": projection["constitutional_proposal"]["reentry_layer"],
-            },
+            data=admit_runtime_event_payload(
+                event_type="constitutional_proposal_recorded",
+                data={
+                    "kind": "odd_sdlc.homeostatic_gap",
+                    "edge": edge_id,
+                    "run_id": projection.get("run_id"),
+                    "proposal_id": projection["constitutional_proposal"]["proposal_id"],
+                    "triage_id": projection["triage"]["triage_id"],
+                    "analysis_fingerprint": projection.get("analysis_fingerprint"),
+                    "state": projection["constitutional_proposal"]["state"],
+                    "identity_hash": projection["constitutional_proposal"]["identity_hash"],
+                    "policy_mode": projection["constitutional_proposal"]["policy_mode"],
+                    "proposal_kind": projection["constitutional_proposal"]["proposal_kind"],
+                    "target_surface": projection["constitutional_proposal"]["target_surface"],
+                    "target_surface_digest": projection["constitutional_proposal"]["target_surface_digest"],
+                    "reentry_layer": projection["constitutional_proposal"]["reentry_layer"],
+                },
+            ),
             workflow_version=workflow_version,
             work_key=projection.get("current_work_key"),
             run_id=projection.get("run_id"),
             aggregate_type="odd_sdlc.edge_triage",
             aggregate_id=edge_id,
-            correlation_id=route_event["event_id"],
-            causation_event_id=route_event["event_id"],
+            correlation_id=_published_event_id(route_event),
+            causation_event_id=_published_event_id(route_event),
         )
     projection["observation"]["event_id"] = observation_event["event_id"]
     projection["triage"]["event_id"] = triage_event["event_id"]
@@ -1195,15 +1244,18 @@ def _publish_edge_projection(
         divergence_event = publish_runtime_event(
             stream=stream,
             event_type="triage_divergence",
-            data={
-                "kind": "odd_sdlc.homeostatic_gap",
-                "edge": edge_id,
-                "run_id": projection.get("run_id"),
-                "prior_triage_hash": prior.get("triage_hash"),
-                "current_triage_hash": projection["triage_hash"],
-                "prior_triage_id": (prior.get("triage") or {}).get("triage_id"),
-                "current_triage_id": projection["triage"]["triage_id"],
-            },
+            data=admit_runtime_event_payload(
+                event_type="triage_divergence",
+                data={
+                    "kind": "odd_sdlc.homeostatic_gap",
+                    "edge": edge_id,
+                    "run_id": projection.get("run_id"),
+                    "prior_triage_hash": prior.get("triage_hash"),
+                    "current_triage_hash": projection["triage_hash"],
+                    "prior_triage_id": (prior.get("triage") or {}).get("triage_id"),
+                    "current_triage_id": projection["triage"]["triage_id"],
+                },
+            ),
             workflow_version=workflow_version,
             work_key=projection.get("current_work_key"),
             run_id=projection.get("run_id"),
@@ -1270,7 +1322,19 @@ def _build_route_binding(
             "dynamic_family": None,
             "selected_graphfunction": None,
             "target_assets": route_proposal["target_assets"],
-            "priority_source": "triage.fixed_vector_mapping",
+            "priority_source": route_proposal.get("priority_source", "triage.fixed_vector_mapping"),
+            "no_lawful_route_reason": None,
+        }
+    if process_outcome_kind == "advance_declared_graph_function" and route_proposal is not None:
+        return {
+            "route_id": route_id,
+            "state": "advance_declared_graph_function",
+            "vector_kind": route_proposal["vector_kind"],
+            "selected_vector": None,
+            "dynamic_family": None,
+            "selected_graphfunction": route_proposal.get("selected_graphfunction"),
+            "target_assets": [],
+            "priority_source": route_proposal.get("priority_source", "triage.declared_graph_function"),
             "no_lawful_route_reason": None,
         }
     if process_outcome_kind == "advance_dynamic_family" and route_proposal is not None:

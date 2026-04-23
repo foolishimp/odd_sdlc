@@ -151,7 +151,6 @@ The route layer distinguishes:
 
 Fixed-vector examples in the first implementation cut are:
 
-- `deepen_realization`
 - `repair_output_contract`
 - `realize_missing_tests`
 - `reopen_design`
@@ -175,12 +174,11 @@ Forward-authority law:
 - once re-entry is chosen, derivation resumes from that layer and flows forward
 - downstream work must not skip the named upstream authority layer
 
-Deepening law:
+Governance boundary:
 
-- when current evidence shows shallow existing realization, route selection
-  prefers deepening that realization over lateral expansion
-- lateral expansion remains lawful only when deeper repair is satisfied,
-  inapplicable, or superseded by stronger declared law
+- route selection names lawful re-entry and route eligibility
+- governance publication may describe preserved structure and unmet pressure
+- builder strategy remains outside route publication
 
 ## Constitutional Gate
 
@@ -305,6 +303,6 @@ It is whether the system can:
 
 - classify that gap honestly
 - name the lawful re-entry layer
-- prefer deepening when shallow realization already exists
+- preserve current-state and route truth without prescribing builder strategy
 - gate constitutional repricing explicitly
 - preserve divergence and current-state clarity at the same time

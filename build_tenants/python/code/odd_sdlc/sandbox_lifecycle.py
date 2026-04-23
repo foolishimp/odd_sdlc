@@ -25,7 +25,14 @@ _APPS_ROOT = _CODE_DIR.parents[4]
 _ABI_INSTALLER = _APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 
 
-def install_kernel_sandbox(target: Path) -> dict[str, Any]:
+def _json_object_payload(raw: str, *, context: str) -> dict[str, object]:
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{context} must produce a JSON object")
+    return payload
+
+
+def install_kernel_sandbox(target: Path) -> dict[str, object]:
     target.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [sys.executable, str(_ABI_INSTALLER), "--target", str(target), "--project-slug", "odd_sdlc_sandbox"],
@@ -34,7 +41,7 @@ def install_kernel_sandbox(target: Path) -> dict[str, Any]:
         timeout=120,
         check=True,
     )
-    return json.loads(result.stdout)
+    return _json_object_payload(result.stdout, context="install_kernel_sandbox")
 
 
 def seed_odd_sdlc_package(target: Path) -> None:
@@ -120,7 +127,7 @@ def seed_canonical_spec_surface(target: Path) -> None:
     )
 
 
-def prepare_sandbox(target: Path) -> dict[str, Any]:
+def prepare_sandbox(target: Path) -> dict[str, object]:
     install_payload = install_kernel_sandbox(target)
     assert_installed_genesis_runtime(target)
     seed_odd_sdlc_package(target)
@@ -134,7 +141,7 @@ def prepare_sandbox(target: Path) -> dict[str, Any]:
     }
 
 
-def reset_sandbox_runtime_state(target: Path) -> dict[str, Any]:
+def reset_sandbox_runtime_state(target: Path) -> dict[str, object]:
     runtime_root = target / ".ai-workspace"
     existed = runtime_root.exists()
     if existed:
@@ -147,7 +154,7 @@ def reset_sandbox_runtime_state(target: Path) -> dict[str, Any]:
     }
 
 
-def observe_sandbox(target: Path) -> dict[str, Any]:
+def observe_sandbox(target: Path) -> dict[str, object]:
     events_path = target / ".ai-workspace" / "events" / "events.jsonl"
     events = []
     if events_path.exists():

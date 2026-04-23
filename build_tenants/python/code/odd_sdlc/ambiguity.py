@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeAlias
 
 from .project_profile import (
     DEFAULT_AMBIGUITY_RISK_APPETITE,
@@ -21,6 +21,7 @@ AMBIGUITY_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-ambiguity-registe
 EVENT_STREAM_PATH = Path(".ai-workspace/events/events.jsonl")
 _DEFAULT_STAGE = "normalize_workspace"
 _RESOLVED_STATUSES = {"resolved", "superseded"}
+AmbiguityRegisterReadModel: TypeAlias = dict[str, object]
 
 
 def _read_existing_register(path: Path) -> dict[str, Any] | None:
@@ -60,12 +61,19 @@ def _event_edge(event: dict[str, Any]) -> str:
     return edge if isinstance(edge, str) else ""
 
 
+def _load_json_dict(path: Path) -> dict[str, Any] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def _matching_event_refs(
     events: list[dict[str, Any]],
     *,
     event_type: str,
     edge: str,
-    predicate,
+    predicate: Callable[[dict[str, Any]], bool],
 ) -> list[str]:
     refs: list[str] = []
     for event in events:
@@ -285,7 +293,7 @@ def load_published_ambiguity_register(workspace_root: Path) -> dict[str, Any] | 
     path = workspace_root / AMBIGUITY_REGISTER_PATH
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_dict(path)
 
 
 def load_or_build_ambiguity_register(workspace_root: Path) -> dict[str, Any]:

@@ -2,17 +2,24 @@
 """Runtime-owned event publication seam for odd_sdlc domain effects."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from genesis.events import EventContext, EventStream, emit
+
+from .runtime_event_contract import (
+    RuntimeEventPayload,
+    RuntimeEventType,
+    admit_runtime_event_payload,
+    serialize_runtime_event_payload,
+)
 
 
 def publish_runtime_event(
     *,
     stream: EventStream,
-    event_type: str,
-    data: dict[str, Any],
+    event_type: RuntimeEventType,
+    data: RuntimeEventPayload,
     workflow_version: str,
     work_key: str | None = None,
     run_id: str | None = None,
@@ -25,10 +32,11 @@ def publish_runtime_event(
     materialization_id: str | None = None,
     call_id: str | None = None,
     vector_id: str | None = None,
-) -> dict[str, Any]:
-    return emit(
+) -> dict[str, object]:
+    admitted_payload = admit_runtime_event_payload(event_type=event_type, data=data)
+    emitted = emit(
         event_type,
-        data,
+        serialize_runtime_event_payload(admitted_payload),
         stream=stream,
         context=EventContext(
             workflow_version=workflow_version,
@@ -46,13 +54,16 @@ def publish_runtime_event(
         ),
         package_snapshot_id=None,
     )
+    if not isinstance(emitted, Mapping):
+        raise RuntimeError(f"emit({event_type!r}) returned a non-mapping payload")
+    return {str(key): value for key, value in emitted.items()}
 
 
 def publish_workspace_runtime_event(
     *,
     workspace_root: Path,
-    event_type: str,
-    data: dict[str, Any],
+    event_type: RuntimeEventType,
+    data: RuntimeEventPayload,
     workflow_version: str,
     work_key: str | None = None,
     run_id: str | None = None,
@@ -65,7 +76,7 @@ def publish_workspace_runtime_event(
     materialization_id: str | None = None,
     call_id: str | None = None,
     vector_id: str | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     return publish_runtime_event(
         stream=EventStream.open(workspace_root),
         event_type=event_type,

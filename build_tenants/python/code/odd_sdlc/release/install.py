@@ -35,6 +35,13 @@ _ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->"
 _ODD_SDLC_BOOTLOADER_END = "<!-- ODD_SDLC_BOOTLOADER_END -->"
 
 
+def _json_object_payload(raw: str, *, context: str) -> dict[str, object]:
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{context} must produce a JSON object")
+    return payload
+
+
 def _copy_package(target_root: Path) -> Path:
     package_root = target_root / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE
     package_root.mkdir(parents=True, exist_ok=True)
@@ -75,7 +82,7 @@ def _ensure_installed_genesis_runtime(target_root: Path) -> Path:
     return destination_root
 
 
-def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, Any]:
+def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, object]:
     if not ABI_INSTALLER.exists():
         raise FileNotFoundError(f"abiogenesis installer not found at {ABI_INSTALLER}")
     result = subprocess.run(
@@ -94,7 +101,7 @@ def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: 
         timeout=180,
         check=True,
     )
-    return json.loads(result.stdout)
+    return _json_object_payload(result.stdout, context="_run_abiogenesis_install")
 
 
 def _write_runtime_contract(target_root: Path) -> Path:

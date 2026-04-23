@@ -81,37 +81,47 @@ def build_repair_frontier_register(
     test_env_tests_root = profile_test_env_tests_relative_path(profile, "").rstrip("/")
     run_archive_path = profile_test_env_relative_path(profile, "50-generated-run-archive.md")
 
-    requirements_unmet = lambda entry: (
-        not bool(entry.get("present_in_current_requirement_surface"))
-        or str(entry.get("carry_status") or "") != "carried"
-    )
-    requirements_preserve = lambda entry: bool(entry.get("present_in_current_requirement_surface"))
+    def requirements_unmet(entry: dict[str, Any]) -> bool:
+        return (
+            not bool(entry.get("present_in_current_requirement_surface"))
+            or str(entry.get("carry_status") or "") != "carried"
+        )
 
-    design_unmet = lambda entry: (
-        str(entry.get("carry_status") or "") == "carried"
-        and not bool(entry.get("design_surface_claim_refs"))
-    )
-    design_preserve = lambda entry: bool(entry.get("design_surface_claim_refs"))
+    def requirements_preserve(entry: dict[str, Any]) -> bool:
+        return bool(entry.get("present_in_current_requirement_surface"))
 
-    code_unmet = lambda entry: any(
-        reason in {"missing_code_realization", "behavioral_realization_missing"}
-        for reason in entry.get("blocking_reasons", ())
-    )
-    code_preserve = lambda entry: bool(
-        entry.get("behavioral_code_refs") or entry.get("code_refs")
-    )
+    def design_unmet(entry: dict[str, Any]) -> bool:
+        return (
+            str(entry.get("carry_status") or "") == "carried"
+            and not bool(entry.get("design_surface_claim_refs"))
+        )
 
-    test_unmet = lambda entry: any(
-        reason in {"missing_planned_test_coverage", "missing_realized_test_evidence"}
-        for reason in entry.get("blocking_reasons", ())
-    )
-    test_preserve = lambda entry: bool(
-        entry.get("planned_test_claim_refs")
-        or entry.get("planned_test_design_claim_refs")
-        or entry.get("planned_test_module_claim_refs")
-        or entry.get("test_refs")
-        or entry.get("test_run_archive_refs")
-    )
+    def design_preserve(entry: dict[str, Any]) -> bool:
+        return bool(entry.get("design_surface_claim_refs"))
+
+    def code_unmet(entry: dict[str, Any]) -> bool:
+        return any(
+            reason in {"missing_code_realization", "behavioral_realization_missing"}
+            for reason in entry.get("blocking_reasons", ())
+        )
+
+    def code_preserve(entry: dict[str, Any]) -> bool:
+        return bool(entry.get("behavioral_code_refs") or entry.get("code_refs"))
+
+    def test_unmet(entry: dict[str, Any]) -> bool:
+        return any(
+            reason in {"missing_planned_test_coverage", "missing_realized_test_source"}
+            for reason in entry.get("blocking_reasons", ())
+        )
+
+    def test_preserve(entry: dict[str, Any]) -> bool:
+        return bool(
+            entry.get("planned_test_claim_refs")
+            or entry.get("planned_test_design_claim_refs")
+            or entry.get("planned_test_module_claim_refs")
+            or entry.get("test_refs")
+            or entry.get("test_run_archive_refs")
+        )
 
     frontiers = {
         "requirements": {
@@ -125,10 +135,6 @@ def build_repair_frontier_register(
             ],
             "lawful_proof_frontier": [
                 REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix(),
-            ],
-            "widening_conditions": [
-                "widen only when the unmet ids are absent from the current generated requirement surface and no existing requirement-family publication carries them",
-                "reframe upward only when the unmet ids require intent, goal, or product change rather than requirement-surface completion",
             ],
         },
         "design": {
@@ -151,10 +157,6 @@ def build_repair_frontier_register(
             "lawful_proof_frontier": [
                 REQUIREMENT_CLOSURE_REGISTER_PATH.as_posix(),
                 f"{tenant_root}/design/",
-            ],
-            "widening_conditions": [
-                "widen only when the unmet ids have no existing design or implementation-design carrier to deepen",
-                "prefer deepening existing design surfaces before adding new design groups or lateral branches",
             ],
         },
         "code": {
@@ -181,10 +183,6 @@ def build_repair_frontier_register(
                     run_archive_path,
                 }
             ),
-            "widening_conditions": [
-                "widen only when the unmet ids have no existing implementation-module or code carrier to deepen",
-                "prefer repairing shallow or placeholder implementation in current files before adding new files or module groups",
-            ],
         },
         "test": {
             "target_asset": "test_run_archive_surface",
@@ -212,10 +210,6 @@ def build_repair_frontier_register(
                     run_archive_path,
                 }
             ),
-            "widening_conditions": [
-                "widen only when the unmet ids have no existing planned-test or realized-test carrier to deepen",
-                "prefer realizing missing tests and run-archive evidence for current ids before widening to unrelated test surface",
-            ],
         },
     }
 
@@ -247,14 +241,8 @@ def build_repair_frontier_prompt_context(
     lines = [
         "# odd_sdlc Deterministic Repair Frontier",
         "",
-        "Use this as the builder-facing repair law over the enduring asset under construction.",
-        "Preserve already-satisfied structure. Repair only the unmet requirement delta unless one listed widening condition is met.",
-        "",
-        "## Global Law",
-        "- inspect the current target asset first and treat existing structure as an obligation, not a blank slate",
-        "- preserve satisfied requirement ids and the existing files, sections, and tests that already carry them",
-        "- deepen or correct current carriers before widening laterally",
-        "- widen only when the named frontier has no existing carrier for the unmet requirement ids",
+        "This publication carries current governance truth for the enduring asset under construction.",
+        "It names preserved structure, unmet requirement pressure, and lawful edit/proof frontiers without prescribing builder strategy.",
         "",
         "## Summary",
         f"- frontier count: {summary.get('frontier_count', 0)}",
@@ -265,10 +253,6 @@ def build_repair_frontier_prompt_context(
 
     for lane_name in ("requirements", "design", "code", "test"):
         lane = dict(frontiers.get(lane_name) or {})
-        widening_conditions = [
-            f"  - {condition}"
-            for condition in lane.get("widening_conditions", ())
-        ] or ["  - none"]
         lines.extend(
             (
                 f"## {lane_name.title()} Frontier",
@@ -280,8 +264,6 @@ def build_repair_frontier_prompt_context(
                 ),
                 *_format_path_lines("lawful edit frontier", list(lane.get("lawful_edit_frontier", ()))),
                 *_format_path_lines("lawful proof frontier", list(lane.get("lawful_proof_frontier", ()))),
-                "- widening conditions:",
-                *widening_conditions,
                 "",
             )
         )

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def _format_id_lines(
@@ -34,7 +34,7 @@ def _gap_ids(payload: dict[str, Any], key: str) -> tuple[str, ...]:
 
 def _family_refs(
     payload: dict[str, Any],
-    predicate,
+    predicate: Callable[[dict[str, Any]], bool],
 ) -> tuple[str, ...]:
     publication = payload.get("requirement_family_traceability")
     if not isinstance(publication, dict):
@@ -78,9 +78,9 @@ def build_requirement_closure_prompt_context_from_register(
     )
 
     lines = [
-        "# odd_sdlc Requirement Closure Builder Context",
+        "# odd_sdlc Requirement Closure Governance Context",
         "",
-        "Use this as a compact builder-facing summary of the live requirement closure state.",
+        "Use this as a compact governance summary of the live requirement closure state.",
         "Treat the generated requirement surface as the target asset under construction.",
         "Use the full closure register only when you need per-id detail.",
         "",
@@ -119,9 +119,9 @@ def build_requirement_closure_prompt_context_from_register(
         *_format_id_lines("requirement families with invalid trace refs", invalid_family_traceability_refs),
         *_format_id_lines("requirement families missing reciprocal design backlink", missing_design_backlink_families),
         "",
-        "## Builder Law",
-        "- inspect the current generated requirement surface first",
-        "- continue from the current workspace state rather than restating the whole imported authority",
-        "- use the full closure register only when the compact summary is insufficient for the next repair step",
+        "## Governance Use",
+        "- the current generated requirement surface is the active target surface",
+        "- the current workspace state remains authoritative over the next repair step",
+        "- the full closure register remains available when compact summary is insufficient",
     ]
     return "\n".join(lines) + "\n"

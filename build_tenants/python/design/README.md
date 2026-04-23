@@ -11,6 +11,8 @@ Adopted common law:
 
 Tenant-local design law:
 
+- `build_tenants/python/design/adrs/ADR-001-maximum-enforceable-python-typing.md`
+- `build_tenants/python/design/adrs/ADR-002-abg-continuation-authority-and-cooperative-operational-dispatch.md`
 - `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
 - `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
 - `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`
@@ -25,6 +27,18 @@ Tenant-local design law:
 `SOFTWARE_DOMAIN_BUILDOUT.md` and
 `HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md` are the current operative
 tenant-local design surfaces for `odd_sdlc`.
+
+`ADR-001-maximum-enforceable-python-typing.md` records the tenant-wide typing
+law: `odd_sdlc` now enforces package-wide strict typing for `odd_sdlc.*`, with
+no tenant-local `follow_imports = skip`, `ignore_missing_imports`, or
+uncovered-module loophole.
+
+`ADR-002-abg-continuation-authority-and-cooperative-operational-dispatch.md`
+records the tenant-wide inversion-of-control law for operational continuation:
+ABG owns continuation and re-entry, while `odd_sdlc` operational commands are
+single-step cooperative adapters that publish evidence and return control. This
+is the tenant-local binding of the shared ODD method principle that GTL/ABG
+applications must not replace ABG continuation with tenant-local orchestration.
 
 `REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md` adopts the
 design-module method for the requirement-closure, traceability, gap, query,

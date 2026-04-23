@@ -8,11 +8,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from .asset_types import ASSET_TYPES
+from .domain_model import AssetCheckpoint, relative_file_uri
 from .project_profile import load_project_profile, strip_scalar_quotes
 from .runtime_effects import publish_workspace_runtime_event
+from .runtime_event_contract import admit_runtime_event_payload
+from .test_lane_evidence import build_test_lane_evidence
 from .traceability_index import build_requirement_traceability_index
 from .workspace_assets import (
     assess_generated_asset_contract,
@@ -21,9 +24,9 @@ from .workspace_assets import (
     asset_materialization_path,
     asset_path,
     checkpoint_for_path,
-    relative_file_uri,
     summarize_code_surface,
     summarize_test_evidence,
+    TestEvidenceSummary,
 )
 
 
@@ -47,6 +50,13 @@ _CODE_SURFACE_PRESERVED_ROOTS = {
     "test_env",
     "workspaces",
 }
+
+
+class GeneratedTestFilePlan(TypedDict):
+    module_name: str
+    relative_path: str
+    requirement_ids: tuple[str, ...]
+    content: str
 
 
 def _is_concrete_requirement_id(requirement_id: str) -> bool:
@@ -545,12 +555,12 @@ def _replace_generated_code_surface(
     }
 
 
-def _planned_generated_test_files(workspace_root: Path) -> tuple[dict[str, object], ...]:
+def _planned_generated_test_files(workspace_root: Path) -> tuple[GeneratedTestFilePlan, ...]:
     stack = _selected_test_stack_defaults(workspace_root)
     modules = load_project_profile(workspace_root).declared_module_names()
     requirement_ids = _planned_test_requirement_ids(workspace_root)
     distributed = _distributed_requirement_ids(requirement_ids, modules)
-    planned: list[dict[str, object]] = []
+    planned: list[GeneratedTestFilePlan] = []
     for module_name in modules:
         module_requirement_ids = distributed.get(module_name, ())
         if not module_requirement_ids:
@@ -708,8 +718,8 @@ def _build_work_report(
     workspace_root: Path,
     target_asset: str,
     target_path: Path,
-    previous_checkpoint,
-    current_checkpoint,
+    previous_checkpoint: AssetCheckpoint,
+    current_checkpoint: AssetCheckpoint,
     attestation: dict[str, Any],
     operation: str,
     materialization_report: dict[str, object] | None = None,
@@ -1472,6 +1482,10 @@ def _construct_release(workspace_root: Path) -> str:
     test_run_archive = _asset_text(workspace_root, "test_run_archive_surface")
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
+    test_lane = build_test_lane_evidence(
+        workspace_root,
+        test_summary=test_summary,
+    )
     if test_summary["parsed_report_count"] == 0:
         completion_state = "construction_complete_pending_execution"
     elif test_summary["failures"] == 0 and test_summary["errors"] == 0:
@@ -1502,6 +1516,8 @@ def _construct_release(workspace_root: Path) -> str:
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
             f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
+            f"- test_lane_completeness_state: {test_lane['completeness_state']}",
+            f"- next_test_lane_gain: {test_lane['next_lawful_gain']}",
             "",
             "## Source Requirements Snapshot",
             requirements,
@@ -1569,16 +1585,37 @@ def _construct_build_execution_surface(workspace_root: Path) -> str:
     )
 
 
+def _dispatch_status(dispatch: object) -> str | None:
+    if not isinstance(dispatch, dict):
+        return None
+    status = dispatch.get("status")
+    return status if isinstance(status, str) and status else None
+
+
+def _dispatch_text(dispatch: object, field_name: str, *, fallback: str) -> str:
+    if not isinstance(dispatch, dict):
+        return fallback
+    value = dispatch.get(field_name)
+    return value if isinstance(value, str) and value else fallback
+
+
+def _dispatch_exit_code(dispatch: object) -> int | str:
+    if not isinstance(dispatch, dict):
+        return "n/a"
+    value = dispatch.get("exit_code")
+    return value if isinstance(value, int) else "n/a"
+
+
 def _construct_build_execution_result_surface(workspace_root: Path) -> str:
     from .operational_dispatch import latest_operational_dispatch
 
     build_execution_surface = _asset_text(workspace_root, "build_execution_surface")
     build_summary = _build_artifact_summary(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "build")
-    if dispatch.get("status") == "failed":
+    if _dispatch_status(dispatch) == "failed":
         status = "failed"
         saga_state = "failed"
-    elif dispatch.get("status") == "succeeded":
+    elif _dispatch_status(dispatch) == "succeeded":
         status = "result_admitted"
         saga_state = "result_admitted"
     else:
@@ -1594,10 +1631,10 @@ def _construct_build_execution_result_surface(workspace_root: Path) -> str:
             f"- status: {status}",
             f"- saga_state: {saga_state}",
             f"- observed build artifact roots: {', '.join(build_summary['observed_paths']) or 'none'}",
-            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
-            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
-            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
-            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
+            f"- dispatch_binding: `{_dispatch_text(dispatch, 'binding', fallback='none')}`",
+            f"- dispatch_exit_code: {_dispatch_exit_code(dispatch)}",
+            f"- dispatch_stdout_log: `{_dispatch_text(dispatch, 'stdout_path', fallback='none')}`",
+            f"- dispatch_stderr_log: `{_dispatch_text(dispatch, 'stderr_path', fallback='none')}`",
             "",
             "## Source Build Execution Snapshot",
             build_execution_surface,
@@ -1646,10 +1683,10 @@ def _construct_test_execution_result_surface(workspace_root: Path) -> str:
     test_execution_surface = _asset_text(workspace_root, "test_execution_surface")
     test_summary = summarize_test_evidence(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "test")
-    if dispatch.get("status") == "failed":
+    if _dispatch_status(dispatch) == "failed":
         status = "failed"
         saga_state = "failed"
-    elif dispatch.get("status") == "succeeded":
+    elif _dispatch_status(dispatch) == "succeeded":
         status = "result_admitted"
         saga_state = "result_admitted"
     elif test_summary["parsed_report_count"] == 0:
@@ -1675,10 +1712,10 @@ def _construct_test_execution_result_surface(workspace_root: Path) -> str:
             f"- tests observed: {test_summary['tests']}",
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
-            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
-            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
-            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
-            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
+            f"- dispatch_binding: `{_dispatch_text(dispatch, 'binding', fallback='none')}`",
+            f"- dispatch_exit_code: {_dispatch_exit_code(dispatch)}",
+            f"- dispatch_stdout_log: `{_dispatch_text(dispatch, 'stdout_path', fallback='none')}`",
+            f"- dispatch_stderr_log: `{_dispatch_text(dispatch, 'stderr_path', fallback='none')}`",
             "",
             "## Source Test Execution Snapshot",
             test_execution_surface,
@@ -1731,10 +1768,10 @@ def _construct_deployment_result_surface(workspace_root: Path) -> str:
     deployment_surface = _asset_text(workspace_root, "deployment_surface")
     test_summary = summarize_test_evidence(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "deployment")
-    if dispatch.get("status") == "failed":
+    if _dispatch_status(dispatch) == "failed":
         status = "failed"
         saga_state = "failed"
-    elif dispatch.get("status") == "succeeded":
+    elif _dispatch_status(dispatch) == "succeeded":
         status = "result_admitted"
         saga_state = "result_admitted"
     else:
@@ -1750,10 +1787,10 @@ def _construct_deployment_result_surface(workspace_root: Path) -> str:
             f"- status: {status}",
             f"- saga_state: {saga_state}",
             f"- returned runtime or deployment reports currently observed: {test_summary['report_file_count']}",
-            f"- dispatch_binding: `{dispatch.get('binding', 'none')}`",
-            f"- dispatch_exit_code: {dispatch.get('exit_code', 'n/a')}",
-            f"- dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
-            f"- dispatch_stderr_log: `{dispatch.get('stderr_path', 'none')}`",
+            f"- dispatch_binding: `{_dispatch_text(dispatch, 'binding', fallback='none')}`",
+            f"- dispatch_exit_code: {_dispatch_exit_code(dispatch)}",
+            f"- dispatch_stdout_log: `{_dispatch_text(dispatch, 'stdout_path', fallback='none')}`",
+            f"- dispatch_stderr_log: `{_dispatch_text(dispatch, 'stderr_path', fallback='none')}`",
             "",
             "## Source Deployment Snapshot",
             deployment_surface,
@@ -1770,9 +1807,9 @@ def _construct_deployed_environment_surface(workspace_root: Path) -> str:
 
     deployment_result_surface = _asset_text(workspace_root, "deployment_result_surface")
     dispatch = latest_operational_dispatch(workspace_root, "deployment")
-    if dispatch.get("status") == "failed":
+    if _dispatch_status(dispatch) == "failed":
         status = "deployment_failed"
-    elif dispatch.get("status") == "succeeded":
+    elif _dispatch_status(dispatch) == "succeeded":
         status = "deployment_result_admitted"
     else:
         status = "deployment_pending_external_evidence"
@@ -1785,7 +1822,7 @@ def _construct_deployed_environment_surface(workspace_root: Path) -> str:
             "## Current Projected State",
             f"- status: {status}",
             "- projection_basis: admitted deployment result surface",
-            f"- deployment_dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
+            f"- deployment_dispatch_stdout_log: `{_dispatch_text(dispatch, 'stdout_path', fallback='none')}`",
             "",
             "## Source Deployment Result Snapshot",
             deployment_result_surface,
@@ -1801,11 +1838,11 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "deployment")
-    if dispatch.get("status") == "failed":
+    if _dispatch_status(dispatch) == "failed":
         completion_state = "deployment_failed"
         observed_status = "failed"
         saga_state = "failed"
-    elif dispatch.get("status") == "succeeded":
+    elif _dispatch_status(dispatch) == "succeeded":
         completion_state = "deployment_result_recorded"
         observed_status = "result_admitted"
         saga_state = "result_admitted"
@@ -1838,7 +1875,7 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
             f"- failures observed: {test_summary['failures']}",
             f"- errors observed: {test_summary['errors']}",
             f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
-            f"- deployment_dispatch_stdout_log: `{dispatch.get('stdout_path', 'none')}`",
+            f"- deployment_dispatch_stdout_log: `{_dispatch_text(dispatch, 'stdout_path', fallback='none')}`",
             "",
             "## Source Deployment Result Snapshot",
             deployment_result_surface,
@@ -2062,12 +2099,20 @@ def _construct_test_code_surface(workspace_root: Path) -> str:
 
 
 def _construct_test_run_archive(workspace_root: Path) -> str:
-    test_summary = summarize_test_evidence(workspace_root)
+    test_summary: TestEvidenceSummary = summarize_test_evidence(workspace_root)
     ungoverned_report_lines = tuple(
         f"- `{path}`" for path in test_summary["ungoverned_report_paths"]
     ) or ("- no undeclared execution reports observed",)
     if _software_project_mode(workspace_root):
         test_code = _construct_test_code_surface(workspace_root)
+        test_lane = build_test_lane_evidence(
+            workspace_root,
+            test_summary=test_summary,
+        )
+        blocking_lines = tuple(
+            f"- blocking_reason: {reason}"
+            for reason in test_lane["blocking_reasons"]
+        ) or ("- blocking_reason: none",)
         report_lines = tuple(f"- `{path}`" for path in test_summary["report_paths"]) or (
             "- no report files observed yet",
         )
@@ -2084,6 +2129,12 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
                 f"- failures observed: {test_summary['failures']}",
                 f"- errors observed: {test_summary['errors']}",
                 f"- ungoverned report files observed: {test_summary['ungoverned_report_file_count']}",
+                "",
+                "## Test Lane Completeness",
+                f"- completeness_state: {test_lane['completeness_state']}",
+                f"- next_lawful_gain: {test_lane['next_lawful_gain']}",
+                f"- realized test source requirement ids: {', '.join(test_lane['realized_test_source_requirement_ids']) or 'none'}",
+                *blocking_lines,
                 "",
                 "## Governed Project Position",
                 *_governed_summary_lines(workspace_root),
@@ -2131,7 +2182,7 @@ def _construct_test_run_archive(workspace_root: Path) -> str:
     )
 
 
-def _constructed_content(target_asset: str, workspace_root: Path) -> str:
+def _constructed_text_content(target_asset: str, workspace_root: Path) -> str:
     if target_asset == "intent_surface":
         return _construct_intent(workspace_root)
     if target_asset == "product_surface":
@@ -2162,8 +2213,6 @@ def _constructed_content(target_asset: str, workspace_root: Path) -> str:
         return _construct_implementation_stack_profile(workspace_root)
     if target_asset == "implementation_module_surface":
         return _construct_implementation_module_surface(workspace_root)
-    if target_asset == "code_surface":
-        return _construct_code_surface(workspace_root)
     if target_asset == "test_design_surface":
         return _construct_test_design(workspace_root)
     if target_asset == "test_stack_profile":
@@ -2232,11 +2281,11 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         operation = "adopt"
     elif not preserve_authority:
         if target_asset == "code_surface":
-            content = _constructed_content(target_asset, workspace)
+            code_content = _construct_code_surface(workspace)
             materialization_report = _replace_generated_code_surface(
                 workspace_root=workspace,
                 target_path=target_path,
-                content=content,
+                content=code_content,
             )
         else:
             if target_asset == "test_run_archive_surface":
@@ -2245,18 +2294,24 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
                     file_path = _code_surface_root(workspace) / str(entry["relative_path"])
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_text(str(entry["content"]), encoding="utf-8")
-            content = _constructed_content(target_asset, workspace)
+            text_content = _constructed_text_content(target_asset, workspace)
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(content, encoding="utf-8")
+            target_path.write_text(text_content, encoding="utf-8")
             if previous_checkpoint.exists and operation == "generate":
                 operation = "repair"
     current_checkpoint = checkpoint_for_path(target_path)
     attestation = assess_generated_asset_contract(workspace, target_asset)
     if not attestation["contract_satisfied"]:
-        foreign_candidates = ", ".join(
-            candidate["relative_path"]
-            for candidate in attestation.get("foreign_realization_candidates", [])
-            if isinstance(candidate, dict) and isinstance(candidate.get("relative_path"), str)
+        foreign_candidate_payload = attestation.get("foreign_realization_candidates")
+        foreign_candidates = (
+            ", ".join(
+                str(candidate.get("relative_path"))
+                for candidate in foreign_candidate_payload
+                if isinstance(candidate, dict)
+                and isinstance(candidate.get("relative_path"), str)
+            )
+            if isinstance(foreign_candidate_payload, list)
+            else ""
         )
         if foreign_candidates:
             raise RuntimeError(
@@ -2281,17 +2336,20 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     publish_workspace_runtime_event(
         workspace_root=workspace,
         event_type="asset_checkpoint_updated",
-        data={
-            "asset_id": target_asset,
-            "asset_uri": relative_file_uri(target_path, workspace_root=workspace),
-            "declared_asset_type": declared_asset_type,
-            "mutable": asset_profile.mutable_default,
-            "manifest_id": manifest["manifest_id"],
-            "edge": manifest["edge"],
-            "target_path": str(target_path),
-            "previous_checkpoint": previous_checkpoint.to_dict(),
-            "current_checkpoint": current_checkpoint.to_dict(),
-        },
+        data=admit_runtime_event_payload(
+            event_type="asset_checkpoint_updated",
+            data={
+                "asset_id": target_asset,
+                "asset_uri": relative_file_uri(target_path, workspace_root=workspace),
+                "declared_asset_type": declared_asset_type,
+                "mutable": asset_profile.mutable_default,
+                "manifest_id": manifest["manifest_id"],
+                "edge": manifest["edge"],
+                "target_path": str(target_path),
+                "previous_checkpoint": previous_checkpoint.to_dict(),
+                "current_checkpoint": current_checkpoint.to_dict(),
+            },
+        ),
         workflow_version=manifest.get("workflow_version", "unknown"),
         run_id=manifest.get("run_id"),
         job_id=manifest.get("job_id"),

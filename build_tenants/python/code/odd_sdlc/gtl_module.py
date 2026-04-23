@@ -23,6 +23,7 @@ from gtl.operator_model import Evaluator, Rule, F_D, F_H, F_P, Operator
 from gtl.work_model import ContractRef, Job, Role
 
 from .ambiguity import load_or_build_ambiguity_register
+from .domain_model import FunctionCatalogEntryPayload
 from .execution_contract import (
     ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
     EXECUTION_CONTRACT_CONTEXT_PATH,
@@ -37,9 +38,9 @@ from .project_profile import (
 )
 from .repair_frontier import REPAIR_FRONTIER_CONTEXT_PATH
 from .runtime_contexts import (
-    REALIZATION_DEEPENING_CONTEXT_PATH as _REALIZATION_DEEPENING_CONTEXT_PATH,
-    REALIZED_TEST_SOURCE_CONTEXT_PATH as _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+    REALIZATION_ITERATION_DIGEST_CONTEXT_PATH as _REALIZATION_ITERATION_DIGEST_CONTEXT_PATH,
     STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH as _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+    TEST_LANE_COMPLETENESS_CONTEXT_PATH as _TEST_LANE_COMPLETENESS_CONTEXT_PATH,
 )
 from .requirement_closure import (
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
@@ -98,6 +99,24 @@ def _requirement_edge_obligation_ledger(
         carry_rule=carry_rule,
         fulfillment_rule=fulfillment_rule,
         evidence_policy=evidence_policy,
+    )
+
+
+def _fp_retry_policy_declaration(
+    *,
+    evaluator_id: str,
+    deepening_eligible: bool,
+) -> Attrs:
+    return Attrs.coerce(
+        {
+            "evaluator_id": evaluator_id,
+            "classification": (
+                "deepening_eligible"
+                if deepening_eligible
+                else "structurally_terminal"
+            ),
+            "deepening_eligible": deepening_eligible,
+        }
     )
 
 
@@ -423,13 +442,13 @@ _repair_frontier_context = _workspace_context(
     "odd_sdlc_repair_frontier",
     REPAIR_FRONTIER_CONTEXT_PATH,
 )
-_realized_test_source_context = _workspace_context(
-    "odd_sdlc_realized_test_source_obligation",
-    _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+_test_lane_completeness_context = _workspace_context(
+    "odd_sdlc_test_lane_completeness",
+    _TEST_LANE_COMPLETENESS_CONTEXT_PATH,
 )
-_realization_deepening_context = _workspace_context(
-    "odd_sdlc_realization_deepening_control_frame",
-    _REALIZATION_DEEPENING_CONTEXT_PATH,
+_realization_iteration_digest_context = _workspace_context(
+    "odd_sdlc_realization_iteration_digest",
+    _REALIZATION_ITERATION_DIGEST_CONTEXT_PATH,
 )
 _requirement_builder_contexts = (
     _requirement_closure_context,
@@ -438,12 +457,12 @@ _requirement_builder_contexts = (
 _realization_builder_contexts = (
     _requirement_closure_context,
     _repair_frontier_context,
-    _realization_deepening_context,
+    _realization_iteration_digest_context,
 )
-_realized_test_builder_contexts = (
+_test_lane_builder_contexts = (
     _requirement_closure_context,
     _repair_frontier_context,
-    _realized_test_source_context,
+    _test_lane_completeness_context,
 )
 
 def _fd_evaluator(name: str) -> Evaluator:
@@ -635,7 +654,7 @@ _test_module_fp = Evaluator(
 _test_run_archive_fp = Evaluator(
     name="test_run_archive_surface_semantically_converged",
     regime=F_P,
-    description="The test run archive surface is semantically converged only when the carried realized validation obligations are backed by governed execution evidence, not merely by planned test structure or selected stack metadata.",
+    description="The test run archive surface is semantically converged only when the carried realized validation obligations are backed by governed realized test source under the active code root; governed execution evidence remains a later operational lane obligation.",
 )
 _test_execution_fp = Evaluator(
     name="test_execution_surface_semantically_converged",
@@ -724,6 +743,7 @@ def _graph_function(
     extra_fd_evaluators: tuple[Evaluator, ...] = (),
     contexts: tuple[Context, ...] = (),
     obligation_ledger: Attrs | dict[str, object] | None = None,
+    fp_retry_policy: Attrs | dict[str, object] | None = None,
 ) -> GraphFunction:
     published_contexts = (
         _stateful_builder_control_context,
@@ -757,6 +777,13 @@ def _graph_function(
             vector_name=name,
             evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
             declarations=declarations,
+        )
+    if fp_retry_policy is not None:
+        declarations = Attrs.coerce(
+            {
+                **declarations.to_dict(),
+                "fp_retry_policy": Attrs.coerce(fp_retry_policy),
+            }
         )
     vector = GraphVector(
         name=name,
@@ -1046,6 +1073,10 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
         fulfillment_rule="implementation_module_surface_coverage",
         evidence_policy="implementation_module_traceability",
     ),
+    fp_retry_policy=_fp_retry_policy_declaration(
+        evaluator_id=_implementation_module_fp.name,
+        deepening_eligible=True,
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_CODE = _graph_function(
@@ -1062,6 +1093,10 @@ GF_DERIVE_CODE = _graph_function(
         fulfillment_rule="behavioral_code_realization",
         evidence_policy="behavioral_code_evidence",
     ),
+    fp_retry_policy=_fp_retry_policy_declaration(
+        evaluator_id=_code_fp.name,
+        deepening_eligible=True,
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_DESIGN = _graph_function(
@@ -1071,12 +1106,16 @@ GF_DERIVE_TEST_DESIGN = _graph_function(
     fd_evaluator=_test_design_fd,
     fp_evaluator=_test_design_fp,
     extra_fd_evaluators=(_test_design_obligation_fd,),
-    contexts=_requirement_builder_contexts,
+    contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_design_surface",
         derivation_rule="validation_design_projection",
         fulfillment_rule="test_design_surface_coverage",
         evidence_policy="planned_test_design_coverage",
+    ),
+    fp_retry_policy=_fp_retry_policy_declaration(
+        evaluator_id=_test_design_fp.name,
+        deepening_eligible=True,
     ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
@@ -1102,6 +1141,10 @@ GF_DERIVE_TEST_MODULE = _graph_function(
         fulfillment_rule="test_module_surface_coverage",
         evidence_policy="planned_test_module_coverage",
     ),
+    fp_retry_policy=_fp_retry_policy_declaration(
+        evaluator_id=_test_module_fp.name,
+        deepening_eligible=True,
+    ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
@@ -1111,12 +1154,12 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
     extra_fd_evaluators=(_test_run_archive_obligation_fd,),
-    contexts=_realized_test_builder_contexts,
+    contexts=_test_lane_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
         signal_key="derive_test_run_archive_surface",
-        derivation_rule="realized_validation_projection",
-        fulfillment_rule="realized_test_evidence",
-        evidence_policy="realized_test_execution_evidence",
+        derivation_rule="realized_test_source_projection",
+        fulfillment_rule="realized_test_source",
+        evidence_policy="realized_test_source_evidence",
     ),
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
@@ -1723,6 +1766,8 @@ def _build_release_operational_cycle(functions: tuple[GraphFunction, ...]) -> Gr
 
 
 GF_RELEASE_OPERATIONAL_CYCLE = _build_release_operational_cycle(OPERATIONAL_LEAF_GRAPH_FUNCTIONS)
+if GF_RELEASE_OPERATIONAL_CYCLE is None:
+    raise RuntimeError("release_operational_cycle must materialize from declared operational leaf graph functions")
 
 RELEASE_OPERATIONAL_CYCLE_STEPS: tuple[str, ...] = tuple(
     vector.name for vector in GF_RELEASE_OPERATIONAL_CYCLE.materialize().vectors
@@ -1741,8 +1786,9 @@ def _job(name: str, graph_function: GraphFunction) -> Job:
 
 def _active_workspace_root(start: Path | None = None) -> Path:
     current = (start or Path.cwd()).resolve()
+    constraints_path = Path(str(PROJECT_CONSTRAINTS_PATH))
     for candidate in (current, *current.parents):
-        if (candidate / PROJECT_CONSTRAINTS_PATH).exists():
+        if (candidate / constraints_path).exists():
             return candidate
     return current
 
@@ -1752,7 +1798,8 @@ def _module_workspace_root() -> Path:
 
 
 def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
-    return (workspace_root / PROJECT_CONSTRAINTS_PATH).exists()
+    constraints_path = Path(str(PROJECT_CONSTRAINTS_PATH))
+    return (workspace_root / constraints_path).exists()
 
 
 def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[GraphFunction, ...]:
@@ -1787,7 +1834,9 @@ def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[Grap
     return tuple(active)
 
 
-def _active_function_catalog(active_operational_functions: tuple[GraphFunction, ...]) -> tuple[dict[str, object], ...]:
+def _active_function_catalog(
+    active_operational_functions: tuple[GraphFunction, ...],
+) -> tuple[FunctionCatalogEntryPayload, ...]:
     active_names = {function.name for function in LEAF_GRAPH_FUNCTIONS}
     active_names.update(function.name for function in active_operational_functions)
     active_names.update(function.name for function in CATALOG_VISIBLE_LIBRARY_GRAPH_FUNCTIONS)
@@ -2125,6 +2174,12 @@ def _build_module(workspace_root: Path) -> Module:
                     "REQ-F-ODDSDLC-028",
                 )),
                 ("function_catalog", _active_function_catalog(active_operational_functions)),
+                ("start_authoritative_head_graph_functions", (
+                    GF_PREPARE_RELEASE.name,
+                )),
+                ("dynamic_route_forbidden_head_graph_functions", (
+                    GF_PREPARE_RELEASE.name,
+                )),
                 ("executive_graph_function", bootstrap_executive.name),
                 ("executive_graph_functions", tuple(function.name for function in executive_graph_functions)),
                 ("ambiguity_policy_start_functions", tuple(function.name for function in ambiguity_policy_start_functions)),

@@ -8,18 +8,23 @@ from typing import Any
 from genesis.result_ingest import ingest_fp_result
 
 from .analysis import refresh_analysis
-from .app import OddSdlcApp, active_programs, start
+from .app import OddSdlcApp, active_programs, gaps, start
 from .constructor import construct_manifest
+from .domain_model import ExecutiveProgramEntryPayload
 from .homeostatic_loop import run_homeostatic_self_check
 from .install_topology import installed_product_code_root
 from .program_catalog import BOOTSTRAP_RELEASE_SELF_TEST, PROGRAM_CATALOG, program_by_name, program_for_edge
+from .public_start_contract import GapDossierReadModel, PublicStartResultPayload
 
 
-def programs() -> list[dict[str, Any]]:
+ProgramObservedState = dict[str, object] | GapDossierReadModel | PublicStartResultPayload
+
+
+def programs() -> list[ExecutiveProgramEntryPayload]:
     return [entry.to_dict() for entry in PROGRAM_CATALOG]
 
 
-def _program_runtime_context(app: OddSdlcApp, *, current_program_name: str, edge: Any) -> dict[str, Any]:
+def _program_runtime_context(app: OddSdlcApp, *, current_program_name: str, edge: object) -> dict[str, Any]:
     active = active_programs(app)
     follow_on = None
     if isinstance(edge, str):
@@ -37,8 +42,8 @@ def _program_completed_without_iteration(
     app: OddSdlcApp,
     *,
     program_name: str,
-    program_payload: dict[str, Any],
-    final_state: dict[str, Any],
+    program_payload: ExecutiveProgramEntryPayload,
+    final_state: ProgramObservedState,
 ) -> dict[str, Any]:
     context = _program_runtime_context(
         app,
@@ -60,8 +65,8 @@ def _program_pending_without_iteration(
     app: OddSdlcApp,
     *,
     program_name: str,
-    program_payload: dict[str, Any],
-    final_state: dict[str, Any],
+    program_payload: ExecutiveProgramEntryPayload,
+    final_state: ProgramObservedState,
 ) -> dict[str, Any]:
     context = _program_runtime_context(
         app,
@@ -80,6 +85,76 @@ def _program_pending_without_iteration(
     }
 
 
+def _published_head_edge(published: dict[str, object] | GapDossierReadModel) -> str | None:
+    dossiers = published.get("dossiers")
+    if not isinstance(dossiers, list) or not dossiers:
+        return None
+    head = dossiers[0]
+    if not isinstance(head, dict):
+        return None
+    edge = head.get("edge")
+    return edge if isinstance(edge, str) and edge else None
+
+
+def _program_boundary_complete(
+    app: OddSdlcApp,
+    *,
+    program_name: str,
+    program_payload: ExecutiveProgramEntryPayload,
+    completed_edges: list[str],
+    steps: list[dict[str, Any]],
+    boundary_edge: str,
+    next_edge: str | None,
+    already_converged: bool,
+) -> dict[str, Any]:
+    final_state = {
+        "status": "program_boundary_complete",
+        "edge": boundary_edge,
+        "blocking_reason": "program_boundary",
+        "stopped_by": "program_boundary",
+    }
+    if next_edge is not None:
+        final_state["next_edge"] = next_edge
+    context = _program_runtime_context(
+        app,
+        current_program_name=program_name,
+        edge=next_edge,
+    )
+    return {
+        "status": "ok",
+        "program": program_payload,
+        "already_converged": already_converged,
+        "completed_edges": completed_edges,
+        "steps": steps,
+        "final_state": final_state,
+        "program_boundary_complete": True,
+        **context,
+    }
+
+
+def _publish_ready_gap_dossier(app: OddSdlcApp) -> dict[str, object] | GapDossierReadModel:
+    published = gaps(app, scope="workspace")
+    dossiers = published.get("dossiers")
+    if not isinstance(dossiers, list) or not dossiers:
+        return published
+    head = dossiers[0]
+    if not isinstance(head, dict):
+        return published
+    proposal = head.get("constitutional_proposal")
+    if not isinstance(proposal, dict) or str(proposal.get("state") or "") != "pending_fh":
+        return published
+    from .homeostatic_loop import apply_constitutional_proposal
+
+    approved = apply_constitutional_proposal(
+        app.config.workspace_root,
+        edge=str(head.get("edge") or ""),
+        proposal_id=str(proposal.get("proposal_id") or ""),
+    )
+    if approved.get("status") != "applied":
+        raise RuntimeError("self-test constitutional proposal application did not settle as applied")
+    return gaps(app, scope="workspace")
+
+
 def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     program = program_by_name(name)
     program_payload = program.to_dict()
@@ -92,6 +167,29 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
     while step_index < len(program.steps):
         expected_edge = program.steps[step_index]
         refresh_analysis(workspace_root, stage="self_test")
+        published = _publish_ready_gap_dossier(app)
+        published_head_edge = _published_head_edge(published)
+        if not steps and published_head_edge is None and bool(published.get("converged")):
+            converged_state: dict[str, object] = {"status": "converged", "edge": None}
+            return _program_completed_without_iteration(
+                app,
+                program_name=program.name,
+                program_payload=program_payload,
+                final_state=converged_state,
+            )
+        if not steps and isinstance(published_head_edge, str):
+            follow_on = program_for_edge(published_head_edge)
+            if follow_on is not None and follow_on.name != program.name:
+                return _program_boundary_complete(
+                    app,
+                    program_name=program.name,
+                    program_payload=program_payload,
+                    completed_edges=[],
+                    steps=[],
+                    boundary_edge=program.steps[-1],
+                    next_edge=published_head_edge,
+                    already_converged=True,
+                )
         start_result = start(
             app,
             scope="workspace",
@@ -126,7 +224,7 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
                         final_state=start_result,
                     )
         if (
-            status == "pending"
+            status in {"pending", "yield"}
             and isinstance(actual_edge, str)
             and actual_edge in program.steps
             and isinstance(manifest_path, str)
@@ -214,16 +312,26 @@ def run_program(app: OddSdlcApp, *, name: str) -> dict[str, Any]:
         pending_retries_for_step = 0
         yielded_retries_for_step = 0
 
-    final_state = start(
-        app,
-        scope="workspace",
-        target="next",
-        until="first_traversal",
-    )
+    refresh_analysis(workspace_root, stage="self_test")
+    published = _publish_ready_gap_dossier(app)
+    published_head_edge = _published_head_edge(published)
+    follow_on = program_for_edge(published_head_edge) if isinstance(published_head_edge, str) else None
+    if follow_on is not None and follow_on.name != program.name:
+        return _program_boundary_complete(
+            app,
+            program_name=program.name,
+            program_payload=program_payload,
+            completed_edges=[step["edge"] for step in steps],
+            steps=steps,
+            boundary_edge=program.steps[-1],
+            next_edge=published_head_edge,
+            already_converged=False,
+        )
+    final_state = {"status": "converged", "edge": None}
     context = _program_runtime_context(
         app,
         current_program_name=program.name,
-        edge=final_state.get("edge"),
+        edge=None,
     )
     return {
         "status": "ok",

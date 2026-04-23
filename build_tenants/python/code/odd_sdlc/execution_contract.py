@@ -6,16 +6,36 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import TYPE_CHECKING, Literal, Mapping, cast
 
 from .publication_io import write_text_if_changed
+from .public_start_contract import (
+    AssetExecutionTargetPayload,
+    CarrierGraphFunctionsPayload,
+    ExecutionContractSurfacePayload,
+    ExecutionSourcePayload,
+    ExecutionTargetPayload,
+    GraphFunctionExecutionTargetPayload,
+    NextExecutionTargetPayload,
+    OperatorExecutionSourcePayload,
+    TicketWorkItemExecutionSourcePayload,
+    WorkItemRouteContractPayload,
+)
 from .start_targeting import resolve_start_target
 from .work_item_routing import (
     STARTABLE_WORK_ITEM_STATUSES,
     WorkItemRouteContract,
     is_work_item_handle,
     load_work_item_ticket_surface,
+    work_item_route_contract_from_payload,
 )
+
+if TYPE_CHECKING:
+    from genesis.events import EventStream
+    from genesis.services import Scope, StartTarget
+    from gtl.module_model import Module
+
+from .runtime_event_contract import admit_runtime_event_payload
 
 
 EXECUTION_CONTRACT_KIND = "odd_sdlc.execution_contract_surface"
@@ -26,6 +46,7 @@ EXECUTION_CONTRACT_CONTEXT_PATH = Path(".ai-workspace/runtime/odd_sdlc-execution
 _EXECUTION_CONTRACT_CARRIER_SHAPE = "typed_execution_contract_carrier.v1"
 _EXECUTION_CONTRACT_SOURCE_KINDS = frozenset({"operator_request", "ticket_work_item"})
 _EXECUTION_CONTRACT_TARGET_KINDS = frozenset({"next", "graph_function", "asset"})
+_EXECUTION_CONTRACT_STATUSES = frozenset({"drafted", "admitted", "rejected", "superseded"})
 
 
 class ExecutionContractSurfaceError(ValueError):
@@ -34,8 +55,8 @@ class ExecutionContractSurfaceError(ValueError):
 
 @dataclass(frozen=True)
 class BoundExecutionStart:
-    scope: Any
-    target: Any
+    scope: Scope
+    target: StartTarget
     execution_contract: "AdmittedExecutionContract"
 
 
@@ -44,10 +65,13 @@ class AdmittedExecutionContractProjection:
     contract_id: str
     source_kind: Literal["operator_request", "ticket_work_item"]
     target_kind: Literal["next", "graph_function", "asset"]
-    payload: Mapping[str, Any]
+    payload: ExecutionContractSurfacePayload
 
-    def to_dict(self) -> dict[str, Any]:
-        return dict(self.payload)
+    def to_dict(self) -> ExecutionContractSurfacePayload:
+        normalized = normalize_execution_contract_surface_payload(self.payload)
+        if normalized is None:
+            raise ExecutionContractSurfaceError("cannot normalize admitted execution contract payload")
+        return normalized
 
 
 @dataclass(frozen=True)
@@ -60,8 +84,8 @@ class NextExecutionTarget:
     binding_source: str | None = None
     kind: Literal["next"] = "next"
 
-    def to_dict(self) -> dict[str, Any]:
-        payload = {
+    def to_payload(self) -> NextExecutionTargetPayload:
+        payload: NextExecutionTargetPayload = {
             "normalized_scope": self.normalized_scope,
             "public_target": self.public_target,
             "until": self.until,
@@ -75,7 +99,10 @@ class NextExecutionTarget:
             payload["binding_source"] = self.binding_source
         return payload
 
-    def to_start_target(self) -> Any:
+    def to_dict(self) -> NextExecutionTargetPayload:
+        return self.to_payload()
+
+    def to_start_target(self) -> StartTarget:
         from genesis.services import StartTarget
 
         return StartTarget.next()
@@ -91,7 +118,7 @@ class GraphFunctionExecutionTarget:
     graph_function_name: str
     kind: Literal["graph_function"] = "graph_function"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_payload(self) -> GraphFunctionExecutionTargetPayload:
         return {
             "normalized_scope": self.normalized_scope,
             "public_target": self.public_target,
@@ -102,7 +129,10 @@ class GraphFunctionExecutionTarget:
             "graph_function_name": self.graph_function_name,
         }
 
-    def to_start_target(self) -> Any:
+    def to_dict(self) -> GraphFunctionExecutionTargetPayload:
+        return self.to_payload()
+
+    def to_start_target(self) -> StartTarget:
         from genesis.services import StartTarget
 
         return StartTarget.graph_function(
@@ -132,8 +162,8 @@ class AssetExecutionTarget:
     ticket_target_truth: str | None = None
     kind: Literal["asset"] = "asset"
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
+    def to_payload(self) -> AssetExecutionTargetPayload:
+        payload: AssetExecutionTargetPayload = {
             "normalized_scope": self.normalized_scope,
             "public_target": self.public_target,
             "until": self.until,
@@ -143,20 +173,28 @@ class AssetExecutionTarget:
             "graph_function_name": self.graph_function_name,
             "asset_id": self.asset_id,
             "asset_uri": self.asset_uri,
-            "asset_relative_path": self.asset_relative_path,
-            "asset_path_kind": self.asset_path_kind,
-            "asset_exists": self.asset_exists,
             "binding_source": self.binding_source,
-            "route_contract": (
-                self.route_contract.to_dict() if self.route_contract is not None else None
-            ),
-            "ticket_id": self.ticket_id,
-            "ticket_relative_path": self.ticket_relative_path,
-            "ticket_target_truth": self.ticket_target_truth,
         }
-        return {key: value for key, value in payload.items() if value not in (None, "", {})}
+        if self.asset_relative_path:
+            payload["asset_relative_path"] = self.asset_relative_path
+        if self.asset_path_kind:
+            payload["asset_path_kind"] = self.asset_path_kind
+        if self.asset_exists is not None:
+            payload["asset_exists"] = self.asset_exists
+        if self.route_contract is not None:
+            payload["route_contract"] = _work_item_route_contract_payload(self.route_contract)
+        if self.ticket_id:
+            payload["ticket_id"] = self.ticket_id
+        if self.ticket_relative_path:
+            payload["ticket_relative_path"] = self.ticket_relative_path
+        if self.ticket_target_truth:
+            payload["ticket_target_truth"] = self.ticket_target_truth
+        return payload
 
-    def to_start_target(self) -> Any:
+    def to_dict(self) -> AssetExecutionTargetPayload:
+        return self.to_payload()
+
+    def to_start_target(self) -> StartTarget:
         from genesis.services import StartTarget
 
         return StartTarget.asset(
@@ -187,7 +225,7 @@ class OperatorExecutionSource:
     proof_surface: tuple[str, ...]
     source_kind: Literal["operator_request"] = "operator_request"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> OperatorExecutionSourcePayload:
         return {
             "source_kind": self.source_kind,
             "ticket_category": self.ticket_category,
@@ -222,8 +260,8 @@ class TicketWorkItemExecutionSource:
     migration_checklist: str
     source_kind: Literal["ticket_work_item"] = "ticket_work_item"
 
-    def to_dict(self) -> dict[str, Any]:
-        payload = {
+    def to_dict(self) -> TicketWorkItemExecutionSourcePayload:
+        payload: TicketWorkItemExecutionSourcePayload = {
             "source_kind": self.source_kind,
             "ticket_id": self.ticket_id,
             "ticket_title": self.ticket_title,
@@ -243,7 +281,7 @@ class TicketWorkItemExecutionSource:
             "migration_declaration": self.migration_declaration,
             "migration_checklist": self.migration_checklist,
         }
-        return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
+        return payload
 
 
 ExecutionSource = OperatorExecutionSource | TicketWorkItemExecutionSource
@@ -255,9 +293,9 @@ class DraftExecutionContract:
     target: ExecutionTarget
     contract_id: str
     status: Literal["drafted"] = "drafted"
-    carrier_shape: Literal["typed_execution_contract_carrier.v1"] = _EXECUTION_CONTRACT_CARRIER_SHAPE
+    carrier_shape: Literal["typed_execution_contract_carrier.v1"] = "typed_execution_contract_carrier.v1"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ExecutionContractSurfacePayload:
         payload = _base_contract_payload(self.source, self.target)
         payload.update(
             {
@@ -280,13 +318,13 @@ class AdmittedExecutionContract:
     register_path: str = EXECUTION_CONTRACT_REGISTER_PATH.as_posix()
     context_path: str = EXECUTION_CONTRACT_CONTEXT_PATH.as_posix()
     status: Literal["admitted"] = "admitted"
-    carrier_shape: Literal["typed_execution_contract_carrier.v1"] = _EXECUTION_CONTRACT_CARRIER_SHAPE
+    carrier_shape: Literal["typed_execution_contract_carrier.v1"] = "typed_execution_contract_carrier.v1"
 
     @property
     def route_contract(self) -> WorkItemRouteContract | None:
         return self.target.route_contract if isinstance(self.target, AssetExecutionTarget) else None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ExecutionContractSurfacePayload:
         payload = _base_contract_payload(self.source, self.target)
         payload.update(
             {
@@ -297,10 +335,11 @@ class AdmittedExecutionContract:
                 "status": self.status,
                 "register_path": self.register_path,
                 "context_path": self.context_path,
-                "supersedes_contract_id": self.supersedes_contract_id,
             }
         )
-        return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
+        if self.supersedes_contract_id is not None:
+            payload["supersedes_contract_id"] = self.supersedes_contract_id
+        return payload
 
 
 @dataclass(frozen=True)
@@ -309,7 +348,7 @@ class RejectedExecutionContract:
     errors: tuple[str, ...]
     status: Literal["rejected"] = "rejected"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ExecutionContractSurfacePayload:
         payload = self.draft.to_dict()
         payload["status"] = self.status
         payload["errors"] = list(self.errors)
@@ -318,12 +357,14 @@ class RejectedExecutionContract:
 
 @dataclass(frozen=True)
 class SupersededExecutionContract:
-    payload: dict[str, Any]
+    payload: ExecutionContractSurfacePayload
     superseded_by_contract_id: str
     status: Literal["superseded"] = "superseded"
 
-    def to_dict(self) -> dict[str, Any]:
-        payload = dict(self.payload)
+    def to_dict(self) -> ExecutionContractSurfacePayload:
+        payload = normalize_execution_contract_surface_payload(self.payload)
+        if payload is None:
+            raise ExecutionContractSurfaceError("cannot normalize superseded execution contract payload")
         payload["status"] = self.status
         payload["superseded_by_contract_id"] = self.superseded_by_contract_id
         return payload
@@ -334,18 +375,211 @@ ExecutionContractCarrier = (
 )
 
 
-def _load_existing_contract(path: Path) -> dict[str, Any] | None:
+def _load_existing_contract(path: Path) -> ExecutionContractSurfacePayload | None:
     if not path.exists():
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return normalize_execution_contract_surface_payload(payload)
+
+
+def _work_item_route_contract_payload(
+    route_contract: WorkItemRouteContract,
+) -> WorkItemRouteContractPayload:
+    return {
+        "route_kind": route_contract.route_kind,
+        "binding_source": route_contract.binding_source,
+        "ticket_id": route_contract.ticket_id,
+        "change_class": route_contract.change_class,
+        "re_entry_point": route_contract.re_entry_point,
+        "reentry_vector": route_contract.reentry_vector,
+        "reentry_target_asset": route_contract.reentry_target_asset,
+        "scope_binding": route_contract.scope_binding,
+        "operator_target_handle": route_contract.operator_target_handle,
+    }
+
+
+def _execution_target_payload(payload: Mapping[str, object]) -> ExecutionTargetPayload:
+    kind = str(payload.get("kind") or "")
+    if kind == "next":
+        projected: NextExecutionTargetPayload = {
+            "normalized_scope": str(payload.get("normalized_scope") or ""),
+            "public_target": str(payload.get("public_target") or ""),
+            "until": str(payload.get("until") or ""),
+            "kind": "next",
+        }
+        edge_override = str(payload.get("edge_override") or "")
+        if edge_override:
+            projected["edge_override"] = edge_override
+        route_state = str(payload.get("route_state") or "")
+        if route_state:
+            projected["route_state"] = route_state
+        binding_source = str(payload.get("binding_source") or "")
+        if binding_source:
+            projected["binding_source"] = binding_source
+        return projected
+    if kind == "graph_function":
+        graph_payload: GraphFunctionExecutionTargetPayload = {
+            "normalized_scope": str(payload.get("normalized_scope") or ""),
+            "public_target": str(payload.get("public_target") or ""),
+            "until": str(payload.get("until") or ""),
+            "kind": "graph_function",
+            "handle": str(payload.get("handle") or ""),
+            "target_id": str(payload.get("target_id") or ""),
+            "graph_function_name": str(payload.get("graph_function_name") or ""),
+        }
+        return graph_payload
+    if kind == "asset":
+        asset_payload: AssetExecutionTargetPayload = {
+            "normalized_scope": str(payload.get("normalized_scope") or ""),
+            "public_target": str(payload.get("public_target") or ""),
+            "until": str(payload.get("until") or ""),
+            "kind": "asset",
+            "handle": str(payload.get("handle") or ""),
+            "target_id": str(payload.get("target_id") or ""),
+            "graph_function_name": str(payload.get("graph_function_name") or ""),
+            "asset_id": str(payload.get("asset_id") or ""),
+            "asset_uri": str(payload.get("asset_uri") or ""),
+            "binding_source": str(payload.get("binding_source") or ""),
+        }
+        for key in (
+            "asset_relative_path",
+            "asset_path_kind",
+            "ticket_id",
+            "ticket_relative_path",
+            "ticket_target_truth",
+        ):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                if key == "asset_relative_path":
+                    asset_payload["asset_relative_path"] = value
+                elif key == "asset_path_kind":
+                    asset_payload["asset_path_kind"] = value
+                elif key == "ticket_id":
+                    asset_payload["ticket_id"] = value
+                elif key == "ticket_relative_path":
+                    asset_payload["ticket_relative_path"] = value
+                elif key == "ticket_target_truth":
+                    asset_payload["ticket_target_truth"] = value
+        asset_exists = payload.get("asset_exists")
+        if isinstance(asset_exists, bool):
+            asset_payload["asset_exists"] = asset_exists
+        route_contract = payload.get("route_contract")
+        if isinstance(route_contract, Mapping):
+            normalized_route_contract = work_item_route_contract_from_payload(route_contract)
+            if normalized_route_contract is not None:
+                asset_payload["route_contract"] = _work_item_route_contract_payload(normalized_route_contract)
+        return asset_payload
+    raise ExecutionContractSurfaceError(f"unsupported execution target kind {kind!r}")
+
+
+def normalize_execution_contract_surface_payload(
+    payload: object,
+) -> ExecutionContractSurfacePayload | None:
+    if not isinstance(payload, Mapping):
+        return None
+    projected: ExecutionContractSurfacePayload = {}
+    contract_kind = payload.get("contract_kind")
+    if isinstance(contract_kind, str) and contract_kind:
+        projected["contract_kind"] = contract_kind
+    carrier_shape = payload.get("carrier_shape")
+    if isinstance(carrier_shape, str) and carrier_shape:
+        projected["carrier_shape"] = carrier_shape
+    contract_id = payload.get("contract_id")
+    if isinstance(contract_id, str) and contract_id:
+        projected["contract_id"] = contract_id
+    status = payload.get("status")
+    if status in _EXECUTION_CONTRACT_STATUSES:
+        projected["status"] = cast(Literal["drafted", "admitted", "rejected", "superseded"], status)
+    source_kind = payload.get("source_kind")
+    if source_kind in _EXECUTION_CONTRACT_SOURCE_KINDS:
+        projected["source_kind"] = cast(Literal["operator_request", "ticket_work_item"], source_kind)
+    ticket_category = payload.get("ticket_category")
+    if isinstance(ticket_category, str) and ticket_category:
+        projected["ticket_category"] = ticket_category
+    change_class = payload.get("change_class")
+    if isinstance(change_class, str) and change_class:
+        projected["change_class"] = change_class
+    re_entry_point = payload.get("re_entry_point")
+    if isinstance(re_entry_point, str) and re_entry_point:
+        projected["re_entry_point"] = re_entry_point
+    affected_boundary = payload.get("affected_boundary")
+    if isinstance(affected_boundary, str) and affected_boundary:
+        projected["affected_boundary"] = affected_boundary
+    superseded_truth = payload.get("superseded_truth")
+    if isinstance(superseded_truth, str) and superseded_truth:
+        projected["superseded_truth"] = superseded_truth
+    closure_law = payload.get("closure_law")
+    if isinstance(closure_law, str) and closure_law:
+        projected["closure_law"] = closure_law
+    required_direction = payload.get("required_direction")
+    if isinstance(required_direction, str) and required_direction:
+        projected["required_direction"] = required_direction
+    acceptance = payload.get("acceptance")
+    if isinstance(acceptance, str) and acceptance:
+        projected["acceptance"] = acceptance
+    migration_declaration = payload.get("migration_declaration")
+    if isinstance(migration_declaration, str) and migration_declaration:
+        projected["migration_declaration"] = migration_declaration
+    migration_checklist = payload.get("migration_checklist")
+    if isinstance(migration_checklist, str) and migration_checklist:
+        projected["migration_checklist"] = migration_checklist
+    register_path = payload.get("register_path")
+    if isinstance(register_path, str) and register_path:
+        projected["register_path"] = register_path
+    context_path = payload.get("context_path")
+    if isinstance(context_path, str) and context_path:
+        projected["context_path"] = context_path
+    supersedes_contract_id = payload.get("supersedes_contract_id")
+    if isinstance(supersedes_contract_id, str) and supersedes_contract_id:
+        projected["supersedes_contract_id"] = supersedes_contract_id
+    superseded_by_contract_id = payload.get("superseded_by_contract_id")
+    if isinstance(superseded_by_contract_id, str) and superseded_by_contract_id:
+        projected["superseded_by_contract_id"] = superseded_by_contract_id
+    ticket_id = payload.get("ticket_id")
+    if isinstance(ticket_id, str) and ticket_id:
+        projected["ticket_id"] = ticket_id
+    ticket_title = payload.get("ticket_title")
+    if isinstance(ticket_title, str) and ticket_title:
+        projected["ticket_title"] = ticket_title
+    ticket_status = payload.get("ticket_status")
+    if isinstance(ticket_status, str) and ticket_status:
+        projected["ticket_status"] = ticket_status
+    carrier_graph_functions = payload.get("carrier_graph_functions")
+    if isinstance(carrier_graph_functions, Mapping):
+        derive = carrier_graph_functions.get("derive")
+        admit = carrier_graph_functions.get("admit")
+        if isinstance(derive, str) and derive and isinstance(admit, str) and admit:
+            projected["carrier_graph_functions"] = {"derive": derive, "admit": admit}
+    evaluation_criteria = payload.get("evaluation_criteria")
+    if isinstance(evaluation_criteria, list):
+        projected["evaluation_criteria"] = [str(entry) for entry in evaluation_criteria if str(entry)]
+    non_closure_conditions = payload.get("non_closure_conditions")
+    if isinstance(non_closure_conditions, list):
+        projected["non_closure_conditions"] = [
+            str(entry) for entry in non_closure_conditions if str(entry)
+        ]
+    proof_surface = payload.get("proof_surface")
+    if isinstance(proof_surface, list):
+        projected["proof_surface"] = [str(entry) for entry in proof_surface if str(entry)]
+    errors = payload.get("errors")
+    if isinstance(errors, list):
+        projected["errors"] = [str(entry) for entry in errors if str(entry)]
+    route_contract = payload.get("route_contract")
+    if isinstance(route_contract, Mapping):
+        normalized_route_contract = work_item_route_contract_from_payload(route_contract)
+        if normalized_route_contract is not None:
+            projected["route_contract"] = _work_item_route_contract_payload(normalized_route_contract)
+    target_truth = payload.get("target_truth")
+    if isinstance(target_truth, Mapping):
+        projected["target_truth"] = _execution_target_payload(target_truth)
+    return projected
 
 
 def _admitted_execution_contract_projection_from_payload(
-    payload: Mapping[str, Any],
+    payload: Mapping[str, object],
 ) -> AdmittedExecutionContractProjection:
     errors: list[str] = []
     contract_id = str(payload.get("contract_id") or "")
@@ -386,11 +620,14 @@ def _admitted_execution_contract_projection_from_payload(
             errors.append("ticket_work_item execution requires target route_contract")
     if errors:
         raise ExecutionContractSurfaceError("; ".join(errors))
+    normalized_payload = normalize_execution_contract_surface_payload(payload)
+    if normalized_payload is None:
+        raise ExecutionContractSurfaceError("cannot normalize admitted execution contract payload")
     return AdmittedExecutionContractProjection(
         contract_id=contract_id,
-        source_kind=source_kind,  # type: ignore[arg-type]
-        target_kind=target_kind,  # type: ignore[arg-type]
-        payload=dict(payload),
+        source_kind=cast(Literal["operator_request", "ticket_work_item"], source_kind),
+        target_kind=cast(Literal["next", "graph_function", "asset"], target_kind),
+        payload=normalized_payload,
     )
 
 
@@ -453,7 +690,7 @@ def _unchecked_checklist_items(text: str) -> list[str]:
     return items
 
 
-def _coerce_string_list(value: Any) -> list[str]:
+def _coerce_string_list(value: object) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(entry).strip() for entry in value if str(entry).strip()]
     if isinstance(value, str) and value.strip():
@@ -461,8 +698,11 @@ def _coerce_string_list(value: Any) -> list[str]:
     return []
 
 
-def _base_contract_payload(source: ExecutionSource, target: ExecutionTarget) -> dict[str, Any]:
-    payload = source.to_dict()
+def _base_contract_payload(source: ExecutionSource, target: ExecutionTarget) -> ExecutionContractSurfacePayload:
+    source_payload: ExecutionSourcePayload = source.to_dict()
+    payload = normalize_execution_contract_surface_payload(source_payload)
+    if payload is None:
+        raise ExecutionContractSurfaceError("cannot normalize execution contract surface payload")
     payload["target_truth"] = target.to_dict()
     return payload
 
@@ -472,7 +712,7 @@ def _execution_target_from_resolved(
     raw_target: str,
     normalized_scope: str,
     until: str,
-    resolved_target: Any,
+    resolved_target: StartTarget,
     route_contract: WorkItemRouteContract | None,
     next_edge_override: str | None = None,
     next_route_state: str | None = None,
@@ -527,7 +767,7 @@ def _ordinary_execution_contract(
     raw_target: str,
     normalized_scope: str,
     until: str,
-    resolved_target: Any,
+    resolved_target: StartTarget,
     route_contract: WorkItemRouteContract | None,
     next_edge_override: str | None = None,
     next_route_state: str | None = None,
@@ -571,12 +811,12 @@ def _ordinary_execution_contract(
     return source, target
 
 
-def _is_ticket_work_item_target(resolved_target: Any) -> bool:
+def _is_ticket_work_item_target(resolved_target: StartTarget) -> bool:
     if str(getattr(resolved_target, "kind", "") or "") != "asset":
         return False
     asset_id = str(getattr(resolved_target, "asset_id", "") or "")
     handle = str(getattr(resolved_target, "handle", "") or "")
-    return is_work_item_handle(asset_id) or is_work_item_handle(handle)
+    return bool(is_work_item_handle(asset_id) or is_work_item_handle(handle))
 
 
 def _ticket_execution_contract(
@@ -585,7 +825,7 @@ def _ticket_execution_contract(
     raw_target: str,
     normalized_scope: str,
     until: str,
-    resolved_target: Any,
+    resolved_target: StartTarget,
     route_contract: WorkItemRouteContract | None,
 ) -> tuple[TicketWorkItemExecutionSource, ExecutionTarget]:
     if route_contract is None:
@@ -689,14 +929,14 @@ def _validate_execution_contract(contract: DraftExecutionContract) -> list[str]:
     return errors
 
 
-def _carrier_graph_functions() -> dict[str, str]:
+def _carrier_graph_functions() -> CarrierGraphFunctionsPayload:
     return {
         "derive": DERIVE_EXECUTION_CONTRACT_GRAPH_FUNCTION,
         "admit": ADMIT_EXECUTION_CONTRACT_GRAPH_FUNCTION,
     }
 
 
-def _contract_id(payload: dict[str, Any]) -> str:
+def _contract_id(payload: ExecutionContractSurfacePayload) -> str:
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -715,21 +955,15 @@ def _draft_execution_contract(source: ExecutionSource, target: ExecutionTarget) 
     )
 
 
-def execution_contract_payload(contract: ExecutionContractCarrier | Mapping[str, Any]) -> dict[str, Any]:
-    if isinstance(
-        contract,
-        (
-            DraftExecutionContract,
-            AdmittedExecutionContract,
-            RejectedExecutionContract,
-            SupersededExecutionContract,
-        ),
-    ):
-        return contract.to_dict()
-    return dict(contract)
+def execution_contract_payload(
+    contract: ExecutionContractCarrier,
+) -> ExecutionContractSurfacePayload:
+    return contract.to_dict()
 
 
-def _render_execution_contract_context(contract: ExecutionContractCarrier | Mapping[str, Any]) -> str:
+def _render_execution_contract_context(
+    contract: ExecutionContractCarrier,
+) -> str:
     contract_payload = execution_contract_payload(contract)
     lines = [
         "# Admitted Execution Contract",
@@ -794,8 +1028,8 @@ def _render_execution_contract_context(contract: ExecutionContractCarrier | Mapp
 def derive_execution_contract_surface(
     *,
     workspace_root: Path,
-    module: Any,
-    stream: Any,
+    module: Module,
+    stream: EventStream,
     workflow_version: str,
     work_key: str | None,
     run_id: str | None,
@@ -814,6 +1048,8 @@ def derive_execution_contract_surface(
         )
     resolved = resolve_start_target(workspace_root, module, raw_target)
     resolved_target = resolved.target
+    source: ExecutionSource
+    target: ExecutionTarget
     if _is_ticket_work_item_target(resolved_target):
         source, target = _ticket_execution_contract(
             workspace_root=workspace_root,
@@ -838,7 +1074,10 @@ def derive_execution_contract_surface(
     publish_runtime_event(
         stream=stream,
         event_type="execution_contract_drafted",
-        data={"execution_contract": draft.to_dict()},
+        data=admit_runtime_event_payload(
+            event_type="execution_contract_drafted",
+            data={"execution_contract": draft.to_dict()},
+        ),
         workflow_version=workflow_version,
         work_key=work_key,
         run_id=run_id,
@@ -851,8 +1090,8 @@ def derive_execution_contract_surface(
 def admit_execution_contract_surface(
     *,
     workspace_root: Path,
-    module: Any,
-    stream: Any,
+    module: Module,
+    stream: EventStream,
     workflow_version: str,
     work_key: str | None,
     run_id: str | None,
@@ -899,7 +1138,10 @@ def admit_execution_contract_surface(
         publish_runtime_event(
             stream=stream,
             event_type="execution_contract_superseded",
-            data={"execution_contract": superseded.to_dict()},
+            data=admit_runtime_event_payload(
+                event_type="execution_contract_superseded",
+                data={"execution_contract": superseded.to_dict()},
+            ),
             workflow_version=workflow_version,
             work_key=work_key,
             run_id=run_id,
@@ -913,11 +1155,14 @@ def admit_execution_contract_surface(
         rejected_payload["register_path"] = EXECUTION_CONTRACT_REGISTER_PATH.as_posix()
         rejected_payload["context_path"] = EXECUTION_CONTRACT_CONTEXT_PATH.as_posix()
         write_text_if_changed(register_path, json.dumps(rejected_payload, indent=2, sort_keys=True))
-        write_text_if_changed(context_path, _render_execution_contract_context(rejected_payload))
+        write_text_if_changed(context_path, _render_execution_contract_context(rejected))
         publish_runtime_event(
             stream=stream,
             event_type="execution_contract_rejected",
-            data={"execution_contract": rejected_payload},
+            data=admit_runtime_event_payload(
+                event_type="execution_contract_rejected",
+                data={"execution_contract": rejected_payload},
+            ),
             workflow_version=workflow_version,
             work_key=work_key,
             run_id=run_id,
@@ -938,7 +1183,10 @@ def admit_execution_contract_surface(
     publish_runtime_event(
         stream=stream,
         event_type="execution_contract_admitted",
-        data={"execution_contract": contract_payload},
+        data=admit_runtime_event_payload(
+            event_type="execution_contract_admitted",
+            data={"execution_contract": contract_payload},
+        ),
         workflow_version=workflow_version,
         work_key=work_key,
         run_id=run_id,
@@ -948,7 +1196,7 @@ def admit_execution_contract_surface(
     return contract
 
 
-def _module_with_injected_target_job(module: Any, *, target_id: str) -> Any:
+def _module_with_injected_target_job(module: Module, *, target_id: str) -> Module:
     from gtl.module_model import Module
     from gtl.work_model import ContractRef, Job
 
@@ -987,7 +1235,7 @@ def _module_with_injected_target_job(module: Any, *, target_id: str) -> Any:
 
 def bound_execution_start_from_contract(
     *,
-    scope: Any,
+    scope: Scope,
     execution_contract: AdmittedExecutionContract,
 ) -> BoundExecutionStart:
     from genesis.services import Scope
@@ -1056,10 +1304,10 @@ def bound_execution_start_from_contract(
 
 def admit_bound_execution_start(
     *,
-    scope: Any,
-    stream: Any,
+    scope: Scope,
+    stream: EventStream,
     workspace_root: Path,
-    module: Any,
+    module: Module,
     workflow_version: str,
     work_key: str | None,
     run_id: str | None,

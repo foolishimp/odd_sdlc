@@ -13,13 +13,12 @@ Tenant-local prompt or backend tuning belongs here when it becomes necessary.
 
 The current domain-local prompt/control-frame surfaces are:
 
-- `STATEFUL_ITERATOR_CONTROL_FRAME.md` — shared builder law for stateful
+- `STATEFUL_ITERATOR_CONTROL_FRAME.md` — shared continuity law for stateful
   iteration over the target asset
-- `DETERMINISTIC_REPAIR_FRONTIER.md` — builder-facing repair-frontier law for
-  preserving satisfied structure and constraining lawful widening
-- `REALIZATION_DEEPENING_CONTROL_FRAME.md` — realization-family builder law
-  for deepening existing module/code/test assets before lateral expansion
+- `DETERMINISTIC_REPAIR_FRONTIER.md` — governance read model for preserved
+  structure, unmet requirement pressure, and lawful edit/proof frontiers
 - `GENERATED_ASSET_CONTRACT_PROMPT_PARITY.md` — shared generated-asset
   contract law for constructor, certification, and F_P prompt parity
-- `REALIZED_TEST_SOURCE_OBLIGATION.md` — edge-local reminder that archive/test
-  claims must stay aligned with realized test sources
+- `REALIZED_TEST_SOURCE_OBLIGATION.md` — retired design note documenting the
+  move from imperative archive-source prompts to the admitted
+  `odd_sdlc.test_lane_evidence` carrier

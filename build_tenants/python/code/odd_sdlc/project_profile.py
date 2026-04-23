@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Literal, TypedDict
 
 from .install_topology import (
     INSTALLED_RUNTIME_CONTRACT_RELATIVE,
@@ -25,6 +26,7 @@ WORKSPACE_STATE_PATH = Path(".ai-workspace/runtime/odd_sdlc-workspace-state.json
 ANALYSIS_MANIFEST_PATH = Path(".ai-workspace/runtime/odd_sdlc-analysis-manifest.json")
 DEFAULT_PROVING_CODE_RELATIVE_PATH = "build_tenants/python/code/odd_sdlc_proving_impl"
 DEFAULT_AMBIGUITY_RISK_APPETITE = "medium"
+UNDECLARED_EXECUTION_CONTRACT = "undeclared"
 AMBIGUITY_RISK_APPETITES = {"low", "medium", "high"}
 TENANT_NAME_ALIASES = {
     "spark_scala": "scala_spark",
@@ -81,11 +83,60 @@ NON_REALIZATION_TENANT_NAMES = {
     "odd_sdlc",
     "odd_service",
 }
-OPERATIONAL_CAPABILITY_SPECS: tuple[dict[str, object], ...] = (
+class OperationalCapabilitySpec(TypedDict):
+    family: str
+    field_name: str
+    cue: str
+    cue_attr: str
+    affected_assets: tuple[str, ...]
+    expected_resolving_edges: tuple[str, ...]
+    resolution_text: str
+
+
+class CodeRootSummary(TypedDict):
+    exists: bool
+    build_markers: list[str]
+    source_file_count: int
+    test_source_file_count: int
+    test_report_file_count: int
+
+
+class RealizationCandidate(TypedDict):
+    relative_path: str
+    build_markers: list[str]
+    source_file_count: int
+    test_source_file_count: int
+    test_report_file_count: int
+    score: int
+
+
+class OperationalCapabilityFamilyPayload(TypedDict):
+    family: str
+    field_name: str
+    cue: str
+    in_scope: bool
+    declared_value: str
+    declared: bool
+    state: Literal["declared", "undeclared"]
+    affected_assets: list[str]
+    expected_resolving_edges: list[str]
+    primary_edge: str
+    resolution_text: str
+
+
+class OperationalCapabilitiesProjectionPayload(TypedDict):
+    projection_kind: Literal["odd_sdlc.operational_capabilities"]
+    schema_version: Literal["v1"]
+    workspace_root: str
+    families: dict[str, OperationalCapabilityFamilyPayload]
+
+
+OPERATIONAL_CAPABILITY_SPECS: tuple[OperationalCapabilitySpec, ...] = (
     {
         "family": "build_execution",
         "field_name": "build_execution_contract",
         "cue": "build_execution",
+        "cue_attr": "",
         "affected_assets": (
             "build_execution_surface",
             "build_execution_result_surface",
@@ -100,6 +151,7 @@ OPERATIONAL_CAPABILITY_SPECS: tuple[dict[str, object], ...] = (
     {
         "family": "test_execution",
         "field_name": "test_execution_contract",
+        "cue": "",
         "cue_attr": "test_runner",
         "affected_assets": (
             "test_execution_surface",
@@ -117,6 +169,7 @@ OPERATIONAL_CAPABILITY_SPECS: tuple[dict[str, object], ...] = (
         "family": "deployment",
         "field_name": "deployment_contract",
         "cue": "deployment",
+        "cue_attr": "",
         "affected_assets": (
             "deployment_surface",
             "deployment_result_surface",
@@ -134,6 +187,7 @@ OPERATIONAL_CAPABILITY_SPECS: tuple[dict[str, object], ...] = (
         "family": "runtime_observation",
         "field_name": "runtime_observation_contract",
         "cue": "runtime_observation",
+        "cue_attr": "",
         "affected_assets": (
             "runtime_observation_surface",
             "retrofit_plan_surface",
@@ -169,6 +223,17 @@ def strip_scalar_quotes(value: str) -> str:
     if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
         return stripped[1:-1]
     return stripped
+
+
+def normalize_execution_contract_declaration(value: str) -> str:
+    stripped = strip_scalar_quotes(value).strip()
+    if not stripped:
+        return UNDECLARED_EXECUTION_CONTRACT
+    return stripped
+
+
+def execution_contract_is_declared(value: str) -> bool:
+    return normalize_execution_contract_declaration(value).lower() != UNDECLARED_EXECUTION_CONTRACT
 
 
 def default_project_slug(workspace_root: Path) -> str:
@@ -265,16 +330,16 @@ class ProjectProfile:
         return ("app-core",)
 
     def has_build_execution_capability(self) -> bool:
-        return bool(self.build_execution_contract.strip())
+        return execution_contract_is_declared(self.build_execution_contract)
 
     def has_test_execution_capability(self) -> bool:
-        return bool(self.test_execution_contract.strip())
+        return execution_contract_is_declared(self.test_execution_contract)
 
     def has_deployment_capability(self) -> bool:
-        return bool(self.deployment_contract.strip())
+        return execution_contract_is_declared(self.deployment_contract)
 
     def has_runtime_observation_capability(self) -> bool:
-        return bool(self.runtime_observation_contract.strip())
+        return execution_contract_is_declared(self.runtime_observation_contract)
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -314,10 +379,18 @@ class ProjectProfile:
             tenant_name=str(payload.get("tenant_name", "python")),
             output_dir=str(payload.get("output_dir", "")),
             declared_output_dir=str(payload.get("declared_output_dir", "")),
-            build_execution_contract=str(payload.get("build_execution_contract", "")),
-            test_execution_contract=str(payload.get("test_execution_contract", "")),
-            deployment_contract=str(payload.get("deployment_contract", "")),
-            runtime_observation_contract=str(payload.get("runtime_observation_contract", "")),
+            build_execution_contract=normalize_execution_contract_declaration(
+                str(payload.get("build_execution_contract", ""))
+            ),
+            test_execution_contract=normalize_execution_contract_declaration(
+                str(payload.get("test_execution_contract", ""))
+            ),
+            deployment_contract=normalize_execution_contract_declaration(
+                str(payload.get("deployment_contract", ""))
+            ),
+            runtime_observation_contract=normalize_execution_contract_declaration(
+                str(payload.get("runtime_observation_contract", ""))
+            ),
             root_code_policy=str(payload.get("root_code_policy", "")),
             realization_mode=str(payload.get("realization_mode", "")),
             resolution_reason=str(payload.get("resolution_reason", "")),
@@ -397,12 +470,19 @@ def is_source_domain_repo_workspace(workspace_root: Path | str) -> bool:
     )
 
 
+def _load_json_object(path: Path) -> dict[str, object] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def load_published_workspace_state(workspace_root: Path | str) -> dict[str, object] | None:
     root = Path(workspace_root).resolve()
     path = root / WORKSPACE_STATE_PATH
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_object(path)
 
 
 def resolve_workspace_mode(
@@ -431,7 +511,7 @@ def load_published_analysis_manifest(workspace_root: Path | str) -> dict[str, ob
     path = root / ANALYSIS_MANIFEST_PATH
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_object(path)
 
 
 def published_analysis_is_current(workspace_root: Path | str) -> bool:
@@ -473,24 +553,24 @@ def operational_capability_projection_for_profile(
     profile: ProjectProfile,
     *,
     workspace_root: Path | str | None = None,
-) -> dict[str, object]:
+) -> OperationalCapabilitiesProjectionPayload:
     root = Path(workspace_root).resolve() if workspace_root is not None else None
-    families: dict[str, dict[str, object]] = {}
+    families: dict[str, OperationalCapabilityFamilyPayload] = {}
     for spec in OPERATIONAL_CAPABILITY_SPECS:
         family = str(spec["family"])
         field_name = str(spec["field_name"])
         contract_value = str(getattr(profile, field_name, "") or "")
-        cue_attr = str(spec.get("cue_attr") or "")
+        cue_attr = spec["cue_attr"]
         cue_value = (
             str(getattr(profile, cue_attr, "") or "")
             if cue_attr
-            else str(spec.get("cue") or "")
+            else spec["cue"]
         )
-        declared = bool(contract_value.strip())
+        declared = execution_contract_is_declared(contract_value)
         expected_resolving_edges = tuple(
-            str(edge_name)
-            for edge_name in spec.get("expected_resolving_edges", ())
-            if str(edge_name)
+            edge_name
+            for edge_name in spec["expected_resolving_edges"]
+            if edge_name
         )
         families[family] = {
             "family": family,
@@ -500,10 +580,10 @@ def operational_capability_projection_for_profile(
             "declared_value": contract_value,
             "declared": declared,
             "state": "declared" if declared else "undeclared",
-            "affected_assets": list(spec.get("affected_assets", ())),
+            "affected_assets": list(spec["affected_assets"]),
             "expected_resolving_edges": list(expected_resolving_edges),
             "primary_edge": expected_resolving_edges[0] if expected_resolving_edges else "",
-            "resolution_text": str(spec.get("resolution_text") or ""),
+            "resolution_text": spec["resolution_text"],
         }
     return {
         "projection_kind": "odd_sdlc.operational_capabilities",
@@ -517,7 +597,7 @@ def build_operational_capability_projection(
     workspace_root: Path | str,
     *,
     profile: ProjectProfile | None = None,
-) -> dict[str, object]:
+) -> OperationalCapabilitiesProjectionPayload:
     root = Path(workspace_root).resolve()
     current_profile = profile or load_project_profile(root)
     return operational_capability_projection_for_profile(
@@ -526,34 +606,114 @@ def build_operational_capability_projection(
     )
 
 
+def _operational_capability_family_payload(
+    value: object,
+) -> OperationalCapabilityFamilyPayload | None:
+    if not isinstance(value, dict):
+        return None
+    family = value.get("family")
+    field_name = value.get("field_name")
+    cue = value.get("cue")
+    in_scope = value.get("in_scope")
+    declared_value = value.get("declared_value")
+    declared = value.get("declared")
+    state = value.get("state")
+    primary_edge = value.get("primary_edge")
+    resolution_text = value.get("resolution_text")
+    if not (
+        isinstance(family, str)
+        and isinstance(field_name, str)
+        and isinstance(cue, str)
+        and isinstance(in_scope, bool)
+        and isinstance(declared_value, str)
+        and isinstance(declared, bool)
+        and state in {"declared", "undeclared"}
+        and isinstance(primary_edge, str)
+        and isinstance(resolution_text, str)
+    ):
+        return None
+    raw_affected_assets = value.get("affected_assets")
+    affected_assets = raw_affected_assets if isinstance(raw_affected_assets, list) else []
+    raw_expected_resolving_edges = value.get("expected_resolving_edges")
+    expected_resolving_edges = (
+        raw_expected_resolving_edges
+        if isinstance(raw_expected_resolving_edges, list)
+        else []
+    )
+    return {
+        "family": family,
+        "field_name": field_name,
+        "cue": cue,
+        "in_scope": in_scope,
+        "declared_value": declared_value,
+        "declared": declared,
+        "state": state,
+        "affected_assets": [item for item in affected_assets if isinstance(item, str)],
+        "expected_resolving_edges": [
+            item for item in expected_resolving_edges if isinstance(item, str)
+        ],
+        "primary_edge": primary_edge,
+        "resolution_text": resolution_text,
+    }
+
+
+def _operational_capability_projection_payload(
+    value: object,
+) -> OperationalCapabilitiesProjectionPayload | None:
+    if not isinstance(value, dict):
+        return None
+    projection_kind = value.get("projection_kind")
+    schema_version = value.get("schema_version")
+    workspace_root = value.get("workspace_root")
+    raw_families = value.get("families")
+    if (
+        projection_kind != "odd_sdlc.operational_capabilities"
+        or schema_version != "v1"
+        or not isinstance(workspace_root, str)
+        or not isinstance(raw_families, dict)
+    ):
+        return None
+    families: dict[str, OperationalCapabilityFamilyPayload] = {}
+    for family_name, family_value in raw_families.items():
+        family_payload = _operational_capability_family_payload(family_value)
+        if isinstance(family_name, str) and family_payload is not None:
+            families[family_name] = family_payload
+    return {
+        "projection_kind": "odd_sdlc.operational_capabilities",
+        "schema_version": "v1",
+        "workspace_root": workspace_root,
+        "families": families,
+    }
+
+
 def load_published_operational_capability_projection(
     workspace_root: Path | str,
-) -> dict[str, object] | None:
+) -> OperationalCapabilitiesProjectionPayload | None:
     payload = load_published_workspace_state(workspace_root)
     if payload is None:
         return None
     if not published_analysis_is_current(workspace_root):
         return None
     projection = payload.get("operational_capabilities")
-    return projection if isinstance(projection, dict) else None
+    return _operational_capability_projection_payload(projection)
 
 
 def load_or_build_operational_capability_projection(
     workspace_root: Path | str,
-) -> dict[str, object]:
+) -> OperationalCapabilitiesProjectionPayload:
     published = load_published_operational_capability_projection(workspace_root)
     if published is not None:
         return published
     return build_operational_capability_projection(workspace_root)
 
 
-def realization_candidates_for_declared_root(workspace_root: Path) -> list[dict[str, object]]:
+def realization_candidates_for_declared_root(workspace_root: Path) -> list[RealizationCandidate]:
     profile = load_project_profile(workspace_root)
     selected_relative = Path(profile.declared_output_dir.strip("/")) if profile.declared_output_dir else None
     return _realization_candidates(workspace_root, selected_relative=selected_relative)
 
 
-def realization_candidates_for_selected_root(workspace_root: Path) -> list[dict[str, object]]:
+def realization_candidates_for_selected_root(workspace_root: Path) -> list[RealizationCandidate]:
     profile = load_project_profile(workspace_root)
     return _realization_candidates(
         workspace_root,
@@ -713,7 +873,7 @@ def detect_project_profile_ambiguities(workspace_root: Path, *, stage: str) -> l
     return entries
 
 
-def _code_root_summary(path: Path) -> dict[str, int | list[str] | bool]:
+def _code_root_summary(path: Path) -> CodeRootSummary:
     if not path.exists() or not path.is_dir():
         return {
             "exists": False,
@@ -756,30 +916,30 @@ def _code_root_summary(path: Path) -> dict[str, int | list[str] | bool]:
     }
 
 
-def _realization_score(summary: dict[str, int | list[str] | bool]) -> int:
-    build_markers = summary.get("build_markers", [])
-    source_file_count = int(summary.get("source_file_count", 0))
-    test_source_file_count = int(summary.get("test_source_file_count", 0))
-    test_report_file_count = int(summary.get("test_report_file_count", 0))
+def _realization_score(summary: CodeRootSummary) -> int:
+    build_markers = summary["build_markers"]
+    source_file_count = summary["source_file_count"]
+    test_source_file_count = summary["test_source_file_count"]
+    test_report_file_count = summary["test_report_file_count"]
     return (100 * len(build_markers)) + source_file_count + (2 * test_source_file_count) + (5 * test_report_file_count)
 
 
-def _candidate_entry(workspace_root: Path, path: Path) -> dict[str, object] | None:
+def _candidate_entry(workspace_root: Path, path: Path) -> RealizationCandidate | None:
     summary = _code_root_summary(path)
-    if not summary["build_markers"] and int(summary["source_file_count"]) < 4 and int(summary["test_report_file_count"]) == 0:
+    if not summary["build_markers"] and summary["source_file_count"] < 4 and summary["test_report_file_count"] == 0:
         return None
     return {
         "relative_path": path.relative_to(workspace_root).as_posix(),
         "build_markers": list(summary["build_markers"]),
-        "source_file_count": int(summary["source_file_count"]),
-        "test_source_file_count": int(summary["test_source_file_count"]),
-        "test_report_file_count": int(summary["test_report_file_count"]),
+        "source_file_count": summary["source_file_count"],
+        "test_source_file_count": summary["test_source_file_count"],
+        "test_report_file_count": summary["test_report_file_count"],
         "score": _realization_score(summary),
     }
 
 
-def _top_level_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
-    candidates: list[dict[str, object]] = []
+def _top_level_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[RealizationCandidate]:
+    candidates: list[RealizationCandidate] = []
     for entry in sorted(workspace_root.iterdir(), key=lambda item: item.name):
         if not entry.is_dir():
             continue
@@ -805,13 +965,13 @@ def _is_selected_or_ancestor(candidate_path: str, selected_path: str | None) -> 
     return selected_path.startswith(candidate_path + "/")
 
 
-def _build_tenant_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
+def _build_tenant_realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[RealizationCandidate]:
     build_tenants_root = workspace_root / "build_tenants"
     if not build_tenants_root.exists() or not build_tenants_root.is_dir():
         return []
 
     selected_relative_posix = selected_relative.as_posix() if selected_relative is not None else None
-    candidates: list[dict[str, object]] = []
+    candidates: list[RealizationCandidate] = []
     seen: set[str] = set()
     for tenant_root in sorted(build_tenants_root.iterdir(), key=lambda item: item.name):
         if not tenant_root.is_dir():
@@ -842,8 +1002,8 @@ def _build_tenant_realization_candidates(workspace_root: Path, *, selected_relat
     return candidates
 
 
-def _realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[dict[str, object]]:
-    candidates: list[dict[str, object]] = []
+def _realization_candidates(workspace_root: Path, *, selected_relative: Path | None) -> list[RealizationCandidate]:
+    candidates: list[RealizationCandidate] = []
     seen: set[str] = set()
     for candidate in _top_level_realization_candidates(workspace_root, selected_relative=selected_relative):
         relative_path = str(candidate["relative_path"])
@@ -874,11 +1034,11 @@ def _resolved_output_from_topology(workspace_root: Path, declared_output_dir: st
         return None
 
     declared_score = _realization_score(declared_summary)
-    placeholder_like = not declared_summary["build_markers"] and int(declared_summary["source_file_count"]) <= 3
-    sorted_candidates = sorted(candidates, key=lambda item: int(item["score"]), reverse=True)
+    placeholder_like = not declared_summary["build_markers"] and declared_summary["source_file_count"] <= 3
+    sorted_candidates = sorted(candidates, key=lambda item: item["score"], reverse=True)
     best = sorted_candidates[0]
-    if placeholder_like and int(best["score"]) > declared_score + 20:
-        return str(best["relative_path"]), "topology_recovery_prefer_realized_root"
+    if placeholder_like and best["score"] > declared_score + 20:
+        return best["relative_path"], "topology_recovery_prefer_realized_root"
     return None
 
 
@@ -1017,9 +1177,9 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
     if declared_output_dir:
         declared_path = workspace_root / declared_output_dir
         declared_summary = _code_root_summary(declared_path)
-        declared_realized = bool(declared_summary["build_markers"]) or int(declared_summary["source_file_count"]) > 0
+        declared_realized = bool(declared_summary["build_markers"]) or declared_summary["source_file_count"] > 0
         canonical_summary = _code_root_summary(canonical_output_path)
-        canonical_realized = bool(canonical_summary["build_markers"]) or int(canonical_summary["source_file_count"]) > 0
+        canonical_realized = bool(canonical_summary["build_markers"]) or canonical_summary["source_file_count"] > 0
         if canonical_realized:
             output_dir = canonical_output_dir
             realization_mode = "selected_output_tree"
@@ -1061,10 +1221,18 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
         tenant_name=tenant_name,
         output_dir=output_dir,
         declared_output_dir=declared_output_dir,
-        build_execution_contract=constraints.get("tenant_build_execution_contract", ""),
-        test_execution_contract=constraints.get("tenant_test_execution_contract", ""),
-        deployment_contract=constraints.get("tenant_deployment_contract", ""),
-        runtime_observation_contract=constraints.get("tenant_runtime_observation_contract", ""),
+        build_execution_contract=normalize_execution_contract_declaration(
+            constraints.get("tenant_build_execution_contract", "")
+        ),
+        test_execution_contract=normalize_execution_contract_declaration(
+            constraints.get("tenant_test_execution_contract", "")
+        ),
+        deployment_contract=normalize_execution_contract_declaration(
+            constraints.get("tenant_deployment_contract", "")
+        ),
+        runtime_observation_contract=normalize_execution_contract_declaration(
+            constraints.get("tenant_runtime_observation_contract", "")
+        ),
         root_code_policy=constraints.get("root_code_policy", ""),
         realization_mode=realization_mode,
         resolution_reason=resolution_reason,

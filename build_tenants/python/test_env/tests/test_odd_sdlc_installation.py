@@ -71,6 +71,7 @@ from odd_sdlc.project_profile import (  # noqa: E402
     load_project_profile,
     realization_candidates_for_declared_root,
 )
+from odd_sdlc.traceability_index import build_requirement_traceability_index  # noqa: E402
 
 
 def _manifest_context(manifest: dict[str, object], name: str) -> dict[str, object]:
@@ -88,13 +89,16 @@ from odd_sdlc.requirement_closure import (  # noqa: E402
     build_requirement_closure_register,
     refresh_requirement_closure_register,
 )
+from odd_sdlc.test_lane_evidence import build_test_lane_evidence  # noqa: E402
 from odd_sdlc.workspace_assets import summarize_test_evidence  # noqa: E402
 import sandbox_runtime  # noqa: E402
 from sandbox_runtime import (  # noqa: E402
+    approve_installed_head_constitutional_proposal,
     complete_current_call,
     complete_bootstrap_chain,
     read_events,
     refresh_installed_analysis,
+    run_constructor_for_start,
     run_installed_odd_sdlc,
     run_installed_python,
     run_installed_substrate,
@@ -144,6 +148,22 @@ def _seed_imported_workspace(path: Path) -> None:
     )
     (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
         _legacy_project_constraints(path.name),
+        encoding="utf-8",
+    )
+
+
+def _seed_two_digit_imported_workspace(path: Path) -> None:
+    _seed_imported_workspace(path)
+    (path / "specification" / "REQUIREMENTS.md").write_text(
+        "\n".join(
+            (
+                "# Imported Requirements",
+                "",
+                "- REQ-ADJ-01: Preserve imported numbering authority.",
+                "- REQ-ADJ-02-A: Preserve imported suffixed numbering authority.",
+                "",
+            )
+        ),
         encoding="utf-8",
     )
 
@@ -366,6 +386,78 @@ def _prime_installed_workspace_for_explicit_public_start(
     )
 
 
+def _repeat_installed_edge_until_yield_or_limit(
+    workspace: Path,
+    *,
+    edge: str,
+    attempts: int,
+    label_prefix: str,
+) -> list[dict[str, object]]:
+    runs: list[dict[str, object]] = []
+    for attempt in range(attempts):
+        refresh_installed_analysis(workspace)
+        published = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "gaps",
+                "--scope",
+                "workspace",
+                label=f"{label_prefix}.gaps.{attempt + 1}",
+            ).stdout
+        )
+        approve_installed_head_constitutional_proposal(
+            workspace,
+            gaps_payload=published,
+            label_prefix=f"{label_prefix}.{attempt + 1}",
+        )
+        start_payload = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "start",
+                "--scope",
+                "workspace",
+                "--target",
+                "next",
+                "--until",
+                "first_traversal",
+                label=f"{label_prefix}.start.{attempt + 1}",
+            ).stdout
+        )
+        actual_edge = start_payload.get("edge")
+        if actual_edge != edge:
+            raise AssertionError(f"Expected edge {edge!r}, got {actual_edge!r}")
+        manifest_path = Path(str(start_payload["fp_manifest_path"]))
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        constructor_payload, result_path = run_constructor_for_start(
+            workspace,
+            start_payload=start_payload,
+            label=f"{label_prefix}.construct.{attempt + 1}",
+        )
+        assessed_payload = json.loads(
+            run_installed_substrate(
+                workspace,
+                "assess-result",
+                "--result",
+                str(result_path),
+                label=f"{label_prefix}.assess-result.{attempt + 1}",
+            ).stdout
+        )
+        runs.append(
+            {
+                "published": published,
+                "start": start_payload,
+                "manifest_path": str(manifest_path),
+                "manifest": manifest_payload,
+                "constructor": constructor_payload,
+                "assessed": assessed_payload,
+                "result_path": str(result_path),
+            }
+        )
+        if assessed_payload.get("status") != "yield":
+            break
+    return runs
+
+
 def _append_tenant_capability_contracts(
     workspace: Path,
     *,
@@ -485,8 +577,8 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "normalize_project_constraints",
         "create_tenant_registry",
         "create_stateful_builder_control_frame",
-        "create_realized_test_source_obligation",
-        "create_realization_deepening_control_frame",
+        "create_test_lane_completeness_context",
+        "create_realization_iteration_digest",
         "create_ambiguity_register",
         "create_requirement_closure_register",
         "create_requirement_closure_prompt_context",
@@ -500,6 +592,10 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
         "create_goals_surface",
         "create_imported_requirements_summary",
         "create_project_bootstrap",
+        "normalize_project_constraint_field",
+        "normalize_project_constraint_field",
+        "normalize_project_constraint_field",
+        "normalize_project_constraint_field",
     ]
 
     assert (workspace / "specification" / "PRODUCT.md").read_text(encoding="utf-8").startswith("# Product")
@@ -529,10 +625,10 @@ def test_normalize_workspace_standardizes_imported_workspace_shape(tmp_path: Pat
     assert 'name: "scala_spark"' in constraints
     assert 'output_dir: "build_tenants/scala_spark/"' in constraints
     assert 'ambiguity_risk_appetite: "medium"' in constraints
-    assert 'build_execution_contract: ""' in constraints
-    assert 'test_execution_contract: ""' in constraints
-    assert 'deployment_contract: ""' in constraints
-    assert 'runtime_observation_contract: ""' in constraints
+    assert 'build_execution_contract: "undeclared"' in constraints
+    assert 'test_execution_contract: "undeclared"' in constraints
+    assert 'deployment_contract: "undeclared"' in constraints
+    assert 'runtime_observation_contract: "undeclared"' in constraints
     tenant_registry = (workspace / "build_tenants" / "TENANT_REGISTRY.md").read_text(encoding="utf-8")
     assert "`scala_spark`" in tenant_registry
     assert "`build_tenants/scala_spark/`" in tenant_registry
@@ -646,6 +742,74 @@ def test_install_deploys_runtime_contract_and_enables_odd_sdlc_gaps(tmp_path: Pa
     analysis_manifest = load_analysis_manifest(workspace)
     assert analysis_manifest is not None
     assert analysis_manifest["analysis_fingerprint"] == workspace_state["analysis_fingerprint"]
+
+
+def test_install_imported_workspace_publishes_canonical_requirement_authority(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.b045"
+    _seed_two_digit_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    imported_summary = (
+        workspace / "specification" / "requirements" / "00-imported-sources.md"
+    ).read_text(encoding="utf-8")
+    assert "REQ-ADJ-001" in imported_summary
+    assert "REQ-ADJ-002-A" in imported_summary
+    assert "REQ-ADJ-01:" not in imported_summary
+    assert "REQ-ADJ-02-A:" not in imported_summary
+
+    index = build_requirement_traceability_index(workspace)
+    assert index.authority_refs["REQ-ADJ-001"] == ["specification/requirements/00-imported-sources.md"]
+    assert index.authority_refs["REQ-ADJ-002-A"] == ["specification/requirements/00-imported-sources.md"]
+
+
+def test_install_reports_named_capability_diagnostic_before_operational_traversal(tmp_path: Path) -> None:
+    workspace = tmp_path / "data_mapper.b046"
+    _seed_imported_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    assert payload["status"] == "installed"
+    constraints = (workspace / ".ai-workspace" / "context" / "project_constraints.yml").read_text(encoding="utf-8")
+    assert 'build_execution_contract: ""' not in constraints
+    assert 'test_execution_contract: ""' not in constraints
+    assert 'deployment_contract: ""' not in constraints
+    assert 'runtime_observation_contract: ""' not in constraints
+    assert 'build_execution_contract: "undeclared"' in constraints
+    assert 'test_execution_contract: "undeclared"' in constraints
+    assert 'deployment_contract: "undeclared"' in constraints
+    assert 'runtime_observation_contract: "undeclared"' in constraints
+
+    profile = load_project_profile(workspace)
+    assert profile.has_build_execution_capability() is False
+    assert profile.has_test_execution_capability() is False
+
+    ambiguity_register = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-ambiguity-register.json").read_text(encoding="utf-8")
+    )
+    missing_build = next(
+        entry
+        for entry in ambiguity_register["ambiguities"]
+        if entry["ambiguity_id"] == "missing-build-execution-capability"
+    )
+    missing_test = next(
+        entry
+        for entry in ambiguity_register["ambiguities"]
+        if entry["ambiguity_id"] == "missing-test-execution-capability"
+    )
+    assert missing_build["status"] == "pending_capability"
+    assert missing_build["observed_state"]["declared_value"] == "undeclared"
+    assert missing_test["status"] == "pending_capability"
+    assert missing_test["observed_state"]["declared_value"] == "undeclared"
     claude_text = (workspace / "CLAUDE.md").read_text(encoding="utf-8")
     agents_text = (workspace / "AGENTS.md").read_text(encoding="utf-8")
     for text in (claude_text, agents_text):
@@ -663,7 +827,7 @@ def test_install_deploys_runtime_contract_and_enables_odd_sdlc_gaps(tmp_path: Pa
         assert "`workspace://.ai-workspace/runtime/odd_sdlc-requirement-closure.json`" in text
         assert f"`workspace://{INSTALLED_RUNTIME_CONTRACT_RELATIVE.as_posix()}`" in text
         assert "- platform: `scala_spark`" in text
-        assert "## 4. Start Here" in text
+        assert "## 5. Start Here" in text
         assert "python -m odd_sdlc gaps --scope workspace --workspace ." in text
         assert "python -m odd_sdlc start --scope workspace --target next --until converged --workspace ." in text
         assert "deployment, runtime-return, and other side-effect stages only traverse" in text
@@ -835,10 +999,175 @@ def test_install_query_domain_publishes_start_target_catalog_and_asset_ownership
     assert start_targets["bootstrap_release_self_test"]["carrier_class"] == "executive_carrier"
     assert start_targets["review_design_consensus_round"]["start_addressable"] is True
     assert start_targets["review_subject_by_consensus"]["start_addressable"] is False
+    graph_functions = {entry["name"]: entry for entry in query_payload["graph_functions"]}
+    bootstrap_vectors = {
+        vector["name"]: vector
+        for vector in graph_functions["bootstrap_release_self_test"]["vectors"]
+    }
+    assert bootstrap_vectors["derive_implementation_module_surface"]["fp_retry_policy"] == {
+        "evaluator_id": "implementation_module_surface_semantically_converged",
+        "classification": "deepening_eligible",
+        "deepening_eligible": True,
+    }
+    assert bootstrap_vectors["derive_code_surface"]["fp_retry_policy"] == {
+        "evaluator_id": "code_surface_semantically_converged",
+        "classification": "deepening_eligible",
+        "deepening_eligible": True,
+    }
+    assert bootstrap_vectors["derive_test_design_surface"]["fp_retry_policy"] == {
+        "evaluator_id": "test_design_surface_semantically_converged",
+        "classification": "deepening_eligible",
+        "deepening_eligible": True,
+    }
+    assert bootstrap_vectors["derive_test_module_surface"]["fp_retry_policy"] == {
+        "evaluator_id": "test_module_surface_semantically_converged",
+        "classification": "deepening_eligible",
+        "deepening_eligible": True,
+    }
 
     asset_ownership = {entry["handle"]: entry for entry in query_payload["asset_ownership_index"]}
     assert asset_ownership["code_surface"]["operator_target"]["handle"] == "bootstrap_release_self_test"
     assert asset_ownership["reviewed_design_surface"]["operator_target"]["handle"] == "review_design_consensus_round"
+
+
+def test_install_data_mapper_derive_code_surface_reenters_with_realization_iteration_continuity(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "data_mapper.test38.retry"
+    _seed_data_mapper_template_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    assert payload["status"] == "installed"
+
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+
+    completed = complete_bootstrap_chain(
+        workspace,
+        label_prefix="data_mapper_retry",
+        steps=(
+            "derive_intent_surface",
+            "derive_product_surface",
+            "derive_goal_surface",
+            "derive_requirement_surface",
+            "derive_feature_decomp_surface",
+            "derive_uat_testcases_surface",
+            "derive_design_surface",
+            "derive_scenario_surface",
+            "derive_implementation_design_surface",
+            "select_implementation_stack_profile",
+            "derive_implementation_module_surface",
+        ),
+    )
+    assert completed[-1]["start"]["edge"] == "derive_implementation_module_surface"
+
+    code_runs = _repeat_installed_edge_until_yield_or_limit(
+        workspace,
+        edge="derive_code_surface",
+        attempts=3,
+        label_prefix="data_mapper_retry.code",
+    )
+
+    assert len(code_runs) >= 2
+
+    for dispatch_index, run in enumerate(code_runs[:2]):
+        published = run["published"]
+        dossier = published["dossiers"][0]
+        iteration = dossier["triage"]["realization_iteration"]
+        manifest_path = Path(run["manifest_path"])
+        result_path = Path(run["result_path"])
+
+        assert dossier["edge"] == "derive_code_surface"
+        assert iteration["edge_id"] == "derive_code_surface"
+        assert iteration["classification"] == "deepening_eligible"
+        assert iteration["deepening_eligible"] is True
+        assert iteration["dispatch_index"] == dispatch_index
+        assert run["start"]["blocking_reason"] == "fp_dispatch"
+        assert run["start"]["edge"] == "derive_code_surface"
+        assert manifest_path.exists()
+        assert result_path.exists()
+        assert run["assessed"]["status"] == "yield"
+
+    second_manifest = code_runs[1]["manifest"]
+    digest_context = _manifest_context(second_manifest, "odd_sdlc_realization_iteration_digest")
+    digest_content = str(digest_context["content"])
+    assert "## `derive_code_surface`" in digest_content
+
+    events = read_events(workspace)
+    derive_code_route_events = [
+        event["data"]
+        for event in events
+        if event["event_type"] == "route_recorded"
+        and isinstance(event.get("data"), dict)
+        and event["data"].get("selected_graphfunction") == "derive_code_surface"
+    ]
+    assert len(derive_code_route_events) >= 2
+    assert derive_code_route_events[0]["priority_source"] == "triage.realization_iteration"
+
+
+def test_b037_installed_archive_edge_materializes_realized_test_source_before_execution_lane(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "data_mapper.test38.archive"
+    _seed_data_mapper_template_workspace(workspace)
+
+    payload = install_release(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    assert payload["status"] == "installed"
+
+    transport_contract = _write_fake_transport_contract(workspace)
+    _append_runtime_contract_overrides(workspace, transport_contract=transport_contract)
+    archive_manifest = ".ai-workspace/tmp/b037-archive-manifest.json"
+    archive_result = ".ai-workspace/tmp/b037-archive-result.json"
+    construct_archive = run_installed_python(
+        workspace,
+        "\n".join(
+            (
+                "import json",
+                "from pathlib import Path",
+                "from odd_sdlc.constructor import construct_manifest",
+                f"manifest = Path({archive_manifest!r})",
+                f"result_path = Path({archive_result!r})",
+                "manifest.parent.mkdir(parents=True, exist_ok=True)",
+                "manifest.write_text(",
+                "    json.dumps(",
+                "        {",
+                '            "manifest_id": "b037-installed-archive",',
+                '            "edge": "derive_test_run_archive_surface",',
+                '            "target_asset": "test_run_archive_surface",',
+                '            "result_path": str(result_path),',
+                '            "fulfillment_obligations": [{"id": "realized_test_source", "evaluator": "realized_test_source"}],',
+                "        }",
+                "    ),",
+                '    encoding="utf-8",',
+                ")",
+                "payload = construct_manifest(manifest, workspace_root='.')",
+                "print(json.dumps(payload))",
+            )
+        ),
+        label="data_mapper_b037.construct_archive",
+    )
+    archive_payload = json.loads(construct_archive.stdout)
+    assert archive_payload["target_asset"] == "test_run_archive_surface"
+    assert archive_payload["attestation"]["contract_satisfied"] is True
+
+    lane = build_test_lane_evidence(workspace)
+    assert lane["completeness_state"] == "realized_test_source"
+    assert lane["next_lawful_gain"] == "record_governed_test_execution_evidence"
+    assert lane["test_source_file_count"] > 0
+    assert lane["parsed_report_count"] == 0
+
+    archive_path = next(workspace.rglob("50-generated-run-archive.md"))
+    archive_text = archive_path.read_text(encoding="utf-8")
+    assert "- completeness_state: realized_test_source" in archive_text
+    assert "- next_lawful_gain: record_governed_test_execution_evidence" in archive_text
 
 
 def test_install_exposes_public_odd_sdlc_graph_function_and_asset_targets(tmp_path: Path) -> None:
@@ -1551,10 +1880,9 @@ def test_default_claude_manifest_declares_domain_dispatch_timeout(tmp_path: Path
     }
     assert manifest["execution_basis"]["edge"] == "derive_intent_surface"
     assert execution_contract["source_kind"] == "ticket_work_item"
-    assert "stateful workspace asset under construction" in manifest["prompt"]
     assert "# Admitted Execution Contract" in manifest["prompt"]
-    assert "Do not treat the edge like a one-shot pure function call over serialized state." in manifest["prompt"]
-    assert (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-realization-deepening-control-frame.md").exists()
+    assert "one-shot pure function call over serialized state" in manifest["prompt"]
+    assert not (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-realization-deepening-control-frame.md").exists()
 
 
 def test_imported_workspace_first_generated_readback_is_materially_specific(tmp_path: Path) -> None:

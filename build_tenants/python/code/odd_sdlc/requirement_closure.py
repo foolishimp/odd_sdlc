@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TypeAlias
 
 from .project_profile import (
     load_project_profile,
@@ -53,6 +53,7 @@ _DECLARED_REQUIREMENT_EDGE_ADAPTER_REF = (
 )
 _REQUIREMENT_CARRIES_FIELD = "Carries Forward From"
 _REQUIREMENT_AUTHORING_DESIGN_FIELD = "Authoring Design"
+RequirementClosureRegisterReadModel: TypeAlias = dict[str, object]
 
 
 class RequirementClosureUnavailableError(ValueError):
@@ -63,6 +64,13 @@ def _read_text(path: Path) -> str:
     if not path.exists() or not path.is_file():
         return ""
     return path.read_text(encoding="utf-8")
+
+
+def _load_json_dict(path: Path) -> dict[str, Any] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
 
 
 def _meaningful_source_lines(path: Path) -> list[str]:
@@ -260,9 +268,9 @@ def _build_requirement_register_entry(
     ]
     if in_authority and not in_current:
         status = "missing_from_current_requirement_surface"
-    elif code_files and test_run_archive_files:
+    elif code_files and test_files:
         status = "realized"
-    elif code_files or test_run_archive_files:
+    elif code_files or test_files:
         status = "partially_realized"
     elif implementation_files or planned_validation_files or uat_validation_files:
         status = "planned"
@@ -274,7 +282,7 @@ def _build_requirement_register_entry(
         in_authority=in_authority,
         in_current=in_current,
     )
-    if behavioral_code_files and test_run_archive_files:
+    if behavioral_code_files and test_files:
         fulfillment_detail = "fulfilled"
     elif behavioral_code_files:
         fulfillment_detail = "implemented_without_realized_tests"
@@ -298,8 +306,8 @@ def _build_requirement_register_entry(
         blocking_reasons.append("missing_code_realization")
     if code_files and not behavioral_code_files:
         blocking_reasons.append("behavioral_realization_missing")
-    if behavioral_code_files and not test_run_archive_files:
-        blocking_reasons.append("missing_realized_test_evidence")
+    if behavioral_code_files and not test_files:
+        blocking_reasons.append("missing_realized_test_source")
 
     return {
         "requirement_id": requirement_id,
@@ -360,6 +368,12 @@ def _build_requirement_blocking_view(
     fulfillment_status: str | None = None,
     blocking_reasons: list[str] | None = None,
 ) -> dict[str, Any]:
+    raw_blocking_reasons = blocking_reasons if blocking_reasons is not None else entry.get("blocking_reasons", ())
+    normalized_blocking_reasons = (
+        [str(reason) for reason in raw_blocking_reasons]
+        if isinstance(raw_blocking_reasons, (list, tuple))
+        else []
+    )
     return {
         "id": str(entry["requirement_id"]),
         "kind": "requirement",
@@ -375,7 +389,7 @@ def _build_requirement_blocking_view(
         "test_refs": list(entry.get("test_refs", ())),
         "implementation_claim_refs": list(entry.get("implementation_claim_refs", ())),
         "planned_test_claim_refs": list(entry.get("planned_test_claim_refs", ())),
-        "blocking_reasons": list(blocking_reasons or entry.get("blocking_reasons", ())),
+        "blocking_reasons": normalized_blocking_reasons,
     }
 
 
@@ -736,8 +750,8 @@ def _declared_requirement_extra_ids(
         return set(index.refs_for("planned_test_design"))
     if fulfillment_rule == "test_module_surface_coverage":
         return set(index.refs_for("planned_test_module"))
-    if fulfillment_rule == "realized_test_evidence":
-        return set(index.test_run_archive_refs)
+    if fulfillment_rule == "realized_test_source":
+        return set(index.realized_test_source_refs)
     if fulfillment_rule == "testcase_authority_coverage":
         return set(index.testcase_authority_refs)
     if fulfillment_rule == "release_readiness":
@@ -747,7 +761,7 @@ def _declared_requirement_extra_ids(
             | set(index.planned_validation_refs)
             | set(index.testcase_authority_refs)
             | set(scan["code_refs"])
-            | set(index.test_run_archive_refs)
+            | set(index.realized_test_source_refs)
         )
     raise ValueError(f"unsupported declared requirement fulfillment rule {fulfillment_rule!r}")
 
@@ -772,7 +786,7 @@ def _declared_requirement_expected_ids(
         return _expected_validation_module_requirement_ids(index)
     if derivation_rule == "validation_authority_projection":
         return _expected_validation_authority_requirement_ids(index)
-    if derivation_rule == "realized_validation_projection":
+    if derivation_rule == "realized_test_source_projection":
         return _expected_realized_validation_requirement_ids(index)
     raise ValueError(
         f"unsupported declared requirement derivation rule {derivation_rule!r} for {fulfillment_rule!r}"
@@ -802,8 +816,8 @@ def _declared_requirement_carried_ids(
         return set(index.refs_for("planned_test_design"))
     if fulfillment_rule == "test_module_surface_coverage":
         return set(index.refs_for("planned_test_module"))
-    if fulfillment_rule == "realized_test_evidence":
-        return set(index.test_run_archive_refs)
+    if fulfillment_rule == "realized_test_source":
+        return set(index.realized_test_source_refs)
     if fulfillment_rule == "testcase_authority_coverage":
         return set(index.testcase_authority_refs)
     if fulfillment_rule == "release_readiness":
@@ -813,7 +827,7 @@ def _declared_requirement_carried_ids(
             | set(index.refs_for("planned_test_module"))
             | set(index.testcase_authority_refs)
             | set(scan["code_refs"])
-            | set(index.test_run_archive_refs)
+            | set(index.realized_test_source_refs)
         )
     raise ValueError(f"unsupported declared requirement fulfillment rule {fulfillment_rule!r}")
 
@@ -855,8 +869,12 @@ def _edge_requirement_evidence_refs(
             list(entry.get("planned_test_module_claim_refs", ())),
             list(entry.get("planned_test_design_claim_refs", ())),
         )
-    if fulfillment_rule == "realized_test_evidence":
-        return list(entry.get("test_run_archive_refs", ()))
+    if fulfillment_rule == "realized_test_source":
+        return _unique_sequence(
+            list(entry.get("test_refs", ())),
+            list(entry.get("test_run_archive_refs", ())),
+            list(entry.get("planned_test_module_claim_refs", ())),
+        )
     if fulfillment_rule == "testcase_authority_coverage":
         return _unique_sequence(
             list(entry.get("testcase_authority_refs", ())),
@@ -866,6 +884,7 @@ def _edge_requirement_evidence_refs(
     if fulfillment_rule == "release_readiness":
         return _unique_sequence(
             list(entry.get("behavioral_code_refs", ())),
+            list(entry.get("test_refs", ())),
             list(entry.get("test_run_archive_refs", ())),
             list(entry.get("testcase_authority_refs", ())),
             list(entry.get("implementation_module_claim_refs", ())),
@@ -958,12 +977,12 @@ def _declared_requirement_fulfillment(
             return "planned", ["missing_test_module_coverage"]
         return "specified", ["missing_test_module_coverage"]
 
-    if fulfillment_rule == "realized_test_evidence":
-        if test_run_archive_refs:
+    if fulfillment_rule == "realized_test_source":
+        if test_refs:
             return "fulfilled", []
         if planned_test_module_claim_refs or planned_test_design_claim_refs or testcase_authority_refs:
-            return "planned", ["missing_realized_test_evidence"]
-        return "specified", ["missing_realized_test_evidence"]
+            return "planned", ["missing_realized_test_source"]
+        return "specified", ["missing_realized_test_source"]
 
     if fulfillment_rule == "testcase_authority_coverage":
         if testcase_authority_refs:
@@ -978,13 +997,13 @@ def _declared_requirement_fulfillment(
             blocking_reasons.append(
                 "behavioral_realization_missing" if code_refs else "missing_code_realization"
             )
-        if not test_run_archive_refs:
-            blocking_reasons.append("missing_realized_test_evidence")
+        if not test_refs:
+            blocking_reasons.append("missing_realized_test_source")
         if not testcase_authority_refs:
             blocking_reasons.append("missing_testcase_authority_coverage")
         if not blocking_reasons:
             return "fulfilled", []
-        if behavioral_code_refs and test_run_archive_refs:
+        if behavioral_code_refs and test_refs:
             return "implemented_without_testcase_authority", blocking_reasons
         if behavioral_code_refs:
             return "implemented_without_realized_tests", blocking_reasons
@@ -1227,7 +1246,7 @@ def load_published_requirement_closure_register(workspace_root: Path) -> dict[st
     path = workspace_root / REQUIREMENT_CLOSURE_REGISTER_PATH
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_dict(path)
 
 
 def _requirement_closure_unavailable_reason(workspace_root: Path) -> str:

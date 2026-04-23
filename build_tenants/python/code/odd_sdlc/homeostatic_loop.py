@@ -14,7 +14,13 @@ from .constitutional_surface import (
     proposal_application_block,
 )
 from .runtime_effects import publish_workspace_runtime_event
+from .runtime_event_contract import admit_runtime_event_payload
 from .triage import enrich_gap_snapshot, load_current_edge_triage
+
+
+def _event_id(event: dict[str, Any]) -> str | None:
+    event_id = event.get("event_id")
+    return event_id if isinstance(event_id, str) and event_id else None
 
 
 def apply_constitutional_proposal(
@@ -55,31 +61,37 @@ def apply_constitutional_proposal(
     approval_event = publish_workspace_runtime_event(
         workspace_root=root,
         event_type="constitutional_proposal_approved_with_edits",
-        data={
-            "edge": edge,
-            "proposal_id": proposal_id,
-            "actor": actor,
-        },
+        data=admit_runtime_event_payload(
+            event_type="constitutional_proposal_approved_with_edits",
+            data={
+                "edge": edge,
+                "proposal_id": proposal_id,
+                "actor": actor,
+            },
+        ),
         workflow_version=str(artifact.get("analysis_fingerprint") or "unknown"),
         run_id=str(artifact.get("run_id") or "") or None,
     )
     applied_event = publish_workspace_runtime_event(
         workspace_root=root,
         event_type="proposal_applied",
-        data={
-            "edge": edge,
-            "proposal_id": proposal_id,
-            "target_surface": target_surface,
-            "surface_digest": surface_digest,
-            "actor": actor,
-            "approval_event_id": approval_event["event_id"],
-        },
+        data=admit_runtime_event_payload(
+            event_type="proposal_applied",
+            data={
+                "edge": edge,
+                "proposal_id": proposal_id,
+                "target_surface": target_surface,
+                "surface_digest": surface_digest,
+                "actor": actor,
+                "approval_event_id": _event_id(approval_event),
+            },
+        ),
         workflow_version=str(artifact.get("analysis_fingerprint") or "unknown"),
         run_id=str(artifact.get("run_id") or "") or None,
         aggregate_type="odd_sdlc.edge_triage",
         aggregate_id=edge,
-        correlation_id=approval_event["event_id"],
-        causation_event_id=approval_event["event_id"],
+        correlation_id=_event_id(approval_event),
+        causation_event_id=_event_id(approval_event),
     )
     refresh_analysis(root, stage="proposal_applied")
     return {
@@ -88,8 +100,8 @@ def apply_constitutional_proposal(
         "proposal_id": proposal_id,
         "target_surface": target_surface,
         "surface_digest": surface_digest,
-        "approval_event_id": approval_event["event_id"],
-        "applied_event_id": applied_event["event_id"],
+        "approval_event_id": _event_id(approval_event),
+        "applied_event_id": _event_id(applied_event),
     }
 
 
@@ -110,12 +122,15 @@ def loopback_homeostatic_gap(
     reopen_event = publish_workspace_runtime_event(
         workspace_root=workspace_root,
         event_type="derivation_reopened",
-        data={
-            "edge": edge,
-            "proposal_id": proposal_id,
-            "target_surface": target_surface,
-            "surface_digest": surface_digest,
-        },
+        data=admit_runtime_event_payload(
+            event_type="derivation_reopened",
+            data={
+                "edge": edge,
+                "proposal_id": proposal_id,
+                "target_surface": target_surface,
+                "surface_digest": surface_digest,
+            },
+        ),
         workflow_version=str(app.scope().workflow_version),
         run_id=run_id,
         aggregate_type="odd_sdlc.edge_triage",
@@ -134,55 +149,61 @@ def loopback_homeostatic_gap(
         retired_event = publish_workspace_runtime_event(
             workspace_root=workspace_root,
             event_type="gap_retired",
-            data={
-                "edge": edge,
-                "proposal_id": proposal_id,
-                "target_surface": target_surface,
-                "surface_digest": surface_digest,
-                "reopen_event_id": reopen_event["event_id"],
-            },
+            data=admit_runtime_event_payload(
+                event_type="gap_retired",
+                data={
+                    "edge": edge,
+                    "proposal_id": proposal_id,
+                    "target_surface": target_surface,
+                    "surface_digest": surface_digest,
+                    "reopen_event_id": _event_id(reopen_event),
+                },
+            ),
             workflow_version=str(app.scope().workflow_version),
             run_id=run_id,
             aggregate_type="odd_sdlc.edge_triage",
             aggregate_id=edge,
-            correlation_id=reopen_event["event_id"],
-            causation_event_id=reopen_event["event_id"],
+            correlation_id=_event_id(reopen_event),
+            causation_event_id=_event_id(reopen_event),
         )
         return {
             "status": "retired",
             "edge": edge,
             "proposal_id": proposal_id,
             "surface_digest": surface_digest,
-            "reopen_event_id": reopen_event["event_id"],
-            "retired_event_id": retired_event["event_id"],
+            "reopen_event_id": _event_id(reopen_event),
+            "retired_event_id": _event_id(retired_event),
         }
 
     gap_event = publish_workspace_runtime_event(
         workspace_root=workspace_root,
         event_type="gap_event",
-        data={
-            "edge": edge,
-            "proposal_id": proposal_id,
-            "originating_gap_edge": edge,
-            "surface_digest": surface_digest,
-            "delta": float(matching_gap.get("delta") or 0.0),
-            "failing": list(matching_gap.get("failing") or ()),
-            "reopen_event_id": reopen_event["event_id"],
-        },
+        data=admit_runtime_event_payload(
+            event_type="gap_event",
+            data={
+                "edge": edge,
+                "proposal_id": proposal_id,
+                "originating_gap_edge": edge,
+                "surface_digest": surface_digest,
+                "delta": float(matching_gap.get("delta") or 0.0),
+                "failing": list(matching_gap.get("failing") or ()),
+                "reopen_event_id": _event_id(reopen_event),
+            },
+        ),
         workflow_version=str(app.scope().workflow_version),
         run_id=run_id,
         aggregate_type="odd_sdlc.edge_triage",
         aggregate_id=edge,
-        correlation_id=reopen_event["event_id"],
-        causation_event_id=reopen_event["event_id"],
+        correlation_id=_event_id(reopen_event),
+        causation_event_id=_event_id(reopen_event),
     )
     return {
         "status": "still_open",
         "edge": edge,
         "proposal_id": proposal_id,
         "surface_digest": surface_digest,
-        "reopen_event_id": reopen_event["event_id"],
-        "gap_event_id": gap_event["event_id"],
+        "reopen_event_id": _event_id(reopen_event),
+        "gap_event_id": _event_id(gap_event),
         "post_gap": matching_gap,
     }
 

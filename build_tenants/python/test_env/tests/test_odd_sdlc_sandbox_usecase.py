@@ -881,20 +881,20 @@ def test_installed_self_test_command_drives_the_current_executive_program(run_ar
     assert [step["assessed"]["status"] for step in payload["steps"]] == ["ok"] * len(payload["steps"])
     assert payload["steps"][-1]["edge"] == "prepare_release_surface"
     assert payload["steps"][-1]["assessed"]["status"] == "ok"
-    assert payload["final_state"]["status"] == "iterated"
-    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
-    assert payload["final_state"]["blocking_reason"] == "fp_dispatch"
+    assert payload["final_state"]["status"] == "program_boundary_complete"
+    assert payload["final_state"]["edge"] == "prepare_release_surface"
+    assert payload["final_state"]["next_edge"] == "prepare_build_execution_surface"
+    assert payload["program_boundary_complete"] is True
     assert payload["follow_on_program"]["name"] == "release_operational_cycle"
     assert [entry["name"] for entry in payload["other_active_programs"]] == ["release_operational_cycle"]
 
     events = read_events(workspace)
     graph_call_events = [event for event in events if event["event_type"] == "graph_call_opened"]
-    assert len(graph_call_events) >= len(payload["completed_edges"])
+    assert len(graph_call_events) == len(payload["completed_edges"])
     graph_function_names = [event["data"]["graph_function"] for event in graph_call_events]
-    assert graph_function_names[: len(payload["completed_edges"])] == [
+    assert graph_function_names == [
         "bootstrap_release_self_test"
     ] * len(payload["completed_edges"])
-    assert all(name == "release_operational_cycle" for name in graph_function_names[len(payload["completed_edges"]) :])
     assert "run_completed" in [event["event_type"] for event in events]
     assert asset_path(workspace, "test_run_archive_surface").exists()
     assert asset_path(workspace, "release_surface").exists()
@@ -916,8 +916,10 @@ def test_installed_self_test_returns_clean_success_when_bootstrap_is_already_com
     assert payload["already_converged"] is True
     assert payload["completed_edges"] == []
     assert payload["steps"] == []
-    assert payload["final_state"]["status"] == "iterated"
-    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
+    assert payload["final_state"]["status"] == "program_boundary_complete"
+    assert payload["final_state"]["edge"] == "prepare_release_surface"
+    assert payload["final_state"]["next_edge"] == "prepare_build_execution_surface"
+    assert payload["program_boundary_complete"] is True
     assert payload["follow_on_program"]["name"] == "release_operational_cycle"
     assert [entry["name"] for entry in payload["other_active_programs"]] == ["release_operational_cycle"]
 
@@ -943,8 +945,10 @@ def test_installed_self_test_resumes_bootstrap_from_the_current_active_edge(run_
     assert payload["already_converged"] is False
     assert payload["completed_edges"] == list(EXPECTED_BOOTSTRAP_STEPS[3:])
     assert payload["steps"][0]["edge"] == "derive_requirement_surface"
-    assert payload["final_state"]["status"] == "iterated"
-    assert payload["final_state"]["edge"] == "prepare_build_execution_surface"
+    assert payload["final_state"]["status"] == "program_boundary_complete"
+    assert payload["final_state"]["edge"] == "prepare_release_surface"
+    assert payload["final_state"]["next_edge"] == "prepare_build_execution_surface"
+    assert payload["program_boundary_complete"] is True
     assert payload["follow_on_program"]["name"] == "release_operational_cycle"
 
 
@@ -1093,60 +1097,93 @@ def test_dispatch_operational_runs_declared_local_bindings_end_to_end(run_archiv
     bootstrap_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="dispatch_bootstrap")
     assert [step["start"]["edge"] for step in bootstrap_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
 
-    first = json.loads(
-        run_installed_odd_sdlc(
-            workspace,
-            "dispatch-operational",
-            archive=run_archive,
-            label="odd_sdlc dispatch-operational build",
-            timeout=120,
-        ).stdout
+    dispatch_labels = (
+        "prepare-build",
+        "dispatch-build",
+        "prepare-test",
+        "dispatch-test",
+        "prepare-deploy",
+        "dispatch-deploy",
+        "project-deployed-environment",
+        "project-runtime-observation",
+        "project-retrofit-plan",
     )
-    second = json.loads(
-        run_installed_odd_sdlc(
-            workspace,
-            "dispatch-operational",
-            archive=run_archive,
-            label="odd_sdlc dispatch-operational test",
-            timeout=120,
-        ).stdout
-    )
-    third = json.loads(
-        run_installed_odd_sdlc(
-            workspace,
-            "dispatch-operational",
-            archive=run_archive,
-            label="odd_sdlc dispatch-operational deploy",
-            timeout=120,
-        ).stdout
-    )
-    run_archive.capture_json("dispatch-operational.build.json", first)
-    run_archive.capture_json("dispatch-operational.test.json", second)
-    run_archive.capture_json("dispatch-operational.deploy.json", third)
+    dispatch_results: list[dict[str, object]] = []
+    for label in dispatch_labels:
+        payload = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "dispatch-operational",
+                archive=run_archive,
+                label=f"odd_sdlc dispatch-operational {label}",
+                timeout=120,
+            ).stdout
+        )
+        dispatch_results.append(payload)
+        run_archive.capture_json(f"dispatch-operational.{label}.json", payload)
+
+    (
+        prepare_build,
+        dispatch_build,
+        prepare_test,
+        dispatch_test,
+        prepare_deploy,
+        dispatch_deploy,
+        project_deployed_environment,
+        project_runtime_observation,
+        project_retrofit_plan,
+    ) = dispatch_results
 
     dispatch_register = json.loads(
         (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-operational-dispatch.json").read_text(encoding="utf-8")
     )
     run_archive.capture_json("operational-dispatch-register.json", dispatch_register)
 
-    assert first["status"] == "ok"
-    assert first["final_state"]["edge"] == "prepare_test_execution_surface"
-    assert [step["kind"] for step in first["completed_steps"]] == ["prepare", "dispatch"]
-    assert first["completed_steps"][-1]["dispatch"]["lane"] == "build"
-    assert second["status"] == "ok"
-    assert second["final_state"]["edge"] == "prepare_deployment_surface"
-    assert [step["kind"] for step in second["completed_steps"]] == ["prepare", "dispatch"]
-    assert second["completed_steps"][-1]["dispatch"]["lane"] == "test"
-    assert third["status"] == "ok"
-    assert third["final_state"]["status"] == "converged"
-    assert [step["edge"] for step in third["completed_steps"]] == [
-        "prepare_deployment_surface",
-        "derive_deployment_result_surface",
-        "derive_deployed_environment_surface",
-        "derive_runtime_observation_surface",
-        "derive_retrofit_plan_surface",
+    assert prepare_build["status"] == "ok"
+    assert [step["edge"] for step in prepare_build["completed_steps"]] == ["prepare_build_execution_surface"]
+    assert prepare_build["final_state"]["edge"] == "derive_build_execution_result_surface"
+
+    assert dispatch_build["status"] == "ok"
+    assert [step["kind"] for step in dispatch_build["completed_steps"]] == ["dispatch"]
+    assert dispatch_build["completed_steps"][-1]["dispatch"]["lane"] == "build"
+    assert dispatch_build["final_state"]["edge"] == "prepare_test_execution_surface"
+
+    assert prepare_test["status"] == "ok"
+    assert [step["edge"] for step in prepare_test["completed_steps"]] == ["prepare_test_execution_surface"]
+    assert prepare_test["final_state"]["edge"] == "derive_test_execution_result_surface"
+
+    assert dispatch_test["status"] == "ok"
+    assert [step["kind"] for step in dispatch_test["completed_steps"]] == ["dispatch"]
+    assert dispatch_test["completed_steps"][-1]["dispatch"]["lane"] == "test"
+    assert dispatch_test["final_state"]["edge"] == "prepare_deployment_surface"
+
+    assert prepare_deploy["status"] == "ok"
+    assert [step["edge"] for step in prepare_deploy["completed_steps"]] == ["prepare_deployment_surface"]
+    assert prepare_deploy["final_state"]["edge"] == "derive_deployment_result_surface"
+
+    assert dispatch_deploy["status"] == "ok"
+    assert [step["kind"] for step in dispatch_deploy["completed_steps"]] == ["dispatch"]
+    assert dispatch_deploy["completed_steps"][-1]["dispatch"]["lane"] == "deployment"
+    assert dispatch_deploy["final_state"]["edge"] == "derive_deployed_environment_surface"
+
+    assert project_deployed_environment["status"] == "ok"
+    assert [step["edge"] for step in project_deployed_environment["completed_steps"]] == [
+        "derive_deployed_environment_surface"
     ]
-    assert third["gap_snapshot"]["converged"] is True
+    assert project_deployed_environment["final_state"]["edge"] == "derive_runtime_observation_surface"
+
+    assert project_runtime_observation["status"] == "ok"
+    assert [step["edge"] for step in project_runtime_observation["completed_steps"]] == [
+        "derive_runtime_observation_surface"
+    ]
+    assert project_runtime_observation["final_state"]["edge"] == "derive_retrofit_plan_surface"
+
+    assert project_retrofit_plan["status"] == "ok"
+    assert [step["edge"] for step in project_retrofit_plan["completed_steps"]] == [
+        "derive_retrofit_plan_surface"
+    ]
+    assert project_retrofit_plan["final_state"]["status"] == "converged"
+    assert project_retrofit_plan["gap_dossier"]["converged"] is True
 
     assert dispatch_register["lanes"]["build"]["status"] == "succeeded"
     assert dispatch_register["lanes"]["test"]["status"] == "succeeded"

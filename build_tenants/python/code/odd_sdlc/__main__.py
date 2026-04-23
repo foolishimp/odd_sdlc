@@ -18,6 +18,13 @@ from .sandbox_lifecycle import observe_sandbox, prepare_sandbox, reset_sandbox_r
 from .self_test import programs, self_test
 
 
+def _stopped_by(result: object) -> str | None:
+    if not isinstance(result, dict):
+        return None
+    stopped_by = result.get("stopped_by")
+    return stopped_by if isinstance(stopped_by, str) else None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="odd_sdlc")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -96,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "install":
-        result = install_release(
+        result: object = install_release(
             args.target,
             project_slug=args.project_slug,
             platform=args.platform,
@@ -173,9 +180,10 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     print(json.dumps(result, indent=2, sort_keys=True))
-    if args.command == "start" and result.get("stopped_by") == "fh_gate":
+    stopped_by = _stopped_by(result)
+    if args.command == "start" and stopped_by == "fh_gate":
         return 3
-    if args.command == "start" and result.get("stopped_by") == "yield":
+    if args.command == "start" and stopped_by == "yield":
         return 6
     return 0
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Iterator
 
 from .project_profile import (
     IGNORE_ROOTS,
@@ -74,6 +74,10 @@ class RequirementTraceabilityIndex:
     def planned_validation_refs(self) -> dict[str, list[str]]:
         refs = _merge_requirement_refs({}, self.refs_for("planned_test_design"))
         return _merge_requirement_refs(refs, self.refs_for("planned_test_module"))
+
+    @property
+    def realized_test_source_refs(self) -> dict[str, list[str]]:
+        return _merge_requirement_refs({}, self.source_scan.test_refs)
 
     def traceability_scan(self) -> dict[str, Any]:
         return self.source_scan.to_dict()
@@ -143,7 +147,7 @@ class RequirementTraceabilityIndex:
         expected_ids = self.expected_realized_validation_requirement_ids()
         if not expected_ids:
             return ()
-        realized_ids = set(self.test_run_archive_refs)
+        realized_ids = set(self.realized_test_source_refs)
         return tuple(sorted(expected_ids - realized_ids))
 
     def missing_test_traceability_ids(self) -> tuple[str, ...]:
@@ -156,7 +160,7 @@ class RequirementTraceabilityIndex:
 
     def unexpected_realized_test_traceability_ids(self) -> tuple[str, ...]:
         expected_ids = self.expected_realized_validation_requirement_ids()
-        realized_ids = set(self.test_run_archive_refs)
+        realized_ids = set(self.realized_test_source_refs)
         return tuple(sorted(realized_ids - expected_ids))
 
 
@@ -465,13 +469,27 @@ def _surface_requirement_refs(workspace_root: Path, relative_paths: tuple[Path, 
     return refs
 
 
+def _canonical_imported_requirement_surface_path(workspace_root: Path) -> Path | None:
+    path = workspace_root / "specification" / "requirements" / "00-imported-sources.md"
+    if not path.exists():
+        return None
+    if not _collect_requirement_ids(path):
+        return None
+    return path
+
+
 def _authority_requirement_paths(workspace_root: Path) -> tuple[Path, ...]:
     spec_root = workspace_root / "specification"
     req_root = spec_root / "requirements"
     candidates: list[Path] = []
+    canonical_imported_requirement_surface = _canonical_imported_requirement_surface_path(workspace_root)
+    if canonical_imported_requirement_surface is not None:
+        candidates.append(canonical_imported_requirement_surface)
     if req_root.exists():
         for path in sorted(req_root.rglob("*.md")):
             if path.name == "10-generated-bootstrap.md":
+                continue
+            if canonical_imported_requirement_surface is not None and path == canonical_imported_requirement_surface:
                 continue
             if path.name.startswith("00-"):
                 continue
@@ -480,6 +498,8 @@ def _authority_requirement_paths(workspace_root: Path) -> tuple[Path, ...]:
         if path.name in {"INTENT.md", "PRODUCT.md", "GOALS.md"}:
             continue
         if "requirement" not in path.name.lower():
+            continue
+        if req_root.exists():
             continue
         if path not in candidates:
             candidates.append(path)
@@ -616,7 +636,7 @@ def _is_source_file(path: Path, *, code_root: Path) -> bool:
     )
 
 
-def _iter_traceability_source_files(code_root: Path):
+def _iter_traceability_source_files(code_root: Path) -> Iterator[Path]:
     for current_root, dirnames, filenames in os.walk(code_root):
         dirnames[:] = sorted(
             dirname
@@ -663,7 +683,7 @@ def _traceability_code_root_relative_path(workspace_root: Path) -> str:
         if source_domain_root.exists():
             return _SOURCE_DOMAIN_CODE_ROOT.as_posix()
     profile = load_project_profile(workspace_root)
-    return profile.code_relative_path()
+    return str(profile.code_relative_path())
 
 
 def _written_testcase_authority_paths(workspace_root: Path) -> tuple[Path, ...]:

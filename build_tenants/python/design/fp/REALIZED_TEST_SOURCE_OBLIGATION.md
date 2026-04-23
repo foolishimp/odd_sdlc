@@ -1,8 +1,12 @@
 # odd_sdlc Realized Test Source Obligation
 
-This edge is not satisfied by archive prose alone.
+This file is no longer published as runtime prompt strategy.
 
-- If the archive claims realized developer-test coverage, actual test source files must exist under the governed code surface.
-- Keep `Validates:` traces on realized test source aligned with the planned test branch and the archive narrative.
-- Update or create real test files before treating the archive as complete.
-- The archive summarizes realized test state; it does not substitute for realized test state.
+The admitted test-lane boundary now lives in `odd_sdlc.test_lane_evidence`:
+
+- `derive_test_module_surface` carries `planned_validation_allocation`
+- `derive_test_run_archive_surface` carries `realized_test_source`
+- the later operational execution lane carries `governed_test_execution_evidence`
+
+The archive remains an honest projection over current completeness.
+ABG owns continuation and re-entry after each bounded gain.

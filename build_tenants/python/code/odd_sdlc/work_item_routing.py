@@ -12,12 +12,17 @@ import yaml
 
 from .asset_types import ASSET_TYPES
 from .domain_model import Asset, AssetCheckpoint, AssetProvenance, relative_file_uri
+from .public_start_contract import WorkItemRouteContractPayload
 
 
 WORK_ITEM_TARGET_HANDLE_PREFIX = "ticket/"
-WORK_ITEM_ROUTE_KIND = "odd_sdlc.work_item_reentry"
-WORK_ITEM_ROUTE_BINDING_SOURCE = "odd_sdlc.work_item_route_contract"
-WORK_ITEM_ROUTE_OPERATOR_TARGET = "bootstrap_release_self_test"
+WORK_ITEM_ROUTE_KIND: Literal["odd_sdlc.work_item_reentry"] = "odd_sdlc.work_item_reentry"
+WORK_ITEM_ROUTE_BINDING_SOURCE: Literal[
+    "odd_sdlc.work_item_route_contract"
+] = "odd_sdlc.work_item_route_contract"
+WORK_ITEM_ROUTE_OPERATOR_TARGET: Literal[
+    "bootstrap_release_self_test"
+] = "bootstrap_release_self_test"
 TRIAGED_WORK_ITEM_DIRS = (
     Path(".ai-workspace/tickets/active"),
     Path(".ai-workspace/tickets/backlog"),
@@ -51,8 +56,19 @@ class WorkItemRouteContract:
     scope_binding: Literal["workspace"]
     operator_target_handle: Literal["bootstrap_release_self_test"]
 
-    def to_dict(self) -> dict[str, str]:
-        return asdict(self)
+    def to_dict(self) -> WorkItemRouteContractPayload:
+        payload = asdict(self)
+        return {
+            "route_kind": str(payload["route_kind"]),
+            "binding_source": str(payload["binding_source"]),
+            "ticket_id": str(payload["ticket_id"]),
+            "change_class": str(payload["change_class"]),
+            "re_entry_point": str(payload["re_entry_point"]),
+            "reentry_vector": str(payload["reentry_vector"]),
+            "reentry_target_asset": str(payload["reentry_target_asset"]),
+            "scope_binding": str(payload["scope_binding"]),
+            "operator_target_handle": str(payload["operator_target_handle"]),
+        }
 
 
 def is_work_item_handle(handle: str) -> bool:
@@ -224,7 +240,7 @@ def triaged_work_item_assets(workspace_root: Path) -> tuple[Asset, ...]:
             ticket_status = str(metadata.get("status") or "")
             checkpoint: AssetCheckpoint = _checkpoint_for_path(ticket_path)
             handle = _work_item_handle(ticket_id)
-            asset_metadata: dict[str, str] = {
+            asset_metadata: dict[str, object] = {
                 "relative_path": ticket_path.relative_to(workspace_root).as_posix(),
                 "exists": "true" if ticket_path.exists() else "false",
                 "path_kind": checkpoint.path_kind,
