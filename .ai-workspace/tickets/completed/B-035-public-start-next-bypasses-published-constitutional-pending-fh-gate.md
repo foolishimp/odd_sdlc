@@ -208,41 +208,36 @@ not closure evidence.
 - [x] `odd_sdlc.app.start(...)` reads the published head-gap carrier before admitting execution for public start entry paths
 - [x] `odd_sdlc.execution_contract.resolve_start_target(...)` and `admit_bound_execution_start(...)` do not create a rival public-start authority path that bypasses the published head-gap truth
 - [x] `genesis.services.gen_start(...)` and `_resolve_start_jobs(...)` consume a scope already constrained by published constitutional gate truth rather than raw module job order alone
-- [ ] ABG `cli_adapter._run_start_until_converged(...)` sees `human_gate_required` only when the odd_sdlc entry path lawfully surfaces it, rather than masking an upstream bypass
+- [x] ABG `cli_adapter._run_start_until_converged(...)` sees `human_gate_required` only when the odd_sdlc entry path lawfully surfaces it, rather than masking an upstream bypass
 - [x] `odd_sdlc query-domain`, gap dossiers, and operator-facing read models tell the same gating story as public start
 - [x] installation proof in `test_odd_sdlc_installation.py` asserts absence of execution-contract and run events before FH resolution when the head edge is pending_fh
 - [x] sandbox proof in `test_odd_sdlc_sandbox_usecase.py` or an adjacent dedicated test asserts the same event-lawfulness rule
 - [x] source proof adds a minimal reproducer for `gaps -> start(...)` on one workspace and inspects the event stream event by event
-- [ ] proof review distinguishes lawful event multiplicity such as per-obligation `assessed` events from unlawful constructive progression
+- [x] proof review distinguishes lawful event multiplicity such as per-obligation `assessed` events from unlawful constructive progression
 
-## Existing Proof Gap
+## Proof Gap Resolved
 
-The current proof shape is too shallow for this boundary.
+The original proof defect for this boundary was shallow event-presence review:
 
-Existing source proof already shows the homeostatic carrier can publish
-constitutional gate truth:
+- source proof could show that `gaps` published `pending_fh`
+- installation and sandbox proofs could still accept traversal success without
+  asserting the absence of pre-gate constructive events
 
-- `test_odd_sdlc_first_slice.py`
-  - `initial["gaps"][0]["constitutional_proposal"]["state"] == "pending_fh"`
-  - `initial["gaps"][0]["route_binding"]["state"] == "await_fh_resolution"`
+That gap is now closed on the completed line:
 
-But the current installation and sandbox proofs still accept event-presence
-success without checking pre-gate lawfulness:
+- source proof locks the pre-admission fail-closed law for `next`, explicit
+  `graph_function:`, and explicit `asset:` starts
+- installation proof now includes both:
+  - negative pre-gate assertions on fresh installs
+  - paired pristine-vs-progressed comparison proving that the same public
+    `start(next)` entry varies only with published carrier truth
+- sandbox proof now asserts the mixed-state negative law directly:
+  published `pending_fh` emits `fh_gate_pending` and emits no
+  `execution_contract_*`, `run_*`, or `fp_dispatched` events before lawful FH
+  resolution
 
-- `test_odd_sdlc_installation.py`
-  - asserts `worker_turn_started`, `graph_call_closed`, `continuation_opened`,
-    and `run_yielded`
-  - does not assert that a published `pending_fh` gate prevents
-    `execution_contract_drafted`, `run_bound`, or `worker_turn_started`
-- `test_odd_sdlc_yield_usecase.py`
-  - likewise checks yield ordering and event presence, not whether the run was
-    lawful to begin
-- current RC sandbox reproduction already exhibits the mixed-state defect in a
-  real installed workspace
-
-This ticket exists partly because the proof lane validated traversal outcomes
-without validating whether the run should have been admitted in the first
-place.
+This ticket therefore closes the proof lane defect as well as the source
+carrier defect.
 
 ## Functional Review Criteria
 
@@ -556,12 +551,8 @@ Explicit public-start prerequisite hardening:
   explicit starts; explicit install starts are repriced to publish and clear
   the governing head constitutional gate before proving admitted traversal
 
-Residual open review scope before closure:
+Residual boundaries intentionally excluded from this ticket:
 
-- prove the installed substrate under review contains the post-fix start-gating
-  carrier path
-- add or reprice one sandbox-facing proof for the same event-lawfulness rule
-- finish the remaining checklist review items around query/read-model
-  storytelling and multiplicity review guidance
-- split out transport-salvage and retry/recovery defects if they still
-  reproduce on the post-fix installed line
+- transport-salvage and retry/recovery defects remain separate residual
+  boundaries unless they reproduce again as part of a new source-carrier
+  defect on a later installed line
