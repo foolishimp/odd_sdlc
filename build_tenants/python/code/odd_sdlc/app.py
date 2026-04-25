@@ -41,6 +41,7 @@ from .gap_dossier import (
     project_public_next_start_resolution,
     project_gap_dossier_input,
     project_gap_dossier_surface,
+    project_operator_gap_analysis,
     publish_gap_dossier_surfaces,
 )
 from .gtl_module import module as odd_sdlc_module
@@ -55,6 +56,7 @@ from .public_start import (
     project_public_start_admission_for_next,
     project_public_start_dispatch_outcome,
     project_public_start_gen_start_outcome,
+    project_public_start_worker_attachment_block,
     resolve_public_start_result_policy,
 )
 from .project_profile import load_or_build_operational_capability_projection
@@ -87,6 +89,10 @@ from .runtime_effects import publish_runtime_event
 from .runtime_event_contract import admit_runtime_event_payload
 from .triage import enrich_gap_snapshot
 from .workspace_assets import bootstrap_assets, bootstrap_bindings, bootstrap_input_collection
+from .worker_attachment import (
+    installed_public_dispatch_requires_worker_attachment,
+    project_fp_worker_attachment,
+)
 
 
 SOURCE_CODE_ROOT = Path(__file__).resolve().parents[1]
@@ -405,6 +411,21 @@ def gaps(
     return _build_gap_surface(app, selector=selector, publish=True)
 
 
+def gap_operator_analysis(
+    app: OddSdlcApp,
+    *,
+    scope: str = "workspace",
+    include_dependent: bool = True,
+) -> dict[str, object]:
+    published = gaps(app, scope=scope, include_dependent=include_dependent)
+    if not isinstance(published, dict) or published.get("gap_dossier_kind") is None:
+        raise ValueError("operator gap analysis requires a dossier-backed gap surface")
+    surface = load_gap_dossier_read_model(app.config.workspace_root, scope=scope)
+    if not bool(surface.get("published")):
+        surface = cast(GapDossierReadModel, published)
+    return project_operator_gap_analysis(cast(GapDossierReadModel, surface))
+
+
 def gap_snapshot(
     app: OddSdlcApp,
     *,
@@ -617,7 +638,22 @@ def _public_next_gap_surface(
     *,
     selector: ScopeSelector,
 ) -> GapDossierReadModel:
-    return load_gap_dossier_read_model(app.config.workspace_root, scope=selector)
+    gap_surface = load_gap_dossier_read_model(app.config.workspace_root, scope=selector)
+    stale_unpublished = (
+        not bool(gap_surface.get("published", True))
+        and str(gap_surface.get("unavailable_reason") or "")
+        in {"published_analysis_stale", "gap_dossier_stale"}
+    )
+    if (
+        bool(gap_surface.get("published", True))
+        and not bool(gap_surface.get("analysis_current"))
+    ) or stale_unpublished:
+        return republish_gap_surface(
+            app,
+            selector=selector,
+            stage="public_start_stale_gap_reprice",
+        )
+    return gap_surface
 
 
 def _resolve_public_start_admission(
@@ -870,6 +906,26 @@ def _run_public_next_start(
             )
             if isinstance(proof_hold_outcome, PublicStartReturn):
                 return proof_hold_outcome.result
+            worker_attachment = project_fp_worker_attachment(
+                bound_start.scope.runtime_config,
+            )
+            if (
+                installed_public_dispatch_requires_worker_attachment(app.config.workspace_root)
+                and worker_attachment["status"] == "unattached"
+            ):
+                dispatch_outcome = project_public_start_worker_attachment_block(
+                    iteration_outcome.result,
+                    worker_attachment=worker_attachment,
+                )
+                result.update(dispatch_outcome.result)
+                _attach_public_next_result_metadata(
+                    result,
+                    resolved_raw_target=directive.raw_target,
+                    next_edge_override=directive.edge_override,
+                    fh_mode=fh_mode,
+                    root_mode=root_mode,
+                )
+                return result
             dispatch_result = auto_dispatch_from_result(
                 iteration_outcome.result,
                 app.config.workspace_root,

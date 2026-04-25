@@ -149,6 +149,16 @@ The route layer distinguishes:
 - suppressed state
 - explicit no-lawful-route state
 
+Route admission applies one precedence order:
+
+1. realization-iteration graph-function re-entry when the current edge is
+   already under governed deepening
+2. explicitly declared authoritative head graph functions
+3. graph-function-only guard rails that fail closed when declaration is absent
+4. declared dynamic-routing candidates, including explicit no-lawful-route when
+   no candidate matches
+5. fixed-vector fallback only when no dynamic-routing declaration was supplied
+
 Fixed-vector examples in the first implementation cut are:
 
 - `repair_output_contract`

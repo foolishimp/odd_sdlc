@@ -14,7 +14,11 @@ from .execution_contract import (
     AdmittedExecutionContractProjection,
     normalize_execution_contract_surface_payload,
 )
-from .project_profile import load_published_workspace_state, published_analysis_is_current
+from .project_profile import (
+    current_workspace_input_fingerprint,
+    load_published_workspace_state,
+    published_analysis_is_current,
+)
 from .public_start_contract import (
     BlockedReason,
     ConstitutionalProposalProjection,
@@ -49,10 +53,73 @@ GAP_DOSSIER_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-gap-dossiers.js
 GAP_DOSSIER_CONTEXT_PATH = Path(".ai-workspace/runtime/odd_sdlc-gap-dossiers.md")
 _SCOPED_GAP_DOSSIER_DIR = Path(".ai-workspace/runtime/scoped_gap_dossiers")
 _SCOPE_PATH_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+_GAP_DOSSIER_EVENT_TYPES = {
+    "assessed",
+    "asset_checkpoint_updated",
+    "closure_failed",
+    "closure_passed",
+    "edge_converged",
+    "edge_reopened",
+    "fp_dispatched",
+    "graph_call_closed",
+    "graph_call_failed",
+    "graph_call_opened",
+    "proof_failed",
+    "proof_passed",
+    "reset",
+}
 
 
 class GapDossierUnavailableError(ValueError):
     """Raised when public consumers require a published gap-dossier carrier."""
+
+
+def _event_stream_projection(workspace_root: Path | str) -> dict[str, str | int | None]:
+    root = Path(workspace_root).resolve()
+    event_path = root / ".ai-workspace" / "events" / "events.jsonl"
+    relevant_events: list[dict[str, str | None]] = []
+    if event_path.exists():
+        for line in event_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            if not isinstance(event, Mapping):
+                continue
+            event_type = str(event.get("event_type") or "")
+            if event_type not in _GAP_DOSSIER_EVENT_TYPES:
+                continue
+            data = event.get("data")
+            data_map = data if isinstance(data, Mapping) else {}
+            relevant_events.append(
+                {
+                    "event_id": str(event.get("event_id") or "") or None,
+                    "event_time": str(event.get("event_time") or "") or None,
+                    "event_type": event_type,
+                    "edge": str(data_map.get("edge") or "") or None,
+                    "work_key": str(event.get("work_key") or data_map.get("work_key") or "") or None,
+                }
+            )
+    event_fingerprint = hashlib.sha256(
+        json.dumps(relevant_events, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    latest = relevant_events[-1] if relevant_events else {}
+    return {
+        "event_stream_fingerprint": event_fingerprint,
+        "event_stream_event_count": len(relevant_events),
+        "event_stream_latest_event_id": latest.get("event_id"),
+        "event_stream_latest_event_time": latest.get("event_time"),
+    }
+
+
+def _gap_dossier_event_stream_current(
+    workspace_root: Path | str,
+    dossier_register: Mapping[str, object],
+) -> bool:
+    published = str(dossier_register.get("event_stream_fingerprint") or "")
+    if not published:
+        return False
+    current = _event_stream_projection(workspace_root)
+    return published == str(current.get("event_stream_fingerprint") or "")
 
 
 @dataclass(frozen=True)
@@ -236,12 +303,15 @@ def _route_state(value: object) -> RouteState | None:
         "advance_dynamic_family",
         "advance_fixed_vector",
         "await_fh_resolution",
+        "blocked_missing_capability",
         "blocked_stale_analysis",
+        "converged",
         "constitutional_reprice_approved",
         "constitutional_reprice_rejected",
         "deferred",
         "no_lawful_route",
         "suppressed_by_mode",
+        "unresolved",
     }:
         return cast(RouteState, value)
     return None
@@ -281,16 +351,19 @@ def _blocked_reason_value(value: object) -> BlockedReason | None:
         "route_binding_unavailable",
         "public_next_start_unavailable",
         "route_binding_not_start_authoritative",
+        "fp_worker_unattached",
         "converged",
         "advance_dynamic_family",
         "advance_fixed_vector",
         "await_fh_resolution",
+        "blocked_missing_capability",
         "blocked_stale_analysis",
         "constitutional_reprice_approved",
         "constitutional_reprice_rejected",
         "deferred",
         "no_lawful_route",
         "suppressed_by_mode",
+        "unresolved",
     }:
         return cast(BlockedReason, value)
     return None
@@ -708,6 +781,9 @@ def _gap_dossier_register_projection(value: object) -> GapDossierRegisterPayload
             return None
         dossiers.append(projected_row)
     analysis_fingerprint = value.get("analysis_fingerprint")
+    event_stream_fingerprint = value.get("event_stream_fingerprint")
+    event_stream_latest_event_id = value.get("event_stream_latest_event_id")
+    event_stream_latest_event_time = value.get("event_stream_latest_event_time")
     return {
         "gap_dossier_kind": gap_dossier_kind,
         "schema_version": schema_version,
@@ -718,6 +794,16 @@ def _gap_dossier_register_projection(value: object) -> GapDossierRegisterPayload
         ),
         "analysis_current": bool(value.get("analysis_current")),
         "analysis_fingerprint": analysis_fingerprint if isinstance(analysis_fingerprint, str) else None,
+        "event_stream_fingerprint": (
+            event_stream_fingerprint if isinstance(event_stream_fingerprint, str) else None
+        ),
+        "event_stream_event_count": _int_value(value.get("event_stream_event_count") or 0),
+        "event_stream_latest_event_id": (
+            event_stream_latest_event_id if isinstance(event_stream_latest_event_id, str) else None
+        ),
+        "event_stream_latest_event_time": (
+            event_stream_latest_event_time if isinstance(event_stream_latest_event_time, str) else None
+        ),
         "summary": _gap_dossier_summary_projection(value.get("summary")),
         "dossiers": dossiers,
     }
@@ -802,6 +888,7 @@ def build_gap_dossier_register(
     execution_contract: AdmittedExecutionContractProjection | None = None,
 ) -> GapDossierRegisterPayload:
     root = Path(workspace_root).resolve()
+    event_stream_projection = _event_stream_projection(root)
     dossiers: list[GapDossierRow] = []
     for row in gap_input.rows:
         triage = _copy_triage_projection(row.triage)
@@ -844,6 +931,18 @@ def build_gap_dossier_register(
         ),
         "analysis_current": gap_input.analysis_current,
         "analysis_fingerprint": gap_input.analysis_fingerprint,
+        "event_stream_fingerprint": str(event_stream_projection["event_stream_fingerprint"]),
+        "event_stream_event_count": int(event_stream_projection["event_stream_event_count"] or 0),
+        "event_stream_latest_event_id": (
+            str(event_stream_projection["event_stream_latest_event_id"])
+            if event_stream_projection["event_stream_latest_event_id"] is not None
+            else None
+        ),
+        "event_stream_latest_event_time": (
+            str(event_stream_projection["event_stream_latest_event_time"])
+            if event_stream_projection["event_stream_latest_event_time"] is not None
+            else None
+        ),
         "summary": summary,
         "dossiers": dossiers,
     }
@@ -878,6 +977,9 @@ def build_gap_dossier_context(
         f"- scope: `{scope_label}`",
         f"- analysis_current: {bool(dossier_register.get('analysis_current'))}",
         f"- analysis_fingerprint: `{str(dossier_register.get('analysis_fingerprint') or 'unpublished')}`",
+        f"- event_stream_fingerprint: `{str(dossier_register.get('event_stream_fingerprint') or 'unpublished')}`",
+        f"- event_stream_event_count: {int(dossier_register.get('event_stream_event_count') or 0)}",
+        f"- event_stream_latest_event_id: `{str(dossier_register.get('event_stream_latest_event_id') or '')}`",
         f"- gap_count: {summary.get('gap_count', 0)}",
         f"- declared_obligation_gap_count: {summary.get('declared_obligation_gap_count', 0)}",
         f"- graph_edge_gap_count: {summary.get('graph_edge_gap_count', 0)}",
@@ -967,6 +1069,10 @@ def _gap_dossier_register_json_payload(
         ),
         "analysis_current": dossier_register["analysis_current"],
         "analysis_fingerprint": dossier_register["analysis_fingerprint"],
+        "event_stream_fingerprint": dossier_register.get("event_stream_fingerprint"),
+        "event_stream_event_count": dossier_register.get("event_stream_event_count", 0),
+        "event_stream_latest_event_id": dossier_register.get("event_stream_latest_event_id"),
+        "event_stream_latest_event_time": dossier_register.get("event_stream_latest_event_time"),
         "summary": dict(dossier_register["summary"]),
         "dossiers": [
             {
@@ -1046,6 +1152,12 @@ def _gap_dossier_unavailable_reason(
     path = root / register_rel
     if not path.exists():
         return "gap_dossier_unpublished"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "gap_dossier_unavailable"
+    if isinstance(payload, Mapping) and not _gap_dossier_event_stream_current(root, payload):
+        return "gap_dossier_stale"
     return "gap_dossier_unavailable"
 
 
@@ -1059,6 +1171,7 @@ def unavailable_gap_dossier_projection(
     register_path, context_path = _published_gap_dossier_paths(root, scope=scope_label)
     reason = _gap_dossier_unavailable_reason(root, scope=scope_label)
     workspace_state = load_published_workspace_state(root) or {}
+    event_stream_projection = _event_stream_projection(root)
     return {
         "scope": scope_label,
         "jobs_considered": 0,
@@ -1068,6 +1181,18 @@ def unavailable_gap_dossier_projection(
         "execution_contract_surface": None,
         "analysis_current": published_analysis_is_current(root),
         "analysis_fingerprint": str(workspace_state.get("analysis_fingerprint") or "") or None,
+        "event_stream_fingerprint": str(event_stream_projection["event_stream_fingerprint"]),
+        "event_stream_event_count": int(event_stream_projection["event_stream_event_count"] or 0),
+        "event_stream_latest_event_id": (
+            str(event_stream_projection["event_stream_latest_event_id"])
+            if event_stream_projection["event_stream_latest_event_id"] is not None
+            else None
+        ),
+        "event_stream_latest_event_time": (
+            str(event_stream_projection["event_stream_latest_event_time"])
+            if event_stream_projection["event_stream_latest_event_time"] is not None
+            else None
+        ),
         "analysis_manifest": load_analysis_manifest(root),
         "converged": False,
         "graph_total_delta": 0.0,
@@ -1315,6 +1440,206 @@ def project_public_next_start_resolution(
     )
 
 
+def _operator_machine_command(scope: str) -> str:
+    if scope == "workspace":
+        return "odd_sdlc gaps --format json"
+    return f"odd_sdlc gaps --scope {scope} --format json"
+
+
+def _operator_frontier_projection(
+    head: GapDossierRow | None,
+) -> dict[str, object] | None:
+    if head is None:
+        return None
+    gap_truth = head.get("gap_truth")
+    triage = head.get("triage")
+    route_binding = head.get("route_binding")
+    refs = head.get("evidence_bundle_refs")
+    if not isinstance(gap_truth, Mapping):
+        gap_truth = {}
+    if not isinstance(triage, Mapping):
+        triage = {}
+    if not isinstance(route_binding, Mapping):
+        route_binding = {}
+    if not isinstance(refs, Mapping):
+        refs = {}
+    route_state = _route_state(route_binding.get("state")) or str(route_binding.get("state") or "")
+    blocker_class = (
+        str(triage.get("process_outcome_kind") or "")
+        or str(route_state or "")
+        or (
+            str(gap_truth.get("blocking_reasons")[0])
+            if isinstance(gap_truth.get("blocking_reasons"), list)
+            and gap_truth.get("blocking_reasons")
+            else ""
+        )
+        or "unclassified"
+    )
+    selected_graphfunction = str(route_binding.get("selected_graphfunction") or "") or None
+    projection: dict[str, object] = {
+        "edge": str(head.get("edge") or ""),
+        "current_work_key": head.get("current_work_key"),
+        "analysis_current": bool(head.get("analysis_current")),
+        "gap_kind": str(gap_truth.get("gap_kind") or ""),
+        "blocker_class": blocker_class,
+        "route_state": route_state,
+        "framework_layer": str(triage.get("framework_layer") or "") or None,
+        "framework_condition": str(triage.get("framework_condition") or "") or None,
+        "process_outcome_kind": str(triage.get("process_outcome_kind") or "") or None,
+        "reentry_layer": str(triage.get("reentry_layer") or "") or None,
+        "resumption_trigger": str(head.get("resumption_trigger") or "") or None,
+        "selected_graphfunction": selected_graphfunction,
+        "blocking_reasons": _string_list(gap_truth.get("blocking_reasons")),
+        "failing": _string_list(gap_truth.get("failing")),
+        "graph_failing": _string_list(gap_truth.get("graph_failing")),
+        "triage_artifact_path": str(refs.get("current_triage_artifact_path") or "") or None,
+        "event_refs": _evidence_bundle_refs_projection(refs),
+    }
+    return projection
+
+
+def _operator_start_resolution_projection(
+    resolution: PublicNextStartResolution,
+) -> dict[str, object]:
+    if isinstance(resolution, PendingConstitutionalStartGate):
+        return {
+            "kind": "fh_gate",
+            "edge": resolution.edge,
+            "route_state": resolution.route_state,
+            "blocking_reason": "fh_gate",
+            "proposal_id": resolution.proposal_id,
+            "proposal_state": resolution.proposal_state,
+            "proposal_kind": resolution.proposal_kind,
+            "target_surface": resolution.target_surface,
+        }
+    if isinstance(resolution, PublicNextStartDirective):
+        return {
+            "kind": "start_directive",
+            "edge": resolution.edge,
+            "route_state": resolution.route_state,
+            "target": resolution.raw_target,
+            "edge_override": resolution.edge_override,
+            "binding_source": resolution.binding_source,
+        }
+    return {
+        "kind": "blocked",
+        "status": resolution.status,
+        "edge": resolution.edge,
+        "route_state": resolution.route_state,
+        "blocking_reason": resolution.blocking_reason,
+        "stopped_by": resolution.stopped_by,
+        "stop_predicate": resolution.stop_predicate,
+        "unavailable_reason": resolution.unavailable_reason,
+    }
+
+
+def _operator_next_steps(
+    *,
+    gap_dossier_surface: GapDossierReadModel,
+    resolution: PublicNextStartResolution,
+    scope: str,
+) -> list[str]:
+    if not bool(gap_dossier_surface.get("published", True)):
+        reason = str(gap_dossier_surface.get("unavailable_reason") or "gap_dossier_unavailable")
+        return [
+            f"Gap guidance is unavailable because {reason}.",
+            f"Use `{_operator_machine_command(scope)}` only after the published dossier carrier is available.",
+        ]
+    if isinstance(resolution, PendingConstitutionalStartGate):
+        return [
+            (
+                f"Resolve constitutional proposal `{resolution.proposal_id}` for "
+                f"`{resolution.target_surface}` through F_H."
+            ),
+            f"After resolution, rerun `odd_sdlc gaps` and then `odd_sdlc start --scope {scope} --target next --until first_traversal`.",
+        ]
+    if isinstance(resolution, PublicNextStartDirective):
+        return [
+            f"Run `odd_sdlc start --scope {scope} --target {resolution.raw_target} --until first_traversal`.",
+            f"Use `{_operator_machine_command(scope)}` for the raw dossier carrier before scripting against the gap surface.",
+        ]
+    if resolution.status == "converged" or resolution.blocking_reason == "converged":
+        return [
+            "No open gap remains in this scope.",
+            f"Use `{_operator_machine_command(scope)}` only when a machine proof needs the raw carrier.",
+        ]
+    if resolution.blocking_reason == "blocked_stale_analysis":
+        return [
+            "Run `odd_sdlc refresh-analysis`, then rerun `odd_sdlc gaps`.",
+            f"If the stale-analysis block remains, inspect `{resolution.triage_artifact_path or 'the current triage artifact'}`.",
+        ]
+    if resolution.blocking_reason == "blocked_missing_capability":
+        return [
+            f"Declare or satisfy the missing capability contract for `{resolution.edge or 'the frontier edge'}`.",
+            "Rerun `odd_sdlc gaps` after the capability surface changes.",
+        ]
+    if resolution.blocking_reason == "no_lawful_route":
+        return [
+            f"Reprice route law or design for `{resolution.edge or 'the frontier edge'}`; no public start route is authoritative.",
+            f"Use `{resolution.triage_artifact_path or 'the current triage artifact'}` as the evidence source for that reprice.",
+        ]
+    if resolution.blocking_reason == "route_binding_unavailable":
+        return [
+            "Repair the published route-binding projection before starting traversal.",
+            f"Use `{_operator_machine_command(scope)}` to inspect the raw dossier carrier.",
+        ]
+    return [
+        f"Inspect `{resolution.triage_artifact_path or 'the current triage artifact'}` for the frontier evidence.",
+        f"Use `{_operator_machine_command(scope)}` for raw machine inspection before scripting a next action.",
+    ]
+
+
+def project_operator_gap_analysis(
+    gap_dossier_surface: GapDossierReadModel,
+) -> dict[str, object]:
+    scope = normalize_gap_dossier_scope(gap_dossier_surface.get("scope"))
+    head = head_gap_dossier(gap_dossier_surface)
+    resolution = project_public_next_start_resolution(gap_dossier_surface)
+    summary = gap_dossier_surface.get("summary")
+    if not isinstance(summary, Mapping):
+        summary = {}
+    if not bool(gap_dossier_surface.get("published", True)):
+        status = "unavailable"
+    elif head is None and (
+        bool(gap_dossier_surface.get("converged"))
+        or _int_value(summary.get("gap_count")) == 0
+    ):
+        status = "converged"
+    elif head is None:
+        status = "blocked"
+    else:
+        status = "open"
+    return {
+        "analysis_kind": "odd_sdlc.operator_gap_analysis",
+        "schema_version": "v1",
+        "scope": scope,
+        "status": status,
+        "published": bool(gap_dossier_surface.get("published", True)),
+        "analysis_current": bool(gap_dossier_surface.get("analysis_current")),
+        "analysis_fingerprint": gap_dossier_surface.get("analysis_fingerprint"),
+        "converged": bool(gap_dossier_surface.get("converged")),
+        "summary": dict(summary),
+        "frontier": _operator_frontier_projection(head),
+        "start_resolution": _operator_start_resolution_projection(resolution),
+        "next_lawful_steps": _operator_next_steps(
+            gap_dossier_surface=gap_dossier_surface,
+            resolution=resolution,
+            scope=scope,
+        ),
+        "machine_output": {
+            "gap_dossier_kind": GAP_DOSSIER_KIND,
+            "command": _operator_machine_command(scope),
+            "format": "json",
+        },
+        "source": {
+            "gap_dossier_kind": gap_dossier_surface.get("gap_dossier_kind"),
+            "gap_dossier_register_path": gap_dossier_surface.get("gap_dossier_register_path"),
+            "gap_dossier_context_path": gap_dossier_surface.get("gap_dossier_context_path"),
+            "binding_source": GAP_DOSSIER_KIND,
+        },
+    }
+
+
 def project_gap_dossier_surface(
     workspace_root: Path | str,
     *,
@@ -1337,6 +1662,10 @@ def project_gap_dossier_surface(
             "open_frames": gap_input.open_frames,
             "analysis_current": gap_input.analysis_current,
             "analysis_fingerprint": gap_input.analysis_fingerprint,
+            "event_stream_fingerprint": dossier_register.get("event_stream_fingerprint"),
+            "event_stream_event_count": int(dossier_register.get("event_stream_event_count") or 0),
+            "event_stream_latest_event_id": dossier_register.get("event_stream_latest_event_id"),
+            "event_stream_latest_event_time": dossier_register.get("event_stream_latest_event_time"),
             "converged": bool(dict(dossier_register.get("summary") or {}).get("gap_count", 0) == 0),
             "graph_total_delta": gap_input.summary.graph_total_delta,
             "carry_delta": gap_input.summary.carry_delta,
@@ -1360,14 +1689,36 @@ def project_gap_dossier_read_model(
     scope_label = normalize_gap_dossier_scope(dossier_register.get("scope"))
     summary = _gap_dossier_summary_projection(dossier_register.get("summary"))
     register_path, context_path = _published_gap_dossier_paths(root, scope=scope_label)
+    dossier_fingerprint = str(dossier_register.get("analysis_fingerprint") or "") or None
+    event_stream_projection = _event_stream_projection(root)
+    event_stream_fingerprint = (
+        str(dossier_register.get("event_stream_fingerprint") or "") or None
+    )
+    analysis_current = (
+        published_analysis_is_current(root)
+        and dossier_fingerprint == current_workspace_input_fingerprint(root)
+        and event_stream_fingerprint == str(event_stream_projection["event_stream_fingerprint"])
+    )
     return {
         "scope": scope_label,
         "jobs_considered": 0,
         "open_frames": 0,
         "published": True,
         "execution_contract_surface": dossier_register.get("execution_contract_surface"),
-        "analysis_current": published_analysis_is_current(root),
-        "analysis_fingerprint": str(dossier_register.get("analysis_fingerprint") or "") or None,
+        "analysis_current": analysis_current,
+        "analysis_fingerprint": dossier_fingerprint,
+        "event_stream_fingerprint": event_stream_fingerprint,
+        "event_stream_event_count": int(dossier_register.get("event_stream_event_count") or 0),
+        "event_stream_latest_event_id": (
+            str(dossier_register.get("event_stream_latest_event_id"))
+            if dossier_register.get("event_stream_latest_event_id") is not None
+            else None
+        ),
+        "event_stream_latest_event_time": (
+            str(dossier_register.get("event_stream_latest_event_time"))
+            if dossier_register.get("event_stream_latest_event_time") is not None
+            else None
+        ),
         "analysis_manifest": load_analysis_manifest(root),
         "converged": bool(_int_value(summary.get("gap_count", 0)) == 0),
         "graph_total_delta": _float_value(summary.get("graph_total_delta", 0.0)),

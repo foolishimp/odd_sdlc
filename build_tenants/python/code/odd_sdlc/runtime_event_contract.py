@@ -349,8 +349,12 @@ def _route_state(value: object, *, field: str) -> RouteState:
         return "advance_fixed_vector"
     if value == "await_fh_resolution":
         return "await_fh_resolution"
+    if value == "blocked_missing_capability":
+        return "blocked_missing_capability"
     if value == "blocked_stale_analysis":
         return "blocked_stale_analysis"
+    if value == "converged":
+        return "converged"
     if value == "constitutional_reprice_approved":
         return "constitutional_reprice_approved"
     if value == "constitutional_reprice_rejected":
@@ -361,6 +365,8 @@ def _route_state(value: object, *, field: str) -> RouteState:
         return "no_lawful_route"
     if value == "suppressed_by_mode":
         return "suppressed_by_mode"
+    if value == "unresolved":
+        return "unresolved"
     raise ValueError(f"{field} has invalid value")
 
 

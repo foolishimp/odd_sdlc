@@ -19,6 +19,7 @@ from .public_start_contract import GapDossierReadModel
 from .project_profile import execution_contract_is_declared, load_project_profile
 from .public_start_contract import PublicStartResultPayload
 from .span_analysis import parse_gap_scope_selector
+from .workspace_assets import asset_path
 
 
 OPERATIONAL_DISPATCH_REGISTER_PATH = Path(".ai-workspace/runtime/odd_sdlc-operational-dispatch.json")
@@ -59,6 +60,7 @@ class OperationalDispatchRecordPayload(TypedDict):
     stderr_path: str
     dispatched_at: str
     completed_at: str
+    cwd: str
 
 
 class OperationalDispatchRegisterPayload(TypedDict):
@@ -172,6 +174,7 @@ def _dispatch_record_payload(value: object) -> OperationalDispatchRecordPayload 
     stderr_path = value.get("stderr_path")
     dispatched_at = value.get("dispatched_at")
     completed_at = value.get("completed_at")
+    cwd = value.get("cwd")
     if not isinstance(dispatch_id, str) or not dispatch_id:
         return None
     if not isinstance(lane, str) or not lane:
@@ -210,6 +213,7 @@ def _dispatch_record_payload(value: object) -> OperationalDispatchRecordPayload 
         "stderr_path": stderr_path,
         "dispatched_at": dispatched_at,
         "completed_at": completed_at,
+        "cwd": cwd if isinstance(cwd, str) and cwd else ".",
     }
 
 
@@ -253,6 +257,8 @@ def classify_operational_binding(contract: str) -> str:
     lowered = contract.strip().lower()
     if not execution_contract_is_declared(contract):
         return "undeclared"
+    if lowered == "spark-submit" or lowered.startswith("spark-submit "):
+        return "external_spark_submit"
     if "sbt" in lowered:
         return "local_scala_sbt"
     if "pytest" in lowered:
@@ -260,6 +266,31 @@ def classify_operational_binding(contract: str) -> str:
     if lowered.startswith("python "):
         return "local_python_command"
     return "local_shell_command"
+
+
+def _requires_external_evidence(binding: str) -> bool:
+    return binding.startswith("external_")
+
+
+def _append_env_option(existing: str, option: str) -> str:
+    if option in existing.split():
+        return existing
+    return f"{existing} {option}".strip()
+
+
+def _configure_local_scala_sbt_env(workspace_root: Path, env: dict[str, str]) -> None:
+    sbt_root = workspace_root / ".ai-workspace" / "runtime" / "sbt"
+    boot_dir = sbt_root / "boot"
+    global_base = sbt_root / "global"
+    ivy_home = sbt_root / "ivy2"
+    for path in (boot_dir, global_base, ivy_home):
+        path.mkdir(parents=True, exist_ok=True)
+
+    sbt_opts = env.get("SBT_OPTS", "")
+    sbt_opts = _append_env_option(sbt_opts, f"-Dsbt.boot.directory={boot_dir}")
+    sbt_opts = _append_env_option(sbt_opts, f"-Dsbt.global.base={global_base}")
+    sbt_opts = _append_env_option(sbt_opts, f"-Dsbt.ivy.home={ivy_home}")
+    env["SBT_OPTS"] = sbt_opts
 
 
 def _write_dispatch_register(
@@ -291,11 +322,18 @@ def _dispatch_local_contract(
     log_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = log_dir / "stdout.log"
     stderr_path = log_dir / "stderr.log"
+    cwd = workspace_root
+    if binding == "local_scala_sbt":
+        code_root = asset_path(workspace_root, "code_surface")
+        if code_root.exists() and code_root.is_dir():
+            cwd = code_root
 
     env = os.environ.copy()
+    if binding == "local_scala_sbt":
+        _configure_local_scala_sbt_env(workspace_root, env)
     completed = subprocess.run(
         ["/bin/zsh", "-lc", contract],
-        cwd=workspace_root,
+        cwd=cwd,
         capture_output=True,
         text=True,
         env=env,
@@ -319,6 +357,7 @@ def _dispatch_local_contract(
         "stderr_path": str(stderr_path.relative_to(workspace_root)),
         "dispatched_at": _timestamp(),
         "completed_at": _timestamp(),
+        "cwd": str(cwd.relative_to(workspace_root)) if cwd != workspace_root else ".",
     }
     _write_dispatch_register(workspace_root, entry)
     return entry
@@ -493,6 +532,22 @@ def dispatch_operational(app: OddSdlcApp) -> OperationalDispatchResultPayload:
                 "current_state": _project_start_state(initial),
                 "completed_steps": steps,
                 "active_programs": active_programs(_fresh_app(app)),
+            }
+
+        binding = classify_operational_binding(contract)
+        if _requires_external_evidence(binding):
+            steps.append(_projection_step(workspace_root, initial))
+            refresh_analysis(workspace_root, stage="operational_dispatch")
+            final_state = _operational_start(app)
+            published_app = _fresh_app(app)
+            return {
+                "status": "ok",
+                "workspace_root": str(workspace_root),
+                "initial_state": _project_start_state(initial),
+                "final_state": _project_start_state(final_state),
+                "completed_steps": steps,
+                "gap_dossier": publish_gap_surface(published_app, selector=parse_gap_scope_selector("workspace")),
+                "active_programs": active_programs(published_app),
             }
 
         dispatch_record = _dispatch_local_contract(

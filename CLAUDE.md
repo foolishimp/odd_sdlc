@@ -38,8 +38,9 @@ The target project may be imported, partial, stale, or still underdefined.
 
 ## 4. Start Here
 - inspect the current pipeline state with `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc gaps --scope workspace --workspace .`
-- advance odd_sdlc graph/worksite state with `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc start --scope workspace --target next --until converged --workspace .`
+- when the operator says `start`, advance odd_sdlc graph/worksite state with `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc start --scope workspace --target next --until converged --fh-mode human-proxy --root-mode supervised --workspace .`
 - resolve published `graph_function:` and `asset:` targets through `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m odd_sdlc query-domain --workspace .`, which publishes `start_target_catalog`, `asset_ownership_index`, and the current `execution_contract_surface` projection when one has been admitted
+- `start --until converged` requires an admitted F_P worker attachment through `transport_contract`; without it the command returns `blocking_reason=fp_worker_unattached` instead of waiting on an unconsumed worker handoff
 - deployment, runtime-return, and other side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`
 - major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite
 - unresolved live requirements remain active future pressure across iterations; inspect the requirement closure register before claiming completion on a partial wave

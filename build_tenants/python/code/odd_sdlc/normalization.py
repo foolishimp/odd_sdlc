@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .analysis import refresh_analysis
+from .imported_intent_carry_forward import build_imported_intent_carry_forward
 from .install_topology import (
     INSTALLED_PRODUCT_CODE_ROOT_RELATIVE,
     INSTALLED_PRODUCT_ROOT_RELATIVE,
@@ -22,9 +23,11 @@ from .install_topology import (
 )
 from .project_profile import (
     UNDECLARED_EXECUTION_CONTRACT,
+    _normalized_scalar,
     _parse_constraints_lines,
     canonical_tenant_name,
     default_project_slug,
+    infer_execution_contract_defaults,
     load_project_profile,
     normalize_execution_contract_declaration,
     parse_design_tenants,
@@ -335,7 +338,17 @@ def _ontology_anchor_headings(path: Path) -> list[str]:
 def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, platform: str) -> str:
     imported = _imported_requirement_sources(workspace_root)
     intent_path = workspace_root / "specification" / "INTENT.md"
-    identity_title, identity_source = _project_identity(workspace_root)
+    carry_forward = build_imported_intent_carry_forward(workspace_root)
+    identity_title = (
+        str(carry_forward.get("identity_title") or "")
+        if carry_forward.get("identity_title") is not None
+        else None
+    )
+    identity_source = (
+        str(carry_forward.get("identity_source") or "")
+        if carry_forward.get("identity_source") is not None
+        else None
+    )
     candidate_titles = []
     if intent_path.exists():
         title = _project_title_from_intent(intent_path) or _first_heading(intent_path)
@@ -352,15 +365,9 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
     )
 
     ontology_lines: list[str] = []
-    seen_anchors: set[tuple[str, str]] = set()
-    candidate_sources = tuple(path for path in (intent_path, *imported) if path.exists())
-    for source in candidate_sources:
-        rel = source.relative_to(workspace_root).as_posix()
-        for anchor in _ontology_anchor_headings(source):
-            key = (rel, anchor)
-            if key in seen_anchors:
-                continue
-            seen_anchors.add(key)
+    for ref in carry_forward["ontology_anchor_refs"]:
+        rel, _, anchor = ref.partition("#")
+        if rel and anchor:
             ontology_lines.append(f"- `{rel}` → {anchor}")
 
     if not ontology_lines:
@@ -406,8 +413,10 @@ def _project_bootstrap_markdown(workspace_root: Path, *, project_slug: str, plat
             "- `specification/PRODUCT.md` and `specification/GOALS.md` only after the imported authority",
             "",
             "## Installed Runtime Start Surface",
-            f"- inspect current gaps with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc gaps --scope workspace --workspace .`",
-            f"- advance odd_sdlc graph/worksite state with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc start --scope workspace --target next --until converged --workspace .`",
+            f"- inspect current gaps with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc gaps --workspace .`",
+            f"- use `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc gaps --format json --workspace .` only when a script needs the raw machine dossier carrier",
+            f"- when the operator says `start`, advance odd_sdlc graph/worksite state with `PYTHONPATH=.genesis:{INSTALLED_PRODUCT_CODE_ROOT_RELATIVE.as_posix()} python -m odd_sdlc start --scope workspace --target next --until converged --fh-mode human-proxy --root-mode supervised --workspace .`",
+            "- `start --until converged` requires an admitted F_P worker attachment through `transport_contract`; without it the command returns `blocking_reason=fp_worker_unattached` instead of waiting on an unconsumed worker handoff",
             "- deployment, runtime-return, and similar side-effect stages only traverse when the active build tenant declares the required technology capability contracts in `project_constraints.yml`",
             "- major ambiguity is always recorded; `project_constraints.yml` declares `ambiguity_risk_appetite`, which governs whether unresolved major ambiguity is carried by `F_P` or escalated to `F_H` unless it is a hard-stop prerequisite",
             "- when release/deployment/runtime remain at `pending_evidence` with no returned execution data, treat the converged boundary as `construction_complete_pending_execution`",
@@ -468,14 +477,14 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
             continue
         if indent == 0 and ":" in stripped:
             key, _, value = stripped.partition(":")
-            top_level[key.strip()] = strip_scalar_quotes(value)
+            top_level[key.strip()] = _normalized_scalar(value)
             section = ""
             current_tenant = None
             current_list_key = None
             continue
         if section == "project" and indent == 2 and ":" in stripped:
             key, _, value = stripped.partition(":")
-            project[key.strip()] = strip_scalar_quotes(value)
+            project[key.strip()] = _normalized_scalar(value)
             continue
         if section != "build_tenants":
             continue
@@ -492,15 +501,21 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
             key = key.strip()
             value = value.strip()
             if not value:
-                current_tenant[key] = []
+                current_tenant[key] = {} if key == "capability_contracts" else []
                 current_list_key = key
             else:
-                current_tenant[key] = strip_scalar_quotes(value)
+                current_tenant[key] = _normalized_scalar(value)
                 current_list_key = None
+            continue
+        if indent >= 6 and current_list_key == "capability_contracts" and ":" in stripped:
+            current_value = current_tenant.get(current_list_key)
+            if isinstance(current_value, dict):
+                key, _, value = stripped.partition(":")
+                current_value[key.strip()] = _normalized_scalar(value)
             continue
         if indent >= 6 and stripped.startswith("- ") and current_list_key:
             current_value = current_tenant.get(current_list_key)
-            item = strip_scalar_quotes(stripped[2:])
+            item = _normalized_scalar(stripped[2:])
             if isinstance(current_value, list):
                 current_value.append(item)
             else:
@@ -512,6 +527,7 @@ def _parse_legacy_build_tenant_constraints(path: Path) -> dict[str, object] | No
         "project": project,
         "top_level": top_level,
         "build_tenants": registry,
+        "source_text": text,
     }
 
 
@@ -536,6 +552,7 @@ def _canonical_constraints_from_legacy_build_tenants(
 
     language = str(project.get("language") or selected.get("language") or "")
     test_runner = str(project.get("test_runner") or selected.get("test_runner") or "")
+    tool = str(project.get("tool") or selected.get("build_tool") or "")
     ambiguity_risk_appetite = str(top_level.get("ambiguity_risk_appetite") or "medium")
     root_code_policy = str(top_level.get("root_code_policy") or "reject")
     description = str(
@@ -549,6 +566,30 @@ def _canonical_constraints_from_legacy_build_tenants(
         if isinstance(module_structure, list) and module_structure
         else '"(app-core)"'
     )
+    capability_contracts = _object_dict(selected.get("capability_contracts"))
+    capability_contract_lines: list[str] = []
+    if capability_contracts:
+        capability_contract_lines.append("      capability_contracts:")
+        for key, value in capability_contracts.items():
+            capability_contract_lines.append(
+                f'        {key}: "{_normalized_scalar(value)}"'
+            )
+    inferred_contracts = infer_execution_contract_defaults(
+        tenant_name=selected_name or canonical_platform,
+        language=language,
+        tool=tool,
+        test_runner=test_runner,
+        capability_contracts=capability_contracts,
+        build_execution_contract=str(selected.get("build_execution_contract") or ""),
+        test_execution_contract=str(selected.get("test_execution_contract") or ""),
+        deployment_contract=str(selected.get("deployment_contract") or ""),
+        runtime_observation_contract=str(selected.get("runtime_observation_contract") or ""),
+        source_text=str(legacy.get("source_text") or ""),
+    )
+    build_execution_contract = inferred_contracts["build_execution_contract"]
+    test_execution_contract = inferred_contracts["test_execution_contract"]
+    deployment_contract = inferred_contracts["deployment_contract"]
+    runtime_observation_contract = inferred_contracts["runtime_observation_contract"]
 
     return "\n".join(
         (
@@ -570,13 +611,41 @@ def _canonical_constraints_from_legacy_build_tenants(
             f'      output_dir: "{output_dir}"',
             f'      description: "{description}"',
             f"      module_structure: {module_structure_value}",
-            f'      build_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
-            f'      test_execution_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
-            f'      deployment_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
-            f'      runtime_observation_contract: "{UNDECLARED_EXECUTION_CONTRACT}"',
+            *capability_contract_lines,
+            f'      build_execution_contract: "{build_execution_contract}"',
+            f'      test_execution_contract: "{test_execution_contract}"',
+            f'      deployment_contract: "{deployment_contract}"',
+            f'      runtime_observation_contract: "{runtime_observation_contract}"',
             f"  root_code_policy: {root_code_policy}",
             "",
         )
+    )
+
+
+def _inferred_contracts_from_current_constraints(
+    path: Path,
+    *,
+    canonical_platform: str,
+    source_text: str,
+) -> dict[str, str]:
+    constraints = _parse_constraints_lines(path)
+    capability_contracts = _object_dict(constraints.get("tenant_capability_contracts"))
+    return infer_execution_contract_defaults(
+        tenant_name=str(constraints.get("tenant_name") or canonical_platform),
+        language=str(constraints.get("language") or constraints.get("tenant_language") or ""),
+        tool=str(
+            constraints.get("tool")
+            or constraints.get("tenant_tool")
+            or constraints.get("tenant_build_tool")
+            or ""
+        ),
+        test_runner=str(constraints.get("test_runner") or constraints.get("tenant_test_runner") or ""),
+        capability_contracts=capability_contracts,
+        build_execution_contract=str(constraints.get("tenant_build_execution_contract") or ""),
+        test_execution_contract=str(constraints.get("tenant_test_execution_contract") or ""),
+        deployment_contract=str(constraints.get("tenant_deployment_contract") or ""),
+        runtime_observation_contract=str(constraints.get("tenant_runtime_observation_contract") or ""),
+        source_text=source_text,
     )
 
 
@@ -745,6 +814,11 @@ def _normalize_project_constraints(
 
     _validate_existing_project_constraints(path)
     original = path.read_text(encoding="utf-8")
+    inferred_contracts = _inferred_contracts_from_current_constraints(
+        path,
+        canonical_platform=canonical_platform,
+        source_text=original,
+    )
     lines = original.splitlines()
     updated: list[str] = []
     in_project = False
@@ -777,14 +851,25 @@ def _normalize_project_constraints(
         for field_name, default_value in TENANT_CAPABILITY_FIELDS:
             if field_name in tenant_fields_seen:
                 continue
-            updated.append(f"{tenant_field_indent}{field_name}: {default_value}")
+            inferred_value = inferred_contracts.get(
+                field_name,
+                strip_scalar_quotes(default_value),
+            )
+            updated.append(f'{tenant_field_indent}{field_name}: "{inferred_value}"')
+            if inferred_value == UNDECLARED_EXECUTION_CONTRACT:
+                detail = f"defaulted missing tenant capability field `{field_name}` during normalization"
+            else:
+                detail = (
+                    f"defaulted missing tenant capability field `{field_name}` "
+                    "to the admitted inferred execution contract"
+                )
             defaults_with_provenance.append(
                 _default_with_provenance(
                     kind="default_project_constraint_field",
                     path=path,
                     field=field_name,
-                    value=default_value,
-                    detail=f"defaulted missing tenant capability field `{field_name}` during normalization",
+                    value=inferred_value,
+                    detail=detail,
                 )
             )
         tenant_capabilities_flushed = True
@@ -876,17 +961,28 @@ def _normalize_project_constraints(
             and stripped.partition(":")[0].strip() in {field_name for field_name, _ in TENANT_CAPABILITY_FIELDS}
         ):
             field_name = stripped.partition(":")[0].strip()
-            raw_value = strip_scalar_quotes(stripped.partition(":")[2]).strip()
-            normalized_value = normalize_execution_contract_declaration(stripped.partition(":")[2])
+            raw_value = _normalized_scalar(stripped.partition(":")[2])
+            line_normalized_value = normalize_execution_contract_declaration(raw_value)
+            normalized_value = inferred_contracts.get(field_name, line_normalized_value)
             updated.append(f'{tenant_field_indent}{field_name}: "{normalized_value}"')
-            if not raw_value and normalized_value == UNDECLARED_EXECUTION_CONTRACT:
+            if raw_value != normalized_value:
+                if normalized_value == UNDECLARED_EXECUTION_CONTRACT:
+                    detail = (
+                        f"rewrote semantically empty tenant capability field `{field_name}` "
+                        "to explicit undeclared capability truth"
+                    )
+                else:
+                    detail = (
+                        f"inferred tenant capability field `{field_name}` from selected "
+                        "tenant execution cues during normalization"
+                    )
                 defaults_with_provenance.append(
                     _default_with_provenance(
                         kind="normalize_project_constraint_field",
                         path=path,
                         field=field_name,
                         value=normalized_value,
-                        detail=f"rewrote semantically empty tenant capability field `{field_name}` to explicit undeclared capability truth",
+                        detail=detail,
                     )
                 )
         else:
@@ -1089,7 +1185,7 @@ def _resolved_platform(workspace_root: Path, requested_platform: str | None) -> 
             return canonical_tenant_name(tenants[0].get("name", ""))
         constraints = _parse_constraints_lines(constraints_path)
         if constraints.get("tenant_name"):
-            return canonical_tenant_name(constraints["tenant_name"])
+            return canonical_tenant_name(str(constraints["tenant_name"]))
     return "python"
 
 
@@ -1227,7 +1323,7 @@ def normalize_workspace(
 
     constraints_path = root / ".ai-workspace" / "context" / "project_constraints.yml"
     raw_constraints = _parse_constraints_lines(constraints_path)
-    legacy_output_dir = raw_constraints.get("tenant_output_dir", "")
+    legacy_output_dir = str(raw_constraints.get("tenant_output_dir") or "")
 
     _normalize_project_constraints(
         root,

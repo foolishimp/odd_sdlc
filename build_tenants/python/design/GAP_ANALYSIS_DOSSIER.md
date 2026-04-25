@@ -45,6 +45,13 @@ The JSON register is the machine-readable current dossier surface.
 The markdown context is the operator-facing review summary over the same
 current dossiers.
 
+The public CLI default is a further operator projection over the published
+dossier head. Bare `odd_sdlc gaps` binds `scope=workspace`, names the frontier,
+classifies the blocker, and lists next lawful steps. That projection is not a
+new carrier: it is derived from the same published dossier/read-model family.
+The raw JSON register remains available through explicit `odd_sdlc gaps
+--format json`.
+
 ## Dossier Shape
 
 Each current dossier publishes:

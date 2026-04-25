@@ -110,7 +110,7 @@ def build_repair_frontier_register(
 
     def test_unmet(entry: dict[str, Any]) -> bool:
         return any(
-            reason in {"missing_planned_test_coverage", "missing_realized_test_source"}
+            reason in {"missing_planned_test_coverage", "missing_realized_test_source", "behavioral_test_missing"}
             for reason in entry.get("blocking_reasons", ())
         )
 

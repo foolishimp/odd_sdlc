@@ -1,7 +1,7 @@
 """Shared admission helpers for residual public-start subordinate payloads."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from genesis.fulfillment_ledger import coerce_published_fulfillment_ledger_ref
 from genesis.policy import admit_resolved_policy
@@ -23,13 +23,13 @@ def _string(value: object, *, field: str) -> str:
     raise ValueError(f"{field} must be a non-empty string")
 
 
-def _string_list(value: object, *, field: str) -> list[str]:
-    if not isinstance(value, list):
-        raise ValueError(f"{field} must be a list[str]")
+def _string_sequence(value: object, *, field: str) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError(f"{field} must be a sequence[str]")
     normalized: list[str] = []
     for item in value:
         if not isinstance(item, str):
-            raise ValueError(f"{field} must be a list[str]")
+            raise ValueError(f"{field} must be a sequence[str]")
         normalized.append(item)
     return normalized
 
@@ -112,7 +112,7 @@ def admit_resolved_policy_payload(value: object) -> ResolvedPolicyPayload:
             payload.get("resolved_policy_bundle_ref"),
             field="resolved_policy.resolved_policy_bundle_ref",
         ),
-        "bundle_refs": _string_list(payload.get("bundle_refs"), field="resolved_policy.bundle_refs"),
+        "bundle_refs": _string_sequence(payload.get("bundle_refs"), field="resolved_policy.bundle_refs"),
         "sources": {
             str(key): _string(item, field=f"resolved_policy.sources.{key}")
             for key, item in sources_value.items()
@@ -205,11 +205,11 @@ def admit_fulfillment_assessments(value: object) -> list[FulfillmentAssessmentPa
                     field=f"fulfillment_assessments[{index}].fulfillment_status",
                 ),
                 "fulfillment_detail": detail,
-                "blocking_reasons": _string_list(
+                "blocking_reasons": _string_sequence(
                     item.get("blocking_reasons", []),
                     field=f"fulfillment_assessments[{index}].blocking_reasons",
                 ),
-                "evidence_refs": _string_list(
+                "evidence_refs": _string_sequence(
                     item.get("evidence_refs", []),
                     field=f"fulfillment_assessments[{index}].evidence_refs",
                 ),

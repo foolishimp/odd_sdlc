@@ -65,8 +65,8 @@ def _approve_pending_start_gate(
     republished = run_installed_odd_sdlc(
         workspace,
         "gaps",
-        "--scope",
-        "workspace",
+        "--format",
+        "json",
         archive=run_archive,
         label=f"{label}.republish_gaps",
     )
@@ -79,8 +79,8 @@ def _approve_head_constitutional_gate(workspace: Path, *, run_archive, label: st
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label=f"{label}.gaps",
         ).stdout
@@ -307,8 +307,8 @@ def test_data_mapper_yield_chain_surfaces_asset_event_and_result_truth(run_archi
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="yield_chain.initial_gaps",
         ).stdout
@@ -440,8 +440,8 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="yield_projection.raw_gaps",
         ).stdout
@@ -455,8 +455,8 @@ def test_data_mapper_yield_chain_projects_run_continuation_and_gap_truth(run_arc
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="yield_projection.domain_gaps",
             timeout=120,

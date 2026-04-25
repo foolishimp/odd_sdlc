@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .imported_intent_carry_forward import build_imported_intent_carry_forward
 from .install_topology import INSTALLED_RUNTIME_CONTRACT_RELATIVE
 from .ambiguity import AMBIGUITY_REGISTER_PATH, build_ambiguity_register
 from .publication_io import write_json_if_changed, write_text_if_changed
@@ -221,6 +222,7 @@ def write_workspace_state(
         "analysis_manifest_path": analysis_manifest_path,
         "project_profile": profile.to_dict(),
         "operational_capabilities": build_operational_capability_projection(root, profile=profile),
+        "imported_intent_carry_forward": build_imported_intent_carry_forward(root),
         "selected_output_dir": profile.output_dir,
         "declared_output_dir": profile.declared_output_dir,
         "resolution_reason": profile.resolution_reason,

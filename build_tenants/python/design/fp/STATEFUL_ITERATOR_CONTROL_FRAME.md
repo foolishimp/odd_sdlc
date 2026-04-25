@@ -10,6 +10,9 @@ asset under construction.
 - Current workspace state outranks prior prompts and manifests as runtime truth.
 - Completion requires transformation to the target asset or lawful realized
   descendants; commentary without file change does not satisfy the edge.
+- This edge works over an existing realization or realization plan, not a blank slate.
+- Existing files and existing module groups are obligations, not proof of completion.
+- Prefer deepening or correcting existing artifacts before replacing them; preserve lawful structure unless current evidence proves it is wrong.
 - Requirement and scenario traceability remain part of preserved continuity.
 - Large registers and inventories may be consulted by reference rather than
   restated into inert prompt text.

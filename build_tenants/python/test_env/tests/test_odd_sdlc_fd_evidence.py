@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -245,7 +246,9 @@ def _seed_traceability_workspace(workspace: Path) -> None:
             (
                 "// Validates: REQ-TRACE-001",
                 "",
-                "class LogicSpec",
+                "class LogicSpec {",
+                "  def verifiesRun(): Unit = assert(Logic.run() == 1)",
+                "}",
                 "",
             )
         ),
@@ -925,6 +928,96 @@ def test_current_requirement_executability_gap_blocks_traceable_stubbed_code(
     assert stubbed["blocking_reasons"] == ["behavioral_realization_missing"]
 
 
+def test_requirement_closure_rejects_metadata_only_scala_module_shells(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-metadata-shell"
+    _seed_traceability_workspace(workspace)
+    shutil.rmtree(workspace / "build_tenants")
+    _write(
+        workspace / "specification" / "requirements" / "10-generated-bootstrap.md",
+        "\n".join(
+            (
+                "# Generated Bootstrap Requirements",
+                "",
+                "- REQ-TRACE-001: Carry a realized implementation path.",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace
+        / "build_tenants"
+        / "scala_spark"
+        / "app-core"
+        / "src"
+        / "main"
+        / "scala"
+        / "pkg"
+        / "AppCoreModule.scala",
+        "\n".join(
+            (
+                "// Implements: REQ-TRACE-001",
+                "package pkg",
+                "",
+                "object AppCoreModule {",
+                '  val moduleName: String = "app-core"',
+                '  val projectName: String = "Metadata Shell"',
+                '  val governedCodeRoot: String = "build_tenants/scala_spark/"',
+                '  val implementedRequirements: List[String] = List("REQ-TRACE-001")',
+                '  def summary: String = s"$projectName::$moduleName"',
+                "}",
+                "",
+            )
+        ),
+    )
+    _write(
+        workspace
+        / "build_tenants"
+        / "scala_spark"
+        / "app-core"
+        / "src"
+        / "test"
+        / "scala"
+        / "pkg"
+        / "AppCoreModuleSpec.scala",
+        "\n".join(
+            (
+                "// Validates: REQ-TRACE-001",
+                "package pkg",
+                "",
+                "import org.scalatest.funsuite.AnyFunSuite",
+                "",
+                "final class AppCoreModuleSpec extends AnyFunSuite {",
+                '  private val validatedRequirements: List[String] = List("REQ-TRACE-001")',
+                '  test("app-core preserves imported project identity") {',
+                "    assert(AppCoreModule.projectName.nonEmpty)",
+                '    assert(AppCoreModule.moduleName == "app-core")',
+                "  }",
+                '  test("app-core carries governed code-root and requirement traceability") {',
+                "    assert(AppCoreModule.governedCodeRoot.nonEmpty)",
+                "    assert(AppCoreModule.implementedRequirements == validatedRequirements)",
+                "    assert(validatedRequirements.nonEmpty)",
+                '    assert(validatedRequirements.forall(_.startsWith("REQ-")))',
+                "  }",
+                "}",
+                "",
+            )
+        ),
+    )
+
+    register = build_requirement_closure_register(workspace)
+    entries = {entry["requirement_id"]: entry for entry in register["requirements"]}
+
+    shell = entries["REQ-TRACE-001"]
+    assert shell["status"] == "realized"
+    assert shell["fulfillment_detail"] == "traceable_stub"
+    assert shell["fulfillment_status"] == "not_fulfilled"
+    assert shell["behavioral_code_refs"] == []
+    assert shell["behavioral_test_refs"] == []
+    assert shell["blocking_reasons"] == ["behavioral_realization_missing"]
+
+
 def test_current_requirement_executability_gap_exposes_missing_carry_forward_requirements(
     tmp_path: Path,
 ) -> None:
@@ -1135,7 +1228,10 @@ def test_code_surface_construction_does_not_delete_tenant_governance_surfaces(
                 '    - name: "scala_spark"',
                 '      output_dir: "build_tenants/scala_spark/"',
                 '      description: "scala traceability lane"',
+                '      build_execution_contract: "sbt clean assembly"',
                 '      test_execution_contract: "sbt test"',
+                "      capability_contracts:",
+                "        fat_jar: true",
                 "  root_code_policy: reject",
                 "",
             )
@@ -1182,10 +1278,115 @@ def test_code_surface_construction_does_not_delete_tenant_governance_surfaces(
     assert constructor_result["target_asset"] == "code_surface"
     assert feature_decomp.read_text(encoding="utf-8").startswith("# Generated Feature Decomposition")
     assert (workspace / "build_tenants" / "scala_spark" / "build.sbt").is_file()
+    assert (workspace / "build_tenants" / "scala_spark" / "project" / "plugins.sbt").read_text(
+        encoding="utf-8"
+    ) == 'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.1.5")\n'
+    build_text = (workspace / "build_tenants" / "scala_spark" / "build.sbt").read_text(encoding="utf-8")
+    assert "Global / autoStartServer := false" in build_text
+    assert "assembly / assemblyMergeStrategy" in build_text
+    assert 'PathList("META-INF", "versions", "9", "module-info.class")' in build_text
     materialization = constructor_result["work_report"]["materialization_report"]
     assert materialization["delete_policy"] == "no_existing_entries_deleted"
     assert materialization["removed_entries"] == []
     assert "build_tenants/scala_spark/design" in materialization["preserved_existing_entries"]
+    module_source = (
+        workspace
+        / "build_tenants"
+        / "scala_spark"
+        / "app-core"
+        / "src"
+        / "main"
+        / "scala"
+        / "cdme"
+        / "app_core"
+        / "AppCoreModule.scala"
+    ).read_text(encoding="utf-8")
+    module_spec = (
+        workspace
+        / "build_tenants"
+        / "scala_spark"
+        / "app-core"
+        / "src"
+        / "test"
+        / "scala"
+        / "cdme"
+        / "app_core"
+        / "AppCoreModuleSpec.scala"
+    ).read_text(encoding="utf-8")
+    assert "def verifiesModuleBehavior(input: String): String" in module_source
+    assert 'test("module exposes executable behavior")' in module_spec
+    result_payload = json.loads(Path(constructor_result["result_path"]).read_text(encoding="utf-8"))
+    [assessment] = result_payload["fulfillment_assessments"]
+    assert assessment["fulfillment_status"] == "fulfilled"
+    assert assessment["blocking_reasons"] == []
+    assert "behavioral code realization evidence is present" in assessment["fulfillment_detail"]
+    assert "generated-asset contract" not in assessment["fulfillment_detail"]
+
+
+def test_declared_build_result_requires_successful_dispatch_evidence(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "fd-evidence-build-dispatch-required"
+    _write(
+        workspace / ".ai-workspace" / "context" / "project_constraints.yml",
+        "\n".join(
+            (
+                "project:",
+                '  name: "fd-evidence-build-dispatch-required"',
+                '  kind: "software-project"',
+                '  language: "Scala"',
+                '  test_runner: "sbt test"',
+                '  module_structure: "multi_module(app-core)"',
+                "",
+                "constraints: {}",
+                "",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "scala_spark"',
+                '      output_dir: "build_tenants/scala_spark/"',
+                '      description: "scala traceability lane"',
+                '      build_execution_contract: "sbt clean assembly"',
+                '      test_execution_contract: "sbt test"',
+                "      capability_contracts:",
+                "        fat_jar: true",
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+    )
+    _write(
+        asset_materialization_path(workspace, "build_execution_surface"),
+        "\n".join(
+            (
+                "# Generated Build Execution Surface",
+                "",
+                asset_marker("build_execution_surface"),
+                "",
+                "## Operational Transition Command",
+                "- status: prepared",
+                "- substrate_contract: `sbt clean assembly`",
+                "- target_result_surface: `build_execution_result_surface`",
+                "",
+            )
+        ),
+    )
+    manifest_path = _write_manifest(
+        workspace / ".ai-workspace" / "fp_manifests" / "derive_build_execution_result_surface_test.json",
+        target_asset="build_execution_result_surface",
+        evaluator_name="build_execution_result_surface_semantically_converged",
+    )
+
+    constructor_result = construct_manifest(manifest_path, workspace_root=workspace)
+
+    result_payload = json.loads(Path(constructor_result["result_path"]).read_text(encoding="utf-8"))
+    [assessment] = result_payload["fulfillment_assessments"]
+    assert assessment["fulfillment_status"] == "blocked"
+    assert assessment["blocking_reasons"] == ["build_execution_evidence_missing"]
+    result_text = asset_materialization_path(workspace, "build_execution_result_surface").read_text(
+        encoding="utf-8"
+    )
+    assert "- status: pending_external_evidence" in result_text
+    assert "- dispatch_binding: `none`" in result_text
 
 
 def test_requirement_family_traceability_publication_is_projected_into_closure_register(

@@ -6,7 +6,7 @@ import argparse
 import json
 
 from .analysis import refresh_analysis
-from .app import bootstrap, catalog, gaps, initialize, iterate, start
+from .app import bootstrap, catalog, gap_operator_analysis, gaps, initialize, iterate, start
 from .continuation import continue_with_result
 from .constructor import construct_manifest
 from .normalization import normalize_workspace
@@ -41,14 +41,26 @@ def main(argv: list[str] | None = None) -> int:
     gaps_parser = subparsers.add_parser(
         "gaps",
         parents=[common],
-        help="Public odd_sdlc graph/worksite observation command",
-        description="Public odd_sdlc graph/worksite observation command. Observe the current governed graph/worksite state without advancing traversal.",
+        help="Public odd_sdlc operator gap-analysis command",
+        description=(
+            "Public odd_sdlc operator gap-analysis command. Bare gaps defaults to "
+            "workspace scope and returns frontier classification plus next lawful "
+            "steps. Use --format json for the raw dossier carrier."
+        ),
     )
-    gaps_parser.add_argument("--scope", required=True)
+    gaps_parser.add_argument("--scope", default="workspace", help="Gap scope; bare gaps defaults to workspace.")
     gaps_parser.add_argument("--from-edge")
     gaps_parser.add_argument("--to-edge")
     gaps_parser.add_argument("--zoom", choices=["coarse", "refined", "combined"], default="combined")
-    gaps_parser.add_argument("--include-dependent", action="store_true")
+    gaps_parser.add_argument("--include-dependent", action="store_true", default=True)
+    gaps_parser.add_argument("--direct-only", dest="include_dependent", action="store_false")
+    gaps_parser.add_argument(
+        "--format",
+        choices=["operator", "json"],
+        default="operator",
+        help="Output operator analysis by default; use json for the raw machine dossier.",
+    )
+    gaps_parser.add_argument("--raw", dest="format", action="store_const", const="json", help=argparse.SUPPRESS)
     iterate_parser = subparsers.add_parser(
         "iterate",
         parents=[common],
@@ -151,14 +163,21 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "refresh-analysis":
         result = refresh_analysis(args.workspace)
     elif args.command == "gaps":
-        result = gaps(
-            app,
-            scope=args.scope,
-            from_edge=args.from_edge,
-            to_edge=args.to_edge,
-            zoom=args.zoom,
-            include_dependent=args.include_dependent,
-        )
+        if args.format == "operator" and args.from_edge is None and args.to_edge is None:
+            result = gap_operator_analysis(
+                app,
+                scope=args.scope,
+                include_dependent=args.include_dependent,
+            )
+        else:
+            result = gaps(
+                app,
+                scope=args.scope,
+                from_edge=args.from_edge,
+                to_edge=args.to_edge,
+                zoom=args.zoom,
+                include_dependent=args.include_dependent,
+            )
     elif args.command == "iterate":
         result = iterate(app, scope=args.scope)
     elif args.command == "dispatch-operational":

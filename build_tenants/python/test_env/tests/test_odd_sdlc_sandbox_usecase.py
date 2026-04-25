@@ -249,7 +249,7 @@ def _prepare_sandbox(workspace: Path, *, run_archive) -> None:
 
 
 @pytest.mark.usecase_id("data_mapper_template_inherited_e2e")
-def test_sandbox_forensic_public_start_stops_before_constructive_events_at_published_fh_gate(
+def test_sandbox_forensic_public_start_routes_valid_imported_template_without_synthetic_fh_gate(
     run_archive,
 ) -> None:
     workspace = run_archive.workspace
@@ -278,56 +278,51 @@ def test_sandbox_forensic_public_start_stops_before_constructive_events_at_publi
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="forensic_gate.gaps",
         ).stdout
     )
     run_archive.capture_json("forensic_gate.gaps.json", gaps_payload)
     assert gaps_payload["dossiers"][0]["edge"] == "derive_intent_surface"
-    assert gaps_payload["dossiers"][0]["constitutional_proposal"]["state"] == "pending_fh"
-    assert gaps_payload["dossiers"][0]["route_binding"]["state"] == "await_fh_resolution"
+    assert gaps_payload["dossiers"][0]["constitutional_proposal"] is None
+    assert gaps_payload["dossiers"][0]["route_binding"]["state"] == "advance_fixed_vector"
 
-    start_result = run_installed_odd_sdlc(
-        workspace,
-        "start",
-        "--scope",
-        "workspace",
-        "--target",
-        "next",
-        "--until",
-        "converged",
-        archive=run_archive,
-        label="forensic_gate.start",
-        timeout=180,
-        check=False,
+    start_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "start",
+            "--scope",
+            "workspace",
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
+            archive=run_archive,
+            label="forensic_gate.start",
+            timeout=180,
+        ).stdout
     )
-    run_archive.capture_text("forensic_gate.start.stdout.txt", start_result.stdout)
-    run_archive.capture_text("forensic_gate.start.stderr.txt", start_result.stderr)
-    assert start_result.returncode == 3
-    start_payload = json.loads(start_result.stdout)
     run_archive.capture_json("forensic_gate.start.json", start_payload)
-    assert start_payload["status"] == "pending"
-    assert start_payload["blocking_reason"] == "fh_gate"
-    assert start_payload["stopped_by"] == "fh_gate"
+    assert start_payload["status"] == "iterated"
+    assert start_payload["blocking_reason"] == "fp_dispatch"
     assert start_payload["edge"] == "derive_intent_surface"
-    assert start_payload["constitutional_proposal"]["state"] == "pending_fh"
+    assert "constitutional_proposal" not in start_payload
 
     events = read_events(workspace)
     run_archive.capture_json("forensic_gate.events.json", events)
     event_types = [event["event_type"] for event in events]
-    assert "constitutional_proposal_recorded" in event_types
-    assert "fh_gate_pending" in event_types
-    assert event_types.index("constitutional_proposal_recorded") < event_types.index("fh_gate_pending")
-    assert "execution_contract_drafted" not in event_types
-    assert "execution_contract_admitted" not in event_types
-    assert "run_bound" not in event_types
-    assert "run_started" not in event_types
-    assert "graph_call_opened" not in event_types
-    assert "vector_started" not in event_types
+    assert "constitutional_proposal_recorded" not in event_types
+    assert "fh_gate_pending" not in event_types
+    assert "execution_contract_drafted" in event_types
+    assert "execution_contract_admitted" in event_types
+    assert "run_bound" in event_types
+    assert "run_started" in event_types
+    assert "graph_call_opened" in event_types
+    assert "vector_started" in event_types
     assert "worker_turn_started" not in event_types
-    assert "fp_dispatched" not in event_types
+    assert "fp_dispatched" in event_types
     assert "assessed" not in event_types
     assert "found" not in event_types
     assert "run_failed" not in event_types
@@ -510,8 +505,8 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="odd_sdlc gaps",
         ).stdout
@@ -606,7 +601,7 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         "workspace_root",
     ]
     assert domain_query["query_contract"]["name"] == "odd_sdlc.query-domain"
-    assert domain_query["query_contract"]["version"] == "v16"
+    assert domain_query["query_contract"]["version"] == "v17"
     assert domain_query["query_contract"]["top_level_keys"] == [
         "query_contract",
         "workspace_root",
@@ -654,9 +649,13 @@ def test_canonical_sandbox_usecase_runs_from_installed_workspace(run_archive) ->
         assert observed_asset["projection_source"] == "event_history"
         assert observed_asset["update_count"] == 1
         assert observed_asset["provenance"]["source"] == "asset_checkpoint_events"
-        assert observed_asset["provenance"]["last_event_id"] == event["event_id"]
+        assert observed_asset["provenance"]["history_basis"] == event["event_id"]
         assert observed_asset["checkpoint"] == event["data"]["current_checkpoint"]
-    assert [run["status"] for run in observed["runs"]] == ["not_started"] + (["completed"] * 18)
+    assert [run["status"] for run in observed["runs"]] == [
+        status
+        for _edge in EXPECTED_BOOTSTRAP_STEPS
+        for status in ("not_started", "completed")
+    ]
     assert [call["status"] for call in observed["graph_calls"]] == ["closed"] * 18
     assert observed["continuations"] == []
     recent_event_types = [event["event_type"] for event in observed["recent_events"]]
@@ -1209,6 +1208,110 @@ def test_dispatch_operational_runs_declared_local_bindings_end_to_end(run_archiv
     assert "## Planned Next Actions" in retrofit_text
 
 
+def test_dispatch_operational_projects_external_spark_submit_as_pending_evidence(run_archive) -> None:
+    workspace = run_archive.workspace
+    _prepare_sandbox(workspace, run_archive=run_archive)
+    _seed_operational_dispatch_scripts(workspace)
+    _rewrite_project_contracts(
+        workspace,
+        build_execution_contract="python .odd_sdlc_ops/build.py",
+        test_execution_contract="python .odd_sdlc_ops/test.py",
+        deployment_contract="spark-submit",
+        runtime_observation_contract="OpenLineage",
+    )
+    refresh_payload = json.loads(
+        run_installed_odd_sdlc(
+            workspace,
+            "refresh-analysis",
+            archive=run_archive,
+            label="odd_sdlc refresh-analysis external deployment",
+        ).stdout
+    )
+    run_archive.capture_json("refresh-analysis.external_deployment.json", refresh_payload)
+
+    bootstrap_chain = complete_bootstrap_chain(workspace, archive=run_archive, label_prefix="external_bootstrap")
+    assert [step["start"]["edge"] for step in bootstrap_chain] == list(EXPECTED_BOOTSTRAP_STEPS)
+
+    dispatch_results: list[dict[str, object]] = []
+    for label in (
+        "prepare-build",
+        "dispatch-build",
+        "prepare-test",
+        "dispatch-test",
+        "prepare-deploy",
+        "project-pending-deployment-result",
+        "project-deployed-environment",
+        "project-runtime-observation",
+        "project-retrofit-plan",
+    ):
+        payload = json.loads(
+            run_installed_odd_sdlc(
+                workspace,
+                "dispatch-operational",
+                archive=run_archive,
+                label=f"odd_sdlc dispatch-operational external {label}",
+                timeout=120,
+            ).stdout
+        )
+        dispatch_results.append(payload)
+        run_archive.capture_json(f"dispatch-operational.external.{label}.json", payload)
+
+    (
+        prepare_build,
+        dispatch_build,
+        prepare_test,
+        dispatch_test,
+        prepare_deploy,
+        pending_deploy_result,
+        project_deployed_environment,
+        project_runtime_observation,
+        project_retrofit_plan,
+    ) = dispatch_results
+
+    assert prepare_build["final_state"]["edge"] == "derive_build_execution_result_surface"
+    assert dispatch_build["completed_steps"][-1]["dispatch"]["lane"] == "build"
+    assert prepare_test["final_state"]["edge"] == "derive_test_execution_result_surface"
+    assert dispatch_test["completed_steps"][-1]["dispatch"]["lane"] == "test"
+    assert prepare_deploy["final_state"]["edge"] == "derive_deployment_result_surface"
+
+    assert pending_deploy_result["status"] == "ok"
+    assert pending_deploy_result["completed_steps"] == [
+        {
+            "kind": "projection",
+            "edge": "derive_deployment_result_surface",
+            "result_path": pending_deploy_result["completed_steps"][0]["result_path"],
+            "admission_status": "ok",
+        }
+    ]
+    assert pending_deploy_result["final_state"]["edge"] == "derive_deployed_environment_surface"
+
+    assert project_deployed_environment["final_state"]["edge"] == "derive_runtime_observation_surface"
+    assert project_runtime_observation["final_state"]["edge"] == "derive_retrofit_plan_surface"
+    assert project_retrofit_plan["final_state"]["status"] == "converged"
+    assert project_retrofit_plan["gap_dossier"]["converged"] is True
+
+    dispatch_register = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-operational-dispatch.json").read_text(encoding="utf-8")
+    )
+    assert dispatch_register["lanes"]["build"]["status"] == "succeeded"
+    assert dispatch_register["lanes"]["test"]["status"] == "succeeded"
+    assert "deployment" not in dispatch_register["lanes"]
+
+    deployment_text = asset_path(workspace, "deployment_surface").read_text(encoding="utf-8")
+    deployment_result_text = asset_path(workspace, "deployment_result_surface").read_text(encoding="utf-8")
+    deployed_environment_text = asset_path(workspace, "deployed_environment_surface").read_text(encoding="utf-8")
+    runtime_text = asset_path(workspace, "runtime_observation_surface").read_text(encoding="utf-8")
+    retrofit_text = asset_path(workspace, "retrofit_plan_surface").read_text(encoding="utf-8")
+
+    assert "- substrate_binding: `external_spark_submit`" in deployment_text
+    assert "- status: pending_external_evidence" in deployment_result_text
+    assert "- dispatch_binding: `none`" in deployment_result_text
+    assert "- status: deployment_pending_external_evidence" in deployed_environment_text
+    assert "- status: pending_external_evidence" in runtime_text
+    assert "- completion_state: construction_complete_pending_execution" in runtime_text
+    assert "- hold deployment/runtime closure until external execution evidence is returned" in retrofit_text
+
+
 def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive) -> None:
     workspace = run_archive.workspace
     _prepare_sandbox(workspace, run_archive=run_archive)
@@ -1239,8 +1342,8 @@ def test_canonical_sandbox_can_reset_runtime_state_and_rerun_cleanly(run_archive
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="odd_sdlc gaps second",
             timeout=120,

@@ -546,8 +546,10 @@ It acts as the current runtime authority above the leaf asset functions:
 The current product also exposes bounded operator inspection and proving
 surfaces around that carrier:
 
-- `odd_sdlc gaps --scope ...` for lawful worksite-scoped observation over the
-  current governed graph state
+- bare `odd_sdlc gaps` for the ordinary workspace-scoped operator analysis over
+  the current governed graph state
+- `odd_sdlc gaps --format json` for the raw machine-readable dossier carrier
+  when scripts or proofs need the underlying register shape
 - the current `gaps` / `query-domain` projection publishes one edge-scoped
   gap-analysis dossier per open edge so observation, triage, route binding, and
   constitutional pressure are reviewable as one current contract rather than as

@@ -11,12 +11,15 @@ RouteState: TypeAlias = Literal[
     "advance_dynamic_family",
     "advance_fixed_vector",
     "await_fh_resolution",
+    "blocked_missing_capability",
     "blocked_stale_analysis",
+    "converged",
     "constitutional_reprice_approved",
     "constitutional_reprice_rejected",
     "deferred",
     "no_lawful_route",
     "suppressed_by_mode",
+    "unresolved",
 ]
 ProposalState: TypeAlias = Literal[
     "pending_fh",
@@ -46,6 +49,7 @@ FailureClass: TypeAlias = Literal[
 StopPredicate: TypeAlias = Literal[
     "human_gate_required",
     "dispatch_required",
+    "worker_attachment_required",
     "gap_stop",
     "yielded",
     "proof_hold",
@@ -64,16 +68,19 @@ BlockedReason: TypeAlias = Literal[
     "route_binding_unavailable",
     "public_next_start_unavailable",
     "route_binding_not_start_authoritative",
+    "fp_worker_unattached",
     "converged",
     "advance_dynamic_family",
     "advance_fixed_vector",
     "await_fh_resolution",
+    "blocked_missing_capability",
     "blocked_stale_analysis",
     "constitutional_reprice_approved",
     "constitutional_reprice_rejected",
     "deferred",
     "no_lawful_route",
     "suppressed_by_mode",
+    "unresolved",
 ]
 StoppedBy: TypeAlias = Literal[
     "fh_gate",
@@ -85,6 +92,7 @@ StoppedBy: TypeAlias = Literal[
     "route_binding",
     "converged",
     "fp_runtime_failure",
+    "worker_attachment",
 ]
 ExecutionTargetKind: TypeAlias = Literal["next", "graph_function", "asset"]
 ExecutionSourceKind: TypeAlias = Literal["operator_request", "ticket_work_item"]
@@ -410,6 +418,10 @@ class GapDossierReadModel(TypedDict):
     execution_contract_surface: ExecutionContractSurfacePayload | None
     analysis_current: bool
     analysis_fingerprint: str | None
+    event_stream_fingerprint: str | None
+    event_stream_event_count: int
+    event_stream_latest_event_id: str | None
+    event_stream_latest_event_time: str | None
     analysis_manifest: object
     converged: bool
     graph_total_delta: float
@@ -436,6 +448,10 @@ class GapDossierRegisterPayload(TypedDict):
     execution_contract_surface: ExecutionContractSurfacePayload | None
     analysis_current: bool
     analysis_fingerprint: str | None
+    event_stream_fingerprint: NotRequired[str | None]
+    event_stream_event_count: NotRequired[int]
+    event_stream_latest_event_id: NotRequired[str | None]
+    event_stream_latest_event_time: NotRequired[str | None]
     summary: GapDossierSummary
     dossiers: list[GapDossierRow]
 
@@ -474,6 +490,7 @@ class PublicNextStartBlockedResult(TypedDict, total=False):
     triage_artifact_path: str | None
     resumption_trigger: str | None
     unavailable_reason: str
+    worker_attachment: object
     fh_mode: FhMode
     root_mode: RootMode
     resolved_target: str

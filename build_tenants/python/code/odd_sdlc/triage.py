@@ -43,7 +43,13 @@ _EDGE_LAYER_BY_NAME = {
     "derive_test_run_archive_surface": "test",
     "qualify_testcase_authority": "test",
     "prepare_release_surface": "execution",
+    "prepare_build_execution_surface": "execution",
+    "derive_build_execution_result_surface": "execution",
+    "prepare_test_execution_surface": "execution",
+    "derive_test_execution_result_surface": "execution",
     "prepare_deployment_surface": "execution",
+    "derive_deployment_result_surface": "execution",
+    "derive_deployed_environment_surface": "execution",
     "derive_runtime_observation_surface": "execution",
     "derive_retrofit_plan_surface": "design",
 }
@@ -67,7 +73,13 @@ _BINDING_LAYER_BY_NAME = {
     "test_run_archive_surface": "test",
     "testcase_authority_surface": "test",
     "release_surface": "execution",
+    "build_execution_surface": "execution",
+    "build_execution_result_surface": "execution",
+    "test_execution_surface": "execution",
+    "test_execution_result_surface": "execution",
     "deployment_surface": "execution",
+    "deployment_result_surface": "execution",
+    "deployed_environment_surface": "execution",
     "runtime_observation_surface": "execution",
     "retrofit_plan_surface": "design",
 }
@@ -582,6 +594,8 @@ def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None
     fixed_vector: str | None = None
     if triage["gap_kind"] == "dependency_gap":
         fixed_vector = f"resume_from_{reentry_layer}" if reentry_layer else None
+    elif reentry_layer in {"goals", "intent"}:
+        fixed_vector = f"resume_from_{reentry_layer}"
     elif reentry_layer == "product":
         fixed_vector = "reopen_product"
     elif reentry_layer == "requirements":
@@ -592,6 +606,8 @@ def _build_fixed_route_proposal(triage: dict[str, Any]) -> dict[str, Any] | None
         fixed_vector = "repair_output_contract"
     elif reentry_layer == "test":
         fixed_vector = "realize_missing_tests"
+    elif reentry_layer == "execution":
+        fixed_vector = "advance_operational_execution"
     if fixed_vector is None:
         return None
     return {
@@ -737,6 +753,7 @@ def _assign_route_proposal(
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
     edge = str(((triage.get("authority_basis") or {}).get("edge")) or "")
+    extensions = dict(triage.get("extensions") or {})
     realization_iteration = _build_realization_iteration_route_proposal(triage)
     if realization_iteration is not None:
         triage["route_proposal"] = realization_iteration
@@ -749,13 +766,8 @@ def _assign_route_proposal(
         triage["process_outcome_kind"] = "advance_declared_graph_function"
         triage["route_proposal"] = declared_graph_function
         return triage
-    proposal = _build_fixed_route_proposal(triage)
-    if proposal is not None:
-        triage["route_proposal"] = proposal
-        return triage
     if edge and edge in _dynamic_route_forbidden_head_graph_functions(workspace_root):
         triage["route_proposal"] = None
-        extensions = dict(triage.get("extensions") or {})
         extensions["no_lawful_route_reason"] = "graph_function_only_route_requires_declaration"
         triage["extensions"] = extensions
         return triage
@@ -767,11 +779,16 @@ def _assign_route_proposal(
         triage["process_outcome_kind"] = "advance_dynamic_family"
         triage["route_proposal"] = dynamic_proposal
         return triage
-    triage["route_proposal"] = None
     if dynamic_consulted:
-        extensions = dict(triage.get("extensions") or {})
+        triage["route_proposal"] = None
         extensions["no_lawful_route_reason"] = "no_matching_dynamic_candidate"
         triage["extensions"] = extensions
+        return triage
+    proposal = _build_fixed_route_proposal(triage)
+    if proposal is not None:
+        triage["route_proposal"] = proposal
+        return triage
+    triage["route_proposal"] = None
     return triage
 
 
@@ -889,6 +906,30 @@ def _build_triage(
         }
         triage["route_proposal"] = None
         return triage
+    if delta > 0 and reentry_layer == "intent" and _workspace_imported_intent_carry_forward_authoritative(
+        entry=entry,
+        workspace_state=workspace_state,
+    ):
+        triage = {
+            "analysis_fingerprint": analysis_fingerprint,
+            "framework_layer": framework_layer,
+            "framework_condition": "unproven",
+            "gap_kind": "unclassified_gap",
+            "process_outcome_kind": "advance_fixed_vector",
+            "reentry_layer": reentry_layer,
+            "resumption_trigger": None,
+            "policy_gate": {"state": "none", "reason": None},
+            "authority_basis": authority_basis,
+            "realized_basis": realized_basis,
+            "asset_findings": [],
+            "evidence": list(observation["evidence"]),
+            "extensions": {},
+        }
+        triage = _assign_route_proposal(triage, workspace_root=workspace_root, runtime_config=runtime_config)
+        if triage["route_proposal"] is None:
+            triage["process_outcome_kind"] = "no_lawful_route"
+            triage["framework_condition"] = "unroutable"
+        return triage
     if delta > 0 and reentry_layer in {"goals", "intent"}:
         triage = {
             "analysis_fingerprint": analysis_fingerprint,
@@ -907,12 +948,16 @@ def _build_triage(
         }
         triage["route_proposal"] = None
         return triage
-    if delta > 0 and reentry_layer in {"product", "requirements", "design", "code", "test"}:
+    if delta > 0 and reentry_layer in {"product", "requirements", "design", "code", "test", "execution"}:
         triage = {
             "analysis_fingerprint": analysis_fingerprint,
             "framework_layer": framework_layer,
             "framework_condition": "unproven",
-            "gap_kind": f"{reentry_layer}_gap" if reentry_layer in {"requirements", "design", "code", "test"} else "unclassified_gap",
+            "gap_kind": (
+                f"{reentry_layer}_gap"
+                if reentry_layer in {"requirements", "design", "code", "test", "execution"}
+                else "unclassified_gap"
+            ),
             "process_outcome_kind": (
                 "advance_declared_graph_function"
                 if realization_iteration is not None and realization_iteration["deepening_eligible"]
@@ -985,7 +1030,7 @@ def _reentry_layer(entry: dict[str, Any]) -> str | None:
     if missing_required:
         return _binding_layer(missing_required[0])
     layer = _edge_layer(str(entry["edge"]))
-    return layer if layer in {"intent", "product", "goals", "requirements", "design", "code", "test"} else None
+    return layer if layer in {"intent", "product", "goals", "requirements", "design", "code", "test", "execution"} else None
 
 
 def _edge_layer(edge_id: str) -> str:
@@ -994,6 +1039,25 @@ def _edge_layer(edge_id: str) -> str:
 
 def _binding_layer(binding: str) -> str:
     return _BINDING_LAYER_BY_NAME.get(binding, "code")
+
+
+def _workspace_imported_intent_carry_forward_authoritative(
+    *,
+    entry: dict[str, Any],
+    workspace_state: dict[str, Any],
+) -> bool:
+    if str(entry.get("edge") or "") != "derive_intent_surface":
+        return False
+    carry_forward = workspace_state.get("imported_intent_carry_forward")
+    if not isinstance(carry_forward, dict):
+        return False
+    if not bool(carry_forward.get("authoritative")):
+        return False
+    if str(carry_forward.get("target_surface") or "") != "specification/INTENT.md":
+        return False
+    if str(carry_forward.get("identity_source") or "") != "specification/INTENT.md":
+        return False
+    return True
 
 
 def _build_constitutional_proposal(

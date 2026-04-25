@@ -48,6 +48,11 @@ from .public_start_subcarriers import (
     admit_published_fulfillment_ledger_ref,
     admit_resolved_policy_payload,
 )
+from .worker_attachment import (
+    WorkerAttachmentProjectionPayload,
+    dispatch_result_is_worker_unattached,
+    project_unattached_worker_attachment,
+)
 
 
 @dataclass(frozen=True)
@@ -147,12 +152,15 @@ def _route_state_value(value: object) -> RouteState | None:
         "advance_dynamic_family",
         "advance_fixed_vector",
         "await_fh_resolution",
+        "blocked_missing_capability",
         "blocked_stale_analysis",
+        "converged",
         "constitutional_reprice_approved",
         "constitutional_reprice_rejected",
         "deferred",
         "no_lawful_route",
         "suppressed_by_mode",
+        "unresolved",
     }:
         return cast(RouteState, value)
     return None
@@ -210,16 +218,19 @@ def _blocked_reason_value(value: object) -> BlockedReason | None:
         "route_binding_unavailable",
         "public_next_start_unavailable",
         "route_binding_not_start_authoritative",
+        "fp_worker_unattached",
         "converged",
         "advance_dynamic_family",
         "advance_fixed_vector",
         "await_fh_resolution",
+        "blocked_missing_capability",
         "blocked_stale_analysis",
         "constitutional_reprice_approved",
         "constitutional_reprice_rejected",
         "deferred",
         "no_lawful_route",
         "suppressed_by_mode",
+        "unresolved",
     }:
         return cast(BlockedReason, value)
     return None
@@ -236,6 +247,7 @@ def _stopped_by_value(value: object) -> StoppedBy | None:
         "route_binding",
         "converged",
         "fp_runtime_failure",
+        "worker_attachment",
     }:
         return cast(StoppedBy, value)
     return None
@@ -443,7 +455,46 @@ def _as_blocked_result(
     root_mode = _root_mode_value(payload)
     if root_mode is not None:
         result["root_mode"] = root_mode
+    worker_attachment = payload.get("worker_attachment")
+    if isinstance(worker_attachment, Mapping):
+        result["worker_attachment"] = dict(worker_attachment)
     return result
+
+
+def _as_worker_attachment_blocked_result(
+    payload: Mapping[str, object],
+    *,
+    worker_attachment: Mapping[str, object],
+) -> PublicNextStartBlockedResult:
+    enriched = dict(payload)
+    enriched["blocking_reason"] = "fp_worker_unattached"
+    enriched["stop_predicate"] = "worker_attachment_required"
+    enriched["stopped_by"] = "worker_attachment"
+    enriched["unavailable_reason"] = str(
+        worker_attachment.get("unavailable_reason")
+        or "fp_worker_attachment_unavailable"
+    )
+    enriched["worker_attachment"] = dict(worker_attachment)
+    return _as_blocked_result(
+        enriched,
+        blocking_reason="fp_worker_unattached",
+        stop_predicate="worker_attachment_required",
+        stopped_by="worker_attachment",
+    )
+
+
+def project_public_start_worker_attachment_block(
+    result: Mapping[str, object],
+    *,
+    worker_attachment: WorkerAttachmentProjectionPayload,
+) -> PublicStartReturn:
+    return PublicStartReturn(
+        _as_worker_attachment_blocked_result(
+            result,
+            worker_attachment=worker_attachment,
+        ),
+        reason="blocked",
+    )
 
 
 def _as_human_gate_result(payload: Mapping[str, object]) -> PublicStartHumanGatePayload:
@@ -704,6 +755,7 @@ def _project_public_start_stop_predicate(result: Mapping[str, object]) -> StopPr
     if value in {
         "human_gate_required",
         "dispatch_required",
+        "worker_attachment_required",
         "gap_stop",
         "yielded",
         "proof_hold",
@@ -719,6 +771,8 @@ def _project_public_start_stop_predicate(result: Mapping[str, object]) -> StopPr
     blocking_reason = _string_value(result, "blocking_reason")
     if blocking_reason == "fp_dispatch":
         return "dispatch_required"
+    if blocking_reason == "fp_worker_unattached":
+        return "worker_attachment_required"
     if blocking_reason == "fh_gate":
         return "human_gate_required"
     if blocking_reason == "fd_gap":
@@ -740,6 +794,7 @@ def _stopped_by_for_public_start_stop_predicate(
 ) -> StoppedBy | None:
     mapping: dict[StopPredicate, StoppedBy | None] = {
         "dispatch_required": "fp_dispatch",
+        "worker_attachment_required": "worker_attachment",
         "human_gate_required": "fh_gate",
         "gap_stop": "fd_gap",
         "yielded": "yield",
@@ -840,6 +895,14 @@ def project_public_start_dispatch_outcome(
         )
     if status == "yield":
         return PublicStartReturn(_as_yielded_result(dispatch_result), reason="yielded")
+    if dispatch_result_is_worker_unattached(dispatch_result):
+        return project_public_start_worker_attachment_block(
+            dispatch_result,
+            worker_attachment=project_unattached_worker_attachment(
+                reason=_string_value(dispatch_result, "reason")
+                or "fp_worker_attachment_unavailable"
+            ),
+        )
     return PublicStartReturn(_as_failure_result(dispatch_result), reason="failure")
 
 

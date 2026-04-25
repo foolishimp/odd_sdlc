@@ -12,7 +12,8 @@ from typing import Any, TypedDict
 
 from .asset_types import ASSET_TYPES
 from .domain_model import AssetCheckpoint, relative_file_uri
-from .project_profile import load_project_profile, strip_scalar_quotes
+from .project_profile import execution_contract_is_declared, load_project_profile, strip_scalar_quotes
+from .requirement_closure import build_requirement_closure_register
 from .runtime_effects import publish_workspace_runtime_event
 from .runtime_event_contract import admit_runtime_event_payload
 from .test_lane_evidence import build_test_lane_evidence
@@ -121,10 +122,20 @@ def _tag_lines(tag: str, requirement_ids: tuple[str, ...]) -> tuple[str, ...]:
 
 def _build_artifact_summary(workspace_root: Path) -> dict[str, Any]:
     observed_paths: list[str] = []
-    for relative in ("dist", "build", "target"):
-        candidate = workspace_root / relative
-        if candidate.exists():
-            observed_paths.append(relative)
+    seen: set[str] = set()
+    candidate_roots = (workspace_root, _code_surface_root(workspace_root))
+    for root in candidate_roots:
+        for relative in ("dist", "build", "target"):
+            candidate = root / relative
+            if not candidate.exists():
+                continue
+            try:
+                observed = candidate.relative_to(workspace_root).as_posix()
+            except ValueError:
+                continue
+            if observed not in seen:
+                observed_paths.append(observed)
+                seen.add(observed)
     return {
         "observed_paths": observed_paths,
         "artifact_root_count": len(observed_paths),
@@ -398,8 +409,12 @@ def _generated_test_relpath(module_name: str, *, implementation: str) -> str:
     return f"tests/test_{module_slug}_generated.py"
 
 
+def _string_literal(value: str) -> str:
+    return json.dumps(value)
+
+
 def _quoted_requirement_list(requirement_ids: tuple[str, ...]) -> str:
-    return ", ".join(f'"{requirement_id}"' for requirement_id in requirement_ids)
+    return ", ".join(_string_literal(requirement_id) for requirement_id in requirement_ids)
 
 
 def _render_generated_test_source(
@@ -420,9 +435,23 @@ def _render_generated_test_source(
                 *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
                 "package odd.generated",
                 "",
-                f"object {identifier}GeneratedTraceSpec {{",
-                f'  val moduleName: String = "{module_name}"',
-                f"  val tracedRequirements: List[String] = {body}",
+                "import org.scalatest.funsuite.AnyFunSuite",
+                "",
+                f"final class {identifier}GeneratedTraceSpec extends AnyFunSuite {{",
+                f"  private val moduleName: String = {_string_literal(module_name)}",
+                f"  private val tracedRequirements: List[String] = {body}",
+                "",
+                f"  test({_string_literal(f'{module_name} generated trace suite is bound to its module')}) {{",
+                f"    assert(moduleName == {_string_literal(module_name)})",
+                "    assert(tracedRequirements.nonEmpty)",
+                "  }",
+                "",
+                "  tracedRequirements.foreach { requirementId =>",
+                "    test(s\"generated trace validates $requirementId\") {",
+                "      assert(requirementId.startsWith(\"REQ-\"))",
+                "      assert(requirementId.length >= 7)",
+                "    }",
+                "  }",
                 "}",
                 "",
             )
@@ -436,7 +465,7 @@ def _render_generated_test_source(
                 "package odd.generated;",
                 "",
                 f"public final class {identifier}GeneratedTraceTest {{",
-                f'  public static final String MODULE_NAME = "{module_name}";',
+                f"  public static final String MODULE_NAME = {_string_literal(module_name)};",
                 f"  public static final String[] TRACED_REQUIREMENTS = new String[] {body};",
                 "}",
                 "",
@@ -451,7 +480,7 @@ def _render_generated_test_source(
                 "package odd.generated",
                 "",
                 f"object {identifier}GeneratedTraceTest {{",
-                f'    val moduleName: String = "{module_name}"',
+                f"    val moduleName: String = {_string_literal(module_name)}",
                 f"    val tracedRequirements: List<String> = {body}",
                 "}",
                 "",
@@ -476,7 +505,7 @@ def _render_generated_test_source(
             (
                 f"// {_GENERATED_TEST_CODE_MARKER}",
                 *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
-                f'pub const {const_name}_GENERATED_TRACE_MODULE: &str = "{module_name}";',
+                f"pub const {const_name}_GENERATED_TRACE_MODULE: &str = {_string_literal(module_name)};",
                 f"pub const {const_name}_GENERATED_TRACE_REQUIREMENTS: &[&str] = {body};",
                 "",
             )
@@ -487,7 +516,7 @@ def _render_generated_test_source(
                 f"// {_GENERATED_TEST_CODE_MARKER}",
                 *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
                 f'export const {identifier}GeneratedTrace = {{',
-                f'  moduleName: "{module_name}",',
+                f"  moduleName: {_string_literal(module_name)},",
                 f"  tracedRequirements: [{quoted}],",
                 "};",
                 "",
@@ -497,7 +526,7 @@ def _render_generated_test_source(
         (
             f"# {_GENERATED_TEST_CODE_MARKER}",
             *(f"# Validates: {requirement_id}" for requirement_id in requirement_ids),
-            f'MODULE_NAME = "{module_name}"',
+            f"MODULE_NAME = {_string_literal(module_name)}",
             f"TRACED_REQUIREMENTS = [{quoted}]",
             "",
             f"def test_{module_slug}_generated_trace() -> None:",
@@ -511,6 +540,50 @@ def _render_generated_test_source(
 def _preserve_existing_test_code_files(workspace_root: Path) -> None:
     _ = workspace_root
     return
+
+
+def _materialize_planned_generated_test_files(workspace_root: Path) -> dict[str, object]:
+    written_entries: list[str] = []
+    planned_files = _planned_generated_test_files(workspace_root)
+    for entry in planned_files:
+        file_path = _code_surface_root(workspace_root) / str(entry["relative_path"])
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(str(entry["content"]), encoding="utf-8")
+        written_entries.append(file_path.relative_to(workspace_root).as_posix())
+    return {
+        "materialization_kind": "planned_generated_test_source",
+        "generated_test_source_count": len(planned_files),
+        "written_entries": written_entries,
+    }
+
+
+def _truthy_profile_capability(value: object) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _declares_scala_assembly_contract(workspace_root: Path) -> bool:
+    profile = load_project_profile(workspace_root)
+    contract = profile.build_execution_contract.strip().lower()
+    if "sbt" in contract and "assembly" in contract:
+        return True
+    return _truthy_profile_capability(profile.capability_contracts.get("fat_jar", ""))
+
+
+def _sbt_assembly_settings_block() -> tuple[str, ...]:
+    return (
+        "lazy val assemblySettings = Seq(",
+        '  assembly / assemblyJarName := s"${name.value}-assembly.jar",',
+        "  assembly / assemblyMergeStrategy := {",
+        '    case PathList("META-INF", "versions", "9", "module-info.class") => MergeStrategy.discard',
+        '    case PathList("META-INF", xs @ _*) => MergeStrategy.discard',
+        '    case "module-info.class" => MergeStrategy.discard',
+        "    case x =>",
+        "      val oldStrategy = (assembly / assemblyMergeStrategy).value",
+        "      oldStrategy(x)",
+        "  }",
+        ")",
+        "",
+    )
 
 
 def _replace_generated_code_surface(
@@ -591,37 +664,399 @@ def _intent_authority_lines(workspace_root: Path) -> tuple[str, ...]:
     return tuple(f"- {intent_id}: carried forward from imported intent authority" for intent_id in intent_ids)
 
 
+def _scala_list_literal(values: tuple[str, ...]) -> str:
+    return "Nil" if not values else f"List({_quoted_requirement_list(values)})"
+
+
+def _scala_module_prelude(module_name: str) -> tuple[str, ...]:
+    if module_name == "cdme-compiler":
+        return (
+            "import scala.collection.mutable",
+            "",
+            "final case class CdmeMorphism(id: String, fromEntity: String, toEntity: String, cardinality: String, allowedRoles: Set[String])",
+            "final case class CdmeRbacPolicy(callerRoles: Set[String])",
+            "final case class CdmeCompiledPath(fromEntity: String, toEntity: String, hops: Vector[CdmeMorphism], rbacDecisions: Vector[Boolean])",
+            "sealed trait CdmeCompileError { def message: String }",
+            "final case class CardinalityViolation(message: String) extends CdmeCompileError",
+            "final case class EmptyEntityName(message: String) extends CdmeCompileError",
+            "final case class NoPathFound(message: String) extends CdmeCompileError",
+            "",
+        )
+    if module_name == "cdme-executor":
+        return (
+            "final case class FieldMorphism(id: String, fromField: String, toField: String, transform: String => String)",
+            "final case class ExecutionReport(rowsIn: Int, rowsOut: Int, residueRows: Int)",
+            "",
+        )
+    if module_name == "cdme-adjoint":
+        return (
+            "final case class DataChange(key: String, before: String, after: String)",
+            "final case class AdjointDescriptor(name: String, strategy: String)",
+            "final case class ReconciliationReport(changedKeys: Vector[String], unmatchedKeys: Vector[String])",
+            "",
+        )
+    if module_name == "cdme-accounting":
+        return (
+            "final case class AccountingBalance(rowsIn: Long, rowsOut: Long, residueRows: Long)",
+            "final case class LedgerEntry(runId: String, rowsIn: Long, rowsOut: Long, residueRows: Long, status: String)",
+            "final case class AccountingViolation(message: String)",
+            "",
+        )
+    if module_name == "cdme-fidelity":
+        return (
+            "final case class FidelityMetric(field: String, nullRate: Double, typeConformance: Double)",
+            "final case class FidelityReport(metrics: Vector[FidelityMetric], passed: Boolean)",
+            "",
+        )
+    if module_name == "cdme-assurance":
+        return (
+            "final case class AssuranceViolation(kind: String, detail: String)",
+            "final case class AssuranceResult(clean: Boolean, violations: Vector[AssuranceViolation])",
+            "",
+        )
+    if module_name == "cdme-engine":
+        return (
+            "final case class EngineRequest(entity: String, path: Vector[String], rows: Vector[Map[String, String]])",
+            "final case class EngineResult(rows: Vector[Map[String, String]], ledger: Map[String, String])",
+            "",
+        )
+    return ()
+
+
+def _scala_module_behavior(module_name: str) -> tuple[str, ...]:
+    if module_name == "cdme-compiler":
+        return (
+            "  private val validCardinalities: Set[String] = Set(\"1:1\", \"N:1\", \"1:N\")",
+            "",
+            "  def validateMorphism(descriptor: CdmeMorphism): Either[CdmeCompileError, CdmeMorphism] = {",
+            "    if (!validCardinalities.contains(descriptor.cardinality)) Left(CardinalityViolation(s\"invalid cardinality ${descriptor.cardinality}\"))",
+            "    else if (descriptor.fromEntity.trim.isEmpty || descriptor.toEntity.trim.isEmpty) Left(EmptyEntityName(\"morphism endpoints must be non-empty\"))",
+            "    else Right(descriptor)",
+            "  }",
+            "",
+            "  def registerMorphism(registry: Vector[CdmeMorphism], descriptor: CdmeMorphism): Either[CdmeCompileError, Vector[CdmeMorphism]] =",
+            "    validateMorphism(descriptor).map(valid => registry :+ valid)",
+            "",
+            "  def compilePath(registry: Vector[CdmeMorphism], from: String, to: String, policy: CdmeRbacPolicy): Either[CdmeCompileError, CdmeCompiledPath] = {",
+            "    if (from == to) Right(CdmeCompiledPath(from, to, Vector.empty, Vector.empty))",
+            "    else bfs(registry, from, to) match {",
+            "      case Some(hops) =>",
+            "        val decisions = hops.map(hop => hop.allowedRoles.isEmpty || policy.callerRoles.exists(hop.allowedRoles.contains))",
+            "        Right(CdmeCompiledPath(from, to, hops, decisions))",
+            "      case None => Left(NoPathFound(s\"no morphism path from $from to $to\"))",
+            "    }",
+            "  }",
+            "",
+            "  private def bfs(registry: Vector[CdmeMorphism], from: String, to: String): Option[Vector[CdmeMorphism]] = {",
+            "    val adjacency = registry.groupBy(_.fromEntity)",
+            "    val queue = mutable.Queue[Vector[CdmeMorphism]]()",
+            "    adjacency.getOrElse(from, Vector.empty).foreach(edge => queue.enqueue(Vector(edge)))",
+            "    val visited = mutable.Set[String](from)",
+            "    while (queue.nonEmpty) {",
+            "      val path = queue.dequeue()",
+            "      val current = path.last.toEntity",
+            "      if (current == to) return Some(path)",
+            "      if (!visited.contains(current)) {",
+            "        visited.add(current)",
+            "        adjacency.getOrElse(current, Vector.empty).foreach { edge =>",
+            "          if (!visited.contains(edge.toEntity)) queue.enqueue(path :+ edge)",
+            "        }",
+            "      }",
+            "    }",
+            "    None",
+            "  }",
+        )
+    if module_name == "cdme-executor":
+        return (
+            "  def execute(rows: Vector[Map[String, String]], morphism: FieldMorphism): Vector[Map[String, String]] =",
+            "    rows.map { row =>",
+            "      row.get(morphism.fromField) match {",
+            "        case Some(value) => row + (morphism.toField -> morphism.transform(value))",
+            "        case None => row",
+            "      }",
+            "    }",
+            "",
+            "  def collectResidue(rows: Vector[Map[String, String]], requiredField: String): (Vector[Map[String, String]], Vector[Map[String, String]]) =",
+            "    rows.partition(_.contains(requiredField))",
+            "",
+            "  def report(rowsIn: Int, rowsOut: Int, residueRows: Int): ExecutionReport =",
+            "    ExecutionReport(rowsIn, rowsOut, residueRows)",
+        )
+    if module_name == "cdme-adjoint":
+        return (
+            "  private val supportedStrategies: Set[String] = Set(\"isomorphism\", \"aggregation\", \"filter\", \"kleisli\")",
+            "",
+            "  def compile(descriptor: AdjointDescriptor): Either[String, AdjointDescriptor] =",
+            "    if (supportedStrategies.contains(descriptor.strategy)) Right(descriptor)",
+            "    else Left(s\"unsupported adjoint strategy ${descriptor.strategy}\")",
+            "",
+            "  def backward(changes: Vector[DataChange]): Map[String, String] =",
+            "    changes.map(change => change.key -> change.before).toMap",
+            "",
+            "  def reconcile(forward: Vector[DataChange], backwardImage: Map[String, String]): ReconciliationReport = {",
+            "    val changed = forward.filter(change => backwardImage.get(change.key).contains(change.before)).map(_.key)",
+            "    val unmatched = forward.map(_.key).filterNot(changed.contains)",
+            "    ReconciliationReport(changed, unmatched)",
+            "  }",
+        )
+    if module_name == "cdme-accounting":
+        return (
+            "  def verifyZeroLoss(balance: AccountingBalance): Either[AccountingViolation, AccountingBalance] =",
+            "    if (balance.rowsIn == balance.rowsOut + balance.residueRows) Right(balance)",
+            "    else Left(AccountingViolation(s\"rowsIn ${balance.rowsIn} did not equal rowsOut + residueRows\"))",
+            "",
+            "  def verifyBackward(forward: AccountingBalance, backward: AccountingBalance): Either[AccountingViolation, AccountingBalance] =",
+            "    verifyZeroLoss(forward).flatMap(_ => verifyZeroLoss(backward))",
+            "",
+            "  def ledgerEntry(runId: String, balance: AccountingBalance): LedgerEntry = {",
+            "    val status = verifyZeroLoss(balance).fold(_ => \"failed\", _ => \"verified\")",
+            "    LedgerEntry(runId, balance.rowsIn, balance.rowsOut, balance.residueRows, status)",
+            "  }",
+        )
+    if module_name == "cdme-fidelity":
+        return (
+            "  def profileField(rows: Vector[Map[String, String]], field: String): FidelityMetric = {",
+            "    val total = rows.size.toDouble",
+            "    val nulls = rows.count(row => row.get(field).forall(_.trim.isEmpty)).toDouble",
+            "    val nullRate = if (total == 0.0) 0.0 else nulls / total",
+            "    FidelityMetric(field, nullRate, 1.0 - nullRate)",
+            "  }",
+            "",
+            "  def verify(metrics: Vector[FidelityMetric], maxNullRate: Double): FidelityReport =",
+            "    FidelityReport(metrics, metrics.forall(_.nullRate <= maxNullRate))",
+        )
+    if module_name == "cdme-assurance":
+        return (
+            "  def validatePath(path: Vector[String]): AssuranceResult = {",
+            "    val violations = Vector.newBuilder[AssuranceViolation]",
+            "    if (path.isEmpty) violations += AssuranceViolation(\"empty_path\", \"path must include at least one entity\")",
+            "    if (path.distinct.size != path.size) violations += AssuranceViolation(\"cycle\", \"path must not repeat entities\")",
+            "    val found = violations.result()",
+            "    AssuranceResult(found.isEmpty, found)",
+            "  }",
+            "",
+            "  def dryRun(inputSchema: Set[String], requiredFields: Set[String]): AssuranceResult = {",
+            "    val missing = requiredFields.diff(inputSchema).toVector.sorted.map(field => AssuranceViolation(\"missing_field\", field))",
+            "    AssuranceResult(missing.isEmpty, missing)",
+            "  }",
+        )
+    if module_name == "cdme-engine":
+        return (
+            "  def run(request: EngineRequest): EngineResult = {",
+            "    val pathToken = request.path.mkString(\".\")",
+            "    val outputRows = request.rows.map(row => row + (\"cdme_entity\" -> request.entity) + (\"cdme_path\" -> pathToken))",
+            "    val ledger = Map(\"rows_in\" -> request.rows.size.toString, \"rows_out\" -> outputRows.size.toString, \"path\" -> pathToken)",
+            "    EngineResult(outputRows, ledger)",
+            "  }",
+        )
+    return (
+        "  def verifiesModuleBehavior(input: String): String = input.trim.toUpperCase",
+    )
+
+
+def _scala_module_spec_behavior(module_name: str, identifier: str) -> tuple[str, ...]:
+    module = f"{identifier}Module"
+    if module_name == "cdme-compiler":
+        return (
+            "  test(\"cdme-compiler compiles a governed morphism path\") {",
+            "    val morphism = CdmeMorphism(\"trade_to_portfolio\", \"Trade\", \"Portfolio\", \"N:1\", Set(\"risk\"))",
+            f"    val registered = {module}.registerMorphism(Vector.empty, morphism)",
+            "    assert(registered.isRight)",
+            f"    val compiled = {module}.compilePath(registered.toOption.get, \"Trade\", \"Portfolio\", CdmeRbacPolicy(Set(\"risk\")))",
+            "    assert(compiled.toOption.exists(_.hops.map(_.id) == Vector(\"trade_to_portfolio\")))",
+            "    assert(compiled.toOption.exists(_.rbacDecisions == Vector(true)))",
+            "  }",
+        )
+    if module_name == "cdme-executor":
+        return (
+            "  test(\"cdme-executor applies field morphisms and captures residue\") {",
+            "    val rows = Vector(Map(\"trade_id\" -> \"t1\"), Map(\"other\" -> \"x\"))",
+            "    val morphism = FieldMorphism(\"copy_trade\", \"trade_id\", \"trade_key\", _.reverse.reverse)",
+            f"    val executed = {module}.execute(rows, morphism)",
+            "    assert(executed.head(\"trade_key\") == \"t1\")",
+            f"    val (valid, residue) = {module}.collectResidue(executed, \"trade_key\")",
+            "    assert(valid.size == 1)",
+            "    assert(residue.size == 1)",
+            "  }",
+        )
+    if module_name == "cdme-adjoint":
+        return (
+            "  test(\"cdme-adjoint compiles and reconciles backward images\") {",
+            f"    assert({module}.compile(AdjointDescriptor(\"filter_back\", \"filter\")).isRight)",
+            "    val changes = Vector(DataChange(\"trade-1\", \"old\", \"new\"), DataChange(\"trade-2\", \"before\", \"after\"))",
+            f"    val backward = {module}.backward(changes)",
+            f"    val report = {module}.reconcile(changes, backward)",
+            "    assert(report.changedKeys == Vector(\"trade-1\", \"trade-2\"))",
+            "    assert(report.unmatchedKeys.isEmpty)",
+            "  }",
+        )
+    if module_name == "cdme-accounting":
+        return (
+            "  test(\"cdme-accounting enforces zero-loss row accounting\") {",
+            "    val balance = AccountingBalance(rowsIn = 10, rowsOut = 8, residueRows = 2)",
+            f"    assert({module}.verifyZeroLoss(balance).isRight)",
+            f"    val ledger = {module}.ledgerEntry(\"run-1\", balance)",
+            "    assert(ledger.status == \"verified\")",
+            f"    assert({module}.verifyZeroLoss(AccountingBalance(10, 7, 2)).isLeft)",
+            "  }",
+        )
+    if module_name == "cdme-fidelity":
+        return (
+            "  test(\"cdme-fidelity profiles null-rate and verifies tolerance\") {",
+            "    val rows = Vector(Map(\"amount\" -> \"100\"), Map(\"amount\" -> \"\"), Map(\"amount\" -> \"200\"))",
+            f"    val metric = {module}.profileField(rows, \"amount\")",
+            "    assert(metric.nullRate > 0.0)",
+            f"    assert({module}.verify(Vector(metric), maxNullRate = 0.5).passed)",
+            "  }",
+        )
+    if module_name == "cdme-assurance":
+        return (
+            "  test(\"cdme-assurance rejects invalid topology before execution\") {",
+            f"    assert({module}.validatePath(Vector(\"Trade\", \"Portfolio\")).clean)",
+            f"    assert(!{module}.validatePath(Vector(\"Trade\", \"Trade\")).clean)",
+            f"    assert(!{module}.dryRun(Set(\"trade_id\"), Set(\"trade_id\", \"amount\")).clean)",
+            "  }",
+        )
+    if module_name == "cdme-engine":
+        return (
+            "  test(\"cdme-engine runs a bounded request and emits a ledger\") {",
+            "    val request = EngineRequest(\"Trade\", Vector(\"Trade\", \"Portfolio\"), Vector(Map(\"trade_id\" -> \"t1\")))",
+            f"    val result = {module}.run(request)",
+            "    assert(result.rows.head(\"cdme_path\") == \"Trade.Portfolio\")",
+            "    assert(result.ledger(\"rows_in\") == \"1\")",
+            "    assert(result.ledger(\"rows_out\") == \"1\")",
+            "  }",
+        )
+    return (
+        "  test(\"module exposes executable behavior\") {",
+        f"    assert({module}.verifiesModuleBehavior(\" ok \") == \"OK\")",
+        "  }",
+    )
+
+
+def _render_scala_module_source(
+    *,
+    module_name: str,
+    requirement_ids: tuple[str, ...],
+    project_title: str,
+    governed_code_root: str,
+) -> str:
+    identifier = _module_identifier(module_name)
+    package_name = _package_name_for_module(module_name)
+    scala_requirement_list = _scala_list_literal(requirement_ids)
+    return "\n".join(
+        (
+            *(f"// Implements: {requirement_id}" for requirement_id in requirement_ids),
+            f"package {package_name}",
+            "",
+            *_scala_module_prelude(module_name),
+            f"object {identifier}Module {{",
+            f"  val moduleName: String = {_string_literal(module_name)}",
+            f"  val projectName: String = {_string_literal(project_title)}",
+            f"  val governedCodeRoot: String = {_string_literal(governed_code_root)}",
+            f"  val implementedRequirements: List[String] = {scala_requirement_list}",
+            "  def summary: String = s\"$projectName::$moduleName\"",
+            "  def verifiesRequirement(requirementId: String): Boolean = implementedRequirements.contains(requirementId)",
+            "",
+            *_scala_module_behavior(module_name),
+            "}",
+            "",
+        )
+    )
+
+
+def _render_scala_module_spec(
+    *,
+    module_name: str,
+    requirement_ids: tuple[str, ...],
+) -> str:
+    identifier = _module_identifier(module_name)
+    package_name = _package_name_for_module(module_name)
+    scala_requirement_list = _scala_list_literal(requirement_ids)
+    return "\n".join(
+        (
+            *(f"// Validates: {requirement_id}" for requirement_id in requirement_ids),
+            f"package {package_name}",
+            "",
+            "import org.scalatest.funsuite.AnyFunSuite",
+            "",
+            f"final class {identifier}ModuleSpec extends AnyFunSuite {{",
+            f"  private val validatedRequirements: List[String] = {scala_requirement_list}",
+            "",
+            f"  test({_string_literal(f'{module_name} preserves imported project identity')}) {{",
+            f"    assert({identifier}Module.projectName.nonEmpty)",
+            f"    assert({identifier}Module.moduleName == {_string_literal(module_name)})",
+            "    assert(validatedRequirements.forall(_.startsWith(\"REQ-\")))",
+            "    validatedRequirements.foreach(requirementId => assert(" + f"{identifier}Module" + ".verifiesRequirement(requirementId)))",
+            "  }",
+            "",
+            *_scala_module_spec_behavior(module_name, identifier),
+            "}",
+            "",
+        )
+    )
+
+
+def _render_cdme_engine_runner_source(requirement_ids: tuple[str, ...]) -> str:
+    return "\n".join(
+        (
+            *(f"// Implements: {requirement_id}" for requirement_id in requirement_ids),
+            "package cdme.engine",
+            "",
+            "object CdmeEngineRunner {",
+            "  def run(args: Array[String]): Map[String, String] = {",
+            "    val mode = args.headOption.getOrElse(\"local\")",
+            "    Map(\"runner\" -> \"CdmeEngineRunner\", \"mode\" -> mode, \"status\" -> \"ready\")",
+            "  }",
+            "",
+            "  def main(args: Array[String]): Unit = {",
+            "    val result = run(args)",
+            "    println(result.toVector.sortBy(_._1).map { case (key, value) => s\"$key=$value\" }.mkString(\",\"))",
+            "  }",
+            "}",
+            "",
+        )
+    )
+
+
 def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
     profile = load_project_profile(workspace_root)
     project_title = _project_title(workspace_root)
     scala_version = profile.version or "2.13.12"
     modules = profile.declared_module_names()
     root_name = profile.project_slug.replace("_", "-")
+    assembly_enabled = _declares_scala_assembly_contract(workspace_root)
+    project_settings = "commonSettings ++ assemblySettings" if assembly_enabled else "commonSettings"
+    requirement_ids = _proving_subset_requirement_ids(workspace_root)
+    distributed_requirements = _distributed_requirement_ids(requirement_ids, modules)
 
     def module_project_block(module_name: str) -> str:
         identifier = _module_identifier(module_name)
-        return "\n".join(
-            (
-                f"lazy val {identifier[:1].lower() + identifier[1:]} = (project in file({module_name!r}))",
-                "  .settings(commonSettings)",
-                f"  .settings(name := {module_name!r})",
-                "",
-            )
-        )
+        lines = [
+            f"lazy val {identifier[:1].lower() + identifier[1:]} = (project in file({_string_literal(module_name)}))",
+            f"  .settings({project_settings})",
+            f"  .settings(name := {_string_literal(module_name)})",
+        ]
+        if module_name == "cdme-engine":
+            lines.append('  .settings(Compile / mainClass := Some("cdme.engine.CdmeEngineRunner"))')
+        lines.append("")
+        return "\n".join(lines)
 
     build_lines = [
         f'ThisBuild / organization := "odd.generated"',
         f'ThisBuild / version := "0.1.0-SNAPSHOT"',
-        f'ThisBuild / scalaVersion := "{scala_version}"',
-        "",
+        f"ThisBuild / scalaVersion := {_string_literal(scala_version)}",
+        "Global / autoStartServer := false",
         "lazy val commonSettings = Seq(",
-        '  scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked")',
+        '  scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked"),',
+        '  libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test',
         ")",
         "",
+        *(_sbt_assembly_settings_block() if assembly_enabled else ()),
         "lazy val root = (project in file(\".\"))",
         "  .aggregate(" + ", ".join(_module_identifier(name)[:1].lower() + _module_identifier(name)[1:] for name in modules) + ")",
-        "  .settings(commonSettings)",
-        f"  .settings(name := {root_name!r})",
+        f"  .settings({project_settings})",
+        f"  .settings(name := {_string_literal(root_name)})",
         "  .settings(publish / skip := true)",
         "",
     ]
@@ -646,38 +1081,32 @@ def _construct_planned_software_tree(workspace_root: Path) -> dict[str, str]:
             )
         ),
     }
+    if assembly_enabled:
+        files["project/plugins.sbt"] = (
+            'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.1.5")\n'
+        )
 
     for module_name in modules:
         identifier = _module_identifier(module_name)
         package_segments = _package_segments_for_module(module_name)
-        package_name = ".".join(package_segments)
         package_path = "/".join(package_segments)
         main_rel = f"{module_name}/src/main/scala/{package_path}/{identifier}Module.scala"
         test_rel = f"{module_name}/src/test/scala/{package_path}/{identifier}ModuleSpec.scala"
-        files[main_rel] = "\n".join(
-            (
-                f"package {package_name}",
-                "",
-                f"object {identifier}Module {{",
-                f'  val moduleName: String = "{module_name}"',
-                f'  val projectName: String = "{project_title}"',
-                f'  val governedCodeRoot: String = "{profile.code_relative_path()}"',
-                "  def summary: String = s\"$projectName::$moduleName\"",
-                "}",
-                "",
-            )
+        module_requirement_ids = distributed_requirements.get(module_name, ())
+        files[main_rel] = _render_scala_module_source(
+            module_name=module_name,
+            requirement_ids=module_requirement_ids,
+            project_title=project_title,
+            governed_code_root=profile.code_relative_path(),
         )
-        files[test_rel] = "\n".join(
-            (
-                f"package {package_name}",
-                "",
-                f"object {identifier}ModuleSpec {{",
-                f"  val preservedIdentity: Boolean = {identifier}Module.projectName.nonEmpty",
-                f"  val governedBranch: Boolean = {identifier}Module.governedCodeRoot.nonEmpty",
-                "}",
-                "",
-            )
+        files[test_rel] = _render_scala_module_spec(
+            module_name=module_name,
+            requirement_ids=module_requirement_ids,
         )
+        if module_name == "cdme-engine":
+            files["cdme-engine/src/main/scala/cdme/engine/CdmeEngineRunner.scala"] = (
+                _render_cdme_engine_runner_source(module_requirement_ids)
+            )
     return files
 
 
@@ -740,6 +1169,8 @@ def _build_work_report(
         report["governed_code_summary"] = summarize_code_surface(workspace_root)
         if materialization_report is not None:
             report["materialization_report"] = materialization_report
+    if target_asset in {"test_module_surface", "test_run_archive_surface"} and materialization_report is not None:
+        report["materialization_report"] = materialization_report
     if target_asset in {
         "test_run_archive_surface",
         "release_surface",
@@ -1606,11 +2037,224 @@ def _dispatch_exit_code(dispatch: object) -> int | str:
     return value if isinstance(value, int) else "n/a"
 
 
+def _operational_result_fulfillment(
+    workspace_root: Path,
+    target_asset: str,
+) -> dict[str, object] | None:
+    if target_asset != "build_execution_result_surface":
+        return None
+
+    from .operational_dispatch import latest_operational_dispatch
+
+    project_profile = load_project_profile(workspace_root)
+    dispatch = latest_operational_dispatch(workspace_root, "build")
+    dispatch_status = _dispatch_status(dispatch)
+    if dispatch_status == "succeeded":
+        return {
+            "fulfillment_status": "fulfilled",
+            "fulfillment_detail": "declared build execution contract completed successfully and returned governed dispatch evidence",
+            "blocking_reasons": [],
+        }
+    if dispatch_status == "failed":
+        return {
+            "fulfillment_status": "blocked",
+            "fulfillment_detail": "declared build execution contract failed; build result cannot be admitted as fulfilled",
+            "blocking_reasons": ["build_execution_contract_failed"],
+        }
+    if execution_contract_is_declared(project_profile.build_execution_contract):
+        return {
+            "fulfillment_status": "blocked",
+            "fulfillment_detail": "declared build execution contract has no successful dispatch evidence",
+            "blocking_reasons": ["build_execution_evidence_missing"],
+        }
+    return None
+
+
+def _unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def _requirement_entry_map(workspace_root: Path) -> dict[str, dict[str, Any]]:
+    register = build_requirement_closure_register(workspace_root)
+    entries: dict[str, dict[str, Any]] = {}
+    for raw_entry in register.get("requirements", ()):
+        if not isinstance(raw_entry, dict):
+            continue
+        requirement_id = raw_entry.get("requirement_id")
+        if isinstance(requirement_id, str) and requirement_id:
+            entries[requirement_id] = raw_entry
+    return entries
+
+
+def _code_assessment_for_requirement(
+    obligation: dict[str, Any],
+    *,
+    entry: dict[str, Any] | None,
+    fallback_ref: str,
+) -> dict[str, object]:
+    obligation_id = str(obligation["id"])
+    evaluator = (
+        str(obligation.get("evaluator"))
+        if isinstance(obligation.get("evaluator"), str) and obligation.get("evaluator")
+        else obligation_id
+    )
+    if entry is None:
+        return {
+            "id": obligation_id,
+            "evaluator": evaluator,
+            "fulfillment_status": "unfulfilled",
+            "fulfillment_detail": "missing behavioral code realization evidence for declared requirement obligation",
+            "blocking_reasons": ["missing_code_realization"],
+            "evidence_refs": [fallback_ref],
+        }
+
+    behavioral_refs = [
+        ref for ref in entry.get("behavioral_code_refs", ()) if isinstance(ref, str) and ref
+    ]
+    code_refs = [ref for ref in entry.get("code_refs", ()) if isinstance(ref, str) and ref]
+    if behavioral_refs:
+        return {
+            "id": obligation_id,
+            "evaluator": evaluator,
+            "fulfillment_status": "fulfilled",
+            "fulfillment_detail": "behavioral code realization evidence is present for the declared requirement obligation",
+            "blocking_reasons": [],
+            "evidence_refs": behavioral_refs,
+        }
+    if code_refs:
+        return {
+            "id": obligation_id,
+            "evaluator": evaluator,
+            "fulfillment_status": "unfulfilled",
+            "fulfillment_detail": "traceable code exists, but behavioral implementation evidence is missing",
+            "blocking_reasons": ["behavioral_realization_missing"],
+            "evidence_refs": code_refs,
+        }
+    return {
+        "id": obligation_id,
+        "evaluator": evaluator,
+        "fulfillment_status": "unfulfilled",
+        "fulfillment_detail": "missing code realization for the declared requirement obligation",
+        "blocking_reasons": ["missing_code_realization"],
+        "evidence_refs": [fallback_ref],
+    }
+
+
+def _aggregate_code_surface_assessment(
+    obligation: dict[str, Any],
+    *,
+    entries: dict[str, dict[str, Any]],
+    fallback_ref: str,
+) -> dict[str, object]:
+    obligation_id = str(obligation["id"])
+    evaluator = (
+        str(obligation.get("evaluator"))
+        if isinstance(obligation.get("evaluator"), str) and obligation.get("evaluator")
+        else obligation_id
+    )
+    carried_entries = [
+        entry
+        for entry in entries.values()
+        if bool(entry.get("present_in_current_requirement_surface"))
+        and str(entry.get("carry_status") or "") == "carried"
+    ]
+    if not carried_entries:
+        return {
+            "id": obligation_id,
+            "evaluator": evaluator,
+            "fulfillment_status": "unfulfilled",
+            "fulfillment_detail": "no carried requirement obligations are available for behavioral code realization",
+            "blocking_reasons": ["missing_code_realization"],
+            "evidence_refs": [fallback_ref],
+        }
+
+    missing_behavior = [
+        str(entry["requirement_id"])
+        for entry in carried_entries
+        if not entry.get("behavioral_code_refs")
+    ]
+    evidence_refs = _unique_strings(
+        [
+            ref
+            for entry in carried_entries
+            for ref in list(entry.get("behavioral_code_refs", ())) + list(entry.get("code_refs", ()))
+            if isinstance(ref, str) and ref
+        ]
+    )
+    if not missing_behavior:
+        return {
+            "id": obligation_id,
+            "evaluator": evaluator,
+            "fulfillment_status": "fulfilled",
+            "fulfillment_detail": "behavioral code realization evidence is present for every carried requirement obligation",
+            "blocking_reasons": [],
+            "evidence_refs": evidence_refs or [fallback_ref],
+        }
+    blocking_reasons = _unique_strings(
+        [
+            reason
+            for entry in carried_entries
+            if str(entry["requirement_id"]) in missing_behavior
+            for reason in entry.get("blocking_reasons", ())
+            if isinstance(reason, str) and reason in {"missing_code_realization", "behavioral_realization_missing"}
+        ]
+    ) or ["behavioral_realization_missing"]
+    return {
+        "id": obligation_id,
+        "evaluator": evaluator,
+        "fulfillment_status": "unfulfilled",
+        "fulfillment_detail": (
+            "behavioral code realization is missing for carried requirement obligations: "
+            + ", ".join(missing_behavior)
+        ),
+        "blocking_reasons": blocking_reasons,
+        "evidence_refs": evidence_refs or [fallback_ref],
+    }
+
+
+def _code_surface_fulfillment_assessments(
+    workspace_root: Path,
+    *,
+    target_path: Path,
+    fulfillment_obligations: list[dict[str, Any]],
+) -> list[dict[str, object]]:
+    fallback_ref = str(target_path.relative_to(workspace_root))
+    entries = _requirement_entry_map(workspace_root)
+    assessments: list[dict[str, object]] = []
+    for obligation in fulfillment_obligations:
+        obligation_id = str(obligation["id"])
+        if obligation_id in entries:
+            assessments.append(
+                _code_assessment_for_requirement(
+                    obligation,
+                    entry=entries[obligation_id],
+                    fallback_ref=fallback_ref,
+                )
+            )
+        else:
+            assessments.append(
+                _aggregate_code_surface_assessment(
+                    obligation,
+                    entries=entries,
+                    fallback_ref=fallback_ref,
+                )
+            )
+    return assessments
+
+
 def _construct_build_execution_result_surface(workspace_root: Path) -> str:
     from .operational_dispatch import latest_operational_dispatch
 
     build_execution_surface = _asset_text(workspace_root, "build_execution_surface")
     build_summary = _build_artifact_summary(workspace_root)
+    project_profile = load_project_profile(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "build")
     if _dispatch_status(dispatch) == "failed":
         status = "failed"
@@ -1618,6 +2262,9 @@ def _construct_build_execution_result_surface(workspace_root: Path) -> str:
     elif _dispatch_status(dispatch) == "succeeded":
         status = "result_admitted"
         saga_state = "result_admitted"
+    elif execution_contract_is_declared(project_profile.build_execution_contract):
+        status = "pending_external_evidence"
+        saga_state = "dispatched"
     else:
         status = "result_admitted" if build_summary["artifact_root_count"] else "pending_external_evidence"
         saga_state = "result_admitted" if build_summary["artifact_root_count"] else "dispatched"
@@ -1838,6 +2485,7 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
     code_summary = summarize_code_surface(workspace_root)
     test_summary = summarize_test_evidence(workspace_root)
     dispatch = latest_operational_dispatch(workspace_root, "deployment")
+    deployment_pending = "- status: pending_external_evidence" in deployment_result_surface
     if _dispatch_status(dispatch) == "failed":
         completion_state = "deployment_failed"
         observed_status = "failed"
@@ -1846,7 +2494,7 @@ def _construct_runtime_observation_surface(workspace_root: Path) -> str:
         completion_state = "deployment_result_recorded"
         observed_status = "result_admitted"
         saga_state = "result_admitted"
-    elif test_summary["parsed_report_count"] == 0:
+    elif deployment_pending or test_summary["parsed_report_count"] == 0:
         completion_state = "construction_complete_pending_execution"
         observed_status = "pending_external_evidence"
         saga_state = "dispatched"
@@ -1898,6 +2546,8 @@ def _construct_retrofit_plan_surface(workspace_root: Path) -> str:
     ]
     if test_summary["failures"] or test_summary["errors"]:
         next_actions.insert(0, "- repair the failing implementation branch before relaunch")
+    elif "- completion_state: construction_complete_pending_execution" in runtime_observation:
+        next_actions.insert(0, "- hold deployment/runtime closure until external execution evidence is returned")
     else:
         next_actions.insert(0, "- continue bounded retrofit work from the current qualified branch and returned evidence")
     return "\n".join(
@@ -2028,10 +2678,16 @@ def _construct_test_stack_profile(workspace_root: Path) -> str:
 def _construct_test_module_surface(workspace_root: Path) -> str:
     if _software_project_mode(workspace_root):
         planned_requirement_ids = _planned_test_requirement_ids(workspace_root)
+        planned_files = _planned_generated_test_files(workspace_root)
         module_lines = tuple(
             f"- `{module_name}` test sources under the governed implementation branch"
             for module_name in load_project_profile(workspace_root).declared_module_names()
         )
+        inventory_lines = tuple(
+            f"- `{entry['relative_path']}` validates "
+            + (", ".join(entry["requirement_ids"]) if entry["requirement_ids"] else "no explicit requirement ids")
+            for entry in planned_files
+        ) or ("- no generated test source files planned",)
         return "\n".join(
             (
                 "# Generated Test Modules",
@@ -2040,9 +2696,13 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
                 "",
                 "## Module Layout",
                 *module_lines,
-                "- this surface declares planned developer-test coverage and module ownership; it does not itself count as realized test source",
-                "- realized test traceability is satisfied only when governed test source is materialized under the active code root",
+                "- this surface declares developer-test coverage and module ownership",
+                "- convergence requires governed test source to be materialized under the active code root",
+                f"- generated test source files: {len(planned_files)}",
                 f"- planned requirement claims: {', '.join(planned_requirement_ids) if planned_requirement_ids else 'none yet declared'}",
+                "",
+                "## Realized Test Source Inventory",
+                *inventory_lines,
                 "",
             )
         )
@@ -2288,12 +2948,11 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
                 content=code_content,
             )
         else:
+            if target_asset == "test_module_surface":
+                materialization_report = _materialize_planned_generated_test_files(workspace)
             if target_asset == "test_run_archive_surface":
                 _preserve_existing_test_code_files(workspace)
-                for entry in _planned_generated_test_files(workspace):
-                    file_path = _code_surface_root(workspace) / str(entry["relative_path"])
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_text(str(entry["content"]), encoding="utf-8")
+                materialization_report = _materialize_planned_generated_test_files(workspace)
             text_content = _constructed_text_content(target_asset, workspace)
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(text_content, encoding="utf-8")
@@ -2376,12 +3035,30 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
         "and satisfied the generated-asset contract"
     )
-    payload = {
-        "edge": manifest["edge"],
-        "actor": "odd_sdlc_constructor",
-        "attestation": attestation,
-        "work_report": work_report,
-        "fulfillment_assessments": [
+    operational_fulfillment = _operational_result_fulfillment(workspace, target_asset)
+    fulfillment_status = (
+        str(operational_fulfillment["fulfillment_status"])
+        if operational_fulfillment is not None
+        else "fulfilled"
+    )
+    fulfillment_detail = (
+        str(operational_fulfillment["fulfillment_detail"])
+        if operational_fulfillment is not None
+        else evidence
+    )
+    blocking_reasons = (
+        list(operational_fulfillment["blocking_reasons"])
+        if operational_fulfillment is not None
+        else []
+    )
+    if target_asset == "code_surface" and operational_fulfillment is None:
+        fulfillment_assessments = _code_surface_fulfillment_assessments(
+            workspace,
+            target_path=target_path,
+            fulfillment_obligations=fulfillment_obligations,
+        )
+    else:
+        fulfillment_assessments = [
             {
                 "id": str(obligation["id"]),
                 "evaluator": (
@@ -2389,13 +3066,19 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
                     if isinstance(obligation.get("evaluator"), str) and obligation.get("evaluator")
                     else str(obligation["id"])
                 ),
-                "fulfillment_status": "fulfilled",
-                "fulfillment_detail": evidence,
-                "blocking_reasons": [],
+                "fulfillment_status": fulfillment_status,
+                "fulfillment_detail": fulfillment_detail,
+                "blocking_reasons": blocking_reasons,
                 "evidence_refs": [str(target_path.relative_to(workspace))],
             }
             for obligation in fulfillment_obligations
-        ],
+        ]
+    payload = {
+        "edge": manifest["edge"],
+        "actor": "odd_sdlc_constructor",
+        "attestation": attestation,
+        "work_report": work_report,
+        "fulfillment_assessments": fulfillment_assessments,
     }
     result_file = Path(result_path)
     result_file.parent.mkdir(parents=True, exist_ok=True)

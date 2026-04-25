@@ -12,7 +12,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Literal, TypedDict
+from collections.abc import Mapping
+from typing import Any, Literal, TypedDict
 
 from .install_topology import (
     INSTALLED_RUNTIME_CONTRACT_RELATIVE,
@@ -232,6 +233,131 @@ def normalize_execution_contract_declaration(value: str) -> str:
     return stripped
 
 
+def execution_contract_is_undeclared(value: str) -> bool:
+    return normalize_execution_contract_declaration(value).lower() == UNDECLARED_EXECUTION_CONTRACT
+
+
+def _truthy_capability_value(value: object) -> bool:
+    normalized = _normalized_scalar(value).strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
+def infer_execution_contract_defaults(
+    *,
+    tenant_name: str,
+    language: str,
+    tool: str,
+    test_runner: str,
+    capability_contracts: Mapping[str, object],
+    build_execution_contract: str,
+    test_execution_contract: str,
+    deployment_contract: str,
+    runtime_observation_contract: str,
+    source_text: str = "",
+) -> dict[str, str]:
+    contracts = {
+        "build_execution_contract": normalize_execution_contract_declaration(build_execution_contract),
+        "test_execution_contract": normalize_execution_contract_declaration(test_execution_contract),
+        "deployment_contract": normalize_execution_contract_declaration(deployment_contract),
+        "runtime_observation_contract": normalize_execution_contract_declaration(runtime_observation_contract),
+    }
+    normalized_test_runner = normalize_execution_contract_declaration(test_runner)
+    tenant = canonical_tenant_name(tenant_name).lower()
+    language_value = language.strip().lower()
+    tool_value = tool.strip().lower()
+    source_lower = source_text.lower()
+    scala_execution_signal = (
+        tool_value == "sbt"
+        or language_value == "scala"
+        or (
+            tenant == "scala_spark"
+            and any(
+                _truthy_capability_value(capability_contracts.get(key))
+                for key in ("fat_jar", "spark_session", "spark_submit_compatible")
+            )
+        )
+    )
+
+    if execution_contract_is_undeclared(contracts["build_execution_contract"]):
+        if scala_execution_signal:
+            contracts["build_execution_contract"] = (
+                "sbt clean assembly"
+                if _truthy_capability_value(capability_contracts.get("fat_jar"))
+                else "sbt compile"
+            )
+        elif tool_value == "dbt" or tenant == "dbt":
+            contracts["build_execution_contract"] = "dbt compile"
+        elif tool_value in {"npm", "pnpm", "yarn"}:
+            contracts["build_execution_contract"] = f"{tool_value} run build"
+        elif tool_value in {"maven", "mvn"}:
+            contracts["build_execution_contract"] = "mvn package"
+        elif tool_value == "gradle":
+            contracts["build_execution_contract"] = "gradle build"
+        elif language_value == "python":
+            contracts["build_execution_contract"] = "python -m build"
+
+    if execution_contract_is_undeclared(contracts["test_execution_contract"]):
+        if not execution_contract_is_undeclared(normalized_test_runner):
+            contracts["test_execution_contract"] = normalized_test_runner
+        elif tool_value == "dbt" or tenant == "dbt":
+            contracts["test_execution_contract"] = "dbt test"
+        elif scala_execution_signal:
+            contracts["test_execution_contract"] = "sbt test"
+        elif tool_value in {"npm", "pnpm", "yarn"}:
+            contracts["test_execution_contract"] = f"{tool_value} test"
+        elif language_value == "python":
+            contracts["test_execution_contract"] = "pytest"
+
+    if execution_contract_is_undeclared(contracts["deployment_contract"]):
+        if _truthy_capability_value(capability_contracts.get("spark_submit_compatible")):
+            contracts["deployment_contract"] = "spark-submit"
+        elif tool_value == "dbt" or tenant == "dbt":
+            contracts["deployment_contract"] = "dbt run"
+
+    if execution_contract_is_undeclared(contracts["runtime_observation_contract"]):
+        if "openlineage" in source_lower:
+            contracts["runtime_observation_contract"] = "OpenLineage"
+        elif _truthy_capability_value(capability_contracts.get("ledger_json")):
+            contracts["runtime_observation_contract"] = "ledger.json"
+
+    return contracts
+
+
+def _strip_inline_comment(value: str) -> str:
+    in_single = False
+    in_double = False
+    for index, char in enumerate(value):
+        if char == "'" and not in_double:
+            in_single = not in_single
+        elif char == '"' and not in_single:
+            in_double = not in_double
+        elif char == "#" and not in_single and not in_double:
+            return value[:index].rstrip()
+    return value
+
+
+def _normalized_scalar(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return strip_scalar_quotes(_strip_inline_comment(str(value))).strip()
+
+
+def _capability_contracts_payload(value: object) -> dict[str, str]:
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        value = decoded
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): _normalized_scalar(item)
+        for key, item in value.items()
+        if str(key).strip() and _normalized_scalar(item)
+    }
+
+
 def execution_contract_is_declared(value: str) -> bool:
     return normalize_execution_contract_declaration(value).lower() != UNDECLARED_EXECUTION_CONTRACT
 
@@ -309,6 +435,7 @@ class ProjectProfile:
     test_execution_contract: str
     deployment_contract: str
     runtime_observation_contract: str
+    capability_contracts: dict[str, str]
     root_code_policy: str
     realization_mode: str
     resolution_reason: str
@@ -327,6 +454,10 @@ class ProjectProfile:
             modules = tuple(part.strip() for part in inner.split(",") if part.strip())
             if modules:
                 return modules
+        if "," in raw:
+            modules = tuple(part.strip() for part in raw.split(",") if part.strip())
+            if modules:
+                return modules
         return ("app-core",)
 
     def has_build_execution_capability(self) -> bool:
@@ -341,7 +472,7 @@ class ProjectProfile:
     def has_runtime_observation_capability(self) -> bool:
         return execution_contract_is_declared(self.runtime_observation_contract)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "workspace_name": self.workspace_name,
             "project_slug": self.project_slug,
@@ -359,13 +490,17 @@ class ProjectProfile:
             "test_execution_contract": self.test_execution_contract,
             "deployment_contract": self.deployment_contract,
             "runtime_observation_contract": self.runtime_observation_contract,
+            "capability_contracts": dict(self.capability_contracts),
             "root_code_policy": self.root_code_policy,
             "realization_mode": self.realization_mode,
             "resolution_reason": self.resolution_reason,
         }
 
     @classmethod
-    def from_dict(cls, payload: dict[str, str]) -> "ProjectProfile":
+    def from_dict(cls, payload: Mapping[str, object]) -> "ProjectProfile":
+        capability_contracts = _capability_contracts_payload(
+            payload.get("capability_contracts")
+        )
         return cls(
             workspace_name=str(payload.get("workspace_name", "")),
             project_slug=str(payload.get("project_slug", "")),
@@ -391,6 +526,7 @@ class ProjectProfile:
             runtime_observation_contract=normalize_execution_contract_declaration(
                 str(payload.get("runtime_observation_contract", ""))
             ),
+            capability_contracts=capability_contracts,
             root_code_policy=str(payload.get("root_code_policy", "")),
             realization_mode=str(payload.get("realization_mode", "")),
             resolution_reason=str(payload.get("resolution_reason", "")),
@@ -546,7 +682,7 @@ def load_published_project_profile(workspace_root: Path | str) -> ProjectProfile
     profile_payload = payload.get("project_profile")
     if not isinstance(profile_payload, dict):
         return None
-    return ProjectProfile.from_dict({key: str(value) for key, value in profile_payload.items()})
+    return ProjectProfile.from_dict(profile_payload)
 
 
 def operational_capability_projection_for_profile(
@@ -1042,8 +1178,8 @@ def _resolved_output_from_topology(workspace_root: Path, declared_output_dir: st
     return None
 
 
-def _parse_constraints_lines(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
+def _parse_constraints_lines(path: Path) -> dict[str, object]:
+    values: dict[str, object] = {}
     if not path.exists():
         return values
 
@@ -1051,58 +1187,189 @@ def _parse_constraints_lines(path: Path) -> dict[str, str]:
     in_design_tenants = False
     first_design_tenant_seen = False
     current_tenant_scope = False
+    current_tenant_nested_key = ""
+    build_tenants: dict[str, dict[str, object]] = {}
+    current_build_tenant_name = ""
+    current_build_tenant: dict[str, object] | None = None
+    current_build_nested_key = ""
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         stripped = raw_line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if stripped == "project:":
+        indent = len(raw_line) - len(raw_line.lstrip())
+        if indent == 0 and stripped == "project:":
             section = "project"
             in_design_tenants = False
             current_tenant_scope = False
+            current_tenant_nested_key = ""
+            current_build_tenant = None
+            current_build_tenant_name = ""
+            current_build_nested_key = ""
             continue
-        if stripped == "structure:":
+        if indent == 0 and stripped == "structure:":
             section = "structure"
             in_design_tenants = False
             current_tenant_scope = False
+            current_tenant_nested_key = ""
+            current_build_tenant = None
+            current_build_tenant_name = ""
+            current_build_nested_key = ""
             continue
-        if stripped == "constraints:":
+        if indent == 0 and stripped == "constraints:":
             section = "constraints"
             in_design_tenants = False
             current_tenant_scope = False
+            current_tenant_nested_key = ""
+            current_build_tenant = None
+            current_build_tenant_name = ""
+            current_build_nested_key = ""
+            continue
+        if indent == 0 and stripped == "build_tenants:":
+            section = "build_tenants"
+            in_design_tenants = False
+            current_tenant_scope = False
+            current_tenant_nested_key = ""
+            current_build_tenant = None
+            current_build_tenant_name = ""
+            current_build_nested_key = ""
+            continue
+        if indent == 0 and ":" in stripped and section != "project":
+            key, _, value = stripped.partition(":")
+            values[key.strip()] = _normalized_scalar(value)
             continue
         if section == "structure" and stripped == "design_tenants:":
             in_design_tenants = True
             current_tenant_scope = False
+            current_tenant_nested_key = ""
             continue
 
         if section == "structure" and stripped.startswith("root_code_policy:"):
-            values["root_code_policy"] = strip_scalar_quotes(stripped.partition(":")[2])
+            values["root_code_policy"] = _normalized_scalar(stripped.partition(":")[2])
             in_design_tenants = False
             current_tenant_scope = False
+            current_tenant_nested_key = ""
             continue
 
         if in_design_tenants and stripped.startswith("- name:"):
             if not first_design_tenant_seen:
-                values["tenant_name"] = strip_scalar_quotes(stripped.partition(":")[2])
+                values["tenant_name"] = _normalized_scalar(stripped.partition(":")[2])
                 first_design_tenant_seen = True
                 current_tenant_scope = True
             else:
                 current_tenant_scope = False
+            current_tenant_nested_key = ""
             continue
 
         if section == "project" and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[key.strip()] = strip_scalar_quotes(value)
+            values[key.strip()] = _normalized_scalar(value)
             continue
 
         if section == "structure" and not in_design_tenants and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[key.strip()] = strip_scalar_quotes(value)
+            values[key.strip()] = _normalized_scalar(value)
             continue
 
+        if current_tenant_scope and stripped == "capability_contracts:":
+            values.setdefault("tenant_capability_contracts", {})
+            current_tenant_nested_key = "capability_contracts"
+            continue
+        if current_tenant_scope and current_tenant_nested_key == "capability_contracts" and indent >= 8 and ":" in stripped:
+            contracts = values.setdefault("tenant_capability_contracts", {})
+            if isinstance(contracts, dict):
+                key, _, value = stripped.partition(":")
+                normalized = _normalized_scalar(value)
+                if normalized:
+                    contracts[key.strip()] = normalized
+            continue
+        if (
+            current_tenant_scope
+            and current_tenant_nested_key in {"module_structure", "frameworks"}
+            and indent >= 8
+            and stripped.startswith("- ")
+        ):
+            key = f"tenant_{current_tenant_nested_key}"
+            existing = values.get(key)
+            item = _normalized_scalar(stripped[2:])
+            if item:
+                values[key] = f"{existing}, {item}" if isinstance(existing, str) and existing else item
+            continue
         if current_tenant_scope and ":" in stripped:
             key, _, value = stripped.partition(":")
-            values[f"tenant_{key.strip()}"] = strip_scalar_quotes(value)
+            normalized = _normalized_scalar(value)
+            values[f"tenant_{key.strip()}"] = normalized
+            current_tenant_nested_key = "" if normalized else key.strip()
+            continue
+
+        if section == "build_tenants" and indent == 2 and stripped.endswith(":"):
+            current_build_tenant_name = canonical_tenant_name(stripped[:-1].strip())
+            current_build_tenant = {}
+            build_tenants[current_build_tenant_name] = current_build_tenant
+            current_build_nested_key = ""
+            continue
+        if section == "build_tenants" and current_build_tenant is not None and indent == 4 and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            key = key.strip()
+            normalized = _normalized_scalar(value)
+            if normalized:
+                current_build_tenant[key] = normalized
+                current_build_nested_key = ""
+            elif key in {"module_structure", "frameworks"}:
+                current_build_tenant[key] = []
+                current_build_nested_key = key
+            elif key == "capability_contracts":
+                current_build_tenant[key] = {}
+                current_build_nested_key = key
+            else:
+                current_build_tenant[key] = ""
+                current_build_nested_key = key
+            continue
+        if section == "build_tenants" and current_build_tenant is not None and indent >= 6:
+            if stripped.startswith("- ") and current_build_nested_key:
+                current_value = current_build_tenant.get(current_build_nested_key)
+                if isinstance(current_value, list):
+                    current_value.append(_normalized_scalar(stripped[2:]))
+                continue
+            if current_build_nested_key == "capability_contracts" and ":" in stripped:
+                contracts = current_build_tenant.get("capability_contracts")
+                if isinstance(contracts, dict):
+                    key, _, value = stripped.partition(":")
+                    normalized = _normalized_scalar(value)
+                    if normalized:
+                        contracts[key.strip()] = normalized
+                continue
+
+    if build_tenants:
+        active_tenant = canonical_tenant_name(str(values.get("active_tenant") or ""))
+        selected_name = active_tenant if active_tenant in build_tenants else next(iter(build_tenants))
+        selected = build_tenants[selected_name]
+        values.setdefault("tenant_name", selected_name)
+        for source_key, target_key in (
+            ("output_dir", "tenant_output_dir"),
+            ("description", "tenant_description"),
+            ("execution_tier", "tenant_execution_tier"),
+            ("language", "language"),
+            ("test_runner", "test_runner"),
+            ("build_tool", "tool"),
+            ("build_execution_contract", "tenant_build_execution_contract"),
+            ("test_execution_contract", "tenant_test_execution_contract"),
+            ("deployment_contract", "tenant_deployment_contract"),
+            ("runtime_observation_contract", "tenant_runtime_observation_contract"),
+        ):
+            selected_value = selected.get(source_key)
+            if isinstance(selected_value, str) and selected_value.strip():
+                current_value = values.get(target_key)
+                if not isinstance(current_value, str) or not current_value.strip():
+                    values[target_key] = selected_value
+        module_structure = selected.get("module_structure")
+        if isinstance(module_structure, list) and module_structure and not values.get("module_structure"):
+            values["module_structure"] = "(" + ", ".join(str(item) for item in module_structure) + ")"
+        capability_contracts = selected.get("capability_contracts")
+        if isinstance(capability_contracts, dict) and capability_contracts:
+            values.setdefault(
+                "tenant_capability_contracts",
+                _capability_contracts_payload(capability_contracts),
+            )
 
     return values
 
@@ -1115,6 +1382,7 @@ def parse_design_tenants(path: Path) -> list[dict[str, str]]:
     section = ""
     in_design_tenants = False
     current_tenant: dict[str, str] | None = None
+    current_nested_key = ""
 
     def _flush_current() -> None:
         nonlocal current_tenant
@@ -1126,20 +1394,30 @@ def parse_design_tenants(path: Path) -> list[dict[str, str]]:
         stripped = raw_line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if stripped == "project:":
+        indent = len(raw_line) - len(raw_line.lstrip())
+        if indent == 0 and stripped == "project:":
             _flush_current()
             section = "project"
             in_design_tenants = False
+            current_nested_key = ""
             continue
-        if stripped == "structure:":
+        if indent == 0 and stripped == "structure:":
             _flush_current()
             section = "structure"
             in_design_tenants = False
+            current_nested_key = ""
             continue
-        if stripped == "constraints:":
+        if indent == 0 and stripped == "constraints:":
             _flush_current()
             section = "constraints"
             in_design_tenants = False
+            current_nested_key = ""
+            continue
+        if indent == 0 and stripped == "build_tenants:":
+            _flush_current()
+            section = "build_tenants"
+            in_design_tenants = False
+            current_nested_key = ""
             continue
         if section == "structure" and stripped == "design_tenants:":
             in_design_tenants = True
@@ -1147,30 +1425,66 @@ def parse_design_tenants(path: Path) -> list[dict[str, str]]:
         if section == "structure" and stripped.startswith("root_code_policy:"):
             _flush_current()
             in_design_tenants = False
+            current_nested_key = ""
             continue
 
         if in_design_tenants and stripped.startswith("- name:"):
             _flush_current()
             current_tenant = {
-                "name": canonical_tenant_name(strip_scalar_quotes(stripped.partition(":")[2])),
+                "name": canonical_tenant_name(_normalized_scalar(stripped.partition(":")[2])),
             }
+            current_nested_key = ""
             continue
 
+        if section == "build_tenants" and indent == 2 and stripped.endswith(":"):
+            _flush_current()
+            current_tenant = {"name": canonical_tenant_name(stripped[:-1].strip())}
+            current_nested_key = ""
+            continue
+
+        if current_tenant is not None and stripped == "capability_contracts:":
+            current_nested_key = "capability_contracts"
+            continue
+        if current_tenant is not None and current_nested_key == "capability_contracts" and indent >= 6 and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            current_tenant[f"capability_contracts.{key.strip()}"] = _normalized_scalar(value)
+            continue
+        if current_tenant is not None and current_nested_key in {"module_structure", "frameworks"} and stripped.startswith("- "):
+            key = current_nested_key
+            existing = current_tenant.get(key, "")
+            item = _normalized_scalar(stripped[2:])
+            current_tenant[key] = f"{existing}, {item}" if existing else item
+            continue
         if current_tenant is not None and ":" in stripped:
             key, _, value = stripped.partition(":")
-            current_tenant[key.strip()] = strip_scalar_quotes(value)
+            normalized = _normalized_scalar(value)
+            current_tenant[key.strip()] = normalized
+            current_nested_key = key.strip() if not normalized else ""
 
     _flush_current()
     return tenants
+
+
+def _constraint_string(
+    constraints: Mapping[str, object],
+    key: str,
+    default: str = "",
+) -> str:
+    value = constraints.get(key)
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return default
+    return str(value)
 
 
 def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
     workspace_root = Path(workspace_root).resolve()
     constraints = _parse_constraints_lines(workspace_root / PROJECT_CONSTRAINTS_PATH)
     workspace_name = workspace_root.resolve().name
-    project_slug = constraints.get("name") or default_project_slug(workspace_root)
-    tenant_name = canonical_tenant_name(constraints.get("tenant_name") or "python")
-    declared_output_dir = constraints.get("tenant_output_dir", "")
+    project_slug = _constraint_string(constraints, "name") or default_project_slug(workspace_root)
+    tenant_name = canonical_tenant_name(_constraint_string(constraints, "tenant_name", "python"))
+    declared_output_dir = _constraint_string(constraints, "tenant_output_dir")
     canonical_output_dir = tenant_output_dir(tenant_name)
     canonical_output_path = workspace_root / canonical_output_dir
 
@@ -1208,32 +1522,62 @@ def resolve_project_profile(workspace_root: Path | str) -> ProjectProfile:
         realization_mode = "generated_proving_subset"
         resolution_reason = "default_proving_subset"
 
+    capability_contracts = _capability_contracts_payload(
+        constraints.get("tenant_capability_contracts")
+    )
+    constraints_path = workspace_root / PROJECT_CONSTRAINTS_PATH
+    source_text = constraints_path.read_text(encoding="utf-8") if constraints_path.exists() else ""
+    build_execution_contract = normalize_execution_contract_declaration(
+        _constraint_string(constraints, "tenant_build_execution_contract")
+    )
+    test_execution_contract = normalize_execution_contract_declaration(
+        _constraint_string(constraints, "tenant_test_execution_contract")
+    )
+    deployment_contract = normalize_execution_contract_declaration(
+        _constraint_string(constraints, "tenant_deployment_contract")
+    )
+    runtime_observation_contract = normalize_execution_contract_declaration(
+        _constraint_string(constraints, "tenant_runtime_observation_contract")
+    )
+    inferred_contracts = infer_execution_contract_defaults(
+        tenant_name=tenant_name,
+        language=_constraint_string(constraints, "language"),
+        tool=_constraint_string(constraints, "tool"),
+        test_runner=_constraint_string(constraints, "test_runner"),
+        capability_contracts=capability_contracts,
+        build_execution_contract=build_execution_contract,
+        test_execution_contract=test_execution_contract,
+        deployment_contract=deployment_contract,
+        runtime_observation_contract=runtime_observation_contract,
+        source_text=source_text,
+    )
+
     return ProjectProfile(
         workspace_name=workspace_name,
         project_slug=project_slug,
-        project_kind=constraints.get("kind", ""),
-        language=constraints.get("language", ""),
-        test_runner=constraints.get("test_runner", ""),
-        tool=constraints.get("tool", ""),
-        version=constraints.get("version", ""),
-        module_structure=constraints.get("module_structure", ""),
-        ambiguity_risk_appetite=constraints.get("ambiguity_risk_appetite", DEFAULT_AMBIGUITY_RISK_APPETITE),
+        project_kind=_constraint_string(constraints, "kind"),
+        language=_constraint_string(constraints, "language"),
+        test_runner=_constraint_string(constraints, "test_runner"),
+        tool=_constraint_string(constraints, "tool"),
+        version=_constraint_string(constraints, "version"),
+        module_structure=(
+            _constraint_string(constraints, "module_structure")
+            or _constraint_string(constraints, "tenant_module_structure")
+        ),
+        ambiguity_risk_appetite=_constraint_string(
+            constraints,
+            "ambiguity_risk_appetite",
+            DEFAULT_AMBIGUITY_RISK_APPETITE,
+        ),
         tenant_name=tenant_name,
         output_dir=output_dir,
         declared_output_dir=declared_output_dir,
-        build_execution_contract=normalize_execution_contract_declaration(
-            constraints.get("tenant_build_execution_contract", "")
-        ),
-        test_execution_contract=normalize_execution_contract_declaration(
-            constraints.get("tenant_test_execution_contract", "")
-        ),
-        deployment_contract=normalize_execution_contract_declaration(
-            constraints.get("tenant_deployment_contract", "")
-        ),
-        runtime_observation_contract=normalize_execution_contract_declaration(
-            constraints.get("tenant_runtime_observation_contract", "")
-        ),
-        root_code_policy=constraints.get("root_code_policy", ""),
+        build_execution_contract=inferred_contracts["build_execution_contract"],
+        test_execution_contract=inferred_contracts["test_execution_contract"],
+        deployment_contract=inferred_contracts["deployment_contract"],
+        runtime_observation_contract=inferred_contracts["runtime_observation_contract"],
+        capability_contracts=capability_contracts,
+        root_code_policy=_constraint_string(constraints, "root_code_policy"),
         realization_mode=realization_mode,
         resolution_reason=resolution_reason,
     )

@@ -13,6 +13,7 @@ Tenant-local design law:
 
 - `build_tenants/python/design/adrs/ADR-001-maximum-enforceable-python-typing.md`
 - `build_tenants/python/design/adrs/ADR-002-abg-continuation-authority-and-cooperative-operational-dispatch.md`
+- `build_tenants/python/design/ODD_SDLC_ABG_BOUNDARY_AND_MODULE_TOPOLOGY.md`
 - `build_tenants/python/design/SOFTWARE_DOMAIN_BUILDOUT.md`
 - `build_tenants/python/design/HOMEOSTATIC_GAP_TRIAGE_AND_INTENT_RENEWAL.md`
 - `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`
@@ -22,6 +23,8 @@ Tenant-local design law:
 - `build_tenants/python/design/QUERY_PLUGIN_CONTRACT.md`
 - `build_tenants/python/design/START_TARGET_CATALOG_AND_ASSET_OWNERSHIP_INDEX.md`
 - `build_tenants/python/design/TICKET_WORK_ITEM_REENTRY_ROUTING.md`
+- `build_tenants/python/design/FP_WORKER_ATTACHMENT_CONTRACT.md`
+- `build_tenants/python/design/PROJECT_PROFILE_CONSTRAINTS_CANONICALIZATION.md`
 - `build_tenants/python/design/fp/README.md`
 
 `SOFTWARE_DOMAIN_BUILDOUT.md` and
@@ -39,6 +42,11 @@ ABG owns continuation and re-entry, while `odd_sdlc` operational commands are
 single-step cooperative adapters that publish evidence and return control. This
 is the tenant-local binding of the shared ODD method principle that GTL/ABG
 applications must not replace ABG continuation with tenant-local orchestration.
+
+`ODD_SDLC_ABG_BOUNDARY_AND_MODULE_TOPOLOGY.md` is the current compression of
+the framework boundary: `odd_sdlc` is the domain scaffold, ABG is the traversal
+engine, GTL is the graph-function program language, and SDLC-owned IoC hooks
+carry domain traversal/evaluation inside ABG-selected vector boundaries.
 
 `REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md` adopts the
 design-module method for the requirement-closure, traceability, gap, query,
@@ -67,6 +75,13 @@ handles.
 for triaged ticket/work-item intake. It defines how work-item handles extend
 the existing `asset:` target family, how route contracts govern re-entry, and
 how routed work-item execution remains visible in manifest/prompt provenance.
+
+`FP_WORKER_ATTACHMENT_CONTRACT.md` defines the installed public-start worker
+readiness contract at the F_P handoff boundary.
+
+`PROJECT_PROFILE_CONSTRAINTS_CANONICALIZATION.md` defines the canonical
+project-profile admission rule for v3.1 and v3.2 `project_constraints.yml`
+shapes.
 
 `build_tenants/python/design/fp/README.md` governs the active builder control
 frames, including the deterministic repair-frontier law used by constructive

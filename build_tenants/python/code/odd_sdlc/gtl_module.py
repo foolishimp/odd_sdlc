@@ -1817,6 +1817,17 @@ def _active_operational_leaf_graph_functions(workspace_root: Path) -> tuple[Grap
         payload = capability_families.get(family)
         return bool(isinstance(payload, dict) and payload.get("declared"))
 
+    if not all(
+        _declared(family)
+        for family in (
+            "build_execution",
+            "test_execution",
+            "deployment",
+            "runtime_observation",
+        )
+    ):
+        return ()
+
     active: list[GraphFunction] = []
     if _declared("build_execution"):
         active.append(GF_PREPARE_BUILD_EXECUTION)

@@ -11,12 +11,16 @@ from test_odd_sdlc_installation import (
     _append_runtime_contract_overrides,
     _append_tenant_capability_contracts,
     _seed_data_mapper_template_workspace,
+    _seed_imported_workspace,
     _write_fake_transport_contract,
 )
 
 
-def _install_data_mapper_with_fake_transport(workspace):
-    _seed_data_mapper_template_workspace(workspace)
+def _install_workspace_with_fake_transport(workspace, *, template: bool):
+    if template:
+        _seed_data_mapper_template_workspace(workspace)
+    else:
+        _seed_imported_workspace(workspace)
     payload = install_release(
         workspace,
         project_slug="data_mapper",
@@ -30,15 +34,15 @@ def _install_data_mapper_with_fake_transport(workspace):
 @pytest.mark.usecase_id("capability_gated_operational_convergence")
 def test_operational_cycle_is_omitted_without_declared_capability(run_archive) -> None:
     workspace = run_archive.workspace
-    payload = _install_data_mapper_with_fake_transport(workspace)
+    payload = _install_workspace_with_fake_transport(workspace, template=False)
     run_archive.capture_json("install.payload.json", payload)
 
     initial_gaps = json.loads(
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="capability gating gaps.initial",
         ).stdout
@@ -85,7 +89,7 @@ def test_operational_cycle_is_omitted_without_declared_capability(run_archive) -
 @pytest.mark.usecase_id("capability_gated_operational_convergence")
 def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> None:
     workspace = run_archive.workspace
-    payload = _install_data_mapper_with_fake_transport(workspace)
+    payload = _install_workspace_with_fake_transport(workspace, template=True)
     _append_tenant_capability_contracts(
         workspace,
         build_execution_contract="sbt test",
@@ -99,8 +103,8 @@ def test_operational_cycle_returns_when_capability_is_declared(run_archive) -> N
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="capability enabled gaps.initial",
         ).stdout

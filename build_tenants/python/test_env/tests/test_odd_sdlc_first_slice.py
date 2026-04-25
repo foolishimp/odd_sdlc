@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+LOCAL_PROJECTS_ROOT = ROOT.parent / "ai_sdlc_examples" / "local_projects"
 
 GRAPH_FUNCTION_NAMES = [
     "bootstrap_release_self_test",
@@ -40,6 +41,20 @@ GRAPH_FUNCTION_NAMES = [
     "derive_execution_contract_surface",
     "admit_execution_contract_surface",
 ]
+
+
+def _resolve_data_mapper_template() -> Path:
+    candidates = (
+        LOCAL_PROJECTS_ROOT / "data_mapper" / "data_mapper.template",
+        LOCAL_PROJECTS_ROOT / "data_mapper.template",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise AssertionError("unable to locate data_mapper.template under ai_sdlc_examples/local_projects")
+
+
+DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
 
 
 def _expected_graph_function_names(actual_names: list[str]) -> list[str]:
@@ -90,6 +105,7 @@ if str(CODE_PATH) not in sys.path:
     sys.path.insert(0, str(CODE_PATH))
 
 import odd_sdlc.app as app_module  # noqa: E402
+import odd_sdlc.__main__ as odd_sdlc_cli  # noqa: E402
 import odd_sdlc.continuation as continuation_module  # noqa: E402
 import odd_sdlc.query as query_module  # noqa: E402
 import odd_sdlc.triage as triage_module  # noqa: E402
@@ -114,6 +130,7 @@ from odd_sdlc.gap_dossier import (  # noqa: E402
     GAP_DOSSIER_REGISTER_PATH,
     load_gap_dossier_read_model,
     project_gap_dossier_input,
+    project_operator_gap_analysis,
 )
 from odd_sdlc.gtl_module import (  # noqa: E402
     BOOTSTRAP_RELEASE_SELF_TEST_INTENT,
@@ -129,6 +146,7 @@ from odd_sdlc.normalization import normalize_workspace  # noqa: E402
 from odd_sdlc.public_start import (  # noqa: E402
     PublicStartDispatchRequired,
     PublicStartReturn,
+    project_public_start_dispatch_outcome,
     project_public_start_gen_start_outcome,
 )
 from odd_sdlc.public_start_subcarriers import (  # noqa: E402
@@ -163,6 +181,7 @@ from odd_sdlc.test_lane_evidence import (  # noqa: E402
     build_test_lane_evidence,
 )
 from odd_sdlc.traceability_index import build_requirement_traceability_index  # noqa: E402
+from odd_sdlc.worker_attachment import project_fp_worker_attachment  # noqa: E402
 from odd_sdlc.triage import CURRENT_TRIAGE_DIR, enrich_gap_snapshot, load_current_edge_triage  # noqa: E402
 from odd_sdlc.workspace_assets import (  # noqa: E402
     ASSET_PATHS,
@@ -202,6 +221,7 @@ def _admit_ordinary_execution_contract(tmp_path: Path, module) -> None:
 from genesis.binding import ContextResolver, TargetAssetBinding, _assemble_prompt, module_to_executable_jobs  # noqa: E402
 from genesis.cli_adapter import _emit_event_cmd  # noqa: E402
 from genesis.events import emit  # noqa: E402
+from genesis.policy import resolve_policy_bundle  # noqa: E402
 
 
 def _generic_fp_obligation_ledger(
@@ -264,6 +284,17 @@ def _seed_imported_workspace_for_normalization(path: Path) -> None:
                 "",
             )
         ),
+        encoding="utf-8",
+    )
+
+
+def _seed_data_mapper_template_workspace(path: Path) -> None:
+    shutil.copytree(DATA_MAPPER_TEMPLATE, path, dirs_exist_ok=True)
+
+
+def _invalidate_imported_intent_surface(path: Path) -> None:
+    (path / "specification" / "INTENT.md").write_text(
+        "# Project Intent\n\nImported project intent.\n",
         encoding="utf-8",
     )
     (path / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
@@ -491,6 +522,284 @@ def test_normalize_workspace_publishes_named_diagnostic_for_empty_execution_cont
     )
     assert missing_build["status"] == "pending_capability"
     assert missing_build["observed_state"]["declared_value"] == "undeclared"
+
+
+def test_b056_project_profile_admits_v31_build_tenants_constraints(tmp_path: Path) -> None:
+    constraints_path = tmp_path / ".ai-workspace" / "context" / "project_constraints.yml"
+    constraints_path.parent.mkdir(parents=True, exist_ok=True)
+    constraints_path.write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "data_mapper"',
+                '  kind: "data-pipeline"',
+                '  test_runner: "sbt test"',
+                'active_tenant: "scala_spark"',
+                'ambiguity_risk_appetite: "medium"',
+                "build_tenants:",
+                "  scala_spark:",
+                '    output_dir: "build_tenants/scala_spark/"',
+                '    language: "Scala"',
+                '    build_tool: "sbt"',
+                "    module_structure:",
+                '      - "cdme-compiler"',
+                '      - "cdme-assurance"',
+                "    capability_contracts:",
+                "      spark_session: true",
+                "      dataframe_reads: true",
+                '      cli_runner_class: "cdme.engine.CdmeEngineRunner"',
+                '    build_execution_contract: "sbt clean assembly"',
+                '    test_execution_contract: "sbt test"',
+                '    deployment_contract: "spark-submit"',
+                '    runtime_observation_contract: "OpenLineage"',
+                "constraints: {}",
+                "root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    profile = load_project_profile(tmp_path)
+
+    assert profile.project_slug == "data_mapper"
+    assert profile.tenant_name == "scala_spark"
+    assert profile.declared_output_dir == "build_tenants/scala_spark/"
+    assert profile.build_execution_contract == "sbt clean assembly"
+    assert profile.test_execution_contract == "sbt test"
+    assert profile.deployment_contract == "spark-submit"
+    assert profile.runtime_observation_contract == "OpenLineage"
+    assert profile.capability_contracts["spark_session"] == "true"
+    assert profile.capability_contracts["dataframe_reads"] == "true"
+    assert profile.capability_contracts["cli_runner_class"] == "cdme.engine.CdmeEngineRunner"
+    assert profile.declared_module_names() == ("cdme-compiler", "cdme-assurance")
+
+
+def test_b056_v31_and_v32_project_constraints_normalize_to_same_profile(tmp_path: Path) -> None:
+    v31 = tmp_path / "v31"
+    v32 = tmp_path / "v32"
+    for workspace in (v31, v32):
+        (workspace / ".ai-workspace" / "context").mkdir(parents=True, exist_ok=True)
+    (v31 / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "data_mapper"',
+                '  kind: "data-pipeline"',
+                '  test_runner: "sbt test"',
+                'active_tenant: "scala_spark"',
+                "build_tenants:",
+                "  scala_spark:",
+                '    output_dir: "build_tenants/scala_spark/"',
+                '    language: "Scala"',
+                '    build_tool: "sbt"',
+                "    capability_contracts:",
+                "      spark_session: true",
+                "      dataframe_reads: true",
+                '    build_execution_contract: "sbt clean assembly"',
+                '    test_execution_contract: "sbt test"',
+                '    deployment_contract: "spark-submit"',
+                '    runtime_observation_contract: "OpenLineage"',
+                "constraints: {}",
+                "root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (v32 / ".ai-workspace" / "context" / "project_constraints.yml").write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "data_mapper"',
+                '  kind: "data-pipeline"',
+                '  language: "Scala"',
+                '  tool: "sbt"',
+                '  test_runner: "sbt test"',
+                "constraints: {}",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "scala_spark"',
+                '      output_dir: "build_tenants/scala_spark/"',
+                "      capability_contracts:",
+                '        spark_session: "true"',
+                '        dataframe_reads: "true"',
+                '      build_execution_contract: "sbt clean assembly"',
+                '      test_execution_contract: "sbt test"',
+                '      deployment_contract: "spark-submit"',
+                '      runtime_observation_contract: "OpenLineage"',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    v31_profile = load_project_profile(v31).to_dict()
+    v32_profile = load_project_profile(v32).to_dict()
+
+    for key in (
+        "project_slug",
+        "tenant_name",
+        "declared_output_dir",
+        "build_execution_contract",
+        "test_execution_contract",
+        "deployment_contract",
+        "runtime_observation_contract",
+        "capability_contracts",
+    ):
+        assert v31_profile[key] == v32_profile[key]
+
+
+def test_b060_normalize_data_mapper_template_maps_stale_execution_cues(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "data_mapper.b060"
+    _seed_data_mapper_template_workspace(workspace)
+
+    normalize_workspace(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+
+    constraints = (workspace / ".ai-workspace" / "context" / "project_constraints.yml").read_text(encoding="utf-8")
+    assert 'test_runner: "sbt test"' in constraints
+    assert 'test_runner: """' not in constraints
+    assert 'build_execution_contract: "sbt clean assembly"' in constraints
+    assert 'test_execution_contract: "sbt test"' in constraints
+    assert 'deployment_contract: "spark-submit"' in constraints
+    assert 'runtime_observation_contract: "OpenLineage"' in constraints
+
+    profile = load_project_profile(workspace)
+    assert profile.test_runner == "sbt test"
+    assert profile.declared_module_names() == (
+        "cdme-compiler",
+        "cdme-assurance",
+        "cdme-executor",
+        "cdme-adjoint",
+        "cdme-accounting",
+        "cdme-fidelity",
+        "cdme-engine",
+    )
+    assert profile.has_build_execution_capability() is True
+    assert profile.has_test_execution_capability() is True
+    assert profile.has_deployment_capability() is True
+    assert profile.has_runtime_observation_capability() is True
+
+
+def test_b059_planned_scala_tree_carries_requirement_traceability(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+    constraints_path = tmp_path / ".ai-workspace" / "context" / "project_constraints.yml"
+    constraints_path.write_text(
+        "\n".join(
+            (
+                "project:",
+                '  name: "planned_traceability"',
+                '  kind: "data-pipeline"',
+                '  language: "Scala"',
+                '  tool: "sbt"',
+                '  test_runner: "sbt test"',
+                "constraints: {}",
+                "structure:",
+                "  design_tenants:",
+                '    - name: "scala_spark"',
+                '      output_dir: "build_tenants/scala_spark/"',
+                '      module_structure: "(app-core, app-extra)"',
+                "      capability_contracts:",
+                '        fat_jar: "true"',
+                '        spark_submit_compatible: "true"',
+                '      build_execution_contract: "sbt clean assembly"',
+                '      test_execution_contract: "sbt test"',
+                '      deployment_contract: "spark-submit"',
+                '      runtime_observation_contract: "OpenLineage"',
+                "  root_code_policy: reject",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    from odd_sdlc.constructor import (  # noqa: PLC2701
+        _construct_planned_software_tree,
+        _materialize_planned_generated_test_files,
+    )
+
+    files = _construct_planned_software_tree(tmp_path)
+    code_root = tmp_path / "build_tenants" / "scala_spark"
+    for relative_path, content in files.items():
+        target = code_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+    index = build_requirement_traceability_index(tmp_path)
+    scan = index.traceability_scan()
+    assert index.missing_code_traceability_ids() == ()
+    assert scan["orphan_code_files"] == []
+    assert scan["orphan_test_files"] == []
+
+    main_source = (code_root / "app-core/src/main/scala/cdme/app_core/AppCoreModule.scala").read_text(encoding="utf-8")
+    test_source = (code_root / "app-core/src/test/scala/cdme/app_core/AppCoreModuleSpec.scala").read_text(encoding="utf-8")
+    build_sbt = (code_root / "build.sbt").read_text(encoding="utf-8")
+    assert 'project in file("app-core")' in build_sbt
+    assert 'name := "app-core"' in build_sbt
+    assert "file('app-core')" not in build_sbt
+    assert "name := 'app-core'" not in build_sbt
+    assert "// Implements: REQ-DEMO-001" in main_source
+    assert "// Implements: REQ-DEMO-002" in main_source
+    assert "// Validates: REQ-DEMO-001" in test_source
+    assert "// Validates: REQ-DEMO-002" in test_source
+    assert "extends AnyFunSuite" in test_source
+
+    materialization_report = _materialize_planned_generated_test_files(tmp_path)
+    assert materialization_report["generated_test_source_count"] == 2
+    generated_trace = (
+        code_root
+        / "app-core/src/test/scala/odd/generated/AppCoreGeneratedTraceSpec.scala"
+    ).read_text(encoding="utf-8")
+    assert "// Validates: REQ-DEMO-001" in generated_trace
+    assert "extends AnyFunSuite" in generated_trace
+
+
+def test_b058_operational_execution_edges_have_public_start_route(
+    tmp_path: Path,
+) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+    refresh_analysis(tmp_path, stage="test")
+
+    enriched = enrich_gap_snapshot(
+        workspace_root=tmp_path,
+        stream=app.stream,
+        workflow_version=app.scope().workflow_version,
+        raw_gap_payload={
+            "scope": "workspace",
+            "jobs_considered": 1,
+            "total_delta": 1.0,
+            "open_frames": 0,
+            "converged": False,
+            "gaps": [
+                {
+                    "edge": "prepare_deployment_surface",
+                    "delta": 1.0,
+                    "failing": ["deployment_surface_semantically_converged"],
+                    "passing": [],
+                    "delta_summary": "deployment surface has not been prepared",
+                    "environment_ready": True,
+                }
+            ],
+        },
+        runtime_config={},
+        publish=False,
+    )
+
+    head = enriched["gaps"][0]
+    assert head["triage"]["framework_layer"] == "execution"
+    assert head["triage"]["reentry_layer"] == "execution"
+    assert head["route_binding"]["state"] == "advance_fixed_vector"
+    assert head["route_binding"]["selected_vector"] == "advance_operational_execution"
 
 
 def _read_events(workspace_root: Path) -> list[dict]:
@@ -1088,7 +1397,7 @@ def test_code_edge_prompt_uses_neutral_repair_frontier_context(tmp_path: Path) -
     assert "current governance truth" in prompt
     assert "without prescribing builder strategy" in prompt
     assert "## Global Law" not in prompt
-    assert "Prefer deepening or correcting existing artifacts" not in prompt
+    assert "Prefer deepening or correcting existing artifacts" in prompt
 
 
 def test_bootstrap_asset_publication_shares_generated_asset_contract_with_fd_certification(
@@ -1608,6 +1917,165 @@ def test_start_next_human_proxy_auto_applies_constitutional_gate_and_advances(
     )
 
 
+def test_b051_valid_imported_intent_carries_forward_without_first_run_fh_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "b051_valid_imported_intent"
+    _seed_data_mapper_template_workspace(workspace)
+    normalize_workspace(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    refresh_analysis(workspace, stage="test")
+    bootstrap_text = (workspace / ".ai-workspace" / "context" / "project_bootstrap.md").read_text(
+        encoding="utf-8"
+    )
+    assert "- authoritative project title: `Categorical Data Mapping & Computation Engine (CDME)`" in bootstrap_text
+    assert "- identity source: `specification/INTENT.md`" in bootstrap_text
+    workspace_state = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-workspace-state.json").read_text(encoding="utf-8")
+    )
+    carry_forward = workspace_state["imported_intent_carry_forward"]
+    assert carry_forward["authoritative"] is True
+    assert carry_forward["identity_source"] == "specification/INTENT.md"
+
+    app = initialize(
+        bootstrap(
+            workspace_root=workspace,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+    calls: list[tuple[object, object]] = []
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    published = gaps(app, scope="workspace")
+    head = published["dossiers"][0]
+    assert head["edge"] == "derive_intent_surface"
+    assert head["route_binding"]["state"] == "advance_fixed_vector"
+    assert head["constitutional_proposal"] is None
+
+    result = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert result["status"] == "ok"
+    assert result["resolved_edge"] == "derive_intent_surface"
+    assert len(calls) == 1
+    execution_contract = json.loads(
+        (workspace / EXECUTION_CONTRACT_REGISTER_PATH).read_text(encoding="utf-8")
+    )
+    assert execution_contract["target_truth"]["route_state"] == "advance_fixed_vector"
+    event_types = [event["event_type"] for event in _read_events(workspace)]
+    assert "fh_gate_pending" not in event_types
+    assert "execution_contract_admitted" in event_types
+
+
+def test_b051_malformed_imported_intent_still_requires_constitutional_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "b051_malformed_imported_intent"
+    _seed_data_mapper_template_workspace(workspace)
+    _invalidate_imported_intent_surface(workspace)
+    normalize_workspace(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    refresh_analysis(workspace, stage="test")
+    bootstrap_text = (workspace / ".ai-workspace" / "context" / "project_bootstrap.md").read_text(
+        encoding="utf-8"
+    )
+    assert "authoritative project title: not confidently determined from imported authority" in bootstrap_text
+    workspace_state = json.loads(
+        (workspace / ".ai-workspace" / "runtime" / "odd_sdlc-workspace-state.json").read_text(encoding="utf-8")
+    )
+    carry_forward = workspace_state["imported_intent_carry_forward"]
+    assert carry_forward["authoritative"] is False
+    assert carry_forward["reason"] == "intent_surface_present_without_project_identity"
+
+    app = initialize(
+        bootstrap(
+            workspace_root=workspace,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+
+    def _should_not_start(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("gen_start must not run while malformed imported intent remains pending_fh")
+
+    monkeypatch.setattr(app_module, "gen_start", _should_not_start)
+
+    published = gaps(app, scope="workspace")
+    head = published["dossiers"][0]
+    assert head["edge"] == "derive_intent_surface"
+    assert head["constitutional_proposal"]["state"] == "pending_fh"
+    assert head["route_binding"]["state"] == "await_fh_resolution"
+
+    result = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert result["status"] == "pending"
+    assert result["blocking_reason"] == "fh_gate"
+    assert result["constitutional_proposal"]["state"] == "pending_fh"
+    assert result["route_binding"]["state"] == "await_fh_resolution"
+
+
+def test_b051_applied_constitutional_proposal_clears_public_pending_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "b051_replayed_constitutional_resolution"
+    _seed_data_mapper_template_workspace(workspace)
+    _invalidate_imported_intent_surface(workspace)
+    normalize_workspace(
+        workspace,
+        project_slug="data_mapper",
+        platform="spark_scala",
+    )
+    refresh_analysis(workspace, stage="test")
+    app = initialize(
+        bootstrap(
+            workspace_root=workspace,
+            runtime_config={"constitutional_repricing": {"mode": "fh_gate"}},
+        )
+    )
+    calls: list[tuple[object, object]] = []
+
+    def _fake_gen_start(intent, stream) -> dict[str, object]:
+        calls.append((intent, stream))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(app_module, "gen_start", _fake_gen_start)
+
+    initial = gaps(app, scope="workspace")
+    proposal = initial["dossiers"][0]["constitutional_proposal"]
+    approved = apply_constitutional_proposal(
+        workspace,
+        edge="derive_intent_surface",
+        proposal_id=proposal["proposal_id"],
+        actor="test",
+    )
+    assert approved["status"] == "applied"
+
+    refreshed = gaps(app, scope="workspace")
+    head = refreshed["dossiers"][0]
+    assert head["route_binding"]["state"] == "constitutional_reprice_approved"
+    assert head["constitutional_proposal"]["state"] == "approve_with_edits"
+
+    result = start(app, scope="workspace", target="next", until="first_traversal")
+
+    assert result["status"] == "ok"
+    assert result["resolved_edge"] == "derive_intent_surface"
+    assert len(calls) == 1
+    event_types = [event["event_type"] for event in _read_events(workspace)]
+    assert "proposal_applied" in event_types
+
+
 def test_continue_with_result_publishes_workspace_gap_surface_and_uses_published_status(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1977,6 +2445,44 @@ def test_project_public_start_gen_start_outcome_projects_proof_hold_before_dispa
     assert proof_hold_outcome.result["status"] == "pending"
     assert proof_hold_outcome.result["stopped_by"] == "proof_hold"
     assert proof_hold_outcome.result["proof_hold_active"] is True
+
+
+def test_b055_public_start_projects_no_worker_dispatch_as_blocked() -> None:
+    attachment = project_fp_worker_attachment({"runtime_backend": "claude"})
+    assert attachment["status"] == "unattached"
+    assert attachment["blocking_reason"] == "fp_worker_unattached"
+
+    outcome = project_public_start_dispatch_outcome(
+        {
+            "status": "error",
+            "failure_class": "policy_config_defect",
+            "reason": "no dispatch agent/backend could be resolved from manifest or runtime config",
+            "target": "next",
+            "edge": "derive_code_surface",
+        }
+    )
+
+    assert isinstance(outcome, PublicStartReturn)
+    assert outcome.reason == "blocked"
+    assert outcome.result["status"] == "pending"
+    assert outcome.result["blocking_reason"] == "fp_worker_unattached"
+    assert outcome.result["stop_predicate"] == "worker_attachment_required"
+    assert outcome.result["stopped_by"] == "worker_attachment"
+    assert outcome.result["worker_attachment"]["status"] == "unattached"
+
+
+def test_b055_public_start_accepts_explicit_transport_contract_as_worker_attachment() -> None:
+    attachment = project_fp_worker_attachment(
+        {
+            "runtime_backend": "claude",
+            "transport_contract": ".genesis/odd_sdlc/release/test_transport_contract.json",
+        }
+    )
+
+    assert attachment["status"] == "attached"
+    assert attachment["worker_attachment_contract"] == "transport_contract"
+    assert attachment["transport_contract"] == ".genesis/odd_sdlc/release/test_transport_contract.json"
+    assert "blocking_reason" not in attachment
 
 
 def test_start_next_converged_surfaces_yielded_dispatch_contract(
@@ -2944,6 +3450,88 @@ def test_gaps_publishes_homeostatic_observation_and_triage(tmp_path: Path) -> No
     assert triage_event["correlation_id"] == observation_event["event_id"]
     assert route_event["correlation_id"] == triage_event["event_id"]
     assert observation_event["data"]["run_id"].startswith("gap_snapshot::")
+
+
+def test_operator_gap_analysis_projects_from_published_dossier_head(tmp_path: Path) -> None:
+    _seed_workspace(tmp_path)
+    app = initialize(bootstrap(workspace_root=tmp_path))
+
+    raw = gaps(app)
+    analysis = project_operator_gap_analysis(raw)
+    head = raw["dossiers"][0]
+
+    assert analysis["analysis_kind"] == "odd_sdlc.operator_gap_analysis"
+    assert analysis["scope"] == "workspace"
+    assert analysis["status"] == "open"
+    assert analysis["frontier"]["edge"] == head["edge"]
+    assert analysis["frontier"]["route_state"] == head["route_binding"]["state"]
+    assert analysis["frontier"]["blocker_class"] == head["triage"]["process_outcome_kind"]
+    assert analysis["start_resolution"]["blocking_reason"] == head["route_binding"]["state"]
+    assert analysis["next_lawful_steps"]
+    assert analysis["machine_output"]["command"] == "odd_sdlc gaps --format json"
+    assert analysis["source"]["binding_source"] == "odd_sdlc.gap_dossier_register"
+    assert analysis["source"]["gap_dossier_register_path"] == GAP_DOSSIER_REGISTER_PATH.as_posix()
+
+
+def test_cli_bare_gaps_defaults_to_workspace_operator_analysis(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seed_workspace(tmp_path)
+
+    exit_code = odd_sdlc_cli.main(["gaps", "--workspace", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+    raw_register = json.loads((tmp_path / GAP_DOSSIER_REGISTER_PATH).read_text(encoding="utf-8"))
+    raw_head = raw_register["dossiers"][0]
+
+    assert exit_code == 0
+    assert payload["analysis_kind"] == "odd_sdlc.operator_gap_analysis"
+    assert payload["scope"] == "workspace"
+    assert payload["frontier"]["edge"] == raw_head["edge"]
+    assert payload["frontier"]["route_state"] == raw_head["route_binding"]["state"]
+    assert payload["next_lawful_steps"]
+    assert payload["machine_output"]["command"] == "odd_sdlc gaps --format json"
+
+
+def test_cli_gaps_raw_json_mode_returns_machine_dossier(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seed_workspace(tmp_path)
+
+    exit_code = odd_sdlc_cli.main(["gaps", "--workspace", str(tmp_path), "--format", "json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["gap_dossier_kind"] == "odd_sdlc.gap_dossier_register"
+    assert payload["scope"] == "workspace"
+    assert payload["published"] is True
+    assert "dossiers" in payload
+    assert payload.get("analysis_kind") != "odd_sdlc.operator_gap_analysis"
+
+
+def test_operator_gap_analysis_fails_closed_when_dossier_unavailable(tmp_path: Path) -> None:
+    surface = load_gap_dossier_read_model(tmp_path, scope="workspace")
+
+    analysis = project_operator_gap_analysis(surface)
+
+    assert analysis["analysis_kind"] == "odd_sdlc.operator_gap_analysis"
+    assert analysis["status"] == "unavailable"
+    assert analysis["frontier"] is None
+    assert analysis["start_resolution"]["blocking_reason"] == "published_gap_dossier_unavailable"
+    assert analysis["next_lawful_steps"][0].startswith("Gap guidance is unavailable")
+    assert analysis["machine_output"]["command"] == "odd_sdlc gaps --format json"
+
+
+def test_cli_gaps_help_teaches_bare_operator_path(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        odd_sdlc_cli.main(["gaps", "--help"])
+
+    assert exc.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "bare gaps defaults to workspace" in help_text
+    assert "--format" in help_text
+    assert "raw dossier carrier" in help_text
 
 
 def test_gaps_fail_closed_when_declared_obligation_carrier_is_unavailable(
@@ -5076,7 +5664,7 @@ def test_b043_operational_dispatch_is_a_single_step_cooperative_adapter() -> Non
     assert "while current.get(\"edge\") in _PROJECTION_ONLY_EDGES" not in operational_dispatch_source
 
 
-def test_b047_upstream_test_lane_surfaces_are_planned_only_before_archive_realization(tmp_path: Path) -> None:
+def test_b047_test_lane_materializes_generated_source_before_archive_evidence(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
     module = odd_sdlc_module(tmp_path)
     vectors_by_name = {
@@ -5095,7 +5683,9 @@ def test_b047_upstream_test_lane_surfaces_are_planned_only_before_archive_realiz
     assert vectors_by_name["derive_test_run_archive_surface"]["derivation_rule"] == "realized_test_source_projection"
     assert vectors_by_name["derive_test_run_archive_surface"]["fulfillment_rule"] == "realized_test_source"
     assert vectors_by_name["derive_test_run_archive_surface"]["evidence_policy"] == "realized_test_source_evidence"
-    assert "it does not itself count as realized test source" in constructor_source
+    assert "_materialize_planned_generated_test_files" in constructor_source
+    assert "planned_generated_test_source" in constructor_source
+    assert "materializes deterministic generated developer-test source" in retired_realized_test_source_note
     assert "no longer published as runtime prompt strategy" in retired_realized_test_source_note.lower()
 
 
@@ -5264,6 +5854,28 @@ def test_b048_public_start_residual_register_fails_closed_on_raw_embedded_payloa
         )
 
 
+def test_b052_public_start_resolved_policy_accepts_genesis_tuple_bundle_refs() -> None:
+    payload = resolve_policy_bundle()
+
+    admitted = admit_resolved_policy_payload(payload)
+
+    assert isinstance(payload["bundle_refs"], tuple)
+    assert admitted["resolved_policy_bundle_ref"] == payload["resolved_policy_bundle_ref"]
+    assert admitted["bundle_refs"] == list(payload["bundle_refs"])
+
+
+def test_b052_public_start_resolved_policy_accepts_list_bundle_refs() -> None:
+    payload = resolve_policy_bundle()
+    tuple_refs = payload["bundle_refs"]
+    assert isinstance(tuple_refs, tuple)
+    payload["bundle_refs"] = list(tuple_refs)
+
+    admitted = admit_resolved_policy_payload(payload)
+
+    assert admitted["resolved_policy_bundle_ref"] == payload["resolved_policy_bundle_ref"]
+    assert admitted["bundle_refs"] == list(tuple_refs)
+
+
 def test_b048_query_domain_rejects_embedded_open_payload_fields() -> None:
     assert (
         query_module._asset_projection(  # noqa: SLF001
@@ -5356,6 +5968,28 @@ def test_b049_runtime_event_emission_uses_closed_carrier_adapter() -> None:
         data={"edge": "derive_code_surface", "actor": "human_proxy"},
     )
     assert approved == {"edge": "derive_code_surface", "actor": "human_proxy"}
+
+    route_recorded = admit_runtime_event_payload(
+        event_type="route_recorded",
+        data={
+            "kind": "odd_sdlc.homeostatic_gap",
+            "edge": "derive_code_surface",
+            "run_id": None,
+            "route_id": "route_demo",
+            "triage_id": "triage_demo",
+            "analysis_fingerprint": None,
+            "state": "blocked_missing_capability",
+            "vector_kind": None,
+            "selected_vector": None,
+            "dynamic_family": None,
+            "selected_graphfunction": None,
+            "target_assets": [],
+            "priority_source": "capability_gate",
+            "realization_iteration": None,
+            "no_lawful_route_reason": None,
+        },
+    )
+    assert route_recorded["state"] == "blocked_missing_capability"
 
 
 def test_b049_runtime_effects_fail_closed_on_raw_dict_payload() -> None:

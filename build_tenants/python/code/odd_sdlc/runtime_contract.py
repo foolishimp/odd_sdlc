@@ -36,6 +36,8 @@ def runtime_contract_lines() -> tuple[str, ...]:
         "package: odd_sdlc.gtl_module:MODULE",
         "domain_package: odd_sdlc",
         "runtime_backend: claude",
+        "worker_attachment_contract: transport_contract",
+        "# add transport_contract to attach an admitted F_P worker; without it start --until converged returns fp_worker_unattached",
         f"asset_binding_contract: {query_assets_binding_contract_json()}",
         "pythonpath:",
         "  - .genesis",

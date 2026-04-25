@@ -211,8 +211,8 @@ def publish_installed_gap_dossier(
     result = run_installed_odd_sdlc(
         workspace,
         "gaps",
-        "--scope",
-        "workspace",
+        "--format",
+        "json",
         archive=archive,
         label=label,
         timeout=timeout,

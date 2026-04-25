@@ -182,8 +182,8 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
         run_installed_odd_sdlc(
             workspace,
             "gaps",
-            "--scope",
-            "workspace",
+            "--format",
+            "json",
             archive=run_archive,
             label="test19 gaps",
         ).stdout

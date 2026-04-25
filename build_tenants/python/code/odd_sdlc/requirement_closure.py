@@ -109,22 +109,81 @@ def _is_structural_only_line(line: str) -> bool:
     return any(pattern.match(normalized) for pattern in _STRUCTURAL_LINE_PATTERNS)
 
 
+def _is_metadata_only_behavior_line(line: str) -> bool:
+    normalized = re.sub(r"\s+", " ", line.strip())
+    if normalized.startswith(
+        (
+            "val moduleName:",
+            "val projectName:",
+            "val governedCodeRoot:",
+            "val implementedRequirements:",
+            "private val validatedRequirements:",
+            "private val tracedRequirements:",
+            "val tracedRequirements:",
+        )
+    ):
+        return True
+    if normalized.startswith(("def summary:", "def summary =")):
+        return True
+    if normalized.startswith(("test(", "it(")):
+        return True
+    if normalized.startswith(("tracedRequirements.foreach", "validatedRequirements.foreach")):
+        return True
+    if not normalized.startswith("assert("):
+        return False
+    return any(
+        token in normalized
+        for token in (
+            "projectName",
+            "moduleName",
+            "governedCodeRoot",
+            "implementedRequirements",
+            "validatedRequirements",
+            "tracedRequirements",
+            ".startsWith(\"REQ-\"",
+        )
+    )
+
+
 def _has_behavioral_signal(path: Path) -> bool:
     for line in _meaningful_source_lines(path):
         if _is_structural_only_line(line):
+            continue
+        if _is_metadata_only_behavior_line(line):
             continue
         lowered = line.lower()
         if any(keyword in lowered for keyword in _BEHAVIORAL_KEYWORDS):
             return True
         if line.startswith("def ") and "=" in line:
             return True
-        if "=" in line and not line.startswith(("val ", "var ", "let ", "const ", "type ")):
+        if "=" in line and not line.startswith(
+            ("val ", "var ", "let ", "const ", "type ", "private val ", "protected val ", "lazy val ")
+        ):
             return True
         if line.startswith(("return ", "assert ", "raise ", "throw ")):
             return True
         if line.startswith(("case ", "else", "elif ", "except ", "catch ")):
             return True
-        if not line.startswith(("def ", "class ", "trait ", "interface ", "enum ", "object ", "sealed ", "final ")):
+        if not line.startswith(
+            (
+                "def ",
+                "class ",
+                "trait ",
+                "interface ",
+                "enum ",
+                "object ",
+                "sealed ",
+                "final ",
+                "val ",
+                "var ",
+                "let ",
+                "const ",
+                "type ",
+                "private val ",
+                "protected val ",
+                "lazy val ",
+            )
+        ):
             return True
     return False
 
@@ -282,8 +341,10 @@ def _build_requirement_register_entry(
         in_authority=in_authority,
         in_current=in_current,
     )
-    if behavioral_code_files and test_files:
+    if behavioral_code_files and behavioral_test_files:
         fulfillment_detail = "fulfilled"
+    elif behavioral_code_files and test_files:
+        fulfillment_detail = "implemented_without_behavioral_tests"
     elif behavioral_code_files:
         fulfillment_detail = "implemented_without_realized_tests"
     elif code_files:
@@ -308,6 +369,8 @@ def _build_requirement_register_entry(
         blocking_reasons.append("behavioral_realization_missing")
     if behavioral_code_files and not test_files:
         blocking_reasons.append("missing_realized_test_source")
+    if behavioral_code_files and test_files and not behavioral_test_files:
+        blocking_reasons.append("behavioral_test_missing")
 
     return {
         "requirement_id": requirement_id,
