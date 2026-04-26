@@ -12,7 +12,7 @@ affected_boundary: odd_sdlc triage realization cohesion, local testability, and 
 priority: medium
 triaged_at: 2026-04-20
 created_at: 2026-04-20
-updated_at: 2026-04-20
+updated_at: 2026-04-26T06:00:00Z
 dependencies:
 intake_source: split from completed T-011 umbrella after stale review-cleanup items were reconciled
 ---
@@ -43,3 +43,20 @@ context for one file.
 - no active operator or proof lane depends on the old monolith as an implicit
   mixed-concern truth surface
 
+## Scope Note
+
+This is a Python-tenant refactor ticket.
+
+The current TypeScript build wave already realized the equivalent separated
+triage shape under `build_tenants/typescript/code/src/triage/` through T-036:
+
+- `observeSdlcGapPressure`
+- `classifySdlcGapObservation`
+- `bindSdlcRoute`
+- `proposeSdlcConstitutionalRepricing`
+- `routeSdlcTicketWorkItem`
+- `retireSdlcGapAfterLoopback`
+
+The Python tenant remains separate. This ticket should not be treated as
+current TypeScript work and should be opened only if the Python maintenance line
+is explicitly resumed.

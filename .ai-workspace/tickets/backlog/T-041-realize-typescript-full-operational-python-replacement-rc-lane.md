@@ -12,7 +12,7 @@ affected_boundary: TypeScript CLI/install adapter, installed workspace normaliza
 priority: medium
 triaged_at: 2026-04-26
 created_at: 2026-04-26
-updated_at: 2026-04-26
+updated_at: 2026-04-26T05:58:00Z
 dependencies:
   - T-038 completed
 governance_scope: STDO Method
@@ -52,3 +52,15 @@ operational claim.
 It must not translate Python file boundaries directly. It must extract the
 Python-observed behavior into graph-function programs, typed carriers, ABG
 runtime truth, public adapters, and qualification archives.
+
+## Triage Note
+
+This ticket is not closable in the bounded TypeScript RC pass.
+
+The current tenant has no `cli/` module, no side-effecting install/normalize
+adapter, no live external `F_P` data_mapper run lane, and no release-cut binary
+surface. Those are the point of this ticket.
+
+The ticket remains backlog until the operator opens the full Python-replacement
+claim. While it is open, the bounded RC qualification must continue to state
+that TypeScript does not replace Python operationally.

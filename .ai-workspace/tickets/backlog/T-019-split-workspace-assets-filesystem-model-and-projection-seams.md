@@ -12,7 +12,7 @@ affected_boundary: odd_sdlc asset publication, generated-asset contract publicat
 priority: medium
 triaged_at: 2026-04-20
 created_at: 2026-04-20
-updated_at: 2026-04-20
+updated_at: 2026-04-26T06:00:00Z
 dependencies:
 intake_source: split from completed T-011 umbrella after stale review-cleanup items were reconciled
 ---
@@ -39,3 +39,19 @@ That makes review and isolated proof harder than it should be.
 - filesystem IO, asset model, and projection assembly are explicit seams
 - current published asset/query truth remains singular through the split
 
+## Scope Note
+
+This is a Python-tenant refactor ticket.
+
+The current TypeScript build wave did not port `workspace_assets.py`. It
+realized the TypeScript side as separate ODD-native surfaces:
+
+- `workspace/source_input.ts` for source-input admission
+- `workspace/project_constraints.ts` for project constraint admission
+- `workspace/bootstrap_lineage.ts` for ingress lineage
+- `domain/` for asset and worksite carriers
+- `projection/query_domain.ts` for read/query and ownership projections
+
+The Python tenant remains separate. This ticket should not be treated as
+current TypeScript work and should be opened only if the Python maintenance line
+is explicitly resumed.

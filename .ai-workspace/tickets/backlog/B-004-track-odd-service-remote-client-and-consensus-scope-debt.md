@@ -7,7 +7,7 @@
 - goal: orchestration-plane
 - priority: medium
 - created_at: 2026-04-13
-- updated_at: 2026-04-17
+- updated_at: 2026-04-26T06:03:00Z
 - dependencies: T-004
 
 ## Triage
@@ -67,3 +67,19 @@ When this ticket is activated, the work should:
 
 - parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
 - requirement: `/Users/jim/src/apps/odd_sdlc/specification/requirements/09-odd-service-orchestration-plane.md`
+- scenario: `/Users/jim/src/apps/odd_sdlc/specification/scenarios/08-odd-service-orchestration-plane.md`
+- product position: `/Users/jim/src/apps/odd_sdlc/specification/PRODUCT.md`
+
+## Current Scope Note
+
+This ticket is odd_service incubation debt, not TypeScript tenant work.
+
+The live authority surfaces already preserve the deferred scope:
+
+- `specification/requirements/09-odd-service-orchestration-plane.md`
+- `specification/scenarios/08-odd-service-orchestration-plane.md`
+- `specification/PRODUCT.md`
+
+It remains backlog until odd_service is explicitly activated. It does not block
+the bounded TypeScript RC because odd_sdlc.TS does not claim orchestration-plane
+remote client, remote snapshot verification, or consensus proving ownership.
