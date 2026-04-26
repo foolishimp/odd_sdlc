@@ -14,11 +14,11 @@ import {
 
 test("T-027 scaffold keeps explicit tenant identity after later build tickets", () => {
   assert.equal(ODD_SDLC_TYPESCRIPT_TENANT_KIND, "odd_sdlc_typescript_tenant");
-  assert.equal(ODD_SDLC_TYPESCRIPT_TENANT_STATUS, "build_active");
+  assert.equal(ODD_SDLC_TYPESCRIPT_TENANT_STATUS, "bounded_rc_qualified");
   assert(ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES.includes("hook_contracts"));
   assert.deepStrictEqual(describeOddSdlcTypescriptTenant(), {
     kind: "odd_sdlc_typescript_tenant",
-    status: "build_active",
+    status: "bounded_rc_qualified",
     product: "odd_sdlc",
     capabilities: ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES
   });

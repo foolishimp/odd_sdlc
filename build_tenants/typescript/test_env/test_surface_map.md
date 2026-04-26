@@ -236,3 +236,22 @@ The lane proves operational command/result/projection separation, capability
 gating, pending external evidence, admitted returned result projection, one-step
 cooperative advance, and runtime-return evidence feeding observation and retrofit
 graph functions.
+
+## T-038 RC Qualification Lane
+
+Derives from:
+
+- `specification/requirements/13-odd-sdlc-typescript-tenant.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`
+- `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT.md`
+- `.ai-workspace/tickets/completed/T-038-qualify-odd-sdlc-typescript-rc-against-python-functionality-and-odd-scenarios.md`
+
+Canonical file:
+
+- `test_env/tests/test_t038_rc_qualification.test.mjs`
+
+The lane proves the bounded TypeScript RC claim through a composed harnessed
+sandbox that walks ingress, query/start, hook evidence, requirement closure,
+triage routing, operational build result admission, and runtime-return
+observation. It also proves that remaining full Python-replacement gaps are
+not part of the bounded RC claim and are tracked by follow-up ticket authority.

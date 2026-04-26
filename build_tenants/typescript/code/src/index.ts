@@ -4,7 +4,8 @@
 export const ODD_SDLC_TYPESCRIPT_TENANT_KIND =
   "odd_sdlc_typescript_tenant" as const;
 
-export const ODD_SDLC_TYPESCRIPT_TENANT_STATUS = "build_active" as const;
+export const ODD_SDLC_TYPESCRIPT_TENANT_STATUS =
+  "bounded_rc_qualified" as const;
 
 export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "abiogenesis_substrate_bound",
@@ -16,7 +17,8 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "hook_contracts",
   "traceability_requirement_closure",
   "gap_triage_route_binding",
-  "operational_transition_runtime_return"
+  "operational_transition_runtime_return",
+  "rc_qualification"
 ] as const);
 
 export interface OddSdlcTypescriptTenantInfo {
@@ -44,3 +46,4 @@ export * from "./start/index.js";
 export * from "./hooks/index.js";
 export * from "./triage/index.js";
 export * from "./operational/index.js";
+export * from "./qualification/index.js";

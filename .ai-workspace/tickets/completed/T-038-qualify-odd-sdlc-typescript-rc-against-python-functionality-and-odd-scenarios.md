@@ -3,7 +3,7 @@ id: T-038
 title: Qualify odd_sdlc TypeScript RC against Python functionality and ODD scenarios
 type: qualification
 ticket_category: build_wave
-status: backlog
+status: completed
 goal: build-odd-sdlc-typescript-as-odd-native-app
 change_intent: Prove that odd_sdlc.TS reaches RC readiness through scenario, sandbox, live, and comparison evidence rather than through green unit tests alone.
 change_class: product_reprice
@@ -13,6 +13,7 @@ priority: critical
 triaged_at: 2026-04-26
 created_at: 2026-04-26
 updated_at: 2026-04-26
+completed_at: 2026-04-26T05:52:39Z
 dependencies:
   - T-037 completed
   - T-039 completed
@@ -50,3 +51,34 @@ non_closure_conditions:
 ## STDO Reading
 
 This is the release-readiness gate for the TS build wave.
+
+## Closure Evidence
+
+T-038 closes as a bounded TypeScript package RC qualification, not as a full
+Python operational replacement claim.
+
+Landed surfaces:
+
+- `build_tenants/typescript/code/src/qualification/rc_qualification.ts`
+- `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT.md`
+- `build_tenants/typescript/test_env/tests/test_t038_rc_qualification.test.mjs`
+- `build_tenants/typescript/test_env/test_surface_map.md`
+- `.ai-workspace/tickets/backlog/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
+
+Verification:
+
+- `npm run test:t038` passed: 2 tests.
+- `npm run test:semantic` passed: 50 tests.
+- `npm run lint:semantic` passed.
+- `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template npm run test:reference:data-mapper` passed: 1 reference test.
+
+STDO review:
+
+- SPEC_METHOD: pass. The release claim is bounded and does not outrun product
+  or design authority.
+- TICKET_METHOD: pass. The remaining full Python-replacement gap is ticketed as
+  T-041.
+- DESIGN_MODULE_METHOD: pass. Qualification is backed by the TypeScript tenant
+  derivation design, test map, report, and composed sandbox proof.
+- ODD_METHOD: pass. The scenario keeps graph functions as program truth, ABG as
+  runtime truth, and SDLC as domain semantics.
