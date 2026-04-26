@@ -3,7 +3,7 @@ id: T-037
 title: Realize TypeScript operational transition and runtime-return surfaces
 type: feature
 ticket_category: build_wave
-status: backlog
+status: completed
 goal: build-odd-sdlc-typescript-as-odd-native-app
 change_intent: Implement build, test, deploy, observe, runtime-return, retrofit, and relaunch operational surfaces as command/result/projection families over ABG truth.
 change_class: realization_refactor
@@ -13,6 +13,7 @@ priority: high
 triaged_at: 2026-04-26
 created_at: 2026-04-26
 updated_at: 2026-04-26
+completed_at: 2026-04-26
 dependencies:
   - T-036 completed
 governance_scope: STDO Method
@@ -45,3 +46,19 @@ non_closure_conditions:
 ## STDO Reading
 
 This ticket keeps side-effecting work cooperative and evidence-backed.
+
+## Closure Evidence
+
+- Added operational transition plan, one-step advance, and runtime-return
+  observation carriers.
+- Capability contracts gate command preparation.
+- Command intent without returned result projects `pending`, not success.
+- Admitted results drive operational state projections only when bound to the
+  command id.
+- Runtime-return evidence feeds runtime observation and retrofit graph
+  functions.
+- Operational advance returns control to ABG/public-start policy and does not
+  loop tenant-local sagas.
+- Focused proof: `npm run test:t037` passed.
+- Regression proof: `npm run test:semantic` passed with 48 tests.
+- Static proof: `npm run lint:semantic` passed.

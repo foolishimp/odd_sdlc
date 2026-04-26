@@ -30,6 +30,7 @@
     "test:t034": "npm run build:semantic && node --test test_env/tests/test_t034_hook_set.test.mjs",
     "test:t035": "npm run build:semantic && node --test test_env/tests/test_t035_traceability_requirement_closure.test.mjs",
     "test:t036": "npm run build:semantic && node --test test_env/tests/test_t036_gap_triage_homeostatic_route.test.mjs",
+    "test:t037": "npm run build:semantic && node --test test_env/tests/test_t037_operational_transition_runtime_return.test.mjs",
     "test:t039": "npm run build:semantic && node --test test_env/tests/test_t039_query_domain_structural_drift.test.mjs",
     "test:t040": "npm run build:semantic && node --test test_env/tests/test_t040_fixture_portability.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"

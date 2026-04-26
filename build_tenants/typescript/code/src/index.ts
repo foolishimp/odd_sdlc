@@ -15,7 +15,8 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "public_start_handoff",
   "hook_contracts",
   "traceability_requirement_closure",
-  "gap_triage_route_binding"
+  "gap_triage_route_binding",
+  "operational_transition_runtime_return"
 ] as const);
 
 export interface OddSdlcTypescriptTenantInfo {
@@ -42,3 +43,4 @@ export * from "./projection/index.js";
 export * from "./start/index.js";
 export * from "./hooks/index.js";
 export * from "./triage/index.js";
+export * from "./operational/index.js";

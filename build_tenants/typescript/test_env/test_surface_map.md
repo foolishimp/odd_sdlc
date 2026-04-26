@@ -219,3 +219,20 @@ repricing proposal, ticket work-item route, and loopback retirement as separate
 typed carriers. It also proves the triage workflow is published as GTL graph
 functions and remains downstream of ABG gap truth and TICKET_METHOD ticket
 authority.
+
+## T-037 Operational Transition And Runtime Return Lane
+
+Derives from:
+
+- `specification/requirements/12-declarative-operational-state-transitions.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_OPERATIONAL_TRANSITION_RUNTIME_RETURN.md`
+- `.ai-workspace/tickets/completed/T-037-realize-typescript-operational-transition-and-runtime-return-surfaces.md`
+
+Canonical file:
+
+- `test_env/tests/test_t037_operational_transition_runtime_return.test.mjs`
+
+The lane proves operational command/result/projection separation, capability
+gating, pending external evidence, admitted returned result projection, one-step
+cooperative advance, and runtime-return evidence feeding observation and retrofit
+graph functions.

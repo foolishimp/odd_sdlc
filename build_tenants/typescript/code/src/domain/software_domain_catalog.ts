@@ -69,7 +69,12 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
     name: "deployment_records",
     description: "Governed records describing how a qualified software branch is launched into an operating environment.",
     lifecycleRole: "deployment",
-    representativeAssetTypes: ["deployment_record_surface"],
+    representativeAssetTypes: [
+      "deployment_record_surface",
+      "deployment_surface",
+      "deployment_result_surface",
+      "deployed_environment_surface"
+    ],
     realizationStatus: "active_first_slice"
   }),
   admitSdlcAssetFamily({
@@ -78,7 +83,11 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
     lifecycleRole: "operation",
     representativeAssetTypes: [
       "runtime_observation_surface",
-      "operational_evidence_surface"
+      "operational_evidence_surface",
+      "build_execution_surface",
+      "build_execution_result_surface",
+      "test_execution_surface",
+      "test_execution_result_surface"
     ],
     realizationStatus: "active_first_slice"
   }),
@@ -88,7 +97,8 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
     lifecycleRole: "retrofit",
     representativeAssetTypes: [
       "maintenance_plan_surface",
-      "retrofit_design_surface"
+      "retrofit_design_surface",
+      "retrofit_plan_surface"
     ],
     realizationStatus: "active_first_slice"
   }),
@@ -222,10 +232,18 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "release_surface",
     "release_document_surface",
     "deployment_record_surface",
+    "deployment_surface",
+    "deployment_result_surface",
+    "deployed_environment_surface",
+    "build_execution_surface",
+    "build_execution_result_surface",
+    "test_execution_surface",
+    "test_execution_result_surface",
     "runtime_observation_surface",
     "operational_evidence_surface",
     "maintenance_plan_surface",
     "retrofit_design_surface",
+    "retrofit_plan_surface",
     "gap_observation_surface",
     "gap_triage_surface",
     "gap_route_surface",
