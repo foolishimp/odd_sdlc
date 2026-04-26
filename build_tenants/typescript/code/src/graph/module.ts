@@ -21,6 +21,7 @@ import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   OPERATIONAL_FUNCTION_CATALOG,
   SDLC_FUNCTION_CATALOG,
+  TRIAGE_FUNCTION_CATALOG,
   type SdlcExecutiveProgramEntry,
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
@@ -322,6 +323,7 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
 export function constructSdlcGtlModule(): Module {
   const bootstrapFunctions = leafFunctions(BOOTSTRAP_RELEASE_FUNCTION_CATALOG);
   const operationalFunctions = leafFunctions(OPERATIONAL_FUNCTION_CATALOG);
+  const triageFunctions = leafFunctions(TRIAGE_FUNCTION_CATALOG);
   const bootstrapExecutive = constructExecutive({
     name: "bootstrap_release_self_test",
     intent: "Top-level bootstrap-to-release executive over the retained proving subset.",
@@ -338,7 +340,8 @@ export function constructSdlcGtlModule(): Module {
     bootstrapExecutive,
     operationalExecutive,
     ...bootstrapFunctions,
-    ...operationalFunctions
+    ...operationalFunctions,
+    ...triageFunctions
   ]);
   const module = admitModule({
     name: "odd_sdlc_typescript",

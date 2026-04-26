@@ -20,6 +20,7 @@ import {
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   OPERATIONAL_FUNCTION_CATALOG,
+  TRIAGE_FUNCTION_CATALOG,
   assertSdlcModuleJobsTargetPublishedGraphFunctions,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule
@@ -63,7 +64,14 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
   const catalog = constructSdlcGraphFunctionCatalog();
 
   assert.equal(catalog.kind, "sdlc_graph_function_catalog");
-  assert.equal(catalog.functions.length, 27);
+  assert.equal(
+    catalog.functions.length,
+    BOOTSTRAP_RELEASE_FUNCTION_CATALOG.length +
+      OPERATIONAL_FUNCTION_CATALOG.length +
+      TRIAGE_FUNCTION_CATALOG.length
+  );
+  assert(catalog.functions.some((entry) => entry.name === "observe_gap_pressure"));
+  assert(catalog.functions.some((entry) => entry.name === "retire_gap_after_loopback"));
   assert.deepStrictEqual(
     catalog.executives.map((entry) => entry.name),
     ["bootstrap_release_self_test", "release_operational_cycle"]

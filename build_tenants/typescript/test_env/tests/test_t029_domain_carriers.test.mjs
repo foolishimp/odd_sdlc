@@ -138,7 +138,10 @@ test("T-029 TypeScript catalog preserves Python software-domain family and work-
   const source = pythonCatalogSource();
   assert.deepStrictEqual(
     SOFTWARE_DOMAIN_ASSET_FAMILIES.map((entry) => entry.name),
-    namesFromConstructor(source, "AssetFamilyDescriptor")
+    [
+      ...namesFromConstructor(source, "AssetFamilyDescriptor"),
+      "governance_loop"
+    ]
   );
   assert.deepStrictEqual(
     SOFTWARE_DOMAIN_WORK_ACT_TYPES.map((entry) => entry.name),

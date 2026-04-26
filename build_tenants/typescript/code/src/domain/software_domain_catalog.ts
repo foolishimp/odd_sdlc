@@ -91,6 +91,20 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
       "retrofit_design_surface"
     ],
     realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "governance_loop",
+    description: "Observation, triage, route, repricing, ticket-route, and retirement surfaces for the homeostatic governance loop.",
+    lifecycleRole: "operation",
+    representativeAssetTypes: [
+      "gap_observation_surface",
+      "gap_triage_surface",
+      "gap_route_surface",
+      "repricing_proposal_surface",
+      "ticket_work_item_route_surface",
+      "gap_retirement_surface"
+    ],
+    realizationStatus: "active_first_slice"
   })
 ]);
 
@@ -211,7 +225,13 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "runtime_observation_surface",
     "operational_evidence_surface",
     "maintenance_plan_surface",
-    "retrofit_design_surface"
+    "retrofit_design_surface",
+    "gap_observation_surface",
+    "gap_triage_surface",
+    "gap_route_surface",
+    "repricing_proposal_surface",
+    "ticket_work_item_route_surface",
+    "gap_retirement_surface"
   ].map((name) =>
     admitSdlcAssetType({
       name,

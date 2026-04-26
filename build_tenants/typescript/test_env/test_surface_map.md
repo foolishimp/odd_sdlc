@@ -201,3 +201,21 @@ The lane proves lineage over admitted source, graph-function work reports,
 generated asset authority, explicit proof claims, requirement closure register,
 and repair frontier. Trace tags alone remain partial evidence and unresolved
 requirements are carried forward.
+
+## T-036 Gap Triage Homeostatic Route Lane
+
+Derives from:
+
+- `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_GAP_TRIAGE_HOMEOSTATIC_LOOP.md`
+- `.ai-workspace/tickets/completed/T-036-realize-typescript-gap-triage-homeostatic-loop-and-ticket-routing.md`
+
+Canonical file:
+
+- `test_env/tests/test_t036_gap_triage_homeostatic_route.test.mjs`
+
+The lane proves observation, classification, route binding, constitutional
+repricing proposal, ticket work-item route, and loopback retirement as separate
+typed carriers. It also proves the triage workflow is published as GTL graph
+functions and remains downstream of ABG gap truth and TICKET_METHOD ticket
+authority.

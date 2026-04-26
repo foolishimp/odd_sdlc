@@ -219,7 +219,47 @@ export const OPERATIONAL_FUNCTION_CATALOG = Object.freeze([
   })
 ]);
 
+export const TRIAGE_FUNCTION_CATALOG = Object.freeze([
+  entry({
+    name: "observe_gap_pressure",
+    intent: "Project current gap pressure from gap dossier and requirement closure truth.",
+    inputs: ["sdlc_gap_dossier", "sdlc_requirement_closure_register"],
+    outputs: ["gap_observation_surface"]
+  }),
+  entry({
+    name: "classify_gap_triage",
+    intent: "Classify observed pressure into framework layer, condition, and process outcome.",
+    inputs: ["gap_observation_surface"],
+    outputs: ["gap_triage_surface"]
+  }),
+  entry({
+    name: "bind_gap_route",
+    intent: "Bind triage classification to lawful re-entry and public start target.",
+    inputs: ["gap_observation_surface", "gap_triage_surface"],
+    outputs: ["gap_route_surface"]
+  }),
+  entry({
+    name: "propose_constitutional_repricing",
+    intent: "Publish a gated constitutional repricing proposal without applying it.",
+    inputs: ["gap_triage_surface"],
+    outputs: ["repricing_proposal_surface"]
+  }),
+  entry({
+    name: "route_ticket_work_item",
+    intent: "Project ticket/work-item routing under TICKET_METHOD authority.",
+    inputs: ["gap_route_surface"],
+    outputs: ["ticket_work_item_route_surface"]
+  }),
+  entry({
+    name: "retire_gap_after_loopback",
+    intent: "Publish gap retirement state after loopback over renewed closure truth.",
+    inputs: ["gap_observation_surface", "sdlc_requirement_closure_register"],
+    outputs: ["gap_retirement_surface"]
+  })
+]);
+
 export const SDLC_FUNCTION_CATALOG = Object.freeze([
   ...BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
-  ...OPERATIONAL_FUNCTION_CATALOG
+  ...OPERATIONAL_FUNCTION_CATALOG,
+  ...TRIAGE_FUNCTION_CATALOG
 ]);
