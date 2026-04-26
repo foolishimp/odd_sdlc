@@ -85,12 +85,14 @@ Canonical file:
 
 - `test_env/tests/test_t031_workspace_ingress.test.mjs`
 
-The lane proves pure typed ingress over the real `data_mapper.template`
-fixture: source-input digests, authority markers, project constraints admission,
-imported requirement authority, and `InputSet -> Project`/requirement lineage.
-The fixture root is supplied by `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT` or the
-documented local default, with a fail-closed diagnostic when the fixture is not
-present.
+The lane proves pure typed ingress over checked-in portable source snapshots:
+source-input digests, authority markers, project constraints admission, imported
+requirement authority, and `InputSet -> Project`/requirement lineage. It does
+not depend on local filesystem fixtures.
+
+The full external `data_mapper.template` fixture is retained as optional local
+reference comparison through `npm run test:reference:data-mapper` and
+`test_env/fixtures/data_mapper_reference_manifest.md`.
 
 ## T-032 Query Domain And Gap Projection Lane
 
@@ -116,7 +118,7 @@ Derives from:
 
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`
-- `.ai-workspace/tickets/backlog/T-039-close-typescript-query-domain-structural-drift-over-admitted-gtl-module.md`
+- `.ai-workspace/tickets/completed/T-039-close-typescript-query-domain-structural-drift-over-admitted-gtl-module.md`
 
 Canonical file:
 
@@ -126,6 +128,23 @@ The lane proves query-domain does not treat graph-function name equality as
 structural equivalence. Same-name output drift, vector drift, and start-target
 drift fail closed before catalog-derived ownership, program, or target read
 models are published.
+
+## T-040 Fixture Portability And Test-Lane Authority
+
+Derives from:
+
+- `specification_methodology/specification/standards/SPEC_METHOD.md`
+- `build_tenants/typescript/test_env/fixtures/data_mapper_reference_manifest.md`
+- `.ai-workspace/tickets/completed/T-040-govern-typescript-data-mapper-fixture-proof-portability-and-test-lane-authority.md`
+
+Canonical file:
+
+- `test_env/tests/test_t040_fixture_portability.test.mjs`
+
+The lane proves required semantic closure excludes external reference fixtures.
+The `data_mapper.template` reference proof is explicitly classified as optional
+local reference comparison and is run through `npm run test:reference:data-mapper`
+when `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT` is provided.
 
 ## T-033 Public Start Lane
 

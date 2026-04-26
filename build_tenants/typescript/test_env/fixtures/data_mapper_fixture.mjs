@@ -1,18 +1,25 @@
 import { existsSync } from "node:fs";
 
-const DEFAULT_DATA_MAPPER_TEMPLATE_ROOT =
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT_ENV = "ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT";
 
 export function canonicalDataMapperFixtureRoot() {
-  const root =
-    process.env.ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT ??
-    DEFAULT_DATA_MAPPER_TEMPLATE_ROOT;
+  const root = process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV];
+  if (root === undefined || root.length === 0) {
+    throw new Error(
+      [
+        "Missing external data_mapper.template fixture root.",
+        "Lane: optional local reference comparison, not semantic closure.",
+        `Set ${DATA_MAPPER_TEMPLATE_ROOT_ENV} to run this reference lane.`
+      ].join(" ")
+    );
+  }
   if (!existsSync(root)) {
     throw new Error(
       [
-        "Missing canonical data_mapper.template fixture.",
+        "Missing external data_mapper.template fixture.",
+        "Lane: optional local reference comparison, not semantic closure.",
         `Checked: ${root}`,
-        "Set ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT to the fixture root for portable runs."
+        `Set ${DATA_MAPPER_TEMPLATE_ROOT_ENV} to the fixture root.`
       ].join(" ")
     );
   }

@@ -7,7 +7,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import {
   admitSdlcProjectConstraints,
@@ -16,21 +15,46 @@ import {
   deriveSdlcWorkspaceIngressReport,
   parseProjectSlugFromConstraintText
 } from "../../build/semantic/code/src/index.js";
-import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
-const fixtureRoot = canonicalDataMapperFixtureRoot();
+const PORTABLE_INTENT_TEXT = [
+  "# Intent",
+  "",
+  "**Project**: data_mapper",
+  "",
+  "INT-001: Governed data mapping exists as a typed project."
+].join("\n");
 
-function fixtureSnapshot(relativePath) {
+const PORTABLE_README_TEXT = [
+  "# Data Mapper",
+  "",
+  "Bootstrap notes without formal authority markers."
+].join("\n");
+
+const PORTABLE_CONSTRAINT_TEXT = [
+  "name: data_mapper",
+  "active_tenant: scala_spark"
+].join("\n");
+
+const PORTABLE_REQUIREMENTS_TEXT = [
+  "# Requirements",
+  "",
+  "REQ-LDM-001: The mapper preserves lineage.",
+  "REQ-ENG-007: The implementation exposes runnable proof."
+].join("\n");
+
+function fixtureSnapshot(relativePath, content) {
   return {
-    uri: `file://${fixtureRoot}/${relativePath}`,
+    uri: `fixture://portable-t031/${relativePath}`,
     relativePath,
-    content: readFileSync(`${fixtureRoot}/${relativePath}`, "utf8")
+    content
   };
 }
 
 test("T-031 admits source inputs with digest, role, authority markers, and ambiguity", () => {
-  const intent = deriveSdlcSourceInput(fixtureSnapshot("specification/INTENT.md"));
-  const readme = deriveSdlcSourceInput(fixtureSnapshot("README.md"));
+  const intent = deriveSdlcSourceInput(
+    fixtureSnapshot("specification/INTENT.md", PORTABLE_INTENT_TEXT)
+  );
+  const readme = deriveSdlcSourceInput(fixtureSnapshot("README.md", PORTABLE_README_TEXT));
   const admitted = admitSdlcSourceInput(intent);
 
   assert.equal(admitted.detectedRole, "intent_surface");
@@ -75,23 +99,19 @@ test("T-031 project constraints admission fails closed on stale or malformed sha
   );
 });
 
-test("T-031 real data_mapper fixture derives imported requirement authority and lineage", () => {
-  const constraintText = readFileSync(
-    `${fixtureRoot}/.ai-workspace/context/project_constraints.yml`,
-    "utf8"
-  );
+test("T-031 portable fixture derives imported requirement authority and lineage", () => {
   const sourceInputs = [
-    deriveSdlcSourceInput(fixtureSnapshot("README.md")),
-    deriveSdlcSourceInput(fixtureSnapshot(".ai-workspace/context/project_constraints.yml")),
-    deriveSdlcSourceInput(fixtureSnapshot("specification/INTENT.md")),
-    deriveSdlcSourceInput(fixtureSnapshot("specification/REQUIREMENTS.md")),
-    deriveSdlcSourceInput(fixtureSnapshot("specification/mapper_requirements.md")),
+    deriveSdlcSourceInput(fixtureSnapshot("README.md", PORTABLE_README_TEXT)),
     deriveSdlcSourceInput(
-      fixtureSnapshot("specification/appendices/APPENDIX_A_FROBENIUS_ALGEBRAS.md")
+      fixtureSnapshot(".ai-workspace/context/project_constraints.yml", PORTABLE_CONSTRAINT_TEXT)
+    ),
+    deriveSdlcSourceInput(fixtureSnapshot("specification/INTENT.md", PORTABLE_INTENT_TEXT)),
+    deriveSdlcSourceInput(
+      fixtureSnapshot("specification/REQUIREMENTS.md", PORTABLE_REQUIREMENTS_TEXT)
     )
   ];
   const constraints = admitSdlcProjectConstraints({
-    projectSlug: parseProjectSlugFromConstraintText(constraintText),
+    projectSlug: parseProjectSlugFromConstraintText(PORTABLE_CONSTRAINT_TEXT),
     activeTenant: "scala_spark",
     selectedOutputRoot: "build_tenants/scala_spark",
     ambiguityRiskAppetite: "low",
@@ -102,14 +122,14 @@ test("T-031 real data_mapper fixture derives imported requirement authority and 
     ]
   });
   const report = deriveSdlcWorkspaceIngressReport({
-    workspaceRootUri: `file://${fixtureRoot}`,
+    workspaceRootUri: "fixture://portable-t031",
     projectConstraints: constraints,
     sourceInputs
   });
 
   assert.equal(report.kind, "sdlc_workspace_ingress_report");
   assert.equal(report.projectConstraints.activeTenant, "scala_spark");
-  assert(report.importedRequirementAuthorities.length > 50);
+  assert.equal(report.importedRequirementAuthorities.length, 2);
   assert(
     report.importedRequirementAuthorities.some(
       (authority) => authority.requirementId === "REQ-LDM-001"
@@ -122,7 +142,7 @@ test("T-031 real data_mapper fixture derives imported requirement authority and 
   );
 
   const projectLineage = report.lineage.find(
-    (entry) => entry.elementId === "project:imported_project"
+    (entry) => entry.elementId === "project:data_mapper"
   );
   assert(projectLineage);
   assert(

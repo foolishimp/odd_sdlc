@@ -174,6 +174,11 @@ software through composed scenarios. Sandbox tests may be harnessed or live:
 - live sandbox tests use an actual F_P worker, tool, or external runtime where
   the release claim depends on live probabilistic or operational behavior.
 
+Required semantic closure must run from the declared source boundary. External
+project fixtures, including the full `data_mapper.template` workspace, are
+reference comparison, sandbox, or RC qualification evidence unless they are
+captured by a checked-in fixture or explicit fixture manifest.
+
 An RC claim may not rely on unit tests alone when it claims public SDLC
 workflow behavior.
 

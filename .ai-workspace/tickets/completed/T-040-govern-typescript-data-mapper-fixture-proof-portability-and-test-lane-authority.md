@@ -3,7 +3,7 @@ id: T-040
 title: Govern TypeScript data-mapper fixture proof portability and test-lane authority
 type: corrective
 ticket_category: build_wave
-status: backlog
+status: completed
 goal: build-odd-sdlc-typescript-as-odd-native-app
 change_intent: Ensure TypeScript test closure separates portable semantic proof from external fixture, sandbox, live, and reference-comparison evidence.
 change_class: design_reframe
@@ -12,6 +12,7 @@ affected_boundary: TypeScript test surface map, data_mapper fixture binding, sem
 priority: P1
 triaged_at: 2026-04-26
 created_at: 2026-04-26
+completed_at: 2026-04-26
 governance_scope: STDO Method
 ---
 
@@ -81,3 +82,19 @@ external-fixture tests from semantic closure.
 - an external reference fixture is required but not declared in the lane map
 - a missing external fixture reports as a generic test failure
 - RC proof uses the fixture without recording source/version
+
+## Closure Evidence
+
+- Required semantic T-031 proof now uses checked-in portable source snapshots.
+- The full external `data_mapper.template` proof moved to
+  `test_t031_data_mapper_reference.reference.mjs`, outside the `*.test.mjs`
+  semantic lane.
+- `data_mapper_reference_manifest.md` declares fixture authority, environment
+  binding, expected local source, and lane classification.
+- `data_mapper_fixture.mjs` now requires `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT`
+  and reports a governed optional-reference diagnostic when absent.
+- `test:t040` proves semantic closure excludes external reference fixtures.
+- `test:reference:data-mapper` proves the retained external comparison lane when
+  the fixture is explicitly bound.
+- `npm run test:t031`, `npm run test:t040`, `npm run test:semantic`,
+  `npm run lint:semantic`, and `test:reference:data-mapper` passed.

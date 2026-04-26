@@ -28,7 +28,9 @@
     "test:t032": "npm run build:semantic && node --test test_env/tests/test_t032_query_gap_projection.test.mjs",
     "test:t033": "npm run build:semantic && node --test test_env/tests/test_t033_public_start.test.mjs",
     "test:t034": "npm run build:semantic && node --test test_env/tests/test_t034_hook_set.test.mjs",
-    "test:t039": "npm run build:semantic && node --test test_env/tests/test_t039_query_domain_structural_drift.test.mjs"
+    "test:t039": "npm run build:semantic && node --test test_env/tests/test_t039_query_domain_structural_drift.test.mjs",
+    "test:t040": "npm run build:semantic && node --test test_env/tests/test_t040_fixture_portability.test.mjs",
+    "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "8.59.0",
