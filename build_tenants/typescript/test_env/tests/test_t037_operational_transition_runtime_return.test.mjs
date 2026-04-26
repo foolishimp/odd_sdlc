@@ -3,6 +3,7 @@
 // Validates: REQ-F-ODDSDLC-038
 // Validates: REQ-F-ODDSDLC-039
 // Investigates: T-037
+// Investigates: T-043
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -136,3 +137,44 @@ test("T-037 runtime-return evidence feeds observation and retrofit graph functio
   assert.deepStrictEqual(observation.emittedRuntimeEventKinds, []);
 });
 
+test("T-043 runtime-return observation rejects foreign results and non-runtime lanes", () => {
+  const runtimePlan = prepareSdlcOperationalTransition({
+    projectConstraints: constraints(["runtime_return_channel"]),
+    lane: "runtime_return",
+    commandId: "command://t043/runtime-return",
+    capabilityContract: "runtime_return_channel",
+    targetAssetIds: ["asset://deployment_result_surface"]
+  });
+  assert(runtimePlan.command);
+  const result = admitSdlcOperationalResult({
+    kind: "sdlc_operational_result",
+    resultId: "result://t043/runtime-return/1",
+    commandId: runtimePlan.command.commandId,
+    status: "succeeded",
+    evidenceAssetIds: ["asset://runtime-observation"],
+    returnedAt: "2026-04-26T00:00:00Z"
+  });
+
+  assert.throws(
+    () =>
+      observeSdlcRuntimeReturn({
+        command: runtimePlan.command,
+        result: {
+          ...result,
+          commandId: "command://t043/foreign"
+        },
+        runtimeFactRefs: []
+      }),
+    /another command/
+  );
+
+  assert.throws(
+    () =>
+      observeSdlcRuntimeReturn({
+        command: preparedBuildCommand(),
+        result,
+        runtimeFactRefs: []
+      }),
+    /runtime_return/
+  );
+});

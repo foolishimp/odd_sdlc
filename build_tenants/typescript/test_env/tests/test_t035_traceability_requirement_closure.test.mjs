@@ -2,6 +2,7 @@
 // Validates: REQ-F-ODDSDLC-030
 // Validates: REQ-F-ODDSDLC-031
 // Investigates: T-035
+// Investigates: T-042
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -10,6 +11,7 @@ import {
   admitSdlcConstructorResult,
   admitSdlcProjectConstraints,
   admitSdlcRequirementProofClaim,
+  constructSdlcWorkReport,
   deriveSdlcLineageLedger,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
@@ -53,42 +55,57 @@ function ingressReport() {
 }
 
 function successfulCodeWorkReport() {
+  return codeWorkReport({
+    targetAssetId: "asset://code_surface",
+    satisfied: true
+  });
+}
+
+function codeWorkReport(input) {
   const contract = hookContractByEdgeName("derive_code_surface");
-  const targetAssetId = "asset://code_surface";
+  const targetAssetId = input.targetAssetId;
   const invocation = minimalSdlcHookInvocationForContract({
     contract,
     targetAssetId,
     fpWorkerContractRef: "worker://fp/local"
   });
+  const constructorResult = admitSdlcConstructorResult({
+    operationType: "generate",
+    outputIdentity: {
+      assetId: targetAssetId,
+      uri: "file:///workspace/src/generated_code.ts",
+      declaredType: "code_surface",
+      digest: "sha256:generated-code",
+      byteCount: 2048
+    },
+    evidenceRefs: [
+      {
+        ref: "file:///workspace/src/generated_code.ts",
+        evidenceType: "materialized_asset",
+        digest: "sha256:generated-code-evidence"
+      }
+    ],
+    generatedAssetContract: {
+      contractName: "generated-asset-contract",
+      targetAssetId,
+      satisfied: input.satisfied,
+      materialized: input.satisfied,
+      diagnostics: input.satisfied ? [] : ["contract_unsatisfied"],
+      foreignRealizationCandidates: []
+    },
+    ambiguityCandidates: []
+  });
+  if (!input.satisfied) {
+    return constructSdlcWorkReport({
+      contract,
+      invocation,
+      constructorResult
+    });
+  }
   const outcome = runSdlcHookTurn({
     contract,
     invocation,
-    constructorResult: admitSdlcConstructorResult({
-      operationType: "generate",
-      outputIdentity: {
-        assetId: targetAssetId,
-        uri: "file:///workspace/src/generated_code.ts",
-        declaredType: "code_surface",
-        digest: "sha256:generated-code",
-        byteCount: 2048
-      },
-      evidenceRefs: [
-        {
-          ref: "file:///workspace/src/generated_code.ts",
-          evidenceType: "materialized_asset",
-          digest: "sha256:generated-code-evidence"
-        }
-      ],
-      generatedAssetContract: {
-        contractName: "generated-asset-contract",
-        targetAssetId,
-        satisfied: true,
-        materialized: true,
-        diagnostics: [],
-        foreignRealizationCandidates: []
-      },
-      ambiguityCandidates: []
-    })
+    constructorResult
   });
   assert.equal(outcome.postflight?.status, "passed");
   assert(outcome.workReport);
@@ -216,6 +233,50 @@ test("T-035 requirement closure rejects trace-only shells and carries unresolved
   assert.deepStrictEqual(register.emittedRuntimeEventKinds, []);
 });
 
+test("T-042 requirement closure rejects split behavioral proof and satisfied contract", () => {
+  const ingress = ingressReport();
+  const unsatisfiedBehavioralAsset = codeWorkReport({
+    targetAssetId: "asset://code_surface_with_behavioral_proof",
+    satisfied: false
+  });
+  const satisfiedTraceAsset = codeWorkReport({
+    targetAssetId: "asset://code_surface_with_trace_only",
+    satisfied: true
+  });
+  const ledger = deriveSdlcLineageLedger({
+    ingressReport: ingress,
+    workReports: [unsatisfiedBehavioralAsset, satisfiedTraceAsset],
+    proofClaims: [
+      proofClaim({
+        requirementId: "REQ-EX-001",
+        assetId: "asset://code_surface_with_behavioral_proof",
+        proofKind: "behavioral_test",
+        authorityVerb: "validates",
+        evidenceRefs: ["test://t042/REQ-EX-001"]
+      }),
+      proofClaim({
+        requirementId: "REQ-EX-001",
+        assetId: "asset://code_surface_with_trace_only",
+        proofKind: "trace_tag",
+        authorityVerb: "implements",
+        evidenceRefs: ["comment://T042:REQ-EX-001"]
+      })
+    ]
+  });
+  const register = projectSdlcRequirementClosureRegister({
+    ingressReport: ingress,
+    lineageLedger: ledger
+  });
+  const split = closureEntry(register, "REQ-EX-001");
+
+  assert.equal(split.fulfillmentStatus, "partial");
+  assert.equal(split.traceabilityStatus, "trace_only");
+  assert.equal(split.carryStatus, "carried_forward");
+  assert(split.openReasons.includes("behavioral_evidence_not_bound_to_satisfied_generated_asset"));
+  assert(!register.fulfilledRequirementIds.includes("REQ-EX-001"));
+  assert(register.unresolvedRequirementIds.includes("REQ-EX-001"));
+});
+
 test("T-035 repair frontier separates unmet deltas from preservation truth", () => {
   const ingress = ingressReport();
   const ledger = deriveSdlcLineageLedger({
@@ -261,4 +322,3 @@ test("T-035 proof claim admission rejects wrong carrier kind", () => {
     /kind/
   );
 });
-

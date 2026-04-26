@@ -235,6 +235,24 @@ function liveRequirementIds(ingressReport: SdlcWorkspaceIngressReport): readonly
   );
 }
 
+function isBehavioralProofKind(proofKind: SdlcRequirementProofKind): boolean {
+  return proofKind === "behavioral_test" || proofKind === "runtime_result";
+}
+
+function entryHasSatisfiedBehavioralProof(input: {
+  readonly entry: SdlcLineageEntry;
+  readonly requirementId: string;
+}): boolean {
+  return (
+    input.entry.generatedAssetContractSatisfied &&
+    input.entry.proofs.some(
+      (proof) =>
+        proof.requirementId === input.requirementId &&
+        isBehavioralProofKind(proof.proofKind)
+    )
+  );
+}
+
 function closureForRequirement(input: {
   readonly requirementId: string;
   readonly ingressReport: SdlcWorkspaceIngressReport;
@@ -260,15 +278,25 @@ function closureForRequirement(input: {
   const hasSatisfiedGeneratedAsset = entries.some(
     (entry) => entry.generatedAssetContractSatisfied
   );
+  const hasSatisfiedBehavioralEntry = entries.some((entry) =>
+    entryHasSatisfiedBehavioralProof({
+      entry,
+      requirementId: input.requirementId
+    })
+  );
   const openReasons: string[] = [];
   let fulfillmentStatus: SdlcRequirementFulfillmentStatus = "missing";
   let traceabilityStatus: SdlcRequirementTraceabilityStatus = "absent";
 
   if (entries.length === 0) {
     openReasons.push("no_generated_asset_lineage");
-  } else if (hasBehavioralEvidence && hasSatisfiedGeneratedAsset) {
+  } else if (hasSatisfiedBehavioralEntry) {
     fulfillmentStatus = "fulfilled";
     traceabilityStatus = "behavioral_evidence";
+  } else if (hasBehavioralEvidence) {
+    fulfillmentStatus = "partial";
+    traceabilityStatus = hasTraceTag ? "trace_only" : "absent";
+    openReasons.push("behavioral_evidence_not_bound_to_satisfied_generated_asset");
   } else if (hasTraceTag) {
     fulfillmentStatus = "partial";
     traceabilityStatus = "trace_only";

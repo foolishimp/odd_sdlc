@@ -61,6 +61,17 @@ The current tenant has no `cli/` module, no side-effecting install/normalize
 adapter, no live external `F_P` data_mapper run lane, and no release-cut binary
 surface. Those are the point of this ticket.
 
+Operator clarification:
+
+- install means npm package plus scripts, not a direct copy of Python install
+  mechanics
+- `start` and `gaps` should come from ABG/public graph-function authority where
+  available, with SDLC-owned bootstrap instructions or `/cmds` for Claude and
+  Codex rather than a rival traversal engine
+- `data_mapper` is the decisive real-world proof workspace
+- the sandbox framework should converge on the common ABG sandbox framework
+  rather than an odd_sdlc-only duplicate harness
+
 The ticket remains backlog until the operator opens the full Python-replacement
 claim. While it is open, the bounded RC qualification must continue to state
 that TypeScript does not replace Python operationally.

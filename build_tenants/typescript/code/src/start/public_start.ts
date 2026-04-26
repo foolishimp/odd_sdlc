@@ -121,7 +121,14 @@ export function admitSdlcPublicStartRequest(
 export function projectSdlcWorkerAttachment(input: {
   readonly transportContract?: string | null;
 }): SdlcWorkerAttachment {
-  const transportContract = input.transportContract ?? null;
+  const rawTransportContract = input.transportContract ?? null;
+  const transportContract =
+    rawTransportContract === null
+      ? null
+      : parseNonEmptyString(
+          rawTransportContract.trim(),
+          "SdlcWorkerAttachment.transportContract"
+        );
   return Object.freeze({
     kind: "sdlc_worker_attachment",
     status: transportContract === null ? "unattached" : "attached",

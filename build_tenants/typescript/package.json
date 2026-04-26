@@ -37,6 +37,7 @@
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"
   },
   "devDependencies": {
+    "@types/node": "^20.19.39",
     "@typescript-eslint/eslint-plugin": "8.59.0",
     "@typescript-eslint/parser": "8.59.0",
     "eslint": "10.2.1",

@@ -3,7 +3,7 @@
 **Status**: Active
 **Date**: 2026-04-26
 **Implements**: REQ-F-ODDSDLC-024, REQ-F-ODDSDLC-040, REQ-F-ODDSDLC-041, REQ-F-ODDSDLC-043
-**Derives From**: `specification/requirements/13-odd-sdlc-typescript-tenant.md`, `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `.ai-workspace/tickets/backlog/T-038-qualify-odd-sdlc-typescript-rc-against-python-functionality-and-odd-scenarios.md`
+**Derives From**: `specification/requirements/13-odd-sdlc-typescript-tenant.md`, `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `.ai-workspace/tickets/completed/T-038-qualify-odd-sdlc-typescript-rc-against-python-functionality-and-odd-scenarios.md`
 
 ## Verdict
 
@@ -24,8 +24,7 @@ distribution.
 - `npm run test:t038`: proves the composed harnessed sandbox path across
   ingress, query/start, hook evidence, requirement closure, triage route, build
   result admission, and runtime-return observation.
-- `npm run test:semantic`: proves the full required TypeScript semantic lane
-  with 50 passing tests.
+- `npm run test:semantic`: proves the full required TypeScript semantic lane.
 - `npm run lint:semantic`: proves the strict lint lane.
 - `npm run test:reference:data-mapper` with
   `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template`:

@@ -109,6 +109,16 @@ export function observeSdlcRuntimeReturn(input: {
   readonly result: SdlcOperationalResult;
   readonly runtimeFactRefs: readonly string[];
 }): SdlcRuntimeReturnObservation {
+  if (input.command.lane !== "runtime_return") {
+    throw new TypeError(
+      "SdlcRuntimeReturnObservation.command: expected runtime_return lane"
+    );
+  }
+  if (input.result.commandId !== input.command.commandId) {
+    throw new TypeError(
+      "SdlcRuntimeReturnObservation.result: result belongs to another command"
+    );
+  }
   const status =
     input.result.status === "succeeded"
       ? "returned"

@@ -2,6 +2,7 @@
 // Implements: REQ-F-ODDSDLC-012
 // Implements: REQ-F-ODDSDLC-022
 
+import { createHash } from "node:crypto";
 import {
   parseClosedRecord,
   parseEnumValue,
@@ -25,6 +26,10 @@ export function fnv1aDigest(content: string): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+export function sha256Digest(content: string): string {
+  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
 export function uniqueSorted(values: readonly string[]): readonly string[] {
@@ -90,7 +95,7 @@ export function deriveSdlcSourceInput(
     kind: "sdlc_source_input",
     uri: snapshot.uri,
     relativePath: snapshot.relativePath,
-    digest: fnv1aDigest(snapshot.content),
+    digest: sha256Digest(snapshot.content),
     detectedRole: role,
     authorityMarkers,
     ambiguity: ambiguityFor({ role, authorityMarkers })

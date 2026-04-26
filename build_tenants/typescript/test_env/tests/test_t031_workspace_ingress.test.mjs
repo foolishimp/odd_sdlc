@@ -4,6 +4,7 @@
 // Validates: REQ-F-ODDSDLC-022
 // Validates: REQ-F-ODDSDLC-032
 // Investigates: T-031
+// Investigates: T-045
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -13,7 +14,8 @@ import {
   admitSdlcSourceInput,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
-  parseProjectSlugFromConstraintText
+  parseProjectSlugFromConstraintText,
+  sha256Digest
 } from "../../build/semantic/code/src/index.js";
 
 const PORTABLE_INTENT_TEXT = [
@@ -58,7 +60,11 @@ test("T-031 admits source inputs with digest, role, authority markers, and ambig
   const admitted = admitSdlcSourceInput(intent);
 
   assert.equal(admitted.detectedRole, "intent_surface");
-  assert(admitted.digest.startsWith("fnv1a32:"));
+  assert.match(admitted.digest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(
+    sha256Digest("abc"),
+    "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  );
   assert(admitted.authorityMarkers.includes("INT-001"));
   assert(admitted.authorityMarkers.some((marker) => marker.startsWith("Project:")));
   assert.equal(admitted.ambiguity.kind, "none");

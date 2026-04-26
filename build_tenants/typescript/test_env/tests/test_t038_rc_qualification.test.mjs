@@ -3,10 +3,11 @@
 // Validates: REQ-F-ODDSDLC-041
 // Validates: REQ-F-ODDSDLC-043
 // Investigates: T-038
+// Investigates: T-046
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -130,6 +131,19 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
     assert(gap.gapTicket);
     assert(existsSync(resolve(REPO_ROOT, gap.gapTicket)));
   }
+});
+
+test("T-046 qualification report points at completed T-038 authority", () => {
+  const reportText = readFileSync(
+    resolve(
+      REPO_ROOT,
+      "build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT.md"
+    ),
+    "utf8"
+  );
+
+  assert(reportText.includes(".ai-workspace/tickets/completed/T-038-qualify-odd-sdlc-typescript-rc-against-python-functionality-and-odd-scenarios.md"));
+  assert(!reportText.includes(".ai-workspace/tickets/backlog/T-038-qualify"));
 });
 
 test("T-038 composed harnessed sandbox walks ingress to operational return", () => {

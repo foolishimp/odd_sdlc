@@ -2,6 +2,7 @@
 // Validates: REQ-F-ODDSDLC-021
 // Validates: REQ-F-ODDSDLC-029
 // Investigates: T-033
+// Investigates: T-044
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -100,6 +101,23 @@ test("T-033 attached public start projects one ABI handoff without iterating int
   assert.equal(outcome.transition.kind, "fp_dispatch");
   assert.equal(outcome.transition.vectorIndex, 0);
   assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, []);
+});
+
+test("T-044 worker attachment rejects empty transport contracts", () => {
+  assert.throws(
+    () => projectSdlcWorkerAttachment({ transportContract: "" }),
+    /transportContract/
+  );
+  assert.throws(
+    () => projectSdlcWorkerAttachment({ transportContract: "   " }),
+    /transportContract/
+  );
+
+  const attached = projectSdlcWorkerAttachment({
+    transportContract: "  transport://trimmed-worker  "
+  });
+  assert.equal(attached.status, "attached");
+  assert.equal(attached.transportContract, "transport://trimmed-worker");
 });
 
 test("T-033 stale query-domain target blocks instead of throwing during ABI admission", () => {

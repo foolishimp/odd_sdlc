@@ -255,3 +255,28 @@ sandbox that walks ingress, query/start, hook evidence, requirement closure,
 triage routing, operational build result admission, and runtime-return
 observation. It also proves that remaining full Python-replacement gaps are
 not part of the bounded RC claim and are tracked by follow-up ticket authority.
+
+## T-042 To T-046 Forensic Remediation Lanes
+
+Derives from:
+
+- `.ai-workspace/comments/codex/20260426T161728Z_FORENSIC_STDO_REVIEW_typescript_tenant_T025_T041.md`
+- `.ai-workspace/tickets/completed/T-042-bind-requirement-closure-proof-to-same-generated-asset-contract.md`
+- `.ai-workspace/tickets/completed/T-043-bind-runtime-return-observation-to-command-identity-and-lane.md`
+- `.ai-workspace/tickets/completed/T-044-admit-worker-attachment-through-non-empty-transport-contract.md`
+- `.ai-workspace/tickets/completed/T-045-promote-source-input-digests-to-sha256.md`
+- `.ai-workspace/tickets/completed/T-046-repair-rc-report-ticket-authority-path.md`
+
+Canonical files:
+
+- `test_env/tests/test_t031_workspace_ingress.test.mjs`
+- `test_env/tests/test_t033_public_start.test.mjs`
+- `test_env/tests/test_t035_traceability_requirement_closure.test.mjs`
+- `test_env/tests/test_t037_operational_transition_runtime_return.test.mjs`
+- `test_env/tests/test_t038_rc_qualification.test.mjs`
+
+The remediation lanes close the forensic STDO review defects without widening
+the bounded RC claim. They prove same-entry requirement closure binding,
+runtime-return command/lane binding, non-empty worker transport admission,
+SHA-256 source-input identity, and corrected completed-ticket authority in the
+shareable RC report.
