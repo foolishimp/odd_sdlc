@@ -13,7 +13,8 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "workspace_ingress",
   "query_domain_projection",
   "public_start_handoff",
-  "hook_contracts"
+  "hook_contracts",
+  "traceability_requirement_closure"
 ] as const);
 
 export interface OddSdlcTypescriptTenantInfo {

@@ -3,7 +3,7 @@ id: T-035
 title: Realize TypeScript traceability lineage and requirement closure
 type: feature
 ticket_category: build_wave
-status: backlog
+status: completed
 goal: build-odd-sdlc-typescript-as-odd-native-app
 change_intent: Implement typed lineage, traceability index/report, requirement closure register, repair frontier, and proof projections over generated and imported SDLC assets.
 change_class: realization_refactor
@@ -13,6 +13,7 @@ priority: high
 triaged_at: 2026-04-26
 created_at: 2026-04-26
 updated_at: 2026-04-26
+completed_at: 2026-04-26
 dependencies:
   - T-034 completed
 governance_scope: STDO Method
@@ -45,3 +46,18 @@ non_closure_conditions:
 ## STDO Reading
 
 This ticket makes eventual completeness auditable.
+
+## Closure Evidence
+
+- Added `SdlcRequirementProofClaim`, `SdlcLineageLedger`,
+  `SdlcRequirementClosureRegister`, and `SdlcRepairFrontier`.
+- Lineage now ties admitted source requirement authority to ABG-selected
+  graph-function work reports, generated asset authority, output identity, and
+  explicit proof claims.
+- Requirement closure separates traceability from fulfillment.
+- Trace-only proof remains partial and carried forward.
+- Missing requirements remain unresolved in the closure register.
+- Repair frontier separates unmet requirement deltas from preservation truth.
+- Focused proof: `npm run test:t035` passed.
+- Regression proof: `npm run test:semantic` passed with 39 tests.
+- Static proof: `npm run lint:semantic` passed.

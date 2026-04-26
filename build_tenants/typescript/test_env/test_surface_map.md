@@ -184,3 +184,20 @@ graph-function authority for generated assets, requested/returned operation
 matching, generated-asset contract blocking, ambiguity candidate preservation,
 wrong-kind rejection for serialized work reports, and no tenant-local runtime
 event or next-traversal selection.
+
+## T-035 Traceability And Requirement Closure Lane
+
+Derives from:
+
+- `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRACEABILITY_REQUIREMENT_CLOSURE.md`
+- `.ai-workspace/tickets/completed/T-035-realize-typescript-traceability-lineage-and-requirement-closure.md`
+
+Canonical file:
+
+- `test_env/tests/test_t035_traceability_requirement_closure.test.mjs`
+
+The lane proves lineage over admitted source, graph-function work reports,
+generated asset authority, explicit proof claims, requirement closure register,
+and repair frontier. Trace tags alone remain partial evidence and unresolved
+requirements are carried forward.
