@@ -5,8 +5,11 @@ import {
   deriveRuntimeAggregateProjection,
   materializeGraphFunction,
   type ExecutionBasis,
+  type GraphFunction,
+  type GraphVector,
   type Module,
-  type RuntimeEvent
+  type RuntimeEvent,
+  type SerializedAttrs
 } from "@abiogenesis/typescript-tenant";
 import {
   SOFTWARE_DOMAIN_ASSET_FAMILIES,
@@ -15,6 +18,7 @@ import {
 } from "../domain/index.js";
 import {
   constructSdlcGraphFunctionCatalog,
+  constructSdlcGtlModule,
   type SdlcGraphFunctionCatalog
 } from "../graph/index.js";
 import type { SdlcWorkspaceIngressReport } from "../workspace/index.js";
@@ -150,13 +154,156 @@ function assetOwnership(
   );
 }
 
+interface GraphFunctionStructuralSignature {
+  readonly id: string;
+  readonly inputNames: readonly string[];
+  readonly outputNames: readonly string[];
+  readonly vectorSignatures: readonly string[];
+  readonly declarationSignature: string;
+  readonly tags: readonly string[];
+  readonly effects: readonly string[];
+}
+
+function sortedStrings(values: readonly string[]): readonly string[] {
+  return Object.freeze([...values].sort());
+}
+
+function serializedAttrsSignature(attrs: SerializedAttrs): string {
+  return JSON.stringify(
+    [...attrs.entries]
+      .map((entry) => Object.freeze({
+        key: entry.key,
+        value: entry.value
+      }))
+      .sort((left, right) => left.key.localeCompare(right.key))
+  );
+}
+
+function graphVectorSignature(vector: GraphVector): string {
+  return JSON.stringify({
+    id: vector.id,
+    name: vector.name,
+    sourceNames: vector.source.map((node) => node.name),
+    targetName: vector.target.name,
+    operatorNames: vector.operators.map((operator) => operator.name),
+    evaluatorNames: vector.evaluators.map((evaluator) => evaluator.name),
+    allowsSubwork: vector.allowsSubwork,
+    declarationSignature: serializedAttrsSignature(vector.declarations),
+    tags: sortedStrings(vector.tags)
+  });
+}
+
+function graphFunctionStructuralSignature(
+  graphFunction: GraphFunction
+): GraphFunctionStructuralSignature {
+  let graph: ReturnType<typeof materializeGraphFunction>;
+  try {
+    graph = materializeGraphFunction(graphFunction);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new TypeError(
+      `SdlcQueryDomainProjection: admitted module structural drift: ${graphFunction.name}.materialize: ${message}`
+    );
+  }
+  return Object.freeze({
+    id: graphFunction.id,
+    inputNames: Object.freeze(graphFunction.inputs.map((node) => node.name)),
+    outputNames: Object.freeze(graphFunction.outputs.map((node) => node.name)),
+    vectorSignatures: Object.freeze(graph.vectors.map(graphVectorSignature)),
+    declarationSignature: serializedAttrsSignature(graphFunction.declarations),
+    tags: sortedStrings(graphFunction.tags),
+    effects: sortedStrings(graphFunction.effects)
+  });
+}
+
+function graphFunctionsByName(module: Module): ReadonlyMap<string, GraphFunction> {
+  return new Map(
+    module.graphFunctions.map((graphFunction) => [graphFunction.name, graphFunction])
+  );
+}
+
+function compareStringArray(input: {
+  readonly label: string;
+  readonly actual: readonly string[];
+  readonly expected: readonly string[];
+  readonly mismatches: string[];
+}): void {
+  if (JSON.stringify(input.actual) !== JSON.stringify(input.expected)) {
+    input.mismatches.push(
+      `${input.label}: expected ${JSON.stringify(input.expected)} got ${JSON.stringify(input.actual)}`
+    );
+  }
+}
+
+function assertGraphFunctionSignature(input: {
+  readonly name: string;
+  readonly actual: GraphFunction;
+  readonly expected: GraphFunction;
+  readonly mismatches: string[];
+}): void {
+  const actual = graphFunctionStructuralSignature(input.actual);
+  const expected = graphFunctionStructuralSignature(input.expected);
+  if (actual.id !== expected.id) {
+    input.mismatches.push(`${input.name}.id: expected ${expected.id} got ${actual.id}`);
+  }
+  compareStringArray({
+    label: `${input.name}.inputNames`,
+    actual: actual.inputNames,
+    expected: expected.inputNames,
+    mismatches: input.mismatches
+  });
+  compareStringArray({
+    label: `${input.name}.outputNames`,
+    actual: actual.outputNames,
+    expected: expected.outputNames,
+    mismatches: input.mismatches
+  });
+  compareStringArray({
+    label: `${input.name}.vectorSignatures`,
+    actual: actual.vectorSignatures,
+    expected: expected.vectorSignatures,
+    mismatches: input.mismatches
+  });
+  if (actual.declarationSignature !== expected.declarationSignature) {
+    input.mismatches.push(`${input.name}.declarations: structural drift`);
+  }
+  compareStringArray({
+    label: `${input.name}.tags`,
+    actual: actual.tags,
+    expected: expected.tags,
+    mismatches: input.mismatches
+  });
+  compareStringArray({
+    label: `${input.name}.effects`,
+    actual: actual.effects,
+    expected: expected.effects,
+    mismatches: input.mismatches
+  });
+}
+
+function startTargetStructuralSignature(module: Module): readonly string[] {
+  const graphFunctionById = new Map(
+    module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction.name])
+  );
+  return Object.freeze(
+    module.jobs
+      .flatMap((job) =>
+        job.contracts.map((contract) =>
+          `${job.name}:${contract.targetId}:${graphFunctionById.get(contract.targetId) ?? "unpublished"}`
+        )
+      )
+      .sort()
+  );
+}
+
 function assertModuleMatchesCatalog(input: {
   readonly module: Module;
   readonly catalog: SdlcGraphFunctionCatalog;
 }): void {
-  const moduleNames = new Set(
-    input.module.graphFunctions.map((graphFunction) => graphFunction.name)
-  );
+  const canonicalModule = constructSdlcGtlModule();
+  const actualByName = graphFunctionsByName(input.module);
+  const expectedByName = graphFunctionsByName(canonicalModule);
+  const moduleNames = new Set(actualByName.keys());
   const expectedNames = [
     ...input.catalog.functions.map((entry) => entry.backingGraphFunction),
     ...input.catalog.executives.map((entry) => entry.backingGraphFunction)
@@ -165,6 +312,31 @@ function assertModuleMatchesCatalog(input: {
   if (missingNames.length > 0) {
     throw new TypeError(
       `SdlcQueryDomainProjection: admitted module missing graph functions: ${missingNames.join(", ")}`
+    );
+  }
+  const unexpectedNames = [...moduleNames].filter((name) => !expectedByName.has(name));
+  if (unexpectedNames.length > 0) {
+    throw new TypeError(
+      `SdlcQueryDomainProjection: admitted module contains unpublished graph functions: ${unexpectedNames.join(", ")}`
+    );
+  }
+  const mismatches: string[] = [];
+  for (const name of expectedNames) {
+    const actual = actualByName.get(name);
+    const expected = expectedByName.get(name);
+    if (actual !== undefined && expected !== undefined) {
+      assertGraphFunctionSignature({ name, actual, expected, mismatches });
+    }
+  }
+  compareStringArray({
+    label: "startTargets",
+    actual: startTargetStructuralSignature(input.module),
+    expected: startTargetStructuralSignature(canonicalModule),
+    mismatches
+  });
+  if (mismatches.length > 0) {
+    throw new TypeError(
+      `SdlcQueryDomainProjection: admitted module structural drift: ${mismatches.join("; ")}`
     );
   }
 }

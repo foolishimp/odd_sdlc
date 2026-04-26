@@ -107,8 +107,25 @@ Canonical file:
 
 The lane proves read-only query-domain, gap, dossier, and span projections over
 typed SDLC carriers, GTL publication, and ABI replay truth. It also proves that
-query-domain fails closed when the admitted GTL module is stale against the
-published SDLC function catalog.
+query-domain fails closed when the admitted GTL module is missing catalog
+functions.
+
+## T-039 Query-Domain Structural Coherence Lane
+
+Derives from:
+
+- `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`
+- `.ai-workspace/tickets/backlog/T-039-close-typescript-query-domain-structural-drift-over-admitted-gtl-module.md`
+
+Canonical file:
+
+- `test_env/tests/test_t039_query_domain_structural_drift.test.mjs`
+
+The lane proves query-domain does not treat graph-function name equality as
+structural equivalence. Same-name output drift, vector drift, and start-target
+drift fail closed before catalog-derived ownership, program, or target read
+models are published.
 
 ## T-033 Public Start Lane
 

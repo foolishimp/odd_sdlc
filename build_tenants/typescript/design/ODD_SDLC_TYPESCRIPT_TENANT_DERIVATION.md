@@ -113,6 +113,10 @@ That second shape is a shadow runtime.
   ABG.
 - Query and gap surfaces do not outrank GTL publication, admitted SDLC
   carriers, or ABG replay truth.
+- Query-domain publication must structurally reconcile catalog-derived function,
+  program, ownership, and start-target views against the admitted GTL module.
+  Same-name graph functions with different inputs, outputs, vectors,
+  declarations, or start-target bindings fail closed before publication.
 - Public start may admit one boundary. It is not the internal iterate engine.
 
 ## Python Evidence Rule

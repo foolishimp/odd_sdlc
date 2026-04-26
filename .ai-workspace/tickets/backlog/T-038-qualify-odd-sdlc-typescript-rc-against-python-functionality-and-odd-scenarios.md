@@ -15,6 +15,8 @@ created_at: 2026-04-26
 updated_at: 2026-04-26
 dependencies:
   - T-037 completed
+  - T-039 completed
+  - T-040 completed
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
