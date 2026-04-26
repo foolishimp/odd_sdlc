@@ -23,3 +23,8 @@ as the governing method reference when writing or revising these files.
   requirement/design traceability chain.
 - Ratified design remains the reciprocal side of that chain through its own
   `**Implements**:` requirement identifiers and `**Derives From**:` references.
+
+## Active Families
+
+- `13-odd-sdlc-typescript-tenant.md` opens the `odd_sdlc.TS` build line as a
+  governed TypeScript realization over the singleton product specification.

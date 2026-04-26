@@ -14,4 +14,5 @@ The current active realization line is:
 
 - shared realization law in `common/`
 - the first live software-domain realization in `odd_sdlc/python/`
+- the active ODD-native TypeScript build line in `typescript/`
 - the incubating service realization in `odd_service/python/`

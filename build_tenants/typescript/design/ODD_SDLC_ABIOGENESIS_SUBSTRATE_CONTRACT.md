@@ -1,0 +1,62 @@
+# odd_sdlc TypeScript ABIogenesis Substrate Contract
+
+**Status**: Active
+**Date**: 2026-04-26
+**Authority**: T-028
+
+## Claim
+
+`odd_sdlc.TS` consumes ABIogenesis TypeScript as runtime substrate. It does not
+own GTL carrier admission, ABG execution basis law, runtime event families,
+replay projection, iteration selection, advancement transitions, or traversal
+structure probes.
+
+## Binding
+
+| Surface | Binding |
+| --- | --- |
+| Package | `@abiogenesis/typescript-tenant` |
+| Version | `3.4.0-rc.2` |
+| Dependency form | local source product dependency |
+| odd_sdlc role | domain product over ABIogenesis substrate |
+| ABIogenesis role | GTL/ABG carrier and runtime truth authority |
+
+## Adapter Boundary
+
+The TypeScript tenant may construct SDLC-owned graph functions and modules, then
+admit them through ABIogenesis public carriers:
+
+```text
+SDLC graph function -> ABIogenesis Module -> ABIogenesis ExecutionBasis
+ExecutionBasis + RuntimeEvent replay -> ABIogenesis projection and transition
+```
+
+The TypeScript tenant must not:
+
+- define local runtime event families
+- choose the next vector from local controller state
+- treat local orchestration state as runtime truth
+- copy ABG projection or iteration mechanics
+- fork GTL carrier admission
+
+## Initial Proof Basis
+
+The first proof graph function is intentionally small:
+
+```text
+ODD_SDLC_SUBSTRATE_PROBE:
+  SdlcWorksite -> SdlcWorkReport
+```
+
+It validates that SDLC-owned type names can be carried through GTL and admitted
+into one ABI `ExecutionBasis`.
+
+## Source Assumptions
+
+The adapter relies on ABIogenesis TypeScript evidence:
+
+- `T-060`: missing compute basis fails closed
+- `T-065`: traversal structure probe exposes deterministic diagnostic evidence
+- `T-066`: ABG internal control loop owns iteration sufficiency
+
+These assumptions are dependencies, not copied law.

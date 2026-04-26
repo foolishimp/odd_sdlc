@@ -1,0 +1,226 @@
+import {
+  admitSdlcAssetFamily,
+  admitSdlcAssetType,
+  admitSdlcWorkActDescriptor
+} from "./admission.js";
+
+export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
+  admitSdlcAssetFamily({
+    name: "worksite_inputs",
+    description: "Operator-supplied and constitutional inputs that open a bounded software-domain wave of work.",
+    lifecycleRole: "entry",
+    representativeAssetTypes: [
+      "intent_doc",
+      "product_doc",
+      "goal_surface",
+      "requirement_surface",
+      "work_request_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "solution_design",
+    description: "Structured design, decomposition, and scenario surfaces that define what is being built and how it will be qualified.",
+    lifecycleRole: "design",
+    representativeAssetTypes: [
+      "feature_decomp_surface",
+      "design_surface",
+      "scenario_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "implementation_branch",
+    description: "Implementation design, stack, module, and code surfaces for the active software branch under construction.",
+    lifecycleRole: "build",
+    representativeAssetTypes: [
+      "implementation_design_surface",
+      "implementation_stack_profile",
+      "implementation_module_surface",
+      "code_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "qualification_branch",
+    description: "Test design, planned coverage, and archived evidence surfaces used to qualify the active software branch, including realized developer-test source generated under the archive stage.",
+    lifecycleRole: "qualification",
+    representativeAssetTypes: [
+      "uat_testcases_surface",
+      "test_design_surface",
+      "test_stack_profile",
+      "test_module_surface",
+      "test_run_archive_surface",
+      "testcase_authority_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "release_readiness",
+    description: "Release-oriented decision surfaces that summarize whether the current software branch is qualified for launch.",
+    lifecycleRole: "release",
+    representativeAssetTypes: [
+      "release_surface",
+      "release_document_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "deployment_records",
+    description: "Governed records describing how a qualified software branch is launched into an operating environment.",
+    lifecycleRole: "deployment",
+    representativeAssetTypes: ["deployment_record_surface"],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "runtime_evidence",
+    description: "Operational observations, incidents, and comparative evidence returned from launched software back into the worksite.",
+    lifecycleRole: "operation",
+    representativeAssetTypes: [
+      "runtime_observation_surface",
+      "operational_evidence_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "retrofit_plans",
+    description: "Maintenance and retrofit planning surfaces that govern corrective work, upgrades, and relaunch decisions.",
+    lifecycleRole: "retrofit",
+    representativeAssetTypes: [
+      "maintenance_plan_surface",
+      "retrofit_design_surface"
+    ],
+    realizationStatus: "active_first_slice"
+  })
+]);
+
+export const SOFTWARE_DOMAIN_WORK_ACT_TYPES = Object.freeze([
+  admitSdlcWorkActDescriptor({
+    name: "generate",
+    description: "Construct new governed artifacts for the current bounded branch of work.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "solution_design",
+      "implementation_branch",
+      "qualification_branch"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "adopt",
+    description: "Bring existing artifacts under governed provenance without pretending they were freshly generated in this workspace.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "implementation_branch",
+      "qualification_branch",
+      "runtime_evidence"
+    ],
+    realizationStatus: "declared_domain_contract"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "import",
+    description: "Register external artifacts or evidence into the worksite with explicit provenance and scope.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "worksite_inputs",
+      "runtime_evidence"
+    ],
+    realizationStatus: "declared_domain_contract"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "qualify",
+    description: "Produce governed evidence and authority surfaces that determine whether the current branch is fit for downstream use.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "qualification_branch",
+      "release_readiness"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "release",
+    description: "Stabilize a bounded branch as ready for launch into a deployment environment.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "release_readiness",
+      "deployment_records"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "deploy",
+    description: "Launch a qualified branch into service and record the governed deployment state.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "deployment_records",
+      "runtime_evidence"
+    ],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "observe",
+    description: "Return governed operational evidence from a launched branch back to the active worksite.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: ["runtime_evidence"],
+    realizationStatus: "active_first_slice"
+  }),
+  admitSdlcWorkActDescriptor({
+    name: "retrofit",
+    description: "Repair, extend, or reconfigure the active branch using returned operational evidence.",
+    mutatesWorkspace: true,
+    producesGovernedEvidence: true,
+    typicalAssetFamilies: [
+      "retrofit_plans",
+      "implementation_branch",
+      "qualification_branch"
+    ],
+    realizationStatus: "active_first_slice"
+  })
+]);
+
+export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
+  [
+    "intent_doc",
+    "product_doc",
+    "goal_surface",
+    "requirement_surface",
+    "work_request_surface",
+    "feature_decomp_surface",
+    "design_surface",
+    "scenario_surface",
+    "implementation_design_surface",
+    "implementation_stack_profile",
+    "implementation_module_surface",
+    "code_surface",
+    "uat_testcases_surface",
+    "test_design_surface",
+    "test_stack_profile",
+    "test_module_surface",
+    "test_run_archive_surface",
+    "testcase_authority_surface",
+    "release_surface",
+    "release_document_surface",
+    "deployment_record_surface",
+    "runtime_observation_surface",
+    "operational_evidence_surface",
+    "maintenance_plan_surface",
+    "retrofit_design_surface"
+  ].map((name) =>
+    admitSdlcAssetType({
+      name,
+      description: `Software-domain asset type ${name}.`,
+      semanticFacets: ["software_domain", "governed_asset"],
+      libraryLevel: "generic",
+      mutableDefault: true,
+      proofHints: ["typed_identity", "provenance"],
+      closureHints: ["traceable_checkpoint"]
+    })
+  )
+);

@@ -1,0 +1,292 @@
+// Implements: REQ-F-ODDSDLC-020
+// Implements: REQ-F-ODDSDLC-035
+
+import {
+  deriveRuntimeAggregateProjection,
+  materializeGraphFunction,
+  type ExecutionBasis,
+  type Module,
+  type RuntimeEvent
+} from "@abiogenesis/typescript-tenant";
+import {
+  SOFTWARE_DOMAIN_ASSET_FAMILIES,
+  SOFTWARE_DOMAIN_ASSET_TYPES,
+  SOFTWARE_DOMAIN_WORK_ACT_TYPES
+} from "../domain/index.js";
+import {
+  constructSdlcGraphFunctionCatalog,
+  type SdlcGraphFunctionCatalog
+} from "../graph/index.js";
+import type { SdlcWorkspaceIngressReport } from "../workspace/index.js";
+
+export interface SdlcGraphFunctionSurface {
+  readonly name: string;
+  readonly inputNames: readonly string[];
+  readonly outputNames: readonly string[];
+  readonly vectorNames: readonly string[];
+  readonly source: "gtl_module";
+}
+
+export interface SdlcStartTargetSurface {
+  readonly name: string;
+  readonly graphFunctionId: string;
+  readonly jobName: string;
+}
+
+export interface SdlcAssetOwnershipSurface {
+  readonly assetType: string;
+  readonly producerGraphFunctions: readonly string[];
+}
+
+export interface SdlcQueryDomainProjection {
+  readonly kind: "sdlc_query_domain_projection";
+  readonly contractName: "odd_sdlc.query-domain";
+  readonly contractVersion: "ts-v1";
+  readonly runtimeModel: "abg-native";
+  readonly queryModel: "odd-domain-read-model";
+  readonly readOnly: true;
+  readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
+  readonly workspaceRootUri: string;
+  readonly assetTypes: typeof SOFTWARE_DOMAIN_ASSET_TYPES;
+  readonly assetFamilies: typeof SOFTWARE_DOMAIN_ASSET_FAMILIES;
+  readonly workActTypes: typeof SOFTWARE_DOMAIN_WORK_ACT_TYPES;
+  readonly functions: SdlcGraphFunctionCatalog["functions"];
+  readonly programs: SdlcGraphFunctionCatalog["executives"];
+  readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
+  readonly startTargets: readonly SdlcStartTargetSurface[];
+  readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
+  readonly currentDossierRefs: readonly string[];
+}
+
+export type SdlcGapStatus = "open" | "partial" | "converged";
+
+export interface SdlcGapProjection {
+  readonly kind: "sdlc_gap_projection";
+  readonly readOnly: true;
+  readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
+  readonly graphFunctionName: string;
+  readonly status: SdlcGapStatus;
+  readonly currentEdge: string | null;
+  readonly nextVectorIndex: number | null;
+  readonly closedVectorIndexes: readonly number[];
+}
+
+export interface SdlcGapDossier {
+  readonly kind: "sdlc_gap_dossier";
+  readonly readOnly: true;
+  readonly choosesNextTraversal: false;
+  readonly edge: string | null;
+  readonly status: SdlcGapStatus;
+  readonly evidenceRefs: readonly string[];
+  readonly triageInput: string;
+  readonly nextLawfulActions: readonly string[];
+}
+
+export interface SdlcSpanAnalysisProjection {
+  readonly kind: "sdlc_span_analysis_projection";
+  readonly readOnly: true;
+  readonly graphFunctionName: string;
+  readonly fromEdge: string | null;
+  readonly toEdge: string | null;
+  readonly zoom: "edge" | "span" | "graph";
+  readonly edges: readonly string[];
+}
+
+function graphFunctionSurface(module: Module): readonly SdlcGraphFunctionSurface[] {
+  return Object.freeze(
+    module.graphFunctions.map((graphFunction) => {
+      const graph = materializeGraphFunction(graphFunction);
+      return Object.freeze({
+        name: graphFunction.name,
+        inputNames: Object.freeze(graphFunction.inputs.map((node) => node.name)),
+        outputNames: Object.freeze(graphFunction.outputs.map((node) => node.name)),
+        vectorNames: Object.freeze(graph.vectors.map((vector) => vector.name)),
+        source: "gtl_module"
+      });
+    })
+  );
+}
+
+function startTargets(module: Module): readonly SdlcStartTargetSurface[] {
+  const byId = new Map(
+    module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction])
+  );
+  const targets: SdlcStartTargetSurface[] = [];
+  for (const job of module.jobs) {
+    for (const contract of job.contracts) {
+      const graphFunction = byId.get(contract.targetId);
+      if (graphFunction !== undefined) {
+        targets.push(
+          Object.freeze({
+            name: graphFunction.name,
+            graphFunctionId: graphFunction.id,
+            jobName: job.name
+          })
+        );
+      }
+    }
+  }
+  return Object.freeze(targets);
+}
+
+function assetOwnership(
+  catalog: SdlcGraphFunctionCatalog
+): readonly SdlcAssetOwnershipSurface[] {
+  const producers = new Map<string, string[]>();
+  for (const entry of catalog.functions) {
+    for (const output of entry.outputs) {
+      const existing = producers.get(output) ?? [];
+      existing.push(entry.backingGraphFunction);
+      producers.set(output, existing);
+    }
+  }
+  return Object.freeze(
+    [...producers.entries()].map(([assetType, producerGraphFunctions]) =>
+      Object.freeze({
+        assetType,
+        producerGraphFunctions: Object.freeze([...producerGraphFunctions].sort())
+      })
+    )
+  );
+}
+
+function assertModuleMatchesCatalog(input: {
+  readonly module: Module;
+  readonly catalog: SdlcGraphFunctionCatalog;
+}): void {
+  const moduleNames = new Set(
+    input.module.graphFunctions.map((graphFunction) => graphFunction.name)
+  );
+  const expectedNames = [
+    ...input.catalog.functions.map((entry) => entry.backingGraphFunction),
+    ...input.catalog.executives.map((entry) => entry.backingGraphFunction)
+  ];
+  const missingNames = expectedNames.filter((name) => !moduleNames.has(name));
+  if (missingNames.length > 0) {
+    throw new TypeError(
+      `SdlcQueryDomainProjection: admitted module missing graph functions: ${missingNames.join(", ")}`
+    );
+  }
+}
+
+export function projectSdlcQueryDomain(input: {
+  readonly module: Module;
+  readonly ingressReport: SdlcWorkspaceIngressReport;
+  readonly currentDossierRefs?: readonly string[];
+}): SdlcQueryDomainProjection {
+  const catalog = constructSdlcGraphFunctionCatalog();
+  assertModuleMatchesCatalog({ module: input.module, catalog });
+  return Object.freeze({
+    kind: "sdlc_query_domain_projection",
+    contractName: "odd_sdlc.query-domain",
+    contractVersion: "ts-v1",
+    runtimeModel: "abg-native",
+    queryModel: "odd-domain-read-model",
+    readOnly: true,
+    emittedRuntimeEventKinds: Object.freeze([]),
+    workspaceRootUri: input.ingressReport.workspaceRootUri,
+    assetTypes: SOFTWARE_DOMAIN_ASSET_TYPES,
+    assetFamilies: SOFTWARE_DOMAIN_ASSET_FAMILIES,
+    workActTypes: SOFTWARE_DOMAIN_WORK_ACT_TYPES,
+    functions: catalog.functions,
+    programs: catalog.executives,
+    graphFunctions: graphFunctionSurface(input.module),
+    startTargets: startTargets(input.module),
+    assetOwnership: assetOwnership(catalog),
+    currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])])
+  });
+}
+
+function gapStatus(input: {
+  readonly vectorCount: number;
+  readonly closedVectorIndexes: readonly number[];
+  readonly nextVectorIndex: number | null;
+}): SdlcGapStatus {
+  if (input.nextVectorIndex === null) {
+    return "converged";
+  }
+  if (input.closedVectorIndexes.length > 0) {
+    return "partial";
+  }
+  return "open";
+}
+
+export function projectSdlcGapsFromReplay(input: {
+  readonly basis: ExecutionBasis;
+  readonly events: readonly RuntimeEvent[];
+}): SdlcGapProjection {
+  const projection = deriveRuntimeAggregateProjection(input.basis, input.events);
+  const currentVector =
+    projection.nextVectorIndex === null
+      ? undefined
+      : input.basis.graph.vectors[projection.nextVectorIndex];
+  return Object.freeze({
+    kind: "sdlc_gap_projection",
+    readOnly: true,
+    emittedRuntimeEventKinds: Object.freeze([]),
+    graphFunctionName: input.basis.graphFunction.name,
+    status: gapStatus({
+      vectorCount: projection.vectorCount,
+      closedVectorIndexes: projection.closedVectorIndexes,
+      nextVectorIndex: projection.nextVectorIndex
+    }),
+    currentEdge: currentVector?.name ?? null,
+    nextVectorIndex: projection.nextVectorIndex,
+    closedVectorIndexes: projection.closedVectorIndexes
+  });
+}
+
+export function deriveSdlcGapDossier(input: {
+  readonly basis: ExecutionBasis;
+  readonly events: readonly RuntimeEvent[];
+  readonly triageInput: string;
+  readonly evidenceRefs: readonly string[];
+}): SdlcGapDossier {
+  const gaps = projectSdlcGapsFromReplay({
+    basis: input.basis,
+    events: input.events
+  });
+  return Object.freeze({
+    kind: "sdlc_gap_dossier",
+    readOnly: true,
+    choosesNextTraversal: false,
+    edge: gaps.currentEdge,
+    status: gaps.status,
+    evidenceRefs: Object.freeze([...input.evidenceRefs]),
+    triageInput: input.triageInput,
+    nextLawfulActions: Object.freeze(
+      gaps.status === "converged"
+        ? ["close_or_reprice"]
+        : ["review_dossier", "triage_gap", "start_declared_target"]
+    )
+  });
+}
+
+export function projectSdlcSpanAnalysis(input: {
+  readonly basis: ExecutionBasis;
+  readonly fromEdge?: string | null;
+  readonly toEdge?: string | null;
+  readonly zoom?: "edge" | "span" | "graph";
+}): SdlcSpanAnalysisProjection {
+  const allEdges = input.basis.graph.vectors.map((vector) => vector.name);
+  const fromIndex =
+    input.fromEdge === undefined || input.fromEdge === null
+      ? 0
+      : allEdges.indexOf(input.fromEdge);
+  const toIndex =
+    input.toEdge === undefined || input.toEdge === null
+      ? allEdges.length - 1
+      : allEdges.indexOf(input.toEdge);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
+    throw new TypeError("SdlcSpanAnalysisProjection requires an ordered bounded edge span");
+  }
+  return Object.freeze({
+    kind: "sdlc_span_analysis_projection",
+    readOnly: true,
+    graphFunctionName: input.basis.graphFunction.name,
+    fromEdge: input.fromEdge ?? null,
+    toEdge: input.toEdge ?? null,
+    zoom: input.zoom ?? "span",
+    edges: Object.freeze(allEdges.slice(fromIndex, toIndex + 1))
+  });
+}

@@ -17,6 +17,22 @@ executed through ABG.
 `odd_sdlc` is the first live domain package on that line and the current
 software-domain package under build-out.
 
+`odd_sdlc.TS` is the next governed build line for the same product definition.
+It is the ODD-native TypeScript tenant target. Its purpose is to rebuild the
+software-domain package around graph functions, typed assets, ABG replay truth,
+and bounded SDLC hooks instead of porting Python service structure
+file-for-file.
+
+The current Python tenant remains the operational discovery implementation. It
+contains needed behavior, dogfood evidence, and hard-won functionality. It is
+source material for comparison and translation, not the architecture authority
+for the TypeScript line.
+
+The ABIogenesis TypeScript tenant is substrate evidence. It proves GTL/ABG
+carriers, graph-function iteration, traversal probes, no-compute-basis failure
+taxonomy, and bootstrap-lineage slices that `odd_sdlc.TS` may consume. It is
+not itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
+
 `odd_service` is the next incubating product line on that same method line.
 It is not a second runtime. It is the proposed enduring orchestration plane
 above `odd_sdlc` and below peer clients such as CLI agents and `odd_manager`.
@@ -469,6 +485,8 @@ The current product definition of `odd_sdlc` is:
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
 - carrying `odd_sdlc` as the first live software-domain realization
+- opening `odd_sdlc.TS` as the ODD-native rebuild line over the same singleton
+  product specification
 - repricing `odd_sdlc` from the current first-slice bootstrap toy into the
   generic software-domain package on the line
 - treating an ODD project as an active SDLC worksite with build, qualify,

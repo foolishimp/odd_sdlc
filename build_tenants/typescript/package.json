@@ -1,0 +1,41 @@
+{
+  "name": "@odd-sdlc/typescript-tenant",
+  "version": "0.0.0-dev",
+  "private": true,
+  "description": "ODD-native TypeScript tenant for odd_sdlc.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./build/semantic/code/src/index.d.ts",
+      "import": "./build/semantic/code/src/index.js"
+    }
+  },
+  "files": [
+    "build/semantic/**"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:semantic": "tsc -p tsconfig.semantic-strict.json",
+    "lint:semantic": "eslint --max-warnings=0 \"code/src/**/*.ts\"",
+    "test:semantic": "npm run build:semantic && node --test test_env/tests/*.test.mjs",
+    "test:t027": "npm run build:semantic && node --test test_env/tests/test_t027_scaffold.test.mjs",
+    "test:t028": "npm run build:semantic && node --test test_env/tests/test_t028_abiogenesis_substrate_binding.test.mjs",
+    "test:t029": "npm run build:semantic && node --test test_env/tests/test_t029_domain_carriers.test.mjs",
+    "test:t030": "npm run build:semantic && node --test test_env/tests/test_t030_graph_catalog_module.test.mjs",
+    "test:t031": "npm run build:semantic && node --test test_env/tests/test_t031_workspace_ingress.test.mjs",
+    "test:t032": "npm run build:semantic && node --test test_env/tests/test_t032_query_gap_projection.test.mjs",
+    "test:t033": "npm run build:semantic && node --test test_env/tests/test_t033_public_start.test.mjs",
+    "test:t034": "npm run build:semantic && node --test test_env/tests/test_t034_hook_set.test.mjs"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "8.59.0",
+    "@typescript-eslint/parser": "8.59.0",
+    "eslint": "10.2.1",
+    "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/build_tenants/abiogenesis/typescript"
+  }
+}

@@ -17,6 +17,10 @@ temporary focus into accidental constitutional law.
 
 ## Current Goals
 
+- open the `odd_sdlc.TS` build line as an ODD-native tenant that uses graph
+  functions as programs, ABG as runtime truth, Python as discovery evidence,
+  and ABIogenesis TypeScript as substrate proof rather than as a finished SDLC
+  product
 - ratify and implement the current odd_sdlc repair wave as a strict inside-out
   migration over live inherited-workspace bug reproducers rather than as
   prompt folklore, bridge surfaces, or compatibility facades
