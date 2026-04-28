@@ -1,0 +1,187 @@
+# odd_sdlc TypeScript Deterministic Traversal State Machine
+
+**Status**: Active
+**Owner Ticket**: `T-076`
+**Implements**: REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-039, REQ-F-ODDSDLC-051, REQ-F-ODDSDLC-052, REQ-F-ODDSDLC-053, REQ-F-ODDSDLC-054, REQ-F-ODDSDLC-055
+**Derives From**: `ODD_SDLC_TYPESCRIPT_INSTALLED_OPERATOR_UX.md`, `ODD_SDLC_TYPESCRIPT_RECURSIVE_REALIZATION_DEEPENING.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
+
+## Position
+
+The installed TypeScript operator is a deterministic event-calculus boundary
+around probabilistic worker output.
+
+The worker may produce a probabilistic candidate surface. The operator must not
+make probabilistic state decisions. It admits the candidate through deterministic
+contracts, emits ABG runtime truth, and returns a projection over that truth.
+
+The governing type is:
+
+```text
+transition : State x Input -> TransitionResult
+```
+
+The function is total. Every observed input at every state returns one typed
+result:
+
+```text
+Advanced | OpenedGap | RequiresReprice | RequiresHuman | Blocked
+```
+
+No state transition may be represented only by archive files, next-action prose,
+operator memory, or a manual rerun convention.
+
+## Authority Split
+
+ABG owns:
+
+- execution basis
+- graph call, frame, vector, retry, continuation, terminal, and assessment
+  event truth
+- replay projection
+- retry attempt counting
+- same-edge retry eligibility
+- convergence projection
+
+`odd_sdlc.TS` owns:
+
+- graph-function domain meaning
+- worker handoff manifest contract
+- product materialization contract
+- worker result report admission
+- deterministic postflight classification
+- gap dossier content
+- domain projection and operator summary
+
+The domain may classify a failed candidate. It must return that classification
+to ABG-compatible event truth before any retry, repair, repricing, human, or
+terminal result is claimed.
+
+## IACS
+
+| Carrier | Boundary | Authority | Admission | Inadmissible Shortcut |
+| --- | --- | --- | --- | --- |
+| `SdlcWorkerHandoffManifest` | worker dispatch | graph edge handoff | derived from ABG execution basis, hook contract, conformed project profile, and replay retry context | prompt-only work instruction |
+| `SdlcWorkerRetryContext` | same-edge re-entry | replay-derived prior failure state | derived from ABG retry projection and admitted gap dossiers | local attempt counter |
+| `SdlcProductMaterializationContract` | product file output | tenant-root materialization law | declares tenant root, selected output root, required roles, and `relativePathBasis=tenant_root` | path convention inferred by worker |
+| `SdlcWorkerResultReport` | worker result | F_P candidate surface | closed JSON report with output digest and materialized file inventory | prose scrape or stdout inference |
+| `SdlcPostflightResult` | deterministic admission | F_D postflight verdict | output, digest, unresolved reasons, materialization, and evidence checks | accepting generated files because they exist |
+| `SdlcPostflightGapDossier` | failure classification | odd_sdlc domain gap meaning | derives from postflight verdict, worker report, materialization contract, and evidence refs | flat blocking-reason string as repair contract |
+| `SdlcAssuranceLedger` | assurance dimension | odd_sdlc domain evaluation truth | one deterministic ledger over materialization, semantic convergence, obligation carry, requirement fulfillment, ambiguity, capability, or shallow realization | hidden evaluator branch or prose-only assessment |
+| `TraversalRequirementSatisfaction` | total-transition input | folded SDLC domain closure truth | deterministic fold over required assurance ledgers | closing from one green artifact or archive-only note |
+| `RuntimeEvent[]` | traversal truth | ABG event calculus | `vector_evaluated`, `retry_repair_planned`, `retry_attempt_opened`, optional continuation events, or `assessed` | archive-only status |
+| `SdlcInstalledOperatorStartOutcome` | operator projection | read model over state and archive | carries emitted event kinds, gap dossier, and archive refs | next action as transition authority |
+
+## Total Transition Slice
+
+The first T-076 implementation slice governs the failed-postflight path:
+
+```text
+WorkerResultReport
+  -> evaluateWorkerResultPostflight
+  -> SdlcPostflightResult(blocked)
+  -> SdlcPostflightGapDossier(open)
+  -> AssuranceLedgerSet
+  -> TraversalRequirementSatisfaction(blocked | retry_same_edge | reprice_required)
+  -> ABG retry repair decision
+  -> retry runtime events appended
+  -> operator projection
+```
+
+The pass path remains:
+
+```text
+WorkerResultReport
+  -> evaluateWorkerResultPostflight
+  -> AssuranceLedgerSet
+  -> TraversalRequirementSatisfaction(close_allowed)
+  -> hook admission
+  -> ABG assessed events
+  -> replay closes current vector
+```
+
+The failed path does not close the vector. Replay keeps the same current edge
+open, records retry attempt truth, and allows the next handoff to carry the
+prior gap dossier.
+
+## Mermaid State Machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> WorkerCompleted
+  WorkerCompleted --> ResultReportAdmitted: report parsed and admitted
+  WorkerCompleted --> GapDossierOpened: report missing or rejected
+
+  ResultReportAdmitted --> MaterializationObserved: files observed
+  MaterializationObserved --> PostflightEvaluated: deterministic checks complete
+
+  PostflightEvaluated --> HookAdmission: postflight passed
+  HookAdmission --> RuntimeAssessed: hook postflight passed
+  RuntimeAssessed --> EdgeClosedByReplay: assessed events appended
+  EdgeClosedByReplay --> [*]
+
+  PostflightEvaluated --> GapDossierOpened: postflight failed
+  GapDossierOpened --> RetryDecision: gap dossier admitted
+  RetryDecision --> RetryEventsAppended: retry planned
+  RetryDecision --> RetryStopped: budget exhausted
+  RetryEventsAppended --> SameEdgeOpenByReplay: vector remains unclosed
+  SameEdgeOpenByReplay --> [*]
+  RetryStopped --> [*]
+```
+
+## Functional Shape
+
+The implementation should read as transforms over admitted truth:
+
+```text
+candidate
+  |> admit result report
+  |> evaluate postflight
+  |> derive assurance ledgers
+  |> fold traversal requirement satisfaction
+  |> fold(postflightToGapAndRetry, postflightToAssessment)
+  |> append events
+  |> project summary
+```
+
+Effect boundaries are limited to:
+
+- worker process invocation
+- filesystem observation
+- archive copies
+- event-log append
+
+The core classification remains pure:
+
+- classify blocking reasons
+- build gap dossier
+- derive assurance ledgers
+- fold traversal requirement satisfaction
+- derive retry decision input
+- construct emitted runtime events
+
+## Local And Global Optimization Review
+
+Local optimization:
+
+- keep materialization path-basis law in `SdlcProductMaterializationContract`
+- keep postflight failure classification in a gap carrier, not in
+  `installed_operator.ts` prose
+- keep retry context as derived replay state in the handoff manifest
+
+Global optimization:
+
+- use ABG retry/continuation events instead of adding an `odd_sdlc` retry event
+  family
+- preserve `operator_summary` as a projection only
+- do not copy Python's distributed controller; preserve its capability by
+  collapsing it into explicit TypeScript carriers and ABG events
+
+## Non-Claims
+
+This design does not claim full data_mapper RC parity. It closes the algebraic
+break where failed postflight previously left event calculus. The broader
+authority-to-code and code-to-test depth checks remain governed by T-066,
+T-069, and the wider T-041 RC envelope. The assurance-ledger slice T-077 through
+T-084 is complete as a deterministic input to this state machine; it is not a
+claim that a fresh external data_mapper qualification run has reached full RC
+depth.

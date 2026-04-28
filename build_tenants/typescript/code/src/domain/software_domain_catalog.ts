@@ -37,6 +37,7 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
       "implementation_design_surface",
       "implementation_stack_profile",
       "implementation_module_surface",
+      "realization_schedule_surface",
       "code_surface"
     ],
     realizationStatus: "active_first_slice"
@@ -50,6 +51,7 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
       "test_design_surface",
       "test_stack_profile",
       "test_module_surface",
+      "test_schedule_surface",
       "test_run_archive_surface",
       "testcase_authority_surface"
     ],
@@ -222,11 +224,13 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "implementation_design_surface",
     "implementation_stack_profile",
     "implementation_module_surface",
+    "realization_schedule_surface",
     "code_surface",
     "uat_testcases_surface",
     "test_design_surface",
     "test_stack_profile",
     "test_module_surface",
+    "test_schedule_surface",
     "test_run_archive_surface",
     "testcase_authority_surface",
     "release_surface",

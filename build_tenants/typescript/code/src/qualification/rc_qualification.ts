@@ -9,11 +9,9 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
   releaseClaim: "bounded_odd_native_typescript_rc",
   verdict: "bounded_rc_ready",
   verdictScope:
-    "The TypeScript tenant is RC-qualified for the bounded ODD-native package surface: strict build, graph publication, pure ingress, read/query projections, public ABG handoff, hook contracts, traceability closure, triage routing, operational command/result projection, and harnessed scenario proof.",
+    "The TypeScript tenant is RC-qualified for the bounded ODD-native package surface: strict build, graph publication, pure ingress, read/query projections, public ABG handoff, hook contracts, traceability closure, triage routing, operational command/result projection, bounded public CLI adapter, harnessed scenario proof, ABG-populated installed sandbox proof, package-backed install/release-cut proof, and one live external F_P data_mapper traversal proof.",
   nonClaimedScope: Object.freeze([
-    "side-effecting installed-workspace CLI replacement for the Python tenant",
-    "live probabilistic data_mapper generation with an external F_P worker",
-    "release-cut packaging and public binary distribution"
+    "full operational Python replacement at Python historical multi-edge data_mapper realization depth"
   ]),
   gates: Object.freeze([
     Object.freeze({
@@ -32,6 +30,30 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
         "build_tenants/typescript/test_env/tests/test_t038_rc_qualification.test.mjs"
     }),
     Object.freeze({
+      name: "T-052 ABG-populated installed sandbox contract",
+      category: "installed_sandbox",
+      command: "npm run test:sandbox",
+      status: "passed",
+      evidenceRef:
+        "build_tenants/typescript/test_env/sandbox/test_t052_abg_installed_sandbox_contract.test.mjs"
+    }),
+    Object.freeze({
+      name: "T-058 bounded public CLI adapter",
+      category: "cli",
+      command: "npm run test:t058",
+      status: "passed",
+      evidenceRef:
+        ".ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md"
+    }),
+    Object.freeze({
+      name: "T-059 install and release-cut adapter",
+      category: "install_release",
+      command: "npm run test:t059",
+      status: "passed",
+      evidenceRef:
+        ".ai-workspace/tickets/completed/T-059-realize-typescript-install-normalize-and-release-cut-adapters.md"
+    }),
+    Object.freeze({
       name: "data_mapper reference comparison",
       category: "reference",
       command:
@@ -43,10 +65,18 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
     Object.freeze({
       name: "live F_P worker traversal",
       category: "live",
-      command: null,
-      status: "not_claimed",
+      command: "ODD_SDLC_TS_LIVE_FP=1 npm run test:live",
+      status: "passed",
       evidenceRef:
-        ".ai-workspace/tickets/backlog/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+        ".ai-workspace/tickets/completed/T-053-build-typescript-live-fp-data-mapper-qualification-lane.md"
+    }),
+    Object.freeze({
+      name: "T-060 TypeScript/Python archive comparison",
+      category: "comparison",
+      command: "npm run test:t038",
+      status: "passed",
+      evidenceRef:
+        "build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_LIVE_PYTHON_ARCHIVE_COMPARISON.md"
     })
   ]),
   pythonParity: Object.freeze([
@@ -54,10 +84,9 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       area: "install and normalize",
       pythonEvidence: "normalization.py and installation tests mutate target workspaces.",
       typescriptEvidence:
-        "workspace ingress admits source inputs, project constraints, imported requirement authority, and bootstrap lineage as pure carriers.",
-      status: "partial_intentional_difference",
-      gapTicket:
-        ".ai-workspace/tickets/backlog/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+        "workspace ingress admits source inputs, project constraints, imported requirement authority, and bootstrap lineage as pure carriers; T-059 installs the package and ABG runtime into a target workspace and writes normalization/bootstrap surfaces.",
+      status: "bounded_parity",
+      gapTicket: null
     }),
     Object.freeze({
       area: "start",
@@ -87,10 +116,9 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       area: "constructors and evaluators",
       pythonEvidence: "constructor.py and fd_checks.py construct assets and evaluate closure.",
       typescriptEvidence:
-        "hooks/ declares per-edge contracts, preflight/postflight F_D, F_P work-report admission, generated-asset authority, and ambiguity preservation.",
-      status: "bounded_parity",
-      gapTicket:
-        ".ai-workspace/tickets/backlog/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+        "hooks/ declares per-edge contracts, preflight/postflight F_D, F_P work-report admission, generated-asset authority, and ambiguity preservation; T-053 proves one live external F_P data_mapper result admitted through the same hook contract.",
+      status: "bounded_parity_with_live_fp_proof",
+      gapTicket: null
     }),
     Object.freeze({
       area: "traceability",
@@ -114,10 +142,19 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       pythonEvidence:
         "Python can produce operational release/run evidence inside installed workspaces.",
       typescriptEvidence:
-        "graph catalog publishes prepare_release_surface and operational graph functions; package release-cut/binary distribution is not claimed.",
-      status: "partial_intentional_difference",
+        "graph catalog publishes prepare_release_surface and operational graph functions; T-059 proves package release-cut artifact and odd-sdlc-ts binary binding.",
+      status: "bounded_parity",
+      gapTicket: null
+    }),
+    Object.freeze({
+      area: "archive comparison and multi-edge depth",
+      pythonEvidence:
+        "Python has passing historical live code-edge archives and richer data_mapper yield-chain archives with multi-edge continuation/yield depth.",
+      typescriptEvidence:
+        "T-053 proves one current live data_mapper derive_code_surface traversal; T-060 publishes the side-by-side comparison and identifies the remaining multi-edge depth question.",
+      status: "bounded_parity_with_depth_gap",
       gapTicket:
-        ".ai-workspace/tickets/backlog/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+        ".ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
     })
   ])
 } as const);

@@ -23,9 +23,9 @@ design surfaces after bootstrap.
   while realization structure lives beneath `build_tenants/`
 - instance path: any mutable named instances remain subordinate beneath tenant
   `workspaces/` rather than competing with source realization roots
-- runtime-boundary path: repo-root `.genesis/` is absent from the source
+- runtime-boundary path: repo-root `.abiogenesis/` is absent from the source
   repository; source commands bind to the ABG source/release substrate and
-  installed workspaces receive their own `.genesis/` runtime during install
+  installed workspaces receive their own `.abiogenesis/` runtime during install
 - fail-closed path: tenant-local roots are absent until real local realization
   law exists
 - documentation path: supporting documentation stays outside the constitutional
@@ -41,5 +41,5 @@ design surfaces after bootstrap.
 5. mutable named instances, when introduced, belong beneath
    `build_tenants/<tenant>/workspaces/<name>/` and do not become source
    authority
-6. repo-root `.genesis/` is not present in the source repository and is not
+6. repo-root `.abiogenesis/` is not present in the source repository and is not
    treated as source truth

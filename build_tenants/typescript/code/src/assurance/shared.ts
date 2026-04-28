@@ -1,0 +1,54 @@
+// Implements: REQ-F-ODDSDLC-013
+// Implements: REQ-F-ODDSDLC-051
+// Implements: REQ-F-ODDSDLC-055
+
+import {
+  makeSdlcAssuranceLedger,
+  makeSdlcAssuranceLedgerReason,
+  type SdlcAssuranceLawfulReentryPoint,
+  type SdlcAssuranceLedger,
+  type SdlcAssuranceLedgerDimension,
+  type SdlcAssuranceLedgerReason,
+  type SdlcAssuranceLedgerVerdict
+} from "./carriers.js";
+
+export function uniqueSorted(values: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(values)].sort());
+}
+
+export function assuranceReason(input: {
+  readonly code: string;
+  readonly message: string;
+  readonly evidenceRefs?: readonly string[];
+  readonly lawfulReentryPoint: SdlcAssuranceLawfulReentryPoint;
+}): SdlcAssuranceLedgerReason {
+  return makeSdlcAssuranceLedgerReason(input);
+}
+
+export function assuranceLedger(input: {
+  readonly dimension: SdlcAssuranceLedgerDimension;
+  readonly verdict: SdlcAssuranceLedgerVerdict;
+  readonly required?: boolean;
+  readonly reasons?: readonly SdlcAssuranceLedgerReason[];
+  readonly evidenceRefs?: readonly string[];
+  readonly carryForwardObligationRefs?: readonly string[];
+}): SdlcAssuranceLedger {
+  return makeSdlcAssuranceLedger(input);
+}
+
+export function verdictFromReasons(input: {
+  readonly blockedReasonCodes: readonly string[];
+  readonly openGapReasonCodes: readonly string[];
+  readonly repriceReasonCodes?: readonly string[];
+}): SdlcAssuranceLedgerVerdict {
+  if (input.blockedReasonCodes.length > 0) {
+    return "blocked";
+  }
+  if ((input.repriceReasonCodes ?? []).length > 0) {
+    return "reprice_required";
+  }
+  if (input.openGapReasonCodes.length > 0) {
+    return "open_gap";
+  }
+  return "satisfied";
+}

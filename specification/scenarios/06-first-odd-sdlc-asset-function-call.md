@@ -26,10 +26,12 @@ development environment:
 - `derive_implementation_design_surface`
 - `select_implementation_stack_profile`
 - `derive_implementation_module_surface`
+- `derive_realization_schedule_surface`
 - `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`
+- `derive_test_schedule_surface`
 - `derive_test_run_archive_surface`
 - `qualify_testcase_authority`
 - `prepare_release_surface`
@@ -60,11 +62,13 @@ development environment:
   testcase-authority output
 - recursive-implementation path: the generated design and scenario surfaces
   open a bounded recursive implementation SDLC that yields implementation
-  design, explicit stack choice, generated module structure, and executable
-  code under the active tenant-local realization root
+  design, explicit stack choice, generated module structure, a governed
+  realization schedule, and executable code under the active tenant-local
+  realization root
 - recursive-test path: the generated design and scenario surfaces open a
   bounded recursive test SDLC that yields test design, explicit stack choice,
-  generated test module structure, and archived test-run evidence
+  generated test module structure, a governed test schedule, and archived
+  test-run evidence
 - release path: the generated design, scenarios, executable code, testcase
   authority, and test archive evidence become lawful inputs to release
   together with requirements

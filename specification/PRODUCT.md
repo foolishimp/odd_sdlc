@@ -55,6 +55,13 @@ It gives a project a lawful way to declare:
   operational work
 - explicit software work acts and operational-return evidence with attributable
   provenance over that same governed line
+- explicit schedule/work-plan surfaces between design/module outputs and
+  realization execution so code and test materialization are constrained by a
+  graph-owned work order rather than a hidden operator checklist
+- dependency-ordered realization and qualification tranches over module,
+  source-asset, test, evidence, and obligation ledgers
+- indexed authority pressure for prompt-bearing edges so workers receive full
+  authority by reference and targeted local obligation slices inline
 - deterministic install-and-normalize behavior over imported or stale workspaces
 - policy over evaluation, escalation, proof, and closure
 - evidence and proving lanes
@@ -73,6 +80,91 @@ project-owned realization topology rooted in `build_tenants/`.
 `specification/` defines the governing `WHAT`.
 
 `build_tenants/` carries one or more realization instances of `HOW`.
+
+## Installed Development Product Contract
+
+`odd_sdlc` publishes an installer as product behavior.
+
+The installer prepares an independent target workspace as an installed
+development product for ODD software-domain work. It consumes the public ABG
+installer for substrate population and then installs the `odd_sdlc` product
+payload beneath:
+
+`.abiogenesis/odd_sdlc/<build_tenant>/`
+
+The installed workspace must be usable by a cold agent. A cold agent must be
+able to inspect installed method references, understand the ownership split,
+run `gaps`, and run `start` without hidden knowledge of the source workspace.
+
+The ownership split is product law:
+
+- the target project owns its `specification/`, source, and imported product
+  truth
+- ABG owns `.abiogenesis/` substrate truth, runtime identity, manifests,
+  events, projections, method reference copies, and substrate command bindings
+- `odd_sdlc` owns `.abiogenesis/odd_sdlc/<build_tenant>/`, domain command
+  bindings, domain install manifests, normalization reports, and
+  marker-governed instruction sections
+
+Installed standards are referenced from the ABG substrate using
+`workspace://.abiogenesis/docs/standards/...`. They are local reference copies
+for operation in the target workspace; they do not become project-specific
+requirements or replace upstream shared method authority.
+
+## Installed Operator UX Contract
+
+The installed product must expose a coherent operator loop, not only a package
+topology.
+
+The installed operator handoff is:
+
+```text
+User -> [Agentic_Coder_CLI | Plain CLI]
+  -> installed odd_sdlc command/callable contract
+  -> ABG runtime truth
+  -> GTL graph-function edge
+  -> IoC worker/plugin execution
+  -> materialized asset + worker result report
+  -> ABG event/projection truth
+  -> [Agentic_Coder_CLI | Plain CLI]
+  -> User
+```
+
+The agentic coder CLI is the primary flexible UI for this product line. It
+accepts user intent, reads installed bootstrap provenance, invokes installed
+commands, inspects archives, and reports the next lawful state. It is not a
+second SDLC runtime.
+
+The same model-backed executable may also be used as an `F_P` worker/plugin
+when ABG dispatches a graph-function edge. That worker role is distinct from
+the UI role and must remain governed by worker handoff manifests and result
+admission.
+
+The minimum installed operator loop is:
+
+1. inspect the current graph/worksite state with `gaps`
+2. run `start`
+3. receive a truthful stop, worker requirement, dispatch, yielded handoff, or
+   convergence result
+4. when a worker is supplied, execute the selected graph-function edge through
+   governed transport rather than stopping at an unconsumed dispatch projection
+5. materialize the declared output asset under governed binding or allocation
+6. ingest the worker result through typed carriers and deterministic checks
+7. update runtime truth through ABG-owned events or ABG-compatible event
+   ingestion
+8. rerun `gaps` and see the next lawful edge or the remaining gap
+9. preserve an archive and postmortem sufficient to diagnose the run
+
+This loop is the operator-facing expression of outcome-driven development.
+
+The command surface may use concise operator summaries by default and expose
+verbose JSON for machines, but routine `gaps` and `start` output must not force
+operators to read the full GTL module to understand the next action.
+
+Python tenant behavior is operational precedent for this loop. TypeScript must
+translate that precedent into graph functions, typed assets, ABG runtime truth,
+and installed product carriers. It must not copy Python service structure as
+architecture.
 
 ## Product Terms
 
@@ -178,6 +270,28 @@ that state.
 The requirement closure register exists so unresolved constitutional work
 remains active future pressure across iterations rather than disappearing after
 one bounded wave.
+
+### Traversal Obligation Context
+
+A graph-edge handoff surface that carries the cumulative obligation chain for
+one traversal.
+
+It references:
+
+- required source and target asset types
+- requirement, design, and module authority surfaces
+- prior edge evidence and intermediate ledgers
+- runtime context sidecars
+- retry gap dossiers
+- current delta summary
+
+The traversal obligation context is the required product-level carrier for
+cumulative realization pressure. Intermediate ledgers distribute probabilistic
+compute across multiple bounded traversals, while the full chain remains
+available as obligation truth for the worker and evaluator.
+
+The current artifact is never the whole closure basis when earlier obligations
+remain live.
 
 ### Trace Authority
 
@@ -421,7 +535,7 @@ The source-repository realization rules below do not redefine downstream
 installed-workspace topology. Downstream project topology is governed
 separately by `REQ-F-ODDSDLC-032`.
 
-The source repository does not carry repo-root `.genesis/` as source truth.
+The source repository does not carry repo-root `.abiogenesis/` as source truth.
 Source commands bind explicitly to the sibling ABG source/release substrate and
 the active `odd_sdlc` source realization.
 
@@ -429,16 +543,16 @@ Downstream installed workspaces are governed separately by
 `REQ-F-ODDSDLC-032`: their constitutional `WHAT` remains under
 `specification/`, their project-owned realization `HOW` lands under
 `build_tenants/<tenant>/`, immutable installed substrate and odd-product
-payloads live under `.genesis/`, installed `odd_sdlc` lives under
-`.genesis/odd_sdlc/`, and mutable named instances may live beneath
-`build_tenants/<tenant>/workspaces/<name>/`.
+payloads live under `.abiogenesis/`, installed `odd_sdlc` lives under
+`.abiogenesis/odd_sdlc/<build_tenant>/`, and mutable named instances may live
+beneath `build_tenants/<tenant>/workspaces/<name>/`.
 
 That same law also governs odd_sdlc self-induction when the target project is a
 mutable odd_sdlc source line:
 
 - released odd_sdlc governs the mutable source project through installed
   operator surfaces
-- the installed payload remains under `.genesis/odd_sdlc/`
+- the installed payload remains under `.abiogenesis/odd_sdlc/<build_tenant>/`
 - the mutable project realization remains under its declared
   `build_tenants/...` root
 - source project, released product, installed payload, and mutable worksite do
@@ -648,10 +762,12 @@ The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox i
 - `derive_implementation_design_surface`
 - `select_implementation_stack_profile`
 - `derive_implementation_module_surface`
+- `derive_realization_schedule_surface`
 - `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`
+- `derive_test_schedule_surface`
 - `derive_test_run_archive_surface`
 - `qualify_testcase_authority`
 - `prepare_release_surface`

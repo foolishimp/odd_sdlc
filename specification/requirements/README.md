@@ -28,3 +28,8 @@ as the governing method reference when writing or revising these files.
 
 - `13-odd-sdlc-typescript-tenant.md` opens the `odd_sdlc.TS` build line as a
   governed TypeScript realization over the singleton product specification.
+- `14-odd-sdlc-installed-product-contract.md` defines the installed development
+  product contract that build tenants must satisfy for operator and sandbox use.
+- `15-odd-sdlc-scheduling-phase.md` defines the graph-owned schedule/work-plan,
+  tranche, dependency-graph, and indexed-pressure surfaces that constrain
+  realization edges before materialization.

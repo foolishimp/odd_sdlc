@@ -18,6 +18,6 @@ Start with these surfaces:
 - `build_tenants/README.md`
 - `build_tenants/TENANT_REGISTRY.md`
 
-The source repo does not carry a repo-root `.genesis/` runtime. Installed
-`.genesis/` directories belong to downstream target workspaces and test
+The source repo does not carry a repo-root `.abiogenesis/` runtime. Installed
+`.abiogenesis/` directories belong to downstream target workspaces and test
 sandboxes.

@@ -132,9 +132,17 @@ operation.
   `CLAUDE.md` and `AGENTS.md` that frames the workspace as a target project
   governed by `odd_sdlc`, while preserving the generic GTL bootloader section
   installed by `abiogenesis`
+- AC-5a: the installed instruction section makes cold-agent operation explicit:
+  operator `gaps` maps to the installed `odd-sdlc-ts gaps --workspace .`
+  command, and operator `start` maps to the installed
+  `odd-sdlc-ts start --workspace . --target next --until blocked` command
+- AC-5b: instruction-file delivery is marker-governed so reinstall or refresh
+  can update the `odd_sdlc` section without deleting unrelated project guidance
+- AC-5c: the install manifest records instruction-file verification for both
+  `AGENTS.md` and `CLAUDE.md`
 - AC-6: the ownership boundary over installed surfaces is explicit:
   - imported `specification/*` remains project-owned authority
-  - `.genesis/*` and the GTL bootloader section remain `abiogenesis`-owned
+  - `.abiogenesis/*` and the GTL bootloader section remain `abiogenesis`-owned
   - the `odd_sdlc` instruction section, runtime contract, normalization report,
     and generated project bootstrap read model remain installer-owned domain
     surfaces

@@ -14,6 +14,7 @@ import {
   admitSdlcSourceInput,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
+  FG_INGRESS_PROJECT,
   parseProjectSlugFromConstraintText,
   sha256Digest
 } from "../../build/semantic/code/src/index.js";
@@ -97,7 +98,7 @@ test("T-031 project constraints admission fails closed on stale or malformed sha
       admitSdlcProjectConstraints({
         projectSlug: "data_mapper",
         activeTenant: "scala_spark",
-        selectedOutputRoot: ".genesis/build_tenants/scala_spark",
+        selectedOutputRoot: ".abiogenesis/build_tenants/scala_spark",
         ambiguityRiskAppetite: "low",
         capabilityContracts: []
       }),
@@ -134,8 +135,18 @@ test("T-031 portable fixture derives imported requirement authority and lineage"
   });
 
   assert.equal(report.kind, "sdlc_workspace_ingress_report");
+  assert.equal(report.governingGraphFunction, FG_INGRESS_PROJECT);
+  assert.equal(report.ingressSourceSet.kind, "ingress_source_set");
+  assert.equal(report.ingressSourceSet.structureGrade, "structured");
+  assert.equal(report.projectIngressContract.graphFunctionName, FG_INGRESS_PROJECT);
+  assert.equal(
+    report.projectIngressContract.topologyPolicyRef,
+    "policy://odd_sdlc/spec_method_project_topology"
+  );
   assert.equal(report.projectConstraints.activeTenant, "scala_spark");
   assert.equal(report.importedRequirementAuthorities.length, 2);
+  assert(report.ambiguityRegister.some((entry) => entry.includes("README.md")));
+  assert(report.bootstrapGapSet.includes("bootstrap_ambiguity_present"));
   assert(
     report.importedRequirementAuthorities.some(
       (authority) => authority.requirementId === "REQ-LDM-001"

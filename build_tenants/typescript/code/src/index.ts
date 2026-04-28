@@ -18,6 +18,12 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "traceability_requirement_closure",
   "gap_triage_route_binding",
   "operational_transition_runtime_return",
+  "public_cli_adapter",
+  "typescript_install_adapter",
+  "installed_operator_execution",
+  "assurance_ledger_composition",
+  "scheduling_phase",
+  "release_cut_packaging",
   "rc_qualification"
 ] as const);
 
@@ -38,6 +44,7 @@ export function describeOddSdlcTypescriptTenant(): OddSdlcTypescriptTenantInfo {
 }
 
 export * from "./runtime/index.js";
+export * from "./shared/blocking_reason.js";
 export * from "./domain/index.js";
 export * from "./graph/index.js";
 export * from "./workspace/index.js";
@@ -47,3 +54,9 @@ export * from "./hooks/index.js";
 export * from "./triage/index.js";
 export * from "./operational/index.js";
 export * from "./qualification/index.js";
+export * from "./package_binding/index.js";
+export * from "./install/index.js";
+export * from "./operator/index.js";
+export * from "./assurance/index.js";
+export * from "./release/index.js";
+export * from "./cli/index.js";

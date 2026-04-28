@@ -20,6 +20,12 @@ import type {
   SdlcTriageProcessOutcome,
   SdlcTriageReEntryLayer
 } from "./carriers.js";
+import {
+  SDLC_TRIAGE_CLASSIFICATION_POLICY,
+  SDLC_TRIAGE_ROUTE_POLICY,
+  type SdlcTriageClassificationCondition,
+  type SdlcTriageRoutePolicyEntry
+} from "./policy.js";
 
 const EMPTY_RUNTIME_EVENT_KINDS: readonly [] = Object.freeze([]);
 
@@ -62,46 +68,42 @@ export function observeSdlcGapPressure(input: {
   });
 }
 
-function classifyObservation(
+function observationCondition(
   observation: SdlcGapObservation
-): {
+): SdlcTriageClassificationCondition {
+  if (
+    observation.gapStatus === "converged" &&
+    observation.requirementPressureIds.length === 0
+  ) {
+    return "converged_without_requirement_pressure";
+  }
+  if (observation.requirementPressureIds.length > 0) {
+    return "requirement_pressure_present";
+  }
+  if (observation.gapStatus === "open" || observation.gapStatus === "partial") {
+    return "open_or_partial_gap";
+  }
+  return "fallback";
+}
+
+function classifyObservation(observation: SdlcGapObservation): {
   readonly frameworkLayer: SdlcTriageFrameworkLayer;
   readonly frameworkCondition: SdlcTriageCondition;
   readonly processOutcome: SdlcTriageProcessOutcome;
   readonly domainMeaning: string;
 } {
-  if (
-    observation.gapStatus === "converged" &&
-    observation.requirementPressureIds.length === 0
-  ) {
-    return {
-      frameworkLayer: "release",
-      frameworkCondition: "gap_retired",
-      processOutcome: "gap_retired",
-      domainMeaning: "gap is closed at current authority basis"
-    };
-  }
-  if (observation.requirementPressureIds.length > 0) {
-    return {
-      frameworkLayer: "requirements",
-      frameworkCondition: "unmet_requirement",
-      processOutcome: "route_selected",
-      domainMeaning: "unresolved requirement pressure must re-enter before implementation closure"
-    };
-  }
-  if (observation.gapStatus === "open" || observation.gapStatus === "partial") {
-    return {
-      frameworkLayer: "code",
-      frameworkCondition: "open_gap",
-      processOutcome: "route_selected",
-      domainMeaning: "current ABG edge remains open and needs a declared start target"
-    };
+  const condition = observationCondition(observation);
+  const policy = SDLC_TRIAGE_CLASSIFICATION_POLICY.find(
+    (entry) => entry.condition === condition
+  );
+  if (policy === undefined) {
+    throw new TypeError(`SdlcTriagePolicy: missing classification policy ${condition}`);
   }
   return {
-    frameworkLayer: "runtime",
-    frameworkCondition: "unclassified_gap",
-    processOutcome: "unclassified_gap",
-    domainMeaning: "no totalized domain route matched the observation"
+    frameworkLayer: policy.frameworkLayer,
+    frameworkCondition: policy.frameworkCondition,
+    processOutcome: policy.processOutcome,
+    domainMeaning: policy.domainMeaning
   };
 }
 
@@ -123,10 +125,27 @@ export function classifySdlcGapObservation(input: {
   });
 }
 
-function reEntryLayerFor(classification: SdlcTriageClassification): SdlcTriageReEntryLayer {
-  if (classification.processOutcome === "gap_retired") {
-    return "none";
+function routePolicyFor(
+  classification: SdlcTriageClassification
+): SdlcTriageRoutePolicyEntry {
+  const policyName =
+    classification.processOutcome === "gap_retired"
+      ? "gap_retired"
+      : classification.frameworkLayer === "requirements"
+        ? "requirements_pressure"
+        : "default_repair";
+  const policy = SDLC_TRIAGE_ROUTE_POLICY.find(
+    (entry) => entry.routePolicy === policyName
+  );
+  if (policy === undefined) {
+    throw new TypeError(`SdlcTriagePolicy: missing route policy ${policyName}`);
   }
+  return policy;
+}
+
+function classificationLayerOrCode(
+  classification: SdlcTriageClassification
+): SdlcTriageReEntryLayer {
   if (
     classification.frameworkLayer === "intent" ||
     classification.frameworkLayer === "goals" ||
@@ -141,14 +160,23 @@ function reEntryLayerFor(classification: SdlcTriageClassification): SdlcTriageRe
   return "code";
 }
 
-function targetGraphFunctionFor(input: {
+function reEntryLayerFor(input: {
   readonly classification: SdlcTriageClassification;
+  readonly routePolicy: SdlcTriageRoutePolicyEntry;
+}): SdlcTriageReEntryLayer {
+  return input.routePolicy.reEntryLayer === "classification_layer_or_code"
+    ? classificationLayerOrCode(input.classification)
+    : input.routePolicy.reEntryLayer;
+}
+
+function targetGraphFunctionFor(input: {
+  readonly routePolicy: SdlcTriageRoutePolicyEntry;
   readonly observation: SdlcGapObservation;
 }): string | null {
-  if (input.classification.processOutcome === "gap_retired") {
+  if (input.routePolicy.targetStrategy === "none") {
     return null;
   }
-  if (input.classification.frameworkLayer === "requirements") {
+  if (input.routePolicy.targetStrategy === "derive_requirement_surface") {
     return "derive_requirement_surface";
   }
   return input.observation.currentEdge;
@@ -158,12 +186,16 @@ export function bindSdlcRoute(input: {
   readonly observation: SdlcGapObservation;
   readonly classification: SdlcTriageClassification;
 }): SdlcRouteBinding {
-  const reEntryLayer = reEntryLayerFor(input.classification);
-  const targetGraphFunction = targetGraphFunctionFor(input);
-  const routeKind =
-    input.classification.processOutcome === "gap_retired"
-      ? "gap_retired"
-      : "fixed_vector_repair";
+  const routePolicy = routePolicyFor(input.classification);
+  const reEntryLayer = reEntryLayerFor({
+    classification: input.classification,
+    routePolicy
+  });
+  const targetGraphFunction = targetGraphFunctionFor({
+    routePolicy,
+    observation: input.observation
+  });
+  const routeKind = routePolicy.routeKind;
   return Object.freeze({
     kind: "sdlc_route_binding",
     routeId: `route:${input.observation.observationId}`,
@@ -239,4 +271,3 @@ export function retireSdlcGapAfterLoopback(input: {
     emittedRuntimeEventKinds: EMPTY_RUNTIME_EVENT_KINDS
   });
 }
-

@@ -30,7 +30,9 @@ import {
   projectSdlcRequirementClosureRegister,
   proposeSdlcConstitutionalRepricing,
   retireSdlcGapAfterLoopback,
-  routeSdlcTicketWorkItem
+  routeSdlcTicketWorkItem,
+  SDLC_TRIAGE_CLASSIFICATION_POLICY,
+  SDLC_TRIAGE_ROUTE_POLICY
 } from "../../build/semantic/code/src/index.js";
 
 function moduleBasis(handle = "bootstrap_release_self_test") {
@@ -141,6 +143,29 @@ test("T-036 observation, classification, and route binding remain separate carri
   assert.equal(route.targetGraphFunction, "derive_requirement_surface");
   assert.equal(route.lawfulStartTarget.handle, "derive_requirement_surface");
   assert.equal(route.mayApplyConstitutionalChange, false);
+});
+
+test("T-057 triage classification and route policy are declared data", () => {
+  assert.deepStrictEqual(
+    SDLC_TRIAGE_CLASSIFICATION_POLICY.map((entry) => entry.condition),
+    [
+      "converged_without_requirement_pressure",
+      "requirement_pressure_present",
+      "open_or_partial_gap",
+      "fallback"
+    ]
+  );
+  assert.deepStrictEqual(
+    SDLC_TRIAGE_ROUTE_POLICY.map((entry) => entry.routePolicy),
+    ["gap_retired", "requirements_pressure", "default_repair"]
+  );
+  assert(
+    SDLC_TRIAGE_ROUTE_POLICY.some(
+      (entry) =>
+        entry.routePolicy === "requirements_pressure" &&
+        entry.targetStrategy === "derive_requirement_surface"
+    )
+  );
 });
 
 test("T-036 constitutional repricing is explicit and never applied by triage", () => {

@@ -23,10 +23,12 @@ graph function over the first bootstrap dependency chain:
 - `derive_implementation_design_surface`
 - `select_implementation_stack_profile`
 - `derive_implementation_module_surface`
+- `derive_realization_schedule_surface`
 - `derive_code_surface`
 - `derive_test_design_surface`
 - `select_test_stack_profile`
 - `derive_test_module_surface`
+- `derive_test_schedule_surface`
 - `derive_test_run_archive_surface`
 - `qualify_testcase_authority`
 - `prepare_release_surface`
@@ -70,10 +72,11 @@ runtime facts, wipe runtime state, and then rerun the same use case.
    `requirements` to feature decomposition and UAT testcase surfaces, then
    continues to generated design and scenario surfaces, then opens a recursive
    implementation branch to implementation design, implementation stack
-   profile, implementation module structure, and executable code, then opens a
-   recursive test branch to test design, test stack profile, test module
-   structure, and archived test evidence, then joins UAT and scenarios into
-   testcase authority, then joins requirements, design, scenarios,
+   profile, implementation module structure, realization schedule, and
+   executable code, then opens a recursive test branch to test design, test
+   stack profile, test module structure, test schedule, and archived test
+   evidence, then joins UAT and scenarios into testcase authority, then joins
+   requirements, design, scenarios,
    implementation code, authority, and test archive evidence into the release
    surface
 4. each bounded constructor turn records attributable asset checkpoint mutation

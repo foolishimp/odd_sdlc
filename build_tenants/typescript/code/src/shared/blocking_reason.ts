@@ -1,0 +1,486 @@
+import {
+  parseClosedRecord,
+  parseEnumValue,
+  parseNonEmptyString,
+  parseStringList
+} from "./validation.js";
+
+export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
+  "output_file_manifest_mismatch",
+  "output_file_outside_allowed_root",
+  "output_file_missing",
+  "output_path_not_file",
+  "output_file_empty",
+  "output_digest_mismatch",
+  "worker_report_unresolved_reasons_present",
+  "unexpected_product_materialization_for_surface_edge",
+  "materialized_product_files_missing",
+  "materialized_product_role_missing",
+  "materialized_product_file_outside_tenant_root",
+  "materialized_product_relative_path_absolute",
+  "materialized_product_relative_path_mismatch",
+  "materialized_product_file_missing",
+  "materialized_product_path_not_file",
+  "materialized_product_file_empty",
+  "materialized_product_byte_count_mismatch",
+  "materialized_product_digest_mismatch",
+  "test_execution_evidence_missing",
+  "test_execution_lane_mismatch",
+  "test_execution_command_mismatch",
+  "test_execution_not_succeeded",
+  "test_execution_zero_tests_observed",
+  "test_execution_failures_present",
+  "test_execution_report_refs_missing",
+  "test_materialization_not_discoverable",
+  "worker_report_admission_failed",
+  "obligation_unassessed",
+  "obligation_status_unassessed",
+  "obligation_blocked_without_evidence",
+  "obligation_assessment_extra",
+  "obligation_payload_insufficient",
+  "obligation_fulfilled_without_output_coverage",
+  "assurance_ledger_reason",
+  "hook_postflight_failed",
+  "hook_postflight_missing",
+  "installed_topology_invalid",
+  "target_unavailable",
+  "stale_query_domain",
+  "project_conformance_blocked",
+  "unsupported_fd_transition",
+  "project_conformance_gaps",
+  "unsupported_transition",
+  "fp_worker_unattached",
+  "worker_process_failed",
+  "install_failed",
+  "abg_install_rejected",
+  "command_binding_missing",
+  "unknown_blocking_reason"
+] as const);
+
+export type SdlcBlockingReasonCode =
+  (typeof SDLC_BLOCKING_REASON_CODES)[number];
+
+export const SDLC_BLOCKING_REASON_CLASSES = Object.freeze([
+  "contract_violation",
+  "authority_to_code",
+  "code_to_test",
+  "missing_evidence",
+  "worker_unresolved",
+  "topology",
+  "target_resolution",
+  "worker_runtime",
+  "runtime_policy",
+  "install",
+  "assurance",
+  "unknown"
+] as const);
+
+export type SdlcBlockingReasonClass =
+  (typeof SDLC_BLOCKING_REASON_CLASSES)[number];
+
+export const SDLC_BLOCKING_REASON_REENTRY_POINTS = Object.freeze([
+  "same_edge_retry",
+  "repair_worker_output",
+  "attach_worker",
+  "repair_installed_topology",
+  "fix_target_or_run_gaps",
+  "repair_project_conformance",
+  "reprice_runtime_policy",
+  "reprice_requirement_or_design",
+  "rerun_start",
+  "inspect_worker_archive",
+  "repair_install",
+  "operator_blocked"
+] as const);
+
+export type SdlcBlockingReasonLawfulReentryPoint =
+  (typeof SDLC_BLOCKING_REASON_REENTRY_POINTS)[number];
+
+export interface SdlcBlockingReason {
+  readonly kind: "sdlc_blocking_reason";
+  readonly code: SdlcBlockingReasonCode;
+  readonly reasonClass: SdlcBlockingReasonClass;
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+  readonly message: string;
+  readonly detail: string | null;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface BlockingReasonMetadata {
+  readonly reasonClass: SdlcBlockingReasonClass;
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+  readonly message: string;
+}
+
+function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
+  if (
+    code.startsWith("output_") ||
+    code.includes("relative_path") ||
+    code.includes("digest") ||
+    code.includes("byte_count") ||
+    code.includes("path_not_file") ||
+    code === "unexpected_product_materialization_for_surface_edge"
+  ) {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "repair_worker_output",
+      message: "Worker output violated the declared handoff contract."
+    });
+  }
+  if (code.startsWith("materialized_product_")) {
+    return Object.freeze({
+      reasonClass: code.includes("missing") || code.includes("empty")
+        ? "missing_evidence"
+        : "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Materialized product evidence does not satisfy the product contract."
+    });
+  }
+  if (code.startsWith("test_execution_")) {
+    return Object.freeze({
+      reasonClass: "code_to_test",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Governed test execution evidence does not satisfy the traversal contract."
+    });
+  }
+  if (code === "worker_report_unresolved_reasons_present") {
+    return Object.freeze({
+      reasonClass: "worker_unresolved",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "The worker report carried unresolved reasons."
+    });
+  }
+  if (code === "worker_report_admission_failed") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "repair_worker_output",
+      message: "The worker report could not be admitted as a closed carrier."
+    });
+  }
+  if (
+    code === "obligation_unassessed" ||
+    code === "obligation_status_unassessed" ||
+    code === "obligation_blocked_without_evidence" ||
+    code === "obligation_assessment_extra" ||
+    code === "obligation_payload_insufficient" ||
+    code === "obligation_fulfilled_without_output_coverage"
+  ) {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint:
+        code === "obligation_blocked_without_evidence" ||
+        code === "obligation_assessment_extra"
+          ? "repair_worker_output"
+          : "same_edge_retry",
+      message: "Worker obligation assessment does not satisfy traversal pressure."
+    });
+  }
+  if (code === "assurance_ledger_reason") {
+    return Object.freeze({
+      reasonClass: "assurance",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Assurance ledger fold blocked traversal closure."
+    });
+  }
+  if (code === "hook_postflight_failed" || code === "hook_postflight_missing") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Hook postflight did not admit the generated result."
+    });
+  }
+  if (
+    code === "installed_topology_invalid" ||
+    code === "project_conformance_blocked" ||
+    code === "project_conformance_gaps"
+  ) {
+    return Object.freeze({
+      reasonClass: "topology",
+      lawfulReentryPoint:
+        code === "installed_topology_invalid"
+          ? "repair_installed_topology"
+          : "repair_project_conformance",
+      message: "Project or install topology is not ready for downstream traversal."
+    });
+  }
+  if (code === "target_unavailable" || code === "stale_query_domain") {
+    return Object.freeze({
+      reasonClass: "target_resolution",
+      lawfulReentryPoint: "fix_target_or_run_gaps",
+      message: "Requested traversal target is not available from current projection truth."
+    });
+  }
+  if (code === "unsupported_fd_transition" || code === "unsupported_transition") {
+    return Object.freeze({
+      reasonClass: "runtime_policy",
+      lawfulReentryPoint: "reprice_runtime_policy",
+      message: "Runtime transition is not supported by the installed operator."
+    });
+  }
+  if (code === "fp_worker_unattached") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "attach_worker",
+      message: "F_P traversal requires an attached worker transport."
+    });
+  }
+  if (code === "worker_process_failed") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Worker process exited unsuccessfully."
+    });
+  }
+  if (
+    code === "install_failed" ||
+    code === "abg_install_rejected" ||
+    code === "command_binding_missing"
+  ) {
+    return Object.freeze({
+      reasonClass: "install",
+      lawfulReentryPoint: "repair_install",
+      message: "Product installation did not complete."
+    });
+  }
+  return Object.freeze({
+    reasonClass: "unknown",
+    lawfulReentryPoint: "operator_blocked",
+    message: "Blocking reason was not recognized by the closed carrier catalog."
+  });
+}
+
+export function makeSdlcBlockingReason(input: {
+  readonly code: SdlcBlockingReasonCode;
+  readonly detail?: string | null;
+  readonly evidenceRefs?: readonly string[];
+  readonly message?: string | undefined;
+  readonly lawfulReentryPoint?: SdlcBlockingReasonLawfulReentryPoint | undefined;
+  readonly reasonClass?: SdlcBlockingReasonClass | undefined;
+}): SdlcBlockingReason {
+  const metadata = metadataForCode(input.code);
+  return Object.freeze({
+    kind: "sdlc_blocking_reason" as const,
+    code: input.code,
+    reasonClass: input.reasonClass ?? metadata.reasonClass,
+    lawfulReentryPoint: input.lawfulReentryPoint ?? metadata.lawfulReentryPoint,
+    message: input.message ?? metadata.message,
+    detail: input.detail ?? null,
+    evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])])
+  });
+}
+
+export function legacyBlockingReasonCode(reason: SdlcBlockingReason): string {
+  if (reason.detail === null) {
+    return reason.code;
+  }
+  if (
+    reason.code === "materialized_product_role_missing" ||
+    reason.code === "worker_report_admission_failed" ||
+    reason.code === "obligation_unassessed" ||
+    reason.code === "obligation_status_unassessed" ||
+    reason.code === "obligation_blocked_without_evidence" ||
+    reason.code === "obligation_assessment_extra" ||
+    reason.code === "obligation_payload_insufficient" ||
+    reason.code === "obligation_fulfilled_without_output_coverage" ||
+    reason.code === "unsupported_fd_transition" ||
+    reason.code === "unsupported_transition" ||
+    reason.code === "unknown_blocking_reason"
+  ) {
+    return `${reason.code}:${reason.detail}`;
+  }
+  if (reason.code === "hook_postflight_failed") {
+    return `hook_postflight:${reason.detail}`;
+  }
+  if (reason.code === "hook_postflight_missing") {
+    return "hook_postflight:hook_postflight_missing";
+  }
+  if (reason.code === "assurance_ledger_reason") {
+    return reason.detail;
+  }
+  return reason.code;
+}
+
+export function summarizeBlockingReasons(
+  reasons: readonly SdlcBlockingReason[]
+): string | null {
+  if (reasons.length === 0) {
+    return null;
+  }
+  return reasons.map(legacyBlockingReasonCode).join(",");
+}
+
+function splitKnownPrefix(raw: string, prefix: string): string | null {
+  return raw.startsWith(`${prefix}:`) ? raw.slice(prefix.length + 1) : null;
+}
+
+export function sdlcBlockingReasonFromLegacy(input: {
+  readonly reason: string;
+  readonly evidenceRefs?: readonly string[];
+}): SdlcBlockingReason {
+  const evidenceRefs = input.evidenceRefs ?? Object.freeze([]);
+  const known = SDLC_BLOCKING_REASON_CODES.find((code) => code === input.reason);
+  if (known !== undefined) {
+    return makeSdlcBlockingReason({
+      code: known,
+      evidenceRefs
+    });
+  }
+  const role = splitKnownPrefix(input.reason, "materialized_product_role_missing");
+  if (role !== null) {
+    return makeSdlcBlockingReason({
+      code: "materialized_product_role_missing",
+      detail: role,
+      evidenceRefs
+    });
+  }
+  const workerReport = splitKnownPrefix(
+    input.reason,
+    "worker_report_admission_failed"
+  );
+  if (workerReport !== null) {
+    return makeSdlcBlockingReason({
+      code: "worker_report_admission_failed",
+      detail: workerReport,
+      evidenceRefs
+    });
+  }
+  const obligationUnassessed = splitKnownPrefix(input.reason, "obligation_unassessed");
+  if (obligationUnassessed !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_unassessed",
+      detail: obligationUnassessed,
+      evidenceRefs
+    });
+  }
+  const obligationStatusUnassessed = splitKnownPrefix(
+    input.reason,
+    "obligation_status_unassessed"
+  );
+  if (obligationStatusUnassessed !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_status_unassessed",
+      detail: obligationStatusUnassessed,
+      evidenceRefs
+    });
+  }
+  const obligationBlockedWithoutEvidence = splitKnownPrefix(
+    input.reason,
+    "obligation_blocked_without_evidence"
+  );
+  if (obligationBlockedWithoutEvidence !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_blocked_without_evidence",
+      detail: obligationBlockedWithoutEvidence,
+      evidenceRefs
+    });
+  }
+  const obligationAssessmentExtra = splitKnownPrefix(
+    input.reason,
+    "obligation_assessment_extra"
+  );
+  if (obligationAssessmentExtra !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_assessment_extra",
+      detail: obligationAssessmentExtra,
+      evidenceRefs
+    });
+  }
+  const obligationPayloadInsufficient = splitKnownPrefix(
+    input.reason,
+    "obligation_payload_insufficient"
+  );
+  if (obligationPayloadInsufficient !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_payload_insufficient",
+      detail: obligationPayloadInsufficient,
+      evidenceRefs
+    });
+  }
+  const obligationFulfilledWithoutOutputCoverage = splitKnownPrefix(
+    input.reason,
+    "obligation_fulfilled_without_output_coverage"
+  );
+  if (obligationFulfilledWithoutOutputCoverage !== null) {
+    return makeSdlcBlockingReason({
+      code: "obligation_fulfilled_without_output_coverage",
+      detail: obligationFulfilledWithoutOutputCoverage,
+      evidenceRefs
+    });
+  }
+  const hookPostflight = splitKnownPrefix(input.reason, "hook_postflight");
+  if (hookPostflight !== null) {
+    return makeSdlcBlockingReason({
+      code:
+        hookPostflight === "hook_postflight_missing"
+          ? "hook_postflight_missing"
+          : "hook_postflight_failed",
+      detail: hookPostflight,
+      evidenceRefs
+    });
+  }
+  const fdTransition = splitKnownPrefix(input.reason, "unsupported_fd_transition");
+  if (fdTransition !== null) {
+    return makeSdlcBlockingReason({
+      code: "unsupported_fd_transition",
+      detail: fdTransition,
+      evidenceRefs
+    });
+  }
+  const transition = splitKnownPrefix(input.reason, "unsupported_transition");
+  if (transition !== null) {
+    return makeSdlcBlockingReason({
+      code: "unsupported_transition",
+      detail: transition,
+      evidenceRefs
+    });
+  }
+  return makeSdlcBlockingReason({
+    code: "unknown_blocking_reason",
+    detail: input.reason,
+    evidenceRefs
+  });
+}
+
+export function admitSdlcBlockingReason(
+  input: unknown,
+  label = "SdlcBlockingReason"
+): SdlcBlockingReason {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "code",
+    "reasonClass",
+    "lawfulReentryPoint",
+    "message",
+    "detail",
+    "evidenceRefs"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_blocking_reason") {
+    throw new TypeError(`${label}.kind: unexpected blocking reason kind`);
+  }
+  const detail =
+    record["detail"] === null
+      ? null
+      : parseNonEmptyString(record["detail"], `${label}.detail`);
+  return Object.freeze({
+    kind: "sdlc_blocking_reason",
+    code: parseEnumValue(
+      record["code"],
+      `${label}.code`,
+      SDLC_BLOCKING_REASON_CODES
+    ),
+    reasonClass: parseEnumValue(
+      record["reasonClass"],
+      `${label}.reasonClass`,
+      SDLC_BLOCKING_REASON_CLASSES
+    ),
+    lawfulReentryPoint: parseEnumValue(
+      record["lawfulReentryPoint"],
+      `${label}.lawfulReentryPoint`,
+      SDLC_BLOCKING_REASON_REENTRY_POINTS
+    ),
+    message: parseNonEmptyString(record["message"], `${label}.message`),
+    detail,
+    evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`)
+  });
+}

@@ -4,6 +4,13 @@
 // Implements: REQ-F-ODDSDLC-022
 // Implements: REQ-F-ODDSDLC-032
 
+import {
+  FG_CONFORM_PROJECT,
+  FG_INGRESS_PROJECT,
+  type IngressSourceSet,
+  type ProjectIngressContract
+} from "../graph/library.js";
+
 export const SDLC_SOURCE_INPUT_ROLE_VALUES = Object.freeze([
   "intent_surface",
   "requirement_surface",
@@ -48,6 +55,104 @@ export interface SdlcProjectConstraints {
   readonly capabilityContracts: readonly string[];
 }
 
+export const SDLC_REALIZATION_MODE_VALUES = Object.freeze([
+  "selected_output_tree",
+  "planned_output_tree",
+  "generated_proving_subset"
+] as const);
+
+export type SdlcRealizationMode =
+  (typeof SDLC_REALIZATION_MODE_VALUES)[number];
+
+export interface SdlcCapabilityContract {
+  readonly kind: "sdlc_capability_contract";
+  readonly name: string;
+  readonly value: string;
+}
+
+export interface SdlcConformProjectProfile {
+  readonly kind: "sdlc_conform_project_profile";
+  readonly workspaceName: string;
+  readonly projectSlug: string;
+  readonly projectKind: string;
+  readonly language: string;
+  readonly testRunner: string;
+  readonly tool: string;
+  readonly version: string;
+  readonly moduleStructure: string;
+  readonly declaredModuleNames: readonly string[];
+  readonly ambiguityRiskAppetite: "low" | "medium" | "high";
+  readonly activeTenant: string;
+  readonly selectedOutputRoot: string;
+  readonly declaredOutputRoot: string;
+  readonly buildExecutionContract: string;
+  readonly testExecutionContract: string;
+  readonly deploymentContract: string;
+  readonly runtimeObservationContract: string;
+  readonly capabilityContracts: readonly SdlcCapabilityContract[];
+  readonly rootCodePolicy: string;
+  readonly realizationMode: SdlcRealizationMode;
+  readonly resolutionReason: string;
+  readonly sourceConstraintDigest: string;
+}
+
+export interface SdlcConformProjectReport {
+  readonly kind: "sdlc_conform_project_report";
+  readonly governingGraphFunction: typeof FG_CONFORM_PROJECT;
+  readonly status: "passed" | "blocked";
+  readonly workspaceRootUri: string;
+  readonly sourceRefs: readonly string[];
+  readonly materializedTopologyRefs: readonly string[];
+  readonly profile: SdlcConformProjectProfile;
+  readonly conformanceGaps: readonly string[];
+}
+
+export const SDLC_MANAGED_TRAVERSAL_PHASE_VALUES = Object.freeze([
+  "prestep",
+  "execute",
+  "postprocess"
+] as const);
+
+export type SdlcManagedTraversalPhase =
+  (typeof SDLC_MANAGED_TRAVERSAL_PHASE_VALUES)[number];
+
+export interface SdlcManagedTraversalPhaseContract {
+  readonly kind: "sdlc_managed_traversal_phase_contract";
+  readonly phase: SdlcManagedTraversalPhase;
+  readonly contract: string;
+}
+
+export interface SdlcManagedTraversalManifest {
+  readonly kind: "sdlc_managed_traversal_manifest";
+  readonly graphFunctionName: typeof FG_CONFORM_PROJECT;
+  readonly sourceType: "unordered_source_set";
+  readonly targetType: "constitutional_bootstrap";
+  readonly workspaceRootUri: string;
+  readonly sourceRefs: readonly string[];
+  readonly expectedOutputRelativePaths: readonly string[];
+  readonly phaseContracts: readonly SdlcManagedTraversalPhaseContract[];
+}
+
+export interface SdlcManagedTraversalPhaseVerdict {
+  readonly kind: "sdlc_managed_traversal_phase_verdict";
+  readonly phase: SdlcManagedTraversalPhase;
+  readonly status: "satisfied" | "blocked";
+  readonly evidenceRefs: readonly string[];
+  readonly gaps: readonly string[];
+}
+
+export interface SdlcManagedTraversalLedger {
+  readonly kind: "sdlc_managed_traversal_ledger";
+  readonly graphFunctionName: typeof FG_CONFORM_PROJECT;
+  readonly sourceType: "unordered_source_set";
+  readonly targetType: "constitutional_bootstrap";
+  readonly status: "satisfied" | "blocked";
+  readonly workspaceRootUri: string;
+  readonly actualOutputRefs: readonly string[];
+  readonly phaseVerdicts: readonly SdlcManagedTraversalPhaseVerdict[];
+  readonly residualGaps: readonly string[];
+}
+
 export interface SdlcImportedRequirementAuthority {
   readonly kind: "sdlc_imported_requirement_authority";
   readonly requirementId: string;
@@ -64,11 +169,16 @@ export interface SdlcBootstrapLineageRecord {
 
 export interface SdlcWorkspaceIngressReport {
   readonly kind: "sdlc_workspace_ingress_report";
+  readonly governingGraphFunction: typeof FG_INGRESS_PROJECT;
   readonly workspaceRootUri: string;
   readonly projectConstraints: SdlcProjectConstraints;
+  readonly ingressSourceSet: IngressSourceSet;
+  readonly projectIngressContract: ProjectIngressContract;
   readonly sourceInputs: readonly SdlcSourceInput[];
   readonly importedRequirementAuthorities: readonly SdlcImportedRequirementAuthority[];
   readonly lineage: readonly SdlcBootstrapLineageRecord[];
+  readonly ambiguityRegister: readonly string[];
+  readonly bootstrapGapSet: readonly string[];
 }
 
 export interface SdlcSourceInputSnapshot {

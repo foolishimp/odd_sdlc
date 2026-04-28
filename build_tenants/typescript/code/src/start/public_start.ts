@@ -20,6 +20,8 @@ import {
   parseNonEmptyString
 } from "../shared/validation.js";
 import type { SdlcQueryDomainProjection } from "../projection/index.js";
+import { FG_CONFORM_PROJECT } from "../graph/index.js";
+import { publicStartTargetPolicyFor } from "./policy.js";
 
 export const SDLC_PUBLIC_START_TARGET_KIND_VALUES = Object.freeze([
   "next",
@@ -71,7 +73,8 @@ export type SdlcPublicStartOutcome =
       readonly blockingReason:
         | "fp_worker_unattached"
         | "target_unavailable"
-        | "stale_query_domain";
+        | "stale_query_domain"
+        | "project_conformance_blocked";
       readonly stopPredicate: "worker_attachment_required" | "gap_stop";
       readonly executionContract: SdlcExecutionContract | null;
       readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
@@ -141,10 +144,11 @@ function resolveGraphFunctionTarget(input: {
   readonly request: SdlcPublicStartRequest;
   readonly queryDomain: SdlcQueryDomainProjection;
 }): string | null {
-  if (input.request.target.kind === "next") {
+  const targetPolicy = publicStartTargetPolicyFor(input.request.target.kind);
+  if (targetPolicy.resolver === "first_start_target") {
     return input.queryDomain.startTargets[0]?.name ?? null;
   }
-  if (input.request.target.kind === "graph_function") {
+  if (targetPolicy.resolver === "named_graph_function") {
     const matched = input.queryDomain.graphFunctions.find(
       (graphFunction) => graphFunction.name === input.request.target.handle
     );
@@ -247,6 +251,19 @@ export function publicStartOnce(input: {
       kind: "sdlc_public_start_blocked",
       status: "blocked",
       blockingReason: "target_unavailable",
+      stopPredicate: "gap_stop",
+      executionContract: null,
+      emittedRuntimeEventKinds: Object.freeze([])
+    });
+  }
+  if (
+    input.queryDomain.projectConformance?.status === "blocked" &&
+    targetGraphFunction !== FG_CONFORM_PROJECT
+  ) {
+    return Object.freeze({
+      kind: "sdlc_public_start_blocked",
+      status: "blocked",
+      blockingReason: "project_conformance_blocked",
       stopPredicate: "gap_stop",
       executionContract: null,
       emittedRuntimeEventKinds: Object.freeze([])

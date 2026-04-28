@@ -8,7 +8,22 @@
     ".": {
       "types": "./build/semantic/code/src/index.d.ts",
       "import": "./build/semantic/code/src/index.js"
+    },
+    "./cli": {
+      "types": "./build/semantic/code/src/cli/index.d.ts",
+      "import": "./build/semantic/code/src/cli/index.js"
+    },
+    "./install": {
+      "types": "./build/semantic/code/src/install/index.d.ts",
+      "import": "./build/semantic/code/src/install/index.js"
+    },
+    "./release": {
+      "types": "./build/semantic/code/src/release/index.d.ts",
+      "import": "./build/semantic/code/src/release/index.js"
     }
+  },
+  "bin": {
+    "odd-sdlc-ts": "./build/semantic/code/src/cli/main.js"
   },
   "files": [
     "build/semantic/**"
@@ -34,6 +49,29 @@
     "test:t038": "npm run build:semantic && node --test test_env/tests/test_t038_rc_qualification.test.mjs",
     "test:t039": "npm run build:semantic && node --test test_env/tests/test_t039_query_domain_structural_drift.test.mjs",
     "test:t040": "npm run build:semantic && node --test test_env/tests/test_t040_fixture_portability.test.mjs",
+    "test:t058": "npm run build:semantic && node --test test_env/tests/test_t058_public_cli_adapter.test.mjs",
+    "test:t059": "npm run build:semantic && node --test test_env/tests/test_t059_install_release_adapter.test.mjs",
+    "test:t064": "npm run build:semantic && node --test test_env/tests/test_t064_installed_operator_ux.test.mjs",
+    "test:t066": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
+    "test:t068": "npm run build:semantic && node --test test_env/tests/test_t068_conform_project_profile.test.mjs",
+    "test:t069": "npm run build:semantic && node --test test_env/tests/test_t069_installed_initial_state.test.mjs",
+    "test:t076": "npm run build:semantic && node --test test_env/tests/test_t076_deterministic_traversal_state_machine.test.mjs",
+    "test:t077-t083": "npm run build:semantic && node --test test_env/tests/test_t077_t083_assurance_ledgers.test.mjs",
+    "test:t084": "npm run build:semantic && node --test test_env/tests/test_t084_assurance_ledger_composition.test.mjs",
+    "test:t086": "npm run build:semantic && node --test test_env/tests/test_t086_blocking_reason_carriers.test.mjs",
+    "test:t087": "npm run build:semantic && node --test test_env/tests/test_t087_project_induction.test.mjs",
+    "test:t088": "npm run build:semantic && node --test test_env/tests/test_t088_traversal_intent_package.test.mjs",
+    "test:t089": "npm run build:semantic && node --test test_env/tests/test_t089_traversal_pressure_enforcement.test.mjs",
+    "test:t091": "npm run build:semantic && node --test test_env/tests/test_t091_traversal_obligation_payload.test.mjs",
+    "test:t093": "npm run build:semantic && node --test test_env/tests/test_t093_scheduling_phase.test.mjs",
+    "test:t096": "npm run build:semantic && node --test test_env/tests/test_t096_managed_traversal_bootstrap.test.mjs",
+    "test:t097": "npm run build:semantic && node --test test_env/tests/test_t097_managed_traversal_carriers.test.mjs",
+    "test:t098": "npm run build:semantic && node --test test_env/tests/test_t098_requirements_to_design_assurance.test.mjs",
+    "test:t099": "npm run build:semantic && node --test test_env/tests/test_t099_tranched_indexed_pressure.test.mjs",
+    "test:t100": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
+    "test:t101": "npm run build:semantic && node --test test_env/tests/test_t101_retry_report_rejection_loop.test.mjs",
+    "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",
+    "test:live": "npm run build:semantic && node --test test_env/live/*.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"
   },
   "devDependencies": {

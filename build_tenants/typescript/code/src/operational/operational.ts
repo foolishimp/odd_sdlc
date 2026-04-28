@@ -16,32 +16,13 @@ import type {
   SdlcOperationalTransitionPlan,
   SdlcRuntimeReturnObservation
 } from "./carriers.js";
+import { operationalLanePolicyFor } from "./policy.js";
 
 const EMPTY_RUNTIME_EVENT_KINDS: readonly [] = Object.freeze([]);
 const RUNTIME_RETURN_FEEDS = Object.freeze([
   "derive_runtime_observation_surface",
   "derive_retrofit_plan_surface"
 ] as const);
-
-function requiredSubstrateBindingFor(lane: SdlcOperationalLane): string {
-  if (lane === "build") {
-    return "runtime://build";
-  }
-  if (lane === "test_execution") {
-    return "runtime://test";
-  }
-  if (lane === "deployment") {
-    return "runtime://deployment";
-  }
-  return "runtime://runtime-return";
-}
-
-function returnedEvidenceExpectationFor(lane: SdlcOperationalLane): string {
-  if (lane === "runtime_return") {
-    return "runtime observation evidence or explicit pending state";
-  }
-  return `${lane} result evidence or explicit pending state`;
-}
 
 export function prepareSdlcOperationalTransition(input: {
   readonly projectConstraints: SdlcProjectConstraints;
@@ -60,6 +41,7 @@ export function prepareSdlcOperationalTransition(input: {
       emittedRuntimeEventKinds: EMPTY_RUNTIME_EVENT_KINDS
     });
   }
+  const lanePolicy = operationalLanePolicyFor(input.lane);
   return Object.freeze({
     kind: "sdlc_operational_transition_plan",
     status: "prepared",
@@ -67,9 +49,9 @@ export function prepareSdlcOperationalTransition(input: {
     command: admitSdlcOperationalTransitionCommand({
       commandId: input.commandId,
       lane: input.lane,
-      requiredSubstrateBinding: requiredSubstrateBindingFor(input.lane),
+      requiredSubstrateBinding: lanePolicy.requiredSubstrateBinding,
       capabilityContract: input.capabilityContract,
-      returnedEvidenceExpectation: returnedEvidenceExpectationFor(input.lane),
+      returnedEvidenceExpectation: lanePolicy.returnedEvidenceExpectation,
       targetAssetIds: input.targetAssetIds
     }),
     blockingReason: null,

@@ -20,12 +20,17 @@ import {
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   OPERATIONAL_FUNCTION_CATALOG,
+  SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
   SDLC_FUNCTION_CATALOG,
   TRIAGE_FUNCTION_CATALOG,
   type SdlcExecutiveProgramEntry,
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
+import {
+  FG_CONFORM_PROJECT,
+  type SdlcReusableGraphFunctionCatalogEntry
+} from "./library.js";
 
 const BUILDER_OPERATOR = admitOperator({
   name: "odd_sdlc_typescript_builder",
@@ -61,7 +66,10 @@ function attrs(entries: readonly SerializedAttrEntry[]): SerializedAttrs {
   });
 }
 
-function firstOutput(entry: SdlcFunctionCatalogEntry): string {
+function firstOutput(entry: {
+  readonly name: string;
+  readonly outputs: readonly string[];
+}): string {
   const output = entry.outputs[0];
   if (output === undefined) {
     throw new TypeError(`${entry.name}: expected one output`);
@@ -131,10 +139,35 @@ function graphFunctionDeclarations(): SerializedAttrs {
   ]);
 }
 
+function reusableGraphFunctionDeclarations(
+  entry: SdlcReusableGraphFunctionCatalogEntry
+): SerializedAttrs {
+  return attrs([
+    attr("function_kind", scalarValue("odd_reusable_graph_function")),
+    attr("graph_function_role", scalarValue(entry.graphFunctionRole)),
+    attr("stable_outer_contract", scalarValue(entry.stableOuterContract)),
+    attr("compute_order", stringListValue(entry.computeOrder)),
+    attr("abg_owned_runtime_truth", stringListValue(entry.abgOwnedRuntimeTruth)),
+    attr("sdlc_owned_domain_truth", stringListValue(entry.sdlcOwnedDomainTruth)),
+    attr("requirement_refs", stringListValue([
+      "REQ-F-GFUNC-003",
+      "REQ-F-GFUNC-004",
+      "REQ-F-GFUNC-005",
+      "REQ-F-ODDSDLC-013",
+      "REQ-F-ODDSDLC-014",
+      "REQ-F-ODDSDLC-015"
+    ]))
+  ]);
+}
+
 function vectorDeclarations(entry: SdlcFunctionCatalogEntry): SerializedAttrs {
   return attrs([
     attr("intent", scalarValue(entry.intent)),
     attr("backing_graph_function", scalarValue(entry.backingGraphFunction)),
+    attr("catalog_role", scalarValue(entry.catalogRole)),
+    attr("specializes_graph_function", scalarValue(entry.specializesGraphFunction)),
+    attr("transform_contract_ref", scalarValue(entry.transformContractRef)),
+    attr("evaluation_contract_ref", scalarValue(entry.evaluationContractRef)),
     attr("compute_basis", stringListValue([
       "preflight:F_D",
       "construct:F_P",
@@ -146,6 +179,19 @@ function vectorDeclarations(entry: SdlcFunctionCatalogEntry): SerializedAttrs {
       "evidence_refs",
       "input_output_identity_or_digest"
     ]))
+  ]);
+}
+
+function reusableVectorDeclarations(
+  entry: SdlcReusableGraphFunctionCatalogEntry
+): SerializedAttrs {
+  return attrs([
+    attr("intent", scalarValue(entry.intent)),
+    attr("catalog_role", scalarValue(entry.graphFunctionRole)),
+    attr("stable_outer_contract", scalarValue(entry.stableOuterContract)),
+    attr("compute_basis", stringListValue(entry.computeOrder)),
+    attr("abg_owned_runtime_truth", stringListValue(entry.abgOwnedRuntimeTruth)),
+    attr("sdlc_owned_domain_truth", stringListValue(entry.sdlcOwnedDomainTruth))
   ]);
 }
 
@@ -179,6 +225,72 @@ function graphFunctionForEntry(entry: SdlcFunctionCatalogEntry): GraphFunction {
     declarations: graphFunctionDeclarations(),
     tags: graphFunction.tags,
     id: graphFunction.id
+  });
+}
+
+function reusableGraphFunctionForEntry(
+  entry: SdlcReusableGraphFunctionCatalogEntry
+): GraphFunction {
+  const sourceNodes = entry.inputs.map(nodeFor);
+  const outputNodes = entry.outputs.map(nodeFor);
+  const primaryTarget = nodeFor(firstOutput(entry));
+  const primaryGraph = edge(sourceNodes, primaryTarget, {
+    id: `vector:odd_sdlc:${entry.name}`,
+    name: entry.name,
+    operators: [BUILDER_OPERATOR],
+    evaluators: [
+      admitEvaluator({
+        name: `${entry.name}_contract_fd`,
+        regime: "F_D",
+        description: `Deterministic contract admission for ${entry.name}.`,
+        binding: `fd://odd_sdlc/library/${entry.name}/contract`,
+        tags: ["library_fd", entry.name]
+      }),
+      admitEvaluator({
+        name: `${entry.name}_configured_fp`,
+        regime: "F_P",
+        description: entry.intent,
+        binding: `fp://odd_sdlc/library/${entry.name}/construct`,
+        tags: ["library_fp", entry.name]
+      })
+    ],
+    contexts: [],
+    rule: null,
+    allowsSubwork: false,
+    declarations: reusableVectorDeclarations(entry),
+    tags: ["odd_sdlc", "reusable_graph_function"]
+  });
+  const vector = firstVector(primaryGraph, entry.name);
+  const graph = Object.freeze({
+    name: `${entry.name}_workflow`,
+    inputs: sourceNodes,
+    outputs: outputNodes,
+    nodes: uniqueNodes([...sourceNodes, ...outputNodes]),
+    vectors: Object.freeze([vector]),
+    contexts: Object.freeze([]),
+    rules: Object.freeze([]),
+    effects: Object.freeze([]),
+    tags: Object.freeze(["odd_sdlc", "published_library"])
+  });
+  return admitGraphFunction({
+    name: entry.name,
+    environment: {
+      requires: sourceNodes,
+      provides: outputNodes,
+      carries: graph.nodes
+    },
+    inputs: sourceNodes,
+    outputs: outputNodes,
+    template: {
+      kind: "inline_graph",
+      ref: `inline:${entry.name}`,
+      graph,
+      version: null
+    },
+    effects: [],
+    declarations: reusableGraphFunctionDeclarations(entry),
+    tags: ["odd_sdlc", "published_library"],
+    id: `graph-function:odd_sdlc:${entry.name}`
   });
 }
 
@@ -297,11 +409,23 @@ function jobFor(graphFunction: GraphFunction) {
   });
 }
 
+function requiredGraphFunction(
+  graphFunctions: readonly GraphFunction[],
+  name: string
+): GraphFunction {
+  const graphFunction = graphFunctions.find((candidate) => candidate.name === name);
+  if (graphFunction === undefined) {
+    throw new TypeError(`Expected published graph function ${name}`);
+  }
+  return graphFunction;
+}
+
 export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
   const bootstrapFunctions = leafFunctions(BOOTSTRAP_RELEASE_FUNCTION_CATALOG);
   const operationalFunctions = leafFunctions(OPERATIONAL_FUNCTION_CATALOG);
   return Object.freeze({
     kind: "sdlc_graph_function_catalog",
+    libraryFunctions: SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
     functions: SDLC_FUNCTION_CATALOG,
     executives: Object.freeze([
       executiveEntry({
@@ -321,6 +445,9 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
 }
 
 export function constructSdlcGtlModule(): Module {
+  const libraryFunctions = Object.freeze(
+    SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.map(reusableGraphFunctionForEntry)
+  );
   const bootstrapFunctions = leafFunctions(BOOTSTRAP_RELEASE_FUNCTION_CATALOG);
   const operationalFunctions = leafFunctions(OPERATIONAL_FUNCTION_CATALOG);
   const triageFunctions = leafFunctions(TRIAGE_FUNCTION_CATALOG);
@@ -336,7 +463,12 @@ export function constructSdlcGtlModule(): Module {
     functions: operationalFunctions,
     outputs: ["retrofit_plan_surface"]
   });
+  const conformProjectFunction = requiredGraphFunction(
+    libraryFunctions,
+    FG_CONFORM_PROJECT
+  );
   const graphFunctions = Object.freeze([
+    ...libraryFunctions,
     bootstrapExecutive,
     operationalExecutive,
     ...bootstrapFunctions,
@@ -349,7 +481,11 @@ export function constructSdlcGtlModule(): Module {
     graphFunctions,
     refinementBoundaries: [],
     candidateFamilies: [],
-    jobs: [jobFor(bootstrapExecutive), jobFor(operationalExecutive)],
+    jobs: [
+      jobFor(conformProjectFunction),
+      jobFor(bootstrapExecutive),
+      jobFor(operationalExecutive)
+    ],
     roles: [],
     operators: [BUILDER_OPERATOR],
     evaluators: [],
@@ -357,6 +493,10 @@ export function constructSdlcGtlModule(): Module {
     imports: [],
     metadata: attrs([
       attr("domain_package", scalarValue("odd_sdlc")),
+      attr(
+        "reusable_graph_function_catalog_size",
+        scalarValue(String(SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.length))
+      ),
       attr("function_catalog_size", scalarValue(String(SDLC_FUNCTION_CATALOG.length))),
       attr("executive_graph_functions", stringListValue([
         bootstrapExecutive.name,

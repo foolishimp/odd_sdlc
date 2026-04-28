@@ -13,7 +13,8 @@ import {
   admitSdlcProjectConstraints,
   advanceSdlcOperationalTransitionOnce,
   observeSdlcRuntimeReturn,
-  prepareSdlcOperationalTransition
+  prepareSdlcOperationalTransition,
+  SDLC_OPERATIONAL_LANE_POLICY
 } from "../../build/semantic/code/src/index.js";
 
 function constraints(capabilityContracts) {
@@ -53,6 +54,18 @@ test("T-037 missing operational capability blocks without false completion", () 
   assert.equal(plan.command, null);
   assert.equal(plan.blockingReason, "missing_capability");
   assert.deepStrictEqual(plan.emittedRuntimeEventKinds, []);
+});
+
+test("T-057 operational lane bindings are declared data", () => {
+  assert.deepStrictEqual(
+    SDLC_OPERATIONAL_LANE_POLICY.map((entry) => entry.lane),
+    ["build", "test_execution", "deployment", "runtime_return"]
+  );
+  const deployment = SDLC_OPERATIONAL_LANE_POLICY.find(
+    (entry) => entry.lane === "deployment"
+  );
+  assert(deployment);
+  assert.equal(deployment.requiredSubstrateBinding, "runtime://deployment");
 });
 
 test("T-037 command intent without returned evidence remains pending", () => {

@@ -3,23 +3,32 @@
 import {
   parseClosedRecord,
   parseEnumValue,
+  parseKind,
   parseNonEmptyString,
   parseString,
   parseStringList
 } from "../shared/validation.js";
 import type { SdlcProjectConstraints } from "./carriers.js";
+import {
+  deriveSdlcConformProjectProfileFromWorkspace,
+  projectConstraintsFromConformProjectProfile
+} from "./project_profile.js";
 
 export function admitSdlcProjectConstraints(
   input: unknown,
   label = "SdlcProjectConstraints"
 ): SdlcProjectConstraints {
   const record = parseClosedRecord(input, label, [
+    "kind",
     "projectSlug",
     "activeTenant",
     "selectedOutputRoot",
     "ambiguityRiskAppetite",
     "capabilityContracts"
   ]);
+  if (record["kind"] !== undefined) {
+    parseKind(record["kind"], "sdlc_project_constraints", `${label}.kind`);
+  }
   const activeTenant = parseNonEmptyString(record["activeTenant"], `${label}.activeTenant`);
   const selectedOutputRoot = parseNonEmptyString(
     record["selectedOutputRoot"],
@@ -43,6 +52,16 @@ export function admitSdlcProjectConstraints(
       `${label}.capabilityContracts`
     )
   });
+}
+
+export function deriveSdlcProjectConstraintsFromWorkspace(
+  workspaceRoot: string
+): SdlcProjectConstraints {
+  return admitSdlcProjectConstraints(
+    projectConstraintsFromConformProjectProfile(
+      deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot)
+    )
+  );
 }
 
 export function parseProjectSlugFromConstraintText(content: string): string {

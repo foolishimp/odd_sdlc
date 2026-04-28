@@ -17,11 +17,15 @@ import {
   SOFTWARE_DOMAIN_WORK_ACT_TYPES
 } from "../domain/index.js";
 import {
+  FG_CONFORM_PROJECT,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
   type SdlcGraphFunctionCatalog
 } from "../graph/index.js";
-import type { SdlcWorkspaceIngressReport } from "../workspace/index.js";
+import type {
+  SdlcConformProjectReport,
+  SdlcWorkspaceIngressReport
+} from "../workspace/index.js";
 
 export interface SdlcGraphFunctionSurface {
   readonly name: string;
@@ -54,12 +58,14 @@ export interface SdlcQueryDomainProjection {
   readonly assetTypes: typeof SOFTWARE_DOMAIN_ASSET_TYPES;
   readonly assetFamilies: typeof SOFTWARE_DOMAIN_ASSET_FAMILIES;
   readonly workActTypes: typeof SOFTWARE_DOMAIN_WORK_ACT_TYPES;
+  readonly libraryFunctions: SdlcGraphFunctionCatalog["libraryFunctions"];
   readonly functions: SdlcGraphFunctionCatalog["functions"];
   readonly programs: SdlcGraphFunctionCatalog["executives"];
   readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
   readonly startTargets: readonly SdlcStartTargetSurface[];
   readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
   readonly currentDossierRefs: readonly string[];
+  readonly projectConformance: SdlcConformProjectReport | null;
 }
 
 export type SdlcGapStatus = "open" | "partial" | "converged";
@@ -111,12 +117,15 @@ function graphFunctionSurface(module: Module): readonly SdlcGraphFunctionSurface
   );
 }
 
-function startTargets(module: Module): readonly SdlcStartTargetSurface[] {
+function startTargets(input: {
+  readonly module: Module;
+  readonly projectConformance?: SdlcConformProjectReport | null;
+}): readonly SdlcStartTargetSurface[] {
   const byId = new Map(
-    module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction])
+    input.module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction])
   );
   const targets: SdlcStartTargetSurface[] = [];
-  for (const job of module.jobs) {
+  for (const job of input.module.jobs) {
     for (const contract of job.contracts) {
       const graphFunction = byId.get(contract.targetId);
       if (graphFunction !== undefined) {
@@ -130,7 +139,12 @@ function startTargets(module: Module): readonly SdlcStartTargetSurface[] {
       }
     }
   }
-  return Object.freeze(targets);
+  if (input.projectConformance?.status === "blocked") {
+    return Object.freeze(
+      targets.filter((target) => target.name === FG_CONFORM_PROJECT)
+    );
+  }
+  return Object.freeze(targets.filter((target) => target.name !== FG_CONFORM_PROJECT));
 }
 
 function assetOwnership(
@@ -305,6 +319,7 @@ function assertModuleMatchesCatalog(input: {
   const expectedByName = graphFunctionsByName(canonicalModule);
   const moduleNames = new Set(actualByName.keys());
   const expectedNames = [
+    ...input.catalog.libraryFunctions.map((entry) => entry.name),
     ...input.catalog.functions.map((entry) => entry.backingGraphFunction),
     ...input.catalog.executives.map((entry) => entry.backingGraphFunction)
   ];
@@ -345,6 +360,7 @@ export function projectSdlcQueryDomain(input: {
   readonly module: Module;
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly currentDossierRefs?: readonly string[];
+  readonly projectConformance?: SdlcConformProjectReport | null;
 }): SdlcQueryDomainProjection {
   const catalog = constructSdlcGraphFunctionCatalog();
   assertModuleMatchesCatalog({ module: input.module, catalog });
@@ -360,12 +376,17 @@ export function projectSdlcQueryDomain(input: {
     assetTypes: SOFTWARE_DOMAIN_ASSET_TYPES,
     assetFamilies: SOFTWARE_DOMAIN_ASSET_FAMILIES,
     workActTypes: SOFTWARE_DOMAIN_WORK_ACT_TYPES,
+    libraryFunctions: catalog.libraryFunctions,
     functions: catalog.functions,
     programs: catalog.executives,
     graphFunctions: graphFunctionSurface(input.module),
-    startTargets: startTargets(input.module),
+    startTargets: startTargets({
+      module: input.module,
+      projectConformance: input.projectConformance ?? null
+    }),
     assetOwnership: assetOwnership(catalog),
-    currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])])
+    currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])]),
+    projectConformance: input.projectConformance ?? null
   });
 }
 

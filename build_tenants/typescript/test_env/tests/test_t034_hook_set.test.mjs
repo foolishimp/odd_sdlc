@@ -11,11 +11,14 @@ import {
   admitSdlcConstructorResult,
   admitSdlcWorkReport,
   constructSdlcHookContractCatalog,
+  defaultOperationForTarget,
   evaluateSdlcHookPostflight,
   evaluateSdlcHookPreflight,
   hookContractByEdgeName,
   minimalSdlcHookInvocationForContract,
-  runSdlcHookTurn
+  runSdlcHookTurn,
+  SDLC_FUNCTION_CATALOG,
+  SDLC_HOOK_TARGET_POLICY
 } from "../../build/semantic/code/src/index.js";
 
 function successfulConstructorResult(contract, targetAssetId) {
@@ -68,8 +71,67 @@ test("T-034 hook catalog covers each selected SDLC edge class with explicit cont
     assert.equal(contract.workReportContract.requireTargetBinding, true);
     assert.equal(contract.workReportContract.requireGeneratedAssetAttestation, true);
     assert.equal(contract.closurePolicy.traceTagsAloneSufficient, false);
+    assert.equal(
+      contract.closurePolicy.nextTraversalSelectionAuthority,
+      "abg_runtime"
+    );
     assert.equal(contract.closurePolicy.maySelectNextTraversal, false);
+    assert.equal(
+      contract.closurePolicy.unresolvedOutcomeAuthority,
+      "abg_retry_repair"
+    );
+    assert.equal(contract.closurePolicy.continuationEvidenceRequired, true);
   }
+});
+
+test("T-051 hook target class and operation policy is declared data", () => {
+  const catalog = constructSdlcHookContractCatalog();
+  const policyByTarget = new Map(
+    SDLC_HOOK_TARGET_POLICY.map((entry) => [entry.targetAssetType, entry])
+  );
+  const catalogTargets = [
+    ...new Set(SDLC_FUNCTION_CATALOG.flatMap((entry) => entry.outputs))
+  ].sort();
+
+  assert.deepStrictEqual([...policyByTarget.keys()].sort(), catalogTargets);
+  assert.equal(policyByTarget.size, SDLC_HOOK_TARGET_POLICY.length);
+
+  for (const contract of catalog) {
+    const policy = policyByTarget.get(contract.targetAssetType);
+    assert(policy);
+    assert.equal(contract.edgeClass, policy.edgeClass);
+    assert.equal(
+      defaultOperationForTarget(contract.targetAssetType),
+      policy.defaultOperation
+    );
+  }
+
+  assert.equal(defaultOperationForTarget("release_surface"), "release");
+  assert.equal(defaultOperationForTarget("deployment_surface"), "deploy");
+  assert.equal(defaultOperationForTarget("test_run_archive_surface"), "qualify");
+  assert.equal(
+    defaultOperationForTarget("runtime_observation_surface"),
+    "return"
+  );
+  assert.equal(defaultOperationForTarget("retrofit_plan_surface"), "retrofit");
+});
+
+test("T-034 closure policy separates tenant hook bounds from ABG re-entry authority", () => {
+  const contract = hookContractByEdgeName("derive_code_surface");
+
+  assert.equal(contract.closurePolicy.postflightFdRequired, true);
+  assert.equal(contract.closurePolicy.generatedAssetContractMustPass, true);
+  assert.equal(contract.closurePolicy.traceTagsAloneSufficient, false);
+  assert.equal(contract.closurePolicy.maySelectNextTraversal, false);
+  assert.equal(
+    contract.closurePolicy.nextTraversalSelectionAuthority,
+    "abg_runtime"
+  );
+  assert.equal(
+    contract.closurePolicy.unresolvedOutcomeAuthority,
+    "abg_retry_repair"
+  );
+  assert.equal(contract.closurePolicy.continuationEvidenceRequired, true);
 });
 
 test("T-034 preflight F_D and postflight F_D are separate from constructive F_P report admission", () => {

@@ -15,7 +15,8 @@ import {
   deriveSdlcWorkspaceIngressReport,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
-  publicStartOnce
+  publicStartOnce,
+  SDLC_PUBLIC_START_TARGET_POLICY
 } from "../../build/semantic/code/src/index.js";
 
 function startContext() {
@@ -54,6 +55,20 @@ test("T-033 public start admits closed request grammar", () => {
         defaultRegime: "F_P"
       }),
     /until/
+  );
+});
+
+test("T-057 public start target resolution policy is declared data", () => {
+  assert.deepStrictEqual(
+    SDLC_PUBLIC_START_TARGET_POLICY.map((entry) => [
+      entry.targetKind,
+      entry.resolver
+    ]),
+    [
+      ["next", "first_start_target"],
+      ["graph_function", "named_graph_function"],
+      ["asset", "asset_producer_executive"]
+    ]
   );
 });
 

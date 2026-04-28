@@ -123,9 +123,14 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
 
   assert.equal(report.kind, "odd_sdlc_typescript_rc_qualification_report");
   assert.equal(report.verdict, "bounded_rc_ready");
-  assert(report.nonClaimedScope.includes("live probabilistic data_mapper generation with an external F_P worker"));
+  assert(!report.nonClaimedScope.includes("live probabilistic data_mapper generation with an external F_P worker"));
+  assert(!report.nonClaimedScope.includes("side-effecting installed-workspace CLI replacement for the Python tenant"));
   assert(report.gates.some((gate) => gate.name === "T-038 composed harnessed sandbox" && gate.status === "passed"));
-  assert(report.gates.some((gate) => gate.name === "live F_P worker traversal" && gate.status === "not_claimed"));
+  assert(report.gates.some((gate) => gate.name === "T-052 ABG-populated installed sandbox contract" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-058 bounded public CLI adapter" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-059 install and release-cut adapter" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "live F_P worker traversal" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-060 TypeScript/Python archive comparison" && gate.status === "passed"));
 
   for (const gap of remainingOddSdlcTypescriptRcGaps()) {
     assert(gap.gapTicket);
@@ -144,6 +149,48 @@ test("T-046 qualification report points at completed T-038 authority", () => {
 
   assert(reportText.includes(".ai-workspace/tickets/completed/T-038-qualify-odd-sdlc-typescript-rc-against-python-functionality-and-odd-scenarios.md"));
   assert(!reportText.includes(".ai-workspace/tickets/backlog/T-038-qualify"));
+});
+
+test("T-054 Python parity blocker map is the full operational RC control surface", () => {
+  const mapPath = resolve(
+    REPO_ROOT,
+    "build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_PYTHON_PARITY_RC_BLOCKER_MAP.md"
+  );
+  const reportPath = resolve(
+    REPO_ROOT,
+    "build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT.md"
+  );
+  const t041Path = resolve(
+    REPO_ROOT,
+    ".ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+  );
+  const comparisonPath = resolve(
+    REPO_ROOT,
+    "build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_LIVE_PYTHON_ARCHIVE_COMPARISON.md"
+  );
+
+  assert(existsSync(mapPath));
+  assert(existsSync(comparisonPath));
+  const mapText = readFileSync(mapPath, "utf8");
+  const reportText = readFileSync(reportPath, "utf8");
+  const t041Text = readFileSync(t041Path, "utf8");
+  const comparisonText = readFileSync(comparisonPath, "utf8");
+
+  assert(reportText.includes("ODD_SDLC_TYPESCRIPT_PYTHON_PARITY_RC_BLOCKER_MAP.md"));
+  assert(t041Text.includes("ODD_SDLC_TYPESCRIPT_PYTHON_PARITY_RC_BLOCKER_MAP.md"));
+  assert(mapText.includes("Full operational Python-replacement RC"));
+  assert(mapText.includes("Live External F_P data_mapper Traversal"));
+  assert(mapText.includes("Owning ticket: `T-053`"));
+  assert(mapText.includes("Status class: `closed`"));
+  assert(mapText.includes("ABG-Installed Sandbox Population"));
+  assert(mapText.includes("T-059"));
+  assert(mapText.includes("T-060"));
+  assert(mapText.includes("Sandbox proof is treated as live external `F_P` proof"));
+  assert(!mapText.includes("Python live tests are TypeScript proof"));
+  assert(comparisonText.includes("Current TypeScript Live data_mapper"));
+  assert(comparisonText.includes("Python Historical Live Code Edge"));
+  assert(comparisonText.includes("Python data_mapper Yield-Chain Baseline"));
+  assert(comparisonText.includes("not yet evidence-equivalent"));
 });
 
 test("T-038 composed harnessed sandbox walks ingress to operational return", () => {

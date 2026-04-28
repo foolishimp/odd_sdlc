@@ -3,14 +3,25 @@
 // Implements: REQ-F-ODDSDLC-015
 // Implements: REQ-F-ODDSDLC-021
 // Implements: REQ-F-ODDSDLC-038
+// Implements: REQ-F-ODDSDLC-057
+
+import {
+  FG_SINGLE_TYPED_TRAVERSAL,
+  REUSABLE_GRAPH_FUNCTION_CATALOG,
+  type SdlcReusableGraphFunctionCatalogEntry
+} from "./library.js";
 
 export interface SdlcFunctionCatalogEntry {
   readonly kind: "sdlc_function_catalog_entry";
+  readonly catalogRole: "product_specialization";
   readonly name: string;
   readonly intent: string;
   readonly inputs: readonly string[];
   readonly outputs: readonly string[];
   readonly backingGraphFunction: string;
+  readonly specializesGraphFunction: typeof FG_SINGLE_TYPED_TRAVERSAL;
+  readonly transformContractRef: string;
+  readonly evaluationContractRef: string;
 }
 
 export interface SdlcExecutiveProgramEntry {
@@ -24,6 +35,7 @@ export interface SdlcExecutiveProgramEntry {
 
 export interface SdlcGraphFunctionCatalog {
   readonly kind: "sdlc_graph_function_catalog";
+  readonly libraryFunctions: readonly SdlcReusableGraphFunctionCatalogEntry[];
   readonly functions: readonly SdlcFunctionCatalogEntry[];
   readonly executives: readonly SdlcExecutiveProgramEntry[];
 }
@@ -36,13 +48,20 @@ function entry(input: {
 }): SdlcFunctionCatalogEntry {
   return Object.freeze({
     kind: "sdlc_function_catalog_entry",
+    catalogRole: "product_specialization",
     name: input.name,
     intent: input.intent,
     inputs: Object.freeze([...input.inputs]),
     outputs: Object.freeze([...input.outputs]),
-    backingGraphFunction: input.name
+    backingGraphFunction: input.name,
+    specializesGraphFunction: FG_SINGLE_TYPED_TRAVERSAL,
+    transformContractRef: `transform://odd_sdlc/${input.name}`,
+    evaluationContractRef: `evaluation://odd_sdlc/${input.name}`
   });
 }
+
+export const SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG =
+  REUSABLE_GRAPH_FUNCTION_CATALOG;
 
 export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   entry({
@@ -112,9 +131,23 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["implementation_module_surface"]
   }),
   entry({
+    name: "derive_realization_schedule_surface",
+    intent: "Derive governed realization schedule from implementation design, modules, and stack profile.",
+    inputs: [
+      "implementation_design_surface",
+      "implementation_module_surface",
+      "implementation_stack_profile"
+    ],
+    outputs: ["realization_schedule_surface"]
+  }),
+  entry({
     name: "derive_code_surface",
-    intent: "Derive governed code from implementation modules and stack profile.",
-    inputs: ["implementation_module_surface", "implementation_stack_profile"],
+    intent: "Derive governed code from implementation modules, stack profile, and admitted realization schedule.",
+    inputs: [
+      "implementation_module_surface",
+      "implementation_stack_profile",
+      "realization_schedule_surface"
+    ],
     outputs: ["code_surface"]
   }),
   entry({
@@ -136,9 +169,15 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["test_module_surface"]
   }),
   entry({
+    name: "derive_test_schedule_surface",
+    intent: "Derive governed test execution schedule from test design, modules, and stack profile.",
+    inputs: ["test_design_surface", "test_module_surface", "test_stack_profile"],
+    outputs: ["test_schedule_surface"]
+  }),
+  entry({
     name: "derive_test_run_archive_surface",
-    intent: "Derive governed test run archive evidence surface.",
-    inputs: ["test_module_surface", "test_stack_profile"],
+    intent: "Derive governed test run archive evidence surface from test modules, stack profile, and admitted test schedule.",
+    inputs: ["test_module_surface", "test_stack_profile", "test_schedule_surface"],
     outputs: ["test_run_archive_surface"]
   }),
   entry({

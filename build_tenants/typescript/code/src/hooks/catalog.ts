@@ -1,0 +1,97 @@
+// Implements: REQ-F-ODDSDLC-013
+// Implements: REQ-F-ODDSDLC-014
+// Implements: REQ-F-ODDSDLC-015
+
+import { SDLC_FUNCTION_CATALOG } from "../graph/index.js";
+import type { SdlcHookContract, SdlcHookEdgeClass } from "./carriers.js";
+import { hookTargetPolicyForTarget } from "./policy.js";
+
+function evaluatorPrefixForClass(edgeClass: SdlcHookEdgeClass): string {
+  return edgeClass.replaceAll("_", "-");
+}
+
+function constructHookContract(input: {
+  readonly edgeName: string;
+  readonly inputs: readonly string[];
+  readonly outputs: readonly string[];
+}): SdlcHookContract {
+  const targetAssetType = input.outputs[0];
+  if (targetAssetType === undefined) {
+    throw new TypeError(`${input.edgeName}: expected at least one target output`);
+  }
+  const edgeClass = hookTargetPolicyForTarget(targetAssetType).edgeClass;
+  const evaluatorPrefix = evaluatorPrefixForClass(edgeClass);
+  return Object.freeze({
+    kind: "sdlc_hook_contract",
+    edgeName: input.edgeName,
+    edgeClass,
+    sourceAssetTypes: Object.freeze([...input.inputs]),
+    targetAssetType,
+    transformProfile: Object.freeze({
+      kind: "sdlc_hook_transform_profile",
+      preflightFd: Object.freeze([
+        "core-binding-identity-provenance-fd",
+        `${evaluatorPrefix}-dependency-surfaces-present`
+      ]),
+      constructiveFp: "fp://odd-sdlc/generic-software-domain-constructor",
+      capabilityFd: Object.freeze([]),
+      postflightFd: Object.freeze([
+        "core-work-report-shape-fd",
+        "generated-asset-contract-fd",
+        `${evaluatorPrefix}-postflight-consistency`
+      ]),
+      fhGate: null
+    }),
+    workReportContract: Object.freeze({
+      kind: "sdlc_work_report_contract",
+      requiredFields: Object.freeze([
+        "targetBinding",
+        "operationType",
+        "evidenceRefs",
+        "inputIdentities",
+        "outputIdentity",
+        "generatedAssetAuthority",
+        "generatedAssetContract",
+        "ambiguityCandidates"
+      ]),
+      requireGraphFunctionAuthority: true,
+      requireTargetBinding: true,
+      requireEvidenceRefs: true,
+      requireInputOutputIdentity: true,
+      requireGeneratedAssetAttestation: true,
+      preserveAmbiguityCandidates: true
+    }),
+    closurePolicy: Object.freeze({
+      kind: "sdlc_hook_closure_policy",
+      postflightFdRequired: true,
+      generatedAssetContractMustPass: true,
+      traceTagsAloneSufficient: false,
+      nextTraversalSelectionAuthority: "abg_runtime",
+      maySelectNextTraversal: false,
+      unresolvedOutcomeAuthority: "abg_retry_repair",
+      continuationEvidenceRequired: true
+    })
+  });
+}
+
+export function constructSdlcHookContractCatalog(): readonly SdlcHookContract[] {
+  return Object.freeze(
+    SDLC_FUNCTION_CATALOG.map((entry) =>
+      constructHookContract({
+        edgeName: entry.name,
+        inputs: entry.inputs,
+        outputs: entry.outputs
+      })
+    )
+  );
+}
+
+export function hookContractByEdgeName(edgeName: string): SdlcHookContract {
+  const matched = constructSdlcHookContractCatalog().find(
+    (contract) => contract.edgeName === edgeName
+  );
+  if (matched === undefined) {
+    throw new TypeError(`SdlcHookContractCatalog: unknown edge ${edgeName}`);
+  }
+  return matched;
+}

@@ -81,6 +81,10 @@ Every live `odd_sdlc` edge declares its traversal contract explicitly.
 - AC-3: each edge declares preflight `F_D`, configured `F_P`, postflight `F_D`,
   and any optional `Capability F_D` or `F_H` concerns
 - AC-4: each edge declares its work-report, proof, and closure expectations
+- AC-5: each requirement-bearing realization edge declares the cumulative
+  obligation context it must traverse: required source surfaces, target asset
+  type, prior-edge evidence refs, requirement/design/module authority refs,
+  runtime context refs, retry gap dossiers, and current delta summary
 
 ### REQ-F-ODDSDLC-014 — generic software-domain traversal favors configured F_P under explicit work-report contract
 
@@ -95,6 +99,12 @@ by configured `F_P` under an explicit output contract.
 - AC-3: the output contract requires a machine-readable work report carrying at
   least target binding, operation type, evidence refs, and input/output
   identity or digest information
+- AC-4: the work report carries obligation fulfillment assessments for the
+  declared traversal obligation context; an artifact write without assessment
+  of the declared obligations is not sufficient constructive closure
+- AC-5: prompt construction favors compact current-state summaries plus stable
+  references and digests for large prior surfaces, so intermediate ledgers
+  distribute LLM compute while preserving the full obligation chain
 
 ### REQ-F-ODDSDLC-015 — layered F_D governs universal, specialized, postflight, and operational truth
 
@@ -109,6 +119,10 @@ by configured `F_P` under an explicit output contract.
   `F_P`-supervised traversal
 - AC-4: `Operational F_D` validates returned runtime, release, and maintenance
   evidence where those surfaces are in scope
+- AC-5: `Obligation F_D` folds declared obligations, worker fulfillment
+  assessments, requirement closure registers, prior gap ledgers, and
+  materialized evidence into explicit close, retry, blocked, or reprice truth
+  before an edge can converge
 
 ### REQ-F-ODDSDLC-016 — runtime-returned evidence is a first-class governed domain input
 
@@ -346,6 +360,9 @@ unresolved live requirements as active future pressure across bounded waves.
 - AC-7: the active ledger publishes per-requirement carry and fulfillment
   judgments explicitly enough that downstream span or operator views can reuse
   them without re-inferring them from one blended status
+- AC-8: the closure register is part of the traversal obligation context for
+  downstream realization edges; unresolved live requirements remain input
+  pressure to later `F_P` traversals and later `F_D` evaluators
 
 ### REQ-F-ODDSDLC-030 — generated source and test surfaces carry explicit trace authority
 
@@ -388,6 +405,10 @@ to verify the req -> design -> module -> code or test traceability chain.
 - AC-8: requirement-side `Authoring Design:` publication is reciprocal with
   ratified design-surface `Implements:` and `Derives From:` publication so the
   requirement/design link is queryable in both directions
+- AC-9: prior-edge evidence, intermediate ledgers, and current generated
+  artifacts are evaluated as one cumulative obligation chain; no current
+  artifact may close a realization edge by hiding or dropping obligations from
+  earlier graph traversals
 
 ### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
 
@@ -400,9 +421,10 @@ installed shape must be conformant:
 - project-owned constitutional `WHAT` remains under `specification/`
 - project-owned realization `HOW` lands under `build_tenants/<tenant>/`
 - immutable installed substrate and installed odd-product payloads remain under
-  `.genesis/`
-- released `odd_sdlc` install payload remains under `.genesis/odd_sdlc/`
-  rather than inside the project tenant topology
+  `.abiogenesis/`
+- released `odd_sdlc` install payload remains under
+  `.abiogenesis/odd_sdlc/<build_tenant>/` rather than inside the project tenant
+  topology
 - mutable named instances, when used, live beneath
   `build_tenants/<tenant>/workspaces/<name>/`
 
@@ -414,8 +436,8 @@ installed shape must be conformant:
   surfaces bind to the active project tenant root rather than to
   `build_tenants/common/` or `build_tenants/odd_sdlc/` by default
 - AC-3: released `odd_sdlc` install payload is carried under
-  `.genesis/odd_sdlc/` and does not masquerade as a project realization tenant
-  in downstream workspaces
+  `.abiogenesis/odd_sdlc/<build_tenant>/` and does not masquerade as a project
+  realization tenant in downstream workspaces
 - AC-4: reset/replay and subsequent bounded traversals continue to operate
   against the tenant-rooted downstream workspace shape
 - AC-5: mutable named downstream instances, when used, are explicit tenant
@@ -452,8 +474,8 @@ released product, installed payload, and mutable worksite identity.
   odd_sdlc may govern mutable odd_sdlc source development through installed
   operator surfaces
 - AC-2: installed self-induction keeps the installed payload under
-  `.genesis/odd_sdlc/` and keeps the mutable source realization under its
-  declared `build_tenants/...` output root
+  `.abiogenesis/odd_sdlc/<build_tenant>/` and keeps the mutable source
+  realization under its declared `build_tenants/...` output root
 - AC-3: installed query/gap or comparable operator proof over an
   odd_sdlc-like mutable source workspace attributes source code and
   requirement traceability to the source realization root rather than to the

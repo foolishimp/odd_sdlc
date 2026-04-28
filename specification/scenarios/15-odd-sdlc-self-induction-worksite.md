@@ -14,7 +14,7 @@ operate it through installed odd_sdlc surfaces.
 
 The proving lane must show:
 
-- the installed payload lands under `.genesis/odd_sdlc/`
+- the installed payload lands under `.abiogenesis/odd_sdlc/<build_tenant>/`
 - the mutable project realization remains under its declared
   `build_tenants/...` output root
 - installed query and gap surfaces attribute source traceability to the mutable
@@ -24,8 +24,8 @@ The proving lane must show:
 
 - self-induction path: released odd_sdlc governs mutable odd_sdlc source
   development without special self-host shortcuts
-- topology path: `.genesis/odd_sdlc/` and the mutable project realization root
-  stay distinct
+- topology path: `.abiogenesis/odd_sdlc/<build_tenant>/` and the mutable
+  project realization root stay distinct
 - traceability path: requirement/code attribution points at the declared source
   realization root
 - operator path: installed `query-domain` and `gaps` operate over the mutable

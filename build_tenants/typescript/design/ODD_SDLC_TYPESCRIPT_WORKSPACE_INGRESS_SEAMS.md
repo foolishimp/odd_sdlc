@@ -3,7 +3,7 @@
 **Status**: Active
 **Date**: 2026-04-26
 **Implements**: REQ-F-ODDSDLC-007, REQ-F-ODDSDLC-012, REQ-F-ODDSDLC-016, REQ-F-ODDSDLC-022, REQ-F-ODDSDLC-032
-**Derives From**: `ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`, `.ai-workspace/tickets/backlog/T-019-split-workspace-assets-filesystem-model-and-projection-seams.md`
+**Derives From**: `ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md`, `build_tenants/python/design/REQUIREMENT_CLOSURE_CARRIER_AND_PROJECTION_BOUNDARY.md`, `.ai-workspace/tickets/backlog/T-019-split-workspace-assets-filesystem-model-and-projection-seams.md`, `.ai-workspace/tickets/completed/T-068-realize-typescript-conform-project-profile-before-product-materialization.md`
 
 ## Position
 
@@ -17,6 +17,7 @@ The TypeScript tenant separates the ingress surface into these seams:
 | carrier vocabulary | `workspace/carriers.ts` | source input, project constraints, imported requirement authority, bootstrap lineage, and ingress report types |
 | source input derivation | `workspace/source_input.ts` | digest, role detection, authority-marker extraction, ambiguity classification, source-input admission |
 | project constraints | `workspace/project_constraints.ts` | closed project-profile admission and project slug parsing |
+| conform project profile | `workspace/project_profile.ts` | `{documents, project_constraints} -> ConformProjectProfile` canonicalization for tenant, output root, modules, capabilities, execution contracts, and realization mode |
 | bootstrap lineage | `workspace/bootstrap_lineage.ts` | imported requirement seed authority and `InputSet -> Project` lineage projection |
 | compatibility barrel | `workspace/ingress.ts` | export continuity only |
 
@@ -25,6 +26,20 @@ The TypeScript tenant separates the ingress surface into these seams:
 Ingress may admit raw workspace snapshots and project constraints into typed
 truth. It may not mutate the workspace, choose a graph traversal, publish ABG
 runtime facts, or infer semantic authority from path names alone.
+
+Project constraints are input only. Downstream installed-operator handoff,
+product materialization, capability gates, and execution-contract prompts
+consume `ConformProjectProfile`, not direct YAML scalar scans.
+
+The lawful bootstrap handoff is:
+
+```text
+{ documents } -> Fg_ingress_project -> Fg_conform_project -> downstream graph program
+```
+
+The first TypeScript slice implements the deterministic conformance carrier for
+project declarations already present in the workspace. It does not encode
+data_mapper or any other workload-specific target.
 
 ## T-019 Lesson
 
@@ -46,6 +61,7 @@ the workspace.
 T-031 remains closed only while:
 
 - raw source input admission is separate from project-constraint admission
+- project-constraint admission projects through `ConformProjectProfile`
 - imported requirement authority is projected from admitted source inputs
 - bootstrap lineage is a projection over admitted carriers
 - downstream requirement closure consumes typed lineage rather than rescanning
