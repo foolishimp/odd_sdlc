@@ -10,25 +10,27 @@
 - re_entry_point: design
 - triaged_at: 2026-04-30
 - created_at: 2026-04-30
-- updated_at: 2026-05-01
+- updated_at: 2026-05-02
 - priority: high
 - build_tenant: typescript
 - owner: unassigned
-- review_status: external_review_accepted_pending_final_live_lane
+- review_status: active_abg_rc6_consumer_migration_required
 - intake_source: `data_mapper.test59.fp.cl` live Claude lane timed out after materializing product files but writing no `worker_result_report.json`; operator review identified that TypeScript collapsed `F_P.transform`, evaluation, materialization ledger construction, obligation assessment, and closure into one worker responsibility.
 - affected_boundary: `build_tenants/typescript/code/src/operator/handoff.ts`, `build_tenants/typescript/code/src/operator/installed_operator.ts`, odd_sdlc F_P plugin adapter, ABG event/admission/projection seams
 - links:
-  - B-071 (`.ai-workspace/tickets/active/B-071-consume-abg-streamed-process-actor-supervision-for-live-claude-lanes.md`)
-  - ABG T-097 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-097-design-abg-supervised-process-actor-execution-and-streamed-observation.md`)
-  - ABG T-098 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-098-design-abg-full-retry-frontier-projection.md`)
-  - ABG T-099 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/active/T-099-design-abg-typed-fp-stage-carriers-and-admission-flow.md`)
+  - B-071 (`.ai-workspace/tickets/completed/B-071-consume-abg-streamed-process-actor-supervision-for-live-claude-lanes.md`)
+  - ABG release cut `v3.4.0-rc.6` (`@abiogenesis/typescript-tenant@3.4.0-rc.6`)
+  - ABG T-097 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-097-design-abg-supervised-process-actor-execution-and-streamed-observation.md`)
+  - ABG T-098 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-098-design-abg-full-retry-frontier-projection.md`)
+  - ABG T-099 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-099-design-abg-typed-fp-stage-carriers-and-admission-flow.md`)
+  - ABG T-100/T-101/T-102/T-103/T-104 completed RC6 substrate surfaces for workspace zoom/foldback, mini data-mapper semantic sandbox, eval-suite projections, graph-span reentry, and cross-workspace output allocation
   - ABG engine-first holistic solution (`/Users/jim/src/apps/abiogenesis/.ai-workspace/comments/codex/20260430T224308AEST_abg_engine_first_holistic_solution.md`)
   - downstream SDLC symptom solution (`/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260430T223828AEST_test60_bug_wave_domain_solution.md`)
   - Claude DMM review (`/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260430T143854Z_REVIEW_typescript-src-simplify-and-domain-models.md`)
-  - T-105 (`.ai-workspace/tickets/active/T-105-migrate-start-until-converged-to-abg-owned-whole-graph-iteration.md`)
+  - T-105 (`.ai-workspace/tickets/completed/T-105-migrate-start-until-converged-to-abg-owned-whole-graph-iteration.md`)
   - T-106 (`.ai-workspace/tickets/completed/T-106-close-conformed-project-profile-authority-seam.md`)
   - T-107 (`.ai-workspace/tickets/backlog/T-107-split-operator-handoff-into-prime-domain-modules.md`)
-  - B-075 (`.ai-workspace/tickets/active/B-075-ignore-build-tool-byproducts-during-test-module-materialization.md`)
+  - B-075 (`.ai-workspace/tickets/completed/B-075-ignore-build-tool-byproducts-during-test-module-materialization.md`)
   - semantic regression: `test_env/tests/test_t064_installed_operator_ux.test.mjs`
   - live scenario: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test59.fp.cl`
 
@@ -186,10 +188,11 @@ report with first-class ABG `F_P.fn` carriers.
 
 ## Required Follow-On Work
 
-- Complete ABG T-099 for first-class `F_P.fn` carriers and event-sourced
+- Consume ABG RC6 first-class `F_P.fn` carriers and event-sourced
   admission/projection flow.
-- Complete ABG T-098 or consume its accepted retry-frontier projection so
-  retries preserve all distinct prior failure modes.
+- Consume ABG RC6 retry-frontier, zoom/foldback, graph-span reentry, eval-suite,
+  and cross-workspace output allocation projections so retries preserve all
+  distinct prior failure modes and traversal consequences remain ABG-owned.
 - Replace the legacy `worker_result_report.json` bridge with admitted
   `F_P.transform_result` and `F_P.evaluate_result` carriers.
 - Extend odd_sdlc plugin mapping to provide SDLC-specific evaluators without
@@ -385,3 +388,129 @@ The terminal blocker was `derive_code_surface` archive
 `20260501T083037157Z_pid63915`, with no stdout, no stderr, no transform result
 payload, and lawful re-entry `triage_gap`. T-102 therefore remains active for
 the broader typed F_P stage/admission boundary and external review.
+
+## ABG RC6 Consumer Architecture - 2026-05-02
+
+T-102 is now fully dependent on ABG TypeScript `v3.4.0-rc.6`. The upstream
+substrate blocker has moved from "ABG must define the stage/admission machinery"
+to "odd_sdlc must consume the RC6 machinery without rebuilding it locally."
+
+Required substrate version:
+
+- package surface: `@abiogenesis/typescript-tenant@3.4.0-rc.6`
+- release tag: `/Users/jim/src/apps/abiogenesis` `v3.4.0-rc.6`
+- current local dependency: `build_tenants/typescript/package.json` uses the
+  sibling ABG file dependency
+
+Required ABG RC6 surfaces:
+
+| ABG RC6 surface | odd_sdlc use |
+| --- | --- |
+| `constructFpTransformRequest` | ABG-owned construction of the transform call contract |
+| `constructFpTransformResult` | typed worker transform result carrier |
+| `admitFpTransformResultForRequest` | ABG-owned admission of worker transform output |
+| `runtimeEventsForFpTransformResult` | ABG-owned runtime events derived from admitted transform truth |
+| `deriveRetryFrontierProjection` | retry-frontier projection without odd_sdlc owning retry mechanics |
+| `constructEvalTask`, `constructEvalTrial`, `constructEvalOutcome`, `constructEvalGradeVector`, `deriveEvalAggregateProjection` | repeatable semantic-eval surfaces for F_P evaluation proof |
+| `deriveZoomFoldbackEvaluationFromEvents` | foldback from scheduled workspace obligations |
+| `deriveGraphReentryFrontierProjection`, `deriveGraphReentryPlan` | graph-span reentry after semantic gaps across A->...->D spans |
+| `admitOutputWorkspaceBinding`, `deriveOutputInstanceAllocation` | explicit input-workspace to output-workspace allocation for graph starts |
+
+### Ownership Law
+
+ABG owns the execution and information substrate:
+
+- graph traversal
+- frame/run/work identity
+- worker process supervision facts
+- F_P transform request/result admission
+- runtime event construction and admission
+- retry-frontier projection
+- zoom/foldback projection
+- graph-span reentry projection and application
+- output workspace binding and allocation
+
+odd_sdlc owns the SDLC semantic layer:
+
+- requirement, design, test, release, and ticket obligation meaning
+- F_P semantic evaluator plugins that judge `A.requirement -> B.result`
+- SDLC-specific obligation row construction from admitted evidence
+- product-specific proof interpretation and operator explanation
+
+F_P owns semantic judgment. F_D owns mechanical checks. F_D checks may reject
+malformed or impossible evidence, but they must not replace requirement-by-
+requirement F_P semantic evaluation.
+
+### Target Flow
+
+```mermaid
+sequenceDiagram
+  participant CLI as odd_sdlc CLI
+  participant ABG as ABG rc6 runner
+  participant Plugin as odd_sdlc F_P plugin
+  participant Worker as Agentic coder worker
+  participant Admit as ABG admission
+  participant Eval as odd_sdlc F_P evaluator
+  participant Fold as ABG retry/foldback/reentry projection
+
+  CLI->>ABG: start graph function with ExecutionBasis
+  ABG->>ABG: allocate output workspace when caller binding is present
+  ABG->>Plugin: FpTransformRequest
+  Plugin->>Worker: run bounded F_P.transform
+  Worker-->>Plugin: artifact refs and process result
+  Plugin->>Admit: FpTransformResult candidate
+  Admit-->>ABG: admitted transform events
+  Plugin->>Eval: evaluate SDLC obligations from admitted refs
+  Eval-->>Plugin: per-obligation semantic rows
+  Plugin-->>ABG: admitted semantic evidence refs and dispatch outcome
+  ABG->>Fold: project retry frontier, foldback, and reentry
+  Fold-->>ABG: close, retry, carry pressure, blocked, or reprice
+```
+
+### Local Rebase Gates Before Implementation Closure
+
+The current odd_sdlc TypeScript tree must be rebased to RC6 before this ticket
+can move toward closure:
+
+- refresh `build_tenants/typescript/package-lock.json`; it still records the
+  sibling ABG package as `3.4.0-rc.2` even though `node_modules` resolves
+  `3.4.0-rc.6`
+- remove the old `inactivityTimeoutMs` argument to ABG
+  `SupervisedProcessActorRequest`; RC6 process actors expose timeout,
+  heartbeat, and termination-grace policy, not that legacy field
+- remove the old `iterationUntil` argument to `runEngineIterateAsync`; RC6 reads
+  iteration policy from `basis.startIntent.until`
+- replace the legacy framework-generated `worker_result_report.json` bridge as
+  closure input with admitted `FpTransformResult` plus odd_sdlc F_P semantic
+  evaluation rows
+
+### Acceptance Criteria Addendum
+
+- AC-10: `npm run build:semantic` passes against
+  `@abiogenesis/typescript-tenant@3.4.0-rc.6`.
+- AC-11: odd_sdlc creates no private substitute for ABG F_P transform admission,
+  retry frontier, foldback, graph-span reentry, or output allocation.
+- AC-12: every worker-backed transform path produces or consumes an ABG
+  `FpTransformRequest` / `FpTransformResult` admission path.
+- AC-13: semantic requirement evaluation remains F_P-owned and is represented as
+  SDLC-domain rows over admitted evidence refs, not as F_D closure.
+- AC-14: closure and next traversal action are derived from ABG-admitted events,
+  ABG projections, and SDLC semantic rows, not from worker self-report or
+  installed-operator branch-local booleans.
+- AC-15: the focused RC6 sandbox and live test lanes exercise an `odd_sdlc`
+  lifecycle graph over bootstrap, requirement-ledger, requirement-schedule,
+  design, implementation, and qualification surfaces. A generic transform demo
+  is insufficient closure evidence for this ticket.
+
+### Focused Proof Added - 2026-05-02
+
+T-102 now has a focused RC6 proof lane over the `odd_sdlc` lifecycle domain:
+
+- deterministic sandbox: `npm run test:t102-t109:rc6-sandbox`
+- live Codex worker: `ODD_SDLC_TS_T109_LIVE=1 ODD_SDLC_TS_LIVE_WORKER_COMMAND=codex ODD_SDLC_TS_LIVE_CODEX_MODEL=gpt-5.3-codex npm run test:t102-t109:rc6-live`
+
+Both lanes use the same bootstrap input, requirement authorities, expected
+requirements ledger, requirements schedule, implementation surface, and
+qualification report. The live lane is pinned to `gpt-5.3-codex` and the
+archive is
+`build_tenants/typescript/test_env/test_runs/t109_live_abg_rc6_sdlc_lifecycle/20260502T134430587Z_pid46797/run_summary.json`.

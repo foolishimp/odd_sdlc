@@ -188,8 +188,7 @@ function constructExecutionContract(input: {
         kind: "graph_function",
         handle: input.targetGraphFunction
       },
-      // Replay identity stays stable; the ABG runner receives requestedUntil separately.
-      until: "converged"
+      until: input.request.until
     }),
     module: input.module,
     runtimeIdentity: admitResolvedRuntimeIdentity({

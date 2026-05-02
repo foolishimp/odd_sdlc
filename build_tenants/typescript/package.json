@@ -70,6 +70,8 @@
     "test:t099": "npm run build:semantic && node --test test_env/tests/test_t099_tranched_indexed_pressure.test.mjs",
     "test:t100": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
     "test:t101": "npm run build:semantic && node --test test_env/tests/test_t101_retry_report_rejection_loop.test.mjs",
+    "test:t102-t109:rc6-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t102_t109_abg_rc6_semantic_ledger_sandbox.test.mjs",
+    "test:t102-t109:rc6-live": "npm run build:semantic && node --test test_env/live/test_t102_t109_abg_rc6_live_semantic_ledger.test.mjs",
     "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",
     "test:live": "npm run build:semantic && node --test test_env/live/*.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"

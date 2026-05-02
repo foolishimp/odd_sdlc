@@ -758,3 +758,30 @@ snippets before handoff, deterministic requirement-family files are materialized
 from concrete bootstrap requirement lines, marker-only requirements are
 rejected before worker dispatch, and postflight rejects a fulfilled requirement
 assessment that cites only input authority without output coverage evidence.
+
+## T-102/T-109 ABG RC6 SDLC Lifecycle Ledger Lanes
+
+Derives from:
+
+- `.ai-workspace/tickets/active/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md`
+- `.ai-workspace/tickets/active/T-109-publish-authoritative-edge-ledger-lineage-chain-for-typescript-traversal-parity.md`
+- `specification/requirements/13-odd-sdlc-typescript-tenant.md`
+- `specification/requirements/15-odd-sdlc-scheduling-phase.md`
+
+Canonical files:
+
+- `test_env/fixtures/t102_t109_rc6_mini_sdlc_lifecycle.mjs`
+- `test_env/sandbox/test_t102_t109_abg_rc6_semantic_ledger_sandbox.test.mjs`
+- `test_env/live/test_t102_t109_abg_rc6_live_semantic_ledger.test.mjs`
+
+Canonical commands:
+
+- `npm run test:t102-t109:rc6-sandbox`
+- `ODD_SDLC_TS_T109_LIVE=1 npm run test:t102-t109:rc6-live`
+
+The lane proves the same mini `odd_sdlc` lifecycle result in deterministic and
+live form. The lifecycle is not a generic data transform: `Workspace.system`
+bootstrap input produces `Workspace.A.requirements.ledger`,
+`Workspace.A.requirements.schedule`, design, implementation, and qualification
+surfaces. The evaluator checks semantic content requirement-by-requirement and
+keeps F_D mechanical checks non-closing.

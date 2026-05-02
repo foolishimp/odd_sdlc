@@ -29,6 +29,7 @@ import {
   readOddSdlcRuntimeEventsSync
 } from "../operator/index.js";
 import {
+  SDLC_PUBLIC_START_UNTIL_VALUES,
   projectSdlcWorkerAttachment,
   publicStartOnce,
   type SdlcPublicStartTargetKind,
@@ -483,6 +484,44 @@ function startOutcomeFor(request: OddSdlcCliTraversalRequest): ReturnType<typeof
   });
 }
 
+function basisIdValue(event: RuntimeEvent): string | null {
+  const value = Reflect.get(event, "basisId");
+  return typeof value === "string" ? value : null;
+}
+
+function hasReplayForBasis(
+  basis: ExecutionBasis,
+  events: readonly RuntimeEvent[]
+): boolean {
+  return events.some((event) => basisIdValue(event) === basis.id);
+}
+
+function startOutcomeForObservedReplay(input: {
+  readonly request: OddSdlcCliTraversalRequest;
+  readonly events: readonly RuntimeEvent[];
+}): ReturnType<typeof publicStartOnce> {
+  const requested = startOutcomeFor(input.request);
+  if (
+    requested.executionContract === null ||
+    hasReplayForBasis(requested.executionContract.basis, input.events)
+  ) {
+    return requested;
+  }
+  for (const until of SDLC_PUBLIC_START_UNTIL_VALUES) {
+    const candidate = startOutcomeFor({
+      ...input.request,
+      until
+    });
+    if (
+      candidate.executionContract !== null &&
+      hasReplayForBasis(candidate.executionContract.basis, input.events)
+    ) {
+      return candidate;
+    }
+  }
+  return requested;
+}
+
 function replayEventsForBasis(
   basis: ExecutionBasis,
   events: readonly RuntimeEvent[]
@@ -490,12 +529,16 @@ function replayEventsForBasis(
   return Object.freeze(
     events.filter((event) => {
       if ("basisId" in event) {
-        return event.basisId === basis.id;
+        return basisIdValue(event) === basis.id;
       }
-      if ("runId" in event || "workKey" in event) {
-        return event.runId === basis.runId && event.workKey === basis.workKey;
-      }
-      return false;
+      const runId = Reflect.get(event, "runId");
+      const workKey = Reflect.get(event, "workKey");
+      return (
+        typeof runId === "string" &&
+        typeof workKey === "string" &&
+        runId === basis.runId &&
+        workKey === basis.workKey
+      );
     })
   );
 }
@@ -526,7 +569,11 @@ async function installedStartPayloadFor(
 }
 
 function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
-  const start = startOutcomeFor(request);
+  const allEvents = readOddSdlcRuntimeEventsSync(request.workspaceRoot);
+  const start = startOutcomeForObservedReplay({
+    request,
+    events: allEvents
+  });
   if (start.executionContract === null) {
     return Object.freeze({
       start,
@@ -535,7 +582,7 @@ function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
   }
   const events = replayEventsForBasis(
     start.executionContract.basis,
-    readOddSdlcRuntimeEventsSync(request.workspaceRoot)
+    allEvents
   );
   const projection = projectSdlcGapsFromReplay({
     basis: start.executionContract.basis,

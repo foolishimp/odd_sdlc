@@ -1,20 +1,21 @@
 ---
 id: T-109
-title: Publish functional traversal-ledger solution from Python discovery evidence
+title: Publish ABG-driven traversal-ledger solution from Python discovery evidence
 type: feature
 ticket_category: rc_blocker
 status: active
-goal: odd-sdlc-typescript-functional-traversal-ledger-solution-from-python-discovery
-change_intent: Design and realize a cohesive functional TypeScript traversal-ledger solution, using Python/test35 as discovery evidence while improving the model through pure projections, algebraic carriers, total closure predicates, and isolated effects.
+goal: odd-sdlc-typescript-abg-rc6-functional-traversal-ledger-solution-from-python-discovery
+change_intent: Design and realize a cohesive ABG-driven TypeScript traversal-ledger solution, using Python/test35 as discovery evidence while improving the model through ABG-owned ledger/event/projection machinery, pure SDLC semantic projections, algebraic carriers, total closure predicates, and isolated effects.
 change_class: design_reframe
 re_entry_point: design
-affected_boundary: canonical TypeScript traversal-ledger design, TypeScript installed operator, ABG-compatible runtime event projection, traversal assurance ledgers, requirement fulfillment projection, gap dossier retry fold, live data_mapper qualification lane
+affected_boundary: canonical TypeScript traversal-ledger design, TypeScript installed operator, ABG RC6 runtime event projection, ABG-owned ledger/admission/projection machinery, SDLC semantic obligation rows, traversal assurance ledgers, requirement fulfillment projection, gap dossier retry fold, graph-span reentry, output workspace allocation, live data_mapper qualification lane
 priority: critical
 build_tenant: typescript
 owner: unassigned
 triaged_at: 2026-05-02
 created_at: 2026-05-02
 updated_at: 2026-05-02
+review_status: active_abg_rc6_architecture_rebase_required
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -24,6 +25,12 @@ governance_scope_expansion:
 dependencies:
   - T-041 active full operational TypeScript replacement lane
   - T-102 active typed F_P stages and ABG-owned admission flow
+  - ABG release cut `v3.4.0-rc.6` (`@abiogenesis/typescript-tenant@3.4.0-rc.6`)
+  - ABG T-099 completed typed F_P stage carriers and admission flow
+  - ABG T-100 completed workspace zoom/foldback evaluation
+  - ABG T-102 completed eval-suite projection artifacts
+  - ABG T-103 completed graph-span foldback and reentry frontier
+  - ABG T-104 completed cross-workspace output allocation
   - T-103 backlog historical data_mapper parity evaluation
   - T-105 completed ABG-owned whole-graph iteration migration
   - T-080 completed requirement fulfillment assurance ledger
@@ -56,12 +63,13 @@ evidence_refs:
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T143724759Z_pid65991/assurance_postflight.json
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T143724759Z_pid65991/gap_dossier.json
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T144605455Z_pid65991/worker_process_failure_postflight.json
-closure_law: This ticket closes only when TypeScript has one canonical functional traversal-ledger design solution, that design has passed a recorded STDO/ODD_SDLC design review, TypeScript publishes and consumes admitted project and edge ledger carriers from that design, semantic gap truth is preserved across worker-runtime failures, and a live data_mapper traversal can continue beyond the test65 vector-8 failure mode through governed edge iteration.
+closure_law: This ticket closes only when TypeScript has one canonical ABG-driven functional traversal-ledger design solution, that design has passed a recorded STDO/ODD_SDLC design review, TypeScript consumes ABG RC6 ledger/event/admission/projection machinery instead of creating a product-local runtime ledger, odd_sdlc publishes SDLC semantic obligation rows and proof interpretation as domain payloads over ABG truth, semantic gap truth is preserved across worker-runtime failures, and a live data_mapper traversal can continue beyond the test65 vector-8 failure mode through governed ABG edge iteration/reentry.
 non_scope:
   - replacing upstream specification authority with runtime ledgers
   - copying Python service structure file-for-file
   - treating raw stdout, heartbeats, or UI summaries as closure authority
   - decentralized consensus or cryptocurrency-style mining
+  - creating an odd_sdlc-private runtime ledger substrate parallel to ABG
 ---
 
 ## STDO Triage
@@ -282,28 +290,29 @@ different closure authority, retry semantics, or carrier ownership.
 The word "blockchain" in this ticket means an append-only, parent-linked,
 digestable audit chain. It does not mean decentralized consensus.
 
-The model has three layers:
+The model is ABG-driven. It has four layers:
 
 ```text
-raw events
-  -> project construction ledger
-  -> selected/admitted per-edge fulfillment ledger surfaces
-  -> closure predicate over the selected ledger
+ABG raw events and lineage facts
+  -> ABG-governed project construction ledger/projections
+  -> selected/admitted SDLC per-edge fulfillment payloads
+  -> closure predicate over the selected SDLC edge payload
   -> requirement-resolution projection
 ```
 
-The raw event log records observations.
+The raw event log records observations under ABG admission and ordering law.
 
-The project construction ledger is the information-plane lineage chain for the
-run. It records attempts, parent refs, manifests, worker processes, output
-refs, materialized files, postflight refs, gap refs, retry decisions, and
-supersession refs. It is append-only and replayable. It is not sufficient by
-itself to close an edge.
+The project construction ledger/projection is ABG-owned information-plane
+lineage for the run. It records attempts, parent refs, manifests, worker
+processes, output refs, materialized files, postflight refs, gap refs, retry
+decisions, and supersession refs. It is append-only and replayable. It is not
+sufficient by itself to close an SDLC edge.
 
-The per-edge fulfillment ledger is the closure authority for one edge attempt
-or edge version. It states what obligations were expected, what was assessed,
-what evidence was admitted, what remained missing/partial/blocked, and whether
-the edge converged.
+The per-edge fulfillment surface is an SDLC semantic payload admitted over ABG
+truth. It is closure authority for one SDLC edge attempt or edge version because
+it states what obligations were expected, what was assessed, what evidence was
+admitted, what remained missing/partial/blocked, and whether the edge
+converged. It is not a second runtime ledger substrate.
 
 The requirement-resolution projection is a derived view across admitted edge
 ledgers. It may be materialized for operators, but it does not outrank the
@@ -311,12 +320,12 @@ admitted edge ledgers or the constitutional requirement authority.
 
 ### Carrier Set
 
-Minimum new or reconciled carriers:
+Minimum new or reconciled odd_sdlc domain payloads over ABG RC6 carriers:
 
 | Carrier | Role |
 | --- | --- |
-| `SdlcProjectConstructionLedger` | append-only project/run lineage chain |
-| `SdlcProjectConstructionLedgerEntry` | one typed lineage event or admitted interpretation |
+| `SdlcProjectConstructionLedger` | product-domain view over ABG project/run lineage |
+| `SdlcProjectConstructionLedgerEntry` | one typed SDLC lineage interpretation row over ABG event refs |
 | `SdlcEdgeAttemptRecord` | attempt identity, edge identity, parent attempt refs, manifest refs, process refs, output refs, and digest refs |
 | `SdlcEdgeFulfillmentLedger` | admitted closure carrier for one edge attempt/version |
 | `SdlcEdgeFulfillmentObligationRow` | one obligation, status, evidence refs, source refs, and blocking reasons |
@@ -533,35 +542,39 @@ against:
 The review must list blocking findings first. Any high or medium finding blocks
 this ticket until resolved or explicitly repriced.
 
-4. Define typed carrier interfaces and pure functions.
+4. Define typed domain payload interfaces and pure functions over ABG truth.
 
-Add TypeScript domain types for the project construction ledger, edge attempt
-record, edge fulfillment ledger, obligation rows, closure decision, and
-requirement-resolution projection. Add pure functions for projection, ledger
+Add TypeScript domain types for SDLC lineage views, edge attempt records, edge
+fulfillment payloads, obligation rows, closure decisions, and
+requirement-resolution projections. Add pure functions for SDLC payload
 construction, closure, retry classification, and requirement-resolution
-derivation.
+derivation over ABG-admitted event/projection truth.
 
-5. Publish project construction ledger entries.
+5. Consume ABG project construction lineage and publish SDLC lineage views.
 
-Every installed operator edge attempt must append lineage entries for manifest
-creation, process start, output observation, materialization observation,
-postflight, assurance, gap dossier, retry, block, reprice, and closure.
+Every installed operator edge attempt must consume ABG-admitted lineage facts
+for manifest creation, process start, output observation, materialization
+observation, postflight, assurance, gap dossier, retry, block, reprice, and
+closure. odd_sdlc may materialize SDLC lineage views as read/evidence payloads,
+but it must not create a private runtime ledger authority beside ABG.
 
-6. Publish edge fulfillment ledgers.
+6. Publish SDLC edge fulfillment payloads over ABG-admitted evidence.
 
-Every requirement-bearing edge must publish an admitted edge ledger from
-manifest obligations, observed materialization, worker/process evidence,
-assurance rows, and requirement authority refs.
+Every requirement-bearing edge must publish an admitted SDLC edge fulfillment
+payload from manifest obligations, observed materialization, worker/process
+evidence, F_P semantic rows, and requirement authority refs. The payload is the
+SDLC edge closure surface; the admission/projection mechanics remain ABG-owned.
 
-7. Fold closure from edge ledgers.
+7. Fold closure from SDLC edge payloads through ABG projection/reentry.
 
-The installed operator and ABG plugin boundary must fold retry/advance/block
-from admitted ledger state, not from raw worker report status alone.
+The installed operator and ABG plugin boundary must derive retry/advance/block
+from ABG projections plus admitted SDLC edge payload state, not from raw worker
+report status or installed-operator branch-local booleans.
 
 8. Preserve semantic gaps across worker-runtime failures.
 
 When a retry worker is silent, the process failure must attach to the attempt
-and project ledger while the prior semantic gap remains the active repair
+and ABG lineage while the prior SDLC semantic gap remains the active repair
 frontier.
 
 9. Add test35 fixture characterization tests.
@@ -601,34 +614,37 @@ implementation design into stack/module/schedule/code materialization.
   has no unresolved high or medium findings.
 - AC-4: active design docs remove any stale language that treats raw worker
   report, raw event chronology, or CLI summary as edge closure authority.
-- AC-5: TypeScript exposes typed carriers for project construction ledger,
-  edge attempt record, edge fulfillment ledger, edge obligation row, closure
-  decision, and requirement-resolution projection.
-- AC-6: TypeScript exposes pure total functions for event projection, edge
-  ledger construction, closure predicate evaluation, retry classification, and
-  requirement-resolution derivation.
+- AC-5: TypeScript exposes typed SDLC domain payloads for project construction
+  lineage views, edge attempt records, edge fulfillment payloads, edge
+  obligation rows, closure decisions, and requirement-resolution projections
+  over ABG-admitted truth.
+- AC-6: TypeScript exposes pure total functions for SDLC payload construction,
+  closure predicate evaluation, retry classification, and
+  requirement-resolution derivation over ABG event/projection inputs.
 - AC-7: effectful filesystem/process/clock operations are isolated from the
   pure projection and closure functions.
 - AC-8: invalid or contradictory carrier states are rejected through closed
   result types or fail-closed validation, not by partial exceptions in closure
   logic.
-- AC-9: the project construction ledger is append-only, parent-linked, and
-  digestable; corrections use supersession refs rather than mutation.
-- AC-10: every worker-backed edge attempt writes a project construction ledger
-  entry with manifest, process, output, postflight, and gap/closure refs.
-- AC-11: every requirement-bearing edge writes an admitted edge fulfillment
-  ledger with expected, fulfilled, partial, blocked, unfulfilled, missing, and
+- AC-9: the ABG-governed project construction lineage consumed by odd_sdlc is
+  append-only, parent-linked, and digestable; corrections use supersession refs
+  rather than mutation.
+- AC-10: every worker-backed edge attempt consumes or records ABG-admitted
+  manifest, process, output, postflight, and gap/closure refs before SDLC
+  lineage views are materialized.
+- AC-11: every requirement-bearing edge writes an admitted SDLC edge fulfillment
+  payload with expected, fulfilled, partial, blocked, unfulfilled, missing, and
   extra counts.
-- AC-12: edge closure is computed only from admitted edge fulfillment ledgers
-  and required assurance dimensions.
-- AC-13: missing requirement traces create a semantic edge ledger with
+- AC-12: edge closure is computed only from admitted SDLC edge fulfillment
+  payloads, ABG projections, and required assurance dimensions.
+- AC-13: missing requirement traces create an SDLC semantic edge payload with
   `edge_converged: false` and a lawful retry or loopback decision.
 - AC-14: silent worker inactivity on a retry creates a worker-runtime failure
   entry without overwriting the prior semantic edge gap.
-- AC-15: prior admitted converged edge ledgers remain available until explicitly
-  superseded by admitted authority change or reprice.
-- AC-16: requirement-resolution output is derived from admitted edge ledgers
-  and does not become a competing authority surface.
+- AC-15: prior admitted converged SDLC edge payloads remain available until
+  explicitly superseded by admitted authority change or reprice.
+- AC-16: requirement-resolution output is derived from admitted SDLC edge
+  payloads and does not become a competing authority surface.
 - AC-17: test35 fixture tests prove the TS carrier model can represent the
   selected Python ledger states and their supersession/pressure semantics.
 - AC-18: a regression reproduces the test65 vector-8 failure and proves the
@@ -650,14 +666,15 @@ implementation design into stack/module/schedule/code materialization.
   canonical solution and reconciled local docs.
 - Starting implementation closure without the recorded design review gate.
 - Treating a design review with unresolved high or medium findings as advisory.
-- Treating the project construction ledger as edge closure authority.
-- Treating raw events as closure authority without admitted edge ledgers.
+- Treating ABG project construction lineage as SDLC edge closure authority.
+- Treating raw events as closure authority without admitted SDLC edge
+  fulfillment payloads.
 - Allowing `silent_worker_inactivity` to erase or replace a prior semantic gap.
 - Allowing worker self-assessment alone to close obligations without admitted
   evidence rows.
 - Closing with runtime markdown assets only while the selected product edge
   requires materialized tenant/product surfaces.
-- Claiming Python equivalence from file counts without edge-ledger
+- Claiming Python equivalence from file counts without SDLC edge-payload
   characterization.
 - Updating code without reconciling the active design pack.
 
@@ -670,9 +687,10 @@ Required proof artifacts:
   `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`
 - recorded STDO/ODD_SDLC design review comment with no unresolved high or
   medium findings
-- TypeScript carrier definitions and validators
-- semantic tests for carrier validation, edge ledger projection, closure fold,
-  retry preservation, and supersession
+- TypeScript SDLC domain payload definitions and validators over ABG RC6
+  carriers/projections
+- semantic tests for payload validation, ABG projection consumption, closure
+  fold, retry preservation, and supersession
 - fixture tests over selected test35 `fp_ledgers`
 - reproduction test or live archive for the test65 vector-8 failure shape
 - fresh live data_mapper archive proving continuation or typed exhaustion
@@ -683,14 +701,19 @@ Minimum commands:
 ```bash
 npm run lint:semantic
 npm run test:semantic
-node --test <focused edge-ledger fixture tests>
+node --test <focused SDLC edge-payload fixture tests>
 node_modules/.bin/odd-sdlc-ts gaps --workspace <fresh data_mapper workspace>
 node_modules/.bin/odd-sdlc-ts start --workspace <fresh data_mapper workspace> --target next --until converged --worker process://claude
 ```
 
-## Implementation Checkpoint 2026-05-02
+## Historical Implementation Checkpoint 2026-05-02 - Parked, Not Current Main
 
-Core TypeScript implementation is present in
+This checkpoint records the parked T-109 implementation branch. It is not
+current `main` closure evidence. After the ABG RC6 release cut and rollback, the
+current implementation path must be rebuilt against ABG `v3.4.0-rc.6` and the
+ABG-owned ledger/admission/projection boundary defined later in this ticket.
+
+On the parked checkpoint branch, core TypeScript implementation was present in
 `build_tenants/typescript/code/src/operator/traversal_ledger.ts` and consumed
 by the installed operator.
 
@@ -727,11 +750,13 @@ Regression proof:
 - `npm run test:semantic` passed, 170/170.
 - `git diff --check` passed.
 
-Closure status:
+Parked-branch closure status at that time:
 
-The core implementation and semantic regression proof are complete. Ticket
-movement still requires the live data_mapper proof or typed exhaustion archive
-named by AC-19, plus final STDO review against the implementation and proof
+On that branch, the core implementation and semantic regression proof were
+complete. That proof does not count as current `main` closure evidence after
+the rollback and ABG RC6 rebase. Ticket movement now requires the RC6
+architecture above, live data_mapper proof or typed exhaustion archive named by
+AC-19, plus final STDO review against the current implementation and proof
 surface.
 
 ## STDO Review Checkpoint 2026-05-02: Ledger Writer Ownership
@@ -783,31 +808,39 @@ Evidence:
 
 Ownership finding:
 
-- Correct ownership target: `odd_sdlc` owns SDLC ledger meaning, obligation
-  mapping, evidence admission, requirement-resolution projection, and closure
-  interpretation.
-- ABG owns traversal, frames, process/runtime facts, event ordering,
-  continuation, retry mechanics, replay, and projection mechanics.
-- The worker does not write SDLC closure ledgers.
-- The current implementation keeps ABG from writing SDLC ledgers, which is
-  correct, but it still places the effectful ledger write inside the installed
-  operator dispatch path instead of behind an explicit product-owned admission
-  port with pure return values.
+RC6 supersession note: this finding is retained as historical review evidence,
+but the current architecture tightens the boundary. ABG owns admission and
+projection mechanics. odd_sdlc owns SDLC semantic payload content over those
+mechanics.
+
+- Correct ownership target: `odd_sdlc` owns SDLC semantic meaning, obligation
+  mapping, F_P evaluator rows, requirement-resolution interpretation, and proof
+  explanation.
+- ABG owns traversal, frames, process/runtime facts, event ordering, event
+  admission, continuation, retry mechanics, replay, ledger mechanics, and
+  projection mechanics.
+- The worker does not write SDLC closure payloads.
+- The parked implementation kept ABG from writing SDLC semantic payloads, which
+  is correct at the semantic-content layer, but it still placed the effectful
+  payload write inside the installed operator dispatch path instead of behind an
+  explicit pure SDLC payload core and ABG-facing effect adapter.
 
 Required correction before ticket closure:
 
-`F_P` must call a product-owned ledger admission function or port whose pure
+`F_P` must call a product-owned semantic payload function or port whose pure
 core returns:
 
-- `SdlcEdgeFulfillmentLedger`
-- `SdlcProjectConstructionLedgerEntry[]`
+- `SdlcEdgeFulfillmentPayload` or equivalent SDLC edge fulfillment value
+- SDLC lineage view rows over ABG event refs
 - `SdlcEdgeClosureDecision`
 - digest-bearing evidence refs
 
-An effect adapter may persist those returned values. The ABG-facing
-`FpDispatchOutcome` must then be derived from the returned ledger closure
-decision, not from parallel postflight, assurance, hook, or gap-dossier branch
-logic. This is required for AC-6, AC-7, AC-12, AC-16, and AC-21.
+An ABG-facing effect adapter may persist those returned values and admit the
+corresponding event/carrier refs through ABG-owned mechanics. The ABG-facing
+`FpDispatchOutcome` must then be derived from the returned SDLC closure decision
+and ABG projection result, not from parallel postflight, assurance, hook, or
+gap-dossier branch logic. This is required for AC-6, AC-7, AC-12, AC-16, and
+AC-21.
 
 ### Current Implemented Flow Mermaid
 
@@ -905,3 +938,224 @@ The ODD_SDLC split remains:
 
 The feature is complete only when that split is visible in both design and
 code.
+
+## ABG RC6 Architecture Rebase - 2026-05-02
+
+This section is the current controlling architecture for reimplementation on
+`main`. It supersedes the parked implementation checkpoint for current closure
+purposes.
+
+### STDO Classification
+
+- First missing layer: design reframe over the odd_sdlc consumer architecture,
+  then realization.
+- Change class remains `design_reframe`.
+- The ABG substrate dependency is now concrete and versioned:
+  `@abiogenesis/typescript-tenant@3.4.0-rc.6`.
+- The ticket must not close by copying Python's service layout, resurrecting the
+  parked T-109 branch as-is, or adding a product-local runtime ledger beside
+  ABG.
+- Implementation may begin only after the local RC6 compatibility gates are
+  green enough for the focused T-109 test to run against current source.
+
+### Current Reality
+
+- ABG source is cut at `v3.4.0-rc.6`.
+- odd_sdlc `package.json` points at the sibling ABG TypeScript package.
+- odd_sdlc `package-lock.json` still records the sibling ABG package as
+  `3.4.0-rc.2`; that lock metadata must be refreshed.
+- current odd_sdlc `main` does not carry
+  `build_tenants/typescript/code/src/operator/traversal_ledger.ts`.
+- current odd_sdlc `main` still has two known RC6 API drift points before the
+  T-109 implementation can be built:
+  - removed `SupervisedProcessActorRequest.inactivityTimeoutMs`
+  - removed `EngineIterateRequest.iterationUntil`, replaced by
+    `basis.startIntent.until`
+
+### Ownership Rule
+
+ABG owns ledger mechanics. odd_sdlc owns SDLC semantic content.
+
+| Concern | Owner | Rule |
+| --- | --- | --- |
+| runtime event admission and ordering | ABG | odd_sdlc never writes authoritative ABG events directly |
+| graph traversal, retry, foldback, and reentry | ABG | odd_sdlc supplies semantic evidence; ABG decides traversal consequence |
+| output workspace binding/allocation | ABG | odd_sdlc consumes allocation; it does not invent parallel workspace routing |
+| F_P transform request/result admission | ABG | odd_sdlc adapts worker transport to ABG `FpTransform*` carriers |
+| requirement/design/test obligation meaning | odd_sdlc | domain semantics stay in the product layer |
+| requirement-by-requirement quality judgment | F_P through odd_sdlc evaluator plugin | F_D cannot replace semantic evaluation |
+| SDLC edge fulfillment payload | odd_sdlc payload over ABG truth | closure payload may be called a ledger, but it is not a second runtime ledger substrate |
+| operator explanation, proof rendering, ticket closure interpretation | odd_sdlc | read model over ABG truth and SDLC semantic rows |
+
+### RC6 Dependency Map
+
+| ABG RC6 capability | T-109 architectural use |
+| --- | --- |
+| F_P stage carriers and admission (`constructFpTransformRequest`, `constructFpTransformResult`, `admitFpTransformResultForRequest`, `runtimeEventsForFpTransformResult`) | replace legacy worker-report bridge as the transform admission path |
+| retry frontier (`deriveRetryFrontierProjection`) | preserve semantic gaps and runtime failures as distinct retry pressure |
+| workspace zoom/foldback (`deriveZoomFoldbackEvaluationFromEvents`) | evaluate scheduled workspace-obligation spans without SDLC owning an outer loop |
+| eval-suite projections | produce repeatable semantic-eval proof artifacts for data-mapper-lite and data_mapper parity lanes |
+| graph-span reentry (`deriveGraphReentryFrontierProjection`, `deriveGraphReentryPlan`) | allow A->B->C->D evaluations to push reentry back to A->B, B->C, or C->D |
+| output allocation (`admitOutputWorkspaceBinding`, `deriveOutputInstanceAllocation`) | support input workspace and distinct output workspace for reviewable parallel streams |
+
+### Target Module Architecture
+
+The exact filenames may be adjusted during implementation, but these ownership
+boundaries are not optional.
+
+| Module responsibility | Owner | Target shape |
+| --- | --- | --- |
+| RC6 compatibility adapter | odd_sdlc over ABG | thin imports and local type mapping for ABG RC6 public contracts |
+| F_P transform adapter | odd_sdlc plugin boundary | constructs worker handoff from ABG `FpTransformRequest`; returns ABG-admissible `FpTransformResult` candidate |
+| SDLC semantic evaluator | odd_sdlc F_P evaluator | evaluates each carried requirement/design/test obligation against admitted transform evidence |
+| SDLC edge fulfillment payload core | pure odd_sdlc domain function | builds immutable edge fulfillment payload and five-term convergence fields from admitted evidence plus F_P rows |
+| SDLC requirement-resolution projection | pure odd_sdlc domain function | derives current requirement-resolution read model from selected admitted edge payloads |
+| ABG effect adapter | ABG-facing boundary | persists/adopts ABG events, projections, refs, digests, output allocation, and reentry facts |
+| installed operator integration | orchestration adapter only | invokes ABG runner and product plugins; does not own closure fold, loop, or private ledger writes |
+
+### Pure Core Contract
+
+The T-109 pure core must be deterministic and side-effect free.
+
+Minimum pure functions:
+
+- derive carried SDLC obligations for an edge from admitted authority refs
+- construct SDLC edge fulfillment payload from manifest obligations, admitted
+  transform evidence, process refs, output refs, and F_P semantic rows
+- compute the five-term edge convergence predicate:
+  `carry_converged AND fulfillment_converged AND admitted AND target_certification_passed AND fd_recheck_passed`
+- classify SDLC semantic gap state into close, retry_same_edge,
+  carry_loopback_pressure, blocked, or reprice_required payload terms
+- derive requirement-resolution projection from selected admitted edge payloads
+- validate replay selection and fail closed on supersession/order conflict
+
+The pure core must return values. It must not write files, append events, read
+the clock, spawn workers, or choose traversal by installed-operator branch
+logic.
+
+### Effect Adapter Contract
+
+Only the adapter boundary may perform effects:
+
+- read and write archive files
+- compute digests
+- observe filesystem deltas
+- invoke process actors
+- call ABG admission constructors
+- append or persist ABG-compatible event/carrier files
+- persist SDLC semantic payloads as evidence refs
+
+The adapter must derive the ABG-facing dispatch result from the returned pure
+closure payload and ABG projection result. It must not construct an independent
+answer after writing a ledger/payload.
+
+### Target Flow
+
+```mermaid
+flowchart TD
+  A["CLI start / agentic-coder start request"]
+  B["ABG ExecutionBasis<br/>with input workspace and optional output workspace binding"]
+  C["ABG output allocation<br/>admitOutputWorkspaceBinding / deriveOutputInstanceAllocation"]
+  D["ABG runner selects graph edge"]
+  E["ABG constructs FpTransformRequest"]
+  F["odd_sdlc F_P transform adapter<br/>prepares worker handoff"]
+  G["worker.F_P.transform<br/>materializes declared artifact/output files"]
+  H["odd_sdlc adapter builds FpTransformResult candidate"]
+  I["ABG admits FpTransformResult<br/>and emits runtime events"]
+  J["odd_sdlc F_P semantic evaluator<br/>requirement-by-requirement A.req -> B.result"]
+  K["pure SDLC edge fulfillment payload<br/>five-term convergence predicate"]
+  L["ABG retry frontier / foldback / graph reentry projection"]
+  M{"ABG traversal consequence"}
+  N["close edge and advance"]
+  O["retry same edge"]
+  P["carry loopback pressure"]
+  Q["blocked or reprice_required"]
+
+  A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L --> M
+  M --> N
+  M --> O
+  M --> P
+  M --> Q
+```
+
+### Graph-Span Reentry Flow
+
+```mermaid
+stateDiagram-v2
+  [*] --> A_to_B
+  A_to_B --> B_to_C: edge payload converged
+  B_to_C --> C_to_D: edge payload converged
+  C_to_D --> SpanEval: terminal output D observed
+  SpanEval --> Close: C->D, B->D, A->D foldback fulfilled
+  SpanEval --> Reenter_C_to_D: C->D semantic gap
+  SpanEval --> Reenter_B_to_C: B->D gap implicates B->C
+  SpanEval --> Reenter_A_to_B: A->D gap implicates A->B
+  SpanEval --> Reprice: intent/product/requirement authority conflict
+  Reenter_C_to_D --> C_to_D
+  Reenter_B_to_C --> B_to_C
+  Reenter_A_to_B --> A_to_B
+```
+
+### Non-Closure Addendum
+
+T-109 does not close if any of these are true:
+
+- odd_sdlc writes a runtime ledger substrate parallel to ABG
+- installed operator branches write an edge payload and then separately choose
+  `FpDispatchOutcome` from local branch facts
+- F_D or lexical trace checks stand in for requirement-by-requirement F_P
+  semantic evaluation
+- graph-span reentry exists only in unit algebra and is not consumed by the
+  ABG runner path used by odd_sdlc
+- output workspace allocation is handled by ad hoc path rewriting instead of
+  ABG RC6 output allocation/binding
+- package lock or TypeScript build still resolves against stale pre-RC6
+  substrate metadata
+
+### Acceptance Criteria Addendum
+
+- AC-22: odd_sdlc dependency metadata and `node_modules` both resolve
+  `@abiogenesis/typescript-tenant@3.4.0-rc.6`.
+- AC-23: `npm run build:semantic` passes against ABG RC6 before T-109 code
+  closure proof is considered.
+- AC-24: implementation consumes ABG RC6 F_P stage admission and does not use
+  `worker_result_report.json` as closure authority.
+- AC-25: implementation consumes ABG RC6 retry frontier, workspace foldback,
+  graph-span reentry, and output allocation where those capabilities are in
+  scope.
+- AC-26: SDLC edge fulfillment payloads are returned by pure functions and
+  persisted by an effect adapter; installed-operator branch logic does not own
+  ledger closure.
+- AC-27: live and deterministic mini-SDLC lifecycle tests prove the actual
+  `odd_sdlc` domain shape: `Workspace.system` bootstrap input produces a
+  requirements ledger, requirements schedule, design surface, implementation
+  surface, and qualification report, with semantic deviation evaluated
+  requirement-by-requirement by F_P, not by F_D mechanical checks.
+- AC-28: the canonical design document is amended to reflect this ABG RC6
+  architecture before implementation closure is claimed.
+- AC-29: the deterministic sandbox lane and live worker lane use the same
+  lifecycle input, requirement IDs, expected lifecycle bundle, semantic
+  evaluator, and edge-fulfillment payload expectations. They do not prove
+  different domains.
+
+### Focused Proof Added - 2026-05-02
+
+The focused RC6 lifecycle proof is now an `odd_sdlc` domain proof, not a
+data-mapper stand-in.
+
+Added surfaces:
+
+- `build_tenants/typescript/test_env/fixtures/t102_t109_rc6_mini_sdlc_lifecycle.mjs`
+- `build_tenants/typescript/test_env/sandbox/test_t102_t109_abg_rc6_semantic_ledger_sandbox.test.mjs`
+- `build_tenants/typescript/test_env/live/test_t102_t109_abg_rc6_live_semantic_ledger.test.mjs`
+
+The shared fixture models `Workspace.system` bootstrap input through
+`Workspace.A.requirements.ledger`, `Workspace.A.requirements.schedule`, design,
+implementation, and qualification surfaces. Both deterministic and live lanes
+assert the same expected lifecycle bundle and the same five F_P semantic rows.
+
+Verification recorded in the working tree:
+
+- `npm run test:t102-t109:rc6-sandbox` passed 5/5.
+- `ODD_SDLC_TS_T109_LIVE=1 ODD_SDLC_TS_LIVE_WORKER_COMMAND=codex ODD_SDLC_TS_LIVE_CODEX_MODEL=gpt-5.3-codex npm run test:t102-t109:rc6-live` passed 1/1.
+- live archive: `build_tenants/typescript/test_env/test_runs/t109_live_abg_rc6_sdlc_lifecycle/20260502T134430587Z_pid46797/run_summary.json`.

@@ -778,8 +778,10 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       stderrRef: pathToFileURL(stderrPath).href,
       processStartedPath: join(input.manifest.archiveRoot, "worker_process_started.json"),
       processEventsPath: join(input.manifest.archiveRoot, "worker_process_events.jsonl"),
-      timeoutMs: inactivityPolicy.timeoutMs,
-      inactivityTimeoutMs: inactivityPolicy.inactivityTimeoutMs,
+      timeoutMs: Math.min(
+        inactivityPolicy.timeoutMs,
+        inactivityPolicy.inactivityTimeoutMs
+      ),
       heartbeatMs: inactivityPolicy.heartbeatMs,
       eventSink: (event) => {
         if (event.kind === "actor_process_started" && !startedContextWritten) {
@@ -1771,7 +1773,6 @@ export async function executeInstalledOperatorStart(input: {
       emitted.push(event);
     },
     plugins: { fpDispatch },
-    iterationUntil: executionContract.requestedUntil,
     maxAttachedFpAttempts: 3
   });
   await appendOddSdlcRuntimeEvents({
