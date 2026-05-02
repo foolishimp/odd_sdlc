@@ -282,6 +282,41 @@ test("T-079 obligation carry ledger rejects dropped retry obligations", () => {
   assert.equal(carried.verdict, "satisfied");
 });
 
+test("T-079 obligation carry ledger accepts projected current reason frontier", () => {
+  const prior = gapDossier([
+    "REQ-ACC-001:obligation_partial",
+    "dropped_prior_obligation:REQ-ACC-001:obligation_partial",
+    "obligation_assessment_open:prior_gap:dropped_prior_obligation:REQ-ACC-001:obligation_partial"
+  ]);
+  const carriedByProjection = deriveObligationCarryAssuranceLedger({
+    manifest: manifest({
+      retryContext: {
+        kind: "sdlc_worker_retry_context",
+        retryAttemptRefs: [],
+        priorGapDossiers: [prior]
+      }
+    }),
+    currentGapDossier: null,
+    currentReasonCodes: ["REQ-ACC-001:obligation_partial"]
+  });
+  const resolvedByProjection = deriveObligationCarryAssuranceLedger({
+    manifest: manifest({
+      retryContext: {
+        kind: "sdlc_worker_retry_context",
+        retryAttemptRefs: [],
+        priorGapDossiers: [prior]
+      }
+    }),
+    currentGapDossier: null,
+    closedReasonCodes: ["REQ-ACC-001:obligation_partial"],
+    currentReasonCodes: []
+  });
+
+  assert.equal(carriedByProjection.verdict, "satisfied");
+  assert.deepStrictEqual(carriedByProjection.reasons, []);
+  assert.equal(resolvedByProjection.verdict, "satisfied");
+});
+
 test("T-079 obligation carry ledger covers omitted, closed, blocked, and reprice states", () => {
   const prior = gapDossier(["materialized_product_relative_path_mismatch"]);
   const omitted = deriveObligationCarryAssuranceLedger({

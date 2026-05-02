@@ -32,7 +32,7 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.4.0-rc.2",
+  packageVersion: "3.4.0-rc.3",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   localRuntimeEventFamilies: Object.freeze([]),

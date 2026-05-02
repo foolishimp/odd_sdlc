@@ -74,6 +74,36 @@ function replaceIntentPackage(manifest, patch) {
   };
 }
 
+function gapDossier(ref, reasons) {
+  return {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_test_module_surface",
+    vectorIndex: 15,
+    targetAssetType: "test_module_surface",
+    reasons: reasons.map((reason) => ({
+      kind: "sdlc_postflight_gap_reason",
+      reason,
+      reasonClass: "assurance",
+      blockingReason: {
+        kind: "sdlc_blocking_reason",
+        code: "assurance_ledger_reason",
+        reasonClass: "assurance",
+        lawfulReentryPoint: "same_edge_retry",
+        message: "Assurance ledger fold blocked traversal closure.",
+        detail: reason,
+        evidenceRefs: [ref]
+      }
+    })),
+    evidenceRefs: [ref],
+    priorManifestId: `${ref}/manifest`,
+    currentGapDossierRef: ref,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+}
+
 test("T-088 handoff manifest carries typed cumulative traversal intent package", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("derive_code_surface");
@@ -125,6 +155,65 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   assert.equal(
     manifest.traversalIntentPackage.evaluatorExpectations.constructiveFp,
     "fp://odd-sdlc/generic-software-domain-constructor"
+  );
+});
+
+test("T-088 retry pressure stays linked and does not expand into prior-gap obligations", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_test_module_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    runId: "t088-bounded-retry-frontier",
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        gapDossier("proof://gap-a", [
+          "REQ-ACC-001:obligation_partial",
+          "REQ-ACC-002:obligation_partial",
+          "dropped_prior_obligation:REQ-ACC-001:obligation_partial"
+        ]),
+        gapDossier("proof://gap-b", [
+          "REQ-ACC-001:obligation_partial",
+          "REQ-ACC-003:obligation_partial",
+          "obligation_assessment_open:prior_gap:dropped_prior_obligation:REQ-ACC-002:obligation_partial"
+        ])
+      ]
+    }
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.equal(manifest.traversalObligationContext.deltaSummary.priorGapCount, 3);
+  assert.equal(
+    manifest.traversalObligationContext.obligations.some(
+      (obligation) => obligation.obligationKind === "prior_gap"
+    ),
+    false
+  );
+  assert.deepStrictEqual(manifest.traversalIntentPackage.priorGapDossierRefs, [
+    "proof://gap-a",
+    "proof://gap-b"
+  ]);
+  assert.match(prompt, /priorGapFrontier/u);
+  assert.match(prompt, /read those files selectively/u);
+  assert.equal(
+    prompt.includes("prior_gap:REQ-ACC-001:obligation_partial"),
+    false
+  );
+  assert.equal(
+    prompt.includes(
+      "obligation_assessment_open:prior_gap:dropped_prior_obligation"
+    ),
+    false
+  );
+  assert.equal(
+    prompt.includes("dropped_prior_obligation:REQ-ACC-001:obligation_partial"),
+    false
   );
 });
 

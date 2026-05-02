@@ -22,9 +22,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
+  buildPostTransformWorkerResultReport,
+  constructPostflightGapDossier,
   constructSdlcGtlModule,
   constructorResultFromWorkerOutput,
   deriveSdlcWorkspaceIngressReport,
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveWorkerHandoffManifest,
   executeInstalledOperatorStart,
@@ -40,6 +43,7 @@ import {
   readOddSdlcRuntimeEvents,
   readWorkerResultReport,
   sha256Text,
+  snapshotProductMaterializationRoot,
   writeHandoffFiles,
   writeProductMaterializationManifest
 } from "../../build/semantic/code/src/index.js";
@@ -150,6 +154,8 @@ function makeStart(workspaceRoot) {
     sourceInputs: []
   });
   const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject =
+    deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
   const start = publicStartOnce({
     request: {
       kind: "sdlc_public_start_request",
@@ -163,6 +169,7 @@ function makeStart(workspaceRoot) {
     },
     module,
     queryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "process://node"
     })
@@ -193,6 +200,18 @@ function assessedEventForVector(basis, vector, index) {
   };
 }
 
+function vectorClosedEventForVector(basis, vector, index) {
+  return {
+    kind: "vector_closed",
+    basisId: basis.id,
+    graphCallId: `graph-call:${basis.id}`,
+    frameId: `frame:${basis.id}:root`,
+    vectorIndex: index,
+    edge: vector.name,
+    closureKind: "advanced"
+  };
+}
+
 function preclosedEventsBeforeEdge(basis, edgeName) {
   const targetIndex = basis.graph.vectors.findIndex(
     (vector) => vector.name === edgeName
@@ -201,7 +220,10 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
   return Object.freeze(
     basis.graph.vectors
       .slice(0, targetIndex)
-      .map((vector, index) => assessedEventForVector(basis, vector, index))
+      .flatMap((vector, index) => [
+        assessedEventForVector(basis, vector, index),
+        vectorClosedEventForVector(basis, vector, index)
+      ])
   );
 }
 
@@ -214,7 +236,7 @@ function writePlaceholderWorkerScript(workspaceRoot) {
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`].join('\\n') + '\\n';",
+      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`)].join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const tenantRelative = 'src/main/scala/generated/Placeholder.scala';",
@@ -243,7 +265,7 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`].join('\\n') + '\\n';",
+      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`)].join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const tenantRelative = 'src/main/scala/generated/Core.scala';",
@@ -284,6 +306,20 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
       "const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
       "const materializedFiles = [{ kind: 'sdlc_materialized_product_file', role: 'source', relativePath: tenantRelative, absolutePath: sourcePath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8') }];",
       "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'generated source without traversal obligation assessments', unresolvedReasons: [], materializedFiles, executionEvidence: null }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
+function writeSilentWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t066_silent_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "setTimeout(() => {",
+      "  process.exit(0);",
+      "}, 10000);"
     ].join("\n"),
     "utf8"
   );
@@ -336,7 +372,7 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`].join('\\n') + '\\n';",
+      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`)].join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const materializedFiles = [];",
@@ -359,11 +395,12 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "    materializedFiles.push({ kind: 'sdlc_materialized_product_file', role: 'build_config', relativePath: 'build.sbt', absolutePath: buildPath, digest: buildDigest, byteCount: Buffer.byteLength(buildConfig, 'utf8') });",
       "  }",
       "}",
-      "if (manifest.targetAssetType === 'test_run_archive_surface') {",
+      "if (manifest.targetAssetType === 'test_execution_result_surface') {",
       "  const reportPath = path.join(manifest.archiveRoot, 'junit-report.xml');",
       "  const report = '<testsuite tests=\"1\" failures=\"0\"><testcase classname=\"cdme.CoreSpec\" name=\"provesCore\"/></testsuite>\\n';",
       "  writeFileSync(reportPath, report, 'utf8');",
-      "  executionEvidence = { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [`file://${reportPath}`], testsObserved: 1, passedCount: 1, failedCount: 0 };",
+      "  const shardEvidence = manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [`file://${reportPath}`], testsObserved: 1, passedCount: 1, failedCount: 0 }));",
+      "  executionEvidence = { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [`file://${reportPath}`], testsObserved: shardEvidence.length, passedCount: shardEvidence.length, failedCount: 0, shardEvidence };",
       "}",
       "const materializedRefs = materializedFiles.map((file) => `file://${file.absolutePath}`);",
       "const executionRefs = executionEvidence === null ? [] : executionEvidence.reportRefs;",
@@ -554,7 +591,181 @@ test("T-066 code-surface postflight rejects markdown-only realization", () => {
   );
 });
 
-test("T-066 test-run archive postflight rejects missing execution evidence", () => {
+test("T-102 post-transform observation admits existing discoverable test files", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_module_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-existing-test-materialization"
+  });
+  const testRelativePath =
+    "cdme-compiler/src/test/scala/cdme/compiler/ExistingSpec.scala";
+  const testPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    testRelativePath
+  );
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(
+    testPath,
+    [
+      "package cdme.compiler",
+      "",
+      "import org.scalatest.funsuite.AnyFunSuite",
+      "",
+      "// Validates: REQ-T066-001",
+      "class ExistingSpec extends AnyFunSuite {",
+      "  test(\"existing spec is admitted as materialization evidence\") {",
+      "    assert(1 == 1)",
+      "  }",
+      "}"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(
+    manifest.outputFile,
+    [
+      "# test_module_surface",
+      "",
+      "edge: derive_test_module_surface",
+      "",
+      "This transform reclassifies existing tenant tests as current edge evidence.",
+      "",
+      "REQ-T066-001"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+
+  assert.equal(report.materializedFiles.length, 1);
+  assert.equal(report.materializedFiles[0].role, "test");
+  assert.equal(report.materializedFiles[0].relativePath, testRelativePath);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "passed");
+});
+
+test("T-102 post-transform observation ignores test-module build byproducts", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_module_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-test-module-byproduct-filter"
+  });
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(
+    manifest.outputFile,
+    [
+      "# test_module_surface",
+      "",
+      "edge: derive_test_module_surface",
+      "",
+      "This transform writes one test and a build tool emits target files.",
+      "",
+      "REQ-T066-001"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  const testRelativePath =
+    "cdme-compiler/src/test/scala/cdme/compiler/GeneratedSpec.scala";
+  const testPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    testRelativePath
+  );
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(
+    testPath,
+    [
+      "package cdme.compiler",
+      "",
+      "import org.scalatest.funsuite.AnyFunSuite",
+      "",
+      "// Validates: REQ-T066-001",
+      "class GeneratedSpec extends AnyFunSuite {",
+      "  test(\"generated spec is admitted\") { assert(1 == 1) }",
+      "}"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  const byproductPaths = [
+    "cdme-compiler/target/scala-2.13/test-zinc/inc_compile_2.13.zip",
+    "cdme-compiler/target/test-reports/TEST-cdme.compiler.GeneratedSpec.xml",
+    ".bsp/sbt.json"
+  ];
+  for (const relativePath of byproductPaths) {
+    const absolutePath = path.join(
+      manifest.productMaterialization.tenantRoot,
+      relativePath
+    );
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, "build-tool byproduct\n", "utf8");
+  }
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+
+  assert.deepStrictEqual(
+    report.materializedFiles.map((file) => file.relativePath),
+    [testRelativePath]
+  );
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "passed");
+});
+
+test("T-066 test execution result postflight rejects missing execution evidence", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "t066-missing-execution-evidence"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "generated only a test execution result markdown surface",
+    materializedFiles: []
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(postflight.status, "blocked");
+  const missingReason = postflight.blockingReasonCarriers.find(
+    (reason) => reason.code === "test_execution_evidence_missing"
+  );
+  assert.notEqual(missingReason, undefined);
+  assert.match(missingReason.detail, /No sdlc_worker_execution_evidence block/);
+});
+
+test("T-104 test-run archive is surface-only and does not require fresh execution evidence", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_run_archive_surface");
@@ -565,29 +776,247 @@ test("T-066 test-run archive postflight rejects missing execution evidence", () 
     vectorIndex: 14,
     contract,
     projectConstraints: constraints,
-    runId: "t066-missing-execution-evidence"
+    runId: "t094-not-run-execution-evidence"
   });
-  writeHandoffFiles(manifest);
+  const handoffFiles = writeHandoffFiles(manifest);
+  const prompt = readFileSync(handoffFiles.promptPath, "utf8");
+
+  assert.match(prompt, /do not run test commands/);
+  assert.match(prompt, /do not emit fresh sdlc_worker_execution_evidence/);
+  assert.match(prompt, /Archive the admitted test_execution_result_surface/);
+  assert.doesNotMatch(prompt, /run that command from the tenant root/);
+
   const output = writeOutputSurface(manifest, "test_run_archive_surface");
   writeReport({
     manifest,
     digest: output.digest,
-    summary: "generated only a test run archive markdown surface",
-    materializedFiles: []
+    summary: "generated archive over prior test execution result truth",
+    materializedFiles: [],
+    executionEvidence: null
   });
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
 
+  assert.equal(report.executionEvidence, null);
   assert.equal(postflight.status, "blocked");
   assert.equal(
     postflight.blockingReasons.includes("test_execution_evidence_missing"),
+    false
+  );
+  assert.equal(
+    postflight.blockingReasons.every(
+      (reason) => reason !== "test_execution_not_succeeded"
+    ),
+    true
+  );
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) =>
+        reason.code === "source_asset_dependency_missing" &&
+        reason.detail.includes("test_execution_result_surface") &&
+        reason.detail.includes("admitted execution-result report missing")
+    ),
     true
   );
 });
 
-test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocker", () => {
+test("T-104 test-run archive closure depends on cited execution-result truth", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const executionManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: executionContract.edgeName,
+    vectorIndex: 17,
+    contract: executionContract,
+    projectConstraints: constraints,
+    runId: "t104-source-execution-result"
+  });
+  writeHandoffFiles(executionManifest);
+  const executionOutput = writeOutputSurface(
+    executionManifest,
+    "test_execution_result_surface"
+  );
+  const executionReportPath = path.join(executionManifest.archiveRoot, "junit-report.xml");
+  writeFileSync(
+    executionReportPath,
+    '<testsuite tests="1" failures="0"><testcase classname="cdme.CoreSpec" name="provesCore"/></testsuite>\n',
+    "utf8"
+  );
+  const shardEvidence = executionManifest.productMaterialization.executionShards.map(
+    (shard) => ({
+      kind: "sdlc_worker_execution_shard_evidence",
+      shardId: shard.shardId,
+      moduleName: shard.moduleName,
+      lane: "test",
+      command: shard.command,
+      status: "succeeded",
+      reportRefs: [`file://${executionReportPath}`],
+      testsObserved: 1,
+      passedCount: 1,
+      failedCount: 0
+    })
+  );
+  writeFileSync(
+    executionManifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: executionManifest.graphFunctionName,
+        edgeName: executionManifest.edgeName,
+        targetAssetType: executionManifest.targetAssetType,
+        outputFile: executionManifest.outputFile,
+        digest: executionOutput.digest,
+        summary: "admitted execution-result dependency with shard truth",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: executionManifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [`file://${executionReportPath}`],
+          testsObserved: shardEvidence.length,
+          passedCount: shardEvidence.length,
+          failedCount: 0,
+          shardEvidence
+        },
+        obligationAssessments: executionManifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [`file://${executionManifest.outputFile}`, `file://${executionReportPath}`],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const executionReport = readWorkerResultReport(executionManifest);
+  const executionPostflight = evaluateWorkerResultPostflight({
+    manifest: executionManifest,
+    report: executionReport
+  });
+  assert.equal(executionPostflight.status, "passed");
+
+  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 18,
+    contract,
+    projectConstraints: constraints,
+    runId: "t104-archive-cites-execution-result"
+  });
+  writeHandoffFiles(manifest);
+  const content = [
+    "# test_run_archive_surface",
+    "",
+    "Archived dependencies:",
+    ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`),
+    "Requirement trace: REQ-T066-001"
+  ].join("\n");
+  const artifact = `${content}\n`;
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, artifact, "utf8");
+  const outputRef = `file://${manifest.outputFile}`;
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: sha256Text(artifact),
+        summary: "archive names execution-result dependency without carrier truth",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: null,
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs.filter(
+              (ref) => !ref.endsWith("/worker_result_report.json")
+            )],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const proseOnlyReport = readWorkerResultReport(manifest);
+  const proseOnlyPostflight = evaluateWorkerResultPostflight({
+    manifest,
+    report: proseOnlyReport
+  });
+
+  assert.equal(proseOnlyPostflight.status, "blocked");
+  assert.equal(
+    proseOnlyPostflight.blockingReasonCarriers.some(
+      (reason) =>
+        reason.code === "source_asset_dependency_missing" &&
+        reason.detail.includes("admitted execution-result report missing")
+    ),
+    true
+  );
+
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: sha256Text(artifact),
+        summary: "archive cites admitted execution-result dependency",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: null,
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: obligation.obligationId ===
+              "source_asset:test_execution_result_surface"
+              ? [outputRef, `file://${executionManifest.reportFile}`, ...obligation.evidenceRefs]
+              : [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(postflight.status, "passed");
+});
+
+test("T-104 test-run archive rejects legacy fresh execution evidence reports", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_run_archive_surface");
@@ -595,7 +1024,69 @@ test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocke
     workspaceRoot: workspace,
     graphFunctionName: "bootstrap_release_self_test",
     edgeName: contract.edgeName,
-    vectorIndex: 14,
+    vectorIndex: 18,
+    contract,
+    projectConstraints: constraints,
+    runId: "t104-archive-rejects-execution-evidence"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_run_archive_surface");
+  const outputRef = `file://${manifest.outputFile}`;
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: output.digest,
+        summary: "legacy archive report tries to emit fresh execution evidence",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: manifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [outputRef],
+          testsObserved: 1,
+          passedCount: 1,
+          failedCount: 0,
+          shardEvidence: []
+        },
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  assert.throws(
+    () => readWorkerResultReport(manifest),
+    /target asset type does not admit execution evidence/u
+  );
+});
+
+test("T-094/T-095 test execution result normalizes not-run evidence to pending blocker", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
     contract,
     projectConstraints: constraints,
     runId: "t094-not-run-execution-evidence"
@@ -612,10 +1103,14 @@ test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocke
   );
   assert.match(
     prompt,
-    /A document that says tests were not run is not closure evidence for this edge/
+    /Pending evidence is a lawful non-closure carrier for triage or repricing/
+  );
+  assert.match(
+    prompt,
+    /do not present a not-run document as release closure evidence/
   );
 
-  const output = writeOutputSurface(manifest, "test_run_archive_surface");
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
   const outputRef = `file://${manifest.outputFile}`;
   writeFileSync(
     manifest.reportFile,
@@ -627,7 +1122,7 @@ test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocke
         targetAssetType: manifest.targetAssetType,
         outputFile: manifest.outputFile,
         digest: output.digest,
-        summary: "test archive reports that execution did not run",
+        summary: "test execution result reports that execution did not run",
         unresolvedReasons: [],
         materializedFiles: [],
         executionEvidence: {
@@ -638,7 +1133,21 @@ test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocke
           reportRefs: [outputRef],
           testsObserved: 0,
           passedCount: 0,
-          failedCount: 0
+          failedCount: 0,
+          shardEvidence: manifest.productMaterialization.executionShards.map(
+            (shard) => ({
+              kind: "sdlc_worker_execution_shard_evidence",
+              shardId: shard.shardId,
+              moduleName: shard.moduleName,
+              lane: "test",
+              command: shard.command,
+              status: "not_run",
+              reportRefs: [outputRef],
+              testsObserved: 0,
+              passedCount: 0,
+              failedCount: 0
+            })
+          )
         },
         obligationAssessments: manifest.traversalObligationContext.obligations.map(
           (obligation) => ({
@@ -663,13 +1172,498 @@ test("T-094/T-095 test-run archive normalizes not-run evidence to pending blocke
   assert.equal(report.executionEvidence.status, "pending");
   assert.equal(postflight.status, "blocked");
   assert.equal(
-    postflight.blockingReasons.includes("test_execution_not_succeeded"),
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "test_execution_not_succeeded"
+    ),
     true
   );
   assert.equal(
     postflight.blockingReasons.includes("test_execution_zero_tests_observed"),
+    false
+  );
+  assert.equal(
+    postflight.blockingReasonCarriers.find(
+      (reason) => reason.code === "test_execution_not_succeeded"
+    )?.lawfulReentryPoint,
+    "triage_gap"
+  );
+  const dossier = constructPostflightGapDossier({ manifest, postflight });
+  assert.equal(dossier.retryEligible, false);
+  assert.deepStrictEqual(dossier.nextLawfulActions, ["triage_gap"]);
+});
+
+test("B-077 execution evidence contradiction stops for triage instead of retry", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 18,
+    contract,
+    projectConstraints: constraints,
+    runId: "b077-execution-evidence-contradiction"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
+  const outputRef = `file://${manifest.outputFile}`;
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: output.digest,
+        summary: "test execution result reports failed status with zero failed tests",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: manifest.productMaterialization.testExecutionContract,
+          status: "failed",
+          reportRefs: [outputRef],
+          testsObserved: 63,
+          passedCount: 63,
+          failedCount: 0,
+          shardEvidence: manifest.productMaterialization.executionShards.map(
+            (shard) => ({
+              kind: "sdlc_worker_execution_shard_evidence",
+              shardId: shard.shardId,
+              moduleName: shard.moduleName,
+              lane: "test",
+              command: shard.command,
+              status: "failed",
+              reportRefs: [outputRef],
+              testsObserved: 63,
+              passedCount: 63,
+              failedCount: 0
+            })
+          )
+        },
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(postflight.status, "blocked");
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "test_execution_evidence_contradiction"
+    ),
     true
   );
+  assert.equal(
+    postflight.blockingReasons.includes("test_execution_not_succeeded"),
+    false
+  );
+  assert.equal(
+    postflight.blockingReasonCarriers.find(
+      (reason) => reason.code === "test_execution_evidence_contradiction"
+    )?.lawfulReentryPoint,
+    "triage_gap"
+  );
+  const dossier = constructPostflightGapDossier({ manifest, postflight });
+  assert.equal(dossier.retryEligible, false);
+  assert.deepStrictEqual(dossier.nextLawfulActions, ["triage_gap"]);
+});
+
+test("B-072 post-transform test execution result admits embedded execution evidence", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "b072-transform-execution-evidence"
+  });
+  writeHandoffFiles(manifest);
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  const content = [
+    "# test_execution_result_surface",
+    "",
+    "The transform returns governed test execution evidence.",
+    "",
+    "```json",
+    JSON.stringify(
+      {
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: manifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [],
+          testsObserved: 2,
+          passedCount: 2,
+          failedCount: 0,
+          shardEvidence: manifest.productMaterialization.executionShards.map(
+            (shard) => ({
+              kind: "sdlc_worker_execution_shard_evidence",
+              shardId: shard.shardId,
+              moduleName: shard.moduleName,
+              lane: "test",
+              command: shard.command,
+              status: "succeeded",
+              reportRefs: [],
+              testsObserved: 2,
+              passedCount: 2,
+              failedCount: 0
+            })
+          )
+        }
+      },
+      null,
+      2
+    ),
+    "```"
+  ].join("\n");
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, `${content}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  assert.equal(report.executionEvidence?.status, "succeeded");
+  assert.equal(report.executionEvidence?.testsObserved, 2);
+  assert.deepStrictEqual(report.executionEvidence?.reportRefs, [
+    `file://${manifest.outputFile}`
+  ]);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "passed");
+});
+
+test("B-072 malformed transform execution result evidence becomes typed invalid blocker", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "b072-malformed-transform-execution-evidence"
+  });
+  writeHandoffFiles(manifest);
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  const content = [
+    "# test_execution_result_surface",
+    "",
+    "The transform returns malformed governed test execution evidence.",
+    "",
+    "```json",
+    JSON.stringify(
+      {
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          status: "succeeded",
+          reportRefs: [],
+          testsObserved: 1,
+          passedCount: 1,
+          failedCount: 0
+        }
+      },
+      null,
+      2
+    ),
+    "```"
+  ].join("\n");
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, `${content}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  assert.equal(report.executionEvidence, null);
+  assert.equal(report.executionEvidenceErrors.length, 1);
+  assert.match(report.executionEvidenceErrors[0], /command/);
+
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "blocked");
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "test_execution_evidence_invalid"
+    ),
+    true
+  );
+  assert.equal(
+    postflight.blockingReasons.includes("test_execution_evidence_missing"),
+    false
+  );
+  const invalidReason = postflight.blockingReasonCarriers.find(
+    (reason) => reason.code === "test_execution_evidence_invalid"
+  );
+  assert.equal(invalidReason?.lawfulReentryPoint, "repair_worker_output");
+  assert.match(invalidReason?.detail ?? "", /command/);
+});
+
+test("B-079 execution-result postflight requires registered shard evidence", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: b079_shard_postflight",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - cdme-compiler",
+      "      - cdme-engine"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "b079-shard-evidence-required"
+  });
+  assert.deepStrictEqual(
+    manifest.productMaterialization.executionShards.map((shard) => shard.moduleName),
+    ["cdme-compiler", "cdme-engine"]
+  );
+  assert.deepStrictEqual(
+    manifest.productMaterialization.executionShards.map((shard) => shard.command),
+    ['sbt "cdme-compiler/test"', 'sbt "cdme-engine/test"']
+  );
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
+  const outputRef = `file://${manifest.outputFile}`;
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: output.digest,
+        summary: "aggregate evidence without shard rows",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: manifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [outputRef],
+          testsObserved: 2,
+          passedCount: 2,
+          failedCount: 0
+        },
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const blockedReport = readWorkerResultReport(manifest);
+  const blockedPostflight = evaluateWorkerResultPostflight({
+    manifest,
+    report: blockedReport
+  });
+  assert.equal(blockedPostflight.status, "blocked");
+  assert.deepStrictEqual(
+    blockedPostflight.blockingReasonCarriers
+      .filter((reason) => reason.code === "test_execution_shard_evidence_missing")
+      .map((reason) => reason.detail),
+    ["test-shard-01-cdme-compiler", "test-shard-02-cdme-engine"]
+  );
+
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: output.digest,
+        summary: "aggregate evidence with registered shard rows",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: manifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [outputRef],
+          testsObserved: 2,
+          passedCount: 2,
+          failedCount: 0,
+          shardEvidence: manifest.productMaterialization.executionShards.map(
+            (shard) => ({
+              kind: "sdlc_worker_execution_shard_evidence",
+              shardId: shard.shardId,
+              moduleName: shard.moduleName,
+              lane: "test",
+              command: shard.command,
+              status: "succeeded",
+              reportRefs: [outputRef],
+              testsObserved: 1,
+              passedCount: 1,
+              failedCount: 0
+            })
+          )
+        },
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const passedReport = readWorkerResultReport(manifest);
+  const passedPostflight = evaluateWorkerResultPostflight({
+    manifest,
+    report: passedReport
+  });
+  assert.equal(passedPostflight.status, "passed");
+});
+
+test("B-080 silent execution-result recovery carries shard identity", async () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: b080_silent_shard_recovery",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - cdme-compiler",
+      "      - cdme-engine"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const start = makeStart(workspace);
+  const basis = start.executionContract.basis;
+  const workerScript = writeSilentWorkerScript(workspace);
+  const previousTimeout = process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+  const previousHeartbeat = process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
+  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "50";
+  process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
+  try {
+    const result = await executeInstalledOperatorStart({
+      workspaceRoot: workspace,
+      start,
+      workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
+      replayEvents: preclosedEventsBeforeEdge(
+        basis,
+        "derive_test_execution_result_surface"
+      )
+    });
+
+    assert.equal(result.status, "worker_failed");
+    assert.equal(result.postflight.status, "blocked");
+    assert.equal(
+      result.postflight.blockingReasonCarriers[0].code,
+      "silent_worker_inactivity"
+    );
+    assert.equal(
+      result.postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+      "triage_gap"
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /executionShardIds=test-shard-01-cdme-compiler,test-shard-02-cdme-engine/u
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /signalSequence=SIGTERM@\d+ms/u
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /processSummaryRef=file:.*worker_process_summary\.json/u
+    );
+    assert.equal(
+      result.postflight.evidenceRefs.some((ref) =>
+        ref.includes("worker_process_started_context.json")
+      ),
+      true
+    );
+    assert.equal(
+      result.postflight.evidenceRefs.some((ref) =>
+        ref.includes("worker_process_summary.json")
+      ),
+      true
+    );
+    assert.equal(result.manifest.productMaterialization.executionShards.length, 2);
+    assert.equal(result.manifest.retryContext.priorGapDossiers.length, 1);
+    assert.deepStrictEqual(result.gapDossier.nextLawfulActions, ["triage_gap"]);
+  } finally {
+    if (previousTimeout === undefined) {
+      delete process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = previousTimeout;
+    }
+    if (previousHeartbeat === undefined) {
+      delete process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = previousHeartbeat;
+    }
+  }
 });
 
 test("T-100 test-module postflight rejects tests that sbt test cannot discover", () => {
@@ -846,15 +1840,18 @@ test("T-066 installed operator rejects shallow source through assurance fold bef
     ),
     true
   );
-  assert.deepStrictEqual(result.emittedRuntimeEventKinds, [
+  assert.deepStrictEqual(result.emittedRuntimeEventKinds.slice(0, 4), [
+    "basis_admitted",
     "graph_call_opened",
     "frame_opened",
-    "vector_traversal_planned",
-    "vector_evaluated",
-    "retry_repair_planned",
-    "retry_attempt_opened",
-    "continuation_terminated",
-    "continuation_reopened"
+    "vector_traversal_planned"
+  ]);
+  assert.equal(result.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
+  assert.equal(result.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
+  assert.equal(result.emittedRuntimeEventKinds.includes("retry_progress_recorded"), true);
+  assert.deepStrictEqual(result.emittedRuntimeEventKinds.slice(-2), [
+    "retry_attempt_stopped",
+    "terminal_reached"
   ]);
   assert.equal(result.gapDossier.status, "open");
   assert.equal(
@@ -949,9 +1946,10 @@ test("T-066 installed data_mapper successor materializes source and behavioral t
   const target = "graph_function:bootstrap_release_self_test";
   let codeResult = null;
   let testResult = null;
+  let testExecutionResult = null;
   let testRunResult = null;
 
-  for (let guard = 0; guard < 20; guard += 1) {
+  for (let guard = 0; guard < 24; guard += 1) {
     const gaps = runInstalledOddSdlc(commandPath, ["gaps", "--workspace", workspace], workspace);
     const currentEdge = gaps.projection.currentEdge;
     if (currentEdge === null || currentEdge === "qualify_testcase_authority") {
@@ -990,6 +1988,9 @@ test("T-066 installed data_mapper successor materializes source and behavioral t
     if (currentEdge === "derive_test_module_surface") {
       testResult = start;
     }
+    if (currentEdge === "derive_test_execution_result_surface") {
+      testExecutionResult = start;
+    }
     if (currentEdge === "derive_test_run_archive_surface") {
       testRunResult = start;
       break;
@@ -998,12 +1999,24 @@ test("T-066 installed data_mapper successor materializes source and behavioral t
 
   assert(codeResult, "derive_code_surface did not run");
   assert(testResult, "derive_test_module_surface did not run");
+  assert(testExecutionResult, "derive_test_execution_result_surface did not run");
   assert(testRunResult, "derive_test_run_archive_surface did not run");
   assert.equal(codeResult.assuranceSatisfaction.status, "close_allowed");
   assert.equal(testResult.assuranceSatisfaction.status, "close_allowed");
+  assert.equal(testExecutionResult.postflight.status, "passed");
   assert.equal(testRunResult.postflight.status, "passed");
-  assert.equal(testRunResult.workerReport.executionEvidence.status, "succeeded");
-  assert.equal(testRunResult.workerReport.executionEvidence.testsObserved, 1);
+  assert.equal(
+    testExecutionResult.workerReport.executionEvidence.status,
+    "succeeded"
+  );
+  assert.equal(
+    testExecutionResult.workerReport.executionEvidence.testsObserved,
+    testExecutionResult.workerReport.executionEvidence.shardEvidence.length
+  );
+  assert(
+    testExecutionResult.workerReport.executionEvidence.shardEvidence.length >= 2
+  );
+  assert.equal(testRunResult.workerReport.executionEvidence, null);
   assert.equal(
     existsSync(
       path.join(

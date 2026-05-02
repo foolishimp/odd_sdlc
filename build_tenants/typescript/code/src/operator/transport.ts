@@ -1,16 +1,12 @@
 // Implements: REQ-F-ODDSDLC-052
 // Implements: REQ-F-ODDSDLC-053
 
-import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import { performance } from "node:perf_hooks";
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import type {
   SdlcWorkerHandoffManifest,
-  SdlcWorkerRunResult,
   SdlcWorkerTransportContract
 } from "./carriers.js";
-import { stableOperatorJson } from "./handoff.js";
 
 function transportAgentKey(command: string): string {
   const name = basename(command).toLowerCase();
@@ -80,81 +76,50 @@ function codexArgs(input: {
   ]);
 }
 
-function argsForWorker(input: {
+function claudeArgs(input: {
+  readonly workspaceRoot: string;
+}): readonly string[] {
+  return Object.freeze([
+    "-p",
+    "--add-dir",
+    input.workspaceRoot,
+    "--permission-mode",
+    "bypassPermissions",
+    "--output-format",
+    "text"
+  ]);
+}
+
+export function argsForWorker(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly manifestPath: string;
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly promptPath: string;
   readonly outputLastMessagePath: string;
 }): readonly string[] {
-  if (input.transport.agentKey === "codex" && input.transport.args.length === 0) {
-    return codexArgs({
-      workspaceRoot: input.manifest.workspaceRoot,
-      promptPath: input.promptPath,
-      outputLastMessagePath: input.outputLastMessagePath
-    });
+  if (input.transport.args.length === 0) {
+    if (input.transport.agentKey === "codex") {
+      return codexArgs({
+        workspaceRoot: input.manifest.workspaceRoot,
+        promptPath: input.promptPath,
+        outputLastMessagePath: input.outputLastMessagePath
+      });
+    }
+    if (input.transport.agentKey === "claude") {
+      return claudeArgs({
+        workspaceRoot: input.manifest.workspaceRoot
+      });
+    }
   }
   return Object.freeze([...input.transport.args, input.manifestPath]);
 }
 
-export function invokeWorkerTransport(input: {
+export function stdinForWorker(input: {
   readonly transport: SdlcWorkerTransportContract;
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly manifestPath: string;
   readonly promptPath: string;
-  readonly timeoutMs?: number;
-}): SdlcWorkerRunResult {
-  mkdirSync(input.manifest.archiveRoot, { recursive: true });
-  const stdoutPath = join(input.manifest.archiveRoot, "worker_stdout.log");
-  const stderrPath = join(input.manifest.archiveRoot, "worker_stderr.log");
-  const outputLastMessagePath =
-    input.transport.agentKey === "codex"
-      ? join(input.manifest.archiveRoot, "worker_last_message.txt")
-      : null;
-  const args = argsForWorker({
-    transport: input.transport,
-    manifestPath: input.manifestPath,
-    manifest: input.manifest,
-    promptPath: input.promptPath,
-    outputLastMessagePath: outputLastMessagePath ?? ""
-  });
-  const startedAt = performance.now();
-  const run = spawnSync(input.transport.command, args, {
-    cwd: input.manifest.workspaceRoot,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ODD_SDLC_OPERATOR_MANIFEST: input.manifestPath,
-      ODD_SDLC_OPERATOR_REPORT: input.manifest.reportFile,
-      ODD_SDLC_OPERATOR_OUTPUT: input.manifest.outputFile,
-      ODD_SDLC_OPERATOR_MATERIALIZATION_ROOT:
-        input.manifest.productMaterialization.tenantRoot,
-      ODD_SDLC_OPERATOR_MATERIALIZATION_MANIFEST:
-        input.manifest.productMaterialization.manifestFile
-    },
-    maxBuffer: 1024 * 1024 * 20,
-    timeout: input.timeoutMs ?? 1000 * 60 * 10
-  });
-  const elapsedMs = performance.now() - startedAt;
-  writeFileSync(stdoutPath, run.stdout, "utf8");
-  writeFileSync(stderrPath, run.stderr, "utf8");
-  const result: SdlcWorkerRunResult = Object.freeze({
-    kind: "sdlc_worker_run_result",
-    command: input.transport.command,
-    args,
-    cwd: input.manifest.workspaceRoot,
-    status: run.status,
-    signal: run.signal,
-    elapsedMs,
-    stdoutPath,
-    stderrPath,
-    outputLastMessagePath,
-    error: run.error?.message ?? null
-  });
-  writeFileSync(
-    join(input.manifest.archiveRoot, "worker_run.json"),
-    stableOperatorJson(result),
-    "utf8"
-  );
-  return result;
+}): string | null {
+  if (input.transport.args.length === 0 && input.transport.agentKey === "claude") {
+    return readFileSync(input.promptPath, "utf8");
+  }
+  return null;
 }

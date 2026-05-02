@@ -15,12 +15,21 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  admitSdlcProjectConstraints,
+  constructWorkerProcessFailurePostflight,
+  constructSdlcGtlModule,
   constructorResultFromWorkerOutput,
   defaultOperationForTarget,
+  deriveSdlcConformProjectProfileFromWorkspace,
+  deriveSdlcWorkspaceIngressReport,
   deriveWorkerHandoffManifest,
+  executeInstalledOperatorStart,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   minimalSdlcHookInvocationForContract,
+  projectSdlcQueryDomain,
+  projectSdlcWorkerAttachment,
+  publicStartOnce,
   readWorkerResultReport,
   runOddSdlcCliAsync,
   runSdlcHookTurn,
@@ -105,6 +114,8 @@ function writeWorkerScript(workspaceRoot) {
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "process.stdout.write('t064 stdout before report\\n');",
+      "process.stderr.write('t064 stderr before report\\n');",
       "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'This is a governed first-slice intent surface.'].join('\\n');",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
@@ -133,6 +144,37 @@ function writeSecondEdgeFailingWorkerScript(workspaceRoot) {
       "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile], blockingReasons: [] }));",
       "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated governed autonomous-loop output', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
+function writeTransformOnlyWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t064_transform_only_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import { dirname } from 'node:path';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'Implements: REQ-T064-001', '', 'This worker performs only F_P.transform and leaves evaluation to the framework.'].join('\\n');",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
+function writeSilentWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t064_silent_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "setTimeout(() => {",
+      "  process.exit(0);",
+      "}, 10000);"
     ].join("\n"),
     "utf8"
   );
@@ -172,25 +214,113 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.equal(start.status, "ok");
   assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
   assert.equal(start.payload.status, "worker_invoked");
-  assert.equal(start.payload.loop.stepCount, 1);
-  assert.equal(start.payload.loop.stoppedBy, "first_traversal");
+  assert.equal("loop" in start.payload, false);
   assert.equal(start.payload.workerRun.status, 0);
   assert.equal(start.payload.postflight.status, "passed");
   assert.equal(start.payload.hookOutcome.postflight.status, "passed");
-  assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds, [
+  assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds.slice(0, 4), [
+    "basis_admitted",
     "graph_call_opened",
     "frame_opened",
-    "vector_traversal_planned",
-    "assessed",
-    "assessed"
+    "vector_traversal_planned"
+  ]);
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("fp_dispatch_requested"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("actor_invocation_started"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("actor_process_started"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("actor_process_stream_observed"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("actor_process_exited"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("actor_invocation_closed"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("authority_snapshot_admitted"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("payload_observed"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("payload_validated"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("evidence_admitted"),
+    true
+  );
+  assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds.slice(-2), [
+    "vector_closed",
+    "terminal_reached"
   ]);
   assert.equal(existsSync(start.payload.workerReport.outputFile), true);
   assert.equal(existsSync(start.payload.archiveRoot), true);
+  assert.equal(
+    existsSync(path.join(start.payload.archiveRoot, "worker_process_started.json")),
+    true
+  );
+  assert.equal(
+    existsSync(path.join(start.payload.archiveRoot, "worker_process_events.jsonl")),
+    true
+  );
+  const startedContextPath = path.join(
+    start.payload.archiveRoot,
+    "worker_process_started_context.json"
+  );
+  assert.equal(existsSync(startedContextPath), true);
+  const startedContext = JSON.parse(readFileSync(startedContextPath, "utf8"));
+  assert.equal(startedContext.kind, "sdlc_worker_process_started_context");
+  assert.match(startedContext.manifestRef, /handoff_manifest\.json$/u);
+  assert.match(startedContext.promptRef, /worker_prompt\.md$/u);
+  assert.match(startedContext.reportRef, /worker_result_report\.json$/u);
+  assert.match(startedContext.outputRef, /intent_surface\.md$/u);
+  assert.equal(startedContext.pid > 0, true);
+  assert.equal(startedContext.timeoutMs > startedContext.inactivityTimeoutMs, true);
+  const processSummaryPath = path.join(
+    start.payload.archiveRoot,
+    "worker_process_summary.json"
+  );
+  assert.equal(existsSync(processSummaryPath), true);
+  const processSummary = JSON.parse(readFileSync(processSummaryPath, "utf8"));
+  assert.equal(processSummary.kind, "sdlc_worker_process_summary");
+  assert.match(processSummary.manifestRef, /handoff_manifest\.json$/u);
+  assert.match(processSummary.promptRef, /worker_prompt\.md$/u);
+  assert.match(processSummary.reportRef, /worker_result_report\.json$/u);
+  assert.match(processSummary.outputRef, /intent_surface\.md$/u);
+  assert.equal(processSummary.timeoutMs > processSummary.inactivityTimeoutMs, true);
+  assert.equal(processSummary.signalSequence.length, 0);
+  assert.match(
+    readFileSync(start.payload.workerRun.stdoutPath, "utf8"),
+    /t064 stdout before report/u
+  );
+  assert.match(
+    readFileSync(start.payload.workerRun.stderrPath, "utf8"),
+    /t064 stderr before report/u
+  );
+  assert.match(
+    readFileSync(path.join(start.payload.archiveRoot, "worker_process_events.jsonl"), "utf8"),
+    /actor_process_stream_observed/u
+  );
 
   const eventLog = path.join(workspace, ".ai-workspace/events/events.jsonl");
   assert.equal(existsSync(eventLog), true);
   const eventLines = readFileSync(eventLog, "utf8").trim().split(/\r?\n/u);
-  assert.equal(eventLines.length, 5);
+  assert.equal(eventLines.length, start.payload.emittedRuntimeEventKinds.length);
 
   const secondGaps = await runOddSdlcCliAsync([
     "gaps",
@@ -223,7 +353,237 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.equal(JSON.parse(json.stdout).kind, "odd_sdlc_cli_result");
 });
 
-test("T-092 installed start --until blocked loops over ABG truth until a real stop", async () => {
+test("B-078 silent worker inactivity is typed before the full process timeout", async () => {
+  const workspace = makeWorkspace();
+  const install = await installOddSdlcTypescript({
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-b078"
+  });
+  assert.equal(install.kind, "installed");
+  const workerScript = writeSilentWorkerScript(workspace);
+  const previousTimeout = process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+  const previousHeartbeat = process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
+  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "120";
+  process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
+  try {
+    const start = await runOddSdlcCliAsync([
+      "start",
+      "--workspace",
+      workspace,
+      "--target",
+      "graph_function:bootstrap_release_self_test",
+      "--until",
+      "first_traversal",
+      "--worker",
+      `process://node?script=${encodeURIComponent(workerScript)}`
+    ]);
+
+    assert.equal(start.status, "ok");
+    assert.equal(start.payload.status, "worker_failed");
+    assert.equal(start.payload.workerRun.timedOut, true);
+    assert.equal(start.payload.workerRun.stdoutByteCount, 0);
+    assert.equal(start.payload.workerRun.stderrByteCount, 0);
+    assert.equal(
+      start.payload.postflight.blockingReasonCarriers[0].code,
+      "silent_worker_inactivity"
+    );
+    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 0);
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /sharpenedRetryAvailable=false/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /pid=\d+/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /inactivityTimeoutMs=120/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /heartbeatMs=20/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /lastHeartbeatElapsedMs=\d+/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /signalSequence=SIGTERM@\d+ms/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /processSummaryRef=file:.*worker_process_summary\.json/u
+    );
+    assert.deepStrictEqual(start.payload.gapDossier.nextLawfulActions, [
+      "triage_gap"
+    ]);
+    assert.equal(start.payload.gapDossier.retryEligible, false);
+    assert.match(
+      readFileSync(
+        path.join(start.payload.archiveRoot, "worker_process_events.jsonl"),
+        "utf8"
+      ),
+      /actor_process_timeout/u
+    );
+    assert.equal(
+      start.payload.postflight.evidenceRefs.some((ref) =>
+        ref.includes("worker_process_events.jsonl")
+      ),
+      true
+    );
+    assert.equal(
+      start.payload.postflight.evidenceRefs.some((ref) =>
+        ref.includes("worker_process_started_context.json")
+      ),
+      true
+    );
+    assert.equal(
+      start.payload.postflight.evidenceRefs.some((ref) =>
+        ref.includes("worker_process_summary.json")
+      ),
+      true
+    );
+    const processSummary = JSON.parse(
+      readFileSync(
+        path.join(start.payload.archiveRoot, "worker_process_summary.json"),
+        "utf8"
+      )
+    );
+    assert.equal(processSummary.kind, "sdlc_worker_process_summary");
+    assert.equal(processSummary.inactivityTimeoutMs, 120);
+    assert.equal(processSummary.heartbeatMs, 20);
+    assert.equal(processSummary.pid > 0, true);
+    assert.equal(processSummary.lastHeartbeatElapsedMs >= 0, true);
+    assert.deepStrictEqual(
+      processSummary.signalSequence.map((entry) => entry.signal),
+      ["SIGTERM"]
+    );
+    assert.match(processSummary.manifestRef, /handoff_manifest\.json$/u);
+    assert.match(processSummary.promptRef, /worker_prompt\.md$/u);
+    assert.match(processSummary.reportRef, /worker_result_report\.json$/u);
+    assert.match(processSummary.outputRef, /intent_surface\.md$/u);
+  } finally {
+    if (previousTimeout === undefined) {
+      delete process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = previousTimeout;
+    }
+    if (previousHeartbeat === undefined) {
+      delete process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = previousHeartbeat;
+    }
+  }
+});
+
+test("B-078 process-summary admission defects fail closed as typed evidence blockers", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_intent_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "b078-process-summary-admission"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  writeFileSync(stdoutPath, "", "utf8");
+  writeFileSync(stderrPath, "", "utf8");
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "node",
+    args: [],
+    cwd: workspace,
+    status: 143,
+    signal: null,
+    elapsedMs: 120,
+    timedOut: true,
+    stdoutByteCount: 0,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null
+  };
+
+  const missing = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+  assert.equal(
+    missing.blockingReasonCarriers[0].code,
+    "worker_process_summary_missing"
+  );
+  assert.equal(
+    missing.blockingReasons.some((reason) =>
+      reason.startsWith("silent_worker_inactivity")
+    ),
+    false
+  );
+
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_process_summary.json"),
+    "{\"kind\":\"wrong\"}\n",
+    "utf8"
+  );
+  const invalid = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+  assert.equal(
+    invalid.blockingReasonCarriers[0].code,
+    "worker_process_summary_invalid"
+  );
+  assert.match(
+    invalid.blockingReasonCarriers[0].detail,
+    /processSummaryRef=file:.*worker_process_summary\.json/u
+  );
+});
+
+test("T-064 operator observes F_P.transform output and generates report", async () => {
+  const workspace = makeWorkspace();
+  const install = await installOddSdlcTypescript({
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t064-transform-only"
+  });
+  assert.equal(install.kind, "installed");
+  const workerScript = writeTransformOnlyWorkerScript(workspace);
+
+  const start = await runOddSdlcCliAsync([
+    "start",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:bootstrap_release_self_test",
+    "--until",
+    "first_traversal",
+    "--worker",
+    `process://node?script=${encodeURIComponent(workerScript)}`
+  ]);
+
+  assert.equal(start.status, "ok");
+  assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(start.payload.status, "worker_invoked");
+  assert.equal(start.payload.workerRun.status, 0);
+  assert.equal(start.payload.workerReport.kind, "odd_sdlc.worker_result_report");
+  assert.match(start.payload.workerReport.summary, /framework-generated/u);
+  assert.equal(start.payload.postflight.status, "passed");
+  assert.equal(
+    existsSync(path.join(start.payload.archiveRoot, "post_transform_observation.json")),
+    true
+  );
+});
+
+test("T-092 installed start --until blocked delegates iteration to ABG until a real stop", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -249,12 +609,36 @@ test("T-092 installed start --until blocked loops over ABG truth until a real st
   assert.equal(start.status, "ok");
   assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
   assert.equal(start.payload.status, "worker_failed");
-  assert.equal(start.payload.loop.stepCount, 2);
-  assert.equal(start.payload.loop.stoppedBy, "worker_failed");
-  assert.deepStrictEqual(
-    start.payload.loop.steps.map((step) => step.currentEdge),
-    ["derive_product_surface", "derive_product_surface"]
+  assert.equal("loop" in start.payload, false);
+  assert.equal(start.payload.summary.currentEdge, "derive_product_surface");
+  assert.equal(start.payload.postflight.status, "blocked");
+  assert.equal(start.payload.gapDossier.status, "open");
+  assert.equal(
+    start.payload.postflight.evidenceRefs.some((ref) =>
+      ref.includes("worker_process_started.json")
+    ),
+    true
   );
+  assert.equal(
+    start.payload.postflight.evidenceRefs.some((ref) =>
+      ref.includes("worker_process_events.jsonl")
+    ),
+    true
+  );
+  assert.equal(
+    start.payload.gapDossier.evidenceRefs.some((ref) =>
+      ref.includes("worker_process_events.jsonl")
+    ),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("retry_repair_planned"),
+    true
+  );
+  assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds.slice(-2), [
+    "retry_attempt_stopped",
+    "terminal_reached"
+  ]);
 
   const gaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
   assert.equal(gaps.status, "ok");
@@ -280,8 +664,8 @@ test("T-092 installed start --until blocked loops over ABG truth until a real st
     }
   );
   assert.equal(compact.status, 0, compact.stderr);
-  assert.match(compact.stdout, /loop_steps: 1/u);
-  assert.match(compact.stdout, /loop_stop: first_traversal/u);
+  assert.doesNotMatch(compact.stdout, /loop_steps:/u);
+  assert.doesNotMatch(compact.stdout, /loop_stop:/u);
 });
 
 test("T-067 installed operator preserves non-generate operation type for qualification edges", () => {
@@ -348,4 +732,79 @@ test("T-067 installed operator preserves non-generate operation type for qualifi
   assert.equal(constructorResult.operationType, "qualify");
   assert.equal(outcome.workReport?.operationType, "qualify");
   assert.equal(outcome.postflight?.status, "passed");
+});
+
+test("T-106 installed operator uses admitted conformed profile after workspace drift", async () => {
+  const workspace = makeWorkspace();
+  const module = constructSdlcGtlModule();
+  const ingressReport = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: `file://${workspace}`,
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t064_fixture",
+      activeTenant: "typescript",
+      selectedOutputRoot: "build_tenants/typescript",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: []
+    }),
+    sourceInputs: []
+  });
+  const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject =
+    deriveSdlcConformProjectProfileFromWorkspace(workspace);
+  assert.equal(conformedProject.activeTenant, "typescript");
+  const start = publicStartOnce({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot: workspace,
+      target: {
+        kind: "graph_function",
+        handle: "bootstrap_release_self_test"
+      },
+      until: "first_traversal",
+      defaultRegime: "F_P"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: "process://node"
+    })
+  });
+  assert.equal(start.kind, "sdlc_public_start_projected");
+
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: drifted_fixture",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const workerScript = writeTransformOnlyWorkerScript(workspace);
+  const result = await executeInstalledOperatorStart({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
+    replayEvents: []
+  });
+
+  assert.notEqual(result.status, "worker_failed");
+  assert.notEqual(result.manifest, null);
+  assert.equal(result.manifest.conformedProject.activeTenant, "typescript");
+  assert.equal(
+    result.manifest.productMaterialization.tenantRoot.endsWith(
+      "build_tenants/typescript"
+    ),
+    true
+  );
 });

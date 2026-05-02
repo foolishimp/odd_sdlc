@@ -219,3 +219,28 @@ test("T-091 postflight admits anchored output evidence for requirement coverage"
 
   assert.equal(postflight.status, "passed");
 });
+
+test("T-091 postflight admits generated asset ref as output coverage evidence", () => {
+  const manifest = manifestFor(workspaceWithImportedRequirement());
+  const outputRef = `asset://${manifest.targetAssetType}@${path
+    .relative(manifest.workspaceRoot, manifest.outputFile)
+    .split(path.sep)
+    .join("/")}#requirement-req-t091-001`;
+  const report = reportFor(
+    manifest,
+    manifest.traversalObligationContext.obligations.map((obligation) => ({
+      kind: "sdlc_worker_obligation_assessment",
+      obligationId: obligation.obligationId,
+      fulfillmentStatus: "fulfilled",
+      evidenceRefs:
+        obligation.obligationKind === "requirement"
+          ? [outputRef]
+          : [manifest.outputFile],
+      blockingReasons: []
+    }))
+  );
+
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(postflight.status, "passed");
+});

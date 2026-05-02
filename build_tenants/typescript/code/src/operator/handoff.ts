@@ -32,6 +32,7 @@ import {
 } from "../shared/validation.js";
 import {
   admitSdlcBlockingReason,
+  canonicalSdlcPriorGapReasonCode,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
   sdlcBlockingReasonFromLegacy,
@@ -59,10 +60,24 @@ import type {
   SdlcRetrievalHint,
   SdlcWorkerHandoffManifest,
   SdlcWorkerExecutionEvidence,
+  SdlcWorkerExecutionShardEvidence,
   SdlcWorkerObligationAssessment,
   SdlcWorkerRetryContext,
   SdlcWorkerResultReport
 } from "./carriers.js";
+
+export interface SdlcObservedProductFileSnapshot {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+  readonly digest: string;
+  readonly byteCount: number;
+}
+
+export interface SdlcProductMaterializationSnapshot {
+  readonly kind: "sdlc_product_materialization_snapshot";
+  readonly tenantRoot: string;
+  readonly files: readonly SdlcObservedProductFileSnapshot[];
+}
 
 const REPORT_FIELDS = Object.freeze([
   "kind",
@@ -75,6 +90,7 @@ const REPORT_FIELDS = Object.freeze([
   "unresolvedReasons",
   "materializedFiles",
   "executionEvidence",
+  "executionEvidenceErrors",
   "obligationAssessments"
 ] as const);
 
@@ -165,6 +181,27 @@ function materializationRolesForTarget(
   return Object.freeze([]);
 }
 
+function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
+  return targetAssetType === "test_execution_result_surface";
+}
+
+function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
+  return (
+    targetAssetType === "test_module_surface" ||
+    targetAdmitsTestExecutionEvidence(targetAssetType)
+  );
+}
+
+function targetRequiresSourceAssetObligations(input: {
+  readonly targetAssetType: string;
+  readonly materializationRequired: boolean;
+}): boolean {
+  return (
+    input.materializationRequired ||
+    input.targetAssetType === "test_run_archive_surface"
+  );
+}
+
 function productMaterializationContract(input: {
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
@@ -184,23 +221,136 @@ function productMaterializationContract(input: {
     input.projectConstraints?.selectedOutputRoot ??
     `build_tenants/${activeTenant}`;
   const requiredRoles = materializationRolesForTarget(input.targetAssetType);
+  const declaredModuleNames = Object.freeze([
+    ...(input.conformedProject?.declaredModuleNames ?? [])
+  ]);
+  const buildExecutionContract =
+    input.conformedProject?.buildExecutionContract ?? "undeclared";
+  const testExecutionContract =
+    input.conformedProject?.testExecutionContract ?? "undeclared";
+  const tenantRoot = resolve(input.workspaceRoot, selectedOutputRoot);
   return Object.freeze({
     kind: "sdlc_product_materialization_contract",
     required: requiredRoles.length > 0,
     activeTenant,
     selectedOutputRoot,
-    tenantRoot: resolve(input.workspaceRoot, selectedOutputRoot),
+    tenantRoot,
     relativePathBasis: "tenant_root",
-    declaredModuleNames: Object.freeze([
-      ...(input.conformedProject?.declaredModuleNames ?? [])
-    ]),
-    buildExecutionContract:
-      input.conformedProject?.buildExecutionContract ?? "undeclared",
-    testExecutionContract:
-      input.conformedProject?.testExecutionContract ?? "undeclared",
+    declaredModuleNames,
+    buildExecutionContract,
+    testExecutionContract,
     manifestFile: join(input.archiveRoot, "product_materialization_manifest.json"),
-    requiredRoles
+    requiredRoles,
+    executionShards: executionShardsFor({
+      targetAssetType: input.targetAssetType,
+      tenantRoot,
+      declaredModuleNames,
+      testExecutionContract
+    })
   });
+}
+
+const DEFAULT_EXECUTION_SHARD_TIMEOUT_MS = 1000 * 60 * 30;
+const DEFAULT_EXECUTION_SHARD_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 10;
+
+function shardIdPart(input: string): string {
+  const normalized = input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "");
+  return normalized.length === 0 ? "unnamed" : normalized;
+}
+
+function sbtProjectSelector(input: string): string {
+  return input.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"');
+}
+
+function shellToken(input: string): string {
+  if (/^[A-Za-z0-9._/@:-]+$/u.test(input)) {
+    return input;
+  }
+  return `'${input.replace(/'/gu, "'\\''")}'`;
+}
+
+function executionShardCommand(input: {
+  readonly moduleName: string;
+  readonly testExecutionContract: string;
+}): string {
+  const contract = input.testExecutionContract.trim();
+  const moduleName = input.moduleName.trim();
+  if (
+    moduleName.length === 0 ||
+    moduleName === "full-suite" ||
+    contract.length === 0 ||
+    contract === "undeclared"
+  ) {
+    return contract;
+  }
+  if (/^sbt(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `sbt "${sbtProjectSelector(moduleName)}/test"`;
+  }
+  if (/^npm(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `npm test --workspace ${shellToken(moduleName)}`;
+  }
+  if (/^pnpm(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `pnpm --filter ${shellToken(moduleName)} test`;
+  }
+  if (/^yarn(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `yarn workspace ${shellToken(moduleName)} test`;
+  }
+  if (/^mvn(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `mvn -pl ${shellToken(moduleName)} test`;
+  }
+  if (/^(?:\.\/)?gradlew?(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
+    return `${contract.split(/\s+/u)[0]} :${moduleName.replace(/\//gu, ":")}:test`;
+  }
+  return contract;
+}
+
+function executionShardsFor(input: {
+  readonly targetAssetType: string;
+  readonly tenantRoot: string;
+  readonly declaredModuleNames: readonly string[];
+  readonly testExecutionContract: string;
+}): SdlcProductMaterializationContract["executionShards"] {
+  if (
+    input.targetAssetType !== "test_schedule_surface" &&
+    input.targetAssetType !== "test_execution_surface" &&
+    input.targetAssetType !== "test_execution_result_surface" &&
+    input.targetAssetType !== "test_run_archive_surface"
+  ) {
+    return Object.freeze([]);
+  }
+  const modules =
+    input.declaredModuleNames.length > 0
+      ? input.declaredModuleNames
+      : Object.freeze(["full-suite"]);
+  return Object.freeze(
+    modules.map((moduleName, index) =>
+      Object.freeze({
+        kind: "sdlc_execution_shard" as const,
+        shardId: `test-shard-${String(index + 1).padStart(2, "0")}-${shardIdPart(
+          moduleName
+        )}`,
+        lane: "test" as const,
+        moduleName,
+        command: executionShardCommand({
+          moduleName,
+          testExecutionContract: input.testExecutionContract
+        }),
+        workingDirectory: input.tenantRoot,
+        timeoutMs: DEFAULT_EXECUTION_SHARD_TIMEOUT_MS,
+        inactivityTimeoutMs: DEFAULT_EXECUTION_SHARD_INACTIVITY_TIMEOUT_MS,
+        expectedReportRefs: Object.freeze([
+          `artifact://odd-sdlc/test-execution/${shardIdPart(moduleName)}`
+        ]),
+        allowedByproductGlobs: Object.freeze(["target/**", ".bsp/**"]),
+        requiredEvidenceKind: "sdlc_worker_execution_evidence" as const,
+        retryPolicy: "same_shard_then_triage" as const
+      })
+    )
+  );
 }
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
@@ -231,6 +381,20 @@ function coverageRefAliases(ref: string): readonly string[] {
     }
     return Object.freeze([...aliases]);
   }
+}
+
+function assetCoverageRef(input: {
+  readonly workspaceRoot: string;
+  readonly targetAssetType: string;
+  readonly outputFile: string;
+}): string | null {
+  const relativePath = relative(input.workspaceRoot, input.outputFile);
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    return null;
+  }
+  return `asset://${input.targetAssetType}@${relativePath
+    .split(path.sep)
+    .join("/")}`;
 }
 
 function normalizeRequirementId(requirementId: string): string {
@@ -464,9 +628,16 @@ function trancheKeysFor(input: {
   }
   if (
     input.contract.targetAssetType === "test_module_surface" ||
-    input.contract.targetAssetType === "test_run_archive_surface"
+    targetAdmitsTestExecutionEvidence(input.contract.targetAssetType)
   ) {
     keys.push("qualification:tranche_execution");
+  }
+  if (input.materialization.executionShards.length > 0) {
+    keys.push(
+      ...input.materialization.executionShards.map(
+        (shard) => `execution_shard:${shard.shardId}`
+      )
+    );
   }
   return uniqueSorted(keys);
 }
@@ -612,6 +783,68 @@ function evaluatorObligations(contract: SdlcHookContract): readonly SdlcTraversa
   );
 }
 
+function priorGapReasonCodes(
+  retryContext: SdlcWorkerRetryContext
+): readonly string[] {
+  return uniqueSorted(
+    retryContext.priorGapDossiers.flatMap((dossier) =>
+      dossier.reasons.map((reason) =>
+        canonicalSdlcPriorGapReasonCode(reason.reason)
+      )
+    )
+  );
+}
+
+function priorGapDossierRefs(
+  retryContext: SdlcWorkerRetryContext
+): readonly string[] {
+  return uniqueSorted(
+    retryContext.priorGapDossiers.flatMap((dossier) => [
+      dossier.currentGapDossierRef,
+      ...dossier.evidenceRefs.filter(
+        (ref) => ref.endsWith("/gap_dossier.json") || ref.startsWith("proof://gap")
+      )
+    ])
+  );
+}
+
+function priorWorkerResultReportRefsForSourceAsset(input: {
+  readonly workspaceRoot: string;
+  readonly assetType: string;
+}): readonly string[] {
+  const operatorRunsRoot = join(
+    input.workspaceRoot,
+    ".ai-workspace",
+    "runtime",
+    "odd_sdlc",
+    "operator-runs"
+  );
+  if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  const refs: string[] = [];
+  for (const runId of readdirSync(operatorRunsRoot)) {
+    const reportPath = join(operatorRunsRoot, runId, "worker_result_report.json");
+    if (!existsSync(reportPath) || !statSync(reportPath).isFile()) {
+      continue;
+    }
+    try {
+      const payload: unknown = JSON.parse(readFileSync(reportPath, "utf8"));
+      const record = objectRecord(payload);
+      if (
+        record !== null &&
+        record["kind"] === "odd_sdlc.worker_result_report" &&
+        record["targetAssetType"] === input.assetType
+      ) {
+        refs.push(pathToFileURL(reportPath).href);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return Object.freeze(uniqueSorted(refs));
+}
+
 function deriveTraversalObligationContext(input: {
   readonly workspaceRoot: string;
   readonly contract: SdlcHookContract;
@@ -625,10 +858,9 @@ function deriveTraversalObligationContext(input: {
   const runtimeContextRefs = runtimeContextRefsFor(input.workspaceRoot);
   const priorEdgeRefs = uniqueSorted([
     ...input.retryContext.retryAttemptRefs.map((ref) => ref.manifestId),
-    ...input.retryContext.priorGapDossiers.map(
-      (dossier) => dossier.currentGapDossierRef
-    )
+    ...priorGapDossierRefs(input.retryContext)
   ]);
+  const priorGapCount = priorGapReasonCodes(input.retryContext).length;
   const obligations: SdlcTraversalObligation[] = [];
   obligations.push(
     Object.freeze({
@@ -649,22 +881,38 @@ function deriveTraversalObligationContext(input: {
       authorityRefs
     })
   );
-  if (input.materialization.required) {
+  if (
+    targetRequiresSourceAssetObligations({
+      targetAssetType: input.contract.targetAssetType,
+      materializationRequired: input.materialization.required
+    })
+  ) {
     obligations.push(
-      ...input.contract.sourceAssetTypes.map((assetType) =>
-        Object.freeze({
+      ...input.contract.sourceAssetTypes.map((assetType) => {
+        const sourceRefs = uniqueSorted([
+          `asset-type://${assetType}`,
+          ...priorWorkerResultReportRefsForSourceAsset({
+            workspaceRoot: input.workspaceRoot,
+            assetType
+          })
+        ]);
+        return Object.freeze({
           kind: "sdlc_traversal_obligation" as const,
           obligationId: `source_asset:${assetType}`,
           obligationKind: "source_asset" as const,
           summary: `Use admitted source asset type ${assetType}.`,
-          evidenceRefs: Object.freeze([`asset-type://${assetType}`]),
+          evidenceRefs: Object.freeze(sourceRefs),
           payload: structuralObligationPayload({
-            sourceRefs: Object.freeze([`asset-type://${assetType}`]),
+            sourceRefs: Object.freeze(sourceRefs),
             coverageExpectation:
               "Worker output must preserve the declared source asset contribution."
           })
-        })
-      ),
+        });
+      })
+    );
+  }
+  if (input.materialization.required) {
+    obligations.push(
       ...input.materialization.declaredModuleNames.map((moduleName) =>
         Object.freeze({
           kind: "sdlc_traversal_obligation" as const,
@@ -681,29 +929,8 @@ function deriveTraversalObligationContext(input: {
       )
     );
   }
-  obligations.push(
-    ...input.retryContext.priorGapDossiers.flatMap((dossier) =>
-      dossier.reasons.map((reason) =>
-        Object.freeze({
-          kind: "sdlc_traversal_obligation" as const,
-          obligationId: `prior_gap:${reason.reason}`,
-          obligationKind: "prior_gap" as const,
-          summary: `Close or carry prior gap ${reason.reason}.`,
-          evidenceRefs: Object.freeze([dossier.currentGapDossierRef]),
-          payload: structuralObligationPayload({
-            sourceRefs: Object.freeze([dossier.currentGapDossierRef]),
-            coverageExpectation:
-              "Worker output must close this prior gap or carry it forward as a typed residual gap."
-          })
-        })
-      )
-    )
-  );
   const requirementCount = obligations.filter(
     (obligation) => obligation.obligationKind === "requirement"
-  ).length;
-  const priorGapCount = obligations.filter(
-    (obligation) => obligation.obligationKind === "prior_gap"
   ).length;
   const authorityIndex = authorityIndexFor(authorityRefs);
   const trancheKeys = trancheKeysFor({
@@ -772,9 +999,7 @@ function constructTraversalIntentPackage(input: {
     retryAttemptRefs: Object.freeze(
       input.retryContext.retryAttemptRefs.map((ref) => ref.manifestId)
     ),
-    priorGapDossierRefs: Object.freeze(
-      input.retryContext.priorGapDossiers.map((dossier) => dossier.currentGapDossierRef)
-    ),
+    priorGapDossierRefs: priorGapDossierRefs(input.retryContext),
     obligationIds: Object.freeze(
       input.obligationContext.obligations.map((obligation) => obligation.obligationId)
     ),
@@ -950,7 +1175,7 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
   if (!manifest.productMaterialization.required) {
     return [
       "Product materialization is not required for this edge.",
-      "Set materializedFiles to an empty array and do not write product source/test files."
+      "Do not write product source/test files for this edge."
     ].join("\n");
   }
   const lines = [
@@ -967,12 +1192,11 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
     `Build execution contract: ${manifest.productMaterialization.buildExecutionContract}`,
     `Test execution contract: ${manifest.productMaterialization.testExecutionContract}`,
     `Required file roles: ${manifest.productMaterialization.requiredRoles.join(", ")}`,
+    `Execution shard count: ${manifest.productMaterialization.executionShards.length}`,
     "Write non-empty downstream product files under the tenant root.",
-    "Every materialized product file must be listed in materializedFiles with:",
-    "kind, role, relativePath, absolutePath, digest, byteCount.",
-    "Each materialized file kind MUST be \"sdlc_materialized_product_file\".",
+    "The framework observes changed product files after F_P.transform exits and builds the materialized file ledger.",
     "Use role source for implementation source and role test for developer tests.",
-    "The digest must be sha256:<hex> over the UTF-8 file content."
+    "Prefer source paths for implementation files and test paths for developer tests."
   ];
   if (manifest.targetAssetType === "test_module_surface") {
     lines.push(
@@ -982,6 +1206,39 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
     );
   }
   return lines.join("\n");
+}
+
+function executionEvidenceTransformPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  if (manifest.targetAssetType === "test_run_archive_surface") {
+    return [
+      "For test_run_archive_surface, do not run test commands and do not emit fresh sdlc_worker_execution_evidence.",
+      "Archive the admitted test_execution_result_surface from the input assets and cite its refs.",
+      "If admitted execution-result truth is absent or insufficient, carry a typed blocker instead of synthesizing release evidence."
+    ].join("\n");
+  }
+  if (!targetAdmitsTestExecutionEvidence(manifest.targetAssetType)) {
+    return "No execution-evidence transform section is required for this edge.";
+  }
+  return [
+    `For ${manifest.targetAssetType}, the transform artifact should contain bounded test execution evidence for framework admission.`,
+    "Do not write worker_result_report.json; the framework admits execution evidence from the transform output.",
+    `Consume manifest.productMaterialization.executionShards; do not collapse shard truth into one unscoped run when shards are present.`,
+    "When executionShards is non-empty, executionEvidence.shardEvidence MUST contain one sdlc_worker_execution_shard_evidence row for each shardId.",
+    "Each shardEvidence row MUST copy shardId and moduleName from the shard register and report counts/status for that shard.",
+    "executionEvidence.status MUST be one of: succeeded, failed, pending.",
+    "Use pending when execution did not run or external evidence is still unavailable.",
+    "Do not use status values such as not_run, skipped, unknown, or none.",
+    "executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null; never arrays or strings.",
+    "executionEvidence.lane MUST be exactly \"test\".",
+    `If the test execution contract is declared as ${JSON.stringify(
+      manifest.productMaterialization.testExecutionContract
+    )}, run that command from the tenant root when execution is available.`,
+    "When tests run, record succeeded or failed and report observed test counts.",
+    "When tests cannot run, record pending, keep counts at 0, and carry a blocker instead of claiming closure.",
+    "Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence."
+  ].join("\n");
 }
 
 function isSbtTestContract(testExecutionContract: string): boolean {
@@ -1007,29 +1264,6 @@ function looksLikeSbtDiscoverableTest(content: string): boolean {
   );
 }
 
-function executionEvidencePrompt(manifest: SdlcWorkerHandoffManifest): string {
-  const base = [
-    "executionEvidence.status MUST be one of: succeeded, failed, pending.",
-    "Use pending when execution did not run or external evidence is still unavailable.",
-    "Do not use status values such as not_run, skipped, unknown, or none.",
-    "executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null; never arrays or strings."
-  ];
-  if (manifest.targetAssetType !== "test_run_archive_surface") {
-    return base.join("\n");
-  }
-  return [
-    ...base,
-    "For test_run_archive_surface, the target outcome is governed test execution evidence.",
-    "For test_run_archive_surface, executionEvidence.lane MUST be exactly \"test\".",
-    `If the test execution contract is declared as ${JSON.stringify(
-      manifest.productMaterialization.testExecutionContract
-    )}, run that command from the tenant root when execution is available.`,
-    "When tests run, set status to succeeded or failed and report observed test counts.",
-    "When tests cannot run, set status to pending, keep counts at 0, and carry a blocking reason instead of claiming closure.",
-    "A document that says tests were not run is not closure evidence for this edge."
-  ].join("\n");
-}
-
 function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
   if (!manifest.targetAssetType.endsWith("_schedule_surface")) {
     return "No schedule-surface schema is required for this edge.";
@@ -1039,6 +1273,7 @@ function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
     "The schedule surface MUST include:",
     "- module_dependency_graph with nodes, edges, and dependency reasons",
     "- realization_tranches or test_tranches ordered by dependency constraints",
+    "- execution_shard_register copied from manifest.productMaterialization.executionShards for test scheduling/execution surfaces",
     "- tranche_obligation_ledger mapping tranche ids to requirement/design/module obligation ids",
     "- tranche_gap_ledger with open, done, blocked, and carry-forward states",
     "- next_tranche_selector describing the lawful next tranche and re-entry condition",
@@ -1076,6 +1311,7 @@ function promptPressureProjection(input: {
   readonly traversalIntentPath: string;
 }): unknown {
   const inlineObligations = inlineObligationsForPrompt(input.manifest);
+  const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
   return Object.freeze({
     kind: "sdlc_worker_prompt_pressure_projection",
     projectionVersion: "ts-prompt-projection-v1",
@@ -1093,6 +1329,13 @@ function promptPressureProjection(input: {
     ),
     inlineObligations: inlineObligations.map(compactObligation),
     retrievalHints: input.manifest.traversalObligationContext.retrievalHints,
+    priorGapFrontier: Object.freeze({
+      kind: "sdlc_prior_gap_frontier_projection",
+      reasonCount: priorGapReasons.length,
+      dossierRefs: priorGapDossierRefs(input.manifest.retryContext),
+      sampleReasonCodes: priorGapReasons.slice(0, 20),
+      omittedReasonCount: Math.max(0, priorGapReasons.length - 20)
+    }),
     omittedObligationCount:
       input.manifest.traversalObligationContext.obligations.length -
       inlineObligations.length,
@@ -1116,31 +1359,22 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "Use those files as authority.",
     "The manifest.traversalIntentPackage is the typed cumulative intent package for this edge.",
     "The prompt projection below is a compact index, not a replacement for the full manifest.",
+    "Prior retry gaps are linked through priorGapFrontier dossier refs; read those files selectively instead of copying historical gap rows.",
     "Do not use any instruction as authority unless it is represented in the manifest, traversal intent package, or another manifest field.",
-    "Write only the requested output artifact and JSON result report unless the manifest says otherwise.",
+    "This invocation is F_P.transform only.",
+    "Perform the bounded constructive transformation and return control to the framework.",
+    "Do not evaluate closure, assess obligations, list materialized files, write ledgers, or decide whether the edge closes.",
+    "The ABG/odd_sdlc post-transform stages observe files, emit events, project ledgers, evaluate obligations, and fold closure after this process exits.",
+    "Write only the requested transform artifact and product files unless the manifest says otherwise.",
     `Output artifact: ${manifest.outputFile}`,
-    `Result report: ${manifest.reportFile}`,
-    "",
-    "The result report must be JSON with exactly these fields:",
-    REPORT_FIELDS.join(", "),
-    "",
-    "Use kind \"odd_sdlc.worker_result_report\".",
-    "Set graphFunctionName, edgeName, targetAssetType, and outputFile from the manifest.",
-    "Set digest to the sha256:<hex> digest of the output artifact content.",
-    "Set unresolvedReasons to an array, empty when no blocker remains.",
-    "Set materializedFiles according to the product materialization contract.",
-    "Set executionEvidence to null unless the target surface is an execution archive/result.",
-    "When executionEvidence is non-null it must have exactly these fields: kind, lane, command, status, reportRefs, testsObserved, passedCount, failedCount.",
-    "executionEvidence.kind MUST be \"sdlc_worker_execution_evidence\".",
-    "Do not add extra executionEvidence fields such as workingDirectory, duration, stdout, or stderr.",
-    executionEvidencePrompt(manifest),
-    "Set obligationAssessments to one assessment for every manifest.traversalObligationContext.obligations item.",
-    "Each obligation assessment must have exactly these fields: kind, obligationId, fulfillmentStatus, evidenceRefs, blockingReasons.",
-    "obligation assessment kind MUST be \"sdlc_worker_obligation_assessment\".",
-    "fulfillmentStatus MUST be one of fulfilled, partial, blocked, unassessed.",
+    `Framework-generated result report path: ${manifest.reportFile}`,
+    "Do not write the result report. The framework writes it after observing this transform.",
+    "If you cannot complete the requested transformation in this turn, write the best bounded transform artifact you can, leave remaining work in that artifact, and exit.",
     "Use conformedProject as the generic project profile. Do not infer product identity from this prompt's examples.",
     "",
     productMaterializationPrompt(manifest),
+    "",
+    executionEvidenceTransformPrompt(manifest),
     "",
     scheduleSurfacePrompt(manifest),
     "",
@@ -1238,12 +1472,31 @@ function parseNullableNonNegativeInteger(input: unknown, label: string): number 
   return parseNonNegativeInteger(input, label);
 }
 
-function admitWorkerExecutionEvidence(
+function parseOptionalArray<T>(
+  input: unknown,
+  label: string,
+  parseItem: (item: unknown, itemLabel: string) => T
+): readonly T[] {
+  if (input === undefined) {
+    return Object.freeze([]);
+  }
+  return parseArray(input, label, parseItem);
+}
+
+function executionEvidenceStatus(input: unknown, label: string) {
+  return input === "not_run"
+    ? "pending"
+    : parseEnumValue(input, label, ["succeeded", "failed", "pending"]);
+}
+
+function admitWorkerExecutionShardEvidence(
   input: unknown,
   label: string
-): SdlcWorkerExecutionEvidence {
+): SdlcWorkerExecutionShardEvidence {
   const record = parseClosedRecord(input, label, [
     "kind",
+    "shardId",
+    "moduleName",
     "lane",
     "command",
     "status",
@@ -1253,21 +1506,16 @@ function admitWorkerExecutionEvidence(
     "failedCount"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_worker_execution_evidence") {
-    throw new TypeError(`${label}.kind: unexpected execution evidence kind`);
+  if (kind !== "sdlc_worker_execution_shard_evidence") {
+    throw new TypeError(`${label}.kind: unexpected execution shard evidence kind`);
   }
   return Object.freeze({
-    kind: "sdlc_worker_execution_evidence" as const,
-    lane: parseEnumValue(record["lane"], `${label}.lane`, ["build", "test"]),
+    kind: "sdlc_worker_execution_shard_evidence" as const,
+    shardId: parseNonEmptyString(record["shardId"], `${label}.shardId`),
+    moduleName: parseNonEmptyString(record["moduleName"], `${label}.moduleName`),
+    lane: parseEnumValue(record["lane"], `${label}.lane`, ["test"]),
     command: parseNonEmptyString(record["command"], `${label}.command`),
-    status:
-      record["status"] === "not_run"
-        ? "pending"
-        : parseEnumValue(record["status"], `${label}.status`, [
-            "succeeded",
-            "failed",
-            "pending"
-          ]),
+    status: executionEvidenceStatus(record["status"], `${label}.status`),
     reportRefs: parseStringList(record["reportRefs"], `${label}.reportRefs`),
     testsObserved: parseNullableNonNegativeInteger(
       record["testsObserved"],
@@ -1280,6 +1528,51 @@ function admitWorkerExecutionEvidence(
     failedCount: parseNullableNonNegativeInteger(
       record["failedCount"],
       `${label}.failedCount`
+    )
+  });
+}
+
+function admitWorkerExecutionEvidence(
+  input: unknown,
+  label: string
+): SdlcWorkerExecutionEvidence {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "lane",
+    "command",
+    "status",
+    "reportRefs",
+    "testsObserved",
+    "passedCount",
+    "failedCount",
+    "shardEvidence"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_worker_execution_evidence") {
+    throw new TypeError(`${label}.kind: unexpected execution evidence kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_execution_evidence" as const,
+    lane: parseEnumValue(record["lane"], `${label}.lane`, ["build", "test"]),
+    command: parseNonEmptyString(record["command"], `${label}.command`),
+    status: executionEvidenceStatus(record["status"], `${label}.status`),
+    reportRefs: parseStringList(record["reportRefs"], `${label}.reportRefs`),
+    testsObserved: parseNullableNonNegativeInteger(
+      record["testsObserved"],
+      `${label}.testsObserved`
+    ),
+    passedCount: parseNullableNonNegativeInteger(
+      record["passedCount"],
+      `${label}.passedCount`
+    ),
+    failedCount: parseNullableNonNegativeInteger(
+      record["failedCount"],
+      `${label}.failedCount`
+    ),
+    shardEvidence: parseOptionalArray(
+      record["shardEvidence"],
+      `${label}.shardEvidence`,
+      admitWorkerExecutionShardEvidence
     )
   });
 }
@@ -1373,6 +1666,18 @@ export function admitWorkerResultReport(
   if (targetAssetType !== manifest.targetAssetType) {
     throw new TypeError("SdlcWorkerResultReport.targetAssetType: manifest mismatch");
   }
+  const executionEvidence = admitOptionalWorkerExecutionEvidence(
+    record["executionEvidence"],
+    "SdlcWorkerResultReport.executionEvidence"
+  );
+  if (
+    !targetAdmitsTestExecutionEvidence(manifest.targetAssetType) &&
+    executionEvidence !== null
+  ) {
+    throw new TypeError(
+      "SdlcWorkerResultReport.executionEvidence: target asset type does not admit execution evidence"
+    );
+  }
   return Object.freeze({
     kind: "odd_sdlc.worker_result_report",
     graphFunctionName,
@@ -1390,9 +1695,10 @@ export function admitWorkerResultReport(
       "SdlcWorkerResultReport.materializedFiles",
       admitMaterializedProductFile
     ),
-    executionEvidence: admitOptionalWorkerExecutionEvidence(
-      record["executionEvidence"],
-      "SdlcWorkerResultReport.executionEvidence"
+    executionEvidence,
+    executionEvidenceErrors: parseStringList(
+      record["executionEvidenceErrors"] ?? [],
+      "SdlcWorkerResultReport.executionEvidenceErrors"
     ),
     obligationAssessments: admitWorkerObligationAssessments(
       record["obligationAssessments"],
@@ -1407,6 +1713,684 @@ function pathIsInside(child: string, parent: string): boolean {
     relativePath.length === 0 ||
     (!relativePath.startsWith("..") && !isAbsolute(relativePath))
   );
+}
+
+function filePathFromEvidenceRef(ref: string): string | null {
+  if (ref.startsWith("file://")) {
+    try {
+      return fileURLToPath(ref);
+    } catch {
+      return null;
+    }
+  }
+  return isAbsolute(ref) ? ref : null;
+}
+
+function readExecutionResultEvidenceFromReportRef(ref: string): {
+  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+  readonly error: string | null;
+} {
+  const filePath = filePathFromEvidenceRef(ref);
+  if (filePath === null || !existsSync(filePath) || !statSync(filePath).isFile()) {
+    return Object.freeze({
+      executionEvidence: null,
+      error: "not a readable file evidence ref"
+    });
+  }
+  try {
+    const payload: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+    const record = parseClosedRecord(payload, "SourceWorkerResultReport", REPORT_FIELDS);
+    const kind = parseNonEmptyString(
+      record["kind"],
+      "SourceWorkerResultReport.kind"
+    );
+    if (kind !== "odd_sdlc.worker_result_report") {
+      return Object.freeze({
+        executionEvidence: null,
+        error: "unexpected report kind"
+      });
+    }
+    const targetAssetType = parseNonEmptyString(
+      record["targetAssetType"],
+      "SourceWorkerResultReport.targetAssetType"
+    );
+    if (targetAssetType !== "test_execution_result_surface") {
+      return Object.freeze({
+        executionEvidence: null,
+        error: `unexpected source target ${targetAssetType}`
+      });
+    }
+    const executionEvidence = admitOptionalWorkerExecutionEvidence(
+      record["executionEvidence"],
+      "SourceWorkerResultReport.executionEvidence"
+    );
+    if (executionEvidence === null) {
+      const executionEvidenceErrors = parseStringList(
+        record["executionEvidenceErrors"] ?? [],
+        "SourceWorkerResultReport.executionEvidenceErrors"
+      );
+      return Object.freeze({
+        executionEvidence: null,
+        error: executionEvidenceErrors.length > 0
+          ? `execution evidence invalid: ${executionEvidenceErrors.join("; ")}`
+          : "execution evidence missing"
+      });
+    }
+    return Object.freeze({ executionEvidence, error: null });
+  } catch (error) {
+    return Object.freeze({
+      executionEvidence: null,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+function archiveSourceExecutionResultDependencyError(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly evidenceRefs: readonly string[];
+}): string | null {
+  const attempts: string[] = [];
+  for (const ref of input.evidenceRefs) {
+    const readResult = readExecutionResultEvidenceFromReportRef(ref);
+    if (readResult.executionEvidence === null) {
+      if (readResult.error !== null) {
+        attempts.push(`${ref}: ${readResult.error}`);
+      }
+      continue;
+    }
+    const executionEvidence = readResult.executionEvidence;
+    const blockers: SdlcBlockingReason[] = [];
+    const evidenceRefs: string[] = [];
+    if (executionEvidence.lane !== "test") {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_lane_mismatch",
+          detail: executionEvidence.lane,
+          evidenceRefs: executionEvidence.reportRefs
+        })
+      );
+    }
+    if (
+      executionEvidence.command !==
+      input.manifest.productMaterialization.testExecutionContract
+    ) {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_command_mismatch",
+          detail: executionEvidence.command,
+          evidenceRefs: executionEvidence.reportRefs
+        })
+      );
+    }
+    if (executionEvidence.status !== "succeeded") {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_not_succeeded",
+          detail: executionEvidence.status,
+          evidenceRefs: executionEvidence.reportRefs
+        })
+      );
+    }
+    if ((executionEvidence.testsObserved ?? 0) <= 0) {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_zero_tests_observed",
+          evidenceRefs: executionEvidence.reportRefs
+        })
+      );
+    }
+    if ((executionEvidence.failedCount ?? 0) > 0) {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_failures_present",
+          detail: String(executionEvidence.failedCount),
+          evidenceRefs: executionEvidence.reportRefs
+        })
+      );
+    }
+    if (executionEvidence.reportRefs.length === 0) {
+      blockers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_report_refs_missing",
+          evidenceRefs: [ref]
+        })
+      );
+    }
+    evaluateExecutionShardEvidence({
+      manifest: input.manifest,
+      executionEvidence,
+      blockingReasonCarriers: blockers,
+      evidenceRefs
+    });
+    if (blockers.length === 0) {
+      return null;
+    }
+    attempts.push(
+      `${ref}: ${blockers.map((blocker) =>
+        blocker.detail === null ? blocker.code : `${blocker.code}:${blocker.detail}`
+      ).join(", ")}`
+    );
+  }
+  const detail = attempts.length > 0 ? attempts.join("; ") : "no evidence refs";
+  return `admitted execution-result report missing or invalid: ${detail}`;
+}
+
+function walkFiles(root: string): readonly string[] {
+  if (!existsSync(root) || !statSync(root).isDirectory()) {
+    return Object.freeze([]);
+  }
+  const files: string[] = [];
+  const visit = (current: string): void => {
+    for (const name of readdirSync(current)) {
+      const absolutePath = join(current, name);
+      const stat = statSync(absolutePath);
+      if (stat.isDirectory()) {
+        visit(absolutePath);
+      } else if (stat.isFile()) {
+        files.push(absolutePath);
+      }
+    }
+  };
+  visit(root);
+  return Object.freeze(files.sort());
+}
+
+export function snapshotProductMaterializationRoot(
+  contract: SdlcProductMaterializationContract
+): SdlcProductMaterializationSnapshot {
+  const tenantRoot = resolve(contract.tenantRoot);
+  return Object.freeze({
+    kind: "sdlc_product_materialization_snapshot" as const,
+    tenantRoot,
+    files: Object.freeze(
+      walkFiles(tenantRoot).map((absolutePath) => {
+        const content = readFileSync(absolutePath, "utf8");
+        return Object.freeze({
+          relativePath: relative(tenantRoot, absolutePath),
+          absolutePath,
+          digest: sha256Text(content),
+          byteCount: Buffer.byteLength(content, "utf8")
+        });
+      })
+    )
+  });
+}
+
+function snapshotByRelativePath(
+  snapshot: SdlcProductMaterializationSnapshot
+): ReadonlyMap<string, SdlcObservedProductFileSnapshot> {
+  return new Map(snapshot.files.map((file) => [file.relativePath, file]));
+}
+
+function isExecutionByproductPath(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  return (
+    normalized === "target" ||
+    normalized.startsWith("target/") ||
+    normalized.includes("/target/") ||
+    normalized === ".bsp" ||
+    normalized.startsWith(".bsp/") ||
+    normalized.includes("/.bsp/")
+  );
+}
+
+function materializedRoleForObservedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): SdlcMaterializedProductFileRole {
+  const normalized = input.relativePath.split(path.sep).join("/");
+  const lower = normalized.toLowerCase();
+  if (
+    lower === "build.sbt" ||
+    lower.endsWith("/build.sbt") ||
+    lower.endsWith(".sbt") ||
+    lower.endsWith("/pom.xml") ||
+    lower.endsWith("/build.gradle") ||
+    lower.endsWith("/build.gradle.kts")
+  ) {
+    return "build_config";
+  }
+  if (input.manifest.targetAssetType === "code_surface") {
+    return "source";
+  }
+  if (
+    input.manifest.targetAssetType === "test_module_surface" ||
+    targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)
+  ) {
+    return "test";
+  }
+  return input.manifest.productMaterialization.requiredRoles[0] ?? "other";
+}
+
+function normalizedRelativePath(relativePath: string): string {
+  return relativePath.split(path.sep).join("/");
+}
+
+function isLikelyTestMaterialization(input: {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+}): boolean {
+  const normalized = normalizedRelativePath(input.relativePath).toLowerCase();
+  if (isExecutionByproductPath(normalized)) {
+    return false;
+  }
+  if (
+    !(
+      normalized.includes("/src/test/") ||
+      normalized.startsWith("src/test/") ||
+      /\b(test|spec)s?\b/u.test(normalized) ||
+      /(?:test|spec)\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt)$/u.test(
+        normalized
+      )
+    )
+  ) {
+    return false;
+  }
+  const content = textIfFile(input.absolutePath);
+  if (content === null) {
+    return false;
+  }
+  if (normalized.endsWith(".scala")) {
+    return looksLikeSbtDiscoverableTest(content);
+  }
+  return content.trim().length > 0;
+}
+
+function isLikelySourceMaterialization(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  if (
+    normalized.includes("/src/test/") ||
+    normalized.startsWith("src/test/") ||
+    normalized.includes("/test/") ||
+    normalized.includes("/tests/")
+  ) {
+    return false;
+  }
+  return /(?:^|\/)src\/(?:main\/)?/u.test(normalized) &&
+    /\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt|sql)$/u.test(normalized);
+}
+
+function observedFileSatisfiesRequiredRole(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcObservedProductFileSnapshot;
+}): boolean {
+  const role = materializedRoleForObservedFile({
+    manifest: input.manifest,
+    relativePath: input.file.relativePath
+  });
+  if (!input.manifest.productMaterialization.requiredRoles.includes(role)) {
+    return false;
+  }
+  if (role === "test") {
+    return isLikelyTestMaterialization(input.file);
+  }
+  if (role === "source") {
+    return isLikelySourceMaterialization(input.file.relativePath);
+  }
+  return role === "build_config";
+}
+
+function materializedFileFromObservedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcObservedProductFileSnapshot;
+}): SdlcMaterializedProductFile {
+  return Object.freeze({
+    kind: "sdlc_materialized_product_file" as const,
+    role: materializedRoleForObservedFile({
+      manifest: input.manifest,
+      relativePath: input.file.relativePath
+    }),
+    relativePath: input.file.relativePath,
+    absolutePath: input.file.absolutePath,
+    digest: input.file.digest,
+    byteCount: input.file.byteCount
+  });
+}
+
+export function observeProductMaterializationDelta(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly before: SdlcProductMaterializationSnapshot;
+}): readonly SdlcMaterializedProductFile[] {
+  const after = snapshotProductMaterializationRoot(
+    input.manifest.productMaterialization
+  );
+  const beforeByPath = snapshotByRelativePath(input.before);
+  const observedByPath = new Map<string, SdlcMaterializedProductFile>();
+  for (const file of after.files) {
+    if (
+      targetIgnoresExecutionByproducts(input.manifest.targetAssetType) &&
+      isExecutionByproductPath(file.relativePath)
+    ) {
+      continue;
+    }
+    const changed = beforeByPath.get(file.relativePath)?.digest !== file.digest;
+    const satisfiesRequiredRole = observedFileSatisfiesRequiredRole({
+      manifest: input.manifest,
+      file
+    });
+    if (!changed && !satisfiesRequiredRole) {
+      continue;
+    }
+    const materialized = materializedFileFromObservedFile({
+      manifest: input.manifest,
+      file
+    });
+    if (
+      changed ||
+      input.manifest.productMaterialization.requiredRoles.includes(
+        materialized.role
+      )
+    ) {
+      observedByPath.set(file.relativePath, materialized);
+    }
+  }
+  return Object.freeze(
+    [...observedByPath.values()].sort((left, right) =>
+      left.relativePath.localeCompare(right.relativePath)
+    )
+  );
+}
+
+function ensureObservedTransformOutput(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+}): void {
+  if (existsSync(input.manifest.outputFile)) {
+    return;
+  }
+  if (
+    !input.manifest.productMaterialization.required &&
+    input.materializedFiles.length === 0
+  ) {
+    return;
+  }
+  mkdirSync(dirname(input.manifest.outputFile), { recursive: true });
+  writeFileSync(
+    input.manifest.outputFile,
+    [
+      `# ${input.manifest.targetAssetType}`,
+      "",
+      `graph_function: ${input.manifest.graphFunctionName}`,
+      `edge: ${input.manifest.edgeName}`,
+      `transform_status: observed`,
+      `materialized_file_count: ${input.materializedFiles.length}`,
+      "",
+      "## Materialized Files",
+      "",
+      ...input.materializedFiles.map(
+        (file) => `- ${file.role}: ${file.relativePath} (${file.digest})`
+      )
+    ].join("\n"),
+    "utf8"
+  );
+}
+
+function objectRecord(input: unknown): Record<string, unknown> | null {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return null;
+  }
+  return Object.fromEntries(Object.entries(input));
+}
+
+function normalizeExecutionEvidenceCandidate(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  if (record["kind"] === "sdlc_worker_execution_evidence") {
+    return input;
+  }
+  if (record["executionEvidence"] !== undefined) {
+    return record["executionEvidence"];
+  }
+  if (record["execution_evidence"] !== undefined) {
+    return record["execution_evidence"];
+  }
+  return input;
+}
+
+function executionEvidenceCandidateWithArtifactRef(input: {
+  readonly candidate: unknown;
+  readonly artifactRef: string;
+}): unknown {
+  const normalized = normalizeExecutionEvidenceCandidate(input.candidate);
+  const record = objectRecord(normalized);
+  if (record === null || record["kind"] !== "sdlc_worker_execution_evidence") {
+    return normalized;
+  }
+  const reportRefs = Array.isArray(record["reportRefs"])
+    ? record["reportRefs"].filter((ref): ref is string => typeof ref === "string")
+    : [];
+  const rawShardEvidence: unknown = record["shardEvidence"];
+  const shardEvidence = Array.isArray(rawShardEvidence)
+    ? rawShardEvidence.map((shard: unknown) => {
+        const shardRecord = objectRecord(shard);
+        if (shardRecord === null) {
+          return shard;
+        }
+        const shardReportRefs = Array.isArray(shardRecord["reportRefs"])
+          ? shardRecord["reportRefs"].filter(
+              (ref): ref is string => typeof ref === "string"
+            )
+          : [];
+        return Object.freeze({
+          ...shardRecord,
+          reportRefs: Object.freeze(
+            shardReportRefs.includes(input.artifactRef)
+              ? shardReportRefs
+              : [...shardReportRefs, input.artifactRef]
+          )
+        });
+      })
+    : undefined;
+  return Object.freeze({
+    ...record,
+    reportRefs: Object.freeze(
+      reportRefs.includes(input.artifactRef)
+        ? reportRefs
+        : [...reportRefs, input.artifactRef]
+    ),
+    ...(shardEvidence === undefined
+      ? {}
+      : { shardEvidence: Object.freeze(shardEvidence) })
+  });
+}
+
+interface ParsedJsonCandidate {
+  readonly ok: boolean;
+  readonly value: unknown;
+}
+
+function parseJsonCandidate(input: string): ParsedJsonCandidate {
+  try {
+    const parsed: unknown = JSON.parse(input);
+    return Object.freeze({ ok: true, value: parsed });
+  } catch {
+    return Object.freeze({ ok: false, value: null });
+  }
+}
+
+function extractExecutionEvidenceFromTransformArtifact(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly content: string;
+}): {
+  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+  readonly errors: readonly string[];
+} {
+  if (!targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)) {
+    return Object.freeze({
+      executionEvidence: null,
+      errors: Object.freeze([])
+    });
+  }
+  const artifactRef = pathToFileURL(input.manifest.outputFile).href;
+  const candidates: unknown[] = [];
+  const wholeJson = parseJsonCandidate(input.content);
+  if (wholeJson.ok) {
+    candidates.push(wholeJson.value);
+  }
+  const fencedBlockExpression = /```(?:json|execution_evidence|executionEvidence)?\s*\n([\s\S]*?)```/gu;
+  for (const match of input.content.matchAll(fencedBlockExpression)) {
+    const block = match[1]?.trim() ?? "";
+    const parsed = parseJsonCandidate(block);
+    if (parsed.ok) {
+      candidates.push(parsed.value);
+    }
+  }
+  const evidenceErrors: string[] = [];
+  for (const candidate of candidates) {
+    const normalized = normalizeExecutionEvidenceCandidate(candidate);
+    const normalizedRecord = objectRecord(normalized);
+    if (
+      normalizedRecord === null ||
+      normalizedRecord["kind"] !== "sdlc_worker_execution_evidence"
+    ) {
+      continue;
+    }
+    try {
+      return Object.freeze({
+        executionEvidence: admitWorkerExecutionEvidence(
+          executionEvidenceCandidateWithArtifactRef({
+            candidate: normalized,
+            artifactRef
+          }),
+          "transformArtifact.executionEvidence"
+        ),
+        errors: Object.freeze([])
+      });
+    } catch (error) {
+      evidenceErrors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return Object.freeze({
+    executionEvidence: null,
+    errors: Object.freeze(evidenceErrors)
+  });
+}
+
+function requirementIdForObligation(obligationId: string): string | null {
+  if (!obligationId.startsWith("requirement:")) {
+    return null;
+  }
+  return normalizeRequirementId(obligationId.slice("requirement:".length));
+}
+
+function observedRequirementIds(input: {
+  readonly outputFile: string;
+  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+}): ReadonlySet<string> {
+  const ids = new Set<string>();
+  const candidatePaths = [
+    input.outputFile,
+    ...input.materializedFiles.map((file) => file.absolutePath)
+  ];
+  for (const filePath of candidatePaths) {
+    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+      continue;
+    }
+    const content = readFileSync(filePath, "utf8");
+    for (const marker of content.match(REQUIREMENT_MARKER_EXPRESSION) ?? []) {
+      ids.add(normalizeRequirementId(marker));
+    }
+  }
+  return ids;
+}
+
+function postTransformObligationAssessments(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+}): readonly SdlcWorkerObligationAssessment[] {
+  const outputRef = pathToFileURL(input.manifest.outputFile).href;
+  const materializedRefs = input.materializedFiles.map((file) =>
+    pathToFileURL(file.absolutePath).href
+  );
+  const baseEvidenceRefs = Object.freeze([outputRef, ...materializedRefs]);
+  const observedRequirements = observedRequirementIds({
+    outputFile: input.manifest.outputFile,
+    materializedFiles: input.materializedFiles
+  });
+  return Object.freeze(
+    input.manifest.traversalObligationContext.obligations.map((obligation) => {
+      const requirementId = requirementIdForObligation(obligation.obligationId);
+      if (requirementId !== null) {
+        const fulfilled = observedRequirements.has(requirementId);
+        return Object.freeze({
+          kind: "sdlc_worker_obligation_assessment" as const,
+          obligationId: obligation.obligationId,
+          fulfillmentStatus: fulfilled ? "fulfilled" : "blocked",
+          evidenceRefs: baseEvidenceRefs,
+          blockingReasons: fulfilled
+            ? Object.freeze([])
+            : Object.freeze([`requirement_trace_not_observed:${requirementId}`])
+        });
+      }
+      if (obligation.obligationKind === "target_asset") {
+        const fulfilled =
+          existsSync(input.manifest.outputFile) &&
+          (!input.manifest.productMaterialization.required ||
+            input.materializedFiles.length > 0);
+        return Object.freeze({
+          kind: "sdlc_worker_obligation_assessment" as const,
+          obligationId: obligation.obligationId,
+          fulfillmentStatus: fulfilled ? "fulfilled" : "blocked",
+          evidenceRefs: baseEvidenceRefs,
+          blockingReasons: fulfilled
+            ? Object.freeze([])
+            : Object.freeze(["target_transform_output_not_observed"])
+        });
+      }
+      return Object.freeze({
+        kind: "sdlc_worker_obligation_assessment" as const,
+        obligationId: obligation.obligationId,
+        fulfillmentStatus: existsSync(input.manifest.outputFile)
+          ? "fulfilled"
+          : "blocked",
+        evidenceRefs:
+          baseEvidenceRefs.length > 0
+            ? baseEvidenceRefs
+            : obligation.evidenceRefs,
+        blockingReasons: existsSync(input.manifest.outputFile)
+          ? Object.freeze([])
+          : Object.freeze(["post_transform_output_missing"])
+      });
+    })
+  );
+}
+
+export function buildPostTransformWorkerResultReport(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly before: SdlcProductMaterializationSnapshot;
+}): SdlcWorkerResultReport {
+  const materializedFiles = observeProductMaterializationDelta(input);
+  ensureObservedTransformOutput({
+    manifest: input.manifest,
+    materializedFiles
+  });
+  if (!existsSync(input.manifest.outputFile)) {
+    throw new TypeError("post-transform output artifact missing");
+  }
+  const content = readFileSync(input.manifest.outputFile, "utf8");
+  const extractedExecutionEvidence = extractExecutionEvidenceFromTransformArtifact({
+    manifest: input.manifest,
+    content
+  });
+  return Object.freeze({
+    kind: "odd_sdlc.worker_result_report" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: resolve(input.manifest.outputFile),
+    digest: sha256Text(content),
+    summary: "framework-generated post-transform report from observed artifacts",
+    unresolvedReasons: Object.freeze([]),
+    materializedFiles,
+    executionEvidence: extractedExecutionEvidence.executionEvidence,
+    executionEvidenceErrors: extractedExecutionEvidence.errors,
+    obligationAssessments: postTransformObligationAssessments({
+      manifest: input.manifest,
+      materializedFiles
+    })
+  });
 }
 
 function evaluateSbtTestDiscoverability(input: {
@@ -1577,14 +2561,27 @@ function evaluateExecutionEvidence(input: {
   readonly blockingReasonCarriers: SdlcBlockingReason[];
   readonly evidenceRefs: string[];
 }): void {
-  if (input.manifest.targetAssetType !== "test_run_archive_surface") {
+  if (!targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)) {
     return;
   }
   const executionEvidence = input.report.executionEvidence;
   if (executionEvidence === null) {
+    const executionEvidenceErrors = input.report.executionEvidenceErrors;
+    if (executionEvidenceErrors.length > 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_evidence_invalid",
+          detail: executionEvidenceErrors.join("; "),
+          evidenceRefs: input.evidenceRefs
+        })
+      );
+      return;
+    }
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "test_execution_evidence_missing",
+        detail:
+          "No sdlc_worker_execution_evidence block was admitted from the worker result or transform artifact.",
         evidenceRefs: input.evidenceRefs
       })
     );
@@ -1611,6 +2608,52 @@ function evaluateExecutionEvidence(input: {
         evidenceRefs: executionEvidence.reportRefs
       })
     );
+  }
+  evaluateExecutionShardEvidence({
+    manifest: input.manifest,
+    executionEvidence,
+    blockingReasonCarriers: input.blockingReasonCarriers,
+    evidenceRefs: input.evidenceRefs
+  });
+  const contradiction = executionEvidenceContradiction(executionEvidence);
+  if (contradiction !== null) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_evidence_contradiction",
+        detail: contradiction,
+        evidenceRefs: executionEvidence.reportRefs
+      })
+    );
+    if (executionEvidence.reportRefs.length === 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_report_refs_missing",
+          evidenceRefs: input.evidenceRefs
+        })
+      );
+    }
+    return;
+  }
+  if (executionEvidence.status === "pending") {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_not_succeeded",
+        detail: executionEvidence.status,
+        evidenceRefs: executionEvidence.reportRefs,
+        lawfulReentryPoint: "triage_gap",
+        message:
+          "Governed test execution is pending; closure requires triage or repricing rather than same-edge retry."
+      })
+    );
+    if (executionEvidence.reportRefs.length === 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_report_refs_missing",
+          evidenceRefs: input.evidenceRefs
+        })
+      );
+    }
+    return;
   }
   if (executionEvidence.status !== "succeeded") {
     input.blockingReasonCarriers.push(
@@ -1648,6 +2691,224 @@ function evaluateExecutionEvidence(input: {
   }
 }
 
+function evaluateExecutionShardEvidence(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly executionEvidence: SdlcWorkerExecutionEvidence;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+  readonly evidenceRefs: string[];
+}): void {
+  const expectedShards = input.manifest.productMaterialization.executionShards;
+  if (expectedShards.length === 0) {
+    return;
+  }
+  const evidenceByShard = new Map<string, SdlcWorkerExecutionShardEvidence>();
+  for (const shardEvidence of input.executionEvidence.shardEvidence) {
+    input.evidenceRefs.push(...shardEvidence.reportRefs);
+    if (evidenceByShard.has(shardEvidence.shardId)) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_shard_evidence_mismatch",
+          detail: `duplicate shard evidence for ${shardEvidence.shardId}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+      continue;
+    }
+    evidenceByShard.set(shardEvidence.shardId, shardEvidence);
+  }
+  const expectedShardIds = new Set(expectedShards.map((shard) => shard.shardId));
+  for (const shardEvidence of input.executionEvidence.shardEvidence) {
+    if (!expectedShardIds.has(shardEvidence.shardId)) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_shard_evidence_mismatch",
+          detail: `unknown shardId ${shardEvidence.shardId}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+    }
+  }
+  for (const expectedShard of expectedShards) {
+    const shardEvidence = evidenceByShard.get(expectedShard.shardId);
+    if (shardEvidence === undefined) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_shard_evidence_missing",
+          detail: expectedShard.shardId,
+          evidenceRefs: input.executionEvidence.reportRefs
+        })
+      );
+      continue;
+    }
+    if (shardEvidence.moduleName !== expectedShard.moduleName) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_shard_evidence_mismatch",
+          detail: `${expectedShard.shardId}: moduleName ${shardEvidence.moduleName}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+    }
+    if (shardEvidence.command !== expectedShard.command) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_command_mismatch",
+          detail: `${expectedShard.shardId}: ${shardEvidence.command}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+    }
+    const contradiction = executionEvidenceContradiction(shardEvidence);
+    if (contradiction !== null) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_evidence_contradiction",
+          detail: `${expectedShard.shardId}: ${contradiction}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+      continue;
+    }
+    if (shardEvidence.status !== "succeeded") {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_not_succeeded",
+          detail: `${expectedShard.shardId}: ${shardEvidence.status}`,
+          evidenceRefs: shardEvidence.reportRefs,
+          lawfulReentryPoint:
+            shardEvidence.status === "pending" ? "triage_gap" : undefined,
+          message:
+            shardEvidence.status === "pending"
+              ? "Governed shard execution is pending; closure requires triage or repricing rather than same-edge retry."
+              : undefined
+        })
+      );
+      continue;
+    }
+    if ((shardEvidence.testsObserved ?? 0) <= 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_zero_tests_observed",
+          detail: expectedShard.shardId,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+    }
+    if ((shardEvidence.failedCount ?? 0) > 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_failures_present",
+          detail: `${expectedShard.shardId}: ${String(shardEvidence.failedCount)}`,
+          evidenceRefs: shardEvidence.reportRefs
+        })
+      );
+    }
+    if (shardEvidence.reportRefs.length === 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "test_execution_report_refs_missing",
+          detail: expectedShard.shardId,
+          evidenceRefs: input.executionEvidence.reportRefs
+        })
+      );
+    }
+  }
+  const expectedComplete = expectedShards.every((shard) =>
+    evidenceByShard.has(shard.shardId)
+  );
+  if (!expectedComplete) {
+    return;
+  }
+  const shardTotals = aggregateShardExecutionEvidence(
+    input.executionEvidence.shardEvidence
+  );
+  if (shardTotals === null) {
+    return;
+  }
+  if (
+    input.executionEvidence.testsObserved !== null &&
+    input.executionEvidence.testsObserved !== shardTotals.testsObserved
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_evidence_contradiction",
+        detail: `aggregate testsObserved ${input.executionEvidence.testsObserved} does not equal shard total ${shardTotals.testsObserved}`,
+        evidenceRefs: input.executionEvidence.reportRefs
+      })
+    );
+  }
+  if (
+    input.executionEvidence.passedCount !== null &&
+    input.executionEvidence.passedCount !== shardTotals.passedCount
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_evidence_contradiction",
+        detail: `aggregate passedCount ${input.executionEvidence.passedCount} does not equal shard total ${shardTotals.passedCount}`,
+        evidenceRefs: input.executionEvidence.reportRefs
+      })
+    );
+  }
+  if (
+    input.executionEvidence.failedCount !== null &&
+    input.executionEvidence.failedCount !== shardTotals.failedCount
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_evidence_contradiction",
+        detail: `aggregate failedCount ${input.executionEvidence.failedCount} does not equal shard total ${shardTotals.failedCount}`,
+        evidenceRefs: input.executionEvidence.reportRefs
+      })
+    );
+  }
+}
+
+function aggregateShardExecutionEvidence(
+  shardEvidence: readonly SdlcWorkerExecutionShardEvidence[]
+): { readonly testsObserved: number; readonly passedCount: number; readonly failedCount: number } | null {
+  let testsObserved = 0;
+  let passedCount = 0;
+  let failedCount = 0;
+  for (const shard of shardEvidence) {
+    if (
+      shard.testsObserved === null ||
+      shard.passedCount === null ||
+      shard.failedCount === null
+    ) {
+      return null;
+    }
+    testsObserved += shard.testsObserved;
+    passedCount += shard.passedCount;
+    failedCount += shard.failedCount;
+  }
+  return Object.freeze({ testsObserved, passedCount, failedCount });
+}
+
+function executionEvidenceContradiction(
+  executionEvidence: SdlcWorkerExecutionEvidence | SdlcWorkerExecutionShardEvidence
+): string | null {
+  const observed = executionEvidence.testsObserved;
+  const passed = executionEvidence.passedCount;
+  const failed = executionEvidence.failedCount;
+  if (observed !== null && passed !== null && failed !== null) {
+    if (passed + failed !== observed) {
+      return `passedCount + failedCount (${passed + failed}) does not equal testsObserved (${observed})`;
+    }
+  }
+  if (executionEvidence.status === "succeeded" && (failed ?? 0) > 0) {
+    return `status succeeded but failedCount is ${failed}`;
+  }
+  if (
+    executionEvidence.status === "failed" &&
+    observed !== null &&
+    observed > 0 &&
+    (failed ?? 0) === 0
+  ) {
+    return `status failed but failedCount is 0 for ${observed} observed tests`;
+  }
+  return null;
+}
+
 function evaluateObligationAssessments(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
@@ -1666,15 +2927,28 @@ function evaluateObligationAssessments(input: {
     ])
   );
   const reportRef = pathToFileURL(input.manifest.reportFile).href;
+  const outputAssetRef = assetCoverageRef({
+    workspaceRoot: input.manifest.workspaceRoot,
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: input.report.outputFile
+  });
+  const outputContent =
+    existsSync(input.report.outputFile) && statSync(input.report.outputFile).isFile()
+      ? readFileSync(input.report.outputFile, "utf8")
+      : "";
   const outputCoverageRefs = new Set<string>([
     ...coverageRefAliases(input.report.outputFile),
     ...coverageRefAliases(pathToFileURL(input.report.outputFile).href),
+    ...(outputAssetRef === null ? [] : coverageRefAliases(outputAssetRef)),
     ...input.report.materializedFiles.flatMap((file) => [
       ...coverageRefAliases(file.absolutePath),
       ...coverageRefAliases(pathToFileURL(file.absolutePath).href)
     ]),
     ...(input.report.executionEvidence?.reportRefs.flatMap((ref) =>
       coverageRefAliases(ref)
+    ) ?? []),
+    ...(input.report.executionEvidence?.shardEvidence.flatMap((shard) =>
+      shard.reportRefs.flatMap((ref) => coverageRefAliases(ref))
     ) ?? [])
   ]);
   for (const obligation of declaredById.values()) {
@@ -1716,6 +2990,33 @@ function evaluateObligationAssessments(input: {
             : [reportRef]
         })
       );
+    }
+    if (
+      input.manifest.targetAssetType === "test_run_archive_surface" &&
+      declared?.obligationKind === "source_asset" &&
+      assessment.fulfillmentStatus === "fulfilled"
+    ) {
+      const sourceAssetType = declared.obligationId.slice("source_asset:".length);
+      const archiveDependencyError =
+        sourceAssetType === "test_execution_result_surface"
+          ? archiveSourceExecutionResultDependencyError({
+              manifest: input.manifest,
+              evidenceRefs: assessment.evidenceRefs
+            })
+          : null;
+      if (!outputContent.includes(sourceAssetType) || archiveDependencyError !== null) {
+        input.blockingReasonCarriers.push(
+          makeSdlcBlockingReason({
+            code: "source_asset_dependency_missing",
+            detail: archiveDependencyError === null
+              ? sourceAssetType
+              : `${sourceAssetType}: ${archiveDependencyError}`,
+            evidenceRefs: assessment.evidenceRefs.length > 0
+              ? assessment.evidenceRefs
+              : [reportRef]
+          })
+        );
+      }
     }
     if (
       declared?.obligationKind === "requirement" &&
@@ -1892,6 +3193,27 @@ export function constructPostflightGapDossier(input: {
     throw new TypeError("Postflight gap dossier requires blocked postflight");
   }
   const gapDossierRef = pathToFileURL(gapDossierPathForManifest(input.manifest)).href;
+  const retryEligible = input.postflight.blockingReasonCarriers.some((reason) =>
+    reason.lawfulReentryPoint === "same_edge_retry" ||
+    reason.lawfulReentryPoint === "repair_worker_output"
+  );
+  const actions = new Set<
+    "retry_same_edge" | "repair_worker_output" | "triage_gap" | "reprice_requirement_or_design"
+  >();
+  for (const reason of input.postflight.blockingReasonCarriers) {
+    if (reason.lawfulReentryPoint === "same_edge_retry") {
+      actions.add("retry_same_edge");
+    } else if (reason.lawfulReentryPoint === "repair_worker_output") {
+      actions.add("repair_worker_output");
+    } else if (reason.lawfulReentryPoint === "triage_gap") {
+      actions.add("triage_gap");
+    } else if (reason.lawfulReentryPoint === "reprice_requirement_or_design") {
+      actions.add("reprice_requirement_or_design");
+    }
+  }
+  if (actions.size === 0) {
+    actions.add("triage_gap");
+  }
   return Object.freeze({
     kind: "sdlc_postflight_gap_dossier",
     status: "open",
@@ -1916,13 +3238,8 @@ export function constructPostflightGapDossier(input: {
       join(input.manifest.archiveRoot, "handoff_manifest.json")
     ).href,
     currentGapDossierRef: gapDossierRef,
-    retryEligible: true,
-    nextLawfulActions: Object.freeze([
-      "retry_same_edge",
-      "repair_worker_output",
-      "triage_gap",
-      "reprice_requirement_or_design"
-    ] as const)
+    retryEligible,
+    nextLawfulActions: Object.freeze([...actions])
   });
 }
 

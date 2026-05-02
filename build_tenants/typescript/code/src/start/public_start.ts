@@ -21,6 +21,7 @@ import {
 } from "../shared/validation.js";
 import type { SdlcQueryDomainProjection } from "../projection/index.js";
 import { FG_CONFORM_PROJECT } from "../graph/index.js";
+import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import { publicStartTargetPolicyFor } from "./policy.js";
 
 export const SDLC_PUBLIC_START_TARGET_KIND_VALUES = Object.freeze([
@@ -62,6 +63,8 @@ export interface SdlcWorkerAttachment {
 export interface SdlcExecutionContract {
   readonly kind: "sdlc_execution_contract";
   readonly targetGraphFunction: string;
+  readonly requestedUntil: SdlcPublicStartUntil;
+  readonly conformedProject: SdlcConformProjectProfile;
   readonly basis: ExecutionBasis;
   readonly workerAttachment: SdlcWorkerAttachment;
 }
@@ -171,6 +174,7 @@ function constructExecutionContract(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly targetGraphFunction: string;
+  readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
 }): SdlcExecutionContract {
   const basis = admitExecutionBasis({
@@ -184,7 +188,8 @@ function constructExecutionContract(input: {
         kind: "graph_function",
         handle: input.targetGraphFunction
       },
-      until: input.request.until
+      // Replay identity stays stable; the ABG runner receives requestedUntil separately.
+      until: "converged"
     }),
     module: input.module,
     runtimeIdentity: admitResolvedRuntimeIdentity({
@@ -213,6 +218,8 @@ function constructExecutionContract(input: {
   return Object.freeze({
     kind: "sdlc_execution_contract",
     targetGraphFunction: input.targetGraphFunction,
+    requestedUntil: input.request.until,
+    conformedProject: input.conformedProject,
     basis,
     workerAttachment: input.workerAttachment
   });
@@ -240,6 +247,7 @@ export function publicStartOnce(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly queryDomain: SdlcQueryDomainProjection;
+  readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
 }): SdlcPublicStartOutcome {
   const targetGraphFunction = resolveGraphFunctionTarget({
@@ -283,6 +291,7 @@ export function publicStartOnce(input: {
     request: input.request,
     module: input.module,
     targetGraphFunction,
+    conformedProject: input.conformedProject,
     workerAttachment: input.workerAttachment
   });
   if (

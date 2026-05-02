@@ -175,9 +175,26 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["test_schedule_surface"]
   }),
   entry({
+    name: "prepare_test_execution_surface",
+    intent: "Prepare command-side test execution transition surface from the admitted test schedule.",
+    inputs: ["test_schedule_surface"],
+    outputs: ["test_execution_surface"]
+  }),
+  entry({
+    name: "derive_test_execution_result_surface",
+    intent: "Admit governed test execution evidence before archive publication.",
+    inputs: ["test_execution_surface", "test_schedule_surface"],
+    outputs: ["test_execution_result_surface"]
+  }),
+  entry({
     name: "derive_test_run_archive_surface",
-    intent: "Derive governed test run archive evidence surface from test modules, stack profile, and admitted test schedule.",
-    inputs: ["test_module_surface", "test_stack_profile", "test_schedule_surface"],
+    intent: "Derive governed test run archive surface from admitted test execution result truth.",
+    inputs: [
+      "test_module_surface",
+      "test_stack_profile",
+      "test_schedule_surface",
+      "test_execution_result_surface"
+    ],
     outputs: ["test_run_archive_surface"]
   }),
   entry({
@@ -213,18 +230,6 @@ export const OPERATIONAL_FUNCTION_CATALOG = Object.freeze([
     intent: "Admit returned build result or pending build state.",
     inputs: ["build_execution_surface"],
     outputs: ["build_execution_result_surface"]
-  }),
-  entry({
-    name: "prepare_test_execution_surface",
-    intent: "Prepare command-side test execution transition surface.",
-    inputs: ["release_surface"],
-    outputs: ["test_execution_surface"]
-  }),
-  entry({
-    name: "derive_test_execution_result_surface",
-    intent: "Admit returned test execution evidence.",
-    inputs: ["test_execution_surface", "test_run_archive_surface"],
-    outputs: ["test_execution_result_surface"]
   }),
   entry({
     name: "prepare_deployment_surface",

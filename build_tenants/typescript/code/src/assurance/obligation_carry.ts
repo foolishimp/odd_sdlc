@@ -13,18 +13,24 @@ import {
   uniqueSorted,
   verdictFromReasons
 } from "./shared.js";
+import { canonicalSdlcPriorGapReasonCode } from "../shared/blocking_reason.js";
 
 function dossierReasonCodes(
   dossiers: readonly SdlcPostflightGapDossier[]
 ): readonly string[] {
   return uniqueSorted(
-    dossiers.flatMap((dossier) => dossier.reasons.map((reason) => reason.reason))
+    dossiers.flatMap((dossier) =>
+      dossier.reasons.map((reason) =>
+        canonicalSdlcPriorGapReasonCode(reason.reason)
+      )
+    )
   );
 }
 
 export function deriveObligationCarryAssuranceLedger(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly currentGapDossier: SdlcPostflightGapDossier | null;
+  readonly currentReasonCodes?: readonly string[];
   readonly closedReasonCodes?: readonly string[];
   readonly expectedPriorGapDossiers?: readonly SdlcPostflightGapDossier[];
   readonly contradictoryReasonCodes?: readonly string[];
@@ -61,7 +67,12 @@ export function deriveObligationCarryAssuranceLedger(input: {
   }
   const closedReasonCodes = new Set(input.closedReasonCodes ?? []);
   const currentReasonCodes = new Set(
-    input.currentGapDossier?.reasons.map((reason) => reason.reason) ?? []
+    uniqueSorted([
+      ...(input.currentGapDossier?.reasons.map((reason) =>
+        canonicalSdlcPriorGapReasonCode(reason.reason)
+      ) ?? []),
+      ...(input.currentReasonCodes ?? []).map(canonicalSdlcPriorGapReasonCode)
+    ])
   );
   const droppedReasonCodes = priorReasonCodes.filter(
     (code) => !closedReasonCodes.has(code) && !currentReasonCodes.has(code)

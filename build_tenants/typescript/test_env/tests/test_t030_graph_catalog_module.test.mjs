@@ -173,8 +173,8 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   const bootstrapProbe = deriveTraversalStructureProbe(bootstrapBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
-  assert.equal(bootstrapBasis.graph.vectors.length, 20);
-  assert.equal(operationalBasis.graph.vectors.length, 9);
+  assert.equal(bootstrapBasis.graph.vectors.length, 22);
+  assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");
   assert.equal(operationalProbe.edge, "prepare_build_execution_surface");
   assert.equal(bootstrapProbe.transitionKind, "fp_dispatch");

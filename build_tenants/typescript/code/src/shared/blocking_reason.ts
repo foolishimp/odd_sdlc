@@ -25,20 +25,28 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_byte_count_mismatch",
   "materialized_product_digest_mismatch",
   "test_execution_evidence_missing",
+  "test_execution_evidence_invalid",
   "test_execution_lane_mismatch",
   "test_execution_command_mismatch",
+  "test_execution_evidence_contradiction",
+  "test_execution_shard_evidence_missing",
+  "test_execution_shard_evidence_mismatch",
   "test_execution_not_succeeded",
   "test_execution_zero_tests_observed",
   "test_execution_failures_present",
   "test_execution_report_refs_missing",
   "test_materialization_not_discoverable",
   "worker_report_admission_failed",
+  "silent_worker_inactivity",
+  "worker_process_summary_missing",
+  "worker_process_summary_invalid",
   "obligation_unassessed",
   "obligation_status_unassessed",
   "obligation_blocked_without_evidence",
   "obligation_assessment_extra",
   "obligation_payload_insufficient",
   "obligation_fulfilled_without_output_coverage",
+  "source_asset_dependency_missing",
   "assurance_ledger_reason",
   "hook_postflight_failed",
   "hook_postflight_missing",
@@ -87,6 +95,7 @@ export const SDLC_BLOCKING_REASON_REENTRY_POINTS = Object.freeze([
   "repair_project_conformance",
   "reprice_runtime_policy",
   "reprice_requirement_or_design",
+  "triage_gap",
   "rerun_start",
   "inspect_worker_archive",
   "repair_install",
@@ -95,6 +104,39 @@ export const SDLC_BLOCKING_REASON_REENTRY_POINTS = Object.freeze([
 
 export type SdlcBlockingReasonLawfulReentryPoint =
   (typeof SDLC_BLOCKING_REASON_REENTRY_POINTS)[number];
+
+const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
+  "materialized_product_role_missing",
+  "worker_report_admission_failed",
+  "test_execution_lane_mismatch",
+  "test_execution_command_mismatch",
+  "test_execution_evidence_invalid",
+  "test_execution_evidence_contradiction",
+  "test_execution_shard_evidence_missing",
+  "test_execution_shard_evidence_mismatch",
+  "test_execution_not_succeeded",
+  "test_execution_failures_present",
+  "silent_worker_inactivity",
+  "worker_process_summary_missing",
+  "worker_process_summary_invalid",
+  "obligation_unassessed",
+  "obligation_status_unassessed",
+  "obligation_blocked_without_evidence",
+  "obligation_assessment_extra",
+  "obligation_payload_insufficient",
+  "obligation_fulfilled_without_output_coverage",
+  "source_asset_dependency_missing",
+  "unsupported_fd_transition",
+  "unsupported_transition",
+  "unknown_blocking_reason"
+] as const satisfies readonly SdlcBlockingReasonCode[]);
+
+const DETAIL_PRESERVING_LEGACY_REASON_CODE_SET: ReadonlySet<SdlcBlockingReasonCode> =
+  new Set(DETAIL_PRESERVING_LEGACY_REASON_CODES);
+
+function preservesLegacyReasonDetail(code: SdlcBlockingReasonCode): boolean {
+  return DETAIL_PRESERVING_LEGACY_REASON_CODE_SET.has(code);
+}
 
 export interface SdlcBlockingReason {
   readonly kind: "sdlc_blocking_reason";
@@ -137,6 +179,22 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     });
   }
   if (code.startsWith("test_execution_")) {
+    if (code === "test_execution_evidence_invalid") {
+      return Object.freeze({
+        reasonClass: "contract_violation",
+        lawfulReentryPoint: "repair_worker_output",
+        message:
+          "Governed test execution evidence could not be admitted as a typed carrier."
+      });
+    }
+    if (code === "test_execution_evidence_contradiction") {
+      return Object.freeze({
+        reasonClass: "code_to_test",
+        lawfulReentryPoint: "triage_gap",
+        message:
+          "Governed test execution evidence is internally contradictory and requires triage."
+      });
+    }
     return Object.freeze({
       reasonClass: "code_to_test",
       lawfulReentryPoint: "same_edge_retry",
@@ -163,7 +221,8 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     code === "obligation_blocked_without_evidence" ||
     code === "obligation_assessment_extra" ||
     code === "obligation_payload_insufficient" ||
-    code === "obligation_fulfilled_without_output_coverage"
+    code === "obligation_fulfilled_without_output_coverage" ||
+    code === "source_asset_dependency_missing"
   ) {
     return Object.freeze({
       reasonClass: "assurance",
@@ -224,6 +283,27 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "F_P traversal requires an attached worker transport."
     });
   }
+  if (code === "silent_worker_inactivity") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Worker process timed out without observable transform progress."
+    });
+  }
+  if (code === "worker_process_summary_missing") {
+    return Object.freeze({
+      reasonClass: "missing_evidence",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Worker process summary evidence is missing from the archive."
+    });
+  }
+  if (code === "worker_process_summary_invalid") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Worker process summary evidence could not be admitted."
+    });
+  }
   if (code === "worker_process_failed") {
     return Object.freeze({
       reasonClass: "worker_runtime",
@@ -273,19 +353,7 @@ export function legacyBlockingReasonCode(reason: SdlcBlockingReason): string {
   if (reason.detail === null) {
     return reason.code;
   }
-  if (
-    reason.code === "materialized_product_role_missing" ||
-    reason.code === "worker_report_admission_failed" ||
-    reason.code === "obligation_unassessed" ||
-    reason.code === "obligation_status_unassessed" ||
-    reason.code === "obligation_blocked_without_evidence" ||
-    reason.code === "obligation_assessment_extra" ||
-    reason.code === "obligation_payload_insufficient" ||
-    reason.code === "obligation_fulfilled_without_output_coverage" ||
-    reason.code === "unsupported_fd_transition" ||
-    reason.code === "unsupported_transition" ||
-    reason.code === "unknown_blocking_reason"
-  ) {
+  if (preservesLegacyReasonDetail(reason.code)) {
     return `${reason.code}:${reason.detail}`;
   }
   if (reason.code === "hook_postflight_failed") {
@@ -307,6 +375,28 @@ export function summarizeBlockingReasons(
     return null;
   }
   return reasons.map(legacyBlockingReasonCode).join(",");
+}
+
+export function canonicalSdlcPriorGapReasonCode(reason: string): string {
+  const prefixes = Object.freeze([
+    "obligation_assessment_open:prior_gap:",
+    "obligation_assessment_missing:prior_gap:",
+    "obligation_assessment_blocked:prior_gap:",
+    "dropped_prior_obligation:",
+    "prior_gap:"
+  ]);
+  let current = reason;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const prefix of prefixes) {
+      if (current.startsWith(prefix)) {
+        current = current.slice(prefix.length);
+        changed = true;
+      }
+    }
+  }
+  return current;
 }
 
 function splitKnownPrefix(raw: string, prefix: string): string | null {
@@ -343,6 +433,16 @@ export function sdlcBlockingReasonFromLegacy(input: {
       detail: workerReport,
       evidenceRefs
     });
+  }
+  for (const code of DETAIL_PRESERVING_LEGACY_REASON_CODES) {
+    const detail = splitKnownPrefix(input.reason, code);
+    if (detail !== null) {
+      return makeSdlcBlockingReason({
+        code,
+        detail,
+        evidenceRefs
+      });
+    }
   }
   const obligationUnassessed = splitKnownPrefix(input.reason, "obligation_unassessed");
   if (obligationUnassessed !== null) {

@@ -1,8 +1,8 @@
 // Implements: REQ-F-ODDSDLC-040
 
 import { installAbiogenesisTypescript } from "@abiogenesis/typescript-tenant/app/m04/install-bootstrap";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 import { admitOddSdlcTypescriptInstallRequest } from "./admission.js";
 import type {
   OddSdlcTypescriptInstallManifest,
@@ -38,6 +38,33 @@ function stableJson(payload: unknown): string {
 async function writeTextFile(targetPath: string, content: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true });
   await writeFile(targetPath, content, "utf8");
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function fileDependencyRef(targetRoot: string, tarballPath: string): string {
+  return `file:${relative(targetRoot, tarballPath).split("\\").join("/")}`;
+}
+
+async function persistInstalledPackageDependency(input: {
+  readonly targetRoot: string;
+  readonly packageName: string;
+  readonly tarballPath: string;
+}): Promise<void> {
+  const packageJsonPath = join(input.targetRoot, "package.json");
+  const raw = await readFile(packageJsonPath, "utf8");
+  const parsed: unknown = JSON.parse(raw);
+  const packageJson: Record<string, unknown> = isPlainRecord(parsed)
+    ? { ...parsed }
+    : {};
+  const dependencies = isPlainRecord(packageJson["dependencies"])
+    ? { ...packageJson["dependencies"] }
+    : {};
+  dependencies[input.packageName] = fileDependencyRef(input.targetRoot, input.tarballPath);
+  packageJson["dependencies"] = dependencies;
+  await writeTextFile(packageJsonPath, stableJson(packageJson));
 }
 
 function substrateRuntimeRef(abgOutcome: Awaited<ReturnType<typeof installAbiogenesisTypescript>>): string | null {
@@ -98,6 +125,11 @@ async function installAdmittedOddSdlcTypescript(
         installedPackageName: `${request.installedPackageName}-abg`
       })
     );
+    await persistInstalledPackageDependency({
+      targetRoot: request.targetRoot,
+      packageName: installedPackage.packageName,
+      tarballPath: installedPackage.tarballPath
+    });
     const oddSdlcCommandPath = installedPackage.commandBindings[0]?.commandPath;
     if (oddSdlcCommandPath === undefined) {
       throw new Error("odd-sdlc-ts command binding was not created");

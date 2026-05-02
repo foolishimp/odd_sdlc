@@ -59,6 +59,26 @@ function assertCommandPath(paths, commandName) {
   return commandPath;
 }
 
+function assertPackageManagerReplayKeepsCommand(targetRoot, commandName) {
+  const commandPath = path.join(targetRoot, "node_modules/.bin", commandName);
+  assert.equal(existsSync(commandPath), true, `${commandName} missing before npm replay`);
+  const result = spawnSync("npm", ["install", "--ignore-scripts"], {
+    cwd: targetRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      npm_config_cache: path.join(targetRoot, ".npm-cache")
+    },
+    maxBuffer: 1024 * 1024 * 5
+  });
+  assert.equal(
+    result.status,
+    0,
+    `npm install replay failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert.equal(existsSync(commandPath), true, `${commandName} missing after npm replay`);
+}
+
 function assertBootstrapGovernanceText(text) {
   for (const alias of [
     "STDO law",
@@ -137,6 +157,16 @@ test("T-059 API installs odd_sdlc.TS and ABG runtime into a target workspace", a
   assert.equal(existsSync(outcome.installManifestPath), true);
   assert.equal(existsSync(outcome.normalizationPath), true);
   assert.equal(existsSync(outcome.bootstrapGuidePath), true);
+  const packageJson = readJson(path.join(targetRoot, "package.json"));
+  assert.equal(
+    packageJson.dependencies["@odd-sdlc/typescript-tenant"],
+    `file:${path.relative(targetRoot, outcome.installedPackage.tarballPath)}`
+  );
+  assert.match(
+    packageJson.dependencies["@abiogenesis/typescript-tenant"],
+    /^file:\.abiogenesis\/package-pack\//u
+  );
+  assertPackageManagerReplayKeepsCommand(targetRoot, "odd-sdlc-ts");
   for (const filename of ["AGENTS.md", "CLAUDE.md"]) {
     const instructionPath = path.join(targetRoot, filename);
     assert.equal(existsSync(instructionPath), true, `${filename} was not written`);
@@ -212,6 +242,15 @@ test("T-059 CLI install command uses the async bounded adapter", async () => {
   assert(readFileSync(path.join(targetRoot, "AGENTS.md"), "utf8").includes("Keep this guidance."));
   assert(readFileSync(path.join(targetRoot, "CLAUDE.md"), "utf8").includes("Keep this guidance."));
   assertCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
+  const packageJson = readJson(path.join(targetRoot, "package.json"));
+  assert.match(
+    packageJson.dependencies["@odd-sdlc/typescript-tenant"],
+    /^file:\.abiogenesis\/odd_sdlc\/typescript\/package-pack\//u
+  );
+  assert.match(
+    packageJson.dependencies["@abiogenesis/typescript-tenant"],
+    /^file:\.abiogenesis\/package-pack\//u
+  );
 
   const syncResult = runOddSdlcCli(["install", "--target", targetRoot]);
   assert.equal(syncResult.status, "error");

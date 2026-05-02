@@ -25,6 +25,7 @@ import {
   verdictFromReasons
 } from "../assurance/shared.js";
 import {
+  canonicalSdlcPriorGapReasonCode,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason
 } from "../shared/blocking_reason.js";
@@ -351,14 +352,39 @@ function closedPriorGapReasonCodes(input: {
   const fulfilledAssessmentIds = new Set(
     input.report.obligationAssessments
       .filter((assessment) => assessment.fulfillmentStatus === "fulfilled")
-      .map((assessment) => assessment.obligationId)
+      .map((assessment) =>
+        canonicalSdlcPriorGapReasonCode(assessment.obligationId)
+      )
   );
   return uniqueSorted(
     input.manifest.retryContext.priorGapDossiers.flatMap((dossier) =>
-      dossier.reasons.flatMap((reason) =>
-        fulfilledAssessmentIds.has(`prior_gap:${reason.reason}`)
-          ? [reason.reason]
-          : []
+      dossier.reasons.flatMap((reason) => {
+        const reasonCode = canonicalSdlcPriorGapReasonCode(reason.reason);
+        return fulfilledAssessmentIds.has(reasonCode) ? [reasonCode] : [];
+      })
+    )
+  );
+}
+
+function priorGapReasonCodes(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return uniqueSorted(
+    manifest.retryContext.priorGapDossiers.flatMap((dossier) =>
+      dossier.reasons.map((reason) =>
+        canonicalSdlcPriorGapReasonCode(reason.reason)
+      )
+    )
+  );
+}
+
+function currentAssuranceReasonCodes(
+  ledgers: readonly SdlcAssuranceLedger[]
+): readonly string[] {
+  return uniqueSorted(
+    ledgers.flatMap((ledger) =>
+      ledger.reasons.map((reason) =>
+        canonicalSdlcPriorGapReasonCode(reason.code)
       )
     )
   );
@@ -461,14 +487,22 @@ export function deriveSdlcOperatorAssuranceGate(input: {
   }
 
   if (input.manifest.retryContext.priorGapDossiers.length > 0) {
+    const currentReasonCodes = currentAssuranceReasonCodes(ledgers);
+    const closedReasonCodes = uniqueSorted([
+      ...closedPriorGapReasonCodes({
+        manifest: input.manifest,
+        report: input.report
+      }),
+      ...priorGapReasonCodes(input.manifest).filter(
+        (reasonCode) => !currentReasonCodes.includes(reasonCode)
+      )
+    ]);
     ledgers.push(
       deriveObligationCarryAssuranceLedger({
         manifest: input.manifest,
         currentGapDossier: null,
-        closedReasonCodes: closedPriorGapReasonCodes({
-          manifest: input.manifest,
-          report: input.report
-        })
+        currentReasonCodes,
+        closedReasonCodes
       })
     );
     requiredDimensions.push("obligation_carry");

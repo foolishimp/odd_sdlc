@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
+  conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcInstalledQualificationInitialState,
   deriveSdlcWorkspaceIngressReport,
@@ -129,6 +130,17 @@ function installedOddSdlcCommand(install) {
 
 function makeStart(workspaceRoot) {
   const module = constructSdlcGtlModule();
+  const constraintsText = [
+    "project:",
+    "  name: t076",
+    "  selected_output_root: build_tenants/scala_spark",
+    "  ambiguity_risk_appetite: medium",
+    "build_tenants:",
+    "  scala_spark:",
+    "    output_dir: build_tenants/scala_spark",
+    "    capability_contracts:",
+    "      - transport_contract"
+  ].join("\n");
   const ingressReport = deriveSdlcWorkspaceIngressReport({
     workspaceRootUri: `file://${workspaceRoot}`,
     projectConstraints: admitSdlcProjectConstraints({
@@ -141,6 +153,10 @@ function makeStart(workspaceRoot) {
     sourceInputs: []
   });
   const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText
+  });
   const start = publicStartOnce({
     request: {
       kind: "sdlc_public_start_request",
@@ -149,11 +165,12 @@ function makeStart(workspaceRoot) {
         kind: "graph_function",
         handle: "bootstrap_release_self_test"
       },
-      until: "converged",
+      until: "first_traversal",
       defaultRegime: "F_P"
     },
     module,
     queryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "process://node"
     })
@@ -184,6 +201,18 @@ function assessedEventForVector(basis, vector, index) {
   };
 }
 
+function vectorClosedEventForVector(basis, vector, index) {
+  return {
+    kind: "vector_closed",
+    basisId: basis.id,
+    graphCallId: `graph-call:${basis.id}`,
+    frameId: `frame:${basis.id}:root`,
+    vectorIndex: index,
+    edge: vector.name,
+    closureKind: "advanced"
+  };
+}
+
 function preclosedEventsBeforeEdge(basis, edgeName) {
   const targetIndex = basis.graph.vectors.findIndex(
     (vector) => vector.name === edgeName
@@ -192,7 +221,10 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
   return Object.freeze(
     basis.graph.vectors
       .slice(0, targetIndex)
-      .map((vector, index) => assessedEventForVector(basis, vector, index))
+      .flatMap((vector, index) => [
+        assessedEventForVector(basis, vector, index),
+        vectorClosedEventForVector(basis, vector, index)
+      ])
   );
 }
 
@@ -284,9 +316,64 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
     replayEvents: preclosedEvents
   });
 
-  assert.equal(first.status, "postflight_failed");
-  assert.equal(first.postflight.status, "blocked");
-  assert.equal(first.gapDossier.status, "open");
+  assert.equal(first.status, "worker_invoked");
+  assert.equal(first.postflight.status, "passed");
+  assert.equal(first.manifest.retryContext.priorGapDossiers.length, 1);
+  assert.equal(first.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
+  const firstGapDossier = first.manifest.retryContext.priorGapDossiers[0];
+  assert(firstGapDossier);
+  assert.deepStrictEqual(
+    firstGapDossier.reasons.map((reason) => reason.reason),
+    ["materialized_product_relative_path_mismatch"]
+  );
+  assert.deepStrictEqual(
+    firstGapDossier.reasons.map((reason) => reason.reasonClass),
+    ["contract_violation"]
+  );
+  assert.deepStrictEqual(first.emittedRuntimeEventKinds.slice(0, 4), [
+    "basis_admitted",
+    "graph_call_opened",
+    "frame_opened",
+    "vector_traversal_planned"
+  ]);
+  assert.equal(first.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
+  assert.equal(first.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
+  assert.equal(first.emittedRuntimeEventKinds.includes("retry_progress_recorded"), true);
+  assert.deepStrictEqual(first.emittedRuntimeEventKinds.slice(-2), [
+    "vector_closed",
+    "terminal_reached"
+  ]);
+  assert.equal(first.summary.nextLawfulAction, "rerun_gaps_or_start_next_edge");
+
+  const failureEvents = await readOddSdlcRuntimeEvents(workspace);
+  const afterFailure = projectSdlcGapsFromReplay({
+    basis,
+    events: Object.freeze([...preclosedEvents, ...failureEvents])
+  });
+  assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), true);
+  assert.notEqual(afterFailure.currentEdge, "derive_code_surface");
+  assert.equal(
+    first.manifest.traversalObligationContext.deltaSummary.priorGapCount,
+    first.manifest.retryContext.priorGapDossiers[0].reasons.length
+  );
+  assert(
+    first.manifest.traversalObligationContext.deltaSummary.priorGapCount,
+    "retry frontier should retain prior gap pressure as a count, not expanded obligations"
+  );
+  assert.equal(
+    first.manifest.traversalIntentPackage.obligationIds.some((id) =>
+      id.startsWith("prior_gap:")
+    ),
+    false
+  );
+  assert.equal(
+    first.manifest.retryContext.priorGapDossiers[0].reasons[0].reason,
+    "materialized_product_relative_path_mismatch"
+  );
+  assert.equal(
+    first.workerReport.materializedFiles[0].relativePath,
+    "cdme-core/src/main/scala/cdme/Core.scala"
+  );
   const firstMaterializationLedger = deriveMaterializationAssuranceLedger({
     manifest: first.manifest,
     report: first.workerReport,
@@ -294,83 +381,14 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
   });
   const firstObligationLedger = deriveObligationCarryAssuranceLedger({
     manifest: first.manifest,
-    currentGapDossier: first.gapDossier
+    currentGapDossier: null,
+    closedReasonCodes: ["materialized_product_relative_path_mismatch"]
   });
   const firstSatisfaction = foldSdlcAssuranceLedgers({
     requiredDimensions: ["materialization", "obligation_carry"],
     ledgers: [firstMaterializationLedger, firstObligationLedger]
   });
-  assert.equal(firstSatisfaction.status, "blocked");
-  assert.deepStrictEqual(firstSatisfaction.retryHandoff.reasonCodes, [
-    "materialized_product_relative_path_mismatch"
-  ]);
-  assert.deepStrictEqual(
-    first.gapDossier.reasons.map((reason) => reason.reason),
-    ["materialized_product_relative_path_mismatch"]
-  );
-  assert.deepStrictEqual(
-    first.gapDossier.reasons.map((reason) => reason.reasonClass),
-    ["contract_violation"]
-  );
-  assert.deepStrictEqual(first.emittedRuntimeEventKinds, [
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned",
-    "vector_evaluated",
-    "retry_repair_planned",
-    "retry_attempt_opened",
-    "continuation_terminated",
-    "continuation_reopened"
-  ]);
-  assert.equal(first.summary.nextLawfulAction, "retry_same_edge_with_gap_dossier");
-
-  const failureEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterFailure = projectSdlcGapsFromReplay({
-    basis,
-    events: Object.freeze([...preclosedEvents, ...failureEvents])
-  });
-  assert.equal(afterFailure.currentEdge, "derive_code_surface");
-  assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), false);
-
-  const second = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport,
-    replayEvents: Object.freeze([...preclosedEvents, ...failureEvents])
-  });
-
-  assert.equal(second.status, "worker_invoked");
-  assert.equal(second.postflight.status, "passed");
-  assert.equal(second.manifest.retryContext.priorGapDossiers.length, 1);
-  assert.equal(second.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
-  assert(
-    second.manifest.traversalIntentPackage.obligationIds.includes(
-      "prior_gap:materialized_product_relative_path_mismatch"
-    )
-  );
-  assert.equal(
-    second.manifest.retryContext.priorGapDossiers[0].reasons[0].reason,
-    "materialized_product_relative_path_mismatch"
-  );
-  assert.equal(
-    second.workerReport.materializedFiles[0].relativePath,
-    "cdme-core/src/main/scala/cdme/Core.scala"
-  );
-  const secondMaterializationLedger = deriveMaterializationAssuranceLedger({
-    manifest: second.manifest,
-    report: second.workerReport,
-    postflight: second.postflight
-  });
-  const secondObligationLedger = deriveObligationCarryAssuranceLedger({
-    manifest: second.manifest,
-    currentGapDossier: null,
-    closedReasonCodes: ["materialized_product_relative_path_mismatch"]
-  });
-  const secondSatisfaction = foldSdlcAssuranceLedgers({
-    requiredDimensions: ["materialization", "obligation_carry"],
-    ledgers: [secondMaterializationLedger, secondObligationLedger]
-  });
-  assert.equal(secondSatisfaction.status, "close_allowed");
+  assert.equal(firstSatisfaction.status, "close_allowed");
 
   const finalEvents = await readOddSdlcRuntimeEvents(workspace);
   const afterSecond = projectSdlcGapsFromReplay({
@@ -456,20 +474,26 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ],
     workspace
   );
-  assert.equal(failed.status, "postflight_failed");
-  assert.equal(failed.postflight.status, "blocked");
-  assert.deepStrictEqual(failed.gapDossier.reasons.map((reason) => reason.reason), [
+  assert.equal(failed.status, "worker_invoked");
+  assert.equal(failed.postflight.status, "passed");
+  assert.equal(failed.manifest.retryContext.priorGapDossiers.length, 1);
+  assert.equal(failed.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
+  const failedGapDossier = failed.manifest.retryContext.priorGapDossiers[0];
+  assert(failedGapDossier);
+  assert.deepStrictEqual(failedGapDossier.reasons.map((reason) => reason.reason), [
     "materialized_product_relative_path_mismatch"
   ]);
-  assert.deepStrictEqual(failed.emittedRuntimeEventKinds, [
+  assert.deepStrictEqual(failed.emittedRuntimeEventKinds.slice(0, 3), [
     "graph_call_opened",
     "frame_opened",
-    "vector_traversal_planned",
-    "vector_evaluated",
-    "retry_repair_planned",
-    "retry_attempt_opened",
-    "continuation_terminated",
-    "continuation_reopened"
+    "vector_traversal_planned"
+  ]);
+  assert.equal(failed.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
+  assert.equal(failed.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
+  assert.equal(failed.emittedRuntimeEventKinds.includes("retry_progress_recorded"), true);
+  assert.deepStrictEqual(failed.emittedRuntimeEventKinds.slice(-2), [
+    "vector_closed",
+    "terminal_reached"
   ]);
 
   const afterFailure = runInstalledOddSdlc(
@@ -477,34 +501,23 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.equal(afterFailure.projection.currentEdge, "derive_code_surface");
-
-  const repaired = runInstalledOddSdlc(
-    commandPath,
-    [
-      "start",
-      "--workspace",
-      workspace,
-      "--target",
-      target,
-      "--until",
-      "first_traversal",
-      "--worker",
-      workerTransport
-    ],
-    workspace
+  assert.notEqual(afterFailure.projection.currentEdge, "derive_code_surface");
+  assert.equal(
+    failed.manifest.traversalObligationContext.deltaSummary.priorGapCount,
+    failed.manifest.retryContext.priorGapDossiers[0].reasons.length
   );
-  assert.equal(repaired.status, "worker_invoked");
-  assert.equal(repaired.postflight.status, "passed");
-  assert.equal(repaired.manifest.retryContext.priorGapDossiers.length, 1);
-  assert.equal(repaired.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
   assert(
-    repaired.manifest.traversalIntentPackage.obligationIds.includes(
-      "prior_gap:materialized_product_relative_path_mismatch"
-    )
+    failed.manifest.traversalObligationContext.deltaSummary.priorGapCount,
+    "retry frontier should retain prior gap pressure as a count, not expanded obligations"
   );
   assert.equal(
-    repaired.workerReport.materializedFiles[0].relativePath,
+    failed.manifest.traversalIntentPackage.obligationIds.some((id) =>
+      id.startsWith("prior_gap:")
+    ),
+    false
+  );
+  assert.equal(
+    failed.workerReport.materializedFiles[0].relativePath,
     "cdme-core/src/main/scala/cdme/Core.scala"
   );
   assert.equal(

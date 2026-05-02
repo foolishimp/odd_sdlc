@@ -15,6 +15,7 @@ import path from "node:path";
 
 import {
   admitSdlcBlockingReason,
+  canonicalSdlcPriorGapReasonCode,
   constructPostflightGapDossier,
   deriveWorkerHandoffManifest,
   evaluateWorkerResultPostflight,
@@ -132,6 +133,38 @@ test("T-086 blocking reason carrier admits closed typed legacy projection", () =
   assert.equal(legacy.code, "unsupported_transition");
   assert.equal(legacy.detail, "fh_escalation");
   assert.equal(legacy.reasonClass, "runtime_policy");
+});
+
+test("T-086 legacy retry-frontier keys preserve execution shard detail", () => {
+  const first = makeSdlcBlockingReason({
+    code: "test_execution_shard_evidence_missing",
+    detail: "test-shard-01-api",
+    evidenceRefs: ["proof://api"]
+  });
+  const second = makeSdlcBlockingReason({
+    code: "test_execution_shard_evidence_missing",
+    detail: "test-shard-02-worker",
+    evidenceRefs: ["proof://worker"]
+  });
+
+  assert.equal(
+    legacyBlockingReasonCode(first),
+    "test_execution_shard_evidence_missing:test-shard-01-api"
+  );
+  assert.equal(
+    legacyBlockingReasonCode(second),
+    "test_execution_shard_evidence_missing:test-shard-02-worker"
+  );
+  assert.notEqual(
+    canonicalSdlcPriorGapReasonCode(legacyBlockingReasonCode(first)),
+    canonicalSdlcPriorGapReasonCode(legacyBlockingReasonCode(second))
+  );
+
+  const admitted = sdlcBlockingReasonFromLegacy({
+    reason: legacyBlockingReasonCode(first)
+  });
+  assert.equal(admitted.code, first.code);
+  assert.equal(admitted.detail, first.detail);
 });
 
 test("T-086 postflight and gap dossier classify from carrier truth", () => {

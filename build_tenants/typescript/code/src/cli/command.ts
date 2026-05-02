@@ -26,8 +26,7 @@ import { deriveOddSdlcTypescriptReleaseCut } from "../release/index.js";
 import {
   executeInstalledOperatorStart,
   readOddSdlcRuntimeEvents,
-  readOddSdlcRuntimeEventsSync,
-  type SdlcInstalledOperatorStartOutcome
+  readOddSdlcRuntimeEventsSync
 } from "../operator/index.js";
 import {
   projectSdlcWorkerAttachment,
@@ -37,9 +36,11 @@ import {
 } from "../start/index.js";
 import {
   deriveSdlcProjectConstraintsFromWorkspace,
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
+  type SdlcConformProjectProfile,
   type SdlcConformProjectReport,
   type SdlcProjectConstraints,
   type SdlcSourceInput,
@@ -95,40 +96,6 @@ export type OddSdlcCliRequest =
   | OddSdlcCliInstallRequest
   | OddSdlcCliReleaseCutRequest;
 
-const AUTONOMOUS_START_STEP_GUARD = 64;
-
-type SdlcAutonomousStartStopReason =
-  | "first_traversal"
-  | "blocked"
-  | "converged"
-  | "worker_required"
-  | "worker_failed"
-  | "worker_report_rejected"
-  | "iteration_guard";
-
-interface SdlcAutonomousStartLoopStep {
-  readonly kind: "sdlc_autonomous_start_loop_step";
-  readonly index: number;
-  readonly status: string;
-  readonly currentEdge: string | null;
-  readonly nextLawfulAction: string;
-  readonly archiveRoot: string | null;
-  readonly emittedRuntimeEventKinds: readonly string[];
-}
-
-interface SdlcAutonomousStartLoopTrace {
-  readonly kind: "sdlc_autonomous_start_loop_trace";
-  readonly requestedUntil: SdlcPublicStartUntil;
-  readonly stepGuard: number;
-  readonly stepCount: number;
-  readonly stoppedBy: SdlcAutonomousStartStopReason;
-  readonly steps: readonly SdlcAutonomousStartLoopStep[];
-}
-
-type SdlcAutonomousStartOutcome = SdlcInstalledOperatorStartOutcome & {
-  readonly loop: SdlcAutonomousStartLoopTrace;
-};
-
 export interface OddSdlcCliResult {
   readonly kind: "odd_sdlc_cli_result";
   readonly command: OddSdlcCliCommand | "unknown";
@@ -159,6 +126,7 @@ interface CliReleaseCutOptionReadModel {
 interface CliWorkspaceContext {
   readonly workspaceRoot: string;
   readonly ingressReport: SdlcWorkspaceIngressReport;
+  readonly conformedProject: SdlcConformProjectProfile;
   readonly conformanceReport: SdlcConformProjectReport;
 }
 
@@ -466,6 +434,7 @@ function workspaceContext(workspaceRoot: string): CliWorkspaceContext {
   return Object.freeze({
     workspaceRoot: root,
     ingressReport,
+    conformedProject: deriveSdlcConformProjectProfileFromWorkspace(root),
     conformanceReport: deriveSdlcConformProjectReportFromWorkspace(root)
   });
 }
@@ -507,6 +476,7 @@ function startOutcomeFor(request: OddSdlcCliTraversalRequest): ReturnType<typeof
     },
     module: constructSdlcGtlModule(),
     queryDomain,
+    conformedProject: context.conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: request.workerTransport
     })
@@ -530,138 +500,29 @@ function replayEventsForBasis(
   );
 }
 
-function loopStepForOutcome(input: {
-  readonly index: number;
-  readonly outcome: SdlcInstalledOperatorStartOutcome;
-}): SdlcAutonomousStartLoopStep {
-  return Object.freeze({
-    kind: "sdlc_autonomous_start_loop_step",
-    index: input.index,
-    status: input.outcome.status,
-    currentEdge: input.outcome.summary.currentEdge,
-    nextLawfulAction: input.outcome.summary.nextLawfulAction,
-    archiveRoot: input.outcome.summary.archiveRoot,
-    emittedRuntimeEventKinds: input.outcome.emittedRuntimeEventKinds
-  });
-}
-
-function stopReasonForOutcome(input: {
-  readonly request: OddSdlcCliTraversalRequest;
-  readonly outcome: SdlcInstalledOperatorStartOutcome;
-}): SdlcAutonomousStartStopReason | null {
-  if (input.request.until === "first_traversal") {
-    return "first_traversal";
-  }
-  if (
-    input.outcome.status === "converged" &&
-    input.outcome.summary.nextLawfulAction !== "rerun_start_for_downstream_graph"
-  ) {
-    return "converged";
-  }
-  if (input.outcome.status === "worker_invoked") {
-    return input.outcome.summary.currentEdge === null ? "converged" : null;
-  }
-  if (
-    input.outcome.status === "postflight_failed" &&
-    input.outcome.summary.nextLawfulAction === "retry_same_edge_with_gap_dossier"
-  ) {
-    return null;
-  }
-  if (
-    input.outcome.status === "worker_report_rejected" &&
-    input.outcome.summary.nextLawfulAction === "retry_same_edge_with_gap_dossier"
-  ) {
-    return null;
-  }
-  if (input.outcome.status === "blocked") {
-    return "blocked";
-  }
-  if (input.outcome.status === "worker_failed") {
-    return "worker_failed";
-  }
-  if (input.outcome.status === "worker_report_rejected") {
-    return "worker_report_rejected";
-  }
-  if (input.outcome.status === "converged") {
-    return null;
-  }
-  return "blocked";
-}
-
-function withAutonomousLoopTrace(input: {
-  readonly outcome: SdlcInstalledOperatorStartOutcome;
-  readonly request: OddSdlcCliTraversalRequest;
-  readonly steps: readonly SdlcAutonomousStartLoopStep[];
-  readonly stoppedBy: SdlcAutonomousStartStopReason;
-}): SdlcAutonomousStartOutcome {
-  return Object.freeze({
-    ...input.outcome,
-    loop: Object.freeze({
-      kind: "sdlc_autonomous_start_loop_trace",
-      requestedUntil: input.request.until,
-      stepGuard: AUTONOMOUS_START_STEP_GUARD,
-      stepCount: input.steps.length,
-      stoppedBy: input.stoppedBy,
-      steps: Object.freeze([...input.steps])
-    })
-  });
-}
-
 async function installedStartPayloadFor(
   request: OddSdlcCliTraversalRequest
 ): Promise<unknown> {
-  const steps: SdlcAutonomousStartLoopStep[] = [];
-  let lastOutcome: SdlcInstalledOperatorStartOutcome | null = null;
-  for (let index = 0; index < AUTONOMOUS_START_STEP_GUARD; index += 1) {
-    const start = startOutcomeFor(request);
-    const deterministicTransition =
-      start.kind === "sdlc_public_start_projected" &&
-      start.transition.kind === "fd_advance";
-    if (request.workerTransport === null && !deterministicTransition) {
-      if (lastOutcome === null) {
-        return start;
-      }
-      return withAutonomousLoopTrace({
-        outcome: lastOutcome,
-        request,
-        steps,
-        stoppedBy: "worker_required"
-      });
-    }
-    const outcome = await executeInstalledOperatorStart({
-      workspaceRoot: request.workspaceRoot,
-      start,
-      workerTransport: request.workerTransport,
-      replayEvents:
-        start.executionContract === null
-          ? Object.freeze([])
-          : replayEventsForBasis(
-              start.executionContract.basis,
-              await readOddSdlcRuntimeEvents(request.workspaceRoot)
-            ),
-      requireInstalledTopology: true
-    });
-    lastOutcome = outcome;
-    steps.push(loopStepForOutcome({ index, outcome }));
-    const stopReason = stopReasonForOutcome({ request, outcome });
-    if (stopReason !== null) {
-      return withAutonomousLoopTrace({
-        outcome,
-        request,
-        steps,
-        stoppedBy: stopReason
-      });
-    }
+  const start = startOutcomeFor(request);
+  const deterministicTransition =
+    start.kind === "sdlc_public_start_projected" &&
+    start.transition.kind === "fd_advance";
+  if (request.workerTransport === null && !deterministicTransition) {
+    return start;
   }
-  if (lastOutcome !== null) {
-    return withAutonomousLoopTrace({
-      outcome: lastOutcome,
-      request,
-      steps,
-      stoppedBy: "iteration_guard"
-    });
-  }
-  return startOutcomeFor(request);
+  return executeInstalledOperatorStart({
+    workspaceRoot: request.workspaceRoot,
+    start,
+    workerTransport: request.workerTransport,
+    replayEvents:
+      start.executionContract === null
+        ? Object.freeze([])
+        : replayEventsForBasis(
+            start.executionContract.basis,
+            await readOddSdlcRuntimeEvents(request.workspaceRoot)
+          ),
+    requireInstalledTopology: true
+  });
 }
 
 function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
@@ -769,14 +630,6 @@ function stringField(
   return typeof value === "string" ? value : null;
 }
 
-function numberField(
-  record: Readonly<Record<string, unknown>>,
-  key: string
-): number | null {
-  const value = record[key];
-  return typeof value === "number" ? value : null;
-}
-
 function numberArrayField(
   record: Readonly<Record<string, unknown>>,
   key: string
@@ -840,7 +693,6 @@ function compactInstalledStartResult(result: OddSdlcCliResult): string | null {
   if (summary === null) {
     return null;
   }
-  const loop = childRecord(result.payload, "loop");
   return [
     "odd-sdlc-ts start",
     `status: ${stringField(summary, "status") ?? result.status}`,
@@ -848,12 +700,6 @@ function compactInstalledStartResult(result: OddSdlcCliResult): string | null {
     `current_edge: ${stringField(summary, "currentEdge") ?? "n/a"}`,
     `blocking_reason: ${stringField(summary, "blockingReason") ?? "none"}`,
     `next_action: ${stringField(summary, "nextLawfulAction") ?? "inspect_json"}`,
-    ...(loop === null
-      ? []
-      : [
-          `loop_steps: ${numberField(loop, "stepCount") ?? "n/a"}`,
-          `loop_stop: ${stringField(loop, "stoppedBy") ?? "n/a"}`
-        ]),
     `archive: ${stringField(summary, "archiveRoot") ?? "none"}`,
     "json: rerun with ODD_SDLC_TS_OUTPUT=json"
   ].join("\n");

@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+  deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   runOddSdlcCliAsync,
@@ -88,7 +89,10 @@ function makeWorkspace() {
       "    output_dir: build_tenants/typescript/",
       "    language: TypeScript",
       "    build_tool: npm",
-      "    test_runner: npm test"
+      "    test_runner: npm test",
+      "    module_structure:",
+      "      - api",
+      "      - worker"
     ].join("\n"),
     "utf8"
   );
@@ -124,7 +128,8 @@ function writeWorkerScript(workspaceRoot) {
       "if (manifest.targetAssetType === 'test_module_surface') { materializedFiles.push(materializedFile('test', 'test/main.test.ts', ['// Validates: REQ-T093-002', \"import test from 'node:test';\", \"import assert from 'node:assert/strict';\", \"test('scheduled value proof', () => {\", '  const actual = 2 + 2;', '  assert.equal(actual, 4);', '});', ''].join('\\n'))); }",
       "const evidenceRefs = [manifest.outputFile, ...materializedFiles.map((file) => file.absolutePath)];",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [...evidenceRefs, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "const executionEvidence = manifest.targetAssetType === 'test_run_archive_surface' ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 } : null;",
+      "const shardEvidence = manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 }));",
+      "const executionEvidence = manifest.targetAssetType === 'test_execution_result_surface' ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: shardEvidence.length, passedCount: shardEvidence.length, failedCount: 0, shardEvidence } : null;",
       "const report = { kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: digestText(`${outputContent}\\n`), summary: `generated ${manifest.targetAssetType}`, unresolvedReasons: [], materializedFiles, executionEvidence, obligationAssessments };",
       "writeFileSync(manifest.reportFile, `${JSON.stringify(report, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
@@ -149,6 +154,14 @@ test("T-093 publishes schedule graph assets before materialization edges", () =>
   );
   assert(
     names.indexOf("derive_test_schedule_surface") <
+      names.indexOf("prepare_test_execution_surface")
+  );
+  assert(
+    names.indexOf("prepare_test_execution_surface") <
+      names.indexOf("derive_test_execution_result_surface")
+  );
+  assert(
+    names.indexOf("derive_test_execution_result_surface") <
       names.indexOf("derive_test_run_archive_surface")
   );
 
@@ -162,7 +175,16 @@ test("T-093 publishes schedule graph assets before materialization edges", () =>
   );
   assert.deepStrictEqual(
     hookContractByEdgeName("derive_test_run_archive_surface").sourceAssetTypes,
-    ["test_module_surface", "test_stack_profile", "test_schedule_surface"]
+    [
+      "test_module_surface",
+      "test_stack_profile",
+      "test_schedule_surface",
+      "test_execution_result_surface"
+    ]
+  );
+  assert.deepStrictEqual(
+    hookContractByEdgeName("derive_test_execution_result_surface").sourceAssetTypes,
+    ["test_execution_surface", "test_schedule_surface"]
   );
   assert(
     SDLC_HOOK_TARGET_POLICY.some(
@@ -176,7 +198,50 @@ test("T-093 publishes schedule graph assets before materialization edges", () =>
   );
 });
 
-test("T-093 autonomous start produces and consumes schedule surfaces", async () => {
+test("B-079 test execution schedule exposes a bounded shard register", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    runId: "b079-shard-register"
+  });
+
+  assert.deepStrictEqual(manifest.productMaterialization.declaredModuleNames, [
+    "api",
+    "worker"
+  ]);
+  assert.deepStrictEqual(
+    manifest.productMaterialization.executionShards.map((shard) => shard.moduleName),
+    ["api", "worker"]
+  );
+  assert.deepStrictEqual(
+    manifest.productMaterialization.executionShards.map((shard) => shard.shardId),
+    ["test-shard-01-api", "test-shard-02-worker"]
+  );
+  assert.deepStrictEqual(
+    manifest.productMaterialization.executionShards.map((shard) => shard.command),
+    ["npm test --workspace api", "npm test --workspace worker"]
+  );
+  assert(
+    manifest.traversalObligationContext.trancheKeys.includes(
+      "execution_shard:test-shard-01-api"
+    )
+  );
+  assert.equal(
+    manifest.productMaterialization.executionShards.every(
+      (shard) =>
+        shard.requiredEvidenceKind === "sdlc_worker_execution_evidence" &&
+        shard.retryPolicy === "same_shard_then_triage"
+    ),
+    true
+  );
+});
+
+test("T-093 ABG-owned start produces and consumes schedule surfaces", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -199,7 +264,8 @@ test("T-093 autonomous start produces and consumes schedule surfaces", async () 
     `process://node?script=${encodeURIComponent(workerScript)}`
   ]);
   assert.equal(start.status, "ok");
-  assert.equal(start.payload.loop.stoppedBy, "converged");
+  assert.equal(start.payload.status, "converged");
+  assert.equal("loop" in start.payload, false);
 
   const edgeLogPath = path.join(
     workspace,
@@ -221,10 +287,14 @@ test("T-093 autonomous start produces and consumes schedule surfaces", async () 
   const testRun = entries.find(
     (entry) => entry.edgeName === "derive_test_run_archive_surface"
   );
+  const testExecutionResult = entries.find(
+    (entry) => entry.edgeName === "derive_test_execution_result_surface"
+  );
 
   assert(realizationSchedule);
   assert(code);
   assert(testSchedule);
+  assert(testExecutionResult);
   assert(testRun);
   assert(
     edgeNames.indexOf("derive_realization_schedule_surface") <
@@ -232,10 +302,16 @@ test("T-093 autonomous start produces and consumes schedule surfaces", async () 
   );
   assert(
     edgeNames.indexOf("derive_test_schedule_surface") <
+      edgeNames.indexOf("derive_test_execution_result_surface")
+  );
+  assert(
+    edgeNames.indexOf("derive_test_execution_result_surface") <
       edgeNames.indexOf("derive_test_run_archive_surface")
   );
   assert(code.inputAssetTypes.includes("realization_schedule_surface"));
+  assert(testExecutionResult.inputAssetTypes.includes("test_execution_surface"));
   assert(testRun.inputAssetTypes.includes("test_schedule_surface"));
+  assert(testRun.inputAssetTypes.includes("test_execution_result_surface"));
 
   const realizationScheduleText = readFileSync(
     realizationSchedule.outputFile,

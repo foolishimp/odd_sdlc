@@ -53,11 +53,66 @@ export interface SdlcWorkerRunResult {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly status: number | null;
-  readonly signal: NodeJS.Signals | null;
+  readonly signal: string | null;
   readonly elapsedMs: number;
+  readonly timedOut: boolean;
+  readonly stdoutByteCount: number;
+  readonly stderrByteCount: number;
   readonly stdoutPath: string;
   readonly stderrPath: string;
   readonly outputLastMessagePath: string | null;
+  readonly error: string | null;
+}
+
+export interface SdlcWorkerProcessStartedContext {
+  readonly kind: "sdlc_worker_process_started_context";
+  readonly processStartedRef: string;
+  readonly processEventsRef: string;
+  readonly manifestRef: string;
+  readonly promptRef: string;
+  readonly reportRef: string;
+  readonly outputRef: string;
+  readonly stdoutRef: string;
+  readonly stderrRef: string;
+  readonly actorInvocationId: string;
+  readonly edge: string;
+  readonly vectorIndex: number;
+  readonly pid: number | null;
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly timeoutMs: number;
+  readonly inactivityTimeoutMs: number;
+  readonly heartbeatMs: number;
+}
+
+export interface SdlcWorkerProcessSummary {
+  readonly kind: "sdlc_worker_process_summary";
+  readonly processStartedRef: string;
+  readonly processEventsRef: string;
+  readonly manifestRef: string;
+  readonly promptRef: string;
+  readonly reportRef: string;
+  readonly outputRef: string;
+  readonly stdoutRef: string;
+  readonly stderrRef: string;
+  readonly pid: number | null;
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly timeoutMs: number;
+  readonly inactivityTimeoutMs: number;
+  readonly heartbeatMs: number;
+  readonly lastHeartbeatIndex: number | null;
+  readonly lastHeartbeatElapsedMs: number | null;
+  readonly signalSequence: readonly {
+    readonly signal: string;
+    readonly elapsedMs: number;
+  }[];
+  readonly status: number | null;
+  readonly signal: string | null;
+  readonly elapsedMs: number;
+  readonly timedOut: boolean;
   readonly error: string | null;
 }
 
@@ -80,6 +135,22 @@ export interface SdlcProductMaterializationContract {
   readonly testExecutionContract: string;
   readonly manifestFile: string;
   readonly requiredRoles: readonly SdlcMaterializedProductFileRole[];
+  readonly executionShards: readonly SdlcExecutionShard[];
+}
+
+export interface SdlcExecutionShard {
+  readonly kind: "sdlc_execution_shard";
+  readonly shardId: string;
+  readonly lane: "test";
+  readonly moduleName: string;
+  readonly command: string;
+  readonly workingDirectory: string;
+  readonly timeoutMs: number;
+  readonly inactivityTimeoutMs: number;
+  readonly expectedReportRefs: readonly string[];
+  readonly allowedByproductGlobs: readonly string[];
+  readonly requiredEvidenceKind: "sdlc_worker_execution_evidence";
+  readonly retryPolicy: "same_shard_then_triage";
 }
 
 export interface SdlcMaterializedProductFile {
@@ -94,6 +165,20 @@ export interface SdlcMaterializedProductFile {
 export interface SdlcWorkerExecutionEvidence {
   readonly kind: "sdlc_worker_execution_evidence";
   readonly lane: "build" | "test";
+  readonly command: string;
+  readonly status: "succeeded" | "failed" | "pending";
+  readonly reportRefs: readonly string[];
+  readonly testsObserved: number | null;
+  readonly passedCount: number | null;
+  readonly failedCount: number | null;
+  readonly shardEvidence: readonly SdlcWorkerExecutionShardEvidence[];
+}
+
+export interface SdlcWorkerExecutionShardEvidence {
+  readonly kind: "sdlc_worker_execution_shard_evidence";
+  readonly shardId: string;
+  readonly moduleName: string;
+  readonly lane: "test";
   readonly command: string;
   readonly status: "succeeded" | "failed" | "pending";
   readonly reportRefs: readonly string[];
@@ -247,6 +332,7 @@ export interface SdlcWorkerRetryContext {
     readonly retryRunId: string;
     readonly retryCallId: string;
     readonly manifestId: string;
+    readonly priorManifestId: string;
     readonly attemptIndex: number;
     readonly sourceProjectionRef: string;
   }[];
@@ -310,6 +396,7 @@ export interface SdlcWorkerResultReport {
   readonly unresolvedReasons: readonly string[];
   readonly materializedFiles: readonly SdlcMaterializedProductFile[];
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+  readonly executionEvidenceErrors: readonly string[];
   readonly obligationAssessments: readonly SdlcWorkerObligationAssessment[];
 }
 

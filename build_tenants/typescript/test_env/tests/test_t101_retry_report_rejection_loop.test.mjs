@@ -92,22 +92,23 @@ function writeRetryWorker(workspaceRoot) {
       "const counts = existsSync(countsPath) ? JSON.parse(readFileSync(countsPath, 'utf8')) : {};",
       "counts[manifest.edgeName] = (counts[manifest.edgeName] ?? 0) + 1;",
       "writeFileSync(countsPath, `${JSON.stringify(counts, null, 2)}\\n`, 'utf8');",
-      "const priorGapCount = manifest.traversalObligationContext.obligations.filter((obligation) => obligation.obligationKind === 'prior_gap').length;",
+      "const priorGapCount = manifest.traversalObligationContext.deltaSummary.priorGapCount;",
       "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
       "function digestText(content) { return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`; }",
       "function materializedFile(role, relativePath, content) { const absolutePath = path.join(manifest.productMaterialization.tenantRoot, relativePath); mkdirSync(dirname(absolutePath), { recursive: true }); writeFileSync(absolutePath, content, 'utf8'); return { kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath, digest: digestText(content), byteCount: Buffer.byteLength(content, 'utf8') }; }",
       "const materializedFiles = [];",
-      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `attempt: ${counts[manifest.edgeName]}`, `prior_gap_count: ${priorGapCount}`, ''];",
+      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `attempt: ${counts[manifest.edgeName]}`, `prior_gap_count: ${priorGapCount}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), ''];",
       "if (manifest.targetAssetType.endsWith('_schedule_surface')) { outputLines.push('## module_dependency_graph', '- node: retry-core', '## realization_tranches', '- id: RT-001 | module: retry-core | state: open', '## tranche_obligation_ledger', '- RT-001: REQ-T101-001', '## tranche_gap_ledger', '- RT-001: open', '## next_tranche_selector', '- next: RT-001'); }",
+      "if (manifest.edgeName === 'derive_code_surface' && counts[manifest.edgeName] === 1) { process.exit(0); }",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "const outputContent = `${outputLines.join('\\n')}\\n`;",
       "writeFileSync(manifest.outputFile, outputContent, 'utf8');",
       "if (manifest.targetAssetType === 'code_surface') { materializedFiles.push(materializedFile('source', 'src/index.ts', ['// Implements: REQ-T101-001', 'export function retryCore(): string {', \"  return 'retry-core';\", '}', ''].join('\\n'))); }",
       "if (manifest.targetAssetType === 'test_module_surface') { materializedFiles.push(materializedFile('test', 'test/index.test.ts', ['// Validates: REQ-T101-002', \"import test from 'node:test';\", \"import assert from 'node:assert/strict';\", \"test('retry core', () => {\", \"  assert.equal('retry-core', 'retry-core');\", '});', ''].join('\\n'))); }",
-      "if (manifest.edgeName === 'derive_code_surface' && counts[manifest.edgeName] === 1) { process.exit(0); }",
       "const evidenceRefs = [manifest.outputFile, ...materializedFiles.map((file) => file.absolutePath)];",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [...evidenceRefs, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "const executionEvidence = manifest.targetAssetType === 'test_run_archive_surface' ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 } : null;",
+      "const shardEvidence = manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 }));",
+      "const executionEvidence = manifest.targetAssetType === 'test_execution_result_surface' ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: shardEvidence.length, passedCount: shardEvidence.length, failedCount: 0, shardEvidence } : null;",
       "const report = { kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: digestText(outputContent), summary: `generated ${manifest.targetAssetType}`, unresolvedReasons: [], materializedFiles, executionEvidence, obligationAssessments };",
       "writeFileSync(manifest.reportFile, `${JSON.stringify(report, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
@@ -116,7 +117,7 @@ function writeRetryWorker(workspaceRoot) {
   return workerPath;
 }
 
-test("T-101 autonomous loop continues retry-eligible worker report rejection", async () => {
+test("T-101 ABG-owned iteration continues retry-eligible worker report rejection", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -127,12 +128,24 @@ test("T-101 autonomous loop continues retry-eligible worker report rejection", a
   assert.equal(install.kind, "installed");
 
   const workerScript = writeRetryWorker(workspace);
-  const start = await runOddSdlcCliAsync([
+  const conform = await runOddSdlcCliAsync([
     "start",
     "--workspace",
     workspace,
     "--target",
     "next",
+    "--until",
+    "converged"
+  ]);
+  assert.equal(conform.status, "ok");
+  assert.equal(conform.payload.status, "converged");
+
+  const start = await runOddSdlcCliAsync([
+    "start",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:bootstrap_release_self_test",
     "--until",
     "blocked",
     "--worker",
@@ -140,20 +153,15 @@ test("T-101 autonomous loop continues retry-eligible worker report rejection", a
   ]);
 
   assert.equal(start.status, "ok");
-  assert.equal(start.payload.loop.stoppedBy, "converged");
-
-  const steps = start.payload.loop.steps;
-  const rejectedIndex = steps.findIndex(
-    (step) =>
-      step.status === "worker_report_rejected" &&
-      step.currentEdge === "derive_code_surface"
-  );
-  assert.notEqual(rejectedIndex, -1);
-  assert.equal(steps[rejectedIndex].nextLawfulAction, "retry_same_edge_with_gap_dossier");
-  assert.equal(steps[rejectedIndex + 1].status, "worker_invoked");
+  assert.equal(start.payload.status, "converged");
+  assert.equal("loop" in start.payload, false);
   assert.equal(
-    steps[rejectedIndex + 1].currentEdge,
-    "derive_test_design_surface"
+    start.payload.emittedRuntimeEventKinds.includes("retry_repair_planned"),
+    true
+  );
+  assert.equal(
+    start.payload.emittedRuntimeEventKinds.includes("retry_progress_recorded"),
+    true
   );
 
   const edgeLog = readFileSync(
@@ -169,4 +177,9 @@ test("T-101 autonomous loop continues retry-eligible worker report rejection", a
   assert.equal(codeAttempts.length, 2);
   assert.equal(codeAttempts[0].priorGapCount, 0);
   assert(codeAttempts[1].priorGapCount > 0);
+  const testDesignAttempts = edgeLog.filter(
+    (entry) => entry.edgeName === "derive_test_design_surface"
+  );
+  assert(testDesignAttempts.length > 0);
+  assert.equal(testDesignAttempts[0].priorGapCount, 0);
 });

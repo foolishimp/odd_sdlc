@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import {
   admitSdlcProjectConstraints,
   admitSdlcPublicStartRequest,
+  conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcWorkspaceIngressReport,
   projectSdlcQueryDomain,
@@ -21,8 +22,9 @@ import {
 
 function startContext() {
   const module = constructSdlcGtlModule();
+  const workspaceRoot = "/workspace/t033";
   const ingressReport = deriveSdlcWorkspaceIngressReport({
-    workspaceRootUri: "file:///workspace/t033",
+    workspaceRootUri: `file://${workspaceRoot}`,
     projectConstraints: admitSdlcProjectConstraints({
       projectSlug: "t033",
       activeTenant: "typescript",
@@ -33,7 +35,21 @@ function startContext() {
     sourceInputs: []
   });
   const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
-  return { module, queryDomain };
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText: [
+      "project:",
+      "  name: t033",
+      "  selected_output_root: build_tenants/typescript",
+      "  ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  typescript:",
+      "    output_dir: build_tenants/typescript",
+      "    capability_contracts:",
+      "      - transport_contract"
+    ].join("\n")
+  });
+  return { module, queryDomain, conformedProject };
 }
 
 test("T-033 public start admits closed request grammar", () => {
@@ -73,7 +89,7 @@ test("T-057 public start target resolution policy is declared data", () => {
 });
 
 test("T-033 F_P public start blocks on unattached worker after execution contract admission", () => {
-  const { module, queryDomain } = startContext();
+  const { module, queryDomain, conformedProject } = startContext();
   const outcome = publicStartOnce({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
@@ -83,6 +99,7 @@ test("T-033 F_P public start blocks on unattached worker after execution contrac
     }),
     module,
     queryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
   });
 
@@ -91,11 +108,12 @@ test("T-033 F_P public start blocks on unattached worker after execution contrac
   assert.equal(outcome.stopPredicate, "worker_attachment_required");
   assert(outcome.executionContract);
   assert.equal(outcome.executionContract.targetGraphFunction, "bootstrap_release_self_test");
+  assert.equal(outcome.executionContract.conformedProject.activeTenant, "typescript");
   assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, []);
 });
 
 test("T-033 attached public start projects one ABI handoff without iterating internally", () => {
-  const { module, queryDomain } = startContext();
+  const { module, queryDomain, conformedProject } = startContext();
   const outcome = publicStartOnce({
     request: admitSdlcPublicStartRequest({
       workspaceRoot: "/workspace/t033",
@@ -105,6 +123,7 @@ test("T-033 attached public start projects one ABI handoff without iterating int
     }),
     module,
     queryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "transport://test-worker"
     })
@@ -136,7 +155,7 @@ test("T-044 worker attachment rejects empty transport contracts", () => {
 });
 
 test("T-033 stale query-domain target blocks instead of throwing during ABI admission", () => {
-  const { module, queryDomain } = startContext();
+  const { module, queryDomain, conformedProject } = startContext();
   const staleModule = {
     ...module,
     graphFunctions: module.graphFunctions.filter(
@@ -152,6 +171,7 @@ test("T-033 stale query-domain target blocks instead of throwing during ABI admi
     }),
     module: staleModule,
     queryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "transport://test-worker"
     })
@@ -163,7 +183,7 @@ test("T-033 stale query-domain target blocks instead of throwing during ABI admi
 });
 
 test("T-033 stale asset ownership projection also blocks as stale query-domain", () => {
-  const { module, queryDomain } = startContext();
+  const { module, queryDomain, conformedProject } = startContext();
   const staleQueryDomain = {
     ...queryDomain,
     assetOwnership: [
@@ -192,6 +212,7 @@ test("T-033 stale asset ownership projection also blocks as stale query-domain",
     }),
     module,
     queryDomain: staleQueryDomain,
+    conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "transport://test-worker"
     })

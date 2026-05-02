@@ -17,6 +17,7 @@ import {
   admitSdlcProjectConstraints,
   admitSdlcRequirementProofClaim,
   classifySdlcGapObservation,
+  conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
   deriveSdlcLineageLedger,
   deriveSdlcSourceInput,
@@ -201,6 +202,21 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
     ingressReport: ingress,
     currentDossierRefs: ["test://t038/dossier"]
   });
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot: "/tmp/t038",
+    constraintsText: [
+      "project:",
+      "  name: data_mapper",
+      "  selected_output_root: build_tenants/typescript",
+      "  ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  typescript:",
+      "    output_dir: build_tenants/typescript",
+      "    capability_contracts:",
+      "      - build_runner",
+      "      - runtime_return_channel"
+    ].join("\n")
+  });
 
   const workerAttachment = projectSdlcWorkerAttachment({
     transportContract: "transport://t038/harnessed-fp"
@@ -218,6 +234,7 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
     },
     module,
     queryDomain,
+    conformedProject,
     workerAttachment
   });
 
