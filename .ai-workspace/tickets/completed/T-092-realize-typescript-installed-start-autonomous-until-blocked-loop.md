@@ -55,6 +55,27 @@ non_closure_conditions:
   - live data_mapper evidence still requires manual `gaps -> start` between successful edges
 ---
 
+## Supersession Notice - 2026-05-01
+
+This ticket is superseded as architecture.
+
+The implementation proved a useful operator shell, but the ticket's target
+truth misframed that shell as an installed odd_sdlc autonomous loop. The
+operator later clarified the intended boundary: odd_sdlc should not own a loop
+that re-enters ABG one vector at a time. At most, odd_sdlc may provide a thin
+shell or installed context instructions (`AGENTS.md` / `CLAUDE.md`) that tell
+an agent how to start ABG. Runtime traversal, retry budget, vector advancement,
+continuation, and closure are ABG responsibilities.
+
+Therefore the completed evidence below is historical containment evidence, not
+accepted final architecture. The active correction is:
+
+- T-102: typed F_P function stages and ABG-owned admission flow.
+- T-105: migrate `start --until converged` to ABG-owned whole-graph iteration.
+
+T-092 must not be cited as authority for odd_sdlc owning an autonomous
+multi-edge traversal loop.
+
 ## STDO Triage
 
 First missing layer: design.

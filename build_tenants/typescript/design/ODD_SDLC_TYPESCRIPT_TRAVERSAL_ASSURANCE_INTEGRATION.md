@@ -138,12 +138,14 @@ The fold result is total:
 | `blocked` | emit typed blocked gap pressure |
 | `reprice_required` | emit typed reprice pressure |
 
-## Autonomous Retry Closure
+## ABG-Owned Retry And Continuation Closure
 
 Worker report admission failure is not success, but it is also not terminal
 when the operator has already converted it into retry/repair runtime truth.
 
-The installed loop follows the operator transition, not the symptom label:
+The installed operator does not own a traversal loop. It exposes odd_sdlc F_P
+dispatch as an ABG engine plugin and lets ABG whole-graph iteration decide
+whether the current vector retries, advances, blocks, or converges.
 
 ```text
 worker report missing or malformed
@@ -151,13 +153,14 @@ worker report missing or malformed
   -> SdlcPostflightGapDossier
   -> retry/continuation runtime events
   -> nextLawfulAction = retry_same_edge_with_gap_dossier
-  -> continue start loop with prior gap pressure
+  -> ABG retry frontier decides whether the same vector receives prior gap pressure
 ```
 
-The next attempt receives the prior gap dossier as
-`prior_gap:*` traversal obligations. The loop stops only when the retry policy
-does not emit retry repair truth, or when a genuine terminal blocked, failed,
-or converged state is reached.
+When ABG schedules a retry, the next attempt receives the prior gap dossier as
+`prior_gap:*` traversal obligations. The runner stops only when ABG reaches a
+terminal blocked, failed, or converged state for the selected graph function.
+The CLI and installed operator may serialize the result and archives, but they
+do not own vector advancement or the retry fold.
 
 ## Design Rule
 

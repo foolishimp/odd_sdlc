@@ -20,6 +20,9 @@ surfaces under `build_tenants/`.
   caveats and known limitations for the active `odd_sdlc` wave
 - [ODD_SDLC_RC_RELEASE_NOTE.md](./ODD_SDLC_RC_RELEASE_NOTE.md) records the
   current `odd_sdlc` release-candidate shipment summary and verification footer
+- [ODD_SDLC_DOMAIN_MODEL.md](./ODD_SDLC_DOMAIN_MODEL.md) publishes the current
+  UI-facing domain model, graph-function catalog, and projection vocabulary for
+  `odd_sdlc`
 
 OODD (Organisation Outcome-Driven Development) is methodology-layer material
 above `odd_sdlc` and lives in the methodology repo at

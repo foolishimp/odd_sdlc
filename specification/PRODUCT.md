@@ -261,6 +261,23 @@ Examples include:
 Without the required capability asset, an executional or operational edge may
 not converge.
 
+Technology capability law is declared product or tenant truth, not hidden core
+runtime behavior. `odd_sdlc` owns the carrier that binds capability,
+execution intent, returned evidence, gap routing, and closure. The active
+project or build tenant owns stack-specific build, test, deployment, and
+runtime semantics through declared capability assets, tenant policy, or
+tenant-local validation surfaces. Core SDLC may require, execute, admit, and
+route those declared validators and their evidence; it does not hard-code
+downstream ecosystem grammar as generic SDLC law.
+
+Implementation defects discovered by declared build, test, lint, typecheck,
+validation, or runtime-return evidence are ordinary worksite repair pressure.
+They block closure and re-enter the constructive iteration loop. `odd_sdlc`
+admits and routes the returned evidence; the agentic coder or tenant-local
+validator repairs the concrete language, framework, dependency, spelling,
+configuration, or runtime defect. Core SDLC does not encode those defect
+grammars as product law.
+
 ### Requirement Closure Register
 
 A machine-readable governed asset that records the live requirement inventory,

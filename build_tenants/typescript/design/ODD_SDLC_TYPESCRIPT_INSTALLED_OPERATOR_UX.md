@@ -236,5 +236,5 @@ Global optimization:
 
 The first slice proves one constructive edge from the installed command path.
 It does not claim full Python parity, multi-edge autonomous convergence, or
-generic ABG output allocation. Those remain RC work until the installed loop is
-expanded and replay proof covers the full data-mapper walk.
+generic ABG output allocation. Those remain RC work for ABG-owned whole-graph
+iteration evidence and replay proof over the full data-mapper walk.

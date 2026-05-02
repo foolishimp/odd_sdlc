@@ -1,18 +1,18 @@
 ---
 id: T-041
-title: Evaluate TypeScript full operational Python-replacement RC lane
+title: Close TypeScript bounded RC on successful data_mapper build
 type: feature
 ticket_category: build_wave_followup
 status: active
-goal: future-full-python-replacement-rc
-change_intent: Evaluate the bounded odd_sdlc.TS package as a full operational replacement candidate by applying the active TypeScript design, data_mapper qualification evidence, and Python comparison surfaces.
+goal: typescript-bounded-data-mapper-build-rc
+change_intent: Close the current odd_sdlc.TS bounded RC claim by proving a successful live data_mapper build through the installed TypeScript operator path, while preserving wider historical Python-comparison work as deferred scope.
 change_class: product_reprice
 re_entry_point: product_definition
-affected_boundary: TypeScript CLI/install adapter, installed workspace normalization, live F_P data_mapper qualification traversal, active total transition function, release-cut packaging, historical data_mapper qualification baseline comparator, run archive comparison
+affected_boundary: TypeScript CLI/install adapter, installed workspace normalization, live Claude F_P data_mapper build traversal, active total transition function, release-cut packaging, run archive comparison
 priority: medium
 triaged_at: 2026-04-26
 created_at: 2026-04-26
-updated_at: 2026-04-27T17:28:36Z
+updated_at: 2026-04-30T09:00:00Z
 dependencies:
   - T-087 completed
   - T-088 completed
@@ -37,41 +37,40 @@ governance_scope_expansion:
   - T: TICKET_METHOD.md
   - D: DESIGN_MODULE_METHOD.md
   - O: ODD_METHOD.md
-intake_source: T-038 RC qualification report bounded the TypeScript release claim and identified the remaining full Python-replacement surfaces.
+intake_source: T-038 RC qualification report bounded the TypeScript release claim; operator decision now sets T-041 closure on a successful live data_mapper build through the production TypeScript operator path.
 active_design_refs:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TENANT_DERIVATION.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_LIVE_FP_DATA_MAPPER_QUALIFICATION.md
-target_truth: odd_sdlc.TS can be evaluated as a full operational replacement candidate for Python, with side-effecting workspace install/normalize, public CLI, live F_P traversal over the independent data_mapper qualification workload, total-function traversal evidence, release-cut packaging, governed comparison against the historical data_mapper qualification baseline, and postmortem archive comparison.
-superseded_truth: bounded TypeScript package RC qualification is equivalent to full Python operational parity.
-closure_law: this ticket closes only when TypeScript proves the full operational claim through unit, harnessed sandbox, live F_P, installed-workspace, release-cut, active total-function traversal evidence, and a governed comparator applied to admitted Python and TypeScript data_mapper evidence.
+target_truth: odd_sdlc.TS can close the current bounded RC claim when the installed TypeScript operator path successfully builds the independent data_mapper workload through a real live worker lane, preserves ABG-owned traversal/runtime truth, and writes a governed postmortem archive over the production path.
+superseded_truth: current bounded RC closure requires full Python operational replacement parity or historical multi-edge comparator equivalence.
+closure_law: this ticket closes when TypeScript proves the bounded RC claim through installed-workspace mutation, public CLI/operator execution, live data_mapper build evidence on the production path, release-cut packaging evidence, and truthful postmortem/archive evidence showing the build succeeded without bypassing ABG or relying on premature closure.
 evaluation_criteria:
   - CLI command grammar exposes the shared install/start/gaps/release operator surface without bypassing graph-function and ABG authority
   - install and normalize prepare an imported target workspace while preserving project-owned authority, substrate-owned surfaces, and installer-owned domain surfaces
-  - live data_mapper qualification traversal uses an external F_P worker and records the postmortem archive
+  - live data_mapper build traversal uses an external live worker on the production installed-operator path and records the postmortem archive
   - release-cut packaging and binary binding are produced by declared TypeScript surfaces rather than inferred from local dev commands
-  - Python comparison states behavioral parity, intentional difference, and remaining gaps with evidence
-  - historical data_mapper qualification comparator reports baseline metrics, required functional families, recursive-deepening evidence, authority-to-code gaps, code-to-test gaps, execution reports, and explicit repricing for intentional differences
+  - the successful data_mapper build materializes the expected tenant-root product files and required build/test evidence for the traversed workload
+  - the run remains truthful about open gaps, retries, and blocking reasons and does not collapse build success into unsupported historical parity claims
 proof_surface:
   - TypeScript CLI/install design
   - installed-workspace sandbox archive
-  - live F_P run archive
+  - live data_mapper build run archive
   - release-cut artifact evidence
-  - Python parity postmortem
-  - applied historical data_mapper qualification comparator report
+  - bounded RC postmortem
 non_closure_conditions:
   - live F_P behavior is claimed without live worker evidence
   - workspace mutation happens outside an adapter that preserves ODD authority boundaries
   - CLI commands decide internal traversal outside ABG
   - release evidence is inferred from semantic tests alone
-  - bounded package RC is confused with full operational replacement
-  - exact historical baseline file counts are used as the closure rule while functional parity remains unproved
+  - a sandbox-only or harness-only pass is substituted for the production installed-operator path
+  - bounded RC closure is confused with full historical Python replacement or multi-edge parity
 ---
 
 ## STDO Reading
 
-T-038 proves a bounded TypeScript package RC. This ticket is the future wider
-operational claim.
+T-038 proves a bounded TypeScript package RC. This ticket now carries the
+current bounded closure bar for the live data_mapper build workload.
 
 It must not translate Python file boundaries directly. It must extract the
 Python-observed behavior into graph-function programs, typed carriers, ABG
@@ -79,7 +78,11 @@ runtime truth, public adapters, and qualification archives.
 
 ## Triage Note
 
-This ticket is not closable in the bounded TypeScript RC pass.
+This ticket is closable in the bounded TypeScript RC pass once the live
+data_mapper build succeeds through the production installed-operator path.
+
+The wider historical Python-replacement and multi-edge comparator claim is
+deferred to `backlog/T-103-evaluate-historical-data-mapper-depth-and-python-parity.md`.
 
 ## 2026-04-28 Dependency Closeout
 
@@ -99,12 +102,12 @@ Current verified TypeScript semantic state:
 - `ODD_SDLC_TS_LIVE_FP=1 npm run test:live` passed, 1 test,
   361.673s
 
-Remaining T-041 work is the full operational RC envelope: live external F_P
-data_mapper evidence has been refreshed at
+Remaining T-041 work is the bounded live data_mapper build proof: live external
+F_P data_mapper evidence has been refreshed at
 `build_tenants/typescript/test_env/test_runs/t053_live_data_mapper/20260428T042026358Z_pid46962`.
-The remaining work is release-cut packaging evidence and governed comparison
-against the historical Python/data_mapper baseline. It is intentionally not
-closed by semantic, sandbox, or single live-dispatch proof alone.
+The remaining work is a successful production-path build run plus current
+release-cut evidence. It is intentionally not closed by semantic, sandbox, or
+non-production live-dispatch proof alone.
 
 T-089 corrected the immediate T-087/T-088 pressure-loss defect by forcing
 non-empty target/evaluator/requirement/prior-gap obligation pressure on prompt
@@ -116,11 +119,8 @@ closed-edge semantics without first repricing product/requirement authority.
 The current tenant has a bounded public CLI adapter from T-058 and
 side-effecting install/normalize plus release-cut package evidence from T-059.
 T-053 closed the first live external `F_P` data_mapper qualification lane.
-These proofs are preconditions, not the final full operational replacement
-claim. T-060 publishes side-by-side Python archive comparison and identifies
-the remaining go/no-go question: whether full RC requires Python's historical
-multi-edge `data_mapper` qualification depth beyond the current TypeScript
-live single-edge proof.
+These proofs are preconditions to the current bounded close. T-060 remains
+useful comparison evidence, but it is no longer the closure gate for T-041.
 
 Operator clarification:
 
@@ -146,9 +146,9 @@ The TypeScript live-test build-out is split into and completed by:
 
 T-053 owns the concrete `test:live` lane, external `F_P` worker dispatch,
 ABG-installed workspace setup, data_mapper qualification scenario binding, and
-live archive proof. T-041 remains the wider operational replacement envelope
-covering CLI replacement, install/normalize behavior, release-cut packaging,
-and Python comparison.
+live archive proof. T-041 remains the bounded RC envelope covering CLI
+replacement, install/normalize behavior, release-cut packaging, and the
+production-path data_mapper build proof.
 
 The operational blocker map is split into:
 
@@ -156,7 +156,7 @@ The operational blocker map is split into:
 
 T-054 owns the single control surface that classifies Python-to-TypeScript
 operational gaps, maps each blocker to a ticket, and distinguishes bounded
-package RC from full operational Python-replacement RC.
+package RC from any future wider historical-parity claim.
 
 Control surface:
 
@@ -167,7 +167,7 @@ The reusable graph-function library implementation is split into:
 - `T-055-realize-typescript-reusable-single-typed-traversal-library-slice.md`
 - `T-056-realize-typescript-ingress-project-library-slice.md`
 
-These tickets prevent full operational RC from hardening around product-local
+These tickets prevent bounded RC from hardening around product-local
 leaf functions and TypeScript helper loops instead of reusable GTL/ABG program
 truth.
 
@@ -187,7 +187,7 @@ completed by:
 T-059 proves package-backed install, ABG runtime population, installed command
 execution, normalization/bootstrap surfaces, and release-cut package/binary
 evidence. It does not close Python archive comparison or final full
-operational replacement.
+historical parity.
 
 The TypeScript/Python archive comparison is split into and completed by:
 
@@ -195,8 +195,8 @@ The TypeScript/Python archive comparison is split into and completed by:
 
 T-060 proves the comparison surface exists. It does not itself prove
 multi-edge `data_mapper` qualification equivalence. The remaining T-041
-decision is whether that depth is required before full operational RC can
-close.
+decision is no longer whether that depth is required for bounded closure. That
+depth is deferred to `T-103`.
 
 The historical data_mapper qualification comparator is consolidated into this RC envelope from:
 
@@ -215,18 +215,36 @@ Closed preconditions:
 - install/normalize and release-cut package evidence: T-059
 - TypeScript/Python archive comparison: T-060
 
-Remaining full-RC question:
+Remaining bounded-RC question:
 
-- If full operational RC means "current TypeScript package can be released as
-  bounded ODD-native tenant with install, release-cut, sandbox, and one live
-  data_mapper qualification edge proof", the evidence is present.
-- If full operational RC means "TypeScript replaces Python's historical
-  multi-edge data_mapper qualification depth", this ticket remains open. The
-  current TypeScript evidence does not yet prove that depth.
+- Does the production installed-operator path complete a successful live
+  data_mapper build with truthful archive evidence and no premature closure?
 
-The next lawful action is an operator go/no-go decision on that bar, followed
-by either closing T-041 as bounded-RC-sufficient or carving a focused
-multi-edge data_mapper qualification-convergence ticket from this envelope.
+The operator decision on the closure bar is now made. When that build succeeds,
+T-041 may close. Historical Python parity and multi-edge depth remain deferred
+scope, not current closure gates.
+
+## Test64 RC Closure Assessment - 2026-05-01
+
+Fresh successor lane:
+
+`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test64.TS.cl`
+
+Outcome:
+
+- the installed TypeScript operator path reached `derive_code_surface`;
+- the terminal archive was
+  `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test64.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T083037157Z_pid63915`;
+- postflight blocked with typed `silent_worker_inactivity`;
+- the final gap dossier has `retryEligible: false` and
+  `nextLawfulActions: ["triage_gap"]`.
+
+This is not RC closure evidence. The lane did not complete code
+materialization, build execution, test execution, release qualification, or a
+successful data_mapper build through the production installed-operator path.
+
+T-041 remains active. The current lawful interpretation is a real live-lane
+blocker, not a bounded RC pass.
 
 ## 2026-04-28 Test52 Bootstrap Closure Bug
 
@@ -267,13 +285,13 @@ Tracked by:
 
 ## 2026-04-28 Project Induction Blocker
 
-Fresh `data_mapper.test51.ts` evidence invalidates the current full-RC path
+Fresh `data_mapper.test51.ts` evidence invalidated the earlier wider RC path
 before downstream code quality can be evaluated. TypeScript install/start
 allowed downstream traversal while the imported workspace lacked the required
 spec_method induction topology, including `specification/requirements/`.
 
-`T-087` is now a critical blocker for this RC envelope. Full operational RC
-requires TypeScript to prove project induction as graph-function-owned `F_D`
+`T-087` became a critical blocker for this RC envelope. Bounded RC requires
+TypeScript to prove project induction as graph-function-owned `F_D`
 truth before any downstream SDLC graph-program edge opens.
 
 ## 2026-04-27 Installed Data Mapper Test46 Evidence
@@ -305,7 +323,7 @@ Observed live defects:
 2. `derive_code_surface` produced only
    `.ai-workspace/runtime/odd_sdlc/assets/20260427T095902442Z_pid38741/code_surface.md`.
    `find build_tenants -maxdepth 5 -type f` failed because `build_tenants/`
-   did not exist. This is the critical full-RC blocker now tracked by
+   did not exist. This was the critical bounded-RC blocker tracked by
    `active/T-066-realize-typescript-downstream-product-code-materialization-over-odd-graph-functions.md`.
 3. `derive_test_run_archive_surface` initially failed hook postflight because
    the installed operator hardcoded constructor `operationType: "generate"`
@@ -320,8 +338,8 @@ Current verdict:
 
 - The TypeScript tenant proves installed graph traversal through a full
   18-vector data_mapper surface graph.
-- The TypeScript tenant does not prove full operational Python replacement.
-  It can currently converge the graph without materializing downstream
+- The TypeScript tenant did not yet prove successful bounded data_mapper build.
+  It could converge the graph without materializing downstream
   product source or tests. T-066 is therefore the governing RC blocker.
 
 ## 2026-04-28 Test55 Managed Traversal Update
@@ -386,9 +404,9 @@ Current verdict:
 
 - The loop, pressure, schedule, retry, and archive evidence laws are materially
   stronger and green.
-- Full RC is still not claimed until a fresh successor live run proves the
-  worker now materializes SBT-discoverable tests and observes passing tests
-  under the real `data_mapper` workload.
+- Bounded RC is still not claimed until a fresh successor live run proves the
+  worker now materializes SBT-discoverable tests and observes passing build/test
+  evidence under the real `data_mapper` workload.
 
 ## 2026-04-28 Test56 Retry-Eligible Report Rejection Bug
 
@@ -434,7 +452,7 @@ Current verdict:
 
 - retry-eligible report rejection now remains inside the autonomous loop and
   re-enters the same edge with prior-gap pressure
-- full RC remains open until a fresh successor live run proves the corrected
+- bounded RC remains open until a fresh successor live run proves the corrected
   loop against `data_mapper`
 
 ## 2026-04-27 T-066 First Guard Update
@@ -457,6 +475,6 @@ Installed smoke workspace:
 - test materialized:
   `build_tenants/scala_spark/src/test/scala/generated/DataMapperSpec.scala`
 
-This is still not full RC closure. It proves the carrier, tenant-root law, and
-postflight rejection rule. It does not yet prove live F_P enterprise-depth
-`data_mapper` realization against the historical qualification baseline.
+This is still not bounded RC closure. It proves the carrier, tenant-root law,
+and postflight rejection rule. It does not yet prove the live production-path
+`data_mapper` build through the installed operator.
