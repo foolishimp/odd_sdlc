@@ -196,10 +196,15 @@ function tenantRoot(activeTenant: string): string {
   return `build_tenants/${activeTenant}`;
 }
 
-function normalizeOutputRoot(value: string, activeTenant: string): string {
+function normalizeDeclaredOutputRoot(value: string, activeTenant: string): string {
   const normalized = nonEmpty(value, tenantRoot(activeTenant)).replace(/\\/g, "/");
   const trimmed = normalized.replace(/\/+$/u, "");
   return trimmed.length === 0 ? tenantRoot(activeTenant) : trimmed;
+}
+
+function canonicalSelectedOutputRoot(value: string, activeTenant: string): string {
+  const declared = normalizeDeclaredOutputRoot(value, activeTenant);
+  return declared.startsWith("build_tenants/") ? declared : tenantRoot(activeTenant);
 }
 
 function newTenant(name: string): MutableTenant {
@@ -639,15 +644,13 @@ export function conformProjectProfileFromConstraintsText(input: {
   const parsed = parseConstraintsText(input.constraintsText);
   const tenant = selectTenant(parsed);
   const activeTenant = canonicalTenantName(nonEmpty(tenant.name, "typescript"));
-  const selectedOutputRoot = normalizeOutputRoot(
-    nonEmpty(
-      tenant.values["output_dir"],
-      nonEmpty(parsed.values["selected_output_root"], tenantRoot(activeTenant))
-    ),
-    activeTenant
-  );
-  const declaredOutputRoot = normalizeOutputRoot(
-    nonEmpty(tenant.values["output_dir"], selectedOutputRoot),
+  const explicitSelectedOutputRoot = nonEmpty(parsed.values["selected_output_root"], "");
+  const declaredTenantOutputRoot = nonEmpty(tenant.values["output_dir"], "");
+  const selectedOutputRoot = explicitSelectedOutputRoot.length > 0
+    ? normalizeDeclaredOutputRoot(explicitSelectedOutputRoot, activeTenant)
+    : canonicalSelectedOutputRoot(declaredTenantOutputRoot, activeTenant);
+  const declaredOutputRoot = normalizeDeclaredOutputRoot(
+    nonEmpty(declaredTenantOutputRoot, selectedOutputRoot),
     activeTenant
   );
   const ambiguityRiskAppetite = normalizeRiskAppetite(
@@ -766,9 +769,21 @@ export function projectConstraintsFromConformProjectProfile(
 export function deriveSdlcConformProjectReportFromWorkspace(
   workspaceRoot: string
 ): SdlcConformProjectReport {
-  const profile = deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
+  return deriveSdlcConformProjectReportFromWorkspaces({
+    sourceWorkspaceRoot: workspaceRoot,
+    outputWorkspaceRoot: workspaceRoot
+  });
+}
+
+export function deriveSdlcConformProjectReportFromWorkspaces(input: {
+  readonly sourceWorkspaceRoot: string;
+  readonly outputWorkspaceRoot: string;
+}): SdlcConformProjectReport {
+  const sourceWorkspaceRoot = input.sourceWorkspaceRoot;
+  const outputWorkspaceRoot = input.outputWorkspaceRoot;
+  const profile = deriveSdlcConformProjectProfileFromWorkspace(sourceWorkspaceRoot);
   const topologyRelativePaths = CONFORM_PROJECT_EXPECTED_OUTPUT_RELATIVE_PATHS;
-  const importedRelativePaths = importedSourceRelativePaths(workspaceRoot);
+  const importedRelativePaths = importedSourceRelativePaths(sourceWorkspaceRoot);
   const sourceRefs: readonly string[] = Object.freeze(
     [...new Set([
       PROJECT_CONSTRAINTS_RELATIVE_PATH,
@@ -778,7 +793,7 @@ export function deriveSdlcConformProjectReportFromWorkspace(
       GOALS_RELATIVE_PATH,
       IMPORTED_SOURCES_RELATIVE_PATH
     ])].flatMap((relativePath) => {
-      const absolutePath = path.join(workspaceRoot, relativePath);
+      const absolutePath = path.join(sourceWorkspaceRoot, relativePath);
       return existsSync(absolutePath) && statSync(absolutePath).isFile()
         ? [pathToFileURL(absolutePath).href]
         : [];
@@ -786,7 +801,7 @@ export function deriveSdlcConformProjectReportFromWorkspace(
   );
   const materializedTopologyRefs = Object.freeze(
     topologyRelativePaths.flatMap((relativePath) => {
-      const absolutePath = path.join(workspaceRoot, relativePath);
+      const absolutePath = path.join(outputWorkspaceRoot, relativePath);
       return existsSync(absolutePath) && statSync(absolutePath).isFile()
         ? [pathToFileURL(absolutePath).href]
         : [];
@@ -796,29 +811,29 @@ export function deriveSdlcConformProjectReportFromWorkspace(
   if (sourceRefs.length === 0) {
     conformanceGaps.push("project_constraints_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, PROJECT_CONSTRAINTS_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, PROJECT_CONSTRAINTS_RELATIVE_PATH))) {
     conformanceGaps.push("project_constraints_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, INTENT_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, INTENT_RELATIVE_PATH))) {
     conformanceGaps.push("intent_surface_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, PRODUCT_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, PRODUCT_RELATIVE_PATH))) {
     conformanceGaps.push("product_surface_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, GOALS_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, GOALS_RELATIVE_PATH))) {
     conformanceGaps.push("goals_surface_missing");
   }
-  const requirementsRoot = path.join(workspaceRoot, REQUIREMENTS_DIR_RELATIVE_PATH);
+  const requirementsRoot = path.join(outputWorkspaceRoot, REQUIREMENTS_DIR_RELATIVE_PATH);
   if (!existsSync(requirementsRoot) || !statSync(requirementsRoot).isDirectory()) {
     conformanceGaps.push("requirements_family_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, IMPORTED_SOURCES_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, IMPORTED_SOURCES_RELATIVE_PATH))) {
     conformanceGaps.push("imported_sources_requirement_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, PROJECT_BOOTSTRAP_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, PROJECT_BOOTSTRAP_RELATIVE_PATH))) {
     conformanceGaps.push("project_bootstrap_missing");
   }
-  if (!existsSync(path.join(workspaceRoot, TENANT_REGISTRY_RELATIVE_PATH))) {
+  if (!existsSync(path.join(outputWorkspaceRoot, TENANT_REGISTRY_RELATIVE_PATH))) {
     conformanceGaps.push("tenant_registry_missing");
   }
   if (profile.selectedOutputRoot.startsWith("build_tenants/") === false) {
@@ -828,7 +843,7 @@ export function deriveSdlcConformProjectReportFromWorkspace(
     kind: "sdlc_conform_project_report",
     governingGraphFunction: FG_CONFORM_PROJECT,
     status: conformanceGaps.length === 0 ? "passed" : "blocked",
-    workspaceRootUri: pathToFileURL(workspaceRoot).href,
+    workspaceRootUri: pathToFileURL(outputWorkspaceRoot).href,
     sourceRefs,
     materializedTopologyRefs,
     profile,
@@ -838,8 +853,12 @@ export function deriveSdlcConformProjectReportFromWorkspace(
 
 export function deriveConformProjectManagedTraversalManifest(input: {
   readonly workspaceRoot: string;
+  readonly sourceWorkspaceRoot?: string;
 }): SdlcManagedTraversalManifest {
-  const report = deriveSdlcConformProjectReportFromWorkspace(input.workspaceRoot);
+  const report = deriveSdlcConformProjectReportFromWorkspaces({
+    sourceWorkspaceRoot: input.sourceWorkspaceRoot ?? input.workspaceRoot,
+    outputWorkspaceRoot: input.workspaceRoot
+  });
   return Object.freeze({
     kind: "sdlc_managed_traversal_manifest",
     graphFunctionName: FG_CONFORM_PROJECT,
@@ -950,6 +969,15 @@ function ensureParent(filePath: string): void {
 
 function writeIfMissing(filePath: string, content: string): boolean {
   if (existsSync(filePath)) {
+    return false;
+  }
+  ensureParent(filePath);
+  writeFileSync(filePath, content, "utf8");
+  return true;
+}
+
+function writeIfChanged(filePath: string, content: string): boolean {
+  if (existsSync(filePath) && readFileSync(filePath, "utf8") === content) {
     return false;
   }
   ensureParent(filePath);
@@ -1156,19 +1184,19 @@ function importedRequirementFamilyContents(input: {
 }
 
 function importedSourcesContent(input: {
-  readonly workspaceRoot: string;
+  readonly sourceWorkspaceRoot: string;
   readonly before: SdlcConformProjectReport;
 }): string {
-  const relativePaths = importedSourceRelativePaths(input.workspaceRoot);
+  const relativePaths = importedSourceRelativePaths(input.sourceWorkspaceRoot);
   const refs = relativePaths.length > 0
     ? relativePaths.map((relativePath) =>
-        pathToFileURL(path.join(input.workspaceRoot, relativePath)).href
+        pathToFileURL(path.join(input.sourceWorkspaceRoot, relativePath)).href
       )
     : input.before.sourceRefs.length > 0
       ? input.before.sourceRefs
-      : [pathToFileURL(input.workspaceRoot).href];
+      : [pathToFileURL(input.sourceWorkspaceRoot).href];
   const requirementMarkers = requirementMarkersFromImportedSources({
-    workspaceRoot: input.workspaceRoot,
+    workspaceRoot: input.sourceWorkspaceRoot,
     relativePaths
   });
   return [
@@ -1195,13 +1223,24 @@ function importedSourcesContent(input: {
 
 export function materializeSdlcProjectConformance(input: {
   readonly workspaceRoot: string;
+  readonly sourceWorkspaceRoot?: string;
 }): SdlcConformProjectReport {
-  const before = deriveSdlcConformProjectReportFromWorkspace(input.workspaceRoot);
+  const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? input.workspaceRoot;
+  const before = deriveSdlcConformProjectReportFromWorkspaces({
+    sourceWorkspaceRoot,
+    outputWorkspaceRoot: input.workspaceRoot
+  });
   const profile = before.profile;
   const written: string[] = [];
   const write = (relativePath: string, content: string): void => {
     const absolutePath = path.join(input.workspaceRoot, relativePath);
     if (writeIfMissing(absolutePath, content)) {
+      written.push(pathToFileURL(absolutePath).href);
+    }
+  };
+  const writeCanonical = (relativePath: string, content: string): void => {
+    const absolutePath = path.join(input.workspaceRoot, relativePath);
+    if (writeIfChanged(absolutePath, content)) {
       written.push(pathToFileURL(absolutePath).href);
     }
   };
@@ -1251,12 +1290,12 @@ export function materializeSdlcProjectConformance(input: {
   ].join("\n"));
 
   write(IMPORTED_SOURCES_RELATIVE_PATH, importedSourcesContent({
-    workspaceRoot: input.workspaceRoot,
+    sourceWorkspaceRoot,
     before
   }));
   for (const familyFile of importedRequirementFamilyContents({
-    workspaceRoot: input.workspaceRoot,
-    relativePaths: importedSourceRelativePaths(input.workspaceRoot)
+    workspaceRoot: sourceWorkspaceRoot,
+    relativePaths: importedSourceRelativePaths(sourceWorkspaceRoot)
   })) {
     write(familyFile.relativePath, familyFile.content);
   }
@@ -1273,7 +1312,7 @@ export function materializeSdlcProjectConformance(input: {
     ""
   ].join("\n"));
 
-  write(PROJECT_CONSTRAINTS_RELATIVE_PATH, canonicalProjectConstraints(profile));
+  writeCanonical(PROJECT_CONSTRAINTS_RELATIVE_PATH, canonicalProjectConstraints(profile));
 
   write(TENANT_REGISTRY_RELATIVE_PATH, [
     "# Tenant Registry",
@@ -1284,7 +1323,10 @@ export function materializeSdlcProjectConformance(input: {
     ""
   ].join("\n"));
 
-  const after = deriveSdlcConformProjectReportFromWorkspace(input.workspaceRoot);
+  const after = deriveSdlcConformProjectReportFromWorkspaces({
+    sourceWorkspaceRoot,
+    outputWorkspaceRoot: input.workspaceRoot
+  });
   return Object.freeze({
     ...after,
     materializedTopologyRefs: Object.freeze([

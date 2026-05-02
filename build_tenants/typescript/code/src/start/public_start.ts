@@ -45,6 +45,7 @@ export type SdlcPublicStartUntil =
 export interface SdlcPublicStartRequest {
   readonly kind: "sdlc_public_start_request";
   readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
   readonly target: {
     readonly kind: SdlcPublicStartTargetKind;
     readonly handle: string;
@@ -96,6 +97,7 @@ export function admitSdlcPublicStartRequest(
 ): SdlcPublicStartRequest {
   const record = parseClosedRecord(input, label, [
     "workspaceRoot",
+    "outputWorkspaceRoot",
     "target",
     "until",
     "defaultRegime"
@@ -107,6 +109,13 @@ export function admitSdlcPublicStartRequest(
   return Object.freeze({
     kind: "sdlc_public_start_request",
     workspaceRoot: parseNonEmptyString(record["workspaceRoot"], `${label}.workspaceRoot`),
+    outputWorkspaceRoot: record["outputWorkspaceRoot"] === undefined ||
+      record["outputWorkspaceRoot"] === null
+      ? null
+      : parseNonEmptyString(
+          record["outputWorkspaceRoot"],
+          `${label}.outputWorkspaceRoot`
+        ),
     target: Object.freeze({
       kind: parseEnumValue(
         target["kind"],
@@ -177,6 +186,22 @@ function constructExecutionContract(input: {
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
 }): SdlcExecutionContract {
+  const requestedOutputs =
+    input.request.outputWorkspaceRoot === undefined ||
+    input.request.outputWorkspaceRoot === null
+      ? undefined
+      : Object.freeze([
+          Object.freeze({
+            outputName: "conform_project",
+            outputAssetType: "constitutional_bootstrap",
+            relativePath: "conform_project_report.json",
+            outputWorkspace: Object.freeze({
+              workspaceRef: "workspace://odd-sdlc/output",
+              workspaceRoot: input.request.outputWorkspaceRoot,
+              authorityRef: "cli://odd-sdlc-ts/output-workspace"
+            })
+          })
+        ]);
   const basis = admitExecutionBasis({
     startIntent: admitStartIntent({
       scope: {
@@ -188,7 +213,8 @@ function constructExecutionContract(input: {
         kind: "graph_function",
         handle: input.targetGraphFunction
       },
-      until: input.request.until
+      until: input.request.until,
+      ...(requestedOutputs === undefined ? {} : { requestedOutputs })
     }),
     module: input.module,
     runtimeIdentity: admitResolvedRuntimeIdentity({

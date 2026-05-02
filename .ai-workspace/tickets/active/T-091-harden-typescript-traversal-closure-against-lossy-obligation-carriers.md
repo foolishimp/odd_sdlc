@@ -3,23 +3,29 @@ id: T-091
 title: Harden TypeScript traversal closure against lossy obligation carriers
 type: bug
 ticket_category: rc_blocker
-status: completed
+status: active
 goal: odd-sdlc-typescript-full-operational-rc
-change_intent: Prevent any prompt-bearing traversal from closing when source authority, prior edge state, requirements, design, module, gap, or evaluator pressure is collapsed into thin IDs and refs that lose the semantic payload needed to constrain the next traversal.
+change_intent: Prevent the first SDLC induction traversal, and later prompt-bearing traversals, from closing when source authority or requirement pressure is collapsed into thin IDs and refs that lose the semantic payload needed to define or constrain the REQ set.
 change_class: design_reframe
 re_entry_point: design
 affected_boundary: Fg_conform_project, all prompt-bearing graph edges, workspace source-input lineage, conform project report, imported requirement authority projection, traversal obligation context, prompt-bearing handoff manifests, assurance ledgers, postflight closure evaluators, installed data_mapper qualification lane
 priority: critical
 triaged_at: 2026-04-28T15:21:18Z
 created_at: 2026-04-28T15:21:18Z
-updated_at: 2026-04-28T15:16:56Z
-completed_at: 2026-04-28T15:16:56Z
+updated_at: 2026-05-02T14:07:30Z
+reopened_at: 2026-05-02T14:07:30Z
+prior_completed_at: 2026-04-28T15:16:56Z
+review_status: reopened_for_first_traversal_requirement_authority_depth
 dependencies:
-  - T-087 completed
+  - T-087 active
+  - T-096 active
   - T-088 completed
   - T-089 completed
+  - ABG release cut `v3.4.0-rc.6` as traversal/runtime substrate
 blocks:
   - T-041 active
+  - T-102 active
+  - T-109 active
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -41,9 +47,9 @@ test52_evidence:
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test52.ts/.ai-workspace/runtime/odd_sdlc/operator-runs/20260428T051318024Z_pid24636/conform_project_report.json
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test52.ts/specification/requirements/00-imported-sources.md
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test52.ts/.ai-workspace/runtime/odd_sdlc/operator-runs/20260428T051442847Z_pid25331/traversal_intent_package.json
-target_truth: Every prompt-bearing traversal closes only when its obligation carrier preserves the concrete source authority, required gain, prior edge state, gap pressure, evaluator contract, and target-output coverage needed to constrain and evaluate that edge. Requirement obligations carry source refs, digests, useful requirement text or summaries, family allocation, and downstream obligation pressure. Design, module, prior-gap, runtime, and source-asset obligations carry equivalent typed payloads. A downstream prompt edge must receive enough concrete pressure to evaluate the target surface against the imported project and all prior graph state, not merely IDs sourced from referenced files.
+target_truth: The induction traversal closes only when its requirement authority carrier preserves the concrete source authority needed to define the initial REQ set: source refs, digests, markers, normalized markers, extracted text or bounded summaries, family allocation, ambiguity state, and evidence refs. Later prompt-bearing traversals inherit the same law for their own obligation carriers. A downstream prompt edge must receive enough concrete pressure to evaluate the target surface against the imported project and all prior graph state, not merely IDs sourced from referenced files.
 superseded_truth: Creating `specification/requirements/00-imported-sources.md` with source refs and requirement markers, then requiring workers to assess every declared obligation ID, is sufficient traversal pressure for imported data_mapper-style workspaces.
-closure_law: this ticket closes only when a fresh installed data_mapper successor proves that every prompt-bearing edge rejects or gaps lossy obligation carriers, `Fg_conform_project` rejects or gaps lossy imported authority, deterministic requirement-family surfaces are written or validated when deterministic family allocation is possible, all admitted bootstrap source refs are preserved in the conformance report, and downstream traversal obligations carry concrete imported requirement/prior-edge/gap/design/module content rather than generic "Fulfill live requirement <id>" summaries.
+closure_law: this reopened ticket closes for the current tranche only when first-traversal induction proves that lossy imported authority cannot define the initial REQ set, `Fg_conform_project` either writes deterministic requirement-family authority or emits typed induction gaps, all admitted bootstrap source refs are preserved in the conformance report, and downstream traversal remains closed until concrete REQ authority exists. The broader every-prompt-edge rule remains binding for later SDLC work, but this tranche does not progress beyond bootstrap induction.
 evaluation_criteria:
   - `conform_project_report.json` lists the full admitted source set, not only the materialized topology files
   - imported requirement authority records source ref, digest, marker, normalized marker, extracted text or bounded summary, and family classification where deterministic
@@ -57,8 +63,9 @@ evaluation_criteria:
   - postflight/assurance closure rejects fulfilled obligation assessments that cite evidence but do not map the declared obligation payload to concrete output coverage or a lawful carry-forward gap
 proof_surface:
   - updated design/module note for typed traversal obligation dossiers and imported requirement authority carriers
-  - deterministic unit tests for source coverage, requirement marker normalization, family file projection, lossy-ledger rejection, obligation-payload admission, and postflight coverage rejection
-  - installed sandbox test over fresh `data_mapper.testNN.ts` proving bootstrap closure or lawful blocking before downstream edge, then proving the same obligation-payload rule on at least one downstream prompt edge
+  - deterministic unit tests for bootstrap source coverage, requirement marker normalization, family file projection, lossy-ledger rejection, authority-payload admission, and induction coverage rejection
+  - installed sandbox test over fresh `data_mapper.testNN.ts` proving bootstrap closure or lawful blocking before downstream edge
+  - internal local-only live data_mapper induction sandbox proving source refs, source digests, `REQ-LDM-*` and `REQ-COV-*` family projection, and non-lossy requirement authority before downstream traversal
   - refreshed data_mapper postmortem comparing test52 failure evidence against the corrected run
 non_closure_conditions:
   - downstream traversal opens from a single imported marker ledger while separate requirement-family files are absent and no gap is published
@@ -67,6 +74,47 @@ non_closure_conditions:
   - any prompt-bearing handoff manifest carries only IDs/refs for a domain obligation that needs concrete source payload to constrain the edge
   - F_P worker output is accepted as satisfying imported requirements when the prompt did not include the concrete imported obligation pressure
 ---
+
+## Reopen Finding - 2026-05-03
+
+The prior closure is reopened for the first traversal because the initial REQ
+set is the load-bearing product of induction.
+
+`00-imported-sources.md` may be a lineage/index ledger. It cannot be the only
+requirement authority when downstream SDLC work depends on concrete REQ
+meaning.
+
+For the current work tranche, this ticket is scoped to bootstrap induction:
+
+```text
+source documents + legacy constraints + imported markers
+  -> imported requirement authority carrier
+  -> requirement-family surfaces or typed induction gap
+  -> ProjectConformance.status == passed only when REQ authority is concrete
+```
+
+If requirement text, family allocation, source lineage, or ambiguity state is
+missing, induction must iterate or block as typed induction truth. It must not
+close and allow later edges to infer requirements from thin IDs.
+
+## Current Scope
+
+In scope:
+
+- preserving admitted source refs and digests in the induction report
+- extracting or summarizing useful requirement text
+- normalizing requirement markers without silent merge or loss
+- allocating requirement families deterministically where possible
+- publishing typed ambiguity/gap rows where allocation is not deterministic
+- proving that lossy imported ledgers keep the traversal on induction
+- proving the checked-in internal data_mapper fixture produces concrete
+  requirement-family surfaces and not only `00-imported-sources.md`
+
+Out of scope for this tranche:
+
+- proving every later prompt-bearing edge
+- implementing full T-109 edge-ledger parity
+- claiming data_mapper lifecycle parity beyond the inducted REQ set
 
 ## STDO Triage
 

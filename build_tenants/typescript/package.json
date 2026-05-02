@@ -65,6 +65,7 @@
     "test:t091": "npm run build:semantic && node --test test_env/tests/test_t091_traversal_obligation_payload.test.mjs",
     "test:t093": "npm run build:semantic && node --test test_env/tests/test_t093_scheduling_phase.test.mjs",
     "test:t096": "npm run build:semantic && node --test test_env/tests/test_t096_managed_traversal_bootstrap.test.mjs",
+    "test:t087-t096:data-mapper-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs",
     "test:t097": "npm run build:semantic && node --test test_env/tests/test_t097_managed_traversal_carriers.test.mjs",
     "test:t098": "npm run build:semantic && node --test test_env/tests/test_t098_requirements_to_design_assurance.test.mjs",
     "test:t099": "npm run build:semantic && node --test test_env/tests/test_t099_tranched_indexed_pressure.test.mjs",

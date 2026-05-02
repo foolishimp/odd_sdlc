@@ -39,6 +39,7 @@ import {
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcConformProjectReportFromWorkspace,
+  deriveSdlcConformProjectReportFromWorkspaces,
   deriveSdlcSourceInput,
   deriveSdlcWorkspaceIngressReport,
   type SdlcConformProjectProfile,
@@ -68,6 +69,7 @@ export interface OddSdlcCliTraversalRequest {
   readonly kind: "odd_sdlc_cli_request";
   readonly command: Exclude<OddSdlcCliCommand, "install" | "release-cut">;
   readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot: string | null;
   readonly target: {
     readonly kind: SdlcPublicStartTargetKind;
     readonly handle: string;
@@ -107,6 +109,7 @@ export interface OddSdlcCliResult {
 
 interface CliOptionReadModel {
   readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot: string | null;
   readonly target: string;
   readonly until: SdlcPublicStartUntil;
   readonly workerTransport: string | null;
@@ -126,6 +129,7 @@ interface CliReleaseCutOptionReadModel {
 
 interface CliWorkspaceContext {
   readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot: string;
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly conformanceReport: SdlcConformProjectReport;
@@ -221,6 +225,7 @@ function parseUntil(value: string): SdlcPublicStartUntil {
 
 function parseOptions(argv: readonly string[]): CliOptionReadModel {
   let workspaceRoot = ".";
+  let outputWorkspaceRoot: string | null = null;
   let target = "next";
   let until: SdlcPublicStartUntil = "blocked";
   let workerTransport: string | null = null;
@@ -228,6 +233,9 @@ function parseOptions(argv: readonly string[]): CliOptionReadModel {
     const token = argv[index];
     if (token === "--workspace") {
       workspaceRoot = requireOptionValue(argv, index, "--workspace");
+      index += 1;
+    } else if (token === "--output-workspace") {
+      outputWorkspaceRoot = requireOptionValue(argv, index, "--output-workspace");
       index += 1;
     } else if (token === "--target") {
       target = requireOptionValue(argv, index, "--target");
@@ -244,6 +252,7 @@ function parseOptions(argv: readonly string[]): CliOptionReadModel {
   }
   return Object.freeze({
     workspaceRoot,
+    outputWorkspaceRoot,
     target,
     until,
     workerTransport
@@ -359,6 +368,8 @@ export function admitOddSdlcCliRequest(argv: readonly string[]): OddSdlcCliReque
     kind: "odd_sdlc_cli_request",
     command,
     workspaceRoot: resolve(options.workspaceRoot),
+    outputWorkspaceRoot:
+      options.outputWorkspaceRoot === null ? null : resolve(options.outputWorkspaceRoot),
     target: parseTarget(options.target),
     until: options.until,
     workerTransport: options.workerTransport
@@ -425,8 +436,16 @@ function projectConstraints(workspaceRoot: string): SdlcProjectConstraints {
   return deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
 }
 
-function workspaceContext(workspaceRoot: string): CliWorkspaceContext {
-  const root = resolve(workspaceRoot);
+function outputWorkspaceRootFor(request: OddSdlcCliTraversalRequest): string {
+  return request.outputWorkspaceRoot ?? request.workspaceRoot;
+}
+
+function workspaceContext(input: {
+  readonly workspaceRoot: string;
+  readonly outputWorkspaceRoot?: string | null;
+}): CliWorkspaceContext {
+  const root = resolve(input.workspaceRoot);
+  const outputRoot = resolve(input.outputWorkspaceRoot ?? root);
   const ingressReport = deriveSdlcWorkspaceIngressReport({
     workspaceRootUri: pathToFileURL(root).href,
     projectConstraints: projectConstraints(root),
@@ -434,9 +453,16 @@ function workspaceContext(workspaceRoot: string): CliWorkspaceContext {
   });
   return Object.freeze({
     workspaceRoot: root,
+    outputWorkspaceRoot: outputRoot,
     ingressReport,
     conformedProject: deriveSdlcConformProjectProfileFromWorkspace(root),
-    conformanceReport: deriveSdlcConformProjectReportFromWorkspace(root)
+    conformanceReport:
+      outputRoot === root
+        ? deriveSdlcConformProjectReportFromWorkspace(root)
+        : deriveSdlcConformProjectReportFromWorkspaces({
+            sourceWorkspaceRoot: root,
+            outputWorkspaceRoot: outputRoot
+          })
   });
 }
 
@@ -465,12 +491,19 @@ function defaultRegimeFor(input: {
 }
 
 function startOutcomeFor(request: OddSdlcCliTraversalRequest): ReturnType<typeof publicStartOnce> {
-  const context = workspaceContext(request.workspaceRoot);
+  const context = workspaceContext({
+    workspaceRoot: request.workspaceRoot,
+    outputWorkspaceRoot: request.outputWorkspaceRoot
+  });
   const queryDomain = queryDomainFor(context);
   return publicStartOnce({
     request: {
       kind: "sdlc_public_start_request",
       workspaceRoot: context.workspaceRoot,
+      outputWorkspaceRoot:
+        context.outputWorkspaceRoot === context.workspaceRoot
+          ? null
+          : context.outputWorkspaceRoot,
       target: request.target,
       until: request.until,
       defaultRegime: defaultRegimeFor({ request, queryDomain })
@@ -485,7 +518,7 @@ function startOutcomeFor(request: OddSdlcCliTraversalRequest): ReturnType<typeof
 }
 
 function basisIdValue(event: RuntimeEvent): string | null {
-  const value = Reflect.get(event, "basisId");
+  const value: unknown = Reflect.get(event, "basisId");
   return typeof value === "string" ? value : null;
 }
 
@@ -547,6 +580,7 @@ async function installedStartPayloadFor(
   request: OddSdlcCliTraversalRequest
 ): Promise<unknown> {
   const start = startOutcomeFor(request);
+  const outputWorkspaceRoot = outputWorkspaceRootFor(request);
   const deterministicTransition =
     start.kind === "sdlc_public_start_projected" &&
     start.transition.kind === "fd_advance";
@@ -554,7 +588,8 @@ async function installedStartPayloadFor(
     return start;
   }
   return executeInstalledOperatorStart({
-    workspaceRoot: request.workspaceRoot,
+    workspaceRoot: outputWorkspaceRoot,
+    sourceWorkspaceRoot: request.workspaceRoot,
     start,
     workerTransport: request.workerTransport,
     replayEvents:
@@ -562,14 +597,15 @@ async function installedStartPayloadFor(
         ? Object.freeze([])
         : replayEventsForBasis(
             start.executionContract.basis,
-            await readOddSdlcRuntimeEvents(request.workspaceRoot)
+            await readOddSdlcRuntimeEvents(outputWorkspaceRoot)
           ),
     requireInstalledTopology: true
   });
 }
 
 function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
-  const allEvents = readOddSdlcRuntimeEventsSync(request.workspaceRoot);
+  const outputWorkspaceRoot = outputWorkspaceRootFor(request);
+  const allEvents = readOddSdlcRuntimeEventsSync(outputWorkspaceRoot);
   const start = startOutcomeForObservedReplay({
     request,
     events: allEvents
@@ -609,7 +645,12 @@ function commandPayload(request: OddSdlcCliTraversalRequest): unknown {
     return describeOddSdlcTypescriptRcQualification();
   }
   if (request.command === "query-domain") {
-    return queryDomainFor(workspaceContext(request.workspaceRoot));
+    return queryDomainFor(
+      workspaceContext({
+        workspaceRoot: request.workspaceRoot,
+        outputWorkspaceRoot: request.outputWorkspaceRoot
+      })
+    );
   }
   if (request.command === "gaps") {
     return gapsPayload(request);

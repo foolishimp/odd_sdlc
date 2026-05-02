@@ -14,8 +14,8 @@ build_tenant: typescript
 owner: unassigned
 triaged_at: 2026-05-02
 created_at: 2026-05-02
-updated_at: 2026-05-02
-review_status: active_abg_rc6_architecture_rebase_required
+updated_at: 2026-05-02T14:07:30Z
+review_status: blocked_by_reopened_first_traversal_induction_packet
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -31,11 +31,13 @@ dependencies:
   - ABG T-102 completed eval-suite projection artifacts
   - ABG T-103 completed graph-span foldback and reentry frontier
   - ABG T-104 completed cross-workspace output allocation
+  - T-087 active mandatory first SDLC project induction traversal
+  - T-096 active managed traversal bootstrap proof
+  - T-091 active first-traversal lossy obligation carrier hardening
   - T-103 backlog historical data_mapper parity evaluation
   - T-105 completed ABG-owned whole-graph iteration migration
   - T-080 completed requirement fulfillment assurance ledger
   - T-084 completed assurance ledger composition
-  - T-091 completed traversal closure hardening against lossy obligation carriers
   - T-101 completed retry-eligible worker report rejection in autonomous loop
 related_tickets:
   - T-107 split operator handoff into prime domain modules
@@ -73,6 +75,24 @@ non_scope:
 ---
 
 ## STDO Triage
+
+### Reopened First-Traversal Blocker - 2026-05-03
+
+T-109 must not progress to downstream traversal-ledger closure until the first
+SDLC traversal packet is repaired:
+
+- T-087: mandatory `{ unknown state } -> inducted spec_method Project`
+  traversal
+- T-096: managed traversal proof from unordered/unknown source set
+- T-091: concrete requirement authority, not lossy marker-only REQ pressure
+
+This is not a deferral of ledger work. It is the prerequisite authority input
+for it. The edge-ledger framework cannot evaluate requirement fulfillment if
+the initial REQ set was never lawfully inducted.
+
+For the current tranche, T-109 remains active but blocked. No data_mapper
+parity or downstream lifecycle closure claim is valid until induction either
+converges or remains on typed induction gaps.
 
 ### First Missing Layer
 

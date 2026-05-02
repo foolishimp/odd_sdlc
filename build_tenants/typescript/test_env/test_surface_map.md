@@ -729,19 +729,24 @@ change ABG.
 
 Derives from:
 
-- `.ai-workspace/tickets/completed/T-087-realize-project-induction-from-bootstrap-documents-as-first-graph-edge.md`
+- `.ai-workspace/tickets/active/T-087-realize-typescript-project-induction-as-fd-graph-function-before-downstream-traversal.md`
 - `.ai-workspace/tickets/completed/T-088-realize-typescript-cumulative-traversal-intent-package-from-test35-pressure.md`
 - `.ai-workspace/tickets/completed/T-089-harden-traversal-intent-pressure-enforcement-on-every-prompt-edge.md`
 - `.ai-workspace/tickets/active/T-091-harden-typescript-traversal-closure-against-lossy-obligation-carriers.md`
+- `.ai-workspace/tickets/active/T-096-prove-managed-traversal-bootstrap-from-unordered-source-set.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_INTENT_PACKAGE.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_WORKSPACE_INGRESS_SEAMS.md`
 
 Canonical files:
 
+- `test_env/fixtures/data_mapper_induction_manifest.md`
+- `test_env/fixtures/internal_data_mapper_fixture.mjs`
 - `test_env/tests/test_t087_project_induction.test.mjs`
 - `test_env/tests/test_t088_traversal_intent_package.test.mjs`
 - `test_env/tests/test_t089_traversal_pressure_enforcement.test.mjs`
 - `test_env/tests/test_t091_traversal_obligation_payload.test.mjs`
+- `test_env/tests/test_t096_managed_traversal_bootstrap.test.mjs`
+- `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`
 
 Canonical commands:
 
@@ -749,6 +754,8 @@ Canonical commands:
 - `npm run test:t088`
 - `npm run test:t089`
 - `npm run test:t091`
+- `npm run test:t096`
+- `npm run test:t087-t096:data-mapper-sandbox`
 
 The lane proves the first bootstrap graph edge and every prompt-bearing worker
 handoff preserve cumulative traversal pressure. T-091 closes the lossy-carrier
@@ -758,6 +765,13 @@ snippets before handoff, deterministic requirement-family files are materialized
 from concrete bootstrap requirement lines, marker-only requirements are
 rejected before worker dispatch, and postflight rejects a fulfilled requirement
 assessment that cites only input authority without output coverage evidence.
+
+The internal data_mapper sandbox is a live installed-workspace regression lane.
+It copies the checked-in fixture under `test_env/test_runs`, installs the current
+TypeScript product into that workspace, runs `gaps`, runs `start`, and asserts
+the produced `conform_project_report.json`, canonical project constraints,
+requirement-family files, source refs, and post-induction route. It does not use
+`ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT` and does not read `ai_sdlc_examples`.
 
 ## T-102/T-109 ABG RC6 SDLC Lifecycle Ledger Lanes
 

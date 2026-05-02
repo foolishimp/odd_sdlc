@@ -19,6 +19,7 @@ test("T-052 sandbox registry: every TypeScript sandbox consumes the ABG installe
   assert.deepStrictEqual(sandboxTests, [
     "test_b068_enterprise_core_outcome_iteration.test.mjs",
     "test_t047_pre_refactor_sandbox.test.mjs",
+    "test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs",
     "test_t102_t109_abg_rc6_semantic_ledger_sandbox.test.mjs"
   ]);
 

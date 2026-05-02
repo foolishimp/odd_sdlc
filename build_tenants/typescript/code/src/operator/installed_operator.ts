@@ -1091,6 +1091,7 @@ function writeRunArchive(input: {
 
 export async function executeInstalledOperatorStart(input: {
   readonly workspaceRoot: string;
+  readonly sourceWorkspaceRoot?: string;
   readonly start: SdlcPublicStartOutcome;
   readonly workerTransport: string | null;
   readonly replayEvents: readonly RuntimeEvent[];
@@ -1163,6 +1164,7 @@ export async function executeInstalledOperatorStart(input: {
     });
   }
   const basis = input.start.executionContract.basis;
+  const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? input.workspaceRoot;
   const projection = deriveRuntimeAggregateProjection(basis, input.replayEvents);
   const decision = deriveIterationAdvanceDecision(basis, projection);
   if (decision.kind === "converged") {
@@ -1225,10 +1227,12 @@ export async function executeInstalledOperatorStart(input: {
     );
     const managedTraversalManifest =
       deriveConformProjectManagedTraversalManifest({
-        workspaceRoot: input.workspaceRoot
+        workspaceRoot: input.workspaceRoot,
+        sourceWorkspaceRoot
       });
     const report = materializeSdlcProjectConformance({
-      workspaceRoot: input.workspaceRoot
+      workspaceRoot: input.workspaceRoot,
+      sourceWorkspaceRoot
     });
     const managedTraversalLedger = deriveConformProjectManagedTraversalLedger({
       workspaceRoot: input.workspaceRoot,
