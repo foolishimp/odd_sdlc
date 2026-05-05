@@ -172,12 +172,12 @@ build_tenants:
       - renderer
 `
   );
-  const contract = hookContractByEdgeName("derive_code_surface");
+  const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
     graphFunctionName: "bootstrap_release_self_test",
     edgeName: contract.edgeName,
-    vectorIndex: 11,
+    vectorIndex: 6,
     contract,
     runId: "t068-conform-project-handoff"
   });

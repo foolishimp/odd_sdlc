@@ -7,3 +7,5 @@ export * from "./ambiguity.js";
 export * from "./capability.js";
 export * from "./shallow_realization.js";
 export * from "./semantic_convergence.js";
+export * from "./component_depth.js";
+export * from "./design_completeness.js";

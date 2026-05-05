@@ -16,7 +16,10 @@ import {
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
   admitStartIntent,
-  deriveTraversalStructureProbe
+  deriveTraversalStructureProbe,
+  runEngineIterateAsync,
+  constructEnginePluginContract,
+  constructFpDispatchOutcome
 } from "@abiogenesis/typescript-tenant";
 
 import {
@@ -167,18 +170,99 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   assert.equal(module.jobs.length, 3);
   assert(module.jobs.some((job) => job.name === `${FG_CONFORM_PROJECT}_job`));
   assertSdlcModuleJobsTargetPublishedGraphFunctions(module);
+  assert.deepStrictEqual(
+    BOOTSTRAP_RELEASE_FUNCTION_CATALOG
+      .filter((entry) =>
+        [
+          "derive_implementation_component_topology_surface",
+          "derive_component_realization_schedule_surface",
+          "derive_component_code_surface",
+          "qualify_component_realization_surface",
+          "derive_test_component_topology_surface",
+          "derive_component_test_surface",
+          "qualify_component_test_execution_surface",
+          "derive_component_repair_schedule_surface",
+          "derive_release_depth_parity_surface"
+        ].includes(entry.name)
+      )
+      .map((entry) => entry.name),
+    [
+      "derive_implementation_component_topology_surface",
+      "derive_component_realization_schedule_surface",
+      "derive_component_code_surface",
+      "qualify_component_realization_surface",
+      "derive_test_component_topology_surface",
+      "derive_component_test_surface",
+      "qualify_component_test_execution_surface",
+      "derive_component_repair_schedule_surface",
+      "derive_release_depth_parity_surface"
+    ]
+  );
 
   const bootstrapBasis = basisFor(module, "bootstrap_release_self_test");
   const operationalBasis = basisFor(module, "release_operational_cycle");
   const bootstrapProbe = deriveTraversalStructureProbe(bootstrapBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
-  assert.equal(bootstrapBasis.graph.vectors.length, 22);
+  assert.equal(bootstrapBasis.graph.vectors.length, 31);
   assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");
   assert.equal(operationalProbe.edge, "prepare_build_execution_surface");
   assert.equal(bootstrapProbe.transitionKind, "fp_dispatch");
   assert.equal(operationalProbe.transitionKind, "fp_dispatch");
+});
+
+test("T-107 SDLC vectors declare ABG traversal modulation and runner passes an attempt envelope", async () => {
+  const module = constructSdlcGtlModule();
+  const basis = basisFor(module, "bootstrap_release_self_test");
+  const firstVector = basis.graph.vectors[0];
+  assert(firstVector);
+  const qualifier = firstVector.declarations.entries.find(
+    (entry) => entry.key === "abg.traversal_modulation"
+  );
+  assert(qualifier);
+  assert.equal(qualifier.value.kind, "hook_ref");
+  assert.equal(
+    qualifier.value.value.ref,
+    "strategy://odd_sdlc/derive_intent_surface/single_vertical_slice"
+  );
+
+  const pluginInputs = [];
+  await runEngineIterateAsync({
+    basis,
+    plugins: {
+      fpDispatch: Object.freeze({
+        contract: constructEnginePluginContract({
+          ref: "plugin://odd-sdlc/test/t107/fp-dispatch",
+          pluginKind: "fp_dispatch",
+          authority: "effect_plugin",
+          inputCarrier: "EnginePluginInput",
+          outputCarrier: "FpDispatchOutcome"
+        }),
+        dispatch: async (input) => {
+          pluginInputs.push(input);
+          return constructFpDispatchOutcome({
+            status: "blocked",
+            resultRef: "result://odd-sdlc/test/t107/no-output",
+            reason: "test stops after envelope capture"
+          });
+        }
+      })
+    },
+    maxAttachedFpAttempts: 1,
+    eventSink: () => undefined
+  });
+
+  assert.equal(pluginInputs.length, 1);
+  assert(pluginInputs[0].traversalAttemptEnvelope);
+  assert.equal(
+    pluginInputs[0].traversalAttemptEnvelope.strategyDirectiveRef,
+    "strategy://odd_sdlc/derive_intent_surface/single_vertical_slice"
+  );
+  assert.deepStrictEqual(
+    pluginInputs[0].traversalAttemptEnvelope.selectedScheduleItemRefs,
+    ["schedule://odd_sdlc/derive_intent_surface/primary"]
+  );
 });
 
 test("T-055 publishes reusable single typed traversal as GTL library function", () => {

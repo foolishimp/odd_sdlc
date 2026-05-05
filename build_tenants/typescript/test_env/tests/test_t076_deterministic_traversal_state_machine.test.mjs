@@ -238,10 +238,18 @@ function writeRetryAwareWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const hasPriorGap = manifest.retryContext.priorGapDossiers.length > 0;",
-      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`].join('\\n') + '\\n';",
+      "const sourceRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
+      "function componentDepthRegister() {",
+      "  if (manifest.targetAssetType !== 'component_code_surface') return null;",
+      "  return { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType, componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', requirementIds: ['REQ-T076-001'], sourceAssetRefs: ['fixture://t076'] }] };",
+      "}",
+      "const register = componentDepthRegister();",
+      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`];",
+      "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
+      "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
-      "const tenantRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
+      "const tenantRelative = sourceRelative;",
       "const sourcePath = path.join(manifest.productMaterialization.tenantRoot, tenantRelative);",
       "mkdirSync(dirname(sourcePath), { recursive: true });",
       "const source = hasPriorGap ? 'package cdme\\nobject Core { val retryClosed = true }\\n' : 'package cdme\\nobject Core { val retryClosed = false }\\n';",
@@ -270,7 +278,29 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const hasPriorGap = manifest.retryContext.priorGapDossiers.length > 0;",
-      "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`].join('\\n') + '\\n';",
+      "const sourceRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
+      "const testRelative = 'cdme-core/src/test/scala/cdme/CoreSpec.scala';",
+      "function componentDepthRegister() {",
+      "  const base = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType };",
+      "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] };",
+      "  const topologyRow = { kind: 'sdlc_component_topology_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', concernRole: 'mapper', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] };",
+      "  const testTopologyRow = { kind: 'sdlc_test_component_topology_row', testClassId: 'CoreSpec', relativePath: testRelative, testcaseIds: ['TC-DM-001'], componentIds: ['cdme-core'], requirementIds: ['REQ-ENG-001'], shardId: 'test-shard-01-cdme-core' };",
+      "  const testRow = { kind: 'sdlc_component_test_realization_row', testClassId: 'CoreSpec', relativePath: testRelative, testcaseIds: ['TC-DM-001'], componentIds: ['cdme-core'], requirementIds: ['REQ-ENG-001'], shardId: 'test-shard-01-cdme-core' };",
+      "  const qualificationRow = { kind: 'sdlc_component_test_qualification_row', testClassId: 'CoreSpec', testcaseIds: ['TC-DM-001'], componentIds: ['cdme-core'], requirementIds: ['REQ-ENG-001'], status: 'passed', evidenceRefs: [manifest.outputFile] };",
+      "  const repairSchedule = { kind: 'sdlc_component_repair_schedule', registerVersion: 'ts-component-depth-v1', scheduleStatus: 'no_repair_required', repairRows: [], evidenceRefs: [manifest.outputFile] };",
+      "  if (manifest.targetAssetType === 'implementation_component_topology_surface') return { ...base, componentTopologyRows: [topologyRow] };",
+      "  if (manifest.targetAssetType === 'component_realization_schedule_surface' || manifest.targetAssetType === 'component_code_surface' || manifest.targetAssetType === 'component_realization_qualification_surface') return { ...base, componentRealizationRows: [componentRow] };",
+      "  if (manifest.targetAssetType === 'test_component_topology_surface') return { ...base, testComponentTopologyRows: [testTopologyRow] };",
+      "  if (manifest.targetAssetType === 'component_test_surface') return { ...base, componentTestRows: [testRow] };",
+      "  if (manifest.targetAssetType === 'component_test_qualification_surface') return { ...base, componentTestQualificationRows: [qualificationRow] };",
+      "  if (manifest.targetAssetType === 'component_repair_schedule_surface') return { ...base, componentRepairSchedule: repairSchedule };",
+      "  if (manifest.targetAssetType === 'release_depth_parity_surface') return { ...base, releaseDepthParity: { kind: 'sdlc_release_depth_parity_assessment', status: 'met', summary: 'component depth parity met for data_mapper retry fixture', blockingReasons: [], evidenceRefs: [manifest.outputFile] } };",
+      "  return null;",
+      "}",
+      "const register = componentDepthRegister();",
+      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`];",
+      "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
+      "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const materializedFiles = [];",
@@ -283,7 +313,7 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "  const source = role === 'test' ? 'package cdme\\nclass CoreSpec\\n' : `package cdme\\nobject Core { val retryClosed = ${hasPriorGap}; val capabilityMarkers = \"${capabilityMarkers}\" }\\n`;",
       "  writeFileSync(productPath, source, 'utf8');",
       "  const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
-      "  const relativePath = manifest.targetAssetType === 'code_surface' && !hasPriorGap ? path.relative(manifest.workspaceRoot, productPath) : tenantRelative;",
+      "  const relativePath = manifest.targetAssetType === 'component_code_surface' && !hasPriorGap ? path.relative(manifest.workspaceRoot, productPath) : tenantRelative;",
       "  materializedFiles.push({ kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath: productPath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8') });",
       "}",
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
@@ -302,10 +332,10 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
   const codeIndex = basis.graph.vectors.findIndex(
-    (vector) => vector.name === "derive_code_surface"
+    (vector) => vector.name === "derive_component_code_surface"
   );
   assert(codeIndex > 0);
-  const preclosedEvents = preclosedEventsBeforeEdge(basis, "derive_code_surface");
+  const preclosedEvents = preclosedEventsBeforeEdge(basis, "derive_component_code_surface");
   const workerScript = writeRetryAwareWorkerScript(workspace);
   const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
 
@@ -351,7 +381,7 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
     events: Object.freeze([...preclosedEvents, ...failureEvents])
   });
   assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), true);
-  assert.notEqual(afterFailure.currentEdge, "derive_code_surface");
+  assert.notEqual(afterFailure.currentEdge, "derive_component_code_surface");
   assert.equal(
     first.manifest.traversalObligationContext.deltaSummary.priorGapCount,
     first.manifest.retryContext.priorGapDossiers[0].reasons.length
@@ -396,7 +426,7 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
     events: Object.freeze([...preclosedEvents, ...finalEvents])
   });
   assert.equal(afterSecond.closedVectorIndexes.includes(codeIndex), true);
-  assert.notEqual(afterSecond.currentEdge, "derive_code_surface");
+  assert.notEqual(afterSecond.currentEdge, "derive_component_code_surface");
 });
 
 test("T-076 installed data_mapper successor re-enters failed code edge from event truth", async () => {
@@ -420,7 +450,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
 
   for (let guard = 0; guard < 20; guard += 1) {
     const gaps = runInstalledOddSdlc(commandPath, ["gaps", "--workspace", workspace], workspace);
-    if (gaps.projection.currentEdge === "derive_code_surface") {
+    if (gaps.projection.currentEdge === "derive_component_code_surface") {
       break;
     }
     if (gaps.projection.currentEdge === FG_CONFORM_PROJECT) {
@@ -457,7 +487,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.equal(beforeFailure.projection.currentEdge, "derive_code_surface");
+  assert.equal(beforeFailure.projection.currentEdge, "derive_component_code_surface");
 
   const failed = runInstalledOddSdlc(
     commandPath,
@@ -501,7 +531,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.notEqual(afterFailure.projection.currentEdge, "derive_code_surface");
+  assert.notEqual(afterFailure.projection.currentEdge, "derive_component_code_surface");
   assert.equal(
     failed.manifest.traversalObligationContext.deltaSummary.priorGapCount,
     failed.manifest.retryContext.priorGapDossiers[0].reasons.length
@@ -535,6 +565,6 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.notEqual(afterRepair.projection.currentEdge, "derive_code_surface");
+  assert.notEqual(afterRepair.projection.currentEdge, "derive_component_code_surface");
   assert(readFileSync(path.join(workspace, ".ai-workspace/events/events.jsonl"), "utf8").trim().length > 0);
 });

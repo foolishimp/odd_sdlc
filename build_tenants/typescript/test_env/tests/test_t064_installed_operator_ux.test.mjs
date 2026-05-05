@@ -353,7 +353,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.equal(JSON.parse(json.stdout).kind, "odd_sdlc_cli_result");
 });
 
-test("B-078 silent worker inactivity is typed before the full process timeout", async () => {
+test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -387,9 +387,9 @@ test("B-078 silent worker inactivity is typed before the full process timeout", 
     assert.equal(start.payload.workerRun.stderrByteCount, 0);
     assert.equal(
       start.payload.postflight.blockingReasonCarriers[0].code,
-      "silent_worker_inactivity"
+      "worker_hard_timeout"
     );
-    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 0);
+    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 1);
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
       /sharpenedRetryAvailable=false/u
@@ -397,6 +397,10 @@ test("B-078 silent worker inactivity is typed before the full process timeout", 
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
       /pid=\d+/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /outcome=hard_timeout/u
     );
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
@@ -576,7 +580,25 @@ test("T-064 operator observes F_P.transform output and generates report", async 
   assert.equal(start.payload.workerRun.status, 0);
   assert.equal(start.payload.workerReport.kind, "odd_sdlc.worker_result_report");
   assert.match(start.payload.workerReport.summary, /framework-generated/u);
+  assert.match(start.payload.workerReport.fpTransformResultRef, /fp_transform_result\.json$/u);
+  assert.equal(start.payload.workerReport.fpTransformStatus, "returned");
   assert.equal(start.payload.postflight.status, "passed");
+  const transformRequest = JSON.parse(
+    readFileSync(path.join(start.payload.archiveRoot, "fp_transform_request.json"), "utf8")
+  );
+  const transformResult = JSON.parse(
+    readFileSync(path.join(start.payload.archiveRoot, "fp_transform_result.json"), "utf8")
+  );
+  const evaluateResult = JSON.parse(
+    readFileSync(path.join(start.payload.archiveRoot, "fp_evaluate_result.json"), "utf8")
+  );
+  assert.equal(transformRequest.kind, "fp_transform_request");
+  assert.equal(transformResult.kind, "fp_transform_result");
+  assert.equal(transformResult.requestRef, transformRequest.requestRef);
+  assert.equal(transformResult.status, "returned");
+  assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
+  assert.equal(evaluateResult.stage, "F_P.evaluate");
+  assert.equal(evaluateResult.status, "passed");
   assert.equal(
     existsSync(path.join(start.payload.archiveRoot, "post_transform_observation.json")),
     true

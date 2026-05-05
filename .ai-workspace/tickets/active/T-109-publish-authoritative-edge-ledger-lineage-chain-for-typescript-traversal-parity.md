@@ -4,7 +4,7 @@ title: Publish ABG-driven traversal-ledger solution from Python discovery eviden
 type: feature
 ticket_category: rc_blocker
 status: active
-goal: odd-sdlc-typescript-abg-rc6-functional-traversal-ledger-solution-from-python-discovery
+goal: odd-sdlc-typescript-abg35-functional-traversal-ledger-solution-from-python-discovery
 change_intent: Design and realize a cohesive ABG-driven TypeScript traversal-ledger solution, using Python/test35 as discovery evidence while improving the model through ABG-owned ledger/event/projection machinery, pure SDLC semantic projections, algebraic carriers, total closure predicates, and isolated effects.
 change_class: design_reframe
 re_entry_point: design
@@ -14,8 +14,8 @@ build_tenant: typescript
 owner: unassigned
 triaged_at: 2026-05-02
 created_at: 2026-05-02
-updated_at: 2026-05-02T14:07:30Z
-review_status: blocked_by_reopened_first_traversal_induction_packet
+updated_at: 2026-05-04
+review_status: active_pending_live_data_mapper_and_semantic_suite_repair
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -24,16 +24,16 @@ governance_scope_expansion:
   - O: ODD_METHOD.md
 dependencies:
   - T-041 active full operational TypeScript replacement lane
-  - T-102 active typed F_P stages and ABG-owned admission flow
-  - ABG release cut `v3.4.0-rc.6` (`@abiogenesis/typescript-tenant@3.4.0-rc.6`)
+  - T-102 completed typed F_P stages and ABG-owned admission flow
+  - ABG release cut `v3.5.0-rc.1` (`@abiogenesis/typescript-tenant@3.5.0-rc.1`)
   - ABG T-099 completed typed F_P stage carriers and admission flow
   - ABG T-100 completed workspace zoom/foldback evaluation
   - ABG T-102 completed eval-suite projection artifacts
   - ABG T-103 completed graph-span foldback and reentry frontier
   - ABG T-104 completed cross-workspace output allocation
-  - T-087 active mandatory first SDLC project induction traversal
-  - T-096 active managed traversal bootstrap proof
-  - T-091 active first-traversal lossy obligation carrier hardening
+  - T-087 completed mandatory first SDLC project induction traversal
+  - T-096 completed managed traversal bootstrap proof
+  - T-091 completed first-traversal lossy obligation carrier hardening
   - T-103 backlog historical data_mapper parity evaluation
   - T-105 completed ABG-owned whole-graph iteration migration
   - T-080 completed requirement fulfillment assurance ledger
@@ -65,7 +65,7 @@ evidence_refs:
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T143724759Z_pid65991/assurance_postflight.json
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T143724759Z_pid65991/gap_dossier.json
   - /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test65.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260501T144605455Z_pid65991/worker_process_failure_postflight.json
-closure_law: This ticket closes only when TypeScript has one canonical ABG-driven functional traversal-ledger design solution, that design has passed a recorded STDO/ODD_SDLC design review, TypeScript consumes ABG RC6 ledger/event/admission/projection machinery instead of creating a product-local runtime ledger, odd_sdlc publishes SDLC semantic obligation rows and proof interpretation as domain payloads over ABG truth, semantic gap truth is preserved across worker-runtime failures, and a live data_mapper traversal can continue beyond the test65 vector-8 failure mode through governed ABG edge iteration/reentry.
+closure_law: This ticket closes only when TypeScript has one canonical ABG-driven functional traversal-ledger design solution, that design has passed a recorded STDO/ODD_SDLC design review, TypeScript consumes ABG 3.5 ledger/event/admission/projection machinery instead of creating a product-local runtime ledger, odd_sdlc publishes SDLC semantic obligation rows and proof interpretation as domain payloads over ABG truth, semantic gap truth is preserved across worker-runtime failures, and a live data_mapper traversal can continue beyond the test65 vector-8 failure mode through governed ABG edge iteration/reentry.
 non_scope:
   - replacing upstream specification authority with runtime ledgers
   - copying Python service structure file-for-file
@@ -77,6 +77,65 @@ non_scope:
 ## STDO Triage
 
 ### Reopened First-Traversal Blocker - 2026-05-03
+
+### Unblocked Checkpoint - 2026-05-04
+
+The reopened first-traversal induction packet is closed:
+
+- T-087 completed first-traversal induction depth proof.
+- T-091 completed first-traversal requirement-authority carrier proof.
+- T-096 completed managed traversal bootstrap proof.
+
+T-109 is now the active traversal-ledger RC blocker. It must prove the canonical
+ABG-driven traversal-ledger solution over the completed ABG 3.5 callout and
+first-traversal substrates before T-041 can close the bounded RC.
+
+### Proof Checkpoint - 2026-05-04
+
+Current green proof:
+
+```text
+npm run test:t102-t110:abg35-sandbox
+npm run build:semantic && node --test test_env/tests/test_t109_traversal_ledger_solution.test.mjs
+```
+
+The ABG 3.5 semantic-ledger sandbox passed 5/5:
+
+- SDLC lifecycle graph admits the same semantic result expected from live.
+- Schedule drift is caught even when F_D file checks pass.
+- F_P transform results that try to own closure authority are rejected.
+- ABG graph-span foldback can reenter the implicated SDLC schedule edge.
+- Repeatable SDLC semantic eval aggregates are projected without F_D closure
+  substitution.
+
+The stale local product-ledger unit test was repriced: removed product-local
+ledger API assertions now guard that retired local ledger exports do not
+reappear and that T-109 proof routes through the ABG 3.5 sandbox lane.
+
+Current blocker:
+
+```text
+npm run test:semantic
+```
+
+The full semantic suite is not green. Remaining failure surface is completed
+T-066 data-mapper successor coverage, not the T-109 sandbox itself:
+
+- installed data-mapper successor iteration grows
+  `.ai-workspace/events/events.jsonl` to hundreds of MB and eventually fails
+  JSON `gaps` with `Cannot create a string longer than 0x1fffffe8 characters`;
+- this indicates runtime-event replay/projection growth is still an RC blocker
+  before T-109 or T-041 can close.
+
+Existing live tests are insufficient for T-109 closure:
+
+- `test_t053_live_fp_data_mapper.test.mjs` uses a direct external worker
+  harness, not the ABG 3.5 installed-operator traversal-ledger path.
+- `test_t102_t109_abg_rc7_live_semantic_ledger.test.mjs` is live but not a
+  data-mapper traversal beyond the old test65 vector-8 failure mode.
+
+T-109 remains open pending a proper installed-operator live data-mapper
+traversal after the T-066 event-log growth defect is repaired.
 
 T-109 must not progress to downstream traversal-ledger closure until the first
 SDLC traversal packet is repaired:

@@ -24,39 +24,39 @@ export const BOOTSTRAP_INPUT = deepFreeze({
 
 export const SDLC_REQUIREMENTS = deepFreeze([
   {
-    id: "REQ-SDLC-RC6-001",
+    id: "REQ-SDLC-RC7-001",
     title: "Bootstrap authority is captured",
     detail:
       "The lifecycle bundle must preserve project slug, bootstrap authority refs, and system workspace identity.",
-    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC6-001"
+    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC7-001"
   },
   {
-    id: "REQ-SDLC-RC6-002",
+    id: "REQ-SDLC-RC7-002",
     title: "Requirement ledger is published",
     detail:
       "The requirements ledger must contain every active requirement with stable ID, detail, and source authority.",
-    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC6-002"
+    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC7-002"
   },
   {
-    id: "REQ-SDLC-RC6-003",
+    id: "REQ-SDLC-RC7-003",
     title: "Requirement schedule covers the ledger",
     detail:
       "The requirements schedule must create one ordered work package for each requirement in ledger order.",
-    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC6-003"
+    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC7-003"
   },
   {
-    id: "REQ-SDLC-RC6-004",
+    id: "REQ-SDLC-RC7-004",
     title: "Implementation is constrained by schedule",
     detail:
       "The implementation surface must realize every scheduled requirement through a work item tied back to the schedule package.",
-    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC6-004"
+    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC7-004"
   },
   {
-    id: "REQ-SDLC-RC6-005",
+    id: "REQ-SDLC-RC7-005",
     title: "Qualification evaluates every requirement",
     detail:
       "The qualification report must evaluate every requirement as a semantic requirement result rather than substituting mechanical F_D checks.",
-    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC6-005"
+    sourceAuthorityRef: "workspace://specification/requirements/mini.md#REQ-SDLC-RC7-005"
   }
 ]);
 
@@ -209,13 +209,13 @@ function isAllFpQualified(output) {
 export function evaluateSemanticRows(output, evidenceRef) {
   const checks = new Map([
     [
-      "REQ-SDLC-RC6-001",
+      "REQ-SDLC-RC7-001",
       output?.project?.slug === BOOTSTRAP_INPUT.projectSlug &&
         output?.project?.systemRef === BOOTSTRAP_INPUT.systemRef &&
         exactArrayEqual(output?.project?.authorityRefs, BOOTSTRAP_INPUT.authorityRefs)
     ],
     [
-      "REQ-SDLC-RC6-002",
+      "REQ-SDLC-RC7-002",
       exactArrayEqual(ledgerRequirementIds(output), requirementIds) &&
         output?.requirementsLedger?.requirements?.every(
           (requirement) =>
@@ -227,7 +227,7 @@ export function evaluateSemanticRows(output, evidenceRef) {
         ) === true
     ],
     [
-      "REQ-SDLC-RC6-003",
+      "REQ-SDLC-RC7-003",
       exactArrayEqual(output?.requirementsSchedule?.scheduledRequirementIds, requirementIds) &&
         exactArrayEqual(scheduleRequirementIds(output), requirementIds) &&
         output?.requirementsSchedule?.workPackages?.every(
@@ -240,7 +240,7 @@ export function evaluateSemanticRows(output, evidenceRef) {
         ) === true
     ],
     [
-      "REQ-SDLC-RC6-004",
+      "REQ-SDLC-RC7-004",
       output?.implementationSurface?.scheduleRef ===
         output?.requirementsSchedule?.scheduleRef &&
         exactArrayEqual(implementationRequirementIds(output), requirementIds) &&
@@ -251,7 +251,7 @@ export function evaluateSemanticRows(output, evidenceRef) {
         ) === true
     ],
     [
-      "REQ-SDLC-RC6-005",
+      "REQ-SDLC-RC7-005",
       exactArrayEqual(qualificationRequirementIds(output), requirementIds) &&
         isAllFpQualified(output)
     ]

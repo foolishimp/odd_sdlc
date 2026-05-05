@@ -3,6 +3,11 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
+import {
+  claudeStreamJsonArgs,
+  type TracedProcessExecutorProfile,
+  type TracedProcessParser
+} from "@abiogenesis/typescript-tenant";
 import type {
   SdlcWorkerHandoffManifest,
   SdlcWorkerTransportContract
@@ -44,6 +49,9 @@ export function admitWorkerTransport(
     script === null || script.trim().length === 0
       ? Object.freeze([])
       : Object.freeze([script]);
+  const rawModel = parsed.searchParams.get("model");
+  const model =
+    rawModel === null || rawModel.trim().length === 0 ? null : rawModel.trim();
   const agentKey = transportAgentKey(command);
   return Object.freeze({
     kind: "sdlc_worker_transport_contract",
@@ -52,6 +60,7 @@ export function admitWorkerTransport(
     agentKey,
     command,
     args,
+    model,
     workerId: `worker://odd-sdlc/${agentKey}`,
     backendId: `backend://process/${agentKey}`
   });
@@ -61,9 +70,13 @@ function codexArgs(input: {
   readonly workspaceRoot: string;
   readonly promptPath: string;
   readonly outputLastMessagePath: string;
+  readonly model: string | null;
 }): readonly string[] {
+  const modelArgs =
+    input.model === null ? Object.freeze([]) : Object.freeze(["--model", input.model]);
   return Object.freeze([
     "exec",
+    ...modelArgs,
     "--skip-git-repo-check",
     "--ephemeral",
     "--sandbox",
@@ -73,20 +86,6 @@ function codexArgs(input: {
     "--output-last-message",
     input.outputLastMessagePath,
     readFileSync(input.promptPath, "utf8")
-  ]);
-}
-
-function claudeArgs(input: {
-  readonly workspaceRoot: string;
-}): readonly string[] {
-  return Object.freeze([
-    "-p",
-    "--add-dir",
-    input.workspaceRoot,
-    "--permission-mode",
-    "bypassPermissions",
-    "--output-format",
-    "text"
   ]);
 }
 
@@ -102,13 +101,12 @@ export function argsForWorker(input: {
       return codexArgs({
         workspaceRoot: input.manifest.workspaceRoot,
         promptPath: input.promptPath,
-        outputLastMessagePath: input.outputLastMessagePath
+        outputLastMessagePath: input.outputLastMessagePath,
+        model: input.transport.model
       });
     }
     if (input.transport.agentKey === "claude") {
-      return claudeArgs({
-        workspaceRoot: input.manifest.workspaceRoot
-      });
+      return claudeStreamJsonArgs(readFileSync(input.promptPath, "utf8"));
     }
   }
   return Object.freeze([...input.transport.args, input.manifestPath]);
@@ -118,8 +116,23 @@ export function stdinForWorker(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly promptPath: string;
 }): string | null {
-  if (input.transport.args.length === 0 && input.transport.agentKey === "claude") {
-    return readFileSync(input.promptPath, "utf8");
-  }
+  void input;
   return null;
+}
+
+export function parserForWorkerTransport(
+  transport: SdlcWorkerTransportContract
+): TracedProcessParser {
+  return transport.agentKey === "claude" && transport.args.length === 0
+    ? "claude-stream-json"
+    : "generic-text";
+}
+
+export function selectedWorkerExecutorProfile(
+  env: Readonly<Record<string, string | undefined>> = process.env
+): TracedProcessExecutorProfile {
+  const raw =
+    env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"] ??
+    env["ABG_TS_AGENT_EXECUTOR_PROFILE"];
+  return raw === "pty-terminal" || raw === "local-spawn" ? raw : "local-spawn";
 }

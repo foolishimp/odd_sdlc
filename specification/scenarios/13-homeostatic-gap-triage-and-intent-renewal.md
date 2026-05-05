@@ -25,11 +25,10 @@ constitutional repricing, while preserving ABG as the event-driven substrate.
 3. Re-run the relevant query or gap surface and verify that the workspace first
    records observation of the disturbance and blocks current triage or route
    truth until analysis is republished.
-4. Use a shallow-realization proving lane, including the named
-   `build_tenants/python/test_env/fixtures/test28_pass2_replay/`
-   survivor fixture, and verify that triage names the affected layer, classifies
-   the mismatch, and preserves route/governance truth without prescribing
-   builder strategy.
+4. Use a shallow-realization proving lane, including the test28 pass-2 replay
+   survivor fixture synthesized inside the proving workspace, and verify that
+   triage names the affected layer, classifies the mismatch, and preserves
+   route/governance truth without prescribing builder strategy.
 5. Use a major-ambiguity or unroutable case and verify that triage preserves
    the ambiguity or no-lawful-route outcome explicitly rather than silently
    demoting it to generic code repair.

@@ -9,7 +9,9 @@ export const SDLC_ASSURANCE_LEDGER_DIMENSIONS = Object.freeze([
   "requirement_fulfillment",
   "ambiguity",
   "capability",
-  "shallow_realization"
+  "shallow_realization",
+  "component_depth",
+  "design_completeness"
 ] as const);
 
 export type SdlcAssuranceLedgerDimension =

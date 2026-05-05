@@ -1,6 +1,7 @@
 // Validates: REQ-F-ODDSDLC-051
 // Validates: REQ-F-ODDSDLC-053
 // Validates: T-086
+// Validates: T-114
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -167,7 +168,7 @@ test("T-086 legacy retry-frontier keys preserve execution shard detail", () => {
   assert.equal(admitted.detail, first.detail);
 });
 
-test("T-086 postflight and gap dossier classify from carrier truth", () => {
+test("T-086/T-114 postflight classifies from typed truth, not report prose", () => {
   const root = makeWorkspace();
   const contract = hookContractByEdgeName("derive_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -199,11 +200,11 @@ test("T-086 postflight and gap dossier classify from carrier truth", () => {
   assert.equal(postflight.status, "blocked");
   assert(
     postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "materialized_product_relative_path_mismatch"
+      (reason) => reason.code === "unexpected_product_materialization_for_surface_edge"
     )
   );
   assert(
-    postflight.blockingReasonCarriers.some(
+    !postflight.blockingReasonCarriers.some(
       (reason) => reason.code === "worker_report_unresolved_reasons_present"
     )
   );
@@ -214,7 +215,8 @@ test("T-086 postflight and gap dossier classify from carrier truth", () => {
 
   const dossier = constructPostflightGapDossier({ manifest, postflight });
   const mismatch = dossier.reasons.find(
-    (reason) => reason.blockingReason.code === "materialized_product_relative_path_mismatch"
+    (reason) =>
+      reason.blockingReason.code === "unexpected_product_materialization_for_surface_edge"
   );
   assert(mismatch);
   assert.equal(mismatch.reasonClass, mismatch.blockingReason.reasonClass);

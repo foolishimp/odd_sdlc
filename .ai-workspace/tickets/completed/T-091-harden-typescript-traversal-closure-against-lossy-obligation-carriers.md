@@ -3,7 +3,7 @@ id: T-091
 title: Harden TypeScript traversal closure against lossy obligation carriers
 type: bug
 ticket_category: rc_blocker
-status: active
+status: completed
 goal: odd-sdlc-typescript-full-operational-rc
 change_intent: Prevent the first SDLC induction traversal, and later prompt-bearing traversals, from closing when source authority or requirement pressure is collapsed into thin IDs and refs that lose the semantic payload needed to define or constrain the REQ set.
 change_class: design_reframe
@@ -12,19 +12,19 @@ affected_boundary: Fg_conform_project, all prompt-bearing graph edges, workspace
 priority: critical
 triaged_at: 2026-04-28T15:21:18Z
 created_at: 2026-04-28T15:21:18Z
-updated_at: 2026-05-02T14:07:30Z
+updated_at: 2026-05-04
+closed_at: 2026-05-04
 reopened_at: 2026-05-02T14:07:30Z
 prior_completed_at: 2026-04-28T15:16:56Z
-review_status: reopened_for_first_traversal_requirement_authority_depth
+review_status: closed_scoped_first_traversal_requirement_authority_depth
 dependencies:
-  - T-087 active
-  - T-096 active
+  - T-087 completed
+  - T-096 completed
   - T-088 completed
   - T-089 completed
-  - ABG release cut `v3.4.0-rc.6` as traversal/runtime substrate
+  - ABG release cut `v3.5.0-rc.1` as traversal/runtime substrate
 blocks:
   - T-041 active
-  - T-102 active
   - T-109 active
 governance_scope: STDO Method
 governance_scope_expansion:
@@ -411,3 +411,32 @@ closed:
 
 The remaining live gap is no longer lossy obligation carriage. It is concrete
 test evidence: no governed tests are being observed by `sbt test`.
+
+## Proof Checkpoint - 2026-05-04
+
+Focused lossy-carrier proof passed against ABG `v3.5.0-rc.1`:
+
+```text
+npm run test:t091
+npm run test:t087-t096:data-mapper-sandbox
+```
+
+Evidence:
+
+- `test_env/tests/test_t091_traversal_obligation_payload.test.mjs`
+- `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151102328Z_pid36499`
+
+The proof covers:
+
+- imported requirement authority is derived from concrete source refs and payload, not marker-ledger IDs alone;
+- marker-only requirement pressure is rejected before worker handoff admission;
+- postflight rejects fulfilled requirements without output coverage evidence;
+- generated asset refs can lawfully anchor requirement coverage evidence;
+- the internal data_mapper induction run preserves source refs, source digests, family requirement surfaces, and concrete requirement IDs including `REQ-LDM-001` and `REQ-COV-008`.
+
+## Closure Decision - 2026-05-04
+
+Closed for the reopened first-traversal requirement-authority depth scope.
+
+The broader every-prompt-edge non-lossy obligation rule remains binding design law, but this ticket's reopened RC-blocking tranche is closed.

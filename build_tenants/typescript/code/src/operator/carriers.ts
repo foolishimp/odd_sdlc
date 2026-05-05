@@ -6,7 +6,15 @@
 // Implements: REQ-F-ODDSDLC-059
 // Implements: REQ-F-ODDSDLC-060
 
-import type { RuntimeEvent } from "@abiogenesis/typescript-tenant";
+import type {
+  FpTransformRequest,
+  FpTransformResult,
+  RuntimeEvent,
+  TracedProcessExecutorProfile,
+  TracedProcessOutcome,
+  TracedProcessStreamModel,
+  TraversalAttemptEnvelope
+} from "@abiogenesis/typescript-tenant";
 import type { SdlcTraversalRequirementSatisfaction } from "../assurance/index.js";
 import type {
   SdlcHookTransformProfile,
@@ -43,6 +51,7 @@ export interface SdlcWorkerTransportContract {
   readonly agentKey: string;
   readonly command: string;
   readonly args: readonly string[];
+  readonly model: string | null;
   readonly workerId: string;
   readonly backendId: string;
 }
@@ -52,6 +61,18 @@ export interface SdlcWorkerRunResult {
   readonly command: string;
   readonly args: readonly string[];
   readonly cwd: string;
+  readonly executorProfile?: TracedProcessExecutorProfile;
+  readonly terminalSessionId?: string | null;
+  readonly streamModel?: TracedProcessStreamModel;
+  readonly outcome?: TracedProcessOutcome;
+  readonly traceRoot?: string;
+  readonly traceResultRef?: string;
+  readonly structuredEventCount?: number | null;
+  readonly structuredParseFailureCount?: number | null;
+  readonly apiRetryCount?: number | null;
+  readonly toolCallCount?: number | null;
+  readonly finalOutputRef?: string | null;
+  readonly terminalTranscriptRef?: string | null;
   readonly status: number | null;
   readonly signal: string | null;
   readonly elapsedMs: number;
@@ -81,6 +102,18 @@ export interface SdlcWorkerProcessStartedContext {
   readonly command: string;
   readonly args: readonly string[];
   readonly cwd: string;
+  readonly executorProfile?: TracedProcessExecutorProfile;
+  readonly terminalSessionId?: string | null;
+  readonly streamModel?: TracedProcessStreamModel;
+  readonly outcome?: TracedProcessOutcome;
+  readonly traceRoot?: string;
+  readonly traceResultRef?: string;
+  readonly structuredEventCount?: number | null;
+  readonly structuredParseFailureCount?: number | null;
+  readonly apiRetryCount?: number | null;
+  readonly toolCallCount?: number | null;
+  readonly finalOutputRef?: string | null;
+  readonly terminalTranscriptRef?: string | null;
   readonly timeoutMs: number;
   readonly inactivityTimeoutMs: number;
   readonly heartbeatMs: number;
@@ -100,6 +133,18 @@ export interface SdlcWorkerProcessSummary {
   readonly command: string;
   readonly args: readonly string[];
   readonly cwd: string;
+  readonly executorProfile?: TracedProcessExecutorProfile;
+  readonly terminalSessionId?: string | null;
+  readonly streamModel?: TracedProcessStreamModel;
+  readonly outcome?: TracedProcessOutcome;
+  readonly traceRoot?: string;
+  readonly traceResultRef?: string;
+  readonly structuredEventCount?: number | null;
+  readonly structuredParseFailureCount?: number | null;
+  readonly apiRetryCount?: number | null;
+  readonly toolCallCount?: number | null;
+  readonly finalOutputRef?: string | null;
+  readonly terminalTranscriptRef?: string | null;
   readonly timeoutMs: number;
   readonly inactivityTimeoutMs: number;
   readonly heartbeatMs: number;
@@ -160,6 +205,388 @@ export interface SdlcMaterializedProductFile {
   readonly absolutePath: string;
   readonly digest: string;
   readonly byteCount: number;
+}
+
+export const SDLC_COMPONENT_CONCERN_ROLES = Object.freeze([
+  "parser",
+  "validator",
+  "mapper",
+  "error_model",
+  "io_adapter",
+  "reporting",
+  "domain_model",
+  "other"
+] as const);
+
+export type SdlcComponentConcernRole =
+  (typeof SDLC_COMPONENT_CONCERN_ROLES)[number];
+
+export interface SdlcComponentTopologyRow {
+  readonly kind: "sdlc_component_topology_row";
+  readonly componentId: string;
+  readonly moduleName: string;
+  readonly relativePath: string;
+  readonly publicBoundary: string;
+  readonly concernRole: SdlcComponentConcernRole;
+  readonly requirementIds: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+}
+
+export interface SdlcComponentRealizationRow {
+  readonly kind: "sdlc_component_realization_row";
+  readonly componentId: string;
+  readonly moduleName: string;
+  readonly relativePath: string;
+  readonly publicBoundary: string;
+  readonly trancheId: string | null;
+  readonly firstProductFileToChange: string | null;
+  readonly upstreamComponentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+}
+
+export interface SdlcTestComponentTopologyRow {
+  readonly kind: "sdlc_test_component_topology_row";
+  readonly testClassId: string;
+  readonly relativePath: string;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly shardId: string | null;
+}
+
+export interface SdlcComponentTestRealizationRow {
+  readonly kind: "sdlc_component_test_realization_row";
+  readonly testClassId: string;
+  readonly relativePath: string;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly shardId: string | null;
+}
+
+export type SdlcComponentTestExecutionStatus =
+  | "passed"
+  | "failed"
+  | "pending"
+  | "unproven";
+
+export interface SdlcComponentTestQualificationRow {
+  readonly kind: "sdlc_component_test_qualification_row";
+  readonly testClassId: string;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly status: SdlcComponentTestExecutionStatus;
+  readonly evidenceRefs: readonly string[];
+}
+
+export const SDLC_COMPONENT_EXECUTION_FAILURE_KINDS = Object.freeze([
+  "execution_evidence_missing",
+  "execution_carrier_invalid",
+  "execution_command_mismatch",
+  "execution_shard_mismatch",
+  "zero_tests_observed",
+  "source_compile_error",
+  "test_compile_error",
+  "assertion_failure",
+  "testcase_authority_contradiction",
+  "runtime_exception",
+  "worker_timeout_or_lost_terminal",
+  "network_or_transport_failure",
+  "triage_gap"
+] as const);
+
+export type SdlcComponentExecutionFailureKind =
+  (typeof SDLC_COMPONENT_EXECUTION_FAILURE_KINDS)[number];
+
+export const SDLC_COMPONENT_REPAIR_TARGETS = Object.freeze([
+  "component_code",
+  "component_test",
+  "test_schedule",
+  "test_execution_surface",
+  "implementation_design",
+  "testcase_authority",
+  "requirement_reprice",
+  "worker_archive",
+  "transport_retry"
+] as const);
+
+export type SdlcComponentRepairTarget =
+  (typeof SDLC_COMPONENT_REPAIR_TARGETS)[number];
+
+export const SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE = Object.freeze([
+  "high",
+  "medium",
+  "low"
+] as const);
+
+export type SdlcComponentAttributionConfidence =
+  (typeof SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE)[number];
+
+export interface SdlcComponentExecutionFailureRow {
+  readonly kind: "sdlc_component_execution_failure_row";
+  readonly failureId: string;
+  readonly shardId: string;
+  readonly moduleName: string;
+  readonly testClassId: string;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly failureKind: SdlcComponentExecutionFailureKind;
+  readonly repairTarget: SdlcComponentRepairTarget;
+  readonly lawfulReentryPoint: string;
+  readonly attributionConfidence: SdlcComponentAttributionConfidence;
+  readonly sourceRefs: readonly string[];
+  readonly testRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcComponentExecutionFailureRegister {
+  readonly kind: "component_execution_failure_register";
+  readonly registerVersion: "ts-component-depth-v1";
+  readonly failureRows: readonly SdlcComponentExecutionFailureRow[];
+}
+
+export const SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES = Object.freeze([
+  "repair_required",
+  "no_repair_required",
+  "triage_gap"
+] as const);
+
+export type SdlcComponentRepairScheduleStatus =
+  (typeof SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES)[number];
+
+export interface SdlcComponentRepairScheduleRow {
+  readonly kind: "sdlc_component_repair_schedule_row";
+  readonly scheduleId: string;
+  readonly failureId: string;
+  readonly repairTarget: SdlcComponentRepairTarget;
+  readonly lawfulReentryPoint: string;
+  readonly attributionConfidence: SdlcComponentAttributionConfidence;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly sourceRefs: readonly string[];
+  readonly testRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcComponentRepairSchedule {
+  readonly kind: "sdlc_component_repair_schedule";
+  readonly registerVersion: "ts-component-depth-v1";
+  readonly scheduleStatus: SdlcComponentRepairScheduleStatus;
+  readonly repairRows: readonly SdlcComponentRepairScheduleRow[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export type SdlcReleaseDepthParityStatus = "met" | "blocked" | "repriced";
+
+export interface SdlcReleaseDepthParityAssessment {
+  readonly kind: "sdlc_release_depth_parity_assessment";
+  readonly status: SdlcReleaseDepthParityStatus;
+  readonly summary: string;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcComponentDepthRegister {
+  readonly kind: "sdlc_component_depth_register";
+  readonly registerVersion: "ts-component-depth-v1";
+  readonly targetAssetType: string;
+  readonly componentTopologyRows: readonly SdlcComponentTopologyRow[];
+  readonly componentRealizationRows: readonly SdlcComponentRealizationRow[];
+  readonly testComponentTopologyRows: readonly SdlcTestComponentTopologyRow[];
+  readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
+  readonly componentTestQualificationRows: readonly SdlcComponentTestQualificationRow[];
+  readonly componentExecutionFailureRegister: SdlcComponentExecutionFailureRegister | null;
+  readonly componentRepairSchedule: SdlcComponentRepairSchedule | null;
+  readonly releaseDepthParity: SdlcReleaseDepthParityAssessment | null;
+}
+
+export type SdlcComponentDepthRegisterAdmissionStatus =
+  | "admitted"
+  | "rejected"
+  | "not_required";
+
+export interface SdlcComponentDepthRegisterAdmission {
+  readonly kind: "sdlc_component_depth_register_admission";
+  readonly status: SdlcComponentDepthRegisterAdmissionStatus;
+  readonly targetAssetType: string;
+  readonly register: SdlcComponentDepthRegister | null;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export const SDLC_DOMAIN_ENTITY_OWNERSHIP = Object.freeze([
+  "owned",
+  "referenced"
+] as const);
+
+export type SdlcDomainEntityOwnership =
+  (typeof SDLC_DOMAIN_ENTITY_OWNERSHIP)[number];
+
+export const SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES = Object.freeze([
+  "one",
+  "optional",
+  "many"
+] as const);
+
+export type SdlcDomainAttributeCardinality =
+  (typeof SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES)[number];
+
+export interface SdlcDomainAttribute {
+  readonly kind: "sdlc_domain_attribute";
+  readonly attributeId: string;
+  readonly name: string;
+  readonly valueType: string;
+  readonly cardinality: SdlcDomainAttributeCardinality;
+  readonly invariantRefs: readonly string[];
+}
+
+export interface SdlcDomainEntity {
+  readonly kind: "sdlc_domain_entity";
+  readonly entityId: string;
+  readonly moduleName: string;
+  readonly ownership: SdlcDomainEntityOwnership;
+  readonly attributes: readonly SdlcDomainAttribute[];
+  readonly invariants: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+}
+
+export interface SdlcDomainOperation {
+  readonly kind: "sdlc_domain_operation";
+  readonly operationId: string;
+  readonly moduleName: string;
+  readonly inputEntityIds: readonly string[];
+  readonly outputEntityIds: readonly string[];
+  readonly requiredAttributeIds: readonly string[];
+}
+
+export interface SdlcModuleSchemaFragment {
+  readonly kind: "sdlc_module_schema_fragment";
+  readonly moduleName: string;
+  readonly entities: readonly SdlcDomainEntity[];
+  readonly operations: readonly SdlcDomainOperation[];
+  readonly requirementIds: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+}
+
+export interface SdlcEntityStateTransition {
+  readonly kind: "sdlc_entity_state_transition";
+  readonly transitionId: string;
+  readonly fromState: string;
+  readonly toState: string;
+  readonly operationId: string;
+  readonly entityId: string;
+}
+
+export interface SdlcModuleStateDiagramFragment {
+  readonly kind: "sdlc_module_state_diagram_fragment";
+  readonly moduleName: string;
+  readonly entityId: string;
+  readonly stateless: boolean;
+  readonly states: readonly string[];
+  readonly transitions: readonly SdlcEntityStateTransition[];
+  readonly requirementIds: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+}
+
+export interface SdlcAggregateDomainEntity {
+  readonly kind: "sdlc_aggregate_domain_entity";
+  readonly entityId: string;
+  readonly ownerModuleName: string;
+  readonly attributes: readonly SdlcDomainAttribute[];
+  readonly sourceModuleNames: readonly string[];
+}
+
+export interface SdlcAggregateDomainModel {
+  readonly kind: "sdlc_aggregate_domain_model";
+  readonly modelVersion: "ts-design-depth-v1";
+  readonly entities: readonly SdlcAggregateDomainEntity[];
+  readonly operations: readonly SdlcDomainOperation[];
+  readonly crossModuleReferences: readonly {
+    readonly fromModuleName: string;
+    readonly toModuleName: string;
+    readonly entityId: string;
+  }[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcSunnyDaySequenceStep {
+  readonly kind: "sdlc_sunny_day_sequence_step";
+  readonly stepId: string;
+  readonly moduleName: string;
+  readonly operationId: string;
+  readonly inputEntityIds: readonly string[];
+  readonly outputEntityIds: readonly string[];
+  readonly stateTransitionIds: readonly string[];
+}
+
+export interface SdlcAggregateSunnyDaySequence {
+  readonly kind: "sdlc_aggregate_sunny_day_sequence";
+  readonly sequenceVersion: "ts-design-depth-v1";
+  readonly steps: readonly SdlcSunnyDaySequenceStep[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export const SDLC_DESIGN_COMPLETENESS_AXES = Object.freeze([
+  "entity",
+  "attribute",
+  "flow"
+] as const);
+
+export type SdlcDesignCompletenessAxis =
+  (typeof SDLC_DESIGN_COMPLETENESS_AXES)[number];
+
+export const SDLC_DESIGN_COMPLETENESS_STATUSES = Object.freeze([
+  "satisfied",
+  "partial",
+  "blocked"
+] as const);
+
+export type SdlcDesignCompletenessStatus =
+  (typeof SDLC_DESIGN_COMPLETENESS_STATUSES)[number];
+
+export interface SdlcDesignCompletenessAxisVerdict {
+  readonly kind: "sdlc_design_completeness_axis_verdict";
+  readonly axis: SdlcDesignCompletenessAxis;
+  readonly status: SdlcDesignCompletenessStatus;
+  readonly reasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcDesignCompletenessVerdict {
+  readonly kind: "sdlc_design_completeness_verdict";
+  readonly verdictVersion: "ts-design-depth-v1";
+  readonly entity: SdlcDesignCompletenessAxisVerdict;
+  readonly attribute: SdlcDesignCompletenessAxisVerdict;
+  readonly flow: SdlcDesignCompletenessAxisVerdict;
+}
+
+export interface SdlcDesignDepthRegister {
+  readonly kind: "sdlc_design_depth_register";
+  readonly registerVersion: "ts-design-depth-v1";
+  readonly targetAssetType: string;
+  readonly moduleSchemaFragments: readonly SdlcModuleSchemaFragment[];
+  readonly moduleStateDiagramFragments: readonly SdlcModuleStateDiagramFragment[];
+  readonly aggregateDomainModel: SdlcAggregateDomainModel | null;
+  readonly aggregateSunnyDaySequence: SdlcAggregateSunnyDaySequence | null;
+  readonly designCompletenessVerdict: SdlcDesignCompletenessVerdict | null;
+}
+
+export type SdlcDesignDepthRegisterAdmissionStatus =
+  | "admitted"
+  | "rejected"
+  | "not_required";
+
+export interface SdlcDesignDepthRegisterAdmission {
+  readonly kind: "sdlc_design_depth_register_admission";
+  readonly status: SdlcDesignDepthRegisterAdmissionStatus;
+  readonly targetAssetType: string;
+  readonly register: SdlcDesignDepthRegister | null;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
 }
 
 export interface SdlcWorkerExecutionEvidence {
@@ -270,6 +697,20 @@ export interface SdlcTraversalObligationContext {
   readonly deltaSummary: SdlcTraversalObligationDeltaSummary;
 }
 
+export type SdlcFeatureScopeMode = "steel_thread" | "full_breadth";
+
+export interface SdlcFeatureScope {
+  readonly kind: "sdlc_feature_scope";
+  readonly scopeVersion: "ts-scope-v1";
+  readonly mode: SdlcFeatureScopeMode;
+  readonly scopeRef: string;
+  readonly basisRefs: readonly string[];
+  readonly includedModuleNames: readonly string[];
+  readonly includedEntityIds: readonly string[];
+  readonly includedOperationIds: readonly string[];
+  readonly deferredModuleNames: readonly string[];
+}
+
 export type SdlcWorkerObligationFulfillmentStatus =
   | "fulfilled"
   | "partial"
@@ -355,6 +796,7 @@ export interface SdlcTraversalIntentPackage {
   readonly priorGapDossierRefs: readonly string[];
   readonly obligationIds: readonly string[];
   readonly obligationDeltaSummary: SdlcTraversalObligationDeltaSummary;
+  readonly featureScope: SdlcFeatureScope;
   readonly productMaterialization: SdlcProductMaterializationContract;
   readonly resultReportSchema: readonly string[];
   readonly evaluatorExpectations: SdlcHookTransformProfile;
@@ -375,11 +817,17 @@ export interface SdlcWorkerHandoffManifest {
   readonly targetAssetType: string;
   readonly outputFile: string;
   readonly reportFile: string;
+  readonly fpTransformRequest: FpTransformRequest | null;
+  readonly fpTransformRequestFile: string;
+  readonly fpTransformResultFile: string;
+  readonly fpEvaluateResultFile: string;
   readonly allowedWriteRoots: readonly string[];
   readonly conformedProject: SdlcConformProjectProfile;
   readonly productMaterialization: SdlcProductMaterializationContract;
+  readonly featureScope: SdlcFeatureScope;
   readonly traversalObligationContext: SdlcTraversalObligationContext;
   readonly traversalIntentPackage: SdlcTraversalIntentPackage;
+  readonly traversalAttemptEnvelope: TraversalAttemptEnvelope | null;
   readonly retryContext: SdlcWorkerRetryContext;
   readonly methodRefs: readonly string[];
   readonly resultReportSchema: readonly string[];
@@ -398,6 +846,10 @@ export interface SdlcWorkerResultReport {
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
   readonly executionEvidenceErrors: readonly string[];
   readonly obligationAssessments: readonly SdlcWorkerObligationAssessment[];
+  readonly fpTransformRequestRef: string | null;
+  readonly fpTransformResultRef: string | null;
+  readonly fpTransformStatus: FpTransformResult["status"] | null;
+  readonly fpEvaluateResultRef: string | null;
 }
 
 export interface SdlcPostflightResult {
@@ -406,6 +858,25 @@ export interface SdlcPostflightResult {
   readonly blockingReasons: readonly string[];
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
   readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcFpEvaluateResult {
+  readonly kind: "sdlc_fp_evaluate_result";
+  readonly stage: "F_P.evaluate";
+  readonly reportRef: string;
+  readonly transformResultRef: string | null;
+  readonly postflightRef: string;
+  readonly status: SdlcPostflightResult["status"];
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly obligationAssessmentCounts: {
+    readonly total: number;
+    readonly fulfilled: number;
+    readonly partial: number;
+    readonly blocked: number;
+    readonly unassessed: number;
+  };
+  readonly executionEvidenceStatus: SdlcWorkerExecutionEvidence["status"] | null;
 }
 
 export interface SdlcInstalledOperatorStartOutcome {

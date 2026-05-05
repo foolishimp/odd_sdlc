@@ -96,15 +96,36 @@ function writeRetryWorker(workspaceRoot) {
       "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
       "function digestText(content) { return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`; }",
       "function materializedFile(role, relativePath, content) { const absolutePath = path.join(manifest.productMaterialization.tenantRoot, relativePath); mkdirSync(dirname(absolutePath), { recursive: true }); writeFileSync(absolutePath, content, 'utf8'); return { kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath, digest: digestText(content), byteCount: Buffer.byteLength(content, 'utf8') }; }",
+      "const sourceRelative = 'retry-core/src/index.ts';",
+      "const testRelative = 'retry-core/test/index.test.ts';",
+      "function componentDepthRegister() {",
+      "  const base = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType };",
+      "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'retry-core', moduleName: 'retry-core', relativePath: sourceRelative, publicBoundary: 'retryCore', requirementIds: ['REQ-T101-001'], sourceAssetRefs: ['fixture://t101'] };",
+      "  const topologyRow = { kind: 'sdlc_component_topology_row', componentId: 'retry-core', moduleName: 'retry-core', relativePath: sourceRelative, publicBoundary: 'retryCore', concernRole: 'other', requirementIds: ['REQ-T101-001'], sourceAssetRefs: ['fixture://t101'] };",
+      "  const testTopologyRow = { kind: 'sdlc_test_component_topology_row', testClassId: 'RetryCoreSpec', relativePath: testRelative, testcaseIds: ['TC-T101-001'], componentIds: ['retry-core'], requirementIds: ['REQ-T101-002'], shardId: 'test-shard-01-retry-core' };",
+      "  const testRow = { kind: 'sdlc_component_test_realization_row', testClassId: 'RetryCoreSpec', relativePath: testRelative, testcaseIds: ['TC-T101-001'], componentIds: ['retry-core'], requirementIds: ['REQ-T101-002'], shardId: 'test-shard-01-retry-core' };",
+      "  const qualificationRow = { kind: 'sdlc_component_test_qualification_row', testClassId: 'RetryCoreSpec', testcaseIds: ['TC-T101-001'], componentIds: ['retry-core'], requirementIds: ['REQ-T101-002'], status: 'passed', evidenceRefs: [manifest.outputFile] };",
+      "  const repairSchedule = { kind: 'sdlc_component_repair_schedule', registerVersion: 'ts-component-depth-v1', scheduleStatus: 'no_repair_required', repairRows: [], evidenceRefs: [manifest.outputFile] };",
+      "  if (manifest.targetAssetType === 'implementation_component_topology_surface') return { ...base, componentTopologyRows: [topologyRow] };",
+      "  if (manifest.targetAssetType === 'component_realization_schedule_surface' || manifest.targetAssetType === 'component_code_surface' || manifest.targetAssetType === 'component_realization_qualification_surface') return { ...base, componentRealizationRows: [componentRow] };",
+      "  if (manifest.targetAssetType === 'test_component_topology_surface') return { ...base, testComponentTopologyRows: [testTopologyRow] };",
+      "  if (manifest.targetAssetType === 'component_test_surface') return { ...base, componentTestRows: [testRow] };",
+      "  if (manifest.targetAssetType === 'component_test_qualification_surface') return { ...base, componentTestQualificationRows: [qualificationRow] };",
+      "  if (manifest.targetAssetType === 'component_repair_schedule_surface') return { ...base, componentRepairSchedule: repairSchedule };",
+      "  if (manifest.targetAssetType === 'release_depth_parity_surface') return { ...base, releaseDepthParity: { kind: 'sdlc_release_depth_parity_assessment', status: 'met', summary: 'T-101 fixture parity met', blockingReasons: [], evidenceRefs: [manifest.outputFile] } };",
+      "  return null;",
+      "}",
       "const materializedFiles = [];",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `attempt: ${counts[manifest.edgeName]}`, `prior_gap_count: ${priorGapCount}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), ''];",
       "if (manifest.targetAssetType.endsWith('_schedule_surface')) { outputLines.push('## module_dependency_graph', '- node: retry-core', '## realization_tranches', '- id: RT-001 | module: retry-core | state: open', '## tranche_obligation_ledger', '- RT-001: REQ-T101-001', '## tranche_gap_ledger', '- RT-001: open', '## next_tranche_selector', '- next: RT-001'); }",
-      "if (manifest.edgeName === 'derive_code_surface' && counts[manifest.edgeName] === 1) { process.exit(0); }",
+      "const componentRegister = componentDepthRegister();",
+      "if (componentRegister !== null) { outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```'); }",
+      "if (manifest.edgeName === 'derive_component_code_surface' && counts[manifest.edgeName] === 1) { process.exit(0); }",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "const outputContent = `${outputLines.join('\\n')}\\n`;",
       "writeFileSync(manifest.outputFile, outputContent, 'utf8');",
-      "if (manifest.targetAssetType === 'code_surface') { materializedFiles.push(materializedFile('source', 'src/index.ts', ['// Implements: REQ-T101-001', 'export function retryCore(): string {', \"  return 'retry-core';\", '}', ''].join('\\n'))); }",
-      "if (manifest.targetAssetType === 'test_module_surface') { materializedFiles.push(materializedFile('test', 'test/index.test.ts', ['// Validates: REQ-T101-002', \"import test from 'node:test';\", \"import assert from 'node:assert/strict';\", \"test('retry core', () => {\", \"  assert.equal('retry-core', 'retry-core');\", '});', ''].join('\\n'))); }",
+      "if (manifest.targetAssetType === 'component_code_surface') { materializedFiles.push(materializedFile('source', sourceRelative, ['// Implements: REQ-T101-001', 'export function retryCore(): string {', \"  return 'retry-core';\", '}', ''].join('\\n'))); }",
+      "if (manifest.targetAssetType === 'component_test_surface') { materializedFiles.push(materializedFile('test', testRelative, ['// Validates: REQ-T101-002', \"import test from 'node:test';\", \"import assert from 'node:assert/strict';\", \"test('retry core', () => {\", \"  assert.equal('retry-core', 'retry-core');\", '});', ''].join('\\n'))); }",
       "const evidenceRefs = [manifest.outputFile, ...materializedFiles.map((file) => file.absolutePath)];",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [...evidenceRefs, ...obligation.evidenceRefs], blockingReasons: [] }));",
       "const shardEvidence = manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 }));",
@@ -172,7 +193,7 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
     .split("\n")
     .map((line) => JSON.parse(line));
   const codeAttempts = edgeLog.filter(
-    (entry) => entry.edgeName === "derive_code_surface"
+    (entry) => entry.edgeName === "derive_component_code_surface"
   );
   assert.equal(codeAttempts.length, 2);
   assert.equal(codeAttempts[0].priorGapCount, 0);

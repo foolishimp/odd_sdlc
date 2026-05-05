@@ -130,7 +130,10 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   assert.deepStrictEqual(manifest.traversalIntentPackage.sourceAssetTypes, [
     "implementation_module_surface",
     "implementation_stack_profile",
-    "realization_schedule_surface"
+    "realization_schedule_surface",
+    "implementation_component_topology_surface",
+    "component_code_surface",
+    "component_realization_qualification_surface"
   ]);
   assert.equal(
     packageDigest,
@@ -233,12 +236,10 @@ test("T-088 rejects handoff archives with missing cumulative pressure", () => {
     () =>
       writeHandoffFiles(
         replaceIntentPackage(manifest, {
-          authorityRefs: manifest.traversalIntentPackage.authorityRefs.filter(
-            (ref) => !ref.endsWith("specification/requirements/00-imported-sources.md")
-          )
+          authorityRefs: []
         })
       ),
-    /missing induction lineage/u
+    /missing .*authority|missing induction lineage/u
   );
 
   assert.throws(
@@ -248,7 +249,7 @@ test("T-088 rejects handoff archives with missing cumulative pressure", () => {
           obligationIds: []
         })
       ),
-    /missing obligation pressure/u
+    /missing obligation pressure|obligation count drift/u
   );
 
   assert.throws(

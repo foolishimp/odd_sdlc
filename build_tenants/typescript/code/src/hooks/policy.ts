@@ -73,6 +73,31 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "implementation"
   }),
   policyEntry({
+    targetAssetType: "aggregate_domain_model_surface",
+    edgeClass: "implementation"
+  }),
+  policyEntry({
+    targetAssetType: "implementation_component_topology_surface",
+    edgeClass: "implementation"
+  }),
+  policyEntry({
+    targetAssetType: "aggregate_sunny_day_sequence_surface",
+    edgeClass: "implementation"
+  }),
+  policyEntry({
+    targetAssetType: "component_realization_schedule_surface",
+    edgeClass: "implementation"
+  }),
+  policyEntry({
+    targetAssetType: "component_code_surface",
+    edgeClass: "implementation"
+  }),
+  policyEntry({
+    targetAssetType: "component_realization_qualification_surface",
+    edgeClass: "qualification",
+    defaultOperation: "qualify"
+  }),
+  policyEntry({
     targetAssetType: "realization_schedule_surface",
     edgeClass: "implementation"
   }),
@@ -93,6 +118,14 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "qualification"
   }),
   policyEntry({
+    targetAssetType: "test_component_topology_surface",
+    edgeClass: "qualification"
+  }),
+  policyEntry({
+    targetAssetType: "component_test_surface",
+    edgeClass: "qualification"
+  }),
+  policyEntry({
     targetAssetType: "test_schedule_surface",
     edgeClass: "qualification"
   }),
@@ -102,8 +135,23 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     defaultOperation: "qualify"
   }),
   policyEntry({
+    targetAssetType: "component_test_qualification_surface",
+    edgeClass: "qualification",
+    defaultOperation: "qualify"
+  }),
+  policyEntry({
+    targetAssetType: "component_repair_schedule_surface",
+    edgeClass: "qualification",
+    defaultOperation: "qualify"
+  }),
+  policyEntry({
     targetAssetType: "testcase_authority_surface",
     edgeClass: "qualification",
+    defaultOperation: "qualify"
+  }),
+  policyEntry({
+    targetAssetType: "release_depth_parity_surface",
+    edgeClass: "release",
     defaultOperation: "qualify"
   }),
   policyEntry({

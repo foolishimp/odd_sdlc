@@ -187,6 +187,50 @@ classDiagram
   ABG-compatible runtime facts, archives the run, and returns the operator
   projection.
 
+## Worker Progress Observation Law
+
+Owner ticket: `.ai-workspace/tickets/active/B-082-backfill-agentic-cli-buffering-progress-observation-design-adr.md`
+ADR: `build_tenants/common/design/adrs/ADR-009-agentic-cli-worker-progress-observation-boundary.md`
+
+Live agentic coder CLIs are not reliable terminal-progress devices. In
+particular, Claude Code text output can buffer until final response while the
+worker is healthy, reading authority, calling the remote model, and writing the
+declared output artifact.
+
+The installed operator therefore distinguishes three progress planes:
+
+| Plane | Examples | Authority Role |
+| --- | --- | --- |
+| process/protocol progress | `actor_process_stream_observed`, structured worker protocol chunks, stdout/stderr byte counts | liveness and diagnostics |
+| artifact progress | declared `outputRef`, `reportRef`, plan/progress carrier refs, archive file mtime/digest/byte changes | liveness and diagnostics over declared refs |
+| closure progress | admitted `SdlcWorkerResultReport`, postflight, ledgers, ABG projection | edge closure authority |
+
+Only closure progress can close an SDLC graph edge. Process/protocol progress
+and artifact progress may prevent false silent-worker classification or sharpen
+retry/reentry, but they do not replace F_P semantic judgment, F_D deterministic
+checks, or ledger admission.
+
+A timeout with preserved declared output or product files is not
+`silent_worker_inactivity`. It is either salvageable through normal
+postflight/ledger admission, or it must surface as typed
+artifact-progress-without-report evidence with refs to the preserved artifacts.
+
+`worker_process_started_context.json` carries `manifestRef`, `promptRef`,
+`reportRef`, `outputRef`, stdout/stderr refs, PID, command, cwd, and timeout
+policy so the archive names the live progress surfaces before completion. Those
+refs are observation surfaces, not semantic closure.
+
+For `process://claude`, the default transport uses realtime structured output
+instead of final buffered text output:
+
+```text
+claude -p --output-format stream-json --include-partial-messages --verbose ...
+```
+
+Heartbeats prove the actor wrapper is alive. They do not prove the worker is
+making productive transform progress. A worker with only heartbeats and no
+process/protocol or declared-artifact progress remains a typed runtime concern.
+
 ## Product Materialization Law
 
 `code_surface` and `test_module_surface` are not satisfied by a markdown

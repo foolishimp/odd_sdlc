@@ -18,6 +18,12 @@ import {
 import path, { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+  admitFpTransformResultForRequest,
+  constructFpTransformResult,
+  type FpTransformRequest,
+  type FpTransformResult
+} from "@abiogenesis/typescript-tenant";
+import {
   admitSdlcConstructorResult,
   type SdlcConstructorResult,
   type SdlcHookContract,
@@ -38,6 +44,10 @@ import {
   sdlcBlockingReasonFromLegacy,
   type SdlcBlockingReason
 } from "../shared/blocking_reason.js";
+import {
+  deriveSdlcFeatureScope,
+  sdlcTraversalObligationInFeatureScope
+} from "./feature_scope.js";
 import type { SdlcProjectConstraints } from "../workspace/index.js";
 import {
   deriveSdlcConformProjectProfileFromWorkspace,
@@ -50,6 +60,7 @@ import type {
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcPostflightGapReasonClass,
+  SdlcFpEvaluateResult,
   SdlcProductMaterializationContract,
   SdlcAuthorityIndexCategory,
   SdlcAuthorityIndexEntry,
@@ -91,7 +102,11 @@ const REPORT_FIELDS = Object.freeze([
   "materializedFiles",
   "executionEvidence",
   "executionEvidenceErrors",
-  "obligationAssessments"
+  "obligationAssessments",
+  "fpTransformRequestRef",
+  "fpTransformResultRef",
+  "fpTransformStatus",
+  "fpEvaluateResultRef"
 ] as const);
 
 const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
@@ -172,10 +187,10 @@ export function operatorRunId(): string {
 function materializationRolesForTarget(
   targetAssetType: string
 ): readonly SdlcMaterializedProductFileRole[] {
-  if (targetAssetType === "code_surface") {
+  if (targetAssetType === "component_code_surface") {
     return Object.freeze(["source"]);
   }
-  if (targetAssetType === "test_module_surface") {
+  if (targetAssetType === "component_test_surface") {
     return Object.freeze(["test"]);
   }
   return Object.freeze([]);
@@ -187,7 +202,7 @@ function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
 
 function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
   return (
-    targetAssetType === "test_module_surface" ||
+    targetAssetType === "component_test_surface" ||
     targetAdmitsTestExecutionEvidence(targetAssetType)
   );
 }
@@ -642,6 +657,25 @@ function trancheKeysFor(input: {
   return uniqueSorted(keys);
 }
 
+function scopeTrancheKeys(input: {
+  readonly trancheKeys: readonly string[];
+  readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
+}): readonly string[] {
+  if (input.featureScope.mode === "full_breadth") {
+    return input.trancheKeys;
+  }
+  return Object.freeze(
+    input.trancheKeys.filter((key) => {
+      if (!key.startsWith("module:")) {
+        return true;
+      }
+      return input.featureScope.includedModuleNames.includes(
+        key.slice("module:".length)
+      );
+    })
+  );
+}
+
 function retrievalHintsFor(input: {
   readonly authorityIndex: readonly SdlcAuthorityIndexEntry[];
   readonly obligations: readonly SdlcTraversalObligation[];
@@ -675,6 +709,33 @@ function runtimeContextRefsFor(workspaceRoot: string): readonly string[] {
       const ref = fileRef(workspaceRoot, relativePath);
       return ref === null ? [] : [ref];
     })
+  );
+}
+
+function scopedAuthorityRefsForFeatureScope(input: {
+  readonly authorityRefs: readonly string[];
+  readonly obligations: readonly SdlcTraversalObligation[];
+  readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
+}): readonly string[] {
+  if (input.featureScope.mode === "full_breadth") {
+    return input.authorityRefs;
+  }
+  const usedRefs = new Set<string>();
+  for (const obligation of input.obligations) {
+    for (const ref of obligation.evidenceRefs) {
+      usedRefs.add(ref);
+    }
+    for (const ref of obligation.payload.sourceRefs) {
+      usedRefs.add(ref);
+    }
+  }
+  return Object.freeze(
+    input.authorityRefs.filter(
+      (ref) =>
+        !ref.includes("/specification/requirements/") ||
+        ref.endsWith("/specification/requirements/00-imported-sources.md") ||
+        usedRefs.has(ref)
+    )
   );
 }
 
@@ -849,6 +910,7 @@ function deriveTraversalObligationContext(input: {
   readonly workspaceRoot: string;
   readonly contract: SdlcHookContract;
   readonly materialization: SdlcProductMaterializationContract;
+  readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly retryContext: SdlcWorkerRetryContext;
 }): SdlcTraversalObligationContext {
   const authorityRefs = authorityRefsFor({
@@ -929,25 +991,41 @@ function deriveTraversalObligationContext(input: {
       )
     );
   }
-  const requirementCount = obligations.filter(
+  const scopedObligations = Object.freeze(
+    obligations.filter((obligation) =>
+      sdlcTraversalObligationInFeatureScope({
+        featureScope: input.featureScope,
+        obligation
+      })
+    )
+  );
+  const scopedAuthorityRefs = scopedAuthorityRefsForFeatureScope({
+    authorityRefs,
+    obligations: scopedObligations,
+    featureScope: input.featureScope
+  });
+  const requirementCount = scopedObligations.filter(
     (obligation) => obligation.obligationKind === "requirement"
   ).length;
-  const authorityIndex = authorityIndexFor(authorityRefs);
-  const trancheKeys = trancheKeysFor({
-    contract: input.contract,
-    materialization: input.materialization
+  const authorityIndex = authorityIndexFor(scopedAuthorityRefs);
+  const trancheKeys = scopeTrancheKeys({
+    trancheKeys: trancheKeysFor({
+      contract: input.contract,
+      materialization: input.materialization
+    }),
+    featureScope: input.featureScope
   });
   const retrievalHints = retrievalHintsFor({
     authorityIndex,
-    obligations,
+    obligations: scopedObligations,
     trancheKeys
   });
   return Object.freeze({
     kind: "sdlc_traversal_obligation_context" as const,
     requiredSourceAssetTypes: Object.freeze([...input.contract.sourceAssetTypes]),
     targetAssetType: input.contract.targetAssetType,
-    obligations: Object.freeze(obligations),
-    authorityRefs,
+    obligations: scopedObligations,
+    authorityRefs: scopedAuthorityRefs,
     authorityIndex,
     trancheKeys,
     retrievalHints,
@@ -955,10 +1033,10 @@ function deriveTraversalObligationContext(input: {
     priorEdgeRefs,
     deltaSummary: Object.freeze({
       kind: "sdlc_traversal_obligation_delta_summary" as const,
-      obligationCount: obligations.length,
+      obligationCount: scopedObligations.length,
       requirementCount,
       priorGapCount,
-      authorityRefCount: authorityRefs.length
+      authorityRefCount: scopedAuthorityRefs.length
     })
   });
 }
@@ -981,6 +1059,7 @@ function constructTraversalIntentPackage(input: {
   readonly resultReportSchema: readonly string[];
   readonly contract: SdlcHookContract;
   readonly materialization: SdlcProductMaterializationContract;
+  readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly obligationContext: SdlcTraversalObligationContext;
   readonly retryContext: SdlcWorkerRetryContext;
 }): SdlcTraversalIntentPackage {
@@ -1004,6 +1083,7 @@ function constructTraversalIntentPackage(input: {
       input.obligationContext.obligations.map((obligation) => obligation.obligationId)
     ),
     obligationDeltaSummary: input.obligationContext.deltaSummary,
+    featureScope: input.featureScope,
     productMaterialization: input.materialization,
     resultReportSchema: Object.freeze([...input.resultReportSchema]),
     evaluatorExpectations: input.contract.transformProfile,
@@ -1033,6 +1113,11 @@ export function assertTraversalIntentPackagePressure(
     pkg.reportFile !== manifest.reportFile
   ) {
     throw new TypeError("traversal intent package identity does not match manifest");
+  }
+  if (
+    JSON.stringify(pkg.featureScope) !== JSON.stringify(manifest.featureScope)
+  ) {
+    throw new TypeError("traversal intent package feature scope drift");
   }
   if (pkg.authorityRefs.length === 0) {
     throw new TypeError("traversal intent package missing source authority refs");
@@ -1081,6 +1166,10 @@ export function deriveWorkerHandoffManifest(input: {
   readonly edgeName: string;
   readonly vectorIndex: number;
   readonly contract: SdlcHookContract;
+  readonly fpTransformRequest?: FpTransformRequest | null | undefined;
+  readonly traversalAttemptEnvelope?:
+    | SdlcWorkerHandoffManifest["traversalAttemptEnvelope"]
+    | undefined;
   readonly conformedProject?: SdlcConformProjectProfile | undefined;
   readonly retryContext?: SdlcWorkerRetryContext | undefined;
   readonly projectConstraints?: Pick<
@@ -1127,14 +1216,30 @@ export function deriveWorkerHandoffManifest(input: {
     "workspace://.abiogenesis/docs/standards/ODD_METHOD.md"
   ]);
   const resultReportSchema = REPORT_FIELDS;
+  const outputFile = join(outputRoot, `${input.contract.targetAssetType}.md`);
+  const reportFile = join(archiveRoot, "worker_result_report.json");
+  const fpTransformRequestFile = join(archiveRoot, "fp_transform_request.json");
+  const fpTransformResultFile = join(archiveRoot, "fp_transform_result.json");
+  const fpEvaluateResultFile = join(archiveRoot, "fp_evaluate_result.json");
+  const traversalAttemptEnvelope = input.traversalAttemptEnvelope ?? null;
+  const featureScope = deriveSdlcFeatureScope({
+    targetAssetType: input.contract.targetAssetType,
+    strategyDirectiveRef: traversalAttemptEnvelope?.strategyDirectiveRef ?? null,
+    selectedScheduleItemRefs:
+      traversalAttemptEnvelope?.selectedScheduleItemRefs ?? Object.freeze([]),
+    requiredProgressArtifactRefs:
+      traversalAttemptEnvelope?.requiredProgressArtifactRefs ?? Object.freeze([]),
+    declaredModuleNames: materialization.declaredModuleNames,
+    materializedEntityIds: Object.freeze([]),
+    materializedOperationIds: Object.freeze([])
+  });
   const traversalObligationContext = deriveTraversalObligationContext({
     workspaceRoot: input.workspaceRoot,
     contract: input.contract,
     materialization,
+    featureScope,
     retryContext
   });
-  const outputFile = join(outputRoot, `${input.contract.targetAssetType}.md`);
-  const reportFile = join(archiveRoot, "worker_result_report.json");
   const traversalIntentPackage = constructTraversalIntentPackage({
     graphFunctionName: input.graphFunctionName,
     edgeName: input.edgeName,
@@ -1145,6 +1250,7 @@ export function deriveWorkerHandoffManifest(input: {
     resultReportSchema,
     contract: input.contract,
     materialization,
+    featureScope,
     obligationContext: traversalObligationContext,
     retryContext
   });
@@ -1160,11 +1266,17 @@ export function deriveWorkerHandoffManifest(input: {
     targetAssetType: input.contract.targetAssetType,
     outputFile,
     reportFile,
+    fpTransformRequest: input.fpTransformRequest ?? null,
+    fpTransformRequestFile,
+    fpTransformResultFile,
+    fpEvaluateResultFile,
     allowedWriteRoots,
     conformedProject,
     productMaterialization: materialization,
+    featureScope,
     traversalObligationContext,
     traversalIntentPackage,
+    traversalAttemptEnvelope,
     retryContext,
     methodRefs,
     resultReportSchema
@@ -1173,10 +1285,23 @@ export function deriveWorkerHandoffManifest(input: {
 
 function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): string {
   if (!manifest.productMaterialization.required) {
-    return [
+    const lines = [
       "Product materialization is not required for this edge.",
       "Do not write product source/test files for this edge."
-    ].join("\n");
+    ];
+    if (manifest.targetAssetType === "code_surface") {
+      lines.push(
+        "For code_surface, produce a compatibility rollup over admitted component_code_surface and component_realization_qualification_surface evidence.",
+        "Do not independently generate broad source files from code_surface; component_code_surface owns product source materialization."
+      );
+    }
+    if (manifest.targetAssetType === "test_module_surface") {
+      lines.push(
+        "For test_module_surface, produce a compatibility rollup over test_component_topology_surface and component_test_surface evidence.",
+        "Do not independently generate broad test files from test_module_surface; component_test_surface owns product test materialization."
+      );
+    }
+    return lines.join("\n");
   }
   const lines = [
     "Product materialization is REQUIRED for this edge.",
@@ -1205,7 +1330,193 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
       "For sbt test, do not emit only standalone object/main tests; use a test framework discoverable by sbt test."
     );
   }
+  if (manifest.targetAssetType === "component_code_surface") {
+    lines.push(
+      "For component_code_surface, materialize implementation source files for every component declared by implementation_component_topology_surface.",
+      "If an admitted component_repair_schedule_surface exists, repair only the cited source rows unless deterministic evidence widens the scope.",
+      "Do not collapse multiple declared components into one generic source file when the topology declares distinct componentIds or relativePaths.",
+      "The transform artifact MUST include a Component Realization Register naming componentId, moduleName, relativePath, exported boundary, requirement ids, and materialized file role for each source file."
+    );
+  }
+  if (manifest.targetAssetType === "component_test_surface") {
+    lines.push(
+      "For component_test_surface, materialize developer test files for every test class or test file declared by test_component_topology_surface.",
+      "If an admitted component_repair_schedule_surface exists, repair only the cited test rows unless deterministic evidence widens the scope.",
+      "Do not collapse allocated testcase ids into one broad smoke test unless the test topology explicitly declares one class/file.",
+      "The transform artifact MUST include a Component Test Register naming testClassId, testcase ids, covered componentIds, requirement ids, and materialized test file path."
+    );
+  }
   return lines.join("\n");
+}
+
+function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
+  if (manifest.targetAssetType === "implementation_component_topology_surface") {
+    return [
+      "This edge produces implementation component topology.",
+      "The output MUST include a fenced JSON block named component_depth_register.",
+      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, targetAssetType, and componentTopologyRows.",
+      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
+      "Each row MUST name componentId, moduleName, relativePath, publicBoundary, domainCarrier or adapter role, sourceAssetRefs, and requirement ids.",
+      "The topology must be production-shaped: separate parsing, validation, mapping, error/reporting, and IO/adapter concerns when those concerns are present in requirements or design.",
+      "Do not use line count or file count as the authority. The authority is explicit concern separation and requirement allocation."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_realization_schedule_surface") {
+    return [
+      "This edge produces a component realization schedule.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows for scheduled components.",
+      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_realization_schedule_surface`.",
+      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
+      "The output MUST order work by declared componentId and dependency reason.",
+      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary or firstProductFileToChange, upstreamComponentIds, requirementIds, and sourceAssetRefs.",
+      "The schedule must make component-by-component progress observable; do not emit only a module-level checklist."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_code_surface") {
+    return [
+      "This edge realizes declared components as product code.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows.",
+      "Each componentRealizationRows entry MUST cite componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
+      "Read implementation_component_topology_surface and component_realization_schedule_surface before writing code.",
+      "Materialized source must preserve declared component boundaries unless a blocker is explicitly carried.",
+      "The output artifact must report realized, blocked, and deferred components by componentId."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_realization_qualification_surface") {
+    return [
+      "This edge qualifies component realization.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows for the realized or blocked components.",
+      "Compare implementation_component_topology_surface to component_code_surface and the observed product materialization ledger.",
+      "The output MUST include realizedComponentIds, missingComponentIds, collapsedComponentIds, and requirement ids affected by each gap.",
+      "A missing or collapsed component is a typed non-closure reason, not a prompt suggestion."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "test_component_topology_surface") {
+    return [
+      "This edge produces test component topology.",
+      "The output MUST include a fenced JSON block named component_depth_register.",
+      "That JSON block MUST contain testComponentTopologyRows.",
+      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
+      "Each row MUST name testClassId, relativePath, testcase ids, covered componentIds, requirement ids, test kind, and expected execution shard.",
+      "Preserve testcase allocation from uat_testcases_surface and scenario/test design authority; do not collapse all TC ids into one generic integration test."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_test_surface") {
+    return [
+      "This edge realizes declared component tests as product test code.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentTestRows.",
+      "Each componentTestRows entry MUST cite testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId.",
+      "Read test_component_topology_surface before writing tests.",
+      "Materialized tests must preserve declared testClassId and testcase allocation unless a blocker is explicitly carried.",
+      "The output artifact must report realized, blocked, and deferred test classes by testClassId."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_test_qualification_surface") {
+    return [
+      "This edge qualifies component test execution.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentTestQualificationRows.",
+      "Each componentTestQualificationRows entry MUST cite testClassId, testcaseIds, componentIds, requirementIds, status, and evidenceRefs.",
+      "When any componentTestQualificationRows entry has status failed, the same JSON block MUST also include componentExecutionFailureRegister with kind component_execution_failure_register.",
+      "Every failureRows entry MUST bind failureId, shardId, moduleName, testClassId, testcaseIds, componentIds, requirementIds, failureKind, repairTarget, lawfulReentryPoint, attributionConfidence, sourceRefs, testRefs, and evidenceRefs.",
+      "If deterministic evidence cannot bind testcaseId + componentId + requirementId, emit a low-confidence triage_gap row rather than mutating source or tests.",
+      "Map admitted test_execution_result_surface evidence to test_component_topology_surface rows and component_test_surface materialization.",
+      "The output MUST include executedTestClassIds, unexecutedTestClassIds, covered testcase ids, uncovered testcase ids, covered componentIds, and uncovered componentIds.",
+      "A passing command without testClassId/testcase/component mapping is insufficient release evidence."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "component_repair_schedule_surface") {
+    return [
+      "This edge derives component repair schedule truth from admitted execution failure rows.",
+      "The output MUST include a fenced JSON block named component_depth_register with componentRepairSchedule.",
+      "componentRepairSchedule.kind MUST be sdlc_component_repair_schedule and registerVersion MUST be ts-component-depth-v1.",
+      "If no repairable failure rows are open, use scheduleStatus no_repair_required with repairRows [].",
+      "If repair is required, use scheduleStatus repair_required and emit one repair row per admitted high-confidence failure row.",
+      "Each repair row MUST bind scheduleId, failureId, repairTarget, lawfulReentryPoint, attributionConfidence, testcaseIds, componentIds, requirementIds, sourceRefs, testRefs, and evidenceRefs.",
+      "Rows that do not bind testcaseId + componentId + requirementId are triage gaps, not repair authority.",
+      "Do not mutate product source or tests in this edge; this edge only schedules bounded repair for later component code/test traversal."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "release_depth_parity_surface") {
+    return [
+      "This edge derives release depth parity evidence.",
+      "The output MUST include a fenced JSON block named component_depth_register with releaseDepthParity.",
+      "releaseDepthParity.status MUST be one of: met, blocked, repriced.",
+      "Compare component topology, component realization qualification, component test qualification, component repair schedule, and test run archive truth.",
+      "If componentRepairSchedule has scheduleStatus repair_required, releaseDepthParity.status MUST NOT be met.",
+      "The output MUST state whether production-depth parity is met, blocked, or repriced.",
+      "Depth parity is based on explicit component concern separation, file/test materialization, testcase allocation, and execution evidence, not on output size alone."
+    ].join("\n");
+  }
+  return "No component-depth schema is required for this edge.";
+}
+
+function designDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
+  const scopeLines = designFeatureScopePromptLines(manifest);
+  if (manifest.targetAssetType === "implementation_module_surface") {
+    return [
+      "This edge produces implementation module structure and design-depth fragments.",
+      ...scopeLines,
+      "The output MUST include a fenced JSON block named design_depth_register.",
+      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `implementation_module_surface`, moduleSchemaFragments, and moduleStateDiagramFragments.",
+      "Each moduleSchemaFragments entry MUST declare moduleName, typed entities, typed attributes, operations, requirementIds, and sourceAssetRefs.",
+      "Each moduleStateDiagramFragments entry MUST declare entityId, stateless, states, transitions, requirementIds, and sourceAssetRefs.",
+      "Stateless entities MUST be explicitly marked stateless; stateful entities MUST declare lawful transitions."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "aggregate_domain_model_surface") {
+    return [
+      "This edge produces the aggregate domain model.",
+      ...scopeLines,
+      "The output MUST include a fenced JSON block named design_depth_register.",
+      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `aggregate_domain_model_surface`, aggregateDomainModel, and designCompletenessVerdict.",
+      "aggregateDomainModel MUST compose module schema fragments into one typed entity/operation model with ownerModuleName and crossModuleReferences.",
+      "designCompletenessVerdict MUST include entity, attribute, and flow axis verdicts. Entity and attribute completeness must be satisfied before downstream scheduling can rely on this surface."
+    ].join("\n");
+  }
+  if (manifest.targetAssetType === "aggregate_sunny_day_sequence_surface") {
+    return [
+      "This edge produces the aggregate sunny-day sequence.",
+      ...scopeLines,
+      "The output MUST include a fenced JSON block named design_depth_register.",
+      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `aggregate_sunny_day_sequence_surface`, aggregateDomainModel, aggregateSunnyDaySequence, and designCompletenessVerdict.",
+      "aggregateSunnyDaySequence.steps MUST name stepId, moduleName, operationId, inputEntityIds, outputEntityIds, and stateTransitionIds.",
+      "Every sequence operation MUST be published in aggregateDomainModel.operations and every exchanged entity MUST be present in aggregateDomainModel.entities.",
+      "designCompletenessVerdict MUST classify entity, attribute, and flow completeness separately."
+    ].join("\n");
+  }
+  return "No design-depth schema is required for this edge.";
+}
+
+function listForPrompt(values: readonly string[]): string {
+  return values.length === 0 ? "(none declared)" : values.join(", ");
+}
+
+function designFeatureScopePromptLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const scope = manifest.featureScope;
+  if (scope.mode === "full_breadth") {
+    return Object.freeze([
+      "Feature scope mode: full_breadth.",
+      `Included modules: ${listForPrompt(scope.includedModuleNames)}.`,
+      "Evaluate and materialize the complete declared breadth for this edge."
+    ]);
+  }
+  return Object.freeze([
+    "Feature scope mode: steel_thread.",
+    `Included modules for this traversal: ${listForPrompt(
+      scope.includedModuleNames
+    )}.`,
+    `Included entities for this traversal: ${listForPrompt(
+      scope.includedEntityIds
+    )}.`,
+    `Included operations for this traversal: ${listForPrompt(
+      scope.includedOperationIds
+    )}.`,
+    `Deferred modules: ${listForPrompt(scope.deferredModuleNames)}.`,
+    "Close only the included feature scope for this edge.",
+    "Preserve deferred modules by reference; do not treat deferred-module omissions as current closure defects or as completed breadth."
+  ]);
 }
 
 function executionEvidenceTransformPrompt(
@@ -1215,6 +1526,7 @@ function executionEvidenceTransformPrompt(
     return [
       "For test_run_archive_surface, do not run test commands and do not emit fresh sdlc_worker_execution_evidence.",
       "Archive the admitted test_execution_result_surface from the input assets and cite its refs.",
+      "Archive component_test_qualification_surface and component_repair_schedule_surface truth; do not close the archive over open repair rows.",
       "If admitted execution-result truth is absent or insufficient, carry a typed blocker instead of synthesizing release evidence."
     ].join("\n");
   }
@@ -1227,6 +1539,10 @@ function executionEvidenceTransformPrompt(
     `Consume manifest.productMaterialization.executionShards; do not collapse shard truth into one unscoped run when shards are present.`,
     "When executionShards is non-empty, executionEvidence.shardEvidence MUST contain one sdlc_worker_execution_shard_evidence row for each shardId.",
     "Each shardEvidence row MUST copy shardId and moduleName from the shard register and report counts/status for that shard.",
+    "The transform artifact MUST include a Requirement Trace Register for every requirement obligation in manifest.traversalObligationContext.obligations.",
+    "For every obligationId that starts with `requirement:`, copy both the full obligationId and the exact requirement id verbatim into the artifact; do not abbreviate, wildcard, or collapse families such as REQ-ACC-*.",
+    "The Requirement Trace Register MUST cite the relevant executionEvidence or shardEvidence row for each requirement id so framework postflight can observe the exact marker.",
+    "If a requirement is not covered, still include its exact requirement id and obligationId with pending/blocked evidence status instead of omitting the row.",
     "executionEvidence.status MUST be one of: succeeded, failed, pending.",
     "Use pending when execution did not run or external evidence is still unavailable.",
     "Do not use status values such as not_run, skipped, unknown, or none.",
@@ -1341,6 +1657,25 @@ function promptPressureProjection(input: {
       inlineObligations.length,
     obligationDeltaSummary:
       input.manifest.traversalObligationContext.deltaSummary,
+    traversalAttemptEnvelope:
+      input.manifest.traversalAttemptEnvelope === null
+        ? null
+        : Object.freeze({
+            envelopeRef: input.manifest.traversalAttemptEnvelope.envelopeRef,
+            profileRef: input.manifest.traversalAttemptEnvelope.profileRef,
+            strategyDirectiveRef:
+              input.manifest.traversalAttemptEnvelope.strategyDirectiveRef,
+            selectedScheduleItemRefs:
+              input.manifest.traversalAttemptEnvelope.selectedScheduleItemRefs,
+            phaseGateRefs: input.manifest.traversalAttemptEnvelope.phaseGateRefs,
+            requiredProgressArtifactRefs:
+              input.manifest.traversalAttemptEnvelope.requiredProgressArtifactRefs,
+            retryBudgetRemaining:
+              input.manifest.traversalAttemptEnvelope.retryBudgetRemaining,
+            mustExitAfterBoundedAttempt:
+              input.manifest.traversalAttemptEnvelope.mustExitAfterBoundedAttempt
+          }),
+    featureScope: input.manifest.featureScope,
     productMaterialization: input.manifest.productMaterialization,
     resultReportSchema: input.manifest.resultReportSchema
   });
@@ -1358,6 +1693,8 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     `Read the traversal intent package before writing output: ${traversalIntentPath}`,
     "Use those files as authority.",
     "The manifest.traversalIntentPackage is the typed cumulative intent package for this edge.",
+    "The manifest.featureScope is framework-derived scope authority. Do not replace it with worker-authored scope.",
+    "When manifest.featureScope.mode is steel_thread, consume only obligations and authority refs carried by traversalObligationContext; deferred modules remain visible in featureScope but are not current closure pressure.",
     "The prompt projection below is a compact index, not a replacement for the full manifest.",
     "Prior retry gaps are linked through priorGapFrontier dossier refs; read those files selectively instead of copying historical gap rows.",
     "Do not use any instruction as authority unless it is represented in the manifest, traversal intent package, or another manifest field.",
@@ -1365,14 +1702,28 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "Perform the bounded constructive transformation and return control to the framework.",
     "Do not evaluate closure, assess obligations, list materialized files, write ledgers, or decide whether the edge closes.",
     "The ABG/odd_sdlc post-transform stages observe files, emit events, project ledgers, evaluate obligations, and fold closure after this process exits.",
+    "The transform artifact MUST include a `## Requirement Trace Register` section when the manifest contains requirement obligations.",
+    "The Requirement Trace Register is observational evidence only, not a closure decision or obligation assessment.",
+    "For every manifest.traversalObligationContext obligation whose obligationId starts with `requirement:`, copy the full obligationId and exact requirement id verbatim; do not abbreviate, wildcard, or collapse requirement families.",
+    `ABG F_P transform request carrier: ${manifest.fpTransformRequestFile}`,
+    `ABG F_P transform result carrier written by framework: ${manifest.fpTransformResultFile}`,
+    `odd_sdlc F_P.evaluate result carrier written by framework: ${manifest.fpEvaluateResultFile}`,
+    "If manifest.traversalAttemptEnvelope is present, treat its selected schedule refs, phase gates, required progress artifacts, retry budget, and bounded-exit flag as ABG replay authority for this attempt.",
     "Write only the requested transform artifact and product files unless the manifest says otherwise.",
     `Output artifact: ${manifest.outputFile}`,
+    "Before executing the transform or editing product files, write an explicit execution plan into the output artifact.",
+    "The output artifact must start with a `## Execution Plan` section that names the bounded steps, authority files read, and first materialization target.",
+    "Do not keep this plan private. If you cannot form that plan, write the blocker into the output artifact and exit.",
+    "After the plan section is written, continue the requested transform in the same artifact.",
     `Framework-generated result report path: ${manifest.reportFile}`,
     "Do not write the result report. The framework writes it after observing this transform.",
     "If you cannot complete the requested transformation in this turn, write the best bounded transform artifact you can, leave remaining work in that artifact, and exit.",
     "Use conformedProject as the generic project profile. Do not infer product identity from this prompt's examples.",
     "",
     productMaterializationPrompt(manifest),
+    "",
+    designDepthPrompt(manifest),
+    componentDepthPrompt(manifest),
     "",
     executionEvidenceTransformPrompt(manifest),
     "",
@@ -1410,6 +1761,13 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     stableOperatorJson(manifest.traversalIntentPackage),
     "utf8"
   );
+  if (manifest.fpTransformRequest !== null) {
+    writeFileSync(
+      manifest.fpTransformRequestFile,
+      stableOperatorJson(manifest.fpTransformRequest),
+      "utf8"
+    );
+  }
   return Object.freeze({ manifestPath, promptPath });
 }
 
@@ -1418,6 +1776,28 @@ function parseNonNegativeInteger(input: unknown, label: string): number {
     throw new TypeError(`${label}: expected non-negative integer`);
   }
   return input;
+}
+
+function parseOptionalNonEmptyString(input: unknown, label: string): string | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  return parseNonEmptyString(input, label);
+}
+
+function parseOptionalFpTransformStatus(
+  input: unknown,
+  label: string
+): FpTransformResult["status"] | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  return parseEnumValue(input, label, [
+    "returned",
+    "blocked",
+    "runtime_failed",
+    "contract_failed"
+  ] as const);
 }
 
 function parseArray<T>(
@@ -1703,6 +2083,22 @@ export function admitWorkerResultReport(
     obligationAssessments: admitWorkerObligationAssessments(
       record["obligationAssessments"],
       "SdlcWorkerResultReport.obligationAssessments"
+    ),
+    fpTransformRequestRef: parseOptionalNonEmptyString(
+      record["fpTransformRequestRef"],
+      "SdlcWorkerResultReport.fpTransformRequestRef"
+    ),
+    fpTransformResultRef: parseOptionalNonEmptyString(
+      record["fpTransformResultRef"],
+      "SdlcWorkerResultReport.fpTransformResultRef"
+    ),
+    fpTransformStatus: parseOptionalFpTransformStatus(
+      record["fpTransformStatus"],
+      "SdlcWorkerResultReport.fpTransformStatus"
+    ),
+    fpEvaluateResultRef: parseOptionalNonEmptyString(
+      record["fpEvaluateResultRef"],
+      "SdlcWorkerResultReport.fpEvaluateResultRef"
     )
   });
 }
@@ -2324,6 +2720,21 @@ function postTransformObligationAssessments(input: {
             : Object.freeze([`requirement_trace_not_observed:${requirementId}`])
         });
       }
+      if (obligation.obligationKind === "source_asset") {
+        const fulfilled = existsSync(input.manifest.outputFile);
+        const evidenceRefs = fulfilled
+          ? uniqueSorted([...baseEvidenceRefs, ...obligation.evidenceRefs])
+          : obligation.evidenceRefs;
+        return Object.freeze({
+          kind: "sdlc_worker_obligation_assessment" as const,
+          obligationId: obligation.obligationId,
+          fulfillmentStatus: fulfilled ? "fulfilled" : "blocked",
+          evidenceRefs,
+          blockingReasons: fulfilled
+            ? Object.freeze([])
+            : Object.freeze(["post_transform_output_missing"])
+        });
+      }
       if (obligation.obligationKind === "target_asset") {
         const fulfilled =
           existsSync(input.manifest.outputFile) &&
@@ -2389,8 +2800,159 @@ export function buildPostTransformWorkerResultReport(input: {
     obligationAssessments: postTransformObligationAssessments({
       manifest: input.manifest,
       materializedFiles
-    })
+    }),
+    fpTransformRequestRef: input.manifest.fpTransformRequest?.requestRef ?? null,
+    fpTransformResultRef:
+      input.manifest.fpTransformRequest === null
+        ? null
+        : pathToFileURL(input.manifest.fpTransformResultFile).href,
+    fpTransformStatus:
+      input.manifest.fpTransformRequest === null ? null : "returned",
+    fpEvaluateResultRef: pathToFileURL(input.manifest.fpEvaluateResultFile).href
   });
+}
+
+function reportEvidenceRefs(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): readonly string[] {
+  return uniqueSorted([
+    pathToFileURL(input.report.outputFile).href,
+    pathToFileURL(input.manifest.reportFile).href,
+    pathToFileURL(input.manifest.productMaterialization.manifestFile).href,
+    ...input.report.materializedFiles.map((file) =>
+      pathToFileURL(file.absolutePath).href
+    ),
+    ...(input.report.executionEvidence?.reportRefs ?? []),
+    ...(input.report.executionEvidence?.shardEvidence.flatMap(
+      (shard) => shard.reportRefs
+    ) ?? [])
+  ]);
+}
+
+function reportOutputArtifactIsAdmitted(report: SdlcWorkerResultReport): boolean {
+  const outputFile = resolve(report.outputFile);
+  if (!existsSync(outputFile) || !statSync(outputFile).isFile()) {
+    return false;
+  }
+  return sha256Text(readFileSync(outputFile, "utf8")) === report.digest;
+}
+
+function transformStatusForReport(
+  report: SdlcWorkerResultReport
+): FpTransformResult["status"] {
+  return reportOutputArtifactIsAdmitted(report) ? "returned" : "blocked";
+}
+
+function transformReasonForReport(report: SdlcWorkerResultReport): string | null {
+  return reportOutputArtifactIsAdmitted(report)
+    ? null
+    : "transform output artifact missing or digest mismatch";
+}
+
+export function workerResultReportWithFpStageRefs(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): SdlcWorkerResultReport {
+  return Object.freeze({
+    ...input.report,
+    fpTransformRequestRef:
+      input.report.fpTransformRequestRef ??
+      input.manifest.fpTransformRequest?.requestRef ??
+      null,
+    fpTransformResultRef:
+      input.report.fpTransformResultRef ??
+      (input.manifest.fpTransformRequest === null
+        ? null
+        : pathToFileURL(input.manifest.fpTransformResultFile).href),
+    fpTransformStatus:
+      input.report.fpTransformStatus ??
+      (input.manifest.fpTransformRequest === null
+        ? null
+        : transformStatusForReport(input.report)),
+    fpEvaluateResultRef:
+      input.report.fpEvaluateResultRef ??
+      pathToFileURL(input.manifest.fpEvaluateResultFile).href
+  });
+}
+
+function evidenceCandidatesForReport(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): NonNullable<Parameters<typeof constructFpTransformResult>[0]["evidenceCandidates"]> {
+  const assessments = input.report.obligationAssessments;
+  const outputArtifactAdmitted = reportOutputArtifactIsAdmitted(input.report);
+  const fulfilledCount = assessments.filter(
+    (assessment) => assessment.fulfillmentStatus === "fulfilled"
+  ).length;
+  const blockedCount = assessments.filter(
+    (assessment) => assessment.fulfillmentStatus === "blocked"
+  ).length;
+  const unassessedCount = assessments.filter(
+    (assessment) => assessment.fulfillmentStatus === "unassessed"
+  ).length;
+  const assessmentEvidenceRefs = reportEvidenceRefs(input);
+  const candidates = [
+    {
+      candidateRef: `target_asset:${input.manifest.targetAssetType}`,
+      authorityRef: `asset-type://${input.manifest.targetAssetType}`,
+      evidenceRefs: assessmentEvidenceRefs,
+      payloadClass: "sdlc_transform_output",
+      contractRef: "contract://odd_sdlc/fp-transform-output",
+      complete: outputArtifactAdmitted,
+      shallow: !outputArtifactAdmitted,
+      contradictsAuthority: false,
+      deferred: false
+    },
+    {
+      candidateRef: `obligation_assessment_set:${input.manifest.edgeName}`,
+      authorityRef: `traversal-intent-package:${input.manifest.traversalIntentPackage.packageDigest}`,
+      evidenceRefs: assessmentEvidenceRefs,
+      payloadClass: "sdlc_obligation_assessment_set",
+      contractRef: "contract://odd_sdlc/fp-transform-obligation-assessment-set",
+      complete: assessments.length > 0 && fulfilledCount === assessments.length,
+      shallow: blockedCount > 0 || unassessedCount > 0,
+      contradictsAuthority: blockedCount > 0,
+      deferred: unassessedCount > 0
+    }
+  ];
+  return Object.freeze(candidates);
+}
+
+export function constructWorkerFpTransformResult(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): FpTransformResult | null {
+  const request = input.manifest.fpTransformRequest;
+  if (request === null) {
+    return null;
+  }
+  return admitFpTransformResultForRequest(
+    request,
+    constructFpTransformResult({
+      request,
+      artifactRef: pathToFileURL(input.report.outputFile).href,
+      status: transformStatusForReport(input.report),
+      reason: transformReasonForReport(input.report),
+      evidenceCandidates: evidenceCandidatesForReport(input)
+    })
+  );
+}
+
+export function writeWorkerFpTransformResult(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): FpTransformResult | null {
+  const result = constructWorkerFpTransformResult(input);
+  if (result === null) {
+    return null;
+  }
+  writeFileSync(
+    input.manifest.fpTransformResultFile,
+    stableOperatorJson(result),
+    "utf8"
+  );
+  return result;
 }
 
 function evaluateSbtTestDiscoverability(input: {
@@ -2655,28 +3217,13 @@ function evaluateExecutionEvidence(input: {
     }
     return;
   }
-  if (executionEvidence.status !== "succeeded") {
-    input.blockingReasonCarriers.push(
-      makeSdlcBlockingReason({
-        code: "test_execution_not_succeeded",
-        detail: executionEvidence.status,
-        evidenceRefs: executionEvidence.reportRefs
-      })
-    );
-  }
+  // Failed-but-structurally-valid execution evidence is admitted here.
+  // T-115 maps failed rows to component_test_qualification_surface and
+  // component_repair_schedule_surface instead of retrying this edge.
   if ((executionEvidence.testsObserved ?? 0) <= 0) {
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "test_execution_zero_tests_observed",
-        evidenceRefs: executionEvidence.reportRefs
-      })
-    );
-  }
-  if ((executionEvidence.failedCount ?? 0) > 0) {
-    input.blockingReasonCarriers.push(
-      makeSdlcBlockingReason({
-        code: "test_execution_failures_present",
-        detail: String(executionEvidence.failedCount),
         evidenceRefs: executionEvidence.reportRefs
       })
     );
@@ -2769,7 +3316,7 @@ function evaluateExecutionShardEvidence(input: {
       );
       continue;
     }
-    if (shardEvidence.status !== "succeeded") {
+    if (shardEvidence.status === "pending") {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "test_execution_not_succeeded",
@@ -2785,20 +3332,13 @@ function evaluateExecutionShardEvidence(input: {
       );
       continue;
     }
+    // Failed shards are repair inputs, not postflight blockers, when their
+    // evidence is otherwise structurally valid.
     if ((shardEvidence.testsObserved ?? 0) <= 0) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "test_execution_zero_tests_observed",
           detail: expectedShard.shardId,
-          evidenceRefs: shardEvidence.reportRefs
-        })
-      );
-    }
-    if ((shardEvidence.failedCount ?? 0) > 0) {
-      input.blockingReasonCarriers.push(
-        makeSdlcBlockingReason({
-          code: "test_execution_failures_present",
-          detail: `${expectedShard.shardId}: ${String(shardEvidence.failedCount)}`,
           evidenceRefs: shardEvidence.reportRefs
         })
       );
@@ -3117,15 +3657,9 @@ export function evaluateWorkerResultPostflight(input: {
       );
     }
   }
-  if (input.report.unresolvedReasons.length > 0) {
-    blockingReasonCarriers.push(
-      makeSdlcBlockingReason({
-        code: "worker_report_unresolved_reasons_present",
-        detail: input.report.unresolvedReasons.join("; "),
-        evidenceRefs: [pathToFileURL(input.manifest.reportFile).href]
-      })
-    );
-  }
+  // worker_result_report.json is a compatibility/read-model artifact. Its
+  // unresolvedReasons field is advisory; typed postflight checks below own
+  // closure/blocking authority.
   evaluateMaterializedProductFiles({
     manifest: input.manifest,
     report: input.report,
@@ -3158,6 +3692,78 @@ export function evaluateWorkerResultPostflight(input: {
     blockingReasonCarriers: Object.freeze(blockingReasonCarriers),
     evidenceRefs: Object.freeze(evidenceRefs)
   });
+}
+
+function obligationAssessmentCounts(
+  report: SdlcWorkerResultReport
+): SdlcFpEvaluateResult["obligationAssessmentCounts"] {
+  let fulfilled = 0;
+  let partial = 0;
+  let blocked = 0;
+  let unassessed = 0;
+  for (const assessment of report.obligationAssessments) {
+    switch (assessment.fulfillmentStatus) {
+      case "fulfilled":
+        fulfilled += 1;
+        break;
+      case "partial":
+        partial += 1;
+        break;
+      case "blocked":
+        blocked += 1;
+        break;
+      case "unassessed":
+        unassessed += 1;
+        break;
+      default: {
+        const exhaustive: never = assessment.fulfillmentStatus;
+        throw new TypeError(`Unsupported obligation status ${exhaustive}`);
+      }
+    }
+  }
+  return Object.freeze({
+    total: report.obligationAssessments.length,
+    fulfilled,
+    partial,
+    blocked,
+    unassessed
+  });
+}
+
+export function constructFpEvaluateResult(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+  readonly postflight: SdlcPostflightResult;
+}): SdlcFpEvaluateResult {
+  return Object.freeze({
+    kind: "sdlc_fp_evaluate_result" as const,
+    stage: "F_P.evaluate" as const,
+    reportRef: pathToFileURL(input.manifest.reportFile).href,
+    transformResultRef:
+      input.manifest.fpTransformRequest === null
+        ? null
+        : pathToFileURL(input.manifest.fpTransformResultFile).href,
+    postflightRef: pathToFileURL(join(input.manifest.archiveRoot, "postflight.json")).href,
+    status: input.postflight.status,
+    blockingReasons: input.postflight.blockingReasons,
+    evidenceRefs: input.postflight.evidenceRefs,
+    obligationAssessmentCounts: obligationAssessmentCounts(input.report),
+    executionEvidenceStatus: input.report.executionEvidence?.status ?? null
+  });
+}
+
+export function writeFpEvaluateResult(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+  readonly postflight: SdlcPostflightResult;
+}): SdlcFpEvaluateResult {
+  const result = constructFpEvaluateResult(input);
+  writeFileSync(
+    input.manifest.fpEvaluateResultFile,
+    stableOperatorJson(result),
+    "utf8"
+  );
+  return result;
 }
 
 export function writeProductMaterializationManifest(input: {

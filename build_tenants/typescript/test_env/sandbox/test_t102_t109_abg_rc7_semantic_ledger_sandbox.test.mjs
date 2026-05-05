@@ -1,6 +1,6 @@
 // Validates: T-102
 // Validates: T-109
-// Validates: ABG-RC6-consumer-architecture
+// Validates: ABG-RC7-consumer-architecture
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -53,7 +53,7 @@ import {
   SDLC_REQUIREMENTS,
   edgePayloadFromRows,
   evaluateSemanticRows
-} from "../fixtures/t102_t109_rc6_mini_sdlc_lifecycle.mjs";
+} from "../fixtures/t102_t109_rc7_mini_sdlc_lifecycle.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(TEST_DIR, "../..");
@@ -82,7 +82,7 @@ function node(name, assetType) {
       standardsRefs: [],
       outputContractRefs: []
     },
-    tags: ["t109-rc6-sdlc-sandbox"],
+    tags: ["t109-rc7-sdlc-sandbox"],
     id: `node:t109:${name}`
   });
 }
@@ -113,7 +113,7 @@ function fpVector(name, source, target) {
     rule: null,
     allowsSubwork: true,
     declarations: emptySerializedAttrs(),
-    tags: ["t109-rc6-sdlc-sandbox"],
+    tags: ["t109-rc7-sdlc-sandbox"],
     id: `vector:t109:${name}`
   });
 }
@@ -154,11 +154,11 @@ function miniSdlcModule() {
     contexts: [],
     rules: [],
     effects: [],
-    tags: ["t109-rc6-sdlc-sandbox"],
+    tags: ["t109-rc7-sdlc-sandbox"],
     id: "graph:t109:mini-odd-sdlc-lifecycle"
   });
   const graphFunction = constructGraphFunction({
-    name: "mini_odd_sdlc_lifecycle_rc6",
+    name: "mini_odd_sdlc_lifecycle_rc7",
     environment: {
       requires: [bootstrap],
       provides: [qualification],
@@ -181,18 +181,18 @@ function miniSdlcModule() {
     },
     effects: [],
     declarations: emptySerializedAttrs(),
-    tags: ["t109-rc6-sdlc-sandbox"],
-    id: "graph-function:t109:mini-odd-sdlc-lifecycle-rc6"
+    tags: ["t109-rc7-sdlc-sandbox"],
+    id: "graph-function:t109:mini-odd-sdlc-lifecycle-rc7"
   });
   const job = constructJob({
-    name: "mini_odd_sdlc_lifecycle_rc6_job",
+    name: "mini_odd_sdlc_lifecycle_rc7_job",
     contracts: [{ kind: "graph_function", targetId: graphFunction.id }],
     roles: [],
-    tags: ["t109-rc6-sdlc-sandbox"],
-    id: "job:t109:mini-odd-sdlc-lifecycle-rc6"
+    tags: ["t109-rc7-sdlc-sandbox"],
+    id: "job:t109:mini-odd-sdlc-lifecycle-rc7"
   });
   return constructModule({
-    name: "odd_sdlc_t109_rc6_sdlc_sandbox",
+    name: "odd_sdlc_t109_rc7_sdlc_sandbox",
     graphs: [graph],
     graphFunctions: [graphFunction],
     refinementBoundaries: [],
@@ -217,7 +217,7 @@ function basisFor(inputWorkspaceRoot, outputWorkspaceRoot, until = "converged") 
         workspaceRoot: inputWorkspaceRoot,
         moduleName: module.name
       },
-      target: { kind: "graph_function", handle: "mini_odd_sdlc_lifecycle_rc6" },
+      target: { kind: "graph_function", handle: "mini_odd_sdlc_lifecycle_rc7" },
       until,
       inputBindings: [
         {
@@ -242,19 +242,19 @@ function basisFor(inputWorkspaceRoot, outputWorkspaceRoot, until = "converged") 
     runtimeIdentity: {
       workerId: "worker://odd-sdlc/t109-sandbox",
       backendId: "backend://deterministic-fixture",
-      buildId: "build://odd-sdlc/t109-rc6-sdlc-sandbox",
-      resolvedRuntimeRef: "runtime://abg-rc6"
+      buildId: "build://odd-sdlc/t109-rc7-sdlc-sandbox",
+      resolvedRuntimeRef: "runtime://abg-rc7"
     },
     resolvedPolicy: {
-      resolvedPolicyBundleRef: "policy://odd-sdlc/t109-rc6",
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t109-rc7",
       defaultRegime: "F_P",
-      dispatchRef: "dispatch://odd-sdlc/t109-rc6",
+      dispatchRef: "dispatch://odd-sdlc/t109-rc7",
       approvalSubjectRef: null
     },
-    runId: "run:t109-rc6-sdlc-sandbox",
-    workKey: "work:t109-rc6-sdlc-sandbox",
-    frameId: "frame:t109-rc6-sdlc-sandbox",
-    frameLineageId: "frame-lineage:t109-rc6-sdlc-sandbox"
+    runId: "run:t109-rc7-sdlc-sandbox",
+    workKey: "work:t109-rc7-sdlc-sandbox",
+    frameId: "frame:t109-rc7-sdlc-sandbox",
+    frameLineageId: "frame-lineage:t109-rc7-sdlc-sandbox"
   });
 }
 
@@ -288,7 +288,7 @@ function requestForFinalEdge(input) {
 }
 
 test("T-102/T-109 sandbox runs an SDLC lifecycle graph and admits the same semantic result expected from live", () => {
-  assert.equal(JSON.parse(readFileSync(ABG_PACKAGE_JSON, "utf8")).version, "3.4.0-rc.6");
+  assert.equal(JSON.parse(readFileSync(ABG_PACKAGE_JSON, "utf8")).version, "3.5.0-rc.1");
 
   const inputWorkspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t109-input-"));
   const outputWorkspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t109-output-"));
@@ -379,11 +379,11 @@ test("T-102/T-109 sandbox catches SDLC schedule drift even when F_D file checks 
   assert.deepEqual(
     rows.map((row) => [row.obligationId, row.status]),
     [
-      ["REQ-SDLC-RC6-001", "fulfilled"],
-      ["REQ-SDLC-RC6-002", "fulfilled"],
-      ["REQ-SDLC-RC6-003", "semantic_gap"],
-      ["REQ-SDLC-RC6-004", "semantic_gap"],
-      ["REQ-SDLC-RC6-005", "fulfilled"]
+      ["REQ-SDLC-RC7-001", "fulfilled"],
+      ["REQ-SDLC-RC7-002", "fulfilled"],
+      ["REQ-SDLC-RC7-003", "semantic_gap"],
+      ["REQ-SDLC-RC7-004", "semantic_gap"],
+      ["REQ-SDLC-RC7-005", "fulfilled"]
     ]
   );
   const payload = edgePayloadFromRows(rows);
@@ -508,7 +508,7 @@ test("T-102/T-109 sandbox projects repeatable SDLC semantic eval aggregates with
   const task = constructEvalTask({
     taskRef: "eval-task:t109-sdlc-lifecycle",
     suiteId: suite.suiteId,
-    graphFunctionRef: "graph-function:t109:mini-odd-sdlc-lifecycle-rc6",
+    graphFunctionRef: "graph-function:t109:mini-odd-sdlc-lifecycle-rc7",
     edgeRef: "derive_qualification_report",
     inputRefs: ["workspace://system/.ai-workspace/context/project_bootstrap.md"],
     declaredOutputRefs: ["artifact://odd-sdlc/mini-lifecycle"],
@@ -525,7 +525,7 @@ test("T-102/T-109 sandbox projects repeatable SDLC semantic eval aggregates with
       taskRef: task.taskRef,
       trialIndex: index,
       workerRef: "worker://odd-sdlc/t109-sandbox",
-      policyRef: "policy://odd-sdlc/t109-rc6",
+      policyRef: "policy://odd-sdlc/t109-rc7",
       outputRootRef: `workspace://output/sdlc-review-stream-${index}`,
       eventStreamRef: `event-stream://t109/sdlc/${index}`,
       transcriptRefs: [`transcript://t109/sdlc/${index}`],
@@ -561,9 +561,9 @@ test("T-102/T-109 sandbox projects repeatable SDLC semantic eval aggregates with
         subjectRef: "artifact://odd-sdlc/mini-lifecycle.json",
         obligationRef: requirement.sourceAuthorityRef,
         status:
-          index === 1 || requirement.id !== "REQ-SDLC-RC6-003" ? "pass" : "fail",
+          index === 1 || requirement.id !== "REQ-SDLC-RC7-003" ? "pass" : "fail",
         detail:
-          index === 1 || requirement.id !== "REQ-SDLC-RC6-003"
+          index === 1 || requirement.id !== "REQ-SDLC-RC7-003"
             ? "SDLC semantic requirement fulfilled"
             : "requirements schedule failed to cover the requirement ledger",
         evidenceRefs: [`artifact://odd-sdlc/mini-lifecycle-${index}.json`]

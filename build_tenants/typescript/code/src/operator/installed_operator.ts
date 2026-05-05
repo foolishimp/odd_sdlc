@@ -18,13 +18,16 @@ import {
   deriveRuntimeAggregateProjection,
   invokeSupervisedProcessActor,
   runEngineIterateAsync,
+  runtimeEventsForFpTransformResult,
   runtimeEventsForIterationDecision,
   type ActorInvocation,
   type EnginePluginInput,
   type ExecutionBasis,
   type RuntimeAggregateProjection,
   type RuntimeEvent,
-  type SupervisedProcessActorResult
+  type SupervisedProcessActorResult,
+  type TracedProcessExecutorProfile,
+  type TracedProcessStreamModel
 } from "@abiogenesis/typescript-tenant";
 import { FG_CONFORM_PROJECT } from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
@@ -66,14 +69,19 @@ import {
   operatorRunId,
   snapshotProductMaterializationRoot,
   stableOperatorJson,
+  workerResultReportWithFpStageRefs,
   writeHandoffFiles,
+  writeFpEvaluateResult,
   writeOperatorArchiveFile,
   writePostflightGapDossier,
+  writeWorkerFpTransformResult,
   writeProductMaterializationManifest
 } from "./handoff.js";
 import {
   admitWorkerTransport,
   argsForWorker,
+  parserForWorkerTransport,
+  selectedWorkerExecutorProfile,
   stdinForWorker
 } from "./transport.js";
 import {
@@ -91,7 +99,8 @@ import {
   makeSdlcBlockingReason,
   sdlcBlockingReasonFromLegacy,
   summarizeBlockingReasons,
-  type SdlcBlockingReason
+  type SdlcBlockingReason,
+  type SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
 
 function summary(input: {
@@ -457,6 +466,8 @@ function writeWorkerProcessStartedContext(input: {
   readonly promptPath: string;
   readonly stdoutPath: string;
   readonly stderrPath: string;
+  readonly executorProfile: TracedProcessExecutorProfile;
+  readonly traceRoot: string;
   readonly policy: ReturnType<typeof workerInactivityPolicy>;
   readonly event: Extract<RuntimeEvent, { readonly kind: "actor_process_started" }>;
 }): SdlcWorkerProcessStartedContext {
@@ -477,6 +488,8 @@ function writeWorkerProcessStartedContext(input: {
     command: input.event.command,
     args: input.event.args,
     cwd: input.event.cwd,
+    executorProfile: input.executorProfile,
+    traceRoot: input.traceRoot,
     timeoutMs: input.policy.timeoutMs,
     inactivityTimeoutMs: input.policy.inactivityTimeoutMs,
     heartbeatMs: input.policy.heartbeatMs
@@ -512,6 +525,45 @@ function writeWorkerProcessSummary(input: {
     command: input.workerRun.command,
     args: input.workerRun.args,
     cwd: input.workerRun.cwd,
+    ...(input.workerRun.executorProfile === undefined
+      ? {}
+      : { executorProfile: input.workerRun.executorProfile }),
+    ...(input.workerRun.terminalSessionId === undefined
+      ? {}
+      : { terminalSessionId: input.workerRun.terminalSessionId }),
+    ...(input.workerRun.streamModel === undefined
+      ? {}
+      : { streamModel: input.workerRun.streamModel }),
+    ...(input.workerRun.outcome === undefined
+      ? {}
+      : { outcome: input.workerRun.outcome }),
+    ...(input.workerRun.traceRoot === undefined
+      ? {}
+      : { traceRoot: input.workerRun.traceRoot }),
+    ...(input.workerRun.traceResultRef === undefined
+      ? {}
+      : { traceResultRef: input.workerRun.traceResultRef }),
+    ...(input.workerRun.structuredEventCount === undefined
+      ? {}
+      : { structuredEventCount: input.workerRun.structuredEventCount }),
+    ...(input.workerRun.structuredParseFailureCount === undefined
+      ? {}
+      : {
+          structuredParseFailureCount:
+            input.workerRun.structuredParseFailureCount
+        }),
+    ...(input.workerRun.apiRetryCount === undefined
+      ? {}
+      : { apiRetryCount: input.workerRun.apiRetryCount }),
+    ...(input.workerRun.toolCallCount === undefined
+      ? {}
+      : { toolCallCount: input.workerRun.toolCallCount }),
+    ...(input.workerRun.finalOutputRef === undefined
+      ? {}
+      : { finalOutputRef: input.workerRun.finalOutputRef }),
+    ...(input.workerRun.terminalTranscriptRef === undefined
+      ? {}
+      : { terminalTranscriptRef: input.workerRun.terminalTranscriptRef }),
     timeoutMs: input.policy.timeoutMs,
     inactivityTimeoutMs: input.policy.inactivityTimeoutMs,
     heartbeatMs: input.policy.heartbeatMs,
@@ -601,6 +653,90 @@ function signalSequenceValue(
   return Object.freeze(values);
 }
 
+interface WorkerTraceProjection {
+  readonly executorProfile: TracedProcessExecutorProfile | null;
+  readonly terminalSessionId: string | null;
+  readonly streamModel: TracedProcessStreamModel | null;
+  readonly structuredEventCount: number | null;
+  readonly structuredParseFailureCount: number | null;
+  readonly apiRetryCount: number | null;
+  readonly toolCallCount: number | null;
+  readonly finalOutputRef: string | null;
+  readonly terminalTranscriptRef: string | null;
+}
+
+function traceResultPath(traceRoot: string): string {
+  return join(traceRoot, "result.json");
+}
+
+function fileRef(path: string): string {
+  return pathToFileURL(path).href;
+}
+
+function optionalPathRef(value: unknown): string | null {
+  const path = stringValue(value);
+  return path === null ? null : fileRef(path);
+}
+
+function traceProjectionFor(traceRoot: string): WorkerTraceProjection {
+  const fallback: WorkerTraceProjection = Object.freeze({
+    executorProfile: null,
+    terminalSessionId: null,
+    streamModel: null,
+    structuredEventCount: null,
+    structuredParseFailureCount: null,
+    apiRetryCount: null,
+    toolCallCount: null,
+    finalOutputRef: null,
+    terminalTranscriptRef: null
+  });
+  if (!existsSync(traceResultPath(traceRoot))) {
+    return fallback;
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(traceResultPath(traceRoot), "utf8"));
+    const record = objectValue(parsed);
+    if (record === null) {
+      return fallback;
+    }
+    const rawExecutorProfile = stringValue(Reflect.get(record, "executorProfile"));
+    const executorProfile =
+      rawExecutorProfile === "local-spawn" || rawExecutorProfile === "pty-terminal"
+        ? rawExecutorProfile
+        : null;
+    const rawStreamModel = stringValue(Reflect.get(record, "streamModel"));
+    const streamModel =
+      rawStreamModel === "stdio" || rawStreamModel === "terminal-transcript"
+        ? rawStreamModel
+        : null;
+    const paths = objectValue(Reflect.get(record, "paths"));
+    const apiRetryEvents = Reflect.get(record, "apiRetryEvents");
+    const toolCallEvents = Reflect.get(record, "toolCallEvents");
+    return Object.freeze({
+      executorProfile,
+      terminalSessionId:
+        Reflect.get(record, "terminalSessionId") === null
+          ? null
+          : stringValue(Reflect.get(record, "terminalSessionId")),
+      streamModel,
+      structuredEventCount: numberValue(Reflect.get(record, "structuredEventCount")),
+      structuredParseFailureCount: numberValue(
+        Reflect.get(record, "structuredParseFailureCount")
+      ),
+      apiRetryCount: Array.isArray(apiRetryEvents) ? apiRetryEvents.length : null,
+      toolCallCount: Array.isArray(toolCallEvents) ? toolCallEvents.length : null,
+      finalOutputRef:
+        paths === null ? null : optionalPathRef(Reflect.get(paths, "finalOutput")),
+      terminalTranscriptRef:
+        paths === null
+          ? null
+          : optionalPathRef(Reflect.get(paths, "terminalTranscript"))
+    });
+  } catch {
+    return fallback;
+  }
+}
+
 type WorkerProcessSummaryAdmission =
   | {
       readonly kind: "admitted";
@@ -658,6 +794,34 @@ function admitWorkerProcessSummary(
     const elapsedMs = numberValue(Reflect.get(record, "elapsedMs"));
     const timedOut = booleanValue(Reflect.get(record, "timedOut"));
     const error = nullableStringValue(Reflect.get(record, "error"));
+    const rawExecutorProfile = stringValue(Reflect.get(record, "executorProfile"));
+    const executorProfile =
+      rawExecutorProfile === "local-spawn" || rawExecutorProfile === "pty-terminal"
+        ? rawExecutorProfile
+        : undefined;
+    const rawStreamModel = stringValue(Reflect.get(record, "streamModel"));
+    const streamModel =
+      rawStreamModel === "stdio" || rawStreamModel === "terminal-transcript"
+        ? rawStreamModel
+        : undefined;
+    const outcome = objectValue(Reflect.get(record, "outcome"));
+    const traceRoot = stringValue(Reflect.get(record, "traceRoot")) ?? undefined;
+    const traceResultRef =
+      stringValue(Reflect.get(record, "traceResultRef")) ?? undefined;
+    const structuredEventCount =
+      nullableNumberValue(Reflect.get(record, "structuredEventCount")) ?? undefined;
+    const structuredParseFailureCount =
+      nullableNumberValue(Reflect.get(record, "structuredParseFailureCount")) ??
+      undefined;
+    const apiRetryCount =
+      nullableNumberValue(Reflect.get(record, "apiRetryCount")) ?? undefined;
+    const toolCallCount =
+      nullableNumberValue(Reflect.get(record, "toolCallCount")) ?? undefined;
+    const finalOutputRef =
+      nullableStringValue(Reflect.get(record, "finalOutputRef")) ?? undefined;
+    const terminalTranscriptRef =
+      nullableStringValue(Reflect.get(record, "terminalTranscriptRef")) ??
+      undefined;
     if (
       processStartedRef === null ||
       processEventsRef === null ||
@@ -710,6 +874,21 @@ function admitWorkerProcessSummary(
         lastHeartbeatIndex,
         lastHeartbeatElapsedMs,
         signalSequence,
+        ...(executorProfile === undefined ? {} : { executorProfile }),
+        ...(streamModel === undefined ? {} : { streamModel }),
+        ...(outcome === null
+          ? {}
+          : { outcome: outcome as NonNullable<SdlcWorkerProcessSummary["outcome"]> }),
+        ...(traceRoot === undefined ? {} : { traceRoot }),
+        ...(traceResultRef === undefined ? {} : { traceResultRef }),
+        ...(structuredEventCount === undefined ? {} : { structuredEventCount }),
+        ...(structuredParseFailureCount === undefined
+          ? {}
+          : { structuredParseFailureCount }),
+        ...(apiRetryCount === undefined ? {} : { apiRetryCount }),
+        ...(toolCallCount === undefined ? {} : { toolCallCount }),
+        ...(finalOutputRef === undefined ? {} : { finalOutputRef }),
+        ...(terminalTranscriptRef === undefined ? {} : { terminalTranscriptRef }),
         status,
         signal,
         elapsedMs,
@@ -735,11 +914,21 @@ async function invokeWorkerThroughAbgProcessActor(input: {
 }): Promise<SdlcWorkerRunResult> {
   const stdoutPath = join(input.manifest.archiveRoot, "worker_stdout.log");
   const stderrPath = join(input.manifest.archiveRoot, "worker_stderr.log");
+  const processStartedPath = join(
+    input.manifest.archiveRoot,
+    "worker_process_started.json"
+  );
+  const processEventsPath = join(
+    input.manifest.archiveRoot,
+    "worker_process_events.jsonl"
+  );
+  const traceRoot = `${processEventsPath}.trace`;
   const outputLastMessagePath =
     input.transport.agentKey === "codex"
       ? join(input.manifest.archiveRoot, "worker_last_message.txt")
       : null;
   const inactivityPolicy = workerInactivityPolicy();
+  const executorProfile = selectedWorkerExecutorProfile();
   let startedContextWritten = false;
   const args = argsForWorker({
     transport: input.transport,
@@ -776,8 +965,10 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       stderrPath,
       stdoutRef: pathToFileURL(stdoutPath).href,
       stderrRef: pathToFileURL(stderrPath).href,
-      processStartedPath: join(input.manifest.archiveRoot, "worker_process_started.json"),
-      processEventsPath: join(input.manifest.archiveRoot, "worker_process_events.jsonl"),
+      processStartedPath,
+      processEventsPath,
+      parser: parserForWorkerTransport(input.transport),
+      executorProfile,
       timeoutMs: Math.min(
         inactivityPolicy.timeoutMs,
         inactivityPolicy.inactivityTimeoutMs
@@ -791,6 +982,8 @@ async function invokeWorkerThroughAbgProcessActor(input: {
             promptPath: input.promptPath,
             stdoutPath,
             stderrPath,
+            executorProfile,
+            traceRoot,
             policy: inactivityPolicy,
             event
           });
@@ -801,11 +994,26 @@ async function invokeWorkerThroughAbgProcessActor(input: {
     });
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
+  const traceProjection = traceProjectionFor(traceRoot);
   const workerRun: SdlcWorkerRunResult = Object.freeze({
     kind: "sdlc_worker_run_result",
     command: processResult.command,
     args: processResult.args,
     cwd: processResult.cwd,
+    executorProfile: traceProjection.executorProfile ?? executorProfile,
+    terminalSessionId: traceProjection.terminalSessionId,
+    streamModel:
+      traceProjection.streamModel ??
+      (executorProfile === "pty-terminal" ? "terminal-transcript" : "stdio"),
+    outcome: processResult.outcome,
+    traceRoot,
+    traceResultRef: fileRef(traceResultPath(traceRoot)),
+    structuredEventCount: traceProjection.structuredEventCount,
+    structuredParseFailureCount: traceProjection.structuredParseFailureCount,
+    apiRetryCount: traceProjection.apiRetryCount,
+    toolCallCount: traceProjection.toolCallCount,
+    finalOutputRef: traceProjection.finalOutputRef,
+    terminalTranscriptRef: traceProjection.terminalTranscriptRef,
     status: processResult.status,
     signal: processResult.signal,
     elapsedMs: processResult.elapsedMs,
@@ -955,8 +1163,36 @@ function workerProcessEvidenceRefs(input: {
     pathToFileURL(input.workerRun.stderrPath).href,
     pathToFileURL(join(input.manifest.archiveRoot, "worker_process_started.json")).href,
     pathToFileURL(join(input.manifest.archiveRoot, "worker_process_events.jsonl")).href,
+    ...(input.workerRun.traceResultRef === undefined
+      ? []
+      : [input.workerRun.traceResultRef]),
     pathToFileURL(join(input.manifest.archiveRoot, "handoff_manifest.json")).href
   ]);
+}
+
+function workerFailureCode(input: {
+  readonly workerRun: SdlcWorkerRunResult;
+  readonly silentInactivity: boolean;
+}): SdlcBlockingReasonCode {
+  if (input.workerRun.outcome?.kind === "hard_timeout") {
+    return "worker_hard_timeout";
+  }
+  if (input.silentInactivity || input.workerRun.outcome?.kind === "inactivity_timeout") {
+    return "silent_worker_inactivity";
+  }
+  if (input.workerRun.outcome?.kind === "executor_unavailable") {
+    return "worker_executor_unavailable";
+  }
+  if (input.workerRun.outcome?.kind === "launch_failed") {
+    return "worker_launch_failed";
+  }
+  if (input.workerRun.outcome?.kind === "process_error") {
+    return "worker_process_error";
+  }
+  if (input.workerRun.outcome?.kind === "lost_terminal") {
+    return "worker_lost_terminal";
+  }
+  return "worker_process_failed";
 }
 
 export function constructWorkerProcessFailurePostflight(input: {
@@ -965,10 +1201,11 @@ export function constructWorkerProcessFailurePostflight(input: {
 }): SdlcPostflightResult {
   const evidenceRefs = workerProcessEvidenceRefs(input);
   const silentInactivity =
-    input.workerRun.timedOut &&
-    input.workerRun.stdoutByteCount === 0 &&
-    input.workerRun.stderrByteCount === 0 &&
-    !existsSync(input.manifest.reportFile);
+    input.workerRun.outcome?.kind === "inactivity_timeout" ||
+    (input.workerRun.timedOut &&
+      input.workerRun.stdoutByteCount === 0 &&
+      input.workerRun.stderrByteCount === 0 &&
+      !existsSync(input.manifest.reportFile));
   const status =
     input.workerRun.status === null
       ? input.workerRun.signal ?? input.workerRun.error ?? "unknown"
@@ -1006,7 +1243,10 @@ export function constructWorkerProcessFailurePostflight(input: {
           .map((entry) => `${entry.signal}@${String(entry.elapsedMs)}ms`)
           .join(",");
   const carrier = makeSdlcBlockingReason({
-    code: silentInactivity ? "silent_worker_inactivity" : "worker_process_failed",
+    code: workerFailureCode({
+      workerRun: input.workerRun,
+      silentInactivity
+    }),
     lawfulReentryPoint: silentInactivity
       ? priorSilentInactivityCount(input.manifest) === 0 && silentRetryAvailable
         ? "same_edge_retry"
@@ -1018,6 +1258,10 @@ export function constructWorkerProcessFailurePostflight(input: {
           `stdoutBytes=${String(input.workerRun.stdoutByteCount)}`,
           `stderrBytes=${String(input.workerRun.stderrByteCount)}`,
           `signal=${input.workerRun.signal ?? "none"}`,
+          `outcome=${input.workerRun.outcome?.kind ?? "legacy_timeout"}`,
+          `executorProfile=${input.workerRun.executorProfile ?? "unknown"}`,
+          `streamModel=${input.workerRun.streamModel ?? "unknown"}`,
+          `traceResultRef=${input.workerRun.traceResultRef ?? "unknown"}`,
           `pid=${processSummary?.pid ?? "unknown"}`,
           `hardTimeoutMs=${processSummary?.timeoutMs ?? "unknown"}`,
           `inactivityTimeoutMs=${processSummary?.inactivityTimeoutMs ?? "unknown"}`,
@@ -1032,7 +1276,13 @@ export function constructWorkerProcessFailurePostflight(input: {
             .join(",")}`,
           `processSummaryRef=${workerProcessSummaryRef(input.manifest)}`
         ].join(";")
-      : `worker exited non-zero: ${status}`,
+      : [
+          `worker exited non-zero: ${status}`,
+          `outcome=${input.workerRun.outcome?.kind ?? "unknown"}`,
+          `executorProfile=${input.workerRun.executorProfile ?? "unknown"}`,
+          `streamModel=${input.workerRun.streamModel ?? "unknown"}`,
+          `traceResultRef=${input.workerRun.traceResultRef ?? "unknown"}`
+        ].join(";"),
     evidenceRefs
   });
   return Object.freeze({
@@ -1390,6 +1640,8 @@ export async function executeInstalledOperatorStart(input: {
         edgeName: pluginInput.edge,
         vectorIndex: pluginInput.vectorIndex,
         contract,
+        fpTransformRequest: pluginInput.fpTransformRequest,
+        traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
         conformedProject: executionContract.conformedProject,
         retryContext: retryContextFromRetryAttemptRefs(
           pluginInput.retryAttemptRefs.filter(
@@ -1538,12 +1790,39 @@ export async function executeInstalledOperatorStart(input: {
           });
         }
       }
-      writeProductMaterializationManifest({ manifest, report: workerReport });      const postflight = evaluateWorkerResultPostflight({ manifest, report: workerReport });
+      workerReport = workerResultReportWithFpStageRefs({
+        manifest,
+        report: workerReport
+      });
+      writeOperatorArchiveFile({
+        archiveRoot: manifest.archiveRoot,
+        relativePath: "worker_result_report.json",
+        payload: workerReport
+      });
+      const fpTransformResult = writeWorkerFpTransformResult({
+        manifest,
+        report: workerReport
+      });
+      if (fpTransformResult !== null && manifest.fpTransformRequest !== null) {
+        emitted.push(
+          ...runtimeEventsForFpTransformResult({
+            basis,
+            request: manifest.fpTransformRequest,
+            result: fpTransformResult
+          })
+        );
+      }
+      writeProductMaterializationManifest({ manifest, report: workerReport });
+      const postflight = evaluateWorkerResultPostflight({
+        manifest,
+        report: workerReport
+      });
       writeOperatorArchiveFile({
         archiveRoot: manifest.archiveRoot,
         relativePath: "postflight.json",
         payload: postflight
       });
+      writeFpEvaluateResult({ manifest, report: workerReport, postflight });
       if (postflight.status !== "passed") {
         const gapDossier = constructPostflightGapDossier({
           manifest,

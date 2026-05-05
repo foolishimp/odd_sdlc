@@ -117,6 +117,8 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   );
 
   assert.match(prompt, /Read the full handoff manifest before writing output/);
+  assert.match(prompt, /must start with a `## Execution Plan` section/);
+  assert.match(prompt, /Do not keep this plan private/);
   assert.match(prompt, /Compact prompt pressure projection/);
   assert.match(prompt, /"projectionVersion": "ts-prompt-projection-v1"/);
   assert.match(prompt, /"omittedObligationCount":/);

@@ -3,7 +3,7 @@ id: T-096
 title: Prove managed traversal bootstrap from unordered or unknown source state
 type: feature
 ticket_category: rc_blocker
-status: active
+status: completed
 goal: odd-sdlc-typescript-full-operational-rc
 change_intent: Prove the first SDLC traversal as a managed graph-function hop from unknown, unordered, or nonconformant source state into an inducted constitutional bootstrap with authoritative requirements.
 change_class: design_reframe
@@ -11,17 +11,17 @@ re_entry_point: design
 affected_boundary: ManagedTraversal, Fg_ingress_project, Fg_conform_project, source-input carriers, induction manifest, induction ledger, conformance report, project constraints canonicalization, requirement authority projection, installed gaps/start routing
 priority: critical
 created_at: 2026-04-28
-updated_at: 2026-05-02T14:07:30Z
+updated_at: 2026-05-04
+closed_at: 2026-05-04
 reopened_at: 2026-05-02T14:07:30Z
 prior_completed_at: 2026-04-28
 owner: codex
 dependencies:
-  - T-087 active mandatory project induction traversal
-  - T-091 active lossy obligation carrier hardening
-  - ABG release cut `v3.4.0-rc.6` as traversal/runtime substrate
+  - T-087 completed mandatory project induction traversal
+  - T-091 completed lossy obligation carrier hardening
+  - ABG release cut `v3.5.0-rc.1` as traversal/runtime substrate
 blocks:
   - T-041 active
-  - T-102 active
   - T-109 active
 governance_scope: STDO Method
 governance_scope_expansion:
@@ -226,3 +226,35 @@ input_workspace -> output_workspace_b
 The test must prove that output A and output B are independently open before
 their own traversal, independently closed after their own traversal, and
 semantically equivalent in the induced requirement set.
+
+## Proof Checkpoint - 2026-05-04
+
+Focused managed-bootstrap proof passed against ABG `v3.5.0-rc.1`:
+
+```text
+npm run test:t096
+npm run test:t087-t096:data-mapper-sandbox
+```
+
+Evidence:
+
+- `test_env/tests/test_t096_managed_traversal_bootstrap.test.mjs`
+- `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151102328Z_pid36499`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151105080Z_pid36499_cross_workspace`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151108594Z_pid36499_multiple_output_workspaces`
+
+The proof covers:
+
+- `Fg_conform_project` as managed traversal from unordered source set to constitutional bootstrap surfaces;
+- unknown/legacy-shaped input admitted as source state before downstream traversal;
+- canonicalization of legacy project constraints;
+- requirement-family projection from imported source authority;
+- separate output workspace materialization;
+- fan-out from one input workspace into multiple output workspaces.
+
+## Closure Decision - 2026-05-04
+
+Closed for the reopened first-traversal managed-bootstrap proof scope.
+
+This closure unblocks T-109 design/proof work but does not close T-109 or the final RC envelope.

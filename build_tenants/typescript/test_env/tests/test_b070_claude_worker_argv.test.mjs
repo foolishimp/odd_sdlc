@@ -11,6 +11,8 @@ import { join } from "node:path";
 import {
   admitWorkerTransport,
   argsForWorker,
+  parserForWorkerTransport,
+  selectedWorkerExecutorProfile,
   stdinForWorker
 } from "../../build/semantic/code/src/index.js";
 
@@ -31,10 +33,17 @@ function fakeManifest(workspaceRoot) {
   return Object.freeze({ workspaceRoot });
 }
 
-test("B-070 process://claude uses headless print argv and delivers prompt on stdin", () => {
+test("B-070 process://claude lowers to ABG-owned stream-json print argv", () => {
   const fx = makeFixture("CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n");
   const transport = admitWorkerTransport("process://claude");
   assert.equal(transport.agentKey, "claude");
+  assert.equal(parserForWorkerTransport(transport), "claude-stream-json");
+  assert.equal(
+    selectedWorkerExecutorProfile({
+      ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal"
+    }),
+    "pty-terminal"
+  );
 
   const args = argsForWorker({
     transport,
@@ -50,18 +59,26 @@ test("B-070 process://claude uses headless print argv and delivers prompt on std
       transport,
       promptPath: fx.promptPath
     }),
-    "CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n",
-    "prompt content should be delivered through stdin to avoid argv size limits"
+    null,
+    "Claude stdin is no longer odd_sdlc-owned transport law"
   );
-  assert.ok(
-    args.includes("--add-dir"),
-    "argv should include --add-dir for workspace read access"
-  );
-  const addDirIndex = args.indexOf("--add-dir");
-  assert.equal(args[addDirIndex + 1], fx.workspaceRoot);
   assert.ok(
     args.includes("--output-format"),
-    "argv should include --output-format for stable stdout shape"
+    "ABG Claude argv should include --output-format for stable stdout shape"
+  );
+  const outputFormatIndex = args.indexOf("--output-format");
+  assert.equal(
+    args[outputFormatIndex + 1],
+    "stream-json",
+    "ABG Claude argv must use realtime stream-json"
+  );
+  assert.ok(
+    !args.includes("--include-partial-messages"),
+    "partial-message handling is not odd_sdlc transport law"
+  );
+  assert.ok(
+    args.includes("--verbose"),
+    "ABG Claude stream-json output requires --verbose in print mode"
   );
   assert.ok(
     args.includes("--permission-mode"),
@@ -74,9 +91,10 @@ test("B-070 process://claude uses headless print argv and delivers prompt on std
     !args.includes(fx.manifestPath),
     "argv must not be the bare manifest path fallthrough"
   );
-  assert.ok(
-    !args.includes("CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n"),
-    "argv must not carry prompt content because live retry prompts can exceed OS argv limits"
+  assert.equal(
+    args[args.length - 1],
+    "CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n",
+    "prompt placement follows the ABG shared Claude callout contract"
   );
 });
 
@@ -84,6 +102,7 @@ test("B-070 process://codex argv shape is preserved (regression guard)", () => {
   const fx = makeFixture("CODEX-PROMPT\n");
   const transport = admitWorkerTransport("process://codex");
   assert.equal(transport.agentKey, "codex");
+  assert.equal(transport.model, null);
 
   const args = argsForWorker({
     transport,
@@ -106,6 +125,33 @@ test("B-070 process://codex argv shape is preserved (regression guard)", () => {
     args[args.length - 1],
     "CODEX-PROMPT\n",
     "codex final positional arg is prompt content"
+  );
+});
+
+test("B-070 process://codex?model=... lowers to codex exec --model", () => {
+  const fx = makeFixture("CODEX-SPARK-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "process://codex?model=gpt-5.3-codex-spark"
+  );
+  assert.equal(transport.agentKey, "codex");
+  assert.equal(transport.model, "gpt-5.3-codex-spark");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  assert.equal(args[0], "exec");
+  assert.ok(args.includes("--model"));
+  const modelIndex = args.indexOf("--model");
+  assert.equal(args[modelIndex + 1], "gpt-5.3-codex-spark");
+  assert.equal(
+    args[args.length - 1],
+    "CODEX-SPARK-PROMPT\n",
+    "codex final positional arg remains prompt content"
   );
 });
 

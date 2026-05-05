@@ -10,6 +10,8 @@ import {
   deriveObligationCarryAssuranceLedger,
   deriveRequirementFulfillmentAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
+  deriveComponentDepthAssuranceLedger,
+  deriveDesignCompletenessAssuranceLedger,
   foldSdlcAssuranceLedgers,
   type SdlcAssuranceLedger,
   type SdlcAssuranceLedgerDimension,
@@ -471,6 +473,24 @@ export function deriveSdlcOperatorAssuranceGate(input: {
       })
     );
     requiredDimensions.push("semantic_convergence");
+  }
+
+  const componentDepth = deriveComponentDepthAssuranceLedger({
+    manifest: input.manifest,
+    report: input.report
+  });
+  if (componentDepth !== null) {
+    ledgers.push(componentDepth);
+    requiredDimensions.push("component_depth");
+  }
+
+  const designCompleteness = deriveDesignCompletenessAssuranceLedger({
+    manifest: input.manifest,
+    report: input.report
+  });
+  if (designCompleteness !== null) {
+    ledgers.push(designCompleteness);
+    requiredDimensions.push("design_completeness");
   }
 
   const requirementClosureRegister = requirementClosureRegisterFromObligations({

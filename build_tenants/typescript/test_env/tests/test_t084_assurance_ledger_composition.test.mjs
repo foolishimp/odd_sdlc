@@ -5,11 +5,16 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   SDLC_ASSURANCE_LEDGER_DIMENSIONS,
   deriveAmbiguityAssuranceLedger,
   deriveCapabilityAssuranceLedger,
+  deriveComponentDepthAssuranceLedger,
+  deriveDesignCompletenessAssuranceLedger,
   deriveMaterializationAssuranceLedger,
   deriveObligationCarryAssuranceLedger,
   deriveRequirementFulfillmentAssuranceLedger,
@@ -37,6 +42,42 @@ function ledger(dimension, verdict, input = {}) {
     evidenceRefs: input.evidenceRefs ?? [],
     carryForwardObligationRefs: input.carryForwardObligationRefs ?? []
   });
+}
+
+function componentDepthArtifact(register) {
+  const root = mkdtempSync(join(tmpdir(), "odd-sdlc-component-depth-"));
+  const filePath = join(root, `${register.targetAssetType}.md`);
+  writeFileSync(
+    filePath,
+    [
+      `# ${register.targetAssetType}`,
+      "",
+      "```component_depth_register",
+      JSON.stringify(register, null, 2),
+      "```",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  return filePath;
+}
+
+function designDepthArtifact(register) {
+  const root = mkdtempSync(join(tmpdir(), "odd-sdlc-design-depth-"));
+  const filePath = join(root, `${register.targetAssetType}.md`);
+  writeFileSync(
+    filePath,
+    [
+      `# ${register.targetAssetType}`,
+      "",
+      "```design_depth_register",
+      JSON.stringify(register, null, 2),
+      "```",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  return filePath;
 }
 
 function allSatisfied(overrides = []) {
@@ -187,7 +228,7 @@ test("T-084 all satisfied ledgers allow closure", () => {
 
   assert.equal(satisfaction.status, "close_allowed");
   assert.equal(satisfaction.missingRequiredDimensions.length, 0);
-  assert.equal(satisfaction.satisfiedDimensions.length, 7);
+  assert.equal(satisfaction.satisfiedDimensions.length, 9);
 });
 
 test("T-084 not-applicable ledger does not hide required failure", () => {
@@ -221,6 +262,56 @@ test("T-084 missing required ledger blocks closure deterministically", () => {
     satisfaction.blockingReasons.map((item) => item.code),
     ["missing_required_ledger:capability"]
   );
+});
+
+test("T-113 component-depth assurance blocks collapsed component test materialization", () => {
+  const outputFile = componentDepthArtifact({
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "MapperComponentSpec",
+        relativePath: "src/test/scala/MapperComponentSpec.scala",
+        testcaseIds: ["TC-DM-001"],
+        componentIds: ["mapper"],
+        requirementIds: ["REQ-DM-001"],
+        shardId: null
+      }
+    ]
+  });
+  const componentDepth = deriveComponentDepthAssuranceLedger({
+    manifest: {
+      ...manifest(),
+      targetAssetType: "component_test_surface"
+    },
+    report: {
+      kind: "odd_sdlc.worker_result_report",
+      graphFunctionName: "bootstrap_release_self_test",
+      edgeName: "derive_component_test_surface",
+      targetAssetType: "component_test_surface",
+      outputFile,
+      digest: "sha256:component-test",
+      summary: "framework-generated post-transform report from observed artifacts",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      executionEvidence: null,
+      executionEvidenceErrors: [],
+      obligationAssessments: [],
+      fpTransformRequestRef: null,
+      fpTransformResultRef: null,
+      fpTransformStatus: null,
+      fpEvaluateResultRef: null
+    }
+  });
+
+  assert(componentDepth);
+  assert.equal(componentDepth.verdict, "open_gap");
+  assert.deepStrictEqual(componentDepth.reasons.map((item) => item.code), [
+    "test_class_missing_file:MapperComponentSpec",
+    "component_depth_materialized_file_missing:component_test_surface:test"
+  ].sort());
 });
 
 test("T-084 folds real outputs from every assurance dimension", () => {
@@ -303,6 +394,133 @@ test("T-084 folds real outputs from every assurance dimension", () => {
       }
     ]
   });
+  const componentDepthOutputFile = componentDepthArtifact({
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "mapper",
+        moduleName: "mapper",
+        relativePath: "src/main/scala/Mapper.scala",
+        publicBoundary: "Mapper.map",
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://requirements"]
+      }
+    ]
+  });
+  const componentDepth = deriveComponentDepthAssuranceLedger({
+    manifest: {
+      ...manifest(),
+      targetAssetType: "component_code_surface"
+    },
+    report: {
+      kind: "odd_sdlc.worker_result_report",
+      graphFunctionName: "bootstrap_release_self_test",
+      edgeName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface",
+      outputFile: componentDepthOutputFile,
+      digest: "sha256:component-code",
+      summary: "framework-generated post-transform report from observed artifacts",
+      unresolvedReasons: [],
+      materializedFiles: [
+        {
+          kind: "sdlc_materialized_product_file",
+          role: "source",
+          relativePath: "src/main/scala/Mapper.scala",
+          absolutePath: "/workspace/build_tenants/scala_spark/src/main/scala/Mapper.scala",
+          digest: "sha256:mapper",
+          byteCount: 32
+        }
+      ],
+      executionEvidence: null,
+      executionEvidenceErrors: [],
+      obligationAssessments: [],
+      fpTransformRequestRef: null,
+      fpTransformResultRef: null,
+      fpTransformStatus: null,
+      fpEvaluateResultRef: null
+    }
+  });
+  assert(componentDepth);
+  const designDepthOutputFile = designDepthArtifact({
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "aggregate_domain_model_surface",
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: {
+      kind: "sdlc_aggregate_domain_model",
+      modelVersion: "ts-design-depth-v1",
+      entities: [
+        {
+          kind: "sdlc_aggregate_domain_entity",
+          entityId: "entity:MapperInput",
+          ownerModuleName: "mapper",
+          attributes: [
+            {
+              kind: "sdlc_domain_attribute",
+              attributeId: "attr:MapperInput.value",
+              name: "value",
+              valueType: "String",
+              cardinality: "one",
+              invariantRefs: ["REQ-DM-001"]
+            }
+          ],
+          sourceModuleNames: ["mapper"]
+        }
+      ],
+      operations: [
+        {
+          kind: "sdlc_domain_operation",
+          operationId: "operation:Mapper.map",
+          moduleName: "mapper",
+          inputEntityIds: ["entity:MapperInput"],
+          outputEntityIds: ["entity:MapperInput"],
+          requiredAttributeIds: ["attr:MapperInput.value"]
+        }
+      ],
+      crossModuleReferences: [],
+      evidenceRefs: ["fixture://design-depth"]
+    },
+    aggregateSunnyDaySequence: null,
+    designCompletenessVerdict: {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-depth-v1",
+      entity: {
+        kind: "sdlc_design_completeness_axis_verdict",
+        axis: "entity",
+        status: "satisfied",
+        reasons: [],
+        evidenceRefs: ["fixture://design-depth"]
+      },
+      attribute: {
+        kind: "sdlc_design_completeness_axis_verdict",
+        axis: "attribute",
+        status: "satisfied",
+        reasons: [],
+        evidenceRefs: ["fixture://design-depth"]
+      },
+      flow: {
+        kind: "sdlc_design_completeness_axis_verdict",
+        axis: "flow",
+        status: "satisfied",
+        reasons: [],
+        evidenceRefs: ["fixture://design-depth"]
+      }
+    }
+  });
+  const designCompleteness = deriveDesignCompletenessAssuranceLedger({
+    manifest: {
+      ...manifest(),
+      targetAssetType: "aggregate_domain_model_surface"
+    },
+    report: {
+      outputFile: designDepthOutputFile
+    }
+  });
+  assert(designCompleteness);
   const satisfaction = foldSdlcAssuranceLedgers({
     ledgers: [
       materialization,
@@ -311,7 +529,9 @@ test("T-084 folds real outputs from every assurance dimension", () => {
       requirement,
       ambiguity,
       capability,
-      shallow
+      shallow,
+      componentDepth,
+      designCompleteness
     ]
   });
 

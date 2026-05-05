@@ -3,23 +3,24 @@
 - id: T-102
 - type: bug
 - ticket_category: ordinary
-- status: active
+- status: completed
 - goal: typescript-rc-fp-worker-coverage
 - change_intent: define and realize a typed `F_P.fn` process model so constructive worker calls, evaluation, event emission, ledger projection, and closure are no longer collapsed into one worker-report contract
 - change_class: design_reframe
 - re_entry_point: design
 - triaged_at: 2026-04-30
 - created_at: 2026-04-30
-- updated_at: 2026-05-02
+- updated_at: 2026-05-04
+- closed_at: 2026-05-04
 - priority: high
 - build_tenant: typescript
 - owner: unassigned
-- review_status: active_abg_rc6_consumer_migration_required
+- review_status: closed_scoped_transform_evaluate_split
 - intake_source: `data_mapper.test59.fp.cl` live Claude lane timed out after materializing product files but writing no `worker_result_report.json`; operator review identified that TypeScript collapsed `F_P.transform`, evaluation, materialization ledger construction, obligation assessment, and closure into one worker responsibility.
 - affected_boundary: `build_tenants/typescript/code/src/operator/handoff.ts`, `build_tenants/typescript/code/src/operator/installed_operator.ts`, odd_sdlc F_P plugin adapter, ABG event/admission/projection seams
 - links:
   - B-071 (`.ai-workspace/tickets/completed/B-071-consume-abg-streamed-process-actor-supervision-for-live-claude-lanes.md`)
-  - ABG release cut `v3.4.0-rc.6` (`@abiogenesis/typescript-tenant@3.4.0-rc.6`)
+  - ABG release cut `v3.5.0-rc.1` (`@abiogenesis/typescript-tenant@3.5.0-rc.1`)
   - ABG T-097 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-097-design-abg-supervised-process-actor-execution-and-streamed-observation.md`)
   - ABG T-098 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-098-design-abg-full-retry-frontier-projection.md`)
   - ABG T-099 (`/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-099-design-abg-typed-fp-stage-carriers-and-admission-flow.md`)
@@ -30,6 +31,9 @@
   - T-105 (`.ai-workspace/tickets/completed/T-105-migrate-start-until-converged-to-abg-owned-whole-graph-iteration.md`)
   - T-106 (`.ai-workspace/tickets/completed/T-106-close-conformed-project-profile-authority-seam.md`)
   - T-107 (`.ai-workspace/tickets/backlog/T-107-split-operator-handoff-into-prime-domain-modules.md`)
+  - T-110 (`.ai-workspace/tickets/active/T-110-migrate-typescript-to-abg-3-5-traced-agent-callout-substrate.md`)
+  - T-112 (`.ai-workspace/tickets/backlog/T-112-model-complete-semantic-lifecycle-over-abg35-substrate.md`)
+  - T-113 (`.ai-workspace/tickets/backlog/T-113-demote-worker-result-report-from-closure-authority.md`)
   - B-075 (`.ai-workspace/tickets/completed/B-075-ignore-build-tool-byproducts-during-test-module-materialization.md`)
   - semantic regression: `test_env/tests/test_t064_installed_operator_ux.test.mjs`
   - live scenario: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test59.fp.cl`
@@ -514,3 +518,141 @@ requirements ledger, requirements schedule, implementation surface, and
 qualification report. The live lane is pinned to `gpt-5.3-codex` and the
 archive is
 `build_tenants/typescript/test_env/test_runs/t109_live_abg_rc6_sdlc_lifecycle/20260502T134430587Z_pid46797/run_summary.json`.
+
+## ABG 3.5.0-rc.1 Reprice - 2026-05-03
+
+ABG now supplies the process/callout substrate that T-102 previously had to
+treat as partially missing or unstable:
+
+- `runAgentActorWorkerCallout` is the single ABG-owned agent actor/worker
+  callout interface.
+- `TracedProcessOutcome` is the canonical process result algebra.
+- `local-spawn` and `pty-terminal` are typed executor profiles.
+- Claude stream-json parsing, api-retry observation, tool-call observation,
+  structured parse failures, terminal transcripts, lost-terminal detection,
+  hard timeout, and inactivity timeout are ABG substrate truth.
+
+This changes T-102 from "wait for ABG to supply the machinery" to "consume the
+ABG 3.5 machinery without rebuilding it locally."
+
+Current governing substrate:
+
+- package surface: `@abiogenesis/typescript-tenant@3.5.0-rc.1`
+- release tag: `/Users/jim/src/apps/abiogenesis` `v3.5.0-rc.1`
+- local dependency form: sibling ABG file dependency from
+  `build_tenants/typescript/package.json`
+
+T-102 remains the owning ticket for the deeper `F_P.transform` /
+`F_P.evaluate` carrier split. The follow-on backlog is split by layer:
+
+- T-110 owns the ABG 3.5 process/callout substrate migration.
+- T-112 owns the full semantic lifecycle model over ABG process truth.
+- T-113 owns demoting `worker_result_report.json` from closure authority to
+  compatibility/read-model projection.
+
+ABG 3.5 should support the process side of everything T-102 needs. It does not
+remove the odd_sdlc work: odd_sdlc must still map SDLC domain obligations to
+typed transform/evaluate carriers, semantic evaluation rows, gap dossiers, and
+release qualification projections.
+
+Updated required substrate surfaces:
+
+| ABG 3.5 surface | T-102 use |
+| --- | --- |
+| `runAgentActorWorkerCallout` | worker process invocation through one ABG-owned callout seam |
+| `TracedProcessOutcome` | typed process outcome truth for postflight and retry classification |
+| `TracedProcessExecutorProfile` | explicit `local-spawn` / `pty-terminal` executor selection |
+| `TracedProcessPaths` | trace archive refs for worker evidence |
+| `claude-stream-json` parser | shared Claude stream-json result/retry/tool-call parser |
+| `apiRetryEvents`, `toolCallEvents`, `structuredParseFailureCount` | transport observation evidence |
+| `hard_timeout`, `inactivity_timeout`, `executor_unavailable`, `lost_terminal` | distinct failure modes that must not collapse into generic worker failure |
+| `constructFpTransformRequest` / `constructFpTransformResult` path where available | typed construction-stage carriers |
+| ABG retry/foldback/reentry/eval projections | lifecycle projections consumed by odd_sdlc closure and gap routing |
+
+Updated closure pressure:
+
+- T-102 cannot close by proving the ABG 3.5 callout migration alone.
+- T-102 can use T-110 as a prerequisite that makes worker process truth
+  reliable enough to finish the transform/evaluate split.
+- T-102 closure requires first-class typed transform/evaluate carriers and ABG
+  admission evidence. Full lifecycle authority replacement is explicitly split
+  to T-112 and T-113.
+- `worker_result_report.json` may remain as a compatibility/read-model bridge
+  after this ticket. T-113 owns its full demotion from closure authority.
+
+## Implementation Checkpoint - 2026-05-03
+
+T-102 now has a concrete ABG 3.5 consumer implementation slice:
+
+- `SdlcWorkerHandoffManifest` carries the ABG `FpTransformRequest` supplied by
+  `EnginePluginInput.fpTransformRequest` and publishes the archive locations for
+  `fp_transform_request.json`, `fp_transform_result.json`, and
+  `fp_evaluate_result.json`.
+- `writeHandoffFiles` writes the ABG transform request carrier when ABG supplied
+  one, so the worker handoff has an explicit typed transform contract.
+- `buildPostTransformWorkerResultReport` remains as a compatibility projection,
+  but it now references the typed transform/evaluate stage carriers instead of
+  being the only post-transform authority.
+- `writeWorkerFpTransformResult` constructs and admits an ABG
+  `FpTransformResult` from observed transform output, materialization evidence,
+  execution evidence, and traversal obligation assessments.
+- `executeInstalledOperatorStart` emits ABG runtime events from the admitted
+  transform result through `runtimeEventsForFpTransformResult`.
+- `writeFpEvaluateResult` writes an odd_sdlc-owned `F_P.evaluate` carrier over
+  postflight truth, blocking reasons, evidence refs, obligation assessment
+  counts, and execution-evidence status.
+- `test_t064_installed_operator_ux.test.mjs` now asserts that the installed
+  transform-only lane archives the request, transform result, and evaluate
+  result carriers.
+
+Closure scoping after code checkpoint:
+
+- Focused proof was rerun on 2026-05-04; see proof checkpoint below.
+- T-113 owns full demotion of `worker_result_report.json`; this slice only
+  makes it a compatibility/read-model projection over typed stage artifacts.
+- T-112 owns the broader semantic lifecycle projection over ABG 3.5
+  process truth.
+
+## Proof Checkpoint - 2026-05-04
+
+Build and focused proof passed against ABG `3.5.0-rc.1`:
+
+- `npm run build:semantic` passed.
+- `npm run test:t102-t110:abg35-sandbox` passed 5/5 after updating the stale
+  sandbox version assertion from `3.4.0-rc.7` to `3.5.0-rc.1`.
+- `ODD_SDLC_TS_T109_LIVE=1 ODD_SDLC_TS_LIVE_WORKER_COMMAND=codex ODD_SDLC_TS_LIVE_CODEX_MODEL=gpt-5.3-codex ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE=pty-terminal ABG_TS_AGENT_EXECUTOR_PROFILE=pty-terminal npm run test:t102-t110:abg35-live`
+  passed 1/1 in 73.068s when run outside the Codex filesystem sandbox.
+
+Live archive:
+
+- `build_tenants/typescript/test_env/test_runs/t109_live_abg_rc7_sdlc_lifecycle/20260503T141831826Z_pid33643`
+
+Observed live archive artifacts:
+
+- `abg_fp_transform_request.json`
+- `abg_fp_transform_result.json`
+- `abg_runtime_events.json`
+- `sdlc_semantic_rows.json`
+- `sdlc_edge_payload.json`
+- `run_summary.json`
+- `worker_run.json`
+
+The first live invocation inside the Codex filesystem sandbox failed before
+model/API work because Codex could not access `/Users/jim/.codex/sessions`.
+The escalated live proof is the accepted live evidence.
+
+## Closure Decision - 2026-05-04
+
+Closed for the scoped T-102 objective: `odd_sdlc.TS` now carries a first-class
+typed `F_P.transform` request/result split, writes transform/evaluate stage
+artifacts, admits transform result evidence through ABG-owned carriers, emits
+ABG runtime events from the admitted transform result, and keeps
+`worker_result_report.json` as a compatibility/read-model bridge rather than
+the only post-transform artifact.
+
+This closure does not claim the full semantic lifecycle is complete. T-112 owns
+the complete lifecycle model over ABG 3.5 process truth. T-113 owns demoting
+`worker_result_report.json` from closure authority to compatibility projection.
+T-110 remains active because its installed-operator live Claude PTY proof and
+negative/forced-failure proof gates are separate from this transform/evaluate
+carrier closure.

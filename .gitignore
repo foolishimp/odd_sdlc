@@ -9,6 +9,11 @@ __pycache__/
 .venv/
 venv/
 .genesis/
+.abiogenesis/
+.metals/
+.scala-build/
+.bloop/
+target/
 
 # ABG runtime state
 .ai-workspace/events/events.jsonl

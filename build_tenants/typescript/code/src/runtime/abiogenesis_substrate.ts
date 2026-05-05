@@ -32,7 +32,7 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.4.0-rc.3",
+  packageVersion: "3.4.0-rc.7",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   localRuntimeEventFamilies: Object.freeze([]),
@@ -40,7 +40,8 @@ export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   sourceAssumptions: Object.freeze([
     "ABIogenesis T-060 no_compute_basis fails closed",
     "ABIogenesis T-065 traversal probe is complete for structural diagnostics",
-    "ABIogenesis T-066 internal control loop owns iteration sufficiency"
+    "ABIogenesis T-066 internal control loop owns iteration sufficiency",
+    "ABIogenesis T-107 traversal attempt envelopes are ABG-derived from GTL qualifiers"
   ])
 } as const);
 

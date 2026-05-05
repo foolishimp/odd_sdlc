@@ -53,6 +53,19 @@ function stringListValue(value: readonly string[]): SerializedAttrValue {
   });
 }
 
+function hookRefValue(
+  ref: string,
+  configEntries: readonly SerializedAttrEntry[]
+): SerializedAttrValue {
+  return Object.freeze({
+    kind: "hook_ref",
+    value: Object.freeze({
+      ref,
+      config: attrs(configEntries)
+    })
+  });
+}
+
 function attr(
   key: string,
   value: SerializedAttrValue
@@ -121,6 +134,24 @@ function fpEvaluator(entry: SdlcFunctionCatalogEntry): Evaluator {
   });
 }
 
+function traversalModulationDeclaration(
+  name: string
+): SerializedAttrEntry {
+  return attr(
+    "abg.traversal_modulation",
+    hookRefValue(`strategy://odd_sdlc/${name}/single_vertical_slice`, [
+      attr("strategy_owner_ref", scalarValue("product://odd_sdlc")),
+      attr("strategy_label", scalarValue("single_vertical_slice")),
+      attr("enforcement_primitives", stringListValue([
+        "single_vertical_slice"
+      ])),
+      attr("obligation_schedule_refs", stringListValue([
+        `schedule://odd_sdlc/${name}/primary`
+      ]))
+    ])
+  );
+}
+
 function graphFunctionDeclarations(): SerializedAttrs {
   return attrs([
     attr("function_kind", scalarValue("odd_asset_function")),
@@ -162,6 +193,7 @@ function reusableGraphFunctionDeclarations(
 
 function vectorDeclarations(entry: SdlcFunctionCatalogEntry): SerializedAttrs {
   return attrs([
+    traversalModulationDeclaration(entry.name),
     attr("intent", scalarValue(entry.intent)),
     attr("backing_graph_function", scalarValue(entry.backingGraphFunction)),
     attr("catalog_role", scalarValue(entry.catalogRole)),
@@ -186,6 +218,7 @@ function reusableVectorDeclarations(
   entry: SdlcReusableGraphFunctionCatalogEntry
 ): SerializedAttrs {
   return attrs([
+    traversalModulationDeclaration(entry.name),
     attr("intent", scalarValue(entry.intent)),
     attr("catalog_role", scalarValue(entry.graphFunctionRole)),
     attr("stable_outer_contract", scalarValue(entry.stableOuterContract)),

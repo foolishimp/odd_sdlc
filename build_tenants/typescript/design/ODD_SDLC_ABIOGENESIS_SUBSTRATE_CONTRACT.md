@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `3.4.0-rc.2` |
+| Version | `3.5.0-rc.1` |
 | Dependency form | local source product dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -38,6 +38,8 @@ The TypeScript tenant must not:
 - treat local orchestration state as runtime truth
 - copy ABG projection or iteration mechanics
 - fork GTL carrier admission
+- own framework-level agent process execution, Claude stream-json parsing, or
+  PTY terminal execution semantics
 
 ## Initial Proof Basis
 
@@ -60,3 +62,25 @@ The adapter relies on ABIogenesis TypeScript evidence:
 - `T-066`: ABG internal control loop owns iteration sufficiency
 
 These assumptions are dependencies, not copied law.
+
+## ABG 3.5 Process Callout Substrate
+
+As of ABG `3.5.0-rc.1`, worker process execution is also substrate-owned.
+
+`odd_sdlc.TS` admits SDLC worker bindings such as `process://claude`, derives
+SDLC handoff manifests and domain postflight projections, then lowers the
+process call to ABG traced actor/worker callout semantics.
+
+ABG owns:
+
+- `runAgentActorWorkerCallout`
+- `TracedProcessOutcome`
+- `local-spawn` and `pty-terminal` executor profiles
+- Claude stream-json parsing
+- api-retry, tool-call, and structured-parse observations
+- trace archive paths
+- hard timeout, inactivity timeout, executor-unavailable, launch-failed, and
+  lost-terminal process outcomes
+
+`odd_sdlc.TS` may preserve worker archive filenames as compatibility
+read-models, but their process facts are projections over ABG trace truth.

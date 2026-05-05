@@ -12,9 +12,9 @@ affected_boundary: TypeScript CLI/install adapter, installed workspace normaliza
 priority: medium
 triaged_at: 2026-04-26
 created_at: 2026-04-26
-updated_at: 2026-04-30T09:00:00Z
+updated_at: 2026-05-04
 dependencies:
-  - T-087 completed
+  - T-087 completed first-traversal induction packet
   - T-088 completed
   - T-089 completed
   - T-086 completed
@@ -31,6 +31,11 @@ dependencies:
   - T-069 completed
   - T-075 consolidated
   - T-076 completed
+  - T-091 completed first-traversal requirement-authority carrier hardening
+  - T-096 completed managed traversal bootstrap proof
+  - T-102 completed typed F_P transform/evaluate carrier split
+  - T-109 active ABG-driven traversal-ledger solution
+  - T-110 completed ABG 3.5 traced callout proof
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -77,6 +82,22 @@ Python-observed behavior into graph-function programs, typed carriers, ABG
 runtime truth, public adapters, and qualification archives.
 
 ## Triage Note
+
+## RC Checkpoint - 2026-05-04
+
+Completed blockers:
+
+- T-102 completed typed `F_P.transform` / `F_P.evaluate` carrier split.
+- T-110 completed ABG 3.5 traced callout proof with live Claude PTY and forced
+  failure evidence.
+- T-087/T-091/T-096 completed first-traversal induction packet proof.
+
+Remaining RC blocker:
+
+- T-109 remains active. Its sandbox proof is green, but the full semantic suite
+  still exposes a data-mapper successor event-log growth failure in completed
+  T-066 coverage. The final RC live data-mapper lane should wait until that
+  installed data-mapper iteration defect is repaired.
 
 This ticket is closable in the bounded TypeScript RC pass once the live
 data_mapper build succeeds through the production installed-operator path.

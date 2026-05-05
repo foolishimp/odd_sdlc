@@ -3,7 +3,7 @@ id: T-087
 title: Realize TypeScript project induction as mandatory first SDLC graph traversal
 type: feature
 ticket_category: rc_blocker
-status: active
+status: completed
 goal: odd-sdlc-typescript-full-operational-rc
 change_intent: Make TypeScript project induction the mandatory first graph traversal of every SDLC run, where an unknown, loose, stale, or imported workspace is admitted and iterated into an inducted spec_method project before any downstream SDLC edge may open.
 change_class: requirement_reprice
@@ -12,19 +12,19 @@ affected_boundary: Fg_ingress_project, Fg_conform_project, installed gaps/start 
 priority: critical
 triaged_at: 2026-04-28T12:13:15Z
 created_at: 2026-04-28T12:13:15Z
-updated_at: 2026-05-02T14:07:30Z
+updated_at: 2026-05-04
+closed_at: 2026-05-04
 reopened_at: 2026-05-02T14:07:30Z
 prior_completed_at: 2026-04-28T03:28:48Z
 prior_completion_type: implementation
-review_status: reopened_for_first_traversal_induction_depth
+review_status: closed_scoped_first_traversal_induction_depth
 dependencies:
   - T-068 completed
   - T-076 completed
   - T-085 completed
-  - ABG release cut `v3.4.0-rc.6` as traversal/runtime substrate
+  - ABG release cut `v3.5.0-rc.1` as traversal/runtime substrate
 blocks:
   - T-041 active
-  - T-102 active
   - T-109 active
   - data_mapper.test66 qualification lane
 related_tickets:
@@ -328,3 +328,36 @@ Verification:
 - `npm run test:t068` passed
 - `npm run test:t069` passed
 - `npm run test:t076` passed
+
+## Proof Checkpoint - 2026-05-04
+
+Focused first-traversal induction proof passed against ABG `v3.5.0-rc.1`:
+
+```text
+npm run test:t087
+npm run test:t087-t096:data-mapper-sandbox
+```
+
+Evidence:
+
+- `test_env/tests/test_t087_project_induction.test.mjs`
+- `test_env/sandbox/test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151102328Z_pid36499`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151105080Z_pid36499_cross_workspace`
+- `build_tenants/typescript/test_env/test_runs/t087_t091_t096_internal_data_mapper_induction/20260503T151108594Z_pid36499_multiple_output_workspaces`
+
+The proof covers:
+
+- understructured installed workspace routes to `Fg_conform_project` before downstream traversal;
+- internal legacy-shaped data_mapper fixture starts as loose source input;
+- `gaps` reports induction/conformance as the current edge;
+- `start` converges the induction traversal and emits graph/vector runtime evidence;
+- induction materializes canonical project constraints and requirement-family surfaces;
+- same input can be inducted into separate output workspaces for comparison;
+- one input can fan out into multiple output workspaces without sharing runtime ledger state.
+
+## Closure Decision - 2026-05-04
+
+Closed for the reopened first-traversal induction depth scope.
+
+This closure does not close the full RC envelope (`T-041`) or the traversal ledger solution (`T-109`).

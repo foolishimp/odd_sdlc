@@ -108,6 +108,18 @@ test("T-051 hook target class and operation policy is declared data", () => {
 
   assert.equal(defaultOperationForTarget("release_surface"), "release");
   assert.equal(defaultOperationForTarget("deployment_surface"), "deploy");
+  assert.equal(
+    defaultOperationForTarget("component_realization_qualification_surface"),
+    "qualify"
+  );
+  assert.equal(
+    defaultOperationForTarget("component_test_qualification_surface"),
+    "qualify"
+  );
+  assert.equal(
+    defaultOperationForTarget("release_depth_parity_surface"),
+    "qualify"
+  );
   assert.equal(defaultOperationForTarget("test_run_archive_surface"), "qualify");
   assert.equal(
     defaultOperationForTarget("runtime_observation_surface"),

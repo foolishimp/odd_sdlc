@@ -26,7 +26,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
-FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 LOCAL_PROJECTS_ROOT = ROOT.parent / "ai_sdlc_examples" / "local_projects"
 
 GRAPH_FUNCTION_NAMES = [
@@ -55,6 +54,36 @@ def _resolve_data_mapper_template() -> Path:
 
 
 DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
+
+TEST28_PASS2_REPLAY_SOURCES = {
+    "JobSubmitter.scala": """package replay
+
+object JobSubmitter {
+  def submit(job: String): String = ???
+}
+""",
+    "Reconciler.scala": """package replay
+
+object Reconciler {
+  val isConsistent = true
+}
+""",
+    "SparkMorphismExecutor.scala": """package replay
+
+object SparkMorphismExecutor {
+  def execute(input: String): String = {
+    val output = output
+    output
+  }
+}
+""",
+}
+
+
+def _write_test28_pass2_replay_code(code_root: Path) -> None:
+    code_root.mkdir(parents=True, exist_ok=True)
+    for filename, source in TEST28_PASS2_REPLAY_SOURCES.items():
+        (code_root / filename).write_text(source, encoding="utf-8")
 
 
 def _expected_graph_function_names(actual_names: list[str]) -> list[str]:
@@ -4295,10 +4324,8 @@ def test_emit_event_cmd_accepts_constitutional_operator_events(tmp_path: Path) -
 
 def test_shallow_code_findings_do_not_publish_deepening_strategy(tmp_path: Path) -> None:
     _seed_workspace(tmp_path)
-    fixture_code_root = FIXTURES_DIR / "test28_pass2_replay" / "code"
     code_root = asset_path(tmp_path, "code_surface")
-    code_root.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(fixture_code_root, code_root, dirs_exist_ok=True)
+    _write_test28_pass2_replay_code(code_root)
     refresh_analysis(tmp_path, stage="test")
     app = initialize(bootstrap(workspace_root=tmp_path))
 

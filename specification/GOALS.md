@@ -44,6 +44,10 @@ temporary focus into accidental constitutional law.
   construction so generic builder prompts preserve satisfied structure and
   repair only unmet requirement deltas unless deterministic truth lawfully
   widens scope
+- use steel-thread implementation as the default delivery strategy for new
+  graph mechanics: prove one typed vertical path through carrier, admission,
+  projection/evaluator, graph wiring, positive fixture, and negative fixture
+  before widening to full data-mapper live proof
 - dogfood the current ticket execution discipline into prompt-bearing surfaces
   so constructive edge traversal and gap-analysis prompts consume published
   execution contracts and gap dossiers rather than ad hoc section assembly

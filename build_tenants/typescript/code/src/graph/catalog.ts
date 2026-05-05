@@ -126,9 +126,67 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_implementation_module_surface",
-    intent: "Derive implementation module structure and requirement allocation.",
+    intent: "Derive implementation module structure, requirement allocation, per-module attribute schemas, and per-module state diagrams.",
     inputs: ["implementation_design_surface", "implementation_stack_profile"],
     outputs: ["implementation_module_surface"]
+  }),
+  entry({
+    name: "derive_aggregate_domain_model_surface",
+    intent: "Compose per-module typed schemas into one aggregate domain model before component topology and scheduling.",
+    inputs: ["implementation_module_surface"],
+    outputs: ["aggregate_domain_model_surface"]
+  }),
+  entry({
+    name: "derive_implementation_component_topology_surface",
+    intent: "Derive production-shaped implementation component topology from implementation design, module authority, aggregate domain model, and stack profile.",
+    inputs: [
+      "implementation_design_surface",
+      "implementation_module_surface",
+      "aggregate_domain_model_surface",
+      "implementation_stack_profile"
+    ],
+    outputs: ["implementation_component_topology_surface"]
+  }),
+  entry({
+    name: "derive_aggregate_sunny_day_sequence_surface",
+    intent: "Compose component topology and aggregate domain model into one end-to-end sunny-day sequence before realization scheduling.",
+    inputs: [
+      "implementation_module_surface",
+      "aggregate_domain_model_surface",
+      "implementation_component_topology_surface"
+    ],
+    outputs: ["aggregate_sunny_day_sequence_surface"]
+  }),
+  entry({
+    name: "derive_component_realization_schedule_surface",
+    intent: "Derive component-level realization schedule from component topology, aggregate design surfaces, module authority, and stack profile.",
+    inputs: [
+      "implementation_component_topology_surface",
+      "implementation_module_surface",
+      "aggregate_domain_model_surface",
+      "aggregate_sunny_day_sequence_surface",
+      "implementation_stack_profile"
+    ],
+    outputs: ["component_realization_schedule_surface"]
+  }),
+  entry({
+    name: "derive_component_code_surface",
+    intent: "Materialize or repair component-shaped implementation code from component topology, realization schedule, and any admitted component repair schedule.",
+    inputs: [
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
+      "implementation_stack_profile"
+    ],
+    outputs: ["component_code_surface"]
+  }),
+  entry({
+    name: "qualify_component_realization_surface",
+    intent: "Qualify component code against the declared implementation component topology.",
+    inputs: [
+      "implementation_component_topology_surface",
+      "component_code_surface"
+    ],
+    outputs: ["component_realization_qualification_surface"]
   }),
   entry({
     name: "derive_realization_schedule_surface",
@@ -136,6 +194,10 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     inputs: [
       "implementation_design_surface",
       "implementation_module_surface",
+      "aggregate_domain_model_surface",
+      "aggregate_sunny_day_sequence_surface",
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
       "implementation_stack_profile"
     ],
     outputs: ["realization_schedule_surface"]
@@ -146,7 +208,10 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     inputs: [
       "implementation_module_surface",
       "implementation_stack_profile",
-      "realization_schedule_surface"
+      "realization_schedule_surface",
+      "implementation_component_topology_surface",
+      "component_code_surface",
+      "component_realization_qualification_surface"
     ],
     outputs: ["code_surface"]
   }),
@@ -169,9 +234,37 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["test_module_surface"]
   }),
   entry({
+    name: "derive_test_component_topology_surface",
+    intent: "Derive test-class topology and TC allocation over implementation component topology.",
+    inputs: [
+      "test_design_surface",
+      "test_module_surface",
+      "implementation_component_topology_surface"
+    ],
+    outputs: ["test_component_topology_surface"]
+  }),
+  entry({
+    name: "derive_component_test_surface",
+    intent: "Materialize or repair component-shaped test code from test component topology, component code, and any admitted component repair schedule.",
+    inputs: [
+      "test_component_topology_surface",
+      "component_code_surface",
+      "test_stack_profile"
+    ],
+    outputs: ["component_test_surface"]
+  }),
+  entry({
     name: "derive_test_schedule_surface",
     intent: "Derive governed test execution schedule from test design, modules, and stack profile.",
-    inputs: ["test_design_surface", "test_module_surface", "test_stack_profile"],
+    inputs: [
+      "test_design_surface",
+      "test_module_surface",
+      "test_stack_profile",
+      "aggregate_domain_model_surface",
+      "aggregate_sunny_day_sequence_surface",
+      "test_component_topology_surface",
+      "component_test_surface"
+    ],
     outputs: ["test_schedule_surface"]
   }),
   entry({
@@ -187,13 +280,35 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["test_execution_result_surface"]
   }),
   entry({
+    name: "qualify_component_test_execution_surface",
+    intent: "Qualify component test execution evidence against test component topology and materialized component tests.",
+    inputs: [
+      "test_execution_result_surface",
+      "test_component_topology_surface",
+      "component_test_surface"
+    ],
+    outputs: ["component_test_qualification_surface"]
+  }),
+  entry({
+    name: "derive_component_repair_schedule_surface",
+    intent: "Derive a bounded component repair schedule from admitted component execution failure rows, execution result truth, and component realization qualification.",
+    inputs: [
+      "component_test_qualification_surface",
+      "test_execution_result_surface",
+      "component_realization_qualification_surface"
+    ],
+    outputs: ["component_repair_schedule_surface"]
+  }),
+  entry({
     name: "derive_test_run_archive_surface",
-    intent: "Derive governed test run archive surface from admitted test execution result truth.",
+    intent: "Derive governed test run archive surface from admitted test execution result truth and component repair schedule state.",
     inputs: [
       "test_module_surface",
       "test_stack_profile",
       "test_schedule_surface",
-      "test_execution_result_surface"
+      "test_execution_result_surface",
+      "component_test_qualification_surface",
+      "component_repair_schedule_surface"
     ],
     outputs: ["test_run_archive_surface"]
   }),
@@ -204,6 +319,18 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["testcase_authority_surface"]
   }),
   entry({
+    name: "derive_release_depth_parity_surface",
+    intent: "Derive release depth parity evidence from component realization, component tests, and admitted test run archive truth.",
+    inputs: [
+      "implementation_component_topology_surface",
+      "component_realization_qualification_surface",
+      "component_test_qualification_surface",
+      "component_repair_schedule_surface",
+      "test_run_archive_surface"
+    ],
+    outputs: ["release_depth_parity_surface"]
+  }),
+  entry({
     name: "prepare_release_surface",
     intent: "Prepare release readiness from requirements, design, code, tests, and archive evidence.",
     inputs: [
@@ -212,7 +339,9 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "scenario_surface",
       "code_surface",
       "testcase_authority_surface",
-      "test_run_archive_surface"
+      "test_run_archive_surface",
+      "component_repair_schedule_surface",
+      "release_depth_parity_surface"
     ],
     outputs: ["release_surface"]
   })

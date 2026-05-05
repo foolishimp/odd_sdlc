@@ -305,7 +305,8 @@ surfaces, especially:
 - `specification/scenarios/11-ambiguity-register-disambiguation-pipeline.md`
 - `specification/scenarios/12-iterative-requirement-closure-and-generated-traceability.md`
 - `specification/scenarios/13-homeostatic-gap-triage-and-intent-renewal.md`
-- `build_tenants/python/test_env/fixtures/test28_pass2_replay/`
+- the test28 pass-2 replay survivor fixture synthesized inside the proving
+  workspace by the focused Python test lane
 
 The critical proving question is not only whether a gap is detected.
 

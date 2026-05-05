@@ -59,6 +59,11 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "unsupported_transition",
   "fp_worker_unattached",
   "worker_process_failed",
+  "worker_hard_timeout",
+  "worker_executor_unavailable",
+  "worker_launch_failed",
+  "worker_process_error",
+  "worker_lost_terminal",
   "install_failed",
   "abg_install_rejected",
   "command_binding_missing",
@@ -309,6 +314,19 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "worker_runtime",
       lawfulReentryPoint: "inspect_worker_archive",
       message: "Worker process exited unsuccessfully."
+    });
+  }
+  if (
+    code === "worker_hard_timeout" ||
+    code === "worker_executor_unavailable" ||
+    code === "worker_launch_failed" ||
+    code === "worker_process_error" ||
+    code === "worker_lost_terminal"
+  ) {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "inspect_worker_archive",
+      message: "Worker process failed with typed ABG process outcome evidence."
     });
   }
   if (
