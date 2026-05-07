@@ -190,6 +190,9 @@ test("T-088 retry pressure stays linked and does not expand into prior-gap oblig
   });
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
 
   assert.equal(manifest.traversalObligationContext.deltaSummary.priorGapCount, 3);
   assert.equal(
@@ -204,18 +207,14 @@ test("T-088 retry pressure stays linked and does not expand into prior-gap oblig
   ]);
   assert.match(prompt, /priorGapFrontier/u);
   assert.match(prompt, /read those files selectively/u);
-  assert.equal(
-    prompt.includes("prior_gap:REQ-ACC-001:obligation_partial"),
-    false
+  assert(
+    invocationPackage.retryRepairInstructions.length > 0,
+    "retry-local repair instructions may cite prior gap reasons without expanding them into obligations"
   );
   assert.equal(
-    prompt.includes(
-      "obligation_assessment_open:prior_gap:dropped_prior_obligation"
+    manifest.traversalIntentPackage.obligationIds.some((id) =>
+      id.startsWith("prior_gap:")
     ),
-    false
-  );
-  assert.equal(
-    prompt.includes("dropped_prior_obligation:REQ-ACC-001:obligation_partial"),
     false
   );
 });

@@ -155,6 +155,105 @@ test("B-070 process://codex?model=... lowers to codex exec --model", () => {
   );
 });
 
+test("T-125 process://claude?model=... lowers to claude --model", () => {
+  const fx = makeFixture("CLAUDE-MODEL-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "process://claude?model=claude-test-model"
+  );
+  assert.equal(transport.agentKey, "claude");
+  assert.equal(transport.model, "claude-test-model");
+  assert.equal(parserForWorkerTransport(transport), "claude-stream-json");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  assert.equal(args[0], "-p");
+  assert.ok(args.includes("--model"));
+  const modelIndex = args.indexOf("--model");
+  assert.equal(args[modelIndex + 1], "claude-test-model");
+  assert.ok(args.includes("--output-format"));
+  assert.equal(args[args.indexOf("--output-format") + 1], "stream-json");
+  assert.equal(args[args.length - 1], "CLAUDE-MODEL-PROMPT\n");
+});
+
+test("T-126 process://claude?model=...&effort=max lowers both Claude controls", () => {
+  const fx = makeFixture("CLAUDE-MAX-EFFORT-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "process://claude?model=claude-sonnet-4-7&effort=max"
+  );
+  assert.equal(transport.agentKey, "claude");
+  assert.equal(transport.model, "claude-sonnet-4-7");
+  assert.equal(transport.effort, "max");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  assert.equal(args[0], "-p");
+  assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-4-7");
+  assert.equal(args[args.indexOf("--effort") + 1], "max");
+  assert.equal(args[args.indexOf("--output-format") + 1], "stream-json");
+  assert.equal(args[args.length - 1], "CLAUDE-MAX-EFFORT-PROMPT\n");
+});
+
+test("T-126 invalid Claude effort is rejected at transport admission", () => {
+  assert.throws(
+    () => admitWorkerTransport("process://claude?effort=extreme"),
+    /SdlcWorkerTransportContract\.effort/u
+  );
+});
+
+test("T-127 bare Claude worker alias admits as process transport", () => {
+  const fx = makeFixture("CLAUDE-ALIAS-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "claude?model=claude-sonnet-4-7&effort=max"
+  );
+  assert.equal(transport.raw, "claude?model=claude-sonnet-4-7&effort=max");
+  assert.equal(transport.scheme, "process");
+  assert.equal(transport.command, "claude");
+  assert.equal(transport.agentKey, "claude");
+  assert.equal(transport.model, "claude-sonnet-4-7");
+  assert.equal(transport.effort, "max");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-4-7");
+  assert.equal(args[args.indexOf("--effort") + 1], "max");
+  assert.equal(args[args.length - 1], "CLAUDE-ALIAS-PROMPT\n");
+});
+
+test("T-127 bare non-Claude worker aliases admit as process transports", () => {
+  for (const alias of ["codex", "gemini", "node"]) {
+    const transport = admitWorkerTransport(alias);
+    assert.equal(transport.raw, alias);
+    assert.equal(transport.scheme, "process");
+    assert.equal(transport.command, alias);
+    assert.equal(transport.agentKey, alias);
+  }
+});
+
+test("T-127 malformed bare worker alias fails through typed transport admission", () => {
+  assert.throws(
+    () => admitWorkerTransport("claude local"),
+    /SdlcWorkerTransportContract\.url/u
+  );
+});
+
 test("B-070 process://node?script=... falls through to manifest-path argv (regression guard)", () => {
   const fx = makeFixture("ignored prompt for node lane\n");
   const transport = admitWorkerTransport(

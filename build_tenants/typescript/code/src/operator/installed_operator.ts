@@ -6,13 +6,18 @@
 // Implements: REQ-F-ODDSDLC-056
 
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import {
+  admitGraphSpanAssessment,
   constructEnginePluginContract,
+  constructGraphSpanAssessedEvent,
+  constructGraphSpanEvaluationScheduledEvent,
+  constructGraphSpanFoldbackEvaluatedEvent,
   constructFpDispatchOutcome,
   constructVectorClosedEvent,
   constructVectorEvaluatedEvent,
+  foldGraphSpanAssessments,
   deriveAdvancementTransition,
   deriveIterationAdvanceDecision,
   deriveRuntimeAggregateProjection,
@@ -27,6 +32,7 @@ import {
   type RuntimeEvent,
   type SupervisedProcessActorResult,
   type TracedProcessExecutorProfile,
+  type TracedProcessOutcome,
   type TracedProcessStreamModel
 } from "@abiogenesis/typescript-tenant";
 import { FG_CONFORM_PROJECT } from "../graph/index.js";
@@ -40,6 +46,8 @@ import {
 } from "../hooks/index.js";
 import type { SdlcPublicStartOutcome } from "../start/index.js";
 import type {
+  SdlcInstalledOperatorStartLoop,
+  SdlcInstalledOperatorStartLoopAttempt,
   SdlcInstalledOperatorStartOutcome,
   SdlcInstalledOperatorStatus,
   SdlcOperatorSummary,
@@ -61,6 +69,7 @@ import {
 import {
   constructPostflightGapDossier,
   buildPostTransformWorkerResultReport,
+  componentRepairReentryPlansForGapDossier,
   constructorResultFromWorkerOutput,
   deriveWorkerHandoffManifest,
   evaluateWorkerResultPostflight,
@@ -102,6 +111,8 @@ import {
   type SdlcBlockingReason,
   type SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
+
+const MAX_INSTALLED_REENTRY_ATTEMPTS = 4;
 
 function summary(input: {
   readonly workspaceRoot: string;
@@ -183,6 +194,135 @@ function terminalOutcome(input: {
     emittedRuntimeEventKinds: input.emittedRuntimeEventKinds,
     eventLogPath: oddSdlcRuntimeEventsPath(input.workspaceRoot),
     archiveRoot: input.archiveRoot
+  });
+}
+
+function installedStartLoopAttemptFor(input: {
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
+  readonly attemptIndex: number;
+}): SdlcInstalledOperatorStartLoopAttempt {
+  return Object.freeze({
+    kind: "sdlc_installed_operator_start_loop_attempt",
+    attemptIndex: input.attemptIndex,
+    status: input.outcome.status,
+    currentEdge: input.outcome.summary.currentEdge,
+    blockingReason: input.outcome.summary.blockingReason,
+    nextLawfulAction: input.outcome.summary.nextLawfulAction,
+    archiveRoot: input.outcome.archiveRoot,
+    retryEligible: input.outcome.gapDossier?.retryEligible ?? false,
+    emittedRuntimeEventKinds: input.outcome.emittedRuntimeEventKinds
+  });
+}
+
+function installedStartHasSameEdgeRetryTruth(
+  outcome: SdlcInstalledOperatorStartOutcome
+): boolean {
+  if (outcome.gapDossier?.retryEligible !== true) {
+    return false;
+  }
+  return (
+    outcome.summary.nextLawfulAction === "retry_same_edge_with_gap_dossier" ||
+    outcome.gapDossier.nextLawfulActions.includes("retry_same_edge")
+  );
+}
+
+function installedStartHasRepairReentryTruth(
+  outcome: SdlcInstalledOperatorStartOutcome
+): boolean {
+  return (
+    outcome.gapDossier?.retryEligible === true &&
+    outcome.gapDossier.nextLawfulActions.includes("repair_worker_output")
+  );
+}
+
+function installedStartHasFpEscalationTruth(
+  outcome: SdlcInstalledOperatorStartOutcome
+): boolean {
+  return (
+    outcome.gapDossier?.retryEligible === true &&
+    outcome.gapDossier.nextLawfulActions.includes("escalate_to_fp")
+  );
+}
+
+function installedStartHasReentryTruth(
+  outcome: SdlcInstalledOperatorStartOutcome
+): boolean {
+  return (
+    installedStartHasSameEdgeRetryTruth(outcome) ||
+    installedStartHasFpEscalationTruth(outcome) ||
+    installedStartHasRepairReentryTruth(outcome)
+  );
+}
+
+function retryContextFromGapDossier(input: {
+  readonly gapDossier: SdlcPostflightGapDossier;
+  readonly attemptIndex: number;
+}): SdlcWorkerRetryContext {
+  const sourceProjectionRef = `projection://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`;
+  return Object.freeze({
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: Object.freeze([
+      Object.freeze({
+        vectorIndex: input.gapDossier.vectorIndex,
+        retryRunId: `retry-run://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`,
+        retryCallId: `retry-call://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`,
+        manifestId: input.gapDossier.priorManifestId,
+        priorManifestId: input.gapDossier.currentGapDossierRef,
+        attemptIndex: input.attemptIndex,
+        sourceProjectionRef
+      })
+    ]),
+    priorGapDossiers: Object.freeze([input.gapDossier])
+  });
+}
+
+function terminalReasonForInstalledStartLoop(input: {
+  readonly requestedUntil: string;
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
+  readonly retryGuardExhausted: boolean;
+}): SdlcInstalledOperatorStartLoop["terminalReason"] {
+  if (input.retryGuardExhausted) {
+    return "retry_guard_exhausted";
+  }
+  if (input.outcome.status === "converged") {
+    return "converged";
+  }
+  if (
+    input.requestedUntil === "first_traversal" &&
+    input.outcome.status === "worker_invoked"
+  ) {
+    return "first_traversal_closed";
+  }
+  if (input.outcome.status === "blocked") {
+    return "blocked";
+  }
+  return "retry_not_planned";
+}
+
+function installedStartWithLoop(input: {
+  readonly requestedUntil: string;
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
+  readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
+  readonly retryGuardExhausted: boolean;
+}): SdlcInstalledOperatorStartOutcome {
+  if (input.attempts.length <= 1) {
+    return input.outcome;
+  }
+  const loop: SdlcInstalledOperatorStartLoop = Object.freeze({
+    kind: "sdlc_installed_operator_start_loop",
+    requestedUntil: input.requestedUntil,
+    maxAttempts: MAX_INSTALLED_REENTRY_ATTEMPTS,
+    attemptCount: input.attempts.length,
+    terminalReason: terminalReasonForInstalledStartLoop({
+      requestedUntil: input.requestedUntil,
+      outcome: input.outcome,
+      retryGuardExhausted: input.retryGuardExhausted
+    }),
+    attempts: Object.freeze([...input.attempts])
+  });
+  return Object.freeze({
+    ...input.outcome,
+    loop
   });
 }
 
@@ -286,6 +426,253 @@ function retryContextFromRetryAttemptRefs(
   });
 }
 
+function mergedRetryContext(input: {
+  readonly projected: SdlcWorkerRetryContext;
+  readonly override: SdlcWorkerRetryContext | undefined;
+  readonly vectorIndex: number;
+}): SdlcWorkerRetryContext {
+  if (input.override === undefined) {
+    return input.projected;
+  }
+  const overrideAttemptRefs = input.override.retryAttemptRefs.filter(
+    (ref) => ref.vectorIndex === input.vectorIndex
+  );
+  const overrideDossiers = input.override.priorGapDossiers.filter(
+    (dossier) =>
+      dossier.vectorIndex === input.vectorIndex ||
+      dossier.nextLawfulActions.includes("repair_worker_output")
+  );
+  if (overrideAttemptRefs.length === 0 && overrideDossiers.length === 0) {
+    return input.projected;
+  }
+  const attemptRefByKey = new Map<
+    string,
+    SdlcWorkerRetryContext["retryAttemptRefs"][number]
+  >();
+  for (const ref of [
+    ...input.projected.retryAttemptRefs,
+    ...overrideAttemptRefs
+  ]) {
+    attemptRefByKey.set(
+      `${ref.vectorIndex}:${ref.priorManifestId}:${ref.attemptIndex}`,
+      ref
+    );
+  }
+  const dossierByRef = new Map<string, SdlcPostflightGapDossier>();
+  for (const dossier of [
+    ...input.projected.priorGapDossiers,
+    ...overrideDossiers
+  ]) {
+    dossierByRef.set(dossier.currentGapDossierRef, dossier);
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: Object.freeze([...attemptRefByKey.values()]),
+    priorGapDossiers: Object.freeze([...dossierByRef.values()])
+  });
+}
+
+function vectorIndexByEdgeName(input: {
+  readonly basis: ExecutionBasis;
+  readonly edgeName: string;
+}): number | null {
+  const index = input.basis.graph.vectors.findIndex(
+    (vector) => vector.name === input.edgeName
+  );
+  return index < 0 ? null : index;
+}
+
+function vectorNodeRefFor(input: {
+  readonly basis: ExecutionBasis;
+  readonly vectorIndex: number;
+  readonly role: "source" | "target";
+}): string {
+  const vector = input.basis.graph.vectors[input.vectorIndex];
+  if (vector === undefined) {
+    throw new TypeError(`missing vector ${input.vectorIndex}`);
+  }
+  const node = input.role === "source" ? vector.source[0] : vector.target;
+  if (node === undefined) {
+    throw new TypeError(`missing ${input.role} node for vector ${input.vectorIndex}`);
+  }
+  return node.id;
+}
+
+function vectorRangeInclusive(start: number, end: number): readonly number[] {
+  const indexes: number[] = [];
+  for (let index = start; index <= end; index += 1) {
+    indexes.push(index);
+  }
+  return Object.freeze(indexes);
+}
+
+function graphSpanRefForRepairReentry(input: {
+  readonly basis: ExecutionBasis;
+  readonly sourceVectorIndex: number;
+  readonly terminalVectorIndex: number;
+}) {
+  return Object.freeze({
+    kind: "graph_span_ref" as const,
+    spanId: `graph-span:odd-sdlc-repair:${input.basis.id}:${input.sourceVectorIndex}->${input.terminalVectorIndex}`,
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    sourceVectorIndex: input.sourceVectorIndex,
+    terminalVectorIndex: input.terminalVectorIndex,
+    sourceNodeRef: vectorNodeRefFor({
+      basis: input.basis,
+      vectorIndex: input.sourceVectorIndex,
+      role: "source"
+    }),
+    terminalNodeRef: vectorNodeRefFor({
+      basis: input.basis,
+      vectorIndex: input.terminalVectorIndex,
+      role: "target"
+    }),
+    coveredVectorIndexes: vectorRangeInclusive(
+      input.sourceVectorIndex,
+      input.terminalVectorIndex
+    )
+  });
+}
+
+function repairReentryGraphSpanRuntimeEvents(input: {
+  readonly basis: ExecutionBasis;
+  readonly outcome: SdlcAbgOwnedFpDispatchState;
+  readonly replayEvents: readonly RuntimeEvent[];
+}): readonly RuntimeEvent[] {
+  const dossier = input.outcome.gapDossier;
+  if (
+    dossier === null ||
+    dossier.retryEligible !== true ||
+    !dossier.nextLawfulActions.includes("repair_worker_output")
+  ) {
+    return Object.freeze([]);
+  }
+  const plans = componentRepairReentryPlansForGapDossier({
+    manifest: input.outcome.manifest,
+    dossier
+  });
+  const targetedPlans = plans
+    .map((plan) =>
+      Object.freeze({
+        plan,
+        targetVectorIndex: vectorIndexByEdgeName({
+          basis: input.basis,
+          edgeName: plan.targetEdgeName
+        })
+      })
+    )
+    .filter(
+      (
+        entry
+      ): entry is {
+        readonly plan: (typeof plans)[number];
+        readonly targetVectorIndex: number;
+      } => entry.targetVectorIndex !== null
+    );
+  if (targetedPlans.length === 0) {
+    return Object.freeze([]);
+  }
+  const terminalVectorIndex = input.outcome.manifest.vectorIndex;
+  const targetVectorIndex = Math.min(
+    ...targetedPlans.map((entry) => entry.targetVectorIndex)
+  );
+  if (targetVectorIndex > terminalVectorIndex) {
+    return Object.freeze([]);
+  }
+  const generation =
+    input.replayEvents.filter((event) => event.kind === "graph_span_foldback_evaluated")
+      .length + 1;
+  const span = graphSpanRefForRepairReentry({
+    basis: input.basis,
+    sourceVectorIndex: targetVectorIndex,
+    terminalVectorIndex
+  });
+  const schedule = Object.freeze({
+    kind: "graph_span_evaluation_schedule" as const,
+    scheduleRef: `graph-span-schedule:odd-sdlc-repair:${JSON.stringify({
+      basisId: input.basis.id,
+      sourceVectorIndex: targetVectorIndex,
+      terminalVectorIndex,
+      gapDossierRef: dossier.currentGapDossierRef,
+      generation
+    })}`,
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    terminalVectorIndex,
+    spanRefs: Object.freeze([span]),
+    generation
+  });
+  const evidenceRefs = uniqueSorted([
+    dossier.currentGapDossierRef,
+    ...dossier.evidenceRefs,
+    ...targetedPlans.flatMap((entry) => [
+      entry.plan.sourceGapDossierRef,
+      ...entry.plan.diagnosticEvidenceRefs,
+      ...entry.plan.repairRowEvidenceRefs
+    ])
+  ]);
+  const assessment = admitGraphSpanAssessment({
+    basis: input.basis,
+    span,
+    assessmentId: `graph-span-assessment:odd-sdlc-repair:${JSON.stringify({
+      basisId: input.basis.id,
+      targetVectorIndex,
+      terminalVectorIndex,
+      failures: targetedPlans.map((entry) => entry.plan.failureId).sort(),
+      generation
+    })}`,
+    attemptIndex: 0,
+    assessmentRegime: "F_P",
+    obligationRows: targetedPlans.map((entry) =>
+      Object.freeze({
+        obligationId: `component-repair-reentry:${entry.plan.failureId}`,
+        sourceAuthorityRef: entry.plan.sourceGapDossierRef,
+        status: "semantic_gap" as const,
+        terminalEvidenceRefs: Object.freeze([]),
+        carryObservations: Object.freeze([
+          Object.freeze({
+            fromVectorIndex: entry.targetVectorIndex,
+            toVectorIndex: terminalVectorIndex,
+            status: "dropped" as const,
+            evidenceRefs
+          })
+        ]),
+        detail: `component repair row ${entry.plan.failureId} targets ${entry.plan.targetEdgeName}`
+      })
+    ),
+    constitutionalReentry: null,
+    evidenceRefs,
+    edgeFoldbackRefs: Object.freeze([]),
+    detail: "odd_sdlc component repair schedule requires graph-span repair reentry",
+    generation
+  });
+  const foldback = foldGraphSpanAssessments({
+    basis: input.basis,
+    terminalVectorIndex,
+    schedule,
+    assessments: Object.freeze([assessment]),
+    generation
+  });
+  return Object.freeze([
+    constructGraphSpanEvaluationScheduledEvent({
+      basis: input.basis,
+      schedule,
+      causationEventRefs: Object.freeze([dossier.currentGapDossierRef])
+    }),
+    constructGraphSpanAssessedEvent({
+      basis: input.basis,
+      assessment,
+      causationEventRefs: evidenceRefs
+    }),
+    constructGraphSpanFoldbackEvaluatedEvent({
+      basis: input.basis,
+      foldback,
+      causationEventRefs: Object.freeze([assessment.assessmentId])
+    })
+  ]);
+}
+
 function fpDispatchPluginContract() {
   return constructEnginePluginContract({
     ref: "plugin://odd-sdlc/typescript/installed-operator/fp-dispatch",
@@ -326,6 +713,9 @@ function actorInvocationForPluginInput(input: {
     kind: "actor_invocation",
     actorInvocationId: ref.actorInvocationId,
     basisId: input.pluginInput.basisId,
+    graphFunctionId: input.pluginInput.graphFunctionId,
+    runId: null,
+    workKey: null,
     graphCallId: input.pluginInput.graphCallId,
     frameId: input.pluginInput.frameId,
     vectorIndex: input.pluginInput.vectorIndex,
@@ -334,7 +724,14 @@ function actorInvocationForPluginInput(input: {
     dispatchRef: ref.dispatchRef,
     workerId: input.transport.workerId,
     backendId: input.transport.backendId,
-    resultRef: ref.resultRef
+    resultRef: ref.resultRef,
+    causationEventRefs: Object.freeze([ref.dispatchRef]),
+    correlationId: [
+      "odd-sdlc-installed-operator",
+      input.pluginInput.basisId,
+      String(input.pluginInput.vectorIndex),
+      String(ref.attemptIndex)
+    ].join(":")
   });
 }
 
@@ -485,6 +882,7 @@ function writeWorkerProcessStartedContext(input: {
     edge: input.event.edge,
     vectorIndex: input.event.vectorIndex,
     pid: input.event.pid,
+    terminalSessionId: input.event.terminalSessionId,
     command: input.event.command,
     args: input.event.args,
     cwd: input.event.cwd,
@@ -584,8 +982,12 @@ function writeWorkerProcessSummary(input: {
   return summary;
 }
 
-function objectValue(input: unknown): object | null {
-  return typeof input === "object" && input !== null ? input : null;
+function isUnknownRecord(input: unknown): input is Readonly<Record<string, unknown>> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function objectValue(input: unknown): Readonly<Record<string, unknown>> | null {
+  return isUnknownRecord(input) ? input : null;
 }
 
 function stringValue(input: unknown): string | null {
@@ -612,6 +1014,59 @@ function nullableStringValue(input: unknown): string | null | undefined {
     return null;
   }
   return typeof input === "string" ? input : undefined;
+}
+
+function tracedProcessOutcomeValue(input: unknown): TracedProcessOutcome | null {
+  const record = objectValue(input);
+  if (record === null) {
+    return null;
+  }
+  const kind = stringValue(record["kind"]);
+  if (kind === "exited") {
+    const status = numberValue(record["status"]);
+    return status === null ? null : Object.freeze({ kind, status });
+  }
+  if (kind === "signaled") {
+    const status = nullableNumberValue(record["status"]);
+    const signal = stringValue(record["signal"]);
+    return status === undefined || signal === null
+      ? null
+      : Object.freeze({ kind, status, signal });
+  }
+  if (kind === "hard_timeout") {
+    const timeoutMs = nullableNumberValue(record["timeoutMs"]);
+    const signal = nullableStringValue(record["signal"]);
+    return timeoutMs === undefined || signal === undefined
+      ? null
+      : Object.freeze({ kind, timeoutMs, signal });
+  }
+  if (kind === "inactivity_timeout") {
+    const inactivityTimeoutMs = nullableNumberValue(record["inactivityTimeoutMs"]);
+    const signal = nullableStringValue(record["signal"]);
+    return inactivityTimeoutMs === undefined || signal === undefined
+      ? null
+      : Object.freeze({ kind, inactivityTimeoutMs, signal });
+  }
+  if (kind === "executor_unavailable") {
+    const reason = stringValue(record["reason"]);
+    const detail = stringValue(record["detail"]);
+    if (
+      (reason !== "screen_missing" && reason !== "screen_shell_unavailable") ||
+      detail === null
+    ) {
+      return null;
+    }
+    return Object.freeze({ kind, reason, detail });
+  }
+  if (
+    kind === "launch_failed" ||
+    kind === "process_error" ||
+    kind === "lost_terminal"
+  ) {
+    const detail = stringValue(record["detail"]);
+    return detail === null ? null : Object.freeze({ kind, detail });
+  }
+  return null;
 }
 
 function stringArrayValue(input: unknown): readonly string[] | null {
@@ -643,8 +1098,8 @@ function signalSequenceValue(
     if (record === null) {
       return null;
     }
-    const signal = stringValue(Reflect.get(record, "signal"));
-    const elapsedMs = numberValue(Reflect.get(record, "elapsedMs"));
+    const signal = stringValue(record["signal"]);
+    const elapsedMs = numberValue(record["elapsedMs"]);
     if (signal === null || elapsedMs === null) {
       return null;
     }
@@ -699,42 +1154,53 @@ function traceProjectionFor(traceRoot: string): WorkerTraceProjection {
     if (record === null) {
       return fallback;
     }
-    const rawExecutorProfile = stringValue(Reflect.get(record, "executorProfile"));
+    const rawExecutorProfile = stringValue(record["executorProfile"]);
     const executorProfile =
       rawExecutorProfile === "local-spawn" || rawExecutorProfile === "pty-terminal"
         ? rawExecutorProfile
         : null;
-    const rawStreamModel = stringValue(Reflect.get(record, "streamModel"));
+    const rawStreamModel = stringValue(record["streamModel"]);
     const streamModel =
       rawStreamModel === "stdio" || rawStreamModel === "terminal-transcript"
         ? rawStreamModel
         : null;
-    const paths = objectValue(Reflect.get(record, "paths"));
-    const apiRetryEvents = Reflect.get(record, "apiRetryEvents");
-    const toolCallEvents = Reflect.get(record, "toolCallEvents");
+    const paths = objectValue(record["paths"]);
+    const apiRetryEvents = record["apiRetryEvents"];
+    const toolCallEvents = record["toolCallEvents"];
     return Object.freeze({
       executorProfile,
       terminalSessionId:
-        Reflect.get(record, "terminalSessionId") === null
+        record["terminalSessionId"] === null
           ? null
-          : stringValue(Reflect.get(record, "terminalSessionId")),
+          : stringValue(record["terminalSessionId"]),
       streamModel,
-      structuredEventCount: numberValue(Reflect.get(record, "structuredEventCount")),
+      structuredEventCount: numberValue(record["structuredEventCount"]),
       structuredParseFailureCount: numberValue(
-        Reflect.get(record, "structuredParseFailureCount")
+        record["structuredParseFailureCount"]
       ),
       apiRetryCount: Array.isArray(apiRetryEvents) ? apiRetryEvents.length : null,
       toolCallCount: Array.isArray(toolCallEvents) ? toolCallEvents.length : null,
       finalOutputRef:
-        paths === null ? null : optionalPathRef(Reflect.get(paths, "finalOutput")),
+        paths === null ? null : optionalPathRef(paths["finalOutput"]),
       terminalTranscriptRef:
         paths === null
           ? null
-          : optionalPathRef(Reflect.get(paths, "terminalTranscript"))
+          : optionalPathRef(paths["terminalTranscript"])
     });
   } catch {
     return fallback;
   }
+}
+
+function terminalSessionIdFromStartedEvent(
+  events: readonly RuntimeEvent[]
+): string | null {
+  for (const event of events) {
+    if (event.kind === "actor_process_started") {
+      return event.terminalSessionId;
+    }
+  }
+  return null;
 }
 
 type WorkerProcessSummaryAdmission =
@@ -761,66 +1227,68 @@ function admitWorkerProcessSummary(
       readFileSync(workerProcessSummaryPath(manifest), "utf8")
     );
     const record = objectValue(parsed);
-    if (record === null || Reflect.get(record, "kind") !== "sdlc_worker_process_summary") {
+    if (record === null || record["kind"] !== "sdlc_worker_process_summary") {
       return Object.freeze({
         kind: "invalid",
         detail: "invalid_kind"
       });
     }
-    const processStartedRef = stringValue(Reflect.get(record, "processStartedRef"));
-    const processEventsRef = stringValue(Reflect.get(record, "processEventsRef"));
-    const manifestRef = stringValue(Reflect.get(record, "manifestRef"));
-    const promptRef = stringValue(Reflect.get(record, "promptRef"));
-    const reportRef = stringValue(Reflect.get(record, "reportRef"));
-    const outputRef = stringValue(Reflect.get(record, "outputRef"));
-    const stdoutRef = stringValue(Reflect.get(record, "stdoutRef"));
-    const stderrRef = stringValue(Reflect.get(record, "stderrRef"));
-    const pid = nullableNumberValue(Reflect.get(record, "pid"));
-    const command = stringValue(Reflect.get(record, "command"));
-    const args = stringArrayValue(Reflect.get(record, "args"));
-    const cwd = stringValue(Reflect.get(record, "cwd"));
-    const timeoutMs = numberValue(Reflect.get(record, "timeoutMs"));
-    const inactivityTimeoutMs = numberValue(Reflect.get(record, "inactivityTimeoutMs"));
-    const heartbeatMs = numberValue(Reflect.get(record, "heartbeatMs"));
+    const processStartedRef = stringValue(record["processStartedRef"]);
+    const processEventsRef = stringValue(record["processEventsRef"]);
+    const manifestRef = stringValue(record["manifestRef"]);
+    const promptRef = stringValue(record["promptRef"]);
+    const reportRef = stringValue(record["reportRef"]);
+    const outputRef = stringValue(record["outputRef"]);
+    const stdoutRef = stringValue(record["stdoutRef"]);
+    const stderrRef = stringValue(record["stderrRef"]);
+    const pid = nullableNumberValue(record["pid"]);
+    const command = stringValue(record["command"]);
+    const args = stringArrayValue(record["args"]);
+    const cwd = stringValue(record["cwd"]);
+    const timeoutMs = numberValue(record["timeoutMs"]);
+    const inactivityTimeoutMs = numberValue(record["inactivityTimeoutMs"]);
+    const heartbeatMs = numberValue(record["heartbeatMs"]);
     const lastHeartbeatIndex = nullableNumberValue(
-      Reflect.get(record, "lastHeartbeatIndex")
+      record["lastHeartbeatIndex"]
     );
     const lastHeartbeatElapsedMs = nullableNumberValue(
-      Reflect.get(record, "lastHeartbeatElapsedMs")
+      record["lastHeartbeatElapsedMs"]
     );
-    const signalSequence = signalSequenceValue(Reflect.get(record, "signalSequence"));
-    const status = nullableNumberValue(Reflect.get(record, "status"));
-    const signal = nullableStringValue(Reflect.get(record, "signal"));
-    const elapsedMs = numberValue(Reflect.get(record, "elapsedMs"));
-    const timedOut = booleanValue(Reflect.get(record, "timedOut"));
-    const error = nullableStringValue(Reflect.get(record, "error"));
-    const rawExecutorProfile = stringValue(Reflect.get(record, "executorProfile"));
+    const signalSequence = signalSequenceValue(record["signalSequence"]);
+    const status = nullableNumberValue(record["status"]);
+    const signal = nullableStringValue(record["signal"]);
+    const elapsedMs = numberValue(record["elapsedMs"]);
+    const timedOut = booleanValue(record["timedOut"]);
+    const error = nullableStringValue(record["error"]);
+    const rawExecutorProfile = stringValue(record["executorProfile"]);
     const executorProfile =
       rawExecutorProfile === "local-spawn" || rawExecutorProfile === "pty-terminal"
         ? rawExecutorProfile
         : undefined;
-    const rawStreamModel = stringValue(Reflect.get(record, "streamModel"));
+    const rawStreamModel = stringValue(record["streamModel"]);
     const streamModel =
       rawStreamModel === "stdio" || rawStreamModel === "terminal-transcript"
         ? rawStreamModel
         : undefined;
-    const outcome = objectValue(Reflect.get(record, "outcome"));
-    const traceRoot = stringValue(Reflect.get(record, "traceRoot")) ?? undefined;
+    const rawOutcome = record["outcome"];
+    const outcome =
+      rawOutcome === undefined ? undefined : tracedProcessOutcomeValue(rawOutcome);
+    const traceRoot = stringValue(record["traceRoot"]) ?? undefined;
     const traceResultRef =
-      stringValue(Reflect.get(record, "traceResultRef")) ?? undefined;
+      stringValue(record["traceResultRef"]) ?? undefined;
     const structuredEventCount =
-      nullableNumberValue(Reflect.get(record, "structuredEventCount")) ?? undefined;
+      nullableNumberValue(record["structuredEventCount"]) ?? undefined;
     const structuredParseFailureCount =
-      nullableNumberValue(Reflect.get(record, "structuredParseFailureCount")) ??
+      nullableNumberValue(record["structuredParseFailureCount"]) ??
       undefined;
     const apiRetryCount =
-      nullableNumberValue(Reflect.get(record, "apiRetryCount")) ?? undefined;
+      nullableNumberValue(record["apiRetryCount"]) ?? undefined;
     const toolCallCount =
-      nullableNumberValue(Reflect.get(record, "toolCallCount")) ?? undefined;
+      nullableNumberValue(record["toolCallCount"]) ?? undefined;
     const finalOutputRef =
-      nullableStringValue(Reflect.get(record, "finalOutputRef")) ?? undefined;
+      nullableStringValue(record["finalOutputRef"]) ?? undefined;
     const terminalTranscriptRef =
-      nullableStringValue(Reflect.get(record, "terminalTranscriptRef")) ??
+      nullableStringValue(record["terminalTranscriptRef"]) ??
       undefined;
     if (
       processStartedRef === null ||
@@ -845,7 +1313,8 @@ function admitWorkerProcessSummary(
       signal === undefined ||
       elapsedMs === null ||
       timedOut === null ||
-      error === undefined
+      error === undefined ||
+      outcome === null
     ) {
       return Object.freeze({
         kind: "invalid",
@@ -876,9 +1345,7 @@ function admitWorkerProcessSummary(
         signalSequence,
         ...(executorProfile === undefined ? {} : { executorProfile }),
         ...(streamModel === undefined ? {} : { streamModel }),
-        ...(outcome === null
-          ? {}
-          : { outcome: outcome as NonNullable<SdlcWorkerProcessSummary["outcome"]> }),
+        ...(outcome === undefined ? {} : { outcome }),
         ...(traceRoot === undefined ? {} : { traceRoot }),
         ...(traceResultRef === undefined ? {} : { traceResultRef }),
         ...(structuredEventCount === undefined ? {} : { structuredEventCount }),
@@ -995,13 +1462,17 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
   const traceProjection = traceProjectionFor(traceRoot);
-  const workerRun: SdlcWorkerRunResult = Object.freeze({
+  const startedEventTerminalSessionId = terminalSessionIdFromStartedEvent(
+    processResult.events
+  );
+	  const workerRun: SdlcWorkerRunResult = Object.freeze({
     kind: "sdlc_worker_run_result",
     command: processResult.command,
     args: processResult.args,
     cwd: processResult.cwd,
     executorProfile: traceProjection.executorProfile ?? executorProfile,
-    terminalSessionId: traceProjection.terminalSessionId,
+	    terminalSessionId:
+	      startedEventTerminalSessionId ?? traceProjection.terminalSessionId,
     streamModel:
       traceProjection.streamModel ??
       (executorProfile === "pty-terminal" ? "terminal-transcript" : "stdio"),
@@ -1161,6 +1632,14 @@ function workerProcessEvidenceRefs(input: {
     workerProcessSummaryRef(input.manifest),
     pathToFileURL(input.workerRun.stdoutPath).href,
     pathToFileURL(input.workerRun.stderrPath).href,
+    ...(input.workerRun.finalOutputRef === undefined ||
+    input.workerRun.finalOutputRef === null
+      ? []
+      : [input.workerRun.finalOutputRef]),
+    ...(input.workerRun.terminalTranscriptRef === undefined ||
+    input.workerRun.terminalTranscriptRef === null
+      ? []
+      : [input.workerRun.terminalTranscriptRef]),
     pathToFileURL(join(input.manifest.archiveRoot, "worker_process_started.json")).href,
     pathToFileURL(join(input.manifest.archiveRoot, "worker_process_events.jsonl")).href,
     ...(input.workerRun.traceResultRef === undefined
@@ -1170,10 +1649,47 @@ function workerProcessEvidenceRefs(input: {
   ]);
 }
 
+function readOptionalWorkerTextRef(ref: string | null | undefined): string {
+  if (ref === null || ref === undefined || !ref.startsWith("file:")) {
+    return "";
+  }
+  try {
+    return readFileSync(fileURLToPath(ref), "utf8").slice(0, 65536);
+  } catch {
+    return "";
+  }
+}
+
+function readOptionalWorkerTextPath(path: string | null | undefined): string {
+  if (path === null || path === undefined) {
+    return "";
+  }
+  try {
+    return readFileSync(path, "utf8").slice(0, 65536);
+  } catch {
+    return "";
+  }
+}
+
+function workerRunRateLimited(workerRun: SdlcWorkerRunResult): boolean {
+  const text = [
+    readOptionalWorkerTextRef(workerRun.finalOutputRef),
+    readOptionalWorkerTextRef(workerRun.traceResultRef),
+    readOptionalWorkerTextPath(workerRun.stdoutPath),
+    readOptionalWorkerTextPath(workerRun.stderrPath)
+  ].join("\n");
+  return /rate_limit_event|api_error_status["']?\s*:?\s*429|monthly usage limit|rate limit|rate_limit/u.test(
+    text
+  );
+}
+
 function workerFailureCode(input: {
   readonly workerRun: SdlcWorkerRunResult;
   readonly silentInactivity: boolean;
 }): SdlcBlockingReasonCode {
+  if (workerRunRateLimited(input.workerRun)) {
+    return "worker_rate_limited";
+  }
   if (input.workerRun.outcome?.kind === "hard_timeout") {
     return "worker_hard_timeout";
   }
@@ -1281,6 +1797,7 @@ export function constructWorkerProcessFailurePostflight(input: {
           `outcome=${input.workerRun.outcome?.kind ?? "unknown"}`,
           `executorProfile=${input.workerRun.executorProfile ?? "unknown"}`,
           `streamModel=${input.workerRun.streamModel ?? "unknown"}`,
+          `finalOutputRef=${input.workerRun.finalOutputRef ?? "none"}`,
           `traceResultRef=${input.workerRun.traceResultRef ?? "unknown"}`
         ].join(";"),
     evidenceRefs
@@ -1300,14 +1817,33 @@ function silentInactivitySharpenedRetryAvailable(
   return manifest.productMaterialization.executionShards.length > 0;
 }
 
+function isSilentWorkerRuntimeReason(
+  reason: SdlcPostflightGapDossier["reasons"][number]
+): boolean {
+  if (reason.blockingReason.code === "silent_worker_inactivity") {
+    return true;
+  }
+  return (
+    reason.blockingReason.code === "worker_hard_timeout" &&
+    (reason.blockingReason.detail?.includes("stdoutBytes=0;stderrBytes=0") ??
+      false)
+  );
+}
+
 function priorSilentInactivityCount(manifest: SdlcWorkerHandoffManifest): number {
   return manifest.retryContext.priorGapDossiers.reduce(
     (count, dossier) =>
       count +
-      dossier.reasons.filter(
-        (reason) => reason.blockingReason.code === "silent_worker_inactivity"
-      ).length,
+      dossier.reasons.filter(isSilentWorkerRuntimeReason).length,
     0
+  );
+}
+
+function workerRuntimeTriageStop(postflight: SdlcPostflightResult): boolean {
+  return postflight.blockingReasonCarriers.some(
+    (reason) =>
+      reason.reasonClass === "worker_runtime" &&
+      reason.lawfulReentryPoint === "triage_gap"
   );
 }
 
@@ -1345,6 +1881,7 @@ export async function executeInstalledOperatorStart(input: {
   readonly start: SdlcPublicStartOutcome;
   readonly workerTransport: string | null;
   readonly replayEvents: readonly RuntimeEvent[];
+  readonly retryContextOverride?: SdlcWorkerRetryContext | undefined;
   readonly requireInstalledTopology?: boolean;
 }): Promise<SdlcInstalledOperatorStartOutcome> {
   if (input.requireInstalledTopology === true) {
@@ -1643,11 +2180,15 @@ export async function executeInstalledOperatorStart(input: {
         fpTransformRequest: pluginInput.fpTransformRequest,
         traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
         conformedProject: executionContract.conformedProject,
-        retryContext: retryContextFromRetryAttemptRefs(
-          pluginInput.retryAttemptRefs.filter(
-            (ref) => ref.vectorIndex === pluginInput.vectorIndex
-          )
-        )
+        retryContext: mergedRetryContext({
+          projected: retryContextFromRetryAttemptRefs(
+            pluginInput.retryAttemptRefs.filter(
+              (ref) => ref.vectorIndex === pluginInput.vectorIndex
+            )
+          ),
+          override: input.retryContextOverride,
+          vectorIndex: pluginInput.vectorIndex
+        })
       });
       const beforeMaterialization = snapshotProductMaterializationRoot(
         manifest.productMaterialization
@@ -1673,11 +2214,7 @@ export async function executeInstalledOperatorStart(input: {
           manifest,
           workerRun
         });
-        const stopForRepeatedSilence = failurePostflight.blockingReasonCarriers.some(
-          (reason) =>
-            reason.code === "silent_worker_inactivity" &&
-            reason.lawfulReentryPoint === "triage_gap"
-        );
+        const stopForRuntimeTriage = workerRuntimeTriageStop(failurePostflight);
         writeOperatorArchiveFile({
           archiveRoot: manifest.archiveRoot,
           relativePath: "worker_process_failure_postflight.json",
@@ -1705,7 +2242,7 @@ export async function executeInstalledOperatorStart(input: {
         return constructFpDispatchOutcome({
           status: "blocked",
           resultRef: gapDossier.currentGapDossierRef,
-          attachedResultArtifact: stopForRepeatedSilence
+          attachedResultArtifact: stopForRuntimeTriage
             ? null
             : runtimeFailureArtifact({
                 failureClass: "runtime_failure",
@@ -1828,7 +2365,8 @@ export async function executeInstalledOperatorStart(input: {
           manifest,
           postflight
         });
-        writePostflightGapDossier({ manifest, gapDossier });        dispatchState.current = {
+        writePostflightGapDossier({ manifest, gapDossier });
+        dispatchState.current = {
           status: "postflight_failed",
           manifest,
           workerRun,
@@ -1885,8 +2423,12 @@ export async function executeInstalledOperatorStart(input: {
           manifest,
           postflight: assuranceGate.blockingPostflight
         });
-        writePostflightGapDossier({ manifest, gapDossier });        dispatchState.current = {
-          status: "postflight_failed",
+        writePostflightGapDossier({ manifest, gapDossier });
+        dispatchState.current = {
+          status:
+            assuranceGate.satisfaction.status === "fp_escalation"
+              ? "fp_escalation"
+              : "postflight_failed",
           manifest,
           workerRun,
           workerReport,
@@ -1900,6 +2442,8 @@ export async function executeInstalledOperatorStart(input: {
           nextLawfulAction:
             assuranceGate.satisfaction.status === "reprice_required"
               ? "reprice_requirement_or_design"
+              : assuranceGate.satisfaction.status === "fp_escalation"
+                ? "escalate_to_fp"
               : null,
           currentEdge: pluginInput.edge
         };
@@ -2058,12 +2602,12 @@ export async function executeInstalledOperatorStart(input: {
     plugins: { fpDispatch },
     maxAttachedFpAttempts: 3
   });
-  await appendOddSdlcRuntimeEvents({
-    workspaceRoot: input.workspaceRoot,
-    events: emitted
-  });
   const completedDispatchState = dispatchState.current;
   if (completedDispatchState === null) {
+    await appendOddSdlcRuntimeEvents({
+      workspaceRoot: input.workspaceRoot,
+      events: emitted
+    });
     return terminalOutcome({
       workspaceRoot: input.workspaceRoot,
       status: "blocked",
@@ -2090,7 +2634,27 @@ export async function executeInstalledOperatorStart(input: {
       currentEdge: decision.edge
     });
   }
+  emitted.push(
+    ...repairReentryGraphSpanRuntimeEvents({
+      basis,
+      outcome: completedDispatchState,
+      replayEvents: input.replayEvents
+    })
+  );
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot: input.workspaceRoot,
+    events: emitted
+  });
   const retryPlanned = emitted.some((event) => event.kind === "retry_repair_planned");
+  const retryVisibleGap =
+    completedDispatchState.gapDossier?.retryEligible === true &&
+    completedDispatchState.gapDossier.nextLawfulActions.includes("retry_same_edge");
+  const repairVisibleGap =
+    completedDispatchState.gapDossier?.retryEligible === true &&
+    completedDispatchState.gapDossier.nextLawfulActions.includes("repair_worker_output");
+  const fpEscalationVisibleGap =
+    completedDispatchState.gapDossier?.retryEligible === true &&
+    completedDispatchState.gapDossier.nextLawfulActions.includes("escalate_to_fp");
   const nextVector =
     engineResult.projection.nextVectorIndex === null
       ? null
@@ -2119,8 +2683,12 @@ export async function executeInstalledOperatorStart(input: {
             ? engineResult.projection.nextVectorIndex === null
               ? "close_or_reprice"
               : "rerun_gaps_or_start_next_edge"
-            : retryPlanned
+            : retryPlanned || retryVisibleGap
               ? "retry_same_edge_with_gap_dossier"
+              : fpEscalationVisibleGap
+                ? "escalate_to_fp_with_gap_dossier"
+              : repairVisibleGap
+                ? "plan_repair_reentry_with_gap_dossier"
               : "inspect_worker_archive");
   const outcome = terminalOutcome({
     workspaceRoot: input.workspaceRoot,
@@ -2182,4 +2750,87 @@ export async function executeInstalledOperatorStart(input: {
     });
   }
   return outcome;
+}
+
+export async function executeInstalledOperatorStartWithReentry(input: {
+  readonly workspaceRoot: string;
+  readonly sourceWorkspaceRoot?: string;
+  readonly start: SdlcPublicStartOutcome;
+  readonly workerTransport: string | null;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly requestedUntil: string;
+  readonly requireInstalledTopology?: boolean;
+  readonly refreshReplayState: () => Promise<{
+    readonly start: SdlcPublicStartOutcome;
+    readonly replayEvents: readonly RuntimeEvent[];
+  }>;
+}): Promise<SdlcInstalledOperatorStartOutcome> {
+  const attempts: SdlcInstalledOperatorStartLoopAttempt[] = [];
+  let latest: SdlcInstalledOperatorStartOutcome | null = null;
+  let start = input.start;
+  let replayEvents = input.replayEvents;
+  let retryGuardExhausted = false;
+  let retryContextOverride: SdlcWorkerRetryContext | undefined;
+  for (
+    let attemptIndex = 0;
+    attemptIndex < MAX_INSTALLED_REENTRY_ATTEMPTS;
+    attemptIndex += 1
+  ) {
+    latest = await executeInstalledOperatorStart({
+      workspaceRoot: input.workspaceRoot,
+      ...(input.sourceWorkspaceRoot === undefined
+        ? {}
+        : { sourceWorkspaceRoot: input.sourceWorkspaceRoot }),
+      start,
+      workerTransport: input.workerTransport,
+      replayEvents,
+      ...(retryContextOverride === undefined ? {} : { retryContextOverride }),
+      ...(input.requireInstalledTopology === undefined
+        ? {}
+        : { requireInstalledTopology: input.requireInstalledTopology })
+    });
+    attempts.push(
+      installedStartLoopAttemptFor({
+        outcome: latest,
+        attemptIndex
+      })
+    );
+    if (!installedStartHasReentryTruth(latest)) {
+      break;
+    }
+    if (attemptIndex === MAX_INSTALLED_REENTRY_ATTEMPTS - 1) {
+      retryGuardExhausted = true;
+      break;
+    }
+    retryContextOverride =
+      latest.gapDossier === null
+        ? undefined
+        : retryContextFromGapDossier({
+            gapDossier: latest.gapDossier,
+            attemptIndex: attemptIndex + 1
+          });
+    const refreshed = await input.refreshReplayState();
+    start = refreshed.start;
+    replayEvents = refreshed.replayEvents;
+  }
+  if (latest === null) {
+    return executeInstalledOperatorStart({
+      workspaceRoot: input.workspaceRoot,
+      ...(input.sourceWorkspaceRoot === undefined
+        ? {}
+        : { sourceWorkspaceRoot: input.sourceWorkspaceRoot }),
+      start,
+      workerTransport: input.workerTransport,
+      replayEvents,
+      ...(input.requireInstalledTopology === undefined
+        ? {}
+        : { requireInstalledTopology: input.requireInstalledTopology })
+    });
+  }
+  return installedStartWithLoop({
+    requestedUntil: input.requestedUntil,
+    outcome: latest,
+    attempts,
+    retryGuardExhausted
+  });
 }

@@ -20,7 +20,7 @@ import {
   deriveSdlcWorkspaceIngressReport,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 import {
   copyInternalDataMapperFixture,
@@ -134,12 +134,12 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   });
   assert.equal(install.kind, "installed");
 
-  const firstGaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+  const firstGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(firstGaps.status, "ok");
   assert.equal(firstGaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
   assert.equal(firstGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT);
 
-  const induction = await runOddSdlcCliAsync(["start", "--workspace", workspace]);
+  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
   assert.equal(induction.status, "ok");
   assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.payload.summary.currentEdge, FG_CONFORM_PROJECT);
@@ -192,7 +192,7 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   assert.match(importedSources, /specification\/mapper_requirements\.md/u);
   assert.match(importedSources, /REQ-LDM-01/u);
 
-  const secondGaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+  const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok");
   assert.notEqual(
     secondGaps.payload.start.executionContract.targetGraphFunction,
@@ -230,7 +230,7 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   });
   assert.equal(controlInstall.kind, "installed");
 
-  const firstGaps = await runOddSdlcCliAsync([
+  const firstGaps = await invokeOddSdlcSpecMethodCommand([
     "gaps",
     "--workspace",
     inputWorkspace,
@@ -246,7 +246,7 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
     outputWorkspace
   );
 
-  const induction = await runOddSdlcCliAsync([
+  const induction = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     inputWorkspace,
@@ -260,7 +260,7 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert.equal(induction.payload.eventLogPath.startsWith(outputWorkspace), true);
   assert.equal(induction.payload.start.executionContract.basis.workspaceRoot, inputWorkspace);
 
-  const controlInduction = await runOddSdlcCliAsync(["start", "--workspace", controlWorkspace]);
+  const controlInduction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", controlWorkspace]);
   assert.equal(controlInduction.status, "ok");
   assert.equal(controlInduction.payload.status, "converged");
 
@@ -310,7 +310,7 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert(outputIds.includes("REQ-LDM-001"));
   assert(outputIds.includes("REQ-COV-008"));
 
-  const nextGaps = await runOddSdlcCliAsync([
+  const nextGaps = await invokeOddSdlcSpecMethodCommand([
     "gaps",
     "--workspace",
     inputWorkspace,
@@ -323,7 +323,7 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
     FG_CONFORM_PROJECT
   );
 
-  const outputOnlyGaps = await runOddSdlcCliAsync(["gaps", "--workspace", outputWorkspace]);
+  const outputOnlyGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", outputWorkspace]);
   assert.equal(outputOnlyGaps.status, "ok");
   assert.notEqual(
     outputOnlyGaps.payload.start.executionContract.targetGraphFunction,
@@ -358,7 +358,7 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
   }
 
   const runInduction = async (outputWorkspace) => {
-    const gaps = await runOddSdlcCliAsync([
+    const gaps = await invokeOddSdlcSpecMethodCommand([
       "gaps",
       "--workspace",
       inputWorkspace,
@@ -374,7 +374,7 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
       outputWorkspace
     );
 
-    const induction = await runOddSdlcCliAsync([
+    const induction = await invokeOddSdlcSpecMethodCommand([
       "start",
       "--workspace",
       inputWorkspace,
@@ -422,7 +422,7 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
   };
 
   const resultA = await runInduction(outputA);
-  const gapsBeforeB = await runOddSdlcCliAsync([
+  const gapsBeforeB = await invokeOddSdlcSpecMethodCommand([
     "gaps",
     "--workspace",
     inputWorkspace,

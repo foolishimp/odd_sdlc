@@ -20,23 +20,23 @@ test("T-052 sandbox registry: every TypeScript sandbox consumes the ABG installe
     "test_b068_enterprise_core_outcome_iteration.test.mjs",
     "test_t047_pre_refactor_sandbox.test.mjs",
     "test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs",
-    "test_t102_t109_abg_rc7_semantic_ledger_sandbox.test.mjs"
+    "test_t102_t109_abg36_semantic_ledger_sandbox.test.mjs"
   ]);
 
-  const directAbgRc6ContractTests = new Set([
-    "test_t102_t109_abg_rc7_semantic_ledger_sandbox.test.mjs"
+  const directAbgContractTests = new Set([
+    "test_t102_t109_abg36_semantic_ledger_sandbox.test.mjs"
   ]);
 
   for (const fileName of sandboxTests) {
     const content = readFileSync(path.join(TEST_DIR, fileName), "utf8");
-    if (directAbgRc6ContractTests.has(fileName)) {
+    if (directAbgContractTests.has(fileName)) {
       assert(
         content.includes("@abiogenesis/typescript-tenant"),
         `${fileName} must consume the public ABG TypeScript package`
       );
       assert(
-        content.includes("3.4.0-rc.7"),
-        `${fileName} must pin the ABG RC7 contract it verifies`
+        content.includes("3.6.0-rc.1"),
+        `${fileName} must pin the ABG 3.6.0-rc.1 contract it verifies`
       );
       continue;
     }

@@ -13,9 +13,8 @@ import {
   readFileSync,
   writeFileSync
 } from "node:fs";
-import path, { dirname, resolve } from "node:path";
+import path, { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 
 import {
   admitSdlcConstructorResult,
@@ -34,9 +33,8 @@ import {
   assertAbgInstalledSandboxEvidence,
   provisionAbgInstalledSandbox
 } from "../sandbox/abg_installed_workspace.mjs";
+import { liveTestArchiveRoot } from "./archive_root.mjs";
 
-const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_LIVE_FP"] === "1";
 const DATA_MAPPER_TEMPLATE_ROOT =
   process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
@@ -269,10 +267,10 @@ test(
   "T-053 live external F_P data_mapper traversal archives worker dispatch and admitted result",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_LIVE_FP=1 not set" },
   async () => {
-    const archiveRoot = path.join(
-      PACKAGE_ROOT,
-      "test_env/test_runs/t053_live_data_mapper",
-      `${archiveTimestamp()}_pid${process.pid}`
+    const archiveRoot = liveTestArchiveRoot(
+      "t053_live_data_mapper",
+      archiveTimestamp(),
+      process.pid
     );
     const workspaceRoot = path.join(archiveRoot, "live_worker_workspace");
     const outputFile = path.join(workspaceRoot, "generated/code_surface.ts");

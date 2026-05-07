@@ -154,6 +154,7 @@ test("T-084 fold admits every ledger verdict kind", () => {
   for (const verdict of [
     "satisfied",
     "open_gap",
+    "fp_escalation",
     "blocked",
     "reprice_required",
     "not_applicable"
@@ -218,6 +219,34 @@ test("T-084 open gap produces same-edge retry pressure", () => {
   ]);
   assert.deepStrictEqual(satisfaction.retryHandoff.reasonCodes, [
     "candidate_restates_target_only"
+  ]);
+});
+
+test("B-086 F_D ambiguity escalation folds to F_P reentry instead of same-edge retry", () => {
+  const escalation = ledger("design_completeness", "fp_escalation", {
+    reasons: [
+      reason("design_completeness_attribute_partial", "escalate_to_fp")
+    ]
+  });
+  const openGap = ledger("semantic_convergence", "open_gap", {
+    reasons: [reason("semantic_claim_missing:REQ-B086-001")]
+  });
+  const satisfaction = foldSdlcAssuranceLedgers({
+    ledgers: allSatisfied([escalation, openGap])
+  });
+
+  assert.equal(satisfaction.status, "fp_escalation");
+  assert.deepStrictEqual(
+    satisfaction.gapReasons.map((item) => item.code),
+    ["semantic_claim_missing:REQ-B086-001"]
+  );
+  assert.deepStrictEqual(
+    satisfaction.fpEscalationReasons.map((item) => item.code),
+    ["design_completeness_attribute_partial"]
+  );
+  assert.deepStrictEqual(satisfaction.retryHandoff.reasonCodes, [
+    "design_completeness_attribute_partial",
+    "semantic_claim_missing:REQ-B086-001"
   ]);
 });
 

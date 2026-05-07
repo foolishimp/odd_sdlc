@@ -24,7 +24,7 @@ import {
 import { describeOddSdlcTypescriptRcQualification } from "../qualification/index.js";
 import { deriveOddSdlcTypescriptReleaseCut } from "../release/index.js";
 import {
-  executeInstalledOperatorStart,
+  executeInstalledOperatorStartWithReentry,
   readOddSdlcRuntimeEvents,
   readOddSdlcRuntimeEventsSync
 } from "../operator/index.js";
@@ -49,7 +49,7 @@ import {
   type SdlcWorkspaceIngressReport
 } from "../workspace/index.js";
 
-export const ODD_SDLC_CLI_COMMAND_VALUES = Object.freeze([
+export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "catalog",
   "query-domain",
   "gaps",
@@ -59,15 +59,15 @@ export const ODD_SDLC_CLI_COMMAND_VALUES = Object.freeze([
   "rc-report"
 ] as const);
 
-export type OddSdlcCliCommand = (typeof ODD_SDLC_CLI_COMMAND_VALUES)[number];
+export type OddSdlcSpecMethodCommand = (typeof ODD_SDLC_SPEC_METHOD_COMMAND_VALUES)[number];
 
-const ODD_SDLC_CLI_COMMAND_SET: ReadonlySet<string> = new Set(
-  ODD_SDLC_CLI_COMMAND_VALUES
+const ODD_SDLC_SPEC_METHOD_COMMAND_SET: ReadonlySet<string> = new Set(
+  ODD_SDLC_SPEC_METHOD_COMMAND_VALUES
 );
 
-export interface OddSdlcCliTraversalRequest {
-  readonly kind: "odd_sdlc_cli_request";
-  readonly command: Exclude<OddSdlcCliCommand, "install" | "release-cut">;
+export interface OddSdlcSpecMethodTraversalRequest {
+  readonly kind: "odd_sdlc_spec_method_request";
+  readonly command: Exclude<OddSdlcSpecMethodCommand, "install" | "release-cut">;
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string | null;
   readonly target: {
@@ -78,8 +78,8 @@ export interface OddSdlcCliTraversalRequest {
   readonly workerTransport: string | null;
 }
 
-export interface OddSdlcCliInstallRequest {
-  readonly kind: "odd_sdlc_cli_install_request";
+export interface OddSdlcSpecMethodInstallRequest {
+  readonly kind: "odd_sdlc_spec_method_install_request";
   readonly command: "install";
   readonly targetRoot: string;
   readonly packageSourceRoot: string;
@@ -87,27 +87,27 @@ export interface OddSdlcCliInstallRequest {
   readonly installedPackageName: string;
 }
 
-export interface OddSdlcCliReleaseCutRequest {
-  readonly kind: "odd_sdlc_cli_release_cut_request";
+export interface OddSdlcSpecMethodReleaseCutRequest {
+  readonly kind: "odd_sdlc_spec_method_release_cut_request";
   readonly command: "release-cut";
   readonly archiveRoot: string;
   readonly packageSourceRoot: string;
 }
 
-export type OddSdlcCliRequest =
-  | OddSdlcCliTraversalRequest
-  | OddSdlcCliInstallRequest
-  | OddSdlcCliReleaseCutRequest;
+export type OddSdlcSpecMethodRequest =
+  | OddSdlcSpecMethodTraversalRequest
+  | OddSdlcSpecMethodInstallRequest
+  | OddSdlcSpecMethodReleaseCutRequest;
 
-export interface OddSdlcCliResult {
-  readonly kind: "odd_sdlc_cli_result";
-  readonly command: OddSdlcCliCommand | "unknown";
+export interface OddSdlcSpecMethodResult {
+  readonly kind: "odd_sdlc_spec_method_result";
+  readonly command: OddSdlcSpecMethodCommand | "unknown";
   readonly status: "ok" | "error";
   readonly exitCode: 0 | 2;
   readonly payload: unknown;
 }
 
-interface CliOptionReadModel {
+interface SpecMethodOptionReadModel {
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string | null;
   readonly target: string;
@@ -115,19 +115,19 @@ interface CliOptionReadModel {
   readonly workerTransport: string | null;
 }
 
-interface CliInstallOptionReadModel {
+interface SpecMethodInstallOptionReadModel {
   readonly targetRoot: string;
   readonly packageSourceRoot: string;
   readonly abgPackageSourceRoot: string;
   readonly installedPackageName: string;
 }
 
-interface CliReleaseCutOptionReadModel {
+interface SpecMethodReleaseCutOptionReadModel {
   readonly archiveRoot: string;
   readonly packageSourceRoot: string;
 }
 
-interface CliWorkspaceContext {
+interface SpecMethodWorkspaceContext {
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string;
   readonly ingressReport: SdlcWorkspaceIngressReport;
@@ -144,6 +144,7 @@ const DEFAULT_SOURCE_PATHS = Object.freeze([
   "specification/mapper_requirements.md",
   ".ai-workspace/context/project_constraints.yml"
 ] as const);
+
 const SOURCE_DISCOVERY_EXTENSIONS = Object.freeze([
   ".md",
   ".markdown",
@@ -162,33 +163,55 @@ const SOURCE_DISCOVERY_IGNORED_DIRS = Object.freeze([
   "build_tenants"
 ] as const);
 
-const CLI_MODULE_ROOT = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_PACKAGE_SOURCE_ROOT = resolve(CLI_MODULE_ROOT, "../../../../..");
+const SPEC_METHOD_MODULE_ROOT = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_PACKAGE_SOURCE_ROOT = resolve(SPEC_METHOD_MODULE_ROOT, "../../../../..");
 
-function defaultAbgPackageSourceRoot(): string {
+function abgSourceCheckoutIsUsable(candidateRoot: string): boolean {
+  return (
+    existsSync(resolve(candidateRoot, "package.json")) &&
+    existsSync(resolve(candidateRoot, "../../..", "docs/LLM_GTL_APP_BUILDER_GUIDE.md"))
+  );
+}
+
+function abgPackageDependencyIsPresent(candidateRoot: string): boolean {
+  return existsSync(resolve(candidateRoot, "package.json"));
+}
+
+export function resolveDefaultAbgPackageSourceRoot(
+  packageSourceRoot: string = DEFAULT_PACKAGE_SOURCE_ROOT
+): string {
+  const siblingSourceCheckout = resolve(
+    packageSourceRoot,
+    "../../..",
+    "abiogenesis/build_tenants/abiogenesis/typescript"
+  );
+  if (abgSourceCheckoutIsUsable(siblingSourceCheckout)) {
+    return siblingSourceCheckout;
+  }
+
   const packageLocalDependency = resolve(
-    DEFAULT_PACKAGE_SOURCE_ROOT,
+    packageSourceRoot,
     "node_modules/@abiogenesis/typescript-tenant"
   );
-  if (existsSync(packageLocalDependency)) {
+  if (abgPackageDependencyIsPresent(packageLocalDependency)) {
     return packageLocalDependency;
   }
   return resolve(
-    DEFAULT_PACKAGE_SOURCE_ROOT,
+    packageSourceRoot,
     "../..",
     "@abiogenesis/typescript-tenant"
   );
 }
 
-const DEFAULT_ABG_PACKAGE_SOURCE_ROOT = defaultAbgPackageSourceRoot();
+const DEFAULT_ABG_PACKAGE_SOURCE_ROOT = resolveDefaultAbgPackageSourceRoot();
 
-function isCommand(value: string): value is OddSdlcCliCommand {
-  return ODD_SDLC_CLI_COMMAND_SET.has(value);
+function isCommand(value: string): value is OddSdlcSpecMethodCommand {
+  return ODD_SDLC_SPEC_METHOD_COMMAND_SET.has(value);
 }
 
-function fail(command: OddSdlcCliCommand | "unknown", message: string): OddSdlcCliResult {
+function fail(command: OddSdlcSpecMethodCommand | "unknown", message: string): OddSdlcSpecMethodResult {
   return Object.freeze({
-    kind: "odd_sdlc_cli_result",
+    kind: "odd_sdlc_spec_method_result",
     command,
     status: "error",
     exitCode: 2,
@@ -198,9 +221,9 @@ function fail(command: OddSdlcCliCommand | "unknown", message: string): OddSdlcC
   });
 }
 
-function ok(command: OddSdlcCliCommand, payload: unknown): OddSdlcCliResult {
+function ok(command: OddSdlcSpecMethodCommand, payload: unknown): OddSdlcSpecMethodResult {
   return Object.freeze({
-    kind: "odd_sdlc_cli_result",
+    kind: "odd_sdlc_spec_method_result",
     command,
     status: "ok",
     exitCode: 0,
@@ -223,7 +246,7 @@ function parseUntil(value: string): SdlcPublicStartUntil {
   throw new TypeError(`--until expected first_traversal, blocked, or converged`);
 }
 
-function parseOptions(argv: readonly string[]): CliOptionReadModel {
+function parseOptions(argv: readonly string[]): SpecMethodOptionReadModel {
   let workspaceRoot = ".";
   let outputWorkspaceRoot: string | null = null;
   let target = "next";
@@ -259,7 +282,7 @@ function parseOptions(argv: readonly string[]): CliOptionReadModel {
   });
 }
 
-function parseInstallOptions(argv: readonly string[]): CliInstallOptionReadModel {
+function parseInstallOptions(argv: readonly string[]): SpecMethodInstallOptionReadModel {
   let targetRoot: string | null = null;
   let packageSourceRoot = DEFAULT_PACKAGE_SOURCE_ROOT;
   let abgPackageSourceRoot = DEFAULT_ABG_PACKAGE_SOURCE_ROOT;
@@ -293,7 +316,7 @@ function parseInstallOptions(argv: readonly string[]): CliInstallOptionReadModel
   });
 }
 
-function parseReleaseCutOptions(argv: readonly string[]): CliReleaseCutOptionReadModel {
+function parseReleaseCutOptions(argv: readonly string[]): SpecMethodReleaseCutOptionReadModel {
   let archiveRoot: string | null = null;
   let packageSourceRoot = DEFAULT_PACKAGE_SOURCE_ROOT;
   for (let index = 0; index < argv.length; index += 1) {
@@ -317,7 +340,7 @@ function parseReleaseCutOptions(argv: readonly string[]): CliReleaseCutOptionRea
   });
 }
 
-function parseTarget(rawTarget: string): OddSdlcCliTraversalRequest["target"] {
+function parseTarget(rawTarget: string): OddSdlcSpecMethodTraversalRequest["target"] {
   if (rawTarget === "next") {
     return Object.freeze({ kind: "next", handle: "next" });
   }
@@ -336,17 +359,17 @@ function parseTarget(rawTarget: string): OddSdlcCliTraversalRequest["target"] {
   throw new TypeError("--target expected next, graph_function:<handle>, or asset:<handle>");
 }
 
-export function admitOddSdlcCliRequest(argv: readonly string[]): OddSdlcCliRequest {
+export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcSpecMethodRequest {
   const command = argv[0];
   if (command === undefined || !isCommand(command)) {
     throw new TypeError(
-      `command expected one of ${ODD_SDLC_CLI_COMMAND_VALUES.join(", ")}`
+      `command expected one of ${ODD_SDLC_SPEC_METHOD_COMMAND_VALUES.join(", ")}`
     );
   }
   if (command === "install") {
     const options = parseInstallOptions(argv.slice(1));
     return Object.freeze({
-      kind: "odd_sdlc_cli_install_request",
+      kind: "odd_sdlc_spec_method_install_request",
       command,
       targetRoot: resolve(options.targetRoot),
       packageSourceRoot: resolve(options.packageSourceRoot),
@@ -357,7 +380,7 @@ export function admitOddSdlcCliRequest(argv: readonly string[]): OddSdlcCliReque
   if (command === "release-cut") {
     const options = parseReleaseCutOptions(argv.slice(1));
     return Object.freeze({
-      kind: "odd_sdlc_cli_release_cut_request",
+      kind: "odd_sdlc_spec_method_release_cut_request",
       command,
       archiveRoot: resolve(options.archiveRoot),
       packageSourceRoot: resolve(options.packageSourceRoot)
@@ -365,7 +388,7 @@ export function admitOddSdlcCliRequest(argv: readonly string[]): OddSdlcCliReque
   }
   const options = parseOptions(argv.slice(1));
   return Object.freeze({
-    kind: "odd_sdlc_cli_request",
+    kind: "odd_sdlc_spec_method_request",
     command,
     workspaceRoot: resolve(options.workspaceRoot),
     outputWorkspaceRoot:
@@ -436,14 +459,14 @@ function projectConstraints(workspaceRoot: string): SdlcProjectConstraints {
   return deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
 }
 
-function outputWorkspaceRootFor(request: OddSdlcCliTraversalRequest): string {
+function outputWorkspaceRootFor(request: OddSdlcSpecMethodTraversalRequest): string {
   return request.outputWorkspaceRoot ?? request.workspaceRoot;
 }
 
 function workspaceContext(input: {
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot?: string | null;
-}): CliWorkspaceContext {
+}): SpecMethodWorkspaceContext {
   const root = resolve(input.workspaceRoot);
   const outputRoot = resolve(input.outputWorkspaceRoot ?? root);
   const ingressReport = deriveSdlcWorkspaceIngressReport({
@@ -466,7 +489,7 @@ function workspaceContext(input: {
   });
 }
 
-function queryDomainFor(context: CliWorkspaceContext): ReturnType<typeof projectSdlcQueryDomain> {
+function queryDomainFor(context: SpecMethodWorkspaceContext): ReturnType<typeof projectSdlcQueryDomain> {
   return projectSdlcQueryDomain({
     module: constructSdlcGtlModule(),
     ingressReport: context.ingressReport,
@@ -475,7 +498,7 @@ function queryDomainFor(context: CliWorkspaceContext): ReturnType<typeof project
 }
 
 function defaultRegimeFor(input: {
-  readonly request: OddSdlcCliTraversalRequest;
+  readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly queryDomain: ReturnType<typeof projectSdlcQueryDomain>;
 }): "F_D" | "F_P" {
   const firstTarget = input.queryDomain.startTargets[0]?.name ?? null;
@@ -490,7 +513,7 @@ function defaultRegimeFor(input: {
   return "F_P";
 }
 
-function startOutcomeFor(request: OddSdlcCliTraversalRequest): ReturnType<typeof publicStartOnce> {
+function startOutcomeFor(request: OddSdlcSpecMethodTraversalRequest): ReturnType<typeof publicStartOnce> {
   const context = workspaceContext({
     workspaceRoot: request.workspaceRoot,
     outputWorkspaceRoot: request.outputWorkspaceRoot
@@ -530,7 +553,7 @@ function hasReplayForBasis(
 }
 
 function startOutcomeForObservedReplay(input: {
-  readonly request: OddSdlcCliTraversalRequest;
+  readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly events: readonly RuntimeEvent[];
 }): ReturnType<typeof publicStartOnce> {
   const requested = startOutcomeFor(input.request);
@@ -577,17 +600,21 @@ function replayEventsForBasis(
 }
 
 async function installedStartPayloadFor(
-  request: OddSdlcCliTraversalRequest
+  request: OddSdlcSpecMethodTraversalRequest
 ): Promise<unknown> {
-  const start = startOutcomeFor(request);
   const outputWorkspaceRoot = outputWorkspaceRootFor(request);
+  const runtimeEvents = await readOddSdlcRuntimeEvents(outputWorkspaceRoot);
+  const start = startOutcomeForObservedReplay({
+    request,
+    events: runtimeEvents
+  });
   const deterministicTransition =
     start.kind === "sdlc_public_start_projected" &&
     start.transition.kind === "fd_advance";
   if (request.workerTransport === null && !deterministicTransition) {
     return start;
   }
-  return executeInstalledOperatorStart({
+  return executeInstalledOperatorStartWithReentry({
     workspaceRoot: outputWorkspaceRoot,
     sourceWorkspaceRoot: request.workspaceRoot,
     start,
@@ -595,15 +622,30 @@ async function installedStartPayloadFor(
     replayEvents:
       start.executionContract === null
         ? Object.freeze([])
-        : replayEventsForBasis(
-            start.executionContract.basis,
-            await readOddSdlcRuntimeEvents(outputWorkspaceRoot)
-          ),
-    requireInstalledTopology: true
+        : replayEventsForBasis(start.executionContract.basis, runtimeEvents),
+    requestedUntil: request.until,
+    requireInstalledTopology: true,
+    refreshReplayState: async () => {
+      const refreshedEvents = await readOddSdlcRuntimeEvents(outputWorkspaceRoot);
+      const refreshedStart = startOutcomeForObservedReplay({
+        request,
+        events: refreshedEvents
+      });
+      return Object.freeze({
+        start: refreshedStart,
+        replayEvents:
+          refreshedStart.executionContract === null
+            ? Object.freeze([])
+            : replayEventsForBasis(
+                refreshedStart.executionContract.basis,
+                refreshedEvents
+              )
+      });
+    }
   });
 }
 
-function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
+function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   const outputWorkspaceRoot = outputWorkspaceRootFor(request);
   const allEvents = readOddSdlcRuntimeEventsSync(outputWorkspaceRoot);
   const start = startOutcomeForObservedReplay({
@@ -627,8 +669,8 @@ function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
   const dossier = deriveSdlcGapDossier({
     basis: start.executionContract.basis,
     events,
-    triageInput: "cli:gaps",
-    evidenceRefs: ["cli://odd-sdlc-ts/gaps"]
+    triageInput: "spec_method:gaps",
+    evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"]
   });
   return Object.freeze({
     start,
@@ -637,7 +679,7 @@ function gapsPayload(request: OddSdlcCliTraversalRequest): unknown {
   });
 }
 
-function commandPayload(request: OddSdlcCliTraversalRequest): unknown {
+function commandPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   if (request.command === "catalog") {
     return constructSdlcGraphFunctionCatalog();
   }
@@ -658,7 +700,7 @@ function commandPayload(request: OddSdlcCliTraversalRequest): unknown {
   return startOutcomeFor(request);
 }
 
-async function commandPayloadAsync(request: OddSdlcCliRequest): Promise<unknown> {
+async function commandPayloadAsync(request: OddSdlcSpecMethodRequest): Promise<unknown> {
   if (request.command === "install") {
     return installOddSdlcTypescript({
       targetRoot: request.targetRoot,
@@ -679,13 +721,17 @@ async function commandPayloadAsync(request: OddSdlcCliRequest): Promise<unknown>
   return commandPayload(request);
 }
 
-export function runOddSdlcCli(argv: readonly string[]): OddSdlcCliResult {
-  let command: OddSdlcCliCommand | "unknown" = "unknown";
+export function invokeOddSdlcSpecMethodCommandSync(
+  argv: readonly string[]
+): OddSdlcSpecMethodResult {
+  let command: OddSdlcSpecMethodCommand | "unknown" = "unknown";
   try {
-    const request = admitOddSdlcCliRequest(argv);
+    const request = admitOddSdlcSpecMethodRequest(argv);
     command = request.command;
     if (request.command === "install" || request.command === "release-cut") {
-      throw new TypeError(`${request.command} requires runOddSdlcCliAsync`);
+      throw new TypeError(
+        `${request.command} requires invokeOddSdlcSpecMethodCommand`
+      );
     }
     return ok(request.command, commandPayload(request));
   } catch (error) {
@@ -693,12 +739,12 @@ export function runOddSdlcCli(argv: readonly string[]): OddSdlcCliResult {
   }
 }
 
-export async function runOddSdlcCliAsync(
+export async function invokeOddSdlcSpecMethodCommand(
   argv: readonly string[]
-): Promise<OddSdlcCliResult> {
-  let command: OddSdlcCliCommand | "unknown" = "unknown";
+): Promise<OddSdlcSpecMethodResult> {
+  let command: OddSdlcSpecMethodCommand | "unknown" = "unknown";
   try {
-    const request = admitOddSdlcCliRequest(argv);
+    const request = admitOddSdlcSpecMethodRequest(argv);
     command = request.command;
     return ok(request.command, await commandPayloadAsync(request));
   } catch (error) {
@@ -752,7 +798,7 @@ function childRecord(
   return isRecord(value) ? value : null;
 }
 
-function compactGapsResult(result: OddSdlcCliResult): string | null {
+function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
   if (result.command !== "gaps" || !isRecord(result.payload)) {
     return null;
   }
@@ -773,7 +819,7 @@ function compactGapsResult(result: OddSdlcCliResult): string | null {
   ].join("\n");
 }
 
-function compactInstalledStartResult(result: OddSdlcCliResult): string | null {
+function compactInstalledStartResult(result: OddSdlcSpecMethodResult): string | null {
   if (result.command !== "start" || !isRecord(result.payload)) {
     return null;
   }
@@ -793,7 +839,7 @@ function compactInstalledStartResult(result: OddSdlcCliResult): string | null {
   ].join("\n");
 }
 
-function compactPublicStartResult(result: OddSdlcCliResult): string | null {
+function compactPublicStartResult(result: OddSdlcSpecMethodResult): string | null {
   if (result.command !== "start" || !isRecord(result.payload)) {
     return null;
   }
@@ -808,7 +854,7 @@ function compactPublicStartResult(result: OddSdlcCliResult): string | null {
   ].join("\n");
 }
 
-export function serializeOddSdlcCliResult(result: OddSdlcCliResult): string {
+export function serializeOddSdlcSpecMethodResult(result: OddSdlcSpecMethodResult): string {
   if (process.env["ODD_SDLC_TS_OUTPUT"] !== "json" && result.status === "ok") {
     const compact =
       compactGapsResult(result) ??

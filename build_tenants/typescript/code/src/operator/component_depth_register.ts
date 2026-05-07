@@ -4,11 +4,16 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   parseClosedRecord,
-  parseEnumValue,
   parseNonEmptyString,
   parseNullableNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import {
+  admitDeclaredAlias,
+  admitExactContractEnum,
+  admitExactProtocolString,
+  admitExactProtocolVersion
+} from "../shared/fd_admission.js";
 import type {
   SdlcComponentDepthRegister,
   SdlcComponentDepthRegisterAdmission,
@@ -16,6 +21,7 @@ import type {
   SdlcComponentExecutionFailureRow,
   SdlcComponentRepairSchedule,
   SdlcComponentRepairScheduleRow,
+  SdlcComponentRepairTarget,
   SdlcComponentRealizationRow,
   SdlcComponentTestQualificationRow,
   SdlcComponentTestRealizationRow,
@@ -48,7 +54,7 @@ type ComponentDepthTarget = (typeof COMPONENT_DEPTH_TARGETS)[number];
 function isComponentDepthTarget(
   targetAssetType: string
 ): targetAssetType is ComponentDepthTarget {
-  return COMPONENT_DEPTH_TARGETS.includes(targetAssetType as ComponentDepthTarget);
+  return COMPONENT_DEPTH_TARGETS.some((target) => target === targetAssetType);
 }
 
 function parseArray<T>(
@@ -71,7 +77,7 @@ function parseComponentTopologyRow(
   input: unknown,
   label: string
 ): SdlcComponentTopologyRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentTopologyRow(input), label, [
     "kind",
     "componentId",
     "moduleName",
@@ -81,21 +87,22 @@ function parseComponentTopologyRow(
     "requirementIds",
     "sourceAssetRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_topology_row") {
-    throw new TypeError(`${label}.kind: unexpected row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_topology_row"
+  });
   return Object.freeze({
     kind: "sdlc_component_topology_row" as const,
     componentId: parseNonEmptyString(record["componentId"], `${label}.componentId`),
     moduleName: parseNonEmptyString(record["moduleName"], `${label}.moduleName`),
     relativePath: parseNonEmptyString(record["relativePath"], `${label}.relativePath`),
     publicBoundary: parseNonEmptyString(record["publicBoundary"], `${label}.publicBoundary`),
-    concernRole: parseEnumValue(
-      record["concernRole"],
-      `${label}.concernRole`,
-      SDLC_COMPONENT_CONCERN_ROLES
-    ),
+    concernRole: admitExactContractEnum({
+      value: record["concernRole"],
+      label: `${label}.concernRole`,
+      values: SDLC_COMPONENT_CONCERN_ROLES
+    }),
     requirementIds: parseStringList(record["requirementIds"], `${label}.requirementIds`),
     sourceAssetRefs: parseStringList(record["sourceAssetRefs"], `${label}.sourceAssetRefs`)
   });
@@ -105,7 +112,7 @@ function parseComponentRealizationRow(
   input: unknown,
   label: string
 ): SdlcComponentRealizationRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentRealizationRow(input), label, [
     "kind",
     "componentId",
     "moduleName",
@@ -117,10 +124,11 @@ function parseComponentRealizationRow(
     "requirementIds",
     "sourceAssetRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_realization_row") {
-    throw new TypeError(`${label}.kind: unexpected row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_realization_row"
+  });
   const relativePath = parseNonEmptyString(record["relativePath"], `${label}.relativePath`);
   const firstProductFileToChange =
     record["firstProductFileToChange"] === undefined
@@ -157,7 +165,7 @@ function parseTestComponentTopologyRow(
   input: unknown,
   label: string
 ): SdlcTestComponentTopologyRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeTestComponentTopologyRow(input), label, [
     "kind",
     "testClassId",
     "relativePath",
@@ -166,10 +174,11 @@ function parseTestComponentTopologyRow(
     "requirementIds",
     "shardId"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_test_component_topology_row") {
-    throw new TypeError(`${label}.kind: unexpected row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_test_component_topology_row"
+  });
   return Object.freeze({
     kind: "sdlc_test_component_topology_row" as const,
     testClassId: parseNonEmptyString(record["testClassId"], `${label}.testClassId`),
@@ -185,7 +194,7 @@ function parseComponentTestRealizationRow(
   input: unknown,
   label: string
 ): SdlcComponentTestRealizationRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentTestRealizationRow(input), label, [
     "kind",
     "testClassId",
     "relativePath",
@@ -194,10 +203,11 @@ function parseComponentTestRealizationRow(
     "requirementIds",
     "shardId"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_test_realization_row") {
-    throw new TypeError(`${label}.kind: unexpected row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_test_realization_row"
+  });
   return Object.freeze({
     kind: "sdlc_component_test_realization_row" as const,
     testClassId: parseNonEmptyString(record["testClassId"], `${label}.testClassId`),
@@ -213,7 +223,10 @@ function parseComponentTestQualificationRow(
   input: unknown,
   label: string
 ): SdlcComponentTestQualificationRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(
+    normalizeComponentTestQualificationRow(input),
+    label,
+    [
     "kind",
     "testClassId",
     "testcaseIds",
@@ -221,23 +234,30 @@ function parseComponentTestQualificationRow(
     "requirementIds",
     "status",
     "evidenceRefs"
-  ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_test_qualification_row") {
-    throw new TypeError(`${label}.kind: unexpected row kind`);
-  }
+    ]
+  );
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_test_qualification_row"
+  });
   return Object.freeze({
     kind: "sdlc_component_test_qualification_row" as const,
     testClassId: parseNonEmptyString(record["testClassId"], `${label}.testClassId`),
     testcaseIds: parseStringList(record["testcaseIds"], `${label}.testcaseIds`),
     componentIds: parseStringList(record["componentIds"], `${label}.componentIds`),
     requirementIds: parseStringList(record["requirementIds"], `${label}.requirementIds`),
-    status: parseEnumValue(record["status"], `${label}.status`, [
-      "passed",
-      "failed",
-      "pending",
-      "unproven"
-    ]),
+    status: admitExactContractEnum({
+      value: record["status"],
+      label: `${label}.status`,
+      values: [
+        "passed",
+        "failed",
+        "blocked",
+        "pending",
+        "unproven"
+      ] as const
+    }),
     evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`)
   });
 }
@@ -246,7 +266,7 @@ function parseComponentExecutionFailureRow(
   input: unknown,
   label: string
 ): SdlcComponentExecutionFailureRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentExecutionFailureRow(input), label, [
     "kind",
     "failureId",
     "shardId",
@@ -263,10 +283,11 @@ function parseComponentExecutionFailureRow(
     "testRefs",
     "evidenceRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_execution_failure_row") {
-    throw new TypeError(`${label}.kind: unexpected failure row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_execution_failure_row"
+  });
   return Object.freeze({
     kind: "sdlc_component_execution_failure_row" as const,
     failureId: parseNonEmptyString(record["failureId"], `${label}.failureId`),
@@ -276,25 +297,26 @@ function parseComponentExecutionFailureRow(
     testcaseIds: parseStringList(record["testcaseIds"], `${label}.testcaseIds`),
     componentIds: parseStringList(record["componentIds"], `${label}.componentIds`),
     requirementIds: parseStringList(record["requirementIds"], `${label}.requirementIds`),
-    failureKind: parseEnumValue(
-      record["failureKind"],
-      `${label}.failureKind`,
-      SDLC_COMPONENT_EXECUTION_FAILURE_KINDS
-    ),
-    repairTarget: parseEnumValue(
-      record["repairTarget"],
-      `${label}.repairTarget`,
-      SDLC_COMPONENT_REPAIR_TARGETS
-    ),
+    failureKind: admitExactContractEnum({
+      value: record["failureKind"],
+      label: `${label}.failureKind`,
+      values: SDLC_COMPONENT_EXECUTION_FAILURE_KINDS
+    }),
+    repairTarget: admitDeclaredAlias({
+      value: record["repairTarget"],
+      label: `${label}.repairTarget`,
+      values: SDLC_COMPONENT_REPAIR_TARGETS,
+      aliases: repairTargetAliasesFor(record)
+    }),
     lawfulReentryPoint: parseNonEmptyString(
       record["lawfulReentryPoint"],
       `${label}.lawfulReentryPoint`
     ),
-    attributionConfidence: parseEnumValue(
-      record["attributionConfidence"],
-      `${label}.attributionConfidence`,
-      SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE
-    ),
+    attributionConfidence: admitExactContractEnum({
+      value: record["attributionConfidence"],
+      label: `${label}.attributionConfidence`,
+      values: SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE
+    }),
     sourceRefs: parseStringList(record["sourceRefs"], `${label}.sourceRefs`),
     testRefs: parseStringList(record["testRefs"], `${label}.testRefs`),
     evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`)
@@ -308,22 +330,21 @@ function parseComponentExecutionFailureRegister(
   if (input === null || input === undefined) {
     return null;
   }
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentExecutionFailureRegister(input), label, [
     "kind",
     "registerVersion",
     "failureRows"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "component_execution_failure_register") {
-    throw new TypeError(`${label}.kind: unexpected failure register kind`);
-  }
-  const registerVersion = parseNonEmptyString(
-    record["registerVersion"],
-    `${label}.registerVersion`
-  );
-  if (registerVersion !== "ts-component-depth-v1") {
-    throw new TypeError(`${label}.registerVersion: unsupported version`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "component_execution_failure_register"
+  });
+  admitExactProtocolVersion({
+    value: record["registerVersion"],
+    label: `${label}.registerVersion`,
+    expected: "ts-component-depth-v1"
+  });
   return Object.freeze({
     kind: "component_execution_failure_register" as const,
     registerVersion: "ts-component-depth-v1" as const,
@@ -339,7 +360,7 @@ function parseComponentRepairScheduleRow(
   input: unknown,
   label: string
 ): SdlcComponentRepairScheduleRow {
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentRepairScheduleRow(input), label, [
     "kind",
     "scheduleId",
     "failureId",
@@ -353,28 +374,30 @@ function parseComponentRepairScheduleRow(
     "testRefs",
     "evidenceRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_repair_schedule_row") {
-    throw new TypeError(`${label}.kind: unexpected repair schedule row kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_repair_schedule_row"
+  });
   return Object.freeze({
     kind: "sdlc_component_repair_schedule_row" as const,
     scheduleId: parseNonEmptyString(record["scheduleId"], `${label}.scheduleId`),
     failureId: parseNonEmptyString(record["failureId"], `${label}.failureId`),
-    repairTarget: parseEnumValue(
-      record["repairTarget"],
-      `${label}.repairTarget`,
-      SDLC_COMPONENT_REPAIR_TARGETS
-    ),
+    repairTarget: admitDeclaredAlias({
+      value: record["repairTarget"],
+      label: `${label}.repairTarget`,
+      values: SDLC_COMPONENT_REPAIR_TARGETS,
+      aliases: repairTargetAliasesFor(record)
+    }),
     lawfulReentryPoint: parseNonEmptyString(
       record["lawfulReentryPoint"],
       `${label}.lawfulReentryPoint`
     ),
-    attributionConfidence: parseEnumValue(
-      record["attributionConfidence"],
-      `${label}.attributionConfidence`,
-      SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE
-    ),
+    attributionConfidence: admitExactContractEnum({
+      value: record["attributionConfidence"],
+      label: `${label}.attributionConfidence`,
+      values: SDLC_COMPONENT_ATTRIBUTION_CONFIDENCE
+    }),
     testcaseIds: parseStringList(record["testcaseIds"], `${label}.testcaseIds`),
     componentIds: parseStringList(record["componentIds"], `${label}.componentIds`),
     requirementIds: parseStringList(record["requirementIds"], `${label}.requirementIds`),
@@ -391,32 +414,31 @@ function parseComponentRepairSchedule(
   if (input === null || input === undefined) {
     return null;
   }
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeComponentRepairSchedule(input), label, [
     "kind",
     "registerVersion",
     "scheduleStatus",
     "repairRows",
     "evidenceRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_repair_schedule") {
-    throw new TypeError(`${label}.kind: unexpected repair schedule kind`);
-  }
-  const registerVersion = parseNonEmptyString(
-    record["registerVersion"],
-    `${label}.registerVersion`
-  );
-  if (registerVersion !== "ts-component-depth-v1") {
-    throw new TypeError(`${label}.registerVersion: unsupported version`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_repair_schedule"
+  });
+  admitExactProtocolVersion({
+    value: record["registerVersion"],
+    label: `${label}.registerVersion`,
+    expected: "ts-component-depth-v1"
+  });
   return Object.freeze({
     kind: "sdlc_component_repair_schedule" as const,
     registerVersion: "ts-component-depth-v1" as const,
-    scheduleStatus: parseEnumValue(
-      record["scheduleStatus"],
-      `${label}.scheduleStatus`,
-      SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES
-    ),
+    scheduleStatus: admitExactContractEnum({
+      value: record["scheduleStatus"],
+      label: `${label}.scheduleStatus`,
+      values: SDLC_COMPONENT_REPAIR_SCHEDULE_STATUSES
+    }),
     repairRows: parseArray(
       record["repairRows"],
       `${label}.repairRows`,
@@ -433,24 +455,25 @@ function parseReleaseDepthParity(
   if (input === null || input === undefined) {
     return null;
   }
-  const record = parseClosedRecord(input, label, [
+  const record = parseClosedRecord(normalizeReleaseDepthParity(input), label, [
     "kind",
     "status",
     "summary",
     "blockingReasons",
     "evidenceRefs"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_release_depth_parity_assessment") {
-    throw new TypeError(`${label}.kind: unexpected parity kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_release_depth_parity_assessment"
+  });
   return Object.freeze({
     kind: "sdlc_release_depth_parity_assessment" as const,
-    status: parseEnumValue(record["status"], `${label}.status`, [
-      "met",
-      "blocked",
-      "repriced"
-    ]),
+    status: admitExactContractEnum({
+      value: record["status"],
+      label: `${label}.status`,
+      values: ["met", "blocked", "repriced"] as const
+    }),
     summary: parseNonEmptyString(record["summary"], `${label}.summary`),
     blockingReasons: parseStringList(record["blockingReasons"], `${label}.blockingReasons`),
     evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`)
@@ -473,19 +496,18 @@ function parseRegister(input: unknown, label: string): SdlcComponentDepthRegiste
     "component_repair_schedule",
     "releaseDepthParity"
   ]);
-  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
-  if (kind !== "sdlc_component_depth_register") {
-    throw new TypeError(`${label}.kind: unexpected register kind`);
-  }
+  admitExactProtocolString({
+    value: record["kind"],
+    label: `${label}.kind`,
+    expected: "sdlc_component_depth_register"
+  });
   const targetAssetType = parseNonEmptyString(record["targetAssetType"], `${label}.targetAssetType`);
   const registerVersion = parseNonEmptyString(record["registerVersion"], `${label}.registerVersion`);
-  const versionIsAdmitted =
-    registerVersion === "ts-component-depth-v1" ||
-    (targetAssetType === "component_realization_schedule_surface" &&
-      registerVersion === "ts-component-realization-v1");
-  if (!versionIsAdmitted) {
-    throw new TypeError(`${label}.registerVersion: unsupported version`);
-  }
+  admitExactProtocolVersion({
+    value: registerVersion,
+    label: `${label}.registerVersion`,
+    expected: "ts-component-depth-v1"
+  });
   return Object.freeze({
     kind: "sdlc_component_depth_register" as const,
     registerVersion: "ts-component-depth-v1" as const,
@@ -538,19 +560,345 @@ function objectRecord(input: unknown): Record<string, unknown> | null {
   return Object.fromEntries(Object.entries(input));
 }
 
+function normalizeComponentTopologyRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    componentId: record["componentId"],
+    moduleName: record["moduleName"],
+    relativePath: record["relativePath"],
+    publicBoundary: record["publicBoundary"],
+    concernRole: record["concernRole"],
+    requirementIds: record["requirementIds"],
+    sourceAssetRefs: record["sourceAssetRefs"]
+  });
+}
+
+function normalizeComponentTopologyRows(input: unknown): unknown {
+  if (input === undefined || !Array.isArray(input)) {
+    return input;
+  }
+  return Object.freeze(input.map((item) => normalizeComponentTopologyRow(item)));
+}
+
+function normalizeComponentRealizationRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    componentId: record["componentId"],
+    moduleName: record["moduleName"],
+    relativePath: record["relativePath"],
+    publicBoundary: record["publicBoundary"],
+    trancheId: record["trancheId"],
+    firstProductFileToChange: record["firstProductFileToChange"],
+    upstreamComponentIds: record["upstreamComponentIds"],
+    requirementIds: record["requirementIds"],
+    sourceAssetRefs: record["sourceAssetRefs"]
+  });
+}
+
+function normalizeComponentRealizationRows(input: unknown): unknown {
+  if (input === undefined || !Array.isArray(input)) {
+    return input;
+  }
+  return Object.freeze(input.map((item) => normalizeComponentRealizationRow(item)));
+}
+
+function normalizeTestComponentTopologyRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    testClassId: record["testClassId"],
+    relativePath: record["relativePath"],
+    testcaseIds: record["testcaseIds"],
+    componentIds: record["componentIds"] ?? record["coveredComponentIds"],
+    requirementIds: record["requirementIds"],
+    shardId:
+      record["shardId"] ??
+      record["expectedExecutionShard"] ??
+      record["executionShard"] ??
+      null
+  });
+}
+
+function normalizeTestComponentTopologyRows(input: unknown): unknown {
+  if (input === undefined || !Array.isArray(input)) {
+    return input;
+  }
+  return Object.freeze(input.map((item) => normalizeTestComponentTopologyRow(item)));
+}
+
+function normalizeComponentTestRealizationRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    testClassId: record["testClassId"],
+    relativePath: record["relativePath"],
+    testcaseIds: record["testcaseIds"],
+    componentIds: record["componentIds"] ?? record["coveredComponentIds"],
+    requirementIds: record["requirementIds"],
+    shardId:
+      record["shardId"] ??
+      record["expectedExecutionShard"] ??
+      record["executionShard"] ??
+      null
+  });
+}
+
+function normalizeComponentTestRealizationRows(input: unknown): unknown {
+  if (input === undefined || !Array.isArray(input)) {
+    return input;
+  }
+  return Object.freeze(input.map((item) => normalizeComponentTestRealizationRow(item)));
+}
+
+function normalizeComponentTestQualificationRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    testClassId: record["testClassId"],
+    testcaseIds: record["testcaseIds"],
+    componentIds: record["componentIds"] ?? record["coveredComponentIds"],
+    requirementIds: record["requirementIds"],
+    status: record["status"],
+    evidenceRefs: record["evidenceRefs"]
+  });
+}
+
+function normalizeComponentTestQualificationRows(input: unknown): unknown {
+  if (input === undefined || !Array.isArray(input)) {
+    return input;
+  }
+  return Object.freeze(
+    input.map((item) => normalizeComponentTestQualificationRow(item))
+  );
+}
+
+function normalizeRepairTarget(input: unknown, record: Record<string, unknown>): unknown {
+  void record;
+  if (input === "component_code" || input === "component_test") {
+    return input;
+  }
+  if (typeof input === "string" && input.includes("/src/test/")) {
+    return "component_test";
+  }
+  if (typeof input === "string" && input.includes("/src/main/")) {
+    return "component_code";
+  }
+  return input;
+}
+
+function repairTargetAliasesFor(
+  record: Record<string, unknown>
+): Readonly<Record<string, SdlcComponentRepairTarget>> {
+  void record;
+  return Object.freeze({});
+}
+
+function normalizeComponentExecutionFailureRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    failureId: record["failureId"],
+    shardId: record["shardId"],
+    moduleName: record["moduleName"],
+    testClassId: record["testClassId"],
+    testcaseIds: record["testcaseIds"],
+    componentIds: record["componentIds"],
+    requirementIds: record["requirementIds"],
+    failureKind: record["failureKind"],
+    repairTarget: normalizeRepairTarget(record["repairTarget"], record),
+    lawfulReentryPoint: record["lawfulReentryPoint"],
+    attributionConfidence: record["attributionConfidence"],
+    sourceRefs: record["sourceRefs"],
+    testRefs: record["testRefs"],
+    evidenceRefs: record["evidenceRefs"]
+  });
+}
+
+function normalizeComponentExecutionFailureRegister(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    registerVersion: record["registerVersion"],
+    failureRows: parseArray(
+      record["failureRows"],
+      "componentExecutionFailureRegister.failureRows",
+      (item) => normalizeComponentExecutionFailureRow(item)
+    )
+  });
+}
+
+function stringValues(input: unknown): readonly string[] {
+  if (!Array.isArray(input)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(input.filter((item): item is string => typeof item === "string"));
+}
+
+function uniqueSortedStrings(input: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(input)].sort());
+}
+
+function normalizeComponentRepairScheduleRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"],
+    scheduleId: record["scheduleId"],
+    failureId: record["failureId"],
+    repairTarget: normalizeRepairTarget(record["repairTarget"], record),
+    lawfulReentryPoint: record["lawfulReentryPoint"],
+    attributionConfidence: record["attributionConfidence"],
+    testcaseIds: record["testcaseIds"],
+    componentIds: record["componentIds"],
+    requirementIds: record["requirementIds"],
+    sourceRefs: record["sourceRefs"],
+    testRefs: record["testRefs"],
+    evidenceRefs: record["evidenceRefs"]
+  });
+}
+
+function normalizeComponentRepairSchedule(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const repairRows = parseArray(
+    record["repairRows"],
+    "componentRepairSchedule.repairRows",
+    (item) => normalizeComponentRepairScheduleRow(item)
+  );
+  const derivedEvidenceRefs = uniqueSortedStrings(
+    repairRows.flatMap((row) =>
+      stringValues(objectRecord(row)?.["evidenceRefs"])
+    )
+  );
+  return Object.freeze({
+    kind: record["kind"],
+    registerVersion: record["registerVersion"],
+    scheduleStatus: record["scheduleStatus"],
+    repairRows,
+    evidenceRefs: record["evidenceRefs"] ?? derivedEvidenceRefs
+  });
+}
+
+function normalizeReleaseDepthParity(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const reasonCodes = stringValues(record["reasonCodes"]);
+  const blockerCodes = stringValues(record["blockerCodes"]);
+  const derivedBlockingReasons =
+    reasonCodes.length > 0 ? reasonCodes : blockerCodes;
+  const blockingReasons =
+    record["blockingReasons"] === undefined
+      ? derivedBlockingReasons
+      : record["blockingReasons"];
+  const evidenceRefs =
+    record["evidenceRefs"] === undefined
+      ? stringValues(record["decisionBasis"])
+      : record["evidenceRefs"];
+  const summary =
+    record["summary"] ??
+    record["blockerDetail"] ??
+    (derivedBlockingReasons.length > 0
+      ? `Release depth parity blocked by ${derivedBlockingReasons.join(", ")}.`
+      : "Release depth parity assessment emitted by worker.");
+  return Object.freeze({
+    kind: record["kind"],
+    status: record["status"],
+    summary,
+    blockingReasons,
+    evidenceRefs
+  });
+}
+
+function componentDepthCandidateRecord(input: Record<string, unknown>): unknown {
+  if (input["component_depth_register"] !== undefined) {
+    return input["component_depth_register"];
+  }
+  if (input["componentDepthRegister"] !== undefined) {
+    return input["componentDepthRegister"];
+  }
+  if (
+    input["kind"] === "sdlc_component_depth_register"
+  ) {
+    return input;
+  }
+  return null;
+}
+
 function normalizeCandidate(input: unknown): unknown {
   const record = objectRecord(input);
   if (record === null) {
     return input;
   }
-  if (record["kind"] === "sdlc_component_depth_register") {
-    return input;
-  }
-  if (record["component_depth_register"] !== undefined) {
-    return record["component_depth_register"];
-  }
-  if (record["componentDepthRegister"] !== undefined) {
-    return record["componentDepthRegister"];
+  const candidate = componentDepthCandidateRecord(record);
+  const candidateRecord = objectRecord(candidate);
+  if (candidateRecord !== null) {
+    return Object.freeze({
+      kind: candidateRecord["kind"],
+      registerVersion: candidateRecord["registerVersion"],
+      targetAssetType: candidateRecord["targetAssetType"],
+      componentTopologyRows: normalizeComponentTopologyRows(
+        candidateRecord["componentTopologyRows"]
+      ),
+      componentRealizationRows: normalizeComponentRealizationRows(
+        candidateRecord["componentRealizationRows"]
+      ),
+      testComponentTopologyRows: normalizeTestComponentTopologyRows(
+        candidateRecord["testComponentTopologyRows"]
+      ),
+      componentTestRows: normalizeComponentTestRealizationRows(
+        candidateRecord["componentTestRows"]
+      ),
+      componentTestQualificationRows: normalizeComponentTestQualificationRows(
+        candidateRecord["componentTestQualificationRows"]
+      ),
+      componentExecutionFailureRegister:
+        normalizeComponentExecutionFailureRegister(
+          candidateRecord["componentExecutionFailureRegister"]
+        ),
+      component_execution_failure_register:
+        normalizeComponentExecutionFailureRegister(
+          candidateRecord["component_execution_failure_register"]
+        ),
+      componentRepairSchedule: normalizeComponentRepairSchedule(
+        candidateRecord["componentRepairSchedule"]
+      ),
+      component_repair_schedule:
+        normalizeComponentRepairSchedule(
+          candidateRecord["component_repair_schedule"]
+        ),
+      releaseDepthParity: normalizeReleaseDepthParity(
+        candidateRecord["releaseDepthParity"]
+      )
+    });
   }
   return input;
 }
@@ -563,9 +911,29 @@ function jsonCandidates(content: string): readonly unknown[] {
     // Whole artifact is usually markdown; fenced JSON below is canonical.
   }
   const fencedBlockExpression =
-    /```(?:json|component_depth_register|componentDepthRegister)?\s*\n([\s\S]*?)```/gu;
+    /^```([^\r\n`]*)\r?\n([\s\S]*?)^```[^\S\r\n]*$/gmu;
   for (const match of content.matchAll(fencedBlockExpression)) {
-    const block = match[1]?.trim() ?? "";
+    const infoString = match[1]?.trim() ?? "";
+    const infoParts = infoString.split(/\s+/u).filter((part) => part.length > 0);
+    const language = infoParts[0] ?? "";
+    if (
+      infoString !== "" &&
+      language !== "json" &&
+      language !== "component_depth_register" &&
+      language !== "componentDepthRegister" &&
+      !infoParts.includes("component_depth_register") &&
+      !infoParts.includes("componentDepthRegister")
+    ) {
+      continue;
+    }
+    const block = match[2]?.trim() ?? "";
+    if (
+      infoString === "" &&
+      !block.startsWith("{") &&
+      !block.startsWith("[")
+    ) {
+      continue;
+    }
     try {
       candidates.push(JSON.parse(block));
     } catch {

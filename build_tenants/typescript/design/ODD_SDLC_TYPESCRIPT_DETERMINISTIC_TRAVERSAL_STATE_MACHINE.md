@@ -61,6 +61,9 @@ terminal result is claimed.
 | Carrier | Boundary | Authority | Admission | Inadmissible Shortcut |
 | --- | --- | --- | --- | --- |
 | `SdlcWorkerHandoffManifest` | worker dispatch | graph edge handoff | derived from ABG execution basis, hook contract, conformed project profile, and replay retry context | prompt-only work instruction |
+| `SdlcTraversalStrategyPlan` | traversal modulation | one authoritative per-edge strategy surface | consumed by GTL/vector declarations and installed operator handoff from the same resolved plan | duplicated full-breadth or steel-thread edge lists in separate modules |
+| `SdlcTraversalStrategyDecision` | current edge strategy | selected strategy for this edge | ABG-selected strategy wins; odd_sdlc fallback is used only when ABG provides no strategy | retry context overriding an explicit ABG-selected strategy |
+| `SdlcFeatureScope` | feature-scope pressure | non-narrowing full-breadth or scoped steel-thread/targeted-repair pressure | derived from the strategy decision and archived in the handoff | full-breadth induction filtered to one module |
 | `SdlcWorkerRetryContext` | same-edge re-entry | replay-derived prior failure state | derived from ABG retry projection and admitted gap dossiers | local attempt counter |
 | `SdlcProductMaterializationContract` | product file output | tenant-root materialization law | declares tenant root, selected output root, required roles, and `relativePathBasis=tenant_root` | path convention inferred by worker |
 | `SdlcWorkerResultReport` | worker result | F_P candidate surface | closed JSON report with output digest and materialized file inventory | prose scrape or stdout inference |
@@ -70,6 +73,57 @@ terminal result is claimed.
 | `TraversalRequirementSatisfaction` | total-transition input | folded SDLC domain closure truth | deterministic fold over required assurance ledgers | closing from one green artifact or archive-only note |
 | `RuntimeEvent[]` | traversal truth | ABG event calculus | `vector_evaluated`, `retry_repair_planned`, `retry_attempt_opened`, optional continuation events, or `assessed` | archive-only status |
 | `SdlcInstalledOperatorStartOutcome` | operator projection | read model over state and archive | carries emitted event kinds, gap dossier, and archive refs | next action as transition authority |
+
+## Traversal Strategy Law
+
+The traversal strategy plan is a carrier, not a convenience map. GTL/vector
+modulation and operator handoff must consume the same resolved plan surface. A
+separate `FULL_BREADTH_TRAVERSAL_NAMES` set in graph construction and a separate
+operator fallback map are competing truth surfaces.
+
+ABG-selected strategy is authoritative when present. odd_sdlc may apply its
+source-owned fallback plan only when ABG has not supplied a strategy directive.
+Retry pressure may select `targeted_repair` only through ABG-visible reentry
+truth, or as fallback repair policy when no ABG-selected strategy exists.
+
+Full-breadth edges may still project a `SdlcFeatureScope` carrier with
+`mode: full_breadth` so manifests remain uniform. That carrier is non-narrowing:
+it must not filter authority refs, retrieval hints, closure obligations,
+materialization, or execution shards. The strategy decision records
+`featureScopeRequired: false` for full-breadth.
+
+## Feature Scope Derivation Law
+
+Feature scope is framework-derived authority. A worker may consume it but does
+not author it for closure.
+
+Steel-thread or targeted-repair scope must bind to selected schedule refs,
+required progress artifact refs, repair/reentry refs, or other typed traversal
+facts. If no selected chain can be derived, the framework must fall back to
+non-narrowing full breadth or emit a typed scope-derivation defect. It must not
+silently choose the first declared module as the current scope.
+
+Scope-aware assurance should evaluate typed row/module/entity/operation
+identities. Reason-string token matching is not closure law by itself; it is
+admissible only as a transitional projection when deterministic tests prove that
+generic in-scope reasons are not suppressed and incidental token mentions do not
+leak out-of-scope blockers.
+
+## Design-Depth Admission Law
+
+Design-depth admission may normalize useful ambiguous candidates before strict
+closure, but normalization remains generic builder behavior. Missing target
+identity is not repaired by inventing placeholder module names. Tenant-specific
+terms such as project module vocabulary must not be hardcoded into generic
+odd_sdlc core to infer ownership.
+
+Contradictory module/entity ownership is either rejected or emitted as typed
+ambiguity pressure. A partial candidate may carry useful design facts forward,
+but it must not erase identity conflicts or convert them into ordinary missing
+detail.
+
+Worker retry field sets and strict parser law must be one surface. A retry
+instruction must not advertise a carrier shape that the parser will reject.
 
 ## Total Transition Slice
 

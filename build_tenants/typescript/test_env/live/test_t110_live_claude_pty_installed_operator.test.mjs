@@ -1,8 +1,9 @@
 // Validates: T-110
-// Validates: ABG-3.5-live-Claude-PTY-installed-operator
+// Validates: ABG-3.6-live-Claude-PTY-installed-operator
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -14,8 +15,9 @@ import path, { dirname, resolve } from "node:path";
 
 import {
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
+import { liveTestArchiveRoot } from "./archive_root.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -24,6 +26,9 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
+const EXPECTED_ABG_VERSION = "3.6.0-rc.1";
+const EXPECTED_FALLBACK_CONFIG_DIGEST =
+  "sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T110_LIVE"] === "1";
 
 function archiveTimestamp() {
@@ -35,6 +40,14 @@ function writeJson(filePath, payload) {
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
+function readJson(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function sha256File(filePath) {
+  return `sha256:${createHash("sha256").update(readFileSync(filePath)).digest("hex")}`;
+}
+
 function makeWorkspace(root) {
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
@@ -44,7 +57,7 @@ function makeWorkspace(root) {
     [
       "# T-110 Live Claude PTY Fixture",
       "",
-      "This workspace proves the installed odd_sdlc TypeScript operator can invoke Claude through the ABG 3.5 pty-terminal callout substrate."
+      "This workspace proves the installed odd_sdlc TypeScript operator can invoke Claude through the ABG 3.6 pty-terminal callout substrate."
     ].join("\n"),
     "utf8"
   );
@@ -71,7 +84,7 @@ function makeWorkspace(root) {
     [
       "# Goals",
       "",
-      "- prove ABG 3.5 pty-terminal execution through process://claude",
+      "- prove ABG 3.6 pty-terminal execution through process://claude",
       "- preserve trace evidence without requiring an exact Claude prose response"
     ].join("\n"),
     "utf8"
@@ -125,10 +138,10 @@ test(
   "T-110 live installed operator invokes process://claude through ABG pty-terminal trace substrate",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T110_LIVE=1 not set" },
   async () => {
-    const archiveRoot = path.join(
-      PACKAGE_ROOT,
-      "test_env/test_runs/t110_live_claude_pty_installed_operator",
-      `${archiveTimestamp()}_pid${process.pid}`
+    const archiveRoot = liveTestArchiveRoot(
+      "t110_live_claude_pty_installed_operator",
+      archiveTimestamp(),
+      process.pid
     );
     const workspace = path.join(archiveRoot, "workspace");
     makeWorkspace(workspace);
@@ -141,16 +154,37 @@ test(
     });
     assert.equal(install.kind, "installed");
 
+    const installedAbgPackageJsonPath = path.join(
+      workspace,
+      "node_modules/@abiogenesis/typescript-tenant/package.json"
+    );
+    const installedFallbackConfigPath = path.join(
+      workspace,
+      ".abiogenesis/config/abg.fallbacks.json"
+    );
+    assert.equal(existsSync(installedAbgPackageJsonPath), true);
+    assert.equal(existsSync(installedFallbackConfigPath), true);
+    const installedAbgPackageJson = readJson(installedAbgPackageJsonPath);
+    const fallbackConfigDigest = sha256File(installedFallbackConfigPath);
+    assert.equal(installedAbgPackageJson.version, EXPECTED_ABG_VERSION);
+    assert.equal(fallbackConfigDigest, EXPECTED_FALLBACK_CONFIG_DIGEST);
+    writeJson(path.join(archiveRoot, "installed_abg_substrate_snapshot.json"), {
+      packageJsonPath: installedAbgPackageJsonPath,
+      version: installedAbgPackageJson.version,
+      fallbackConfigPath: installedFallbackConfigPath,
+      fallbackConfigDigest
+    });
+
     const previousOddProfile = process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"];
     const previousAbgProfile = process.env["ABG_TS_AGENT_EXECUTOR_PROFILE"];
     process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"] = "pty-terminal";
     process.env["ABG_TS_AGENT_EXECUTOR_PROFILE"] = "pty-terminal";
     try {
-      const gaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+      const gaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
       writeJson(path.join(archiveRoot, "gaps_result.json"), gaps);
       assert.equal(gaps.status, "ok");
 
-      const start = await runOddSdlcCliAsync([
+      const start = await invokeOddSdlcSpecMethodCommand([
         "start",
         "--workspace",
         workspace,
@@ -168,6 +202,8 @@ test(
       assert.equal(start.payload.status, "worker_invoked");
       assert.equal(start.payload.workerRun.executorProfile, "pty-terminal");
       assert.equal(start.payload.workerRun.streamModel, "terminal-transcript");
+      assert.equal(typeof start.payload.workerRun.terminalSessionId, "string");
+      assert.equal(start.payload.workerRun.terminalSessionId.length > 0, true);
       assert.equal(start.payload.workerRun.outcome.kind, "exited");
       assert.equal(start.payload.workerRun.outcome.status, 0);
       assert.equal(start.payload.workerRun.status, 0);
@@ -181,12 +217,23 @@ test(
 
       const traceResultPath = pathFromFileRef(start.payload.workerRun.traceResultRef);
       assert.equal(existsSync(traceResultPath), true);
-      const traceResult = JSON.parse(readFileSync(traceResultPath, "utf8"));
+      const traceResult = readJson(traceResultPath);
       writeJson(path.join(archiveRoot, "trace_result_snapshot.json"), traceResult);
       assert.equal(traceResult.executorProfile, "pty-terminal");
       assert.equal(traceResult.streamModel, "terminal-transcript");
+      assert.equal(traceResult.terminalSessionId, start.payload.workerRun.terminalSessionId);
       assert.equal(traceResult.outcome.kind, "exited");
       assert.equal(traceResult.outcome.status, 0);
+      const startedContextPath = path.join(
+        start.payload.archiveRoot,
+        "worker_process_started_context.json"
+      );
+      assert.equal(existsSync(startedContextPath), true);
+      const startedContext = readJson(startedContextPath);
+      assert.equal(
+        startedContext.terminalSessionId,
+        start.payload.workerRun.terminalSessionId
+      );
     } finally {
       if (previousOddProfile === undefined) {
         delete process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"];

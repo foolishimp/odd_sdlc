@@ -19,7 +19,7 @@ import {
   deriveConformProjectManagedTraversalManifest,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -94,7 +94,7 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
     )
   );
 
-  const induction = await runOddSdlcCliAsync(["start", "--workspace", workspace]);
+  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
   assert.equal(induction.status, "ok");
   assert.equal(induction.payload.status, "converged");
   assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);

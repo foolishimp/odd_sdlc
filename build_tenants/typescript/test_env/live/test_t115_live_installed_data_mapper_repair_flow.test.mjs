@@ -20,6 +20,7 @@ import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
+import { liveTestArchiveRoot } from "./archive_root.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -132,7 +133,7 @@ function runInstalled(commandPath, args, workspace, archiveRoot, label) {
   writeFileSync(path.join(archiveRoot, `${label}.stderr.log`), run.stderr ?? "", "utf8");
   assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
   const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_cli_result");
+  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
   assert.equal(parsed.status, "ok", JSON.stringify(parsed, null, 2));
   return parsed.payload;
 }
@@ -180,9 +181,29 @@ function writeRepairFlowWorkerScript(workspace) {
       "  if (manifest.targetAssetType === 'release_depth_parity_surface') return { ...base, componentRepairSchedule: repairSchedule, releaseDepthParity: { kind: 'sdlc_release_depth_parity_assessment', status: 'met', summary: 'worker attempted to close parity over open repair row', blockingReasons: [], evidenceRefs: [`file://${manifest.outputFile}`] } };",
       "  return null;",
       "}",
-      "const register = componentDepthRegister();",
+      "function designAxis(axis) {",
+      "  return { kind: 'sdlc_design_completeness_axis_verdict', axis, status: 'satisfied', reasons: [], evidenceRefs: [`file://${manifest.outputFile}`] };",
+      "}",
+      "function designVerdict() {",
+      "  return { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: designAxis('entity'), attribute: designAxis('attribute'), flow: designAxis('flow') };",
+      "}",
+      "function designDepthRegister() {",
+      "  const attribute = { kind: 'sdlc_domain_attribute', attributeId: 'attr:MappingPlan.planId', name: 'planId', valueType: 'String', cardinality: 'one', invariantRefs: ['REQ-ENG-001'] };",
+      "  const entity = { kind: 'sdlc_domain_entity', entityId: 'entity:MappingPlan', moduleName: 'cdme-compiler', ownership: 'owned', attributes: [attribute], invariants: ['planId is stable across compilation'], sourceAssetRefs: ['template://data_mapper'] };",
+      "  const operation = { kind: 'sdlc_domain_operation', operationId: 'operation:compileMappingPlan', moduleName: 'cdme-compiler', inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], requiredAttributeIds: [attribute.attributeId] };",
+      "  const aggregateDomainModel = { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [{ kind: 'sdlc_aggregate_domain_entity', entityId: entity.entityId, ownerModuleName: 'cdme-compiler', attributes: [attribute], sourceModuleNames: ['cdme-compiler'] }], operations: [operation], crossModuleReferences: [], evidenceRefs: [`file://${manifest.outputFile}`] };",
+      "  const sunnyDaySequence = { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:compileMappingPlan', moduleName: 'cdme-compiler', operationId: operation.operationId, inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], stateTransitionIds: ['transition:MappingPlan.draft.compiled'] }], evidenceRefs: [`file://${manifest.outputFile}`] };",
+      "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType };",
+      "  if (manifest.targetAssetType === 'implementation_module_surface') return { ...base, moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'cdme-compiler', entities: [entity], operations: [operation], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'cdme-compiler', entityId: entity.entityId, stateless: false, states: ['draft', 'compiled'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:MappingPlan.draft.compiled', fromState: 'draft', toState: 'compiled', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], aggregateDomainModel: null, aggregateSunnyDaySequence: null, designCompletenessVerdict: null };",
+      "  if (manifest.targetAssetType === 'aggregate_domain_model_surface') return { ...base, moduleSchemaFragments: [], moduleStateDiagramFragments: [], aggregateDomainModel, aggregateSunnyDaySequence: null, designCompletenessVerdict: designVerdict() };",
+      "  if (manifest.targetAssetType === 'aggregate_sunny_day_sequence_surface') return { ...base, moduleSchemaFragments: [], moduleStateDiagramFragments: [], aggregateDomainModel, aggregateSunnyDaySequence: sunnyDaySequence, designCompletenessVerdict: designVerdict() };",
+      "  return null;",
+      "}",
+      "const componentRegister = componentDepthRegister();",
+      "const designRegister = designDepthRegister();",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`)];",
-      "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
+      "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
+      "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
@@ -208,7 +229,7 @@ function writeRepairFlowWorkerScript(workspace) {
       "const executionRefs = executionEvidence === null ? [] : executionEvidence.reportRefs;",
       "const outputRef = `file://${manifest.outputFile}`;",
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
-      "appendFileSync(observationPath, `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, hasFailureRegister: register?.componentExecutionFailureRegister?.failureRows?.length > 0, repairScheduleStatus: register?.componentRepairSchedule?.scheduleStatus ?? null, executionStatus: executionEvidence?.status ?? null, reportUnresolvedReasonsAdvisory: true })}\\n`, 'utf8');",
+      "appendFileSync(observationPath, `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, hasFailureRegister: componentRegister?.componentExecutionFailureRegister?.failureRows?.length > 0, repairScheduleStatus: componentRegister?.componentRepairSchedule?.scheduleStatus ?? null, executionStatus: executionEvidence?.status ?? null, reportUnresolvedReasonsAdvisory: true })}\\n`, 'utf8');",
       "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'T-115 live installed repair-flow worker output', unresolvedReasons: ['advisory report prose must not decide closure'], materializedFiles, executionEvidence, executionEvidenceErrors: [], obligationAssessments: manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [outputRef, ...materializedRefs, ...executionRefs, ...obligation.evidenceRefs], blockingReasons: [] })) }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
@@ -233,10 +254,10 @@ test(
   "T-114/T-115 live installed data_mapper admits failed execution as repair schedule truth",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T115_DATA_MAPPER_LIVE=1 not set" },
   async () => {
-    const archiveRoot = path.join(
-      PACKAGE_ROOT,
-      "test_env/test_runs/t115_live_installed_data_mapper_repair_flow",
-      `${archiveTimestamp()}_pid${process.pid}`
+    const archiveRoot = liveTestArchiveRoot(
+      "t115_live_installed_data_mapper_repair_flow",
+      archiveTimestamp(),
+      process.pid
     );
     mkdirSync(archiveRoot, { recursive: true });
     const workspace = freshDataMapperWorkspace(archiveRoot);

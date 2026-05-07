@@ -1,9 +1,14 @@
 // Implements: T-122
 
-import type { SdlcFeatureScope, SdlcTraversalObligation } from "./carriers.js";
+import type {
+  SdlcFeatureScope,
+  SdlcTraversalObligation,
+  SdlcTraversalStrategy
+} from "./carriers.js";
 
 export interface SdlcFeatureScopeDerivationInput {
   readonly targetAssetType: string;
+  readonly selectedStrategy?: SdlcTraversalStrategy | undefined;
   readonly strategyDirectiveRef: string | null;
   readonly selectedScheduleItemRefs: readonly string[];
   readonly requiredProgressArtifactRefs?: readonly string[];
@@ -99,7 +104,7 @@ export function sdlcModuleNameInFeatureScope(input: {
     return true;
   }
   if (input.featureScope.includedModuleNames.length === 0) {
-    return true;
+    return false;
   }
   return input.featureScope.includedModuleNames.includes(input.moduleName);
 }
@@ -111,8 +116,12 @@ export function sdlcTextMatchesFeatureScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
+  const tokens = featureScopeTokens(input.featureScope);
+  if (tokens.length === 0) {
+    return false;
+  }
   const normalized = input.text.toLowerCase();
-  return featureScopeTokens(input.featureScope).some((token) =>
+  return tokens.some((token) =>
     normalized.includes(token.toLowerCase())
   );
 }
@@ -167,6 +176,20 @@ function isSteelThreadDirective(strategyDirectiveRef: string | null): boolean {
   );
 }
 
+function selectedScopeMode(input: {
+  readonly selectedStrategy?: SdlcTraversalStrategy | undefined;
+  readonly strategyDirectiveRef: string | null;
+}): SdlcFeatureScope["mode"] {
+  if (input.selectedStrategy !== undefined) {
+    return input.selectedStrategy === "targeted_repair"
+      ? "targeted_repair"
+      : input.selectedStrategy;
+  }
+  return isSteelThreadDirective(input.strategyDirectiveRef)
+    ? "steel_thread"
+    : "full_breadth";
+}
+
 function selectedModules(input: {
   readonly declaredModuleNames: readonly string[];
   readonly refs: readonly string[];
@@ -175,13 +198,7 @@ function selectedModules(input: {
   const explicit = declared.filter((moduleName) =>
     tokenAppearsInRef({ token: moduleName, refs: input.refs })
   );
-  if (explicit.length > 0) {
-    return uniqueInOrder(explicit);
-  }
-  const firstDeclared = declared[0];
-  return firstDeclared === undefined
-    ? Object.freeze([])
-    : Object.freeze([firstDeclared]);
+  return uniqueInOrder(explicit);
 }
 
 function selectedIds(input: {
@@ -204,9 +221,10 @@ export function deriveSdlcFeatureScope(
   basisRefValues.push(...input.selectedScheduleItemRefs);
   basisRefValues.push(...(input.requiredProgressArtifactRefs ?? []));
   const basisRefs = uniqueSorted(basisRefValues);
-  const mode = isSteelThreadDirective(input.strategyDirectiveRef)
-    ? "steel_thread"
-    : "full_breadth";
+  const mode = selectedScopeMode({
+    selectedStrategy: input.selectedStrategy,
+    strategyDirectiveRef: input.strategyDirectiveRef
+  });
   if (mode === "full_breadth") {
     return Object.freeze({
       kind: "sdlc_feature_scope" as const,
@@ -225,11 +243,24 @@ export function deriveSdlcFeatureScope(
     declaredModuleNames,
     refs: basisRefs
   });
+  if (includedModuleNames.length === 0) {
+    return Object.freeze({
+      kind: "sdlc_feature_scope" as const,
+      scopeVersion: "ts-scope-v1" as const,
+      mode: "full_breadth" as const,
+      scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/full-breadth`,
+      basisRefs,
+      includedModuleNames: declaredModuleNames,
+      includedEntityIds: uniqueSorted(input.materializedEntityIds),
+      includedOperationIds: uniqueSorted(input.materializedOperationIds),
+      deferredModuleNames: Object.freeze([])
+    });
+  }
   return Object.freeze({
     kind: "sdlc_feature_scope" as const,
     scopeVersion: "ts-scope-v1" as const,
     mode,
-    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/steel-thread/${includedModuleNames
+    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/${mode.replace("_", "-")}/${includedModuleNames
       .map(slugPart)
       .join("+") || "unscoped"}`,
     basisRefs,

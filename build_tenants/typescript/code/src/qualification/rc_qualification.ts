@@ -5,13 +5,14 @@
 
 export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
   kind: "odd_sdlc_typescript_rc_qualification_report",
-  reportId: "odd-sdlc-ts-rc-qualification-20260426",
+  reportId: "odd-sdlc-ts-rc-qualification-20260506",
   releaseClaim: "bounded_odd_native_typescript_rc",
-  verdict: "bounded_rc_ready",
+  verdict: "blocked_pending_b085_component_test_repair",
   verdictScope:
-    "The TypeScript tenant is RC-qualified for the bounded ODD-native package surface: strict build, graph publication, pure ingress, read/query projections, public ABG handoff, hook contracts, traceability closure, triage routing, operational command/result projection, bounded public CLI adapter, harnessed scenario proof, ABG-populated installed sandbox proof, package-backed install/release-cut proof, and one live external F_P data_mapper traversal proof.",
+    "The TypeScript tenant keeps the bounded package-surface proof, but the current full operational RC lane is blocked by B-085: the live data_mapper run is stopped at derive_release_depth_parity_surface until the typed component repair schedule is consumed, DiagnosticsFinalizeSpec.scala is repaired, the implicated shard passes, and release-depth parity is rederived.",
   nonClaimedScope: Object.freeze([
-    "full operational Python replacement at Python historical multi-edge data_mapper realization depth"
+    "full operational Python replacement at Python historical multi-edge data_mapper realization depth",
+    "current RC closure while B-085 remains active"
   ]),
   gates: Object.freeze([
     Object.freeze({
@@ -38,8 +39,8 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
         "build_tenants/typescript/test_env/sandbox/test_t052_abg_installed_sandbox_contract.test.mjs"
     }),
     Object.freeze({
-      name: "T-058 bounded public CLI adapter",
-      category: "cli",
+      name: "T-058/T-120 Spec Method entrypoint",
+      category: "spec_method",
       command: "npm run test:t058",
       status: "passed",
       evidenceRef:
@@ -69,6 +70,14 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       status: "passed",
       evidenceRef:
         ".ai-workspace/tickets/completed/T-053-build-typescript-live-fp-data-mapper-qualification-lane.md"
+    }),
+    Object.freeze({
+      name: "B-085 current live data_mapper release-depth parity",
+      category: "live_rc_blocker",
+      command: "odd-sdlc-ts gaps --workspace .",
+      status: "blocked",
+      evidenceRef:
+        ".ai-workspace/tickets/active/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md"
     }),
     Object.freeze({
       name: "T-060 TypeScript/Python archive comparison",
@@ -151,10 +160,10 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       pythonEvidence:
         "Python has passing historical live code-edge archives and richer data_mapper yield-chain archives with multi-edge continuation/yield depth.",
       typescriptEvidence:
-        "T-053 proves one current live data_mapper derive_code_surface traversal; T-060 publishes the side-by-side comparison and identifies the remaining multi-edge depth question.",
-      status: "bounded_parity_with_depth_gap",
+        "T-053 proves one current live data_mapper derive_code_surface traversal; T-060 publishes the side-by-side comparison. The active T-041 lane is currently blocked by B-085 at release-depth parity until component-test repair evidence is admitted.",
+      status: "blocked_by_b085_current_live_repair",
       gapTicket:
-        ".ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+        ".ai-workspace/tickets/active/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md"
     })
   ])
 } as const);

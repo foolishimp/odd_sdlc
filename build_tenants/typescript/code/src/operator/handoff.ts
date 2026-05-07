@@ -36,6 +36,7 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import { admitExactContractEnum } from "../shared/fd_admission.js";
 import {
   admitSdlcBlockingReason,
   canonicalSdlcPriorGapReasonCode,
@@ -48,6 +49,11 @@ import {
   deriveSdlcFeatureScope,
   sdlcTraversalObligationInFeatureScope
 } from "./feature_scope.js";
+import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
+import { deriveSdlcTraversalStrategyDecision } from "./traversal_strategy.js";
+import {
+  defaultSdlcTraversalScopeRefsForName
+} from "../shared/traversal_strategy_plan.js";
 import type { SdlcProjectConstraints } from "../workspace/index.js";
 import {
   deriveSdlcConformProjectProfileFromWorkspace,
@@ -61,6 +67,8 @@ import type {
   SdlcPostflightGapReason,
   SdlcPostflightGapReasonClass,
   SdlcFpEvaluateResult,
+  SdlcComponentRepairReentryPlan,
+  SdlcComponentRepairScheduleRow,
   SdlcProductMaterializationContract,
   SdlcAuthorityIndexCategory,
   SdlcAuthorityIndexEntry,
@@ -68,7 +76,12 @@ import type {
   SdlcTraversalObligation,
   SdlcTraversalObligationPayload,
   SdlcTraversalObligationContext,
+  SdlcTraversalStrategyDecision,
   SdlcRetrievalHint,
+  SdlcWorkerInvocationObligation,
+  SdlcWorkerInvocationPackage,
+  SdlcWorkerRetryRepairInstruction,
+  SdlcWorkerRetryRepairScope,
   SdlcWorkerHandoffManifest,
   SdlcWorkerExecutionEvidence,
   SdlcWorkerExecutionShardEvidence,
@@ -141,6 +154,7 @@ const WORKER_OBLIGATION_FULFILLMENT_STATUSES = Object.freeze([
 
 const POSTFLIGHT_GAP_ACTIONS = Object.freeze([
   "retry_same_edge",
+  "escalate_to_fp",
   "repair_worker_output",
   "triage_gap",
   "reprice_requirement_or_design"
@@ -217,6 +231,19 @@ function targetRequiresSourceAssetObligations(input: {
   );
 }
 
+function executionCommandMatchesContract(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly command: string;
+}): boolean {
+  if (
+    input.command === input.manifest.productMaterialization.testExecutionContract
+  ) {
+    return true;
+  }
+  const shards = input.manifest.productMaterialization.executionShards;
+  return shards.length === 1 && input.command === shards[0]?.command;
+}
+
 function productMaterializationContract(input: {
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
@@ -262,6 +289,29 @@ function productMaterializationContract(input: {
       declaredModuleNames,
       testExecutionContract
     })
+  });
+}
+
+function productMaterializationForFeatureScope(input: {
+  readonly materialization: SdlcProductMaterializationContract;
+  readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
+}): SdlcProductMaterializationContract {
+  if (
+    (input.featureScope.mode !== "steel_thread" &&
+      input.featureScope.mode !== "targeted_repair") ||
+    input.materialization.executionShards.length === 0 ||
+    input.featureScope.includedModuleNames.length === 0
+  ) {
+    return input.materialization;
+  }
+  const includedModules = new Set(input.featureScope.includedModuleNames);
+  return Object.freeze({
+    ...input.materialization,
+    executionShards: Object.freeze(
+      input.materialization.executionShards.filter((shard) =>
+        includedModules.has(shard.moduleName)
+      )
+    )
   });
 }
 
@@ -869,6 +919,24 @@ function priorGapDossierRefs(
   );
 }
 
+function retryContextScopeRefs(
+  retryContext: SdlcWorkerRetryContext
+): readonly string[] {
+  return uniqueSorted(
+    retryContext.priorGapDossiers.flatMap((dossier) => [
+      dossier.currentGapDossierRef,
+      dossier.edgeName,
+      dossier.targetAssetType,
+      ...dossier.evidenceRefs,
+      ...dossier.reasons.flatMap((reason) => [
+        reason.reason,
+        reason.blockingReason.detail ?? "",
+        ...reason.blockingReason.evidenceRefs
+      ])
+    ])
+  );
+}
+
 function priorWorkerResultReportRefsForSourceAsset(input: {
   readonly workspaceRoot: string;
   readonly assetType: string;
@@ -1059,6 +1127,7 @@ function constructTraversalIntentPackage(input: {
   readonly resultReportSchema: readonly string[];
   readonly contract: SdlcHookContract;
   readonly materialization: SdlcProductMaterializationContract;
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
   readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly obligationContext: SdlcTraversalObligationContext;
   readonly retryContext: SdlcWorkerRetryContext;
@@ -1083,6 +1152,7 @@ function constructTraversalIntentPackage(input: {
       input.obligationContext.obligations.map((obligation) => obligation.obligationId)
     ),
     obligationDeltaSummary: input.obligationContext.deltaSummary,
+    traversalStrategyDecision: input.traversalStrategyDecision,
     featureScope: input.featureScope,
     productMaterialization: input.materialization,
     resultReportSchema: Object.freeze([...input.resultReportSchema]),
@@ -1113,6 +1183,12 @@ export function assertTraversalIntentPackagePressure(
     pkg.reportFile !== manifest.reportFile
   ) {
     throw new TypeError("traversal intent package identity does not match manifest");
+  }
+  if (
+    JSON.stringify(pkg.traversalStrategyDecision) !==
+    JSON.stringify(manifest.traversalStrategyDecision)
+  ) {
+    throw new TypeError("traversal intent package strategy decision drift");
   }
   if (
     JSON.stringify(pkg.featureScope) !== JSON.stringify(manifest.featureScope)
@@ -1198,7 +1274,7 @@ export function deriveWorkerHandoffManifest(input: {
   const conformedProject =
     input.conformedProject ??
     deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot);
-  const materialization = productMaterializationContract({
+  const baseMaterialization = productMaterializationContract({
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
     targetAssetType: input.contract.targetAssetType,
@@ -1206,9 +1282,6 @@ export function deriveWorkerHandoffManifest(input: {
     projectConstraints: input.projectConstraints
   });
   const retryContext = input.retryContext ?? emptyRetryContext();
-  const allowedWriteRoots = materialization.required
-    ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
-    : Object.freeze([outputRoot, archiveRoot]);
   const methodRefs = Object.freeze([
     "workspace://.abiogenesis/docs/standards/SPEC_METHOD.md",
     "workspace://.abiogenesis/docs/standards/TICKET_METHOD.md",
@@ -1222,17 +1295,39 @@ export function deriveWorkerHandoffManifest(input: {
   const fpTransformResultFile = join(archiveRoot, "fp_transform_result.json");
   const fpEvaluateResultFile = join(archiveRoot, "fp_evaluate_result.json");
   const traversalAttemptEnvelope = input.traversalAttemptEnvelope ?? null;
-  const featureScope = deriveSdlcFeatureScope({
+  const retrySelectedScheduleItemRefs = retryContextScopeRefs(retryContext);
+  const selectedScheduleItemRefs =
+    traversalAttemptEnvelope?.selectedScheduleItemRefs ??
+    (retrySelectedScheduleItemRefs.length > 0
+      ? retrySelectedScheduleItemRefs
+      : defaultSdlcTraversalScopeRefsForName(input.edgeName));
+  const traversalStrategyDecision = deriveSdlcTraversalStrategyDecision({
+    edgeName: input.edgeName,
     targetAssetType: input.contract.targetAssetType,
     strategyDirectiveRef: traversalAttemptEnvelope?.strategyDirectiveRef ?? null,
-    selectedScheduleItemRefs:
-      traversalAttemptEnvelope?.selectedScheduleItemRefs ?? Object.freeze([]),
+    selectedScheduleItemRefs,
     requiredProgressArtifactRefs:
       traversalAttemptEnvelope?.requiredProgressArtifactRefs ?? Object.freeze([]),
-    declaredModuleNames: materialization.declaredModuleNames,
+    retryContext
+  });
+  const featureScope = deriveSdlcFeatureScope({
+    targetAssetType: input.contract.targetAssetType,
+    selectedStrategy: traversalStrategyDecision.selectedStrategy,
+    strategyDirectiveRef: traversalAttemptEnvelope?.strategyDirectiveRef ?? null,
+    selectedScheduleItemRefs,
+    requiredProgressArtifactRefs:
+      traversalAttemptEnvelope?.requiredProgressArtifactRefs ?? Object.freeze([]),
+    declaredModuleNames: baseMaterialization.declaredModuleNames,
     materializedEntityIds: Object.freeze([]),
     materializedOperationIds: Object.freeze([])
   });
+  const materialization = productMaterializationForFeatureScope({
+    materialization: baseMaterialization,
+    featureScope
+  });
+  const allowedWriteRoots = materialization.required
+    ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
+    : Object.freeze([outputRoot, archiveRoot]);
   const traversalObligationContext = deriveTraversalObligationContext({
     workspaceRoot: input.workspaceRoot,
     contract: input.contract,
@@ -1250,6 +1345,7 @@ export function deriveWorkerHandoffManifest(input: {
     resultReportSchema,
     contract: input.contract,
     materialization,
+    traversalStrategyDecision,
     featureScope,
     obligationContext: traversalObligationContext,
     retryContext
@@ -1273,6 +1369,7 @@ export function deriveWorkerHandoffManifest(input: {
     allowedWriteRoots,
     conformedProject,
     productMaterialization: materialization,
+    traversalStrategyDecision,
     featureScope,
     traversalObligationContext,
     traversalIntentPackage,
@@ -1345,6 +1442,12 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
       "Do not collapse allocated testcase ids into one broad smoke test unless the test topology explicitly declares one class/file.",
       "The transform artifact MUST include a Component Test Register naming testClassId, testcase ids, covered componentIds, requirement ids, and materialized test file path."
     );
+    if (isSbtTestContract(manifest.productMaterialization.testExecutionContract)) {
+      lines.push(
+        "For ScalaTest Matchers, avoid local identifiers that collide with matcher words such as a, an, be, empty, or contain.",
+        "For numeric or primitive assertions, prefer shouldEqual or parenthesized shouldBe RHS so matcher overload inference cannot require a matcher word."
+      );
+    }
   }
   return lines.join("\n");
 }
@@ -1415,8 +1518,11 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
     return [
       "This edge qualifies component test execution.",
       "The output MUST include a fenced JSON block named component_depth_register with componentTestQualificationRows.",
+      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_test_qualification_surface`.",
       "Each componentTestQualificationRows entry MUST cite testClassId, testcaseIds, componentIds, requirementIds, status, and evidenceRefs.",
+      "componentTestQualificationRows.status MUST be one of passed, failed, blocked, pending, or unproven. Use blocked for classes that could not execute because another typed failure stopped the shard.",
       "When any componentTestQualificationRows entry has status failed, the same JSON block MUST also include componentExecutionFailureRegister with kind component_execution_failure_register.",
+      "componentExecutionFailureRegister.registerVersion MUST be ts-component-depth-v1.",
       "Every failureRows entry MUST bind failureId, shardId, moduleName, testClassId, testcaseIds, componentIds, requirementIds, failureKind, repairTarget, lawfulReentryPoint, attributionConfidence, sourceRefs, testRefs, and evidenceRefs.",
       "If deterministic evidence cannot bind testcaseId + componentId + requirementId, emit a low-confidence triage_gap row rather than mutating source or tests.",
       "Map admitted test_execution_result_surface evidence to test_component_topology_surface rows and component_test_surface materialization.",
@@ -1428,11 +1534,16 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
     return [
       "This edge derives component repair schedule truth from admitted execution failure rows.",
       "The output MUST include a fenced JSON block named component_depth_register with componentRepairSchedule.",
+      "That JSON block MUST contain only the component-depth carrier fields accepted for this target: kind, registerVersion, targetAssetType, and componentRepairSchedule.",
+      "Keep module_dependency_graph, tranche ledgers, and explanatory schedule prose outside the component_depth_register JSON block.",
       "componentRepairSchedule.kind MUST be sdlc_component_repair_schedule and registerVersion MUST be ts-component-depth-v1.",
+      "componentRepairSchedule.scheduleStatus MUST be one of repair_required, no_repair_required, or triage_gap.",
       "If no repairable failure rows are open, use scheduleStatus no_repair_required with repairRows [].",
       "If repair is required, use scheduleStatus repair_required and emit one repair row per admitted high-confidence failure row.",
+      "Do not convert prior postflight gaps, schema rejections, or module-build notes into repair rows; repair rows only derive from admitted componentExecutionFailureRegister.failureRows.",
       "Each repair row MUST bind scheduleId, failureId, repairTarget, lawfulReentryPoint, attributionConfidence, testcaseIds, componentIds, requirementIds, sourceRefs, testRefs, and evidenceRefs.",
-      "Rows that do not bind testcaseId + componentId + requirementId are triage gaps, not repair authority.",
+      "repairTarget MUST be one of component_code, component_test, test_schedule, test_execution_surface, implementation_design, testcase_authority, requirement_reprice, worker_archive, or transport_retry.",
+      "Rows that do not bind testcaseId + componentId + requirementId are not repair authority; do not emit them in repairRows. If deterministic evidence cannot bind them, set scheduleStatus triage_gap with repairRows [].",
       "Do not mutate product source or tests in this edge; this edge only schedules bounded repair for later component code/test traversal."
     ].join("\n");
   }
@@ -1503,7 +1614,7 @@ function designFeatureScopePromptLines(
     ]);
   }
   return Object.freeze([
-    "Feature scope mode: steel_thread.",
+    `Feature scope mode: ${scope.mode}.`,
     `Included modules for this traversal: ${listForPrompt(
       scope.includedModuleNames
     )}.`,
@@ -1544,16 +1655,18 @@ function executionEvidenceTransformPrompt(
     "The Requirement Trace Register MUST cite the relevant executionEvidence or shardEvidence row for each requirement id so framework postflight can observe the exact marker.",
     "If a requirement is not covered, still include its exact requirement id and obligationId with pending/blocked evidence status instead of omitting the row.",
     "executionEvidence.status MUST be one of: succeeded, failed, pending.",
-    "Use pending when execution did not run or external evidence is still unavailable.",
+    "Use pending only when execution did not run or external evidence is still unavailable.",
+    "If a declared test command was executed and exits non-zero during compile, discovery, or test phases, record failed, not pending, even when testsObserved is 0.",
     "Do not use status values such as not_run, skipped, unknown, or none.",
     "executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null; never arrays or strings.",
     "executionEvidence.lane MUST be exactly \"test\".",
     `If the test execution contract is declared as ${JSON.stringify(
       manifest.productMaterialization.testExecutionContract
     )}, run that command from the tenant root when execution is available.`,
-    "When tests run, record succeeded or failed and report observed test counts.",
-    "When tests cannot run, record pending, keep counts at 0, and carry a blocker instead of claiming closure.",
-    "Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence."
+    "When the command runs, record succeeded or failed and report observed test counts.",
+    "When the command cannot run at all, record pending, keep counts at 0, and carry a blocker instead of claiming closure.",
+    "Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence.",
+    "Execution evidence MUST be emitted as a fenced JSON block with kind sdlc_worker_execution_evidence. Do not emit YAML for the execution evidence carrier."
   ].join("\n");
 }
 
@@ -1597,8 +1710,11 @@ function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
   ].join("\n");
 }
 
-function compactObligation(obligation: SdlcTraversalObligation): unknown {
+function compactObligation(
+  obligation: SdlcTraversalObligation
+): SdlcWorkerInvocationObligation {
   return Object.freeze({
+    kind: "sdlc_worker_invocation_obligation" as const,
     obligationId: obligation.obligationId,
     obligationKind: obligation.obligationKind,
     summary: obligation.summary,
@@ -1621,12 +1737,25 @@ function inlineObligationsForPrompt(
   return Object.freeze([...structural, ...requirementSlice]);
 }
 
+function requirementTraceObligationIdsForPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return Object.freeze(
+    manifest.traversalObligationContext.obligations
+      .filter((obligation) => obligation.obligationKind === "requirement")
+      .map((obligation) => obligation.obligationId)
+  );
+}
+
 function promptPressureProjection(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly manifestPath: string;
   readonly traversalIntentPath: string;
 }): unknown {
   const inlineObligations = inlineObligationsForPrompt(input.manifest);
+  const requirementTraceObligationIds = requirementTraceObligationIdsForPrompt(
+    input.manifest
+  );
   const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
   return Object.freeze({
     kind: "sdlc_worker_prompt_pressure_projection",
@@ -1643,6 +1772,7 @@ function promptPressureProjection(input: {
     inlineObligationIds: inlineObligations.map(
       (obligation) => obligation.obligationId
     ),
+    requirementTraceObligationIds,
     inlineObligations: inlineObligations.map(compactObligation),
     retrievalHints: input.manifest.traversalObligationContext.retrievalHints,
     priorGapFrontier: Object.freeze({
@@ -1657,6 +1787,7 @@ function promptPressureProjection(input: {
       inlineObligations.length,
     obligationDeltaSummary:
       input.manifest.traversalObligationContext.deltaSummary,
+    traversalStrategyDecision: input.manifest.traversalStrategyDecision,
     traversalAttemptEnvelope:
       input.manifest.traversalAttemptEnvelope === null
         ? null
@@ -1681,30 +1812,796 @@ function promptPressureProjection(input: {
   });
 }
 
+function retryRepairScopeForReason(
+  reason: string,
+  reasonClass: SdlcPostflightGapReason["reasonClass"]
+): SdlcWorkerRetryRepairScope {
+  if (
+    reason.includes("_register_invalid:") ||
+    reason.includes("_register_missing") ||
+    reason.startsWith("test_execution_evidence_invalid") ||
+    reason.startsWith("test_execution_evidence_missing")
+  ) {
+    return "schema_local";
+  }
+  if (
+    reasonClass === "assurance" ||
+    reasonClass === "topology" ||
+    reasonClass === "authority_to_code" ||
+    reasonClass === "code_to_test"
+  ) {
+    return "semantic_local";
+  }
+  return "broad_regeneration";
+}
+
+function componentDepthFieldSetForTarget(
+  targetAssetType: string
+): readonly string[] {
+  if (targetAssetType === "implementation_component_topology_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "componentTopologyRows[].kind",
+      "componentTopologyRows[].componentId",
+      "componentTopologyRows[].moduleName",
+      "componentTopologyRows[].relativePath",
+      "componentTopologyRows[].publicBoundary",
+      "componentTopologyRows[].concernRole",
+      "componentTopologyRows[].requirementIds",
+      "componentTopologyRows[].sourceAssetRefs"
+    ]);
+  }
+  if (
+    targetAssetType === "component_realization_schedule_surface" ||
+    targetAssetType === "component_code_surface" ||
+    targetAssetType === "component_realization_qualification_surface"
+  ) {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "componentRealizationRows[].kind",
+      "componentRealizationRows[].componentId",
+      "componentRealizationRows[].moduleName",
+      "componentRealizationRows[].relativePath",
+      "componentRealizationRows[].publicBoundary",
+      "componentRealizationRows[].requirementIds",
+      "componentRealizationRows[].sourceAssetRefs"
+    ]);
+  }
+  if (targetAssetType === "test_component_topology_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "testComponentTopologyRows[].kind",
+      "testComponentTopologyRows[].testClassId",
+      "testComponentTopologyRows[].relativePath",
+      "testComponentTopologyRows[].testcaseIds",
+      "testComponentTopologyRows[].componentIds",
+      "testComponentTopologyRows[].requirementIds",
+      "testComponentTopologyRows[].shardId"
+    ]);
+  }
+  if (targetAssetType === "component_test_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "componentTestRows[].kind",
+      "componentTestRows[].testClassId",
+      "componentTestRows[].relativePath",
+      "componentTestRows[].testcaseIds",
+      "componentTestRows[].componentIds",
+      "componentTestRows[].requirementIds",
+      "componentTestRows[].shardId"
+    ]);
+  }
+  if (targetAssetType === "component_test_qualification_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "componentTestQualificationRows[].kind",
+      "componentTestQualificationRows[].testClassId",
+      "componentTestQualificationRows[].testcaseIds",
+      "componentTestQualificationRows[].componentIds",
+      "componentTestQualificationRows[].requirementIds",
+      "componentTestQualificationRows[].status",
+      "componentTestQualificationRows[].evidenceRefs"
+    ]);
+  }
+  if (targetAssetType === "component_repair_schedule_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "componentRepairSchedule.kind",
+      "componentRepairSchedule.registerVersion",
+      "componentRepairSchedule.scheduleStatus",
+      "componentRepairSchedule.repairRows",
+      "componentRepairSchedule.evidenceRefs",
+      "componentRepairSchedule.repairRows[].kind",
+      "componentRepairSchedule.repairRows[].scheduleId",
+      "componentRepairSchedule.repairRows[].failureId",
+      "componentRepairSchedule.repairRows[].repairTarget",
+      "componentRepairSchedule.repairRows[].lawfulReentryPoint",
+      "componentRepairSchedule.repairRows[].attributionConfidence",
+      "componentRepairSchedule.repairRows[].testcaseIds",
+      "componentRepairSchedule.repairRows[].componentIds",
+      "componentRepairSchedule.repairRows[].requirementIds",
+      "componentRepairSchedule.repairRows[].sourceRefs",
+      "componentRepairSchedule.repairRows[].testRefs",
+      "componentRepairSchedule.repairRows[].evidenceRefs"
+    ]);
+  }
+  if (targetAssetType === "release_depth_parity_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "releaseDepthParity.kind",
+      "releaseDepthParity.status",
+      "releaseDepthParity.evidenceRefs"
+    ]);
+  }
+  return Object.freeze(["kind", "registerVersion", "targetAssetType"]);
+}
+
+function designDepthFieldSetForTarget(targetAssetType: string): readonly string[] {
+  if (targetAssetType === "implementation_module_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "moduleSchemaFragments[].kind",
+      "moduleSchemaFragments[].moduleName",
+      "moduleSchemaFragments[].entities[].kind",
+      "moduleSchemaFragments[].entities[].entityId",
+      "moduleSchemaFragments[].entities[].moduleName",
+      "moduleSchemaFragments[].entities[].ownership",
+      "moduleSchemaFragments[].entities[].attributes[].kind",
+      "moduleSchemaFragments[].entities[].attributes[].attributeId",
+      "moduleSchemaFragments[].entities[].attributes[].name",
+      "moduleSchemaFragments[].entities[].attributes[].valueType",
+      "moduleSchemaFragments[].entities[].attributes[].cardinality",
+      "moduleSchemaFragments[].entities[].attributes[].invariantRefs",
+      "moduleSchemaFragments[].entities[].invariants",
+      "moduleSchemaFragments[].entities[].sourceAssetRefs",
+      "moduleSchemaFragments[].operations[].kind",
+      "moduleSchemaFragments[].operations[].operationId",
+      "moduleSchemaFragments[].operations[].moduleName",
+      "moduleSchemaFragments[].operations[].inputEntityIds",
+      "moduleSchemaFragments[].operations[].outputEntityIds",
+      "moduleSchemaFragments[].operations[].requiredAttributeIds",
+      "moduleSchemaFragments[].requirementIds",
+      "moduleSchemaFragments[].sourceAssetRefs",
+      "moduleStateDiagramFragments[].kind",
+      "moduleStateDiagramFragments[].moduleName",
+      "moduleStateDiagramFragments[].entityId",
+      "moduleStateDiagramFragments[].stateless",
+      "moduleStateDiagramFragments[].states",
+      "moduleStateDiagramFragments[].transitions[].kind",
+      "moduleStateDiagramFragments[].transitions[].transitionId",
+      "moduleStateDiagramFragments[].transitions[].fromState",
+      "moduleStateDiagramFragments[].transitions[].toState",
+      "moduleStateDiagramFragments[].transitions[].operationId",
+      "moduleStateDiagramFragments[].transitions[].entityId",
+      "moduleStateDiagramFragments[].requirementIds",
+      "moduleStateDiagramFragments[].sourceAssetRefs"
+    ]);
+  }
+  if (targetAssetType === "aggregate_domain_model_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "aggregateDomainModel.kind",
+      "aggregateDomainModel.entities",
+      "aggregateDomainModel.operations",
+      "aggregateDomainModel.crossModuleReferences",
+      "designCompletenessVerdict.entity",
+      "designCompletenessVerdict.attribute",
+      "designCompletenessVerdict.flow"
+    ]);
+  }
+  if (targetAssetType === "aggregate_sunny_day_sequence_surface") {
+    return Object.freeze([
+      "kind",
+      "registerVersion",
+      "targetAssetType",
+      "aggregateDomainModel",
+      "aggregateSunnyDaySequence.steps",
+      "designCompletenessVerdict.entity",
+      "designCompletenessVerdict.attribute",
+      "designCompletenessVerdict.flow"
+    ]);
+  }
+  return Object.freeze(["kind", "registerVersion", "targetAssetType"]);
+}
+
+function acceptedCarrierSchemaForReason(input: {
+  readonly reason: string;
+  readonly targetAssetType: string;
+}): { readonly schemaRef: string; readonly fieldSet: readonly string[] } | null {
+  if (
+    input.reason.startsWith("component_depth_register_invalid:") ||
+    input.reason === "component_depth_register_missing" ||
+    input.reason.startsWith("component_repair_schedule_") ||
+    input.reason.startsWith("component_repair_row_open:")
+  ) {
+    return Object.freeze({
+      schemaRef: "schema://odd_sdlc/component_depth_register",
+      fieldSet: componentDepthFieldSetForTarget(input.targetAssetType)
+    });
+  }
+  if (
+    input.reason.startsWith("design_depth_register_invalid:") ||
+    input.reason === "design_depth_register_missing" ||
+    input.reason.startsWith("design_attribute_missing:") ||
+    input.reason.startsWith("design_operation_required_attributes_missing:")
+  ) {
+    return Object.freeze({
+      schemaRef: "schema://odd_sdlc/design_depth_register",
+      fieldSet: designDepthFieldSetForTarget(input.targetAssetType)
+    });
+  }
+  if (
+    input.reason.startsWith("test_execution_evidence_invalid") ||
+    input.reason.startsWith("test_execution_evidence_missing")
+  ) {
+    return Object.freeze({
+      schemaRef: "schema://odd_sdlc/test_execution_evidence",
+      fieldSet: Object.freeze([
+        "kind",
+        "lane",
+        "command",
+        "status",
+        "reportRefs",
+        "testsObserved",
+        "passedCount",
+        "failedCount",
+        "shardEvidence[].kind",
+        "shardEvidence[].shardId",
+        "shardEvidence[].moduleName",
+        "shardEvidence[].lane",
+        "shardEvidence[].command",
+        "shardEvidence[].status",
+        "shardEvidence[].reportRefs",
+        "shardEvidence[].testsObserved",
+        "shardEvidence[].passedCount",
+        "shardEvidence[].failedCount"
+      ])
+    });
+  }
+  return null;
+}
+
+function repairReentryTargetForRepairTarget(
+  repairTarget: SdlcComponentRepairScheduleRow["repairTarget"]
+): { readonly targetEdgeName: string; readonly targetAssetType: string } | null {
+  if (repairTarget === "component_test") {
+    return Object.freeze({
+      targetEdgeName: "derive_component_test_surface",
+      targetAssetType: "component_test_surface"
+    });
+  }
+  if (repairTarget === "component_code") {
+    return Object.freeze({
+      targetEdgeName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface"
+    });
+  }
+  if (repairTarget === "test_schedule") {
+    return Object.freeze({
+      targetEdgeName: "derive_test_schedule_surface",
+      targetAssetType: "test_schedule_surface"
+    });
+  }
+  if (repairTarget === "test_execution_surface") {
+    return Object.freeze({
+      targetEdgeName: "prepare_test_execution_surface",
+      targetAssetType: "test_execution_surface"
+    });
+  }
+  return null;
+}
+
+function filePathForEvidenceRef(input: {
+  readonly workspaceRoot: string;
+  readonly ref: string;
+}): string | null {
+  try {
+    const parsed = new URL(input.ref);
+    if (parsed.protocol === "file:") {
+      return fileURLToPath(parsed);
+    }
+    if (parsed.protocol === "workspace:") {
+      return join(input.workspaceRoot, parsed.pathname.replace(/^\/+/, ""));
+    }
+  } catch {
+    if (isAbsolute(input.ref)) {
+      return input.ref;
+    }
+  }
+  return null;
+}
+
+function existingEvidencePaths(input: {
+  readonly workspaceRoot: string;
+  readonly refs: readonly string[];
+}): readonly string[] {
+  return uniqueSorted(
+    input.refs.flatMap((ref) => {
+      const filePath = filePathForEvidenceRef({
+        workspaceRoot: input.workspaceRoot,
+        ref
+      });
+      return filePath !== null && existsSync(filePath) && statSync(filePath).isFile()
+        ? [filePath]
+        : [];
+    })
+  );
+}
+
+function recentRuntimeAssetPaths(input: {
+  readonly workspaceRoot: string;
+  readonly targetAssetTypes: readonly string[];
+  readonly limit: number;
+}): readonly string[] {
+  const assetsRoot = join(
+    input.workspaceRoot,
+    ".ai-workspace",
+    "runtime",
+    "odd_sdlc",
+    "assets"
+  );
+  if (!existsSync(assetsRoot) || !statSync(assetsRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  const candidates: { readonly filePath: string; readonly mtimeMs: number }[] = [];
+  for (const runId of readdirSync(assetsRoot)) {
+    const runRoot = join(assetsRoot, runId);
+    if (!existsSync(runRoot) || !statSync(runRoot).isDirectory()) {
+      continue;
+    }
+    for (const targetAssetType of input.targetAssetTypes) {
+      const filePath = join(runRoot, `${targetAssetType}.md`);
+      if (existsSync(filePath) && statSync(filePath).isFile()) {
+        candidates.push(Object.freeze({
+          filePath,
+          mtimeMs: statSync(filePath).mtimeMs
+        }));
+      }
+    }
+  }
+  return Object.freeze(
+    candidates
+      .sort((left, right) => right.mtimeMs - left.mtimeMs)
+      .slice(0, input.limit)
+      .map((candidate) => candidate.filePath)
+  );
+}
+
+function componentRepairRowsFromArtifact(input: {
+  readonly outputFile: string;
+  readonly preferredTargetAssetType: string;
+}): readonly SdlcComponentRepairScheduleRow[] {
+  const targetAssetTypes = uniqueSorted([
+    input.preferredTargetAssetType,
+    "component_repair_schedule_surface",
+    "release_depth_parity_surface"
+  ]);
+  for (const targetAssetType of targetAssetTypes) {
+    const admission = admitComponentDepthRegisterFromArtifact({
+      targetAssetType,
+      outputFile: input.outputFile
+    });
+    if (
+      admission.status === "admitted" &&
+      admission.register !== null &&
+      admission.register.componentRepairSchedule !== null
+    ) {
+      return admission.register.componentRepairSchedule.repairRows;
+    }
+  }
+  return Object.freeze([]);
+}
+
+function componentRepairRowsForFailure(input: {
+  readonly workspaceRoot: string;
+  readonly preferredTargetAssetType: string;
+  readonly failureId: string;
+  readonly evidenceRefs: readonly string[];
+}): readonly SdlcComponentRepairScheduleRow[] {
+  const paths = uniqueSorted([
+    ...existingEvidencePaths({
+      workspaceRoot: input.workspaceRoot,
+      refs: input.evidenceRefs
+    }),
+    ...recentRuntimeAssetPaths({
+      workspaceRoot: input.workspaceRoot,
+      targetAssetTypes: Object.freeze([
+        "component_repair_schedule_surface",
+        "release_depth_parity_surface"
+      ]),
+      limit: 8
+    })
+  ]);
+  return Object.freeze(
+    paths.flatMap((outputFile) =>
+      componentRepairRowsFromArtifact({
+        outputFile,
+        preferredTargetAssetType: input.preferredTargetAssetType
+      }).filter((row) => row.failureId === input.failureId)
+    )
+  );
+}
+
+function diagnosticNeedlesForRepairRow(
+  row: SdlcComponentRepairScheduleRow
+): readonly string[] {
+  return uniqueSorted([
+    row.failureId,
+    ...row.testRefs.map((ref) => path.basename(ref)),
+    ...row.sourceRefs.map((ref) => path.basename(ref)),
+    "[error]",
+    "type mismatch",
+    "Cannot prove",
+    "test_compile_failed",
+    "blockerDetail"
+  ]).filter((needle) => needle.length > 0);
+}
+
+function diagnosticEvidenceForRepairRow(input: {
+  readonly workspaceRoot: string;
+  readonly row: SdlcComponentRepairScheduleRow;
+  readonly evidenceRefs: readonly string[];
+}): { readonly evidenceRefs: readonly string[]; readonly excerpt: string } {
+  const paths = uniqueSorted([
+    ...existingEvidencePaths({
+      workspaceRoot: input.workspaceRoot,
+      refs: uniqueSorted([...input.evidenceRefs, ...input.row.evidenceRefs])
+    }),
+    ...recentRuntimeAssetPaths({
+      workspaceRoot: input.workspaceRoot,
+      targetAssetTypes: Object.freeze(["test_execution_result_surface"]),
+      limit: 6
+    })
+  ]);
+  const needles = diagnosticNeedlesForRepairRow(input.row).map((needle) =>
+    needle.toLowerCase()
+  );
+  const selectedLines: string[] = [];
+  const evidenceRefs: string[] = [];
+  for (const filePath of paths) {
+    let content: string;
+    try {
+      content = readFileSync(filePath, "utf8");
+    } catch {
+      continue;
+    }
+    const matchingLines = content
+      .split(/\r?\n/u)
+      .filter((line) => {
+        const lower = line.toLowerCase();
+        return needles.some((needle) => lower.includes(needle));
+      })
+      .slice(0, 40);
+    if (matchingLines.length === 0) {
+      continue;
+    }
+    evidenceRefs.push(pathToFileURL(filePath).href);
+    selectedLines.push(`From ${pathToFileURL(filePath).href}:`, ...matchingLines);
+  }
+  return Object.freeze({
+    evidenceRefs: uniqueSorted(evidenceRefs),
+    excerpt: selectedLines.join("\n").slice(0, 2400)
+  });
+}
+
+function componentRepairReentryPlanForReason(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly dossier: SdlcPostflightGapDossier;
+  readonly reason: SdlcPostflightGapReason;
+}): SdlcComponentRepairReentryPlan | null {
+  const prefix = "component_repair_row_open:";
+  if (!input.reason.reason.startsWith(prefix)) {
+    return null;
+  }
+  const failureId = input.reason.reason.slice(prefix.length);
+  if (failureId.length === 0) {
+    return null;
+  }
+  const evidenceRefs = uniqueSorted([
+    ...input.dossier.evidenceRefs,
+    ...input.reason.blockingReason.evidenceRefs
+  ]);
+  const row = componentRepairRowsForFailure({
+    workspaceRoot: input.manifest.workspaceRoot,
+    preferredTargetAssetType: input.dossier.targetAssetType,
+    failureId,
+    evidenceRefs
+  })[0];
+  if (row === undefined) {
+    return null;
+  }
+  const target = repairReentryTargetForRepairTarget(row.repairTarget);
+  if (target === null) {
+    return null;
+  }
+  const acceptedCarrier = acceptedCarrierSchemaForReason({
+    reason: input.reason.reason,
+    targetAssetType: target.targetAssetType
+  });
+  if (acceptedCarrier === null) {
+    return null;
+  }
+  const diagnostics = diagnosticEvidenceForRepairRow({
+    workspaceRoot: input.manifest.workspaceRoot,
+    row,
+    evidenceRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_component_repair_reentry_plan" as const,
+    planVersion: "ts-component-repair-reentry-v1" as const,
+    planId: `component_repair_reentry:${row.failureId}`,
+    sourceGapDossierRef: input.dossier.currentGapDossierRef,
+    sourceEdgeName: input.dossier.edgeName,
+    sourceTargetAssetType: input.dossier.targetAssetType,
+    reason: input.reason.reason,
+    targetEdgeName: target.targetEdgeName,
+    targetAssetType: target.targetAssetType,
+    repairTarget: row.repairTarget,
+    failureId: row.failureId,
+    scheduleId: row.scheduleId,
+    testcaseIds: row.testcaseIds,
+    componentIds: row.componentIds,
+    requirementIds: row.requirementIds,
+    sourceRefs: row.sourceRefs,
+    testRefs: row.testRefs,
+    repairRowEvidenceRefs: uniqueSorted(row.evidenceRefs),
+    diagnosticEvidenceRefs: uniqueSorted([
+      ...diagnostics.evidenceRefs,
+      ...row.evidenceRefs
+    ]),
+    diagnosticExcerpt: diagnostics.excerpt,
+    acceptedCarrierSchemaRef: acceptedCarrier.schemaRef,
+    acceptedCarrierFieldSet: acceptedCarrier.fieldSet,
+    noBroadRegeneration: true
+  });
+}
+
+function repairReentryPlansForContext(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcComponentRepairReentryPlan[] {
+  const plans = new Map<string, SdlcComponentRepairReentryPlan>();
+  for (const dossier of manifest.retryContext.priorGapDossiers) {
+    for (const plan of componentRepairReentryPlansForGapDossier({
+      manifest,
+      dossier
+    })) {
+      plans.set(plan.planId, plan);
+    }
+  }
+  return Object.freeze([...plans.values()]);
+}
+
+export function componentRepairReentryPlansForGapDossier(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly dossier: SdlcPostflightGapDossier;
+}): readonly SdlcComponentRepairReentryPlan[] {
+  const plans = new Map<string, SdlcComponentRepairReentryPlan>();
+  for (const reason of input.dossier.reasons) {
+    const plan = componentRepairReentryPlanForReason({
+      manifest: input.manifest,
+      dossier: input.dossier,
+      reason
+    });
+    if (plan !== null) {
+      plans.set(plan.planId, plan);
+    }
+  }
+  return Object.freeze([...plans.values()]);
+}
+
+function retryRepairInstructionsForContext(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcWorkerRetryRepairInstruction[] {
+  const instructions: SdlcWorkerRetryRepairInstruction[] = [];
+  for (const dossier of manifest.retryContext.priorGapDossiers) {
+    for (const reason of dossier.reasons) {
+      const repairReentryPlan = componentRepairReentryPlanForReason({
+        manifest,
+        dossier,
+        reason
+      });
+      const acceptedCarrier = acceptedCarrierSchemaForReason({
+        reason: reason.reason,
+        targetAssetType: repairReentryPlan?.targetAssetType ?? dossier.targetAssetType
+      });
+      const repairScope = retryRepairScopeForReason(
+        reason.reason,
+        reason.reasonClass
+      );
+      const evidenceRefs = uniqueSorted([
+        ...dossier.evidenceRefs,
+        ...reason.blockingReason.evidenceRefs
+      ]);
+      instructions.push(
+        Object.freeze({
+          kind: "sdlc_worker_retry_repair_instruction" as const,
+          repairScope,
+          gapDossierRef: dossier.currentGapDossierRef,
+          reason: reason.reason,
+          reasonClass: reason.reasonClass,
+          blockingReasonCode: reason.blockingReason.code,
+          blockingReasonDetail: reason.blockingReason.detail ?? "",
+          rejectedArtifactRefs: evidenceRefs,
+          acceptedCarrierSchemaRef: acceptedCarrier?.schemaRef ?? null,
+          acceptedCarrierFieldSet: acceptedCarrier?.fieldSet ?? Object.freeze([]),
+          repairReentryPlanId: repairReentryPlan?.planId ?? null,
+          nonClosureRules:
+            repairReentryPlan !== null
+              ? Object.freeze([
+                  `Re-enter ${repairReentryPlan.targetEdgeName} for target ${repairReentryPlan.targetAssetType}.`,
+                  `Repair only the scheduled ${repairReentryPlan.repairTarget} row ${repairReentryPlan.scheduleId}.`,
+                  "Read diagnosticEvidenceRefs and copy the exact diagnostic lines into the execution plan before editing.",
+                  "Do not broadly regenerate tests, source, schedules, or release surfaces.",
+                  "Do not bypass postflight; the framework will re-admit and re-evaluate the carrier."
+                ])
+              : repairScope === "schema_local" || acceptedCarrier !== null
+              ? Object.freeze([
+                  "Repair the same rejected edge artifact.",
+                  "Add, remove, rename, or map rejected fields into the accepted carrier field set.",
+                  "Do not regenerate unrelated surfaces or change authority scope unless the gap dossier widens the repair.",
+                  "Do not bypass postflight; the framework will re-admit and re-evaluate the carrier."
+                ])
+              : Object.freeze([
+                  "Use the gap dossier as bounded repair pressure.",
+                  "Do not treat process success or worker prose as semantic closure.",
+                  "Do not bypass postflight; the framework will re-evaluate the result."
+                ])
+        })
+      );
+    }
+  }
+  return Object.freeze(instructions);
+}
+
+export function constructWorkerInvocationPackage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath?: string | undefined;
+  readonly traversalIntentPath?: string | undefined;
+}): SdlcWorkerInvocationPackage {
+  const manifestPath =
+    input.manifestPath ?? join(input.manifest.archiveRoot, "handoff_manifest.json");
+  const traversalIntentPath =
+    input.traversalIntentPath ??
+    join(input.manifest.archiveRoot, "traversal_intent_package.json");
+  const inlineObligations = inlineObligationsForPrompt(input.manifest).map(
+    compactObligation
+  );
+  const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
+  const repairReentryPlans = repairReentryPlansForContext(input.manifest);
+  const retryRepairInstructions = retryRepairInstructionsForContext(input.manifest);
+  const base = Object.freeze({
+    kind: "sdlc_worker_invocation_package" as const,
+    packageVersion: "ts-invocation-v1" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    vectorIndex: input.manifest.vectorIndex,
+    sourceAssetTypes: input.manifest.inputAssetTypes,
+    targetAssetType: input.manifest.targetAssetType,
+    manifestPath,
+    manifestRef: pathToFileURL(manifestPath).href,
+    manifestDigest: sha256Text(stableOperatorJson(input.manifest)),
+    traversalIntentPackagePath: traversalIntentPath,
+    traversalIntentPackageRef: pathToFileURL(traversalIntentPath).href,
+    traversalIntentPackageDigest:
+      input.manifest.traversalIntentPackage.packageDigest,
+    outputContract: Object.freeze({
+      kind: "sdlc_worker_invocation_output_contract" as const,
+      outputFile: input.manifest.outputFile,
+      reportFile: input.manifest.reportFile,
+      fpTransformRequestFile: input.manifest.fpTransformRequestFile,
+      fpTransformResultFile: input.manifest.fpTransformResultFile,
+      fpEvaluateResultFile: input.manifest.fpEvaluateResultFile,
+      materializationRequired: input.manifest.productMaterialization.required,
+      tenantRoot: input.manifest.productMaterialization.tenantRoot,
+      selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+      requiredRoles: input.manifest.productMaterialization.requiredRoles,
+      buildExecutionContract:
+        input.manifest.productMaterialization.buildExecutionContract,
+      testExecutionContract:
+        input.manifest.productMaterialization.testExecutionContract
+    }),
+    allowedWriteRoots: input.manifest.allowedWriteRoots,
+    traversalStrategyDecision: input.manifest.traversalStrategyDecision,
+    featureScope: input.manifest.featureScope,
+    retryFrontier: Object.freeze({
+      kind: "sdlc_worker_invocation_retry_frontier" as const,
+      retryAttemptRefs: input.manifest.retryContext.retryAttemptRefs.map(
+        (ref) => ref.manifestId
+      ),
+      dossierRefs: priorGapDossierRefs(input.manifest.retryContext),
+      reasonCount: priorGapReasons.length,
+      sampleReasonCodes: priorGapReasons.slice(0, 20),
+      omittedReasonCount: Math.max(0, priorGapReasons.length - 20)
+    }),
+    repairReentryPlans,
+    retryRepairInstructions,
+    inlineObligations,
+    inlineObligationIds: inlineObligations.map(
+      (obligation) => obligation.obligationId
+    ),
+    requirementTraceObligationIds:
+      requirementTraceObligationIdsForPrompt(input.manifest),
+    omittedObligationCount:
+      input.manifest.traversalObligationContext.obligations.length -
+      inlineObligations.length,
+    retrievalHints: input.manifest.traversalObligationContext.retrievalHints,
+    obligationDeltaSummary:
+      input.manifest.traversalObligationContext.deltaSummary,
+    authorityRefCount:
+      input.manifest.traversalObligationContext.authorityRefs.length,
+    runtimeContextRefs:
+      input.manifest.traversalObligationContext.runtimeContextRefs,
+    priorEdgeRefs: input.manifest.traversalObligationContext.priorEdgeRefs,
+    resultReportSchema: input.manifest.resultReportSchema
+  });
+  return Object.freeze({
+    ...base,
+    packageDigest: sha256Text(stableOperatorJson(base))
+  });
+}
+
 export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   const manifestPath = join(manifest.archiveRoot, "handoff_manifest.json");
+  const invocationPackagePath = join(
+    manifest.archiveRoot,
+    "worker_invocation_package.json"
+  );
   const traversalIntentPath = join(
     manifest.archiveRoot,
     "traversal_intent_package.json"
   );
+  const invocationPackage = constructWorkerInvocationPackage({
+    manifest,
+    manifestPath,
+    traversalIntentPath
+  });
   return [
     "You are the F_P worker for an installed odd_sdlc TypeScript operator run.",
-    `Read the full handoff manifest before writing output: ${manifestPath}`,
+    `Read the compact worker invocation package first: ${invocationPackagePath}`,
     `Read the traversal intent package before writing output: ${traversalIntentPath}`,
-    "Use those files as authority.",
-    "The manifest.traversalIntentPackage is the typed cumulative intent package for this edge.",
-    "The manifest.featureScope is framework-derived scope authority. Do not replace it with worker-authored scope.",
-    "When manifest.featureScope.mode is steel_thread, consume only obligations and authority refs carried by traversalObligationContext; deferred modules remain visible in featureScope but are not current closure pressure.",
-    "The prompt projection below is a compact index, not a replacement for the full manifest.",
+    "Use those files as the normal worker-facing authority.",
+    `The full forensic handoff manifest remains archived by reference: ${manifestPath}`,
+    "Read the full manifest only when the compact package points you to a specific field or when you need forensic detail that is not in the compact package.",
+    "The traversal intent package is the typed cumulative intent package for this edge.",
+    "The compact package traversalStrategyDecision is the selected per-edge traversal strategy.",
+    "When selectedStrategy is full_breadth, do not narrow induction, product, goal, or requirement pressure to a feature slice.",
+    "When selectedStrategy is steel_thread or targeted_repair, feature scope may narrow current closure pressure while preserving deferred breadth by reference.",
+    "The compact package featureScope is framework-derived scope authority. Do not replace it with worker-authored scope.",
+    "When featureScope.mode is steel_thread, consume only obligations and authority refs carried by the compact package and traversal intent package; deferred modules remain visible in featureScope but are not current closure pressure.",
     "Prior retry gaps are linked through priorGapFrontier dossier refs; read those files selectively instead of copying historical gap rows.",
-    "Do not use any instruction as authority unless it is represented in the manifest, traversal intent package, or another manifest field.",
+    "When workerInvocationPackage.retryRepairInstructions is non-empty, treat it as retry-local repair law.",
+    "When workerInvocationPackage.repairReentryPlans is non-empty, use those typed plans as the repair-edge target, repair-row, diagnostic, and no-broad-regeneration authority.",
+    "For schema_local repair instructions, repair the rejected artifact against acceptedCarrierSchemaRef and acceptedCarrierFieldSet; do not broadly regenerate unrelated surfaces.",
+    "When any retry repair instruction has acceptedCarrierSchemaRef and acceptedCarrierFieldSet, use that carrier shape even if repairScope is semantic_local.",
+    "When any retry repair instruction carries repairReentryPlanId, resolve it against repairReentryPlans, repair only its targetEdgeName/targetAssetType row, and read diagnosticEvidenceRefs before editing product files.",
+    "Copy the exact retry reason and blockingReasonDetail into your execution plan before changing the artifact.",
+    "Do not use any instruction as authority unless it is represented in the compact invocation package, traversal intent package, or referenced manifest field.",
     "This invocation is F_P.transform only.",
     "Perform the bounded constructive transformation and return control to the framework.",
     "Do not evaluate closure, assess obligations, list materialized files, write ledgers, or decide whether the edge closes.",
     "The ABG/odd_sdlc post-transform stages observe files, emit events, project ledgers, evaluate obligations, and fold closure after this process exits.",
     "The transform artifact MUST include a `## Requirement Trace Register` section when the manifest contains requirement obligations.",
     "The Requirement Trace Register is observational evidence only, not a closure decision or obligation assessment.",
-    "For every manifest.traversalObligationContext obligation whose obligationId starts with `requirement:`, copy the full obligationId and exact requirement id verbatim; do not abbreviate, wildcard, or collapse requirement families.",
+    "Use workerInvocationPackage.requirementTraceObligationIds as the complete checklist for requirement trace markers, including ids omitted from compact inlineObligations.",
+    "For every requirementTraceObligationIds entry whose obligationId starts with `requirement:`, copy the full obligationId and exact requirement id verbatim; do not abbreviate, wildcard, or collapse requirement families.",
     `ABG F_P transform request carrier: ${manifest.fpTransformRequestFile}`,
     `ABG F_P transform result carrier written by framework: ${manifest.fpTransformResultFile}`,
     `odd_sdlc F_P.evaluate result carrier written by framework: ${manifest.fpEvaluateResultFile}`,
@@ -1729,7 +2626,9 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     scheduleSurfacePrompt(manifest),
     "",
-    "Compact prompt pressure projection:",
+    "Compact worker invocation package:",
+    stableOperatorJson(invocationPackage),
+    "Legacy compact prompt pressure projection:",
     stableOperatorJson(
       promptPressureProjection({
         manifest,
@@ -1743,6 +2642,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
 export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   readonly manifestPath: string;
   readonly promptPath: string;
+  readonly invocationPackagePath: string;
 } {
   assertTraversalIntentPackagePressure(manifest);
   mkdirSync(manifest.archiveRoot, { recursive: true });
@@ -1750,10 +2650,20 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     mkdirSync(writeRoot, { recursive: true });
   }
   const manifestPath = join(manifest.archiveRoot, "handoff_manifest.json");
+  const invocationPackagePath = join(
+    manifest.archiveRoot,
+    "worker_invocation_package.json"
+  );
   const promptPath = join(manifest.archiveRoot, "worker_prompt.md");
   const conformedProjectPath = join(manifest.archiveRoot, "conformed_project.json");
   const traversalIntentPath = join(manifest.archiveRoot, "traversal_intent_package.json");
+  const invocationPackage = constructWorkerInvocationPackage({
+    manifest,
+    manifestPath,
+    traversalIntentPath
+  });
   writeFileSync(manifestPath, stableOperatorJson(manifest), "utf8");
+  writeFileSync(invocationPackagePath, stableOperatorJson(invocationPackage), "utf8");
   writeFileSync(promptPath, promptForHandoff(manifest), "utf8");
   writeFileSync(conformedProjectPath, stableOperatorJson(manifest.conformedProject), "utf8");
   writeFileSync(
@@ -1768,7 +2678,7 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
       "utf8"
     );
   }
-  return Object.freeze({ manifestPath, promptPath });
+  return Object.freeze({ manifestPath, promptPath, invocationPackagePath });
 }
 
 function parseNonNegativeInteger(input: unknown, label: string): number {
@@ -1864,9 +2774,11 @@ function parseOptionalArray<T>(
 }
 
 function executionEvidenceStatus(input: unknown, label: string) {
-  return input === "not_run"
-    ? "pending"
-    : parseEnumValue(input, label, ["succeeded", "failed", "pending"]);
+  return admitExactContractEnum({
+    value: input,
+    label,
+    values: ["succeeded", "failed", "pending"] as const
+  });
 }
 
 function admitWorkerExecutionShardEvidence(
@@ -2207,8 +3119,10 @@ function archiveSourceExecutionResultDependencyError(input: {
       );
     }
     if (
-      executionEvidence.command !==
-      input.manifest.productMaterialization.testExecutionContract
+      !executionCommandMatchesContract({
+        manifest: input.manifest,
+        command: executionEvidence.command
+      })
     ) {
       blockers.push(
         makeSdlcBlockingReason({
@@ -2218,7 +3132,7 @@ function archiveSourceExecutionResultDependencyError(input: {
         })
       );
     }
-    if (executionEvidence.status !== "succeeded") {
+    if (executionEvidence.status === "pending") {
       blockers.push(
         makeSdlcBlockingReason({
           code: "test_execution_not_succeeded",
@@ -2227,19 +3141,13 @@ function archiveSourceExecutionResultDependencyError(input: {
         })
       );
     }
-    if ((executionEvidence.testsObserved ?? 0) <= 0) {
+    if (
+      executionEvidence.status !== "failed" &&
+      (executionEvidence.testsObserved ?? 0) <= 0
+    ) {
       blockers.push(
         makeSdlcBlockingReason({
           code: "test_execution_zero_tests_observed",
-          evidenceRefs: executionEvidence.reportRefs
-        })
-      );
-    }
-    if ((executionEvidence.failedCount ?? 0) > 0) {
-      blockers.push(
-        makeSdlcBlockingReason({
-          code: "test_execution_failures_present",
-          detail: String(executionEvidence.failedCount),
           evidenceRefs: executionEvidence.reportRefs
         })
       );
@@ -2324,6 +3232,9 @@ function isExecutionByproductPath(relativePath: string): boolean {
     normalized === "target" ||
     normalized.startsWith("target/") ||
     normalized.includes("/target/") ||
+    normalized === "project" ||
+    normalized.startsWith("project/") ||
+    normalized.includes("/project/target/") ||
     normalized === ".bsp" ||
     normalized.startsWith(".bsp/") ||
     normalized.includes("/.bsp/")
@@ -2570,22 +3481,36 @@ function executionEvidenceCandidateWithArtifactRef(input: {
             )
           : [];
         return Object.freeze({
-          ...shardRecord,
+          kind: shardRecord["kind"],
+          shardId: shardRecord["shardId"],
+          moduleName: shardRecord["moduleName"],
+          lane: shardRecord["lane"],
+          command: shardRecord["command"],
+          status: shardRecord["status"],
           reportRefs: Object.freeze(
             shardReportRefs.includes(input.artifactRef)
               ? shardReportRefs
               : [...shardReportRefs, input.artifactRef]
-          )
+          ),
+          testsObserved: shardRecord["testsObserved"],
+          passedCount: shardRecord["passedCount"],
+          failedCount: shardRecord["failedCount"]
         });
       })
     : undefined;
   return Object.freeze({
-    ...record,
+    kind: record["kind"],
+    lane: record["lane"],
+    command: record["command"],
+    status: record["status"],
     reportRefs: Object.freeze(
       reportRefs.includes(input.artifactRef)
         ? reportRefs
         : [...reportRefs, input.artifactRef]
     ),
+    testsObserved: record["testsObserved"],
+    passedCount: record["passedCount"],
+    failedCount: record["failedCount"],
     ...(shardEvidence === undefined
       ? {}
       : { shardEvidence: Object.freeze(shardEvidence) })
@@ -2625,9 +3550,21 @@ function extractExecutionEvidenceFromTransformArtifact(input: {
   if (wholeJson.ok) {
     candidates.push(wholeJson.value);
   }
-  const fencedBlockExpression = /```(?:json|execution_evidence|executionEvidence)?\s*\n([\s\S]*?)```/gu;
+  const fencedBlockExpression =
+    /^```([^\r\n`]*)\r?\n([\s\S]*?)^```[^\S\r\n]*$/gmu;
   for (const match of input.content.matchAll(fencedBlockExpression)) {
-    const block = match[1]?.trim() ?? "";
+    const infoString = match[1]?.trim() ?? "";
+    const infoParts = infoString.split(/\s+/u).filter((part) => part.length > 0);
+    const language = infoParts[0] ?? "";
+    if (
+      infoString !== "" &&
+      language !== "json" &&
+      language !== "execution_evidence" &&
+      language !== "executionEvidence"
+    ) {
+      continue;
+    }
+    const block = match[2]?.trim() ?? "";
     const parsed = parseJsonCandidate(block);
     if (parsed.ok) {
       candidates.push(parsed.value);
@@ -3160,8 +4097,10 @@ function evaluateExecutionEvidence(input: {
     );
   }
   if (
-    executionEvidence.command !==
-    input.manifest.productMaterialization.testExecutionContract
+    !executionCommandMatchesContract({
+      manifest: input.manifest,
+      command: executionEvidence.command
+    })
   ) {
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
@@ -3220,7 +4159,10 @@ function evaluateExecutionEvidence(input: {
   // Failed-but-structurally-valid execution evidence is admitted here.
   // T-115 maps failed rows to component_test_qualification_surface and
   // component_repair_schedule_surface instead of retrying this edge.
-  if ((executionEvidence.testsObserved ?? 0) <= 0) {
+  if (
+    executionEvidence.status !== "failed" &&
+    (executionEvidence.testsObserved ?? 0) <= 0
+  ) {
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "test_execution_zero_tests_observed",
@@ -3334,7 +4276,10 @@ function evaluateExecutionShardEvidence(input: {
     }
     // Failed shards are repair inputs, not postflight blockers, when their
     // evidence is otherwise structurally valid.
-    if ((shardEvidence.testsObserved ?? 0) <= 0) {
+    if (
+      shardEvidence.status !== "failed" &&
+      (shardEvidence.testsObserved ?? 0) <= 0
+    ) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "test_execution_zero_tests_observed",
@@ -3801,14 +4746,21 @@ export function constructPostflightGapDossier(input: {
   const gapDossierRef = pathToFileURL(gapDossierPathForManifest(input.manifest)).href;
   const retryEligible = input.postflight.blockingReasonCarriers.some((reason) =>
     reason.lawfulReentryPoint === "same_edge_retry" ||
+    reason.lawfulReentryPoint === "escalate_to_fp" ||
     reason.lawfulReentryPoint === "repair_worker_output"
   );
   const actions = new Set<
-    "retry_same_edge" | "repair_worker_output" | "triage_gap" | "reprice_requirement_or_design"
+    | "retry_same_edge"
+    | "escalate_to_fp"
+    | "repair_worker_output"
+    | "triage_gap"
+    | "reprice_requirement_or_design"
   >();
   for (const reason of input.postflight.blockingReasonCarriers) {
     if (reason.lawfulReentryPoint === "same_edge_retry") {
       actions.add("retry_same_edge");
+    } else if (reason.lawfulReentryPoint === "escalate_to_fp") {
+      actions.add("escalate_to_fp");
     } else if (reason.lawfulReentryPoint === "repair_worker_output") {
       actions.add("repair_worker_output");
     } else if (reason.lawfulReentryPoint === "triage_gap") {

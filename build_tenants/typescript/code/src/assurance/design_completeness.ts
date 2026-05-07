@@ -1,5 +1,7 @@
 // Implements: T-116
 // Implements: T-121
+// Implements: T-122
+// Implements: B-086
 
 import { admitDesignDepthRegisterFromArtifact } from "../operator/design_depth_register.js";
 import type {
@@ -32,9 +34,7 @@ const DESIGN_COMPLETENESS_TARGETS = Object.freeze([
 ] as const);
 
 function targetRequiresDesignCompleteness(targetAssetType: string): boolean {
-  return DESIGN_COMPLETENESS_TARGETS.includes(
-    targetAssetType as (typeof DESIGN_COMPLETENESS_TARGETS)[number]
-  );
+  return DESIGN_COMPLETENESS_TARGETS.some((target) => target === targetAssetType);
 }
 
 function reason(input: {
@@ -50,6 +50,19 @@ function reason(input: {
   });
 }
 
+function fpEscalationReason(input: {
+  readonly code: string;
+  readonly message: string;
+  readonly evidenceRefs: readonly string[];
+}): SdlcAssuranceLedgerReason {
+  return assuranceReason({
+    code: input.code,
+    message: input.message,
+    evidenceRefs: input.evidenceRefs,
+    lawfulReentryPoint: "escalate_to_fp"
+  });
+}
+
 function duplicateValues(values: readonly string[]): readonly string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -62,6 +75,127 @@ function duplicateValues(values: readonly string[]): readonly string[] {
   return uniqueSorted([...duplicates]);
 }
 
+function identitySlug(input: string): string {
+  return input
+    .trim()
+    .replace(/[^A-Za-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLowerCase();
+}
+
+function identityCompactSlug(input: string): string {
+  return input
+    .trim()
+    .replace(/[^A-Za-z0-9]+/gu, "")
+    .toLowerCase();
+}
+
+function identityLocalName(input: string, scheme: string): string {
+  const schemePrefix = `${scheme}:`;
+  const withoutScheme = input.startsWith(schemePrefix)
+    ? input.slice(schemePrefix.length)
+    : input;
+  return withoutScheme.split(".").filter((part) => part.length > 0).at(-1) ??
+    withoutScheme;
+}
+
+function scopedIdentityAliases(input: {
+  readonly scheme: "entity" | "operation";
+  readonly id: string;
+  readonly moduleName?: string | undefined;
+}): readonly string[] {
+  const aliases = new Set<string>();
+  aliases.add(input.id);
+  const local = identityLocalName(input.id, input.scheme);
+  const localSlug = identitySlug(local);
+  const localCompactSlug = identityCompactSlug(local);
+  if (localSlug.length > 0) {
+    aliases.add(`${input.scheme}:${localSlug}`);
+    if (input.moduleName !== undefined && input.moduleName.length > 0) {
+      aliases.add(`${input.scheme}:${identitySlug(input.moduleName)}.${localSlug}`);
+    }
+  }
+  if (localCompactSlug.length > 0) {
+    aliases.add(`${input.scheme}:${localCompactSlug}`);
+    if (input.moduleName !== undefined && input.moduleName.length > 0) {
+      aliases.add(`${input.scheme}:${identitySlug(input.moduleName)}.${localCompactSlug}`);
+    }
+  }
+  const schemePrefix = `${input.scheme}:`;
+  const withoutScheme = input.id.startsWith(schemePrefix)
+    ? input.id.slice(schemePrefix.length)
+    : input.id;
+  const wholeSlug = identitySlug(withoutScheme);
+  const wholeCompactSlug = identityCompactSlug(withoutScheme);
+  if (wholeSlug.length > 0) {
+    aliases.add(`${input.scheme}:${wholeSlug}`);
+  }
+  if (wholeCompactSlug.length > 0) {
+    aliases.add(`${input.scheme}:${wholeCompactSlug}`);
+  }
+  return Object.freeze([...aliases]);
+}
+
+function scopedIdsMatch(input: {
+  readonly scheme: "entity" | "operation";
+  readonly leftId: string;
+  readonly leftModuleName?: string | undefined;
+  readonly rightId: string;
+  readonly rightModuleName?: string | undefined;
+}): boolean {
+  if (
+    input.leftModuleName !== undefined &&
+    input.leftModuleName.length > 0 &&
+    input.rightModuleName !== undefined &&
+    input.rightModuleName.length > 0 &&
+    input.leftModuleName !== input.rightModuleName
+  ) {
+    return false;
+  }
+  const rightAliases = new Set(
+    scopedIdentityAliases({
+      scheme: input.scheme,
+      id: input.rightId,
+      moduleName: input.rightModuleName
+    })
+  );
+  return scopedIdentityAliases({
+    scheme: input.scheme,
+    id: input.leftId,
+    moduleName: input.leftModuleName
+  }).some((alias) => rightAliases.has(alias));
+}
+
+function entityIdsMatch(input: {
+  readonly leftEntityId: string;
+  readonly leftModuleName?: string | undefined;
+  readonly rightEntityId: string;
+  readonly rightModuleName?: string | undefined;
+}): boolean {
+  return scopedIdsMatch({
+    scheme: "entity",
+    leftId: input.leftEntityId,
+    leftModuleName: input.leftModuleName,
+    rightId: input.rightEntityId,
+    rightModuleName: input.rightModuleName
+  });
+}
+
+function operationIdsMatch(input: {
+  readonly leftOperationId: string;
+  readonly leftModuleName?: string | undefined;
+  readonly rightOperationId: string;
+  readonly rightModuleName?: string | undefined;
+}): boolean {
+  return scopedIdsMatch({
+    scheme: "operation",
+    leftId: input.leftOperationId,
+    leftModuleName: input.leftModuleName,
+    rightId: input.rightOperationId,
+    rightModuleName: input.rightModuleName
+  });
+}
+
 function admissionReasons(
   admission: SdlcDesignDepthRegisterAdmission
 ): readonly SdlcAssuranceLedgerReason[] {
@@ -72,7 +206,7 @@ function admissionReasons(
     admission.blockingReasons.map((blockingReason) =>
       reason({
         code: blockingReason,
-        message: `Design-depth register admission rejected: ${blockingReason}`,
+        message: `Design-depth register admission ${admission.status}: ${blockingReason}`,
         evidenceRefs: admission.evidenceRefs
       })
     )
@@ -154,7 +288,7 @@ function moduleInScope(input: {
     return true;
   }
   if (input.featureScope.includedModuleNames.length === 0) {
-    return true;
+    return false;
   }
   return input.featureScope.includedModuleNames.includes(input.moduleName);
 }
@@ -166,7 +300,15 @@ function aggregateEntityInScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
-  if (input.featureScope.includedEntityIds.includes(input.entity.entityId)) {
+  if (
+    input.featureScope.includedEntityIds.some((entityId) =>
+      entityIdsMatch({
+        leftEntityId: entityId,
+        rightEntityId: input.entity.entityId,
+        rightModuleName: input.entity.ownerModuleName
+      })
+    )
+  ) {
     return true;
   }
   return (
@@ -187,7 +329,15 @@ function domainEntityInScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
-  if (input.featureScope.includedEntityIds.includes(input.entity.entityId)) {
+  if (
+    input.featureScope.includedEntityIds.some((entityId) =>
+      entityIdsMatch({
+        leftEntityId: entityId,
+        rightEntityId: input.entity.entityId,
+        rightModuleName: input.entity.moduleName
+      })
+    )
+  ) {
     return true;
   }
   return moduleInScope({
@@ -203,7 +353,15 @@ function operationInScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
-  if (input.featureScope.includedOperationIds.includes(input.operation.operationId)) {
+  if (
+    input.featureScope.includedOperationIds.some((operationId) =>
+      operationIdsMatch({
+        leftOperationId: operationId,
+        rightOperationId: input.operation.operationId,
+        rightModuleName: input.operation.moduleName
+      })
+    )
+  ) {
     return true;
   }
   return moduleInScope({
@@ -219,7 +377,15 @@ function sequenceStepInScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
-  if (input.featureScope.includedOperationIds.includes(input.step.operationId)) {
+  if (
+    input.featureScope.includedOperationIds.some((operationId) =>
+      operationIdsMatch({
+        leftOperationId: operationId,
+        rightOperationId: input.step.operationId,
+        rightModuleName: input.step.moduleName
+      })
+    )
+  ) {
     return true;
   }
   return moduleInScope({
@@ -262,7 +428,7 @@ function scopedModuleSchemaReasons(input: {
     })
   );
   return Object.freeze([
-    ...input.featureScope.mode === "steel_thread"
+    ...input.featureScope.mode !== "full_breadth"
       ? input.featureScope.includedModuleNames
           .filter((moduleName) =>
             !scopedSchemas.some((schema) => schema.moduleName === moduleName)
@@ -292,15 +458,27 @@ function aggregateDomainReasons(input: {
   if (input.model === null) {
     return Object.freeze([]);
   }
-  const scopedEntities = input.model.entities.filter((entity) =>
+  const model = input.model;
+  const scopedEntities = model.entities.filter((entity) =>
     aggregateEntityInScope({ featureScope: input.featureScope, entity })
   );
-  const scopedOperations = input.model.operations.filter((operation) =>
+  const scopedOperations = model.operations.filter((operation) =>
     operationInScope({ featureScope: input.featureScope, operation })
   );
-  const entityIds = new Set(input.model.entities.map((entity) => entity.entityId));
+  const entityMatchesModel = (candidate: {
+    readonly entityId: string;
+    readonly moduleName?: string | undefined;
+  }): boolean =>
+    model.entities.some((entity) =>
+      entityIdsMatch({
+        leftEntityId: entity.entityId,
+        leftModuleName: entity.ownerModuleName,
+        rightEntityId: candidate.entityId,
+        rightModuleName: candidate.moduleName
+      })
+    );
   return Object.freeze([
-    ...(input.featureScope.mode === "steel_thread"
+    ...(input.featureScope.mode !== "full_breadth"
       ? input.featureScope.includedModuleNames
           .filter((moduleName) =>
             !scopedEntities.some(
@@ -347,7 +525,13 @@ function aggregateDomainReasons(input: {
       .filter(
         (ref) =>
           input.featureScope.mode === "full_breadth" ||
-          input.featureScope.includedEntityIds.includes(ref.entityId) ||
+          input.featureScope.includedEntityIds.some((entityId) =>
+            entityIdsMatch({
+              leftEntityId: entityId,
+              rightEntityId: ref.entityId,
+              rightModuleName: ref.fromModuleName
+            })
+          ) ||
           moduleInScope({
             featureScope: input.featureScope,
             moduleName: ref.fromModuleName
@@ -357,7 +541,12 @@ function aggregateDomainReasons(input: {
             moduleName: ref.toModuleName
           })
       )
-      .filter((ref) => !entityIds.has(ref.entityId))
+      .filter((ref) =>
+        !entityMatchesModel({
+          entityId: ref.entityId,
+          moduleName: ref.fromModuleName
+        })
+      )
       .map((ref) =>
         reason({
           code: `design_cross_module_entity_missing:${ref.entityId}`,
@@ -377,14 +566,35 @@ function sunnyDaySequenceReasons(input: {
   if (input.sequence === null || input.model === null) {
     return Object.freeze([]);
   }
-  const operationIds = new Set(input.model.operations.map((operation) => operation.operationId));
-  const entityIds = new Set(input.model.entities.map((entity) => entity.entityId));
+  const model = input.model;
+  const entityMatchesModel = (candidate: {
+    readonly entityId: string;
+    readonly moduleName?: string | undefined;
+  }): boolean =>
+    model.entities.some((entity) =>
+      entityIdsMatch({
+        leftEntityId: entity.entityId,
+        leftModuleName: entity.ownerModuleName,
+        rightEntityId: candidate.entityId,
+        rightModuleName: candidate.moduleName
+      })
+    );
   const scopedSteps = input.sequence.steps.filter((step) =>
     sequenceStepInScope({ featureScope: input.featureScope, step })
   );
   return Object.freeze([
     ...scopedSteps
-      .filter((step) => !operationIds.has(step.operationId))
+      .filter(
+        (step) =>
+          !model.operations.some((operation) =>
+            operationIdsMatch({
+              leftOperationId: operation.operationId,
+              leftModuleName: operation.moduleName,
+              rightOperationId: step.operationId,
+              rightModuleName: step.moduleName
+            })
+          )
+      )
       .map((step) =>
         reason({
           code: `design_flow_operation_missing:${step.operationId}`,
@@ -394,7 +604,12 @@ function sunnyDaySequenceReasons(input: {
       ),
     ...scopedSteps.flatMap((step) =>
       [...step.inputEntityIds, ...step.outputEntityIds]
-        .filter((entityId) => !entityIds.has(entityId))
+        .filter((entityId) =>
+          !entityMatchesModel({
+            entityId,
+            moduleName: step.moduleName
+          })
+        )
         .map((entityId) =>
           reason({
             code: `design_flow_entity_missing:${entityId}`,
@@ -413,11 +628,29 @@ function axisReasonMentionsScope(input: {
   if (input.featureScope.mode === "full_breadth") {
     return true;
   }
+  const normalizedReason = input.axisReason.toLowerCase();
   return [
     ...input.featureScope.includedModuleNames,
     ...input.featureScope.includedEntityIds,
     ...input.featureScope.includedOperationIds
-  ].some((token) => token.length > 0 && input.axisReason.includes(token));
+  ].some(
+    (token) =>
+      token.length > 0 && normalizedReason.includes(token.toLowerCase())
+  );
+}
+
+function axisReasonMentionsDeferredScope(input: {
+  readonly featureScope: SdlcFeatureScope;
+  readonly axisReason: string;
+}): boolean {
+  if (input.featureScope.mode === "full_breadth") {
+    return false;
+  }
+  const normalizedReason = input.axisReason.toLowerCase();
+  return input.featureScope.deferredModuleNames.some(
+    (token) =>
+      token.length > 0 && normalizedReason.includes(token.toLowerCase())
+  );
 }
 
 function axisVerdictReasons(input: {
@@ -428,19 +661,28 @@ function axisVerdictReasons(input: {
   if (input.axis.status === "satisfied") {
     return Object.freeze([]);
   }
-  if (
-    input.featureScope.mode === "steel_thread" &&
-    !input.axis.reasons.some((axisReason) =>
+  if (input.featureScope.mode !== "full_breadth") {
+    const mentionsCurrentScope = input.axis.reasons.some((axisReason) =>
       axisReasonMentionsScope({
         featureScope: input.featureScope,
         axisReason
       })
-    )
-  ) {
-    return Object.freeze([]);
+    );
+    const mentionsOnlyDeferredScope =
+      !mentionsCurrentScope &&
+      input.axis.reasons.length > 0 &&
+      input.axis.reasons.every((axisReason) =>
+        axisReasonMentionsDeferredScope({
+          featureScope: input.featureScope,
+          axisReason
+        })
+      );
+    if (mentionsOnlyDeferredScope) {
+      return Object.freeze([]);
+    }
   }
   return Object.freeze([
-    reason({
+    fpEscalationReason({
       code: `design_completeness_${input.axis.axis}_${input.axis.status}`,
       message: `Design completeness axis ${input.axis.axis} is ${input.axis.status}.`,
       evidenceRefs: uniqueSorted([...input.evidenceRefs, ...input.axis.evidenceRefs])
@@ -453,7 +695,7 @@ function axisVerdictReasons(input: {
         })
       )
       .map((axisReason) =>
-        reason({
+        fpEscalationReason({
           code: `design_completeness_${input.axis.axis}_reason:${axisReason}`,
           message: `Design completeness axis ${input.axis.axis} reason: ${axisReason}`,
           evidenceRefs: uniqueSorted([...input.evidenceRefs, ...input.axis.evidenceRefs])
@@ -496,11 +738,13 @@ function registerReasons(input: {
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
   return Object.freeze([
-    ...scopedModuleSchemaReasons({
-      register: input.register,
-      featureScope: input.featureScope,
-      evidenceRefs: input.evidenceRefs
-    }),
+    ...(input.register.targetAssetType === "implementation_module_surface"
+      ? scopedModuleSchemaReasons({
+          register: input.register,
+          featureScope: input.featureScope,
+          evidenceRefs: input.evidenceRefs
+        })
+      : []),
     ...aggregateDomainReasons({
       model: input.register.aggregateDomainModel,
       featureScope: input.featureScope,
@@ -532,7 +776,7 @@ function defaultFullBreadthScope(targetAssetType: string): SdlcFeatureScope {
 
 export function deriveDesignCompletenessAssuranceLedger(input: {
   readonly manifest: Pick<SdlcWorkerHandoffManifest, "targetAssetType"> &
-    Partial<Pick<SdlcWorkerHandoffManifest, "featureScope">>;
+    Partial<Pick<SdlcWorkerHandoffManifest, "archiveRoot" | "featureScope">>;
   readonly report: Pick<SdlcWorkerResultReport, "outputFile">;
 }): SdlcAssuranceLedger | null {
   if (!targetRequiresDesignCompleteness(input.manifest.targetAssetType)) {
@@ -540,7 +784,8 @@ export function deriveDesignCompletenessAssuranceLedger(input: {
   }
   const admission = admitDesignDepthRegisterFromArtifact({
     targetAssetType: input.manifest.targetAssetType,
-    outputFile: input.report.outputFile
+    outputFile: input.report.outputFile,
+    archiveRoot: input.manifest.archiveRoot ?? null
   });
   const evidenceRefs = admission.evidenceRefs;
   const featureScope =
@@ -560,12 +805,17 @@ export function deriveDesignCompletenessAssuranceLedger(input: {
     dimension: "design_completeness",
     verdict: verdictFromReasons({
       blockedReasonCodes: Object.freeze([]),
-      openGapReasonCodes: reasons.map((item) => item.code)
+      openGapReasonCodes: reasons
+        .filter((item) => item.lawfulReentryPoint !== "escalate_to_fp")
+        .map((item) => item.code),
+      fpEscalationReasonCodes: reasons
+        .filter((item) => item.lawfulReentryPoint === "escalate_to_fp")
+        .map((item) => item.code)
     }),
     reasons,
     evidenceRefs,
     carryForwardObligationRefs:
-      featureScope.mode === "steel_thread"
+      featureScope.mode !== "full_breadth"
         ? featureScope.deferredModuleNames.map((moduleName) => `module:${moduleName}`)
         : Object.freeze([])
   });

@@ -27,6 +27,7 @@ import type { SdlcConformProjectProfile } from "../workspace/index.js";
 export type SdlcInstalledOperatorStatus =
   | "blocked"
   | "converged"
+  | "fp_escalation"
   | "worker_invoked"
   | "worker_failed"
   | "worker_report_rejected"
@@ -44,6 +45,32 @@ export interface SdlcOperatorSummary {
   readonly archiveRoot: string | null;
 }
 
+export interface SdlcInstalledOperatorStartLoopAttempt {
+  readonly kind: "sdlc_installed_operator_start_loop_attempt";
+  readonly attemptIndex: number;
+  readonly status: SdlcInstalledOperatorStatus;
+  readonly currentEdge: string | null;
+  readonly blockingReason: string | null;
+  readonly nextLawfulAction: string;
+  readonly archiveRoot: string | null;
+  readonly retryEligible: boolean;
+  readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
+}
+
+export interface SdlcInstalledOperatorStartLoop {
+  readonly kind: "sdlc_installed_operator_start_loop";
+  readonly requestedUntil: string;
+  readonly maxAttempts: number;
+  readonly attemptCount: number;
+  readonly terminalReason:
+    | "first_traversal_closed"
+    | "converged"
+    | "blocked"
+    | "retry_not_planned"
+    | "retry_guard_exhausted";
+  readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
+}
+
 export interface SdlcWorkerTransportContract {
   readonly kind: "sdlc_worker_transport_contract";
   readonly raw: string;
@@ -52,6 +79,7 @@ export interface SdlcWorkerTransportContract {
   readonly command: string;
   readonly args: readonly string[];
   readonly model: string | null;
+  readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
   readonly workerId: string;
   readonly backendId: string;
 }
@@ -268,6 +296,7 @@ export interface SdlcComponentTestRealizationRow {
 export type SdlcComponentTestExecutionStatus =
   | "passed"
   | "failed"
+  | "blocked"
   | "pending"
   | "unproven";
 
@@ -577,6 +606,7 @@ export interface SdlcDesignDepthRegister {
 
 export type SdlcDesignDepthRegisterAdmissionStatus =
   | "admitted"
+  | "partial"
   | "rejected"
   | "not_required";
 
@@ -697,7 +727,42 @@ export interface SdlcTraversalObligationContext {
   readonly deltaSummary: SdlcTraversalObligationDeltaSummary;
 }
 
-export type SdlcFeatureScopeMode = "steel_thread" | "full_breadth";
+export type SdlcTraversalStrategy =
+  | "full_breadth"
+  | "steel_thread"
+  | "targeted_repair";
+
+export type SdlcTraversalStrategyDecisionSource =
+  | "abg_selected"
+  | "odd_sdlc_fallback_plan";
+
+export interface SdlcTraversalStrategyPlan {
+  readonly kind: "sdlc_traversal_strategy_plan";
+  readonly planVersion: "ts-strategy-plan-v1";
+  readonly planRef: string;
+  readonly defaultStrategy: SdlcTraversalStrategy;
+  readonly edgeStrategies: Readonly<Record<string, SdlcTraversalStrategy>>;
+  readonly edgeScopeRefs?: Readonly<Record<string, readonly string[]>>;
+}
+
+export interface SdlcTraversalStrategyDecision {
+  readonly kind: "sdlc_traversal_strategy_decision";
+  readonly decisionVersion: "ts-strategy-decision-v1";
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+  readonly selectedStrategy: SdlcTraversalStrategy;
+  readonly decisionSource: SdlcTraversalStrategyDecisionSource;
+  readonly strategyPlanRef: string;
+  readonly strategyDirectiveRef: string | null;
+  readonly featureScopeRequired: boolean;
+  readonly featureScopeDerived: boolean;
+  readonly basisRefs: readonly string[];
+}
+
+export type SdlcFeatureScopeMode =
+  | "steel_thread"
+  | "targeted_repair"
+  | "full_breadth";
 
 export interface SdlcFeatureScope {
   readonly kind: "sdlc_feature_scope";
@@ -760,6 +825,7 @@ export interface SdlcPostflightGapDossier {
   readonly retryEligible: boolean;
   readonly nextLawfulActions: readonly (
     | "retry_same_edge"
+    | "escalate_to_fp"
     | "repair_worker_output"
     | "triage_gap"
     | "reprice_requirement_or_design"
@@ -796,12 +862,128 @@ export interface SdlcTraversalIntentPackage {
   readonly priorGapDossierRefs: readonly string[];
   readonly obligationIds: readonly string[];
   readonly obligationDeltaSummary: SdlcTraversalObligationDeltaSummary;
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
   readonly featureScope: SdlcFeatureScope;
   readonly productMaterialization: SdlcProductMaterializationContract;
   readonly resultReportSchema: readonly string[];
   readonly evaluatorExpectations: SdlcHookTransformProfile;
   readonly outputFile: string;
   readonly reportFile: string;
+  readonly packageDigest: string;
+}
+
+export interface SdlcWorkerInvocationObligation {
+  readonly kind: "sdlc_worker_invocation_obligation";
+  readonly obligationId: string;
+  readonly obligationKind: SdlcTraversalObligationKind;
+  readonly summary: string;
+  readonly evidenceRefs: readonly string[];
+  readonly sourceRefs: readonly string[];
+  readonly sourceSnippetCount: number;
+  readonly coverageExpectation: string;
+}
+
+export interface SdlcWorkerInvocationRetryFrontier {
+  readonly kind: "sdlc_worker_invocation_retry_frontier";
+  readonly retryAttemptRefs: readonly string[];
+  readonly dossierRefs: readonly string[];
+  readonly reasonCount: number;
+  readonly sampleReasonCodes: readonly string[];
+  readonly omittedReasonCount: number;
+}
+
+export type SdlcWorkerRetryRepairScope =
+  | "schema_local"
+  | "semantic_local"
+  | "broad_regeneration";
+
+export interface SdlcWorkerRetryRepairInstruction {
+  readonly kind: "sdlc_worker_retry_repair_instruction";
+  readonly repairScope: SdlcWorkerRetryRepairScope;
+  readonly gapDossierRef: string;
+  readonly reason: string;
+  readonly reasonClass: SdlcPostflightGapReasonClass;
+  readonly blockingReasonCode: string;
+  readonly blockingReasonDetail: string;
+  readonly rejectedArtifactRefs: readonly string[];
+  readonly acceptedCarrierSchemaRef: string | null;
+  readonly acceptedCarrierFieldSet: readonly string[];
+  readonly repairReentryPlanId: string | null;
+  readonly nonClosureRules: readonly string[];
+}
+
+export interface SdlcComponentRepairReentryPlan {
+  readonly kind: "sdlc_component_repair_reentry_plan";
+  readonly planVersion: "ts-component-repair-reentry-v1";
+  readonly planId: string;
+  readonly sourceGapDossierRef: string;
+  readonly sourceEdgeName: string;
+  readonly sourceTargetAssetType: string;
+  readonly reason: string;
+  readonly targetEdgeName: string;
+  readonly targetAssetType: string;
+  readonly repairTarget: SdlcComponentRepairTarget;
+  readonly failureId: string;
+  readonly scheduleId: string;
+  readonly testcaseIds: readonly string[];
+  readonly componentIds: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly sourceRefs: readonly string[];
+  readonly testRefs: readonly string[];
+  readonly repairRowEvidenceRefs: readonly string[];
+  readonly diagnosticEvidenceRefs: readonly string[];
+  readonly diagnosticExcerpt: string;
+  readonly acceptedCarrierSchemaRef: string;
+  readonly acceptedCarrierFieldSet: readonly string[];
+  readonly noBroadRegeneration: true;
+}
+
+export interface SdlcWorkerInvocationOutputContract {
+  readonly kind: "sdlc_worker_invocation_output_contract";
+  readonly outputFile: string;
+  readonly reportFile: string;
+  readonly fpTransformRequestFile: string;
+  readonly fpTransformResultFile: string;
+  readonly fpEvaluateResultFile: string;
+  readonly materializationRequired: boolean;
+  readonly tenantRoot: string;
+  readonly selectedOutputRoot: string;
+  readonly requiredRoles: readonly SdlcMaterializedProductFileRole[];
+  readonly buildExecutionContract: string;
+  readonly testExecutionContract: string;
+}
+
+export interface SdlcWorkerInvocationPackage {
+  readonly kind: "sdlc_worker_invocation_package";
+  readonly packageVersion: "ts-invocation-v1";
+  readonly graphFunctionName: string;
+  readonly edgeName: string;
+  readonly vectorIndex: number;
+  readonly sourceAssetTypes: readonly string[];
+  readonly targetAssetType: string;
+  readonly manifestPath: string;
+  readonly manifestRef: string;
+  readonly manifestDigest: string;
+  readonly traversalIntentPackagePath: string;
+  readonly traversalIntentPackageRef: string;
+  readonly traversalIntentPackageDigest: string;
+  readonly outputContract: SdlcWorkerInvocationOutputContract;
+  readonly allowedWriteRoots: readonly string[];
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
+  readonly featureScope: SdlcFeatureScope;
+  readonly retryFrontier: SdlcWorkerInvocationRetryFrontier;
+  readonly repairReentryPlans: readonly SdlcComponentRepairReentryPlan[];
+  readonly retryRepairInstructions: readonly SdlcWorkerRetryRepairInstruction[];
+  readonly inlineObligations: readonly SdlcWorkerInvocationObligation[];
+  readonly inlineObligationIds: readonly string[];
+  readonly requirementTraceObligationIds: readonly string[];
+  readonly omittedObligationCount: number;
+  readonly retrievalHints: readonly SdlcRetrievalHint[];
+  readonly obligationDeltaSummary: SdlcTraversalObligationDeltaSummary;
+  readonly authorityRefCount: number;
+  readonly runtimeContextRefs: readonly string[];
+  readonly priorEdgeRefs: readonly string[];
+  readonly resultReportSchema: readonly string[];
   readonly packageDigest: string;
 }
 
@@ -824,6 +1006,7 @@ export interface SdlcWorkerHandoffManifest {
   readonly allowedWriteRoots: readonly string[];
   readonly conformedProject: SdlcConformProjectProfile;
   readonly productMaterialization: SdlcProductMaterializationContract;
+  readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
   readonly featureScope: SdlcFeatureScope;
   readonly traversalObligationContext: SdlcTraversalObligationContext;
   readonly traversalIntentPackage: SdlcTraversalIntentPackage;
@@ -897,4 +1080,5 @@ export interface SdlcInstalledOperatorStartOutcome {
   readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
   readonly eventLogPath: string;
   readonly archiveRoot: string | null;
+  readonly loop?: SdlcInstalledOperatorStartLoop | undefined;
 }

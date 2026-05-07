@@ -377,6 +377,16 @@ function componentTestQualificationReasons(input: {
             })
           ]
         : []),
+      ...(row.status === "blocked" && failureRows.length === 0
+        ? [
+            reason({
+              code: `execution_test_class_blocked_without_failure:${row.testClassId}`,
+              message: `Blocked test class ${row.testClassId} has no admitted component execution failure row to drive repair.`,
+              evidenceRefs: uniqueSorted([...input.evidenceRefs, ...row.evidenceRefs]),
+              lawfulReentryPoint: "operator_blocked"
+            })
+          ]
+        : []),
       ...(row.status === "failed" && !matchingFailure(row)
         ? [
             reason({
@@ -439,7 +449,7 @@ function componentRepairScheduleReasons(input: {
         code: "component_repair_schedule_missing",
         message: "Component repair schedule surface did not carry a typed repair schedule.",
         evidenceRefs: input.evidenceRefs,
-        lawfulReentryPoint: "operator_blocked"
+        lawfulReentryPoint: "repair_worker_output"
       })
     ]);
   }
@@ -447,22 +457,22 @@ function componentRepairScheduleReasons(input: {
   return Object.freeze([
     ...(schedule.scheduleStatus === "no_repair_required" && schedule.repairRows.length > 0
       ? [
-          reason({
-            code: "component_repair_schedule_contradiction:no_repair_required_with_rows",
-            message: "Repair schedule says no repair is required but carries repair rows.",
-            evidenceRefs: scheduleRefs,
-            lawfulReentryPoint: "operator_blocked"
-          })
+            reason({
+              code: "component_repair_schedule_contradiction:no_repair_required_with_rows",
+              message: "Repair schedule says no repair is required but carries repair rows.",
+              evidenceRefs: scheduleRefs,
+              lawfulReentryPoint: "repair_worker_output"
+            })
         ]
       : []),
     ...(schedule.scheduleStatus === "repair_required" && schedule.repairRows.length === 0
       ? [
-          reason({
-            code: "component_repair_schedule_rows_missing",
-            message: "Repair schedule says repair is required but carries no repair rows.",
-            evidenceRefs: scheduleRefs,
-            lawfulReentryPoint: "operator_blocked"
-          })
+            reason({
+              code: "component_repair_schedule_rows_missing",
+              message: "Repair schedule says repair is required but carries no repair rows.",
+              evidenceRefs: scheduleRefs,
+              lawfulReentryPoint: "repair_worker_output"
+            })
         ]
       : []),
     ...(schedule.scheduleStatus === "triage_gap"
@@ -484,7 +494,7 @@ function componentRepairScheduleReasons(input: {
               code: `component_repair_schedule_unbound:${row.scheduleId}`,
               message: `Repair schedule row ${row.scheduleId} does not bind testcaseId + componentId + requirementId.`,
               evidenceRefs: uniqueSorted([...scheduleRefs, ...row.evidenceRefs]),
-              lawfulReentryPoint: "operator_blocked"
+              lawfulReentryPoint: "repair_worker_output"
             })
           ]
         : []),
@@ -494,7 +504,7 @@ function componentRepairScheduleReasons(input: {
               code: `component_repair_schedule_not_high_confidence:${row.scheduleId}`,
               message: `Repair schedule row ${row.scheduleId} is ${row.attributionConfidence}; automatic repair requires high confidence.`,
               evidenceRefs: uniqueSorted([...scheduleRefs, ...row.evidenceRefs]),
-              lawfulReentryPoint: "operator_blocked"
+              lawfulReentryPoint: "repair_worker_output"
             })
           ]
         : [])

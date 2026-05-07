@@ -12,7 +12,7 @@ affected_boundary: TypeScript CLI/install adapter, installed workspace normaliza
 priority: medium
 triaged_at: 2026-04-26
 created_at: 2026-04-26
-updated_at: 2026-05-04
+updated_at: 2026-05-07
 dependencies:
   - T-087 completed first-traversal induction packet
   - T-088 completed
@@ -34,8 +34,12 @@ dependencies:
   - T-091 completed first-traversal requirement-authority carrier hardening
   - T-096 completed managed traversal bootstrap proof
   - T-102 completed typed F_P transform/evaluate carrier split
+  - B-084 active design-depth admission closure correction
+  - B-086 active SDLC F_D disambiguation and alias admission sweep
   - T-109 active ABG-driven traversal-ledger solution
   - T-110 completed ABG 3.5 traced callout proof
+  - T-122 active feature scope carrier closure correction
+  - T-123 active traversal strategy authority correction
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -67,12 +71,235 @@ non_closure_conditions:
   - live F_P behavior is claimed without live worker evidence
   - workspace mutation happens outside an adapter that preserves ODD authority boundaries
   - CLI commands decide internal traversal outside ABG
+  - GTL/vector declarations and installed operator handoff consume different
+    traversal strategy truth surfaces
   - release evidence is inferred from semantic tests alone
   - a sandbox-only or harness-only pass is substituted for the production installed-operator path
   - bounded RC closure is confused with full historical Python replacement or multi-edge parity
+  - feature-scope closure relies on live evidence that predates
+    `featureScope`/`traversalStrategyDecision` handoff carriers
+  - design-depth admission closure relies on pre-fix failure dossiers or permits
+    missing/contradictory identity normalization in generic core
+  - RC proof depends on F_D false failures that force canonical entity or
+    operation spelling beyond the disambiguation supplied by the live carrier
+  - RC proof depends on F_D false failures that reject scope-qualified
+    design-completeness statuses when the selected feature scope supplies that
+    qualifier context
+  - RC proof depends on any F_D false failure that requires a canonical
+    spelling, enum, notation, or identity form beyond the disambiguation
+    supplied by ticket, handoff, source authority, feature scope, or carrier
+    context
+  - RC proof depends on F_D enforcing a disambiguated requirement that is only a
+    local parser/assurance preference and not a hard signal in the source
+  - RC proof depends on F_D forcing failure for semantic disambiguation that
+    must escalate to F_P
 ---
 
 ## STDO Reading
+
+## Current Blocker Addendum - B-084 - 2026-05-07
+
+B-084 is reopened and is now an RC blocker.
+
+The core admission direction remains valid: partial design-depth candidates can
+be preserved and converted into gap pressure. The closure claim is not valid
+because:
+
+- the ticket's own proof section says live data_mapper proof remains
+  outstanding;
+- the cited test69 refs are pre-fix failure dossiers, not closure evidence;
+- current normalization can invent `unnamed-module` for missing module identity;
+- generic `odd_sdlc` core contains CDME-specific module inference;
+- contradictory schema/entity ownership is not rejected or surfaced as typed
+  ambiguity pressure;
+- accepted retry field sets had drifted from the parser's strict verdict shape.
+
+RC cannot close until B-084 proves generic design-depth admission without fake
+identity, tenant-specific normalization, schema/prompt drift, or untested
+ownership contradictions.
+
+## Current Blocker Addendum - T-122 - 2026-05-07
+
+T-122 is reopened and is now an RC blocker.
+
+The implementation has a real typed `SdlcFeatureScope` base, but the completed
+ticket claim is not lawful because:
+
+- its own focused verification says live data_mapper steel-thread proof remains
+  outstanding;
+- cited `test68` live manifests do not carry `featureScope` or
+  `traversalStrategyDecision`;
+- current scope derivation silently picks the first declared module when refs do
+  not bind a selected chain;
+- design-completeness scoping still relies on reason-string token matching
+  without typed reason scope or sufficient negative tests.
+
+RC cannot close until T-122 proves feature-scope derivation and assurance
+filtering through deterministic tests plus live data_mapper handoff evidence that
+actually carries the scope and strategy carriers.
+
+## Current Blocker Addendum - 2026-05-07
+
+T-123 is reopened and is now an RC blocker for the TypeScript bounded lane.
+
+The reason is not that steel-thread/full-breadth selection is absent. Newer code
+does show `derive_intent_surface` as `full_breadth` and post-induction
+`derive_uat_testcases_surface` as `steel_thread` in the interrupted T-109 live
+lane.
+
+The blocker is authority split:
+
+- `graph/module.ts` still owns a hard-coded full-breadth edge set for GTL vector
+  declarations;
+- `operator/traversal_strategy.ts` owns a separate fallback strategy plan for
+  handoff decisions;
+- `deriveWorkerHandoffManifest()` does not consume a resolved plan surface;
+- retry context can override an ABG-selected strategy instead of entering as
+  ABG-visible repair/reentry truth.
+
+RC cannot close while graph/vector declarations and installed operator handoff
+can disagree on traversal strategy authority.
+
+## RC Checkpoint - 2026-05-07
+
+The reopened deterministic blockers have been repaired for review, but RC is
+not closed.
+
+Current deterministic/sandbox proof:
+
+- combined focused suite passed: 57/57
+- `npm run test:semantic` passed: 239/239
+- `npm run test:sandbox` passed: 15/15
+
+Repaired blocker surfaces:
+
+- T-120: Spec Method entrypoint is the single installed command truth; the old
+  `cli/command.ts` command/control module is absent.
+- B-085: `component_repair_row_open:*` now produces a typed
+  `repairReentryPlans[]` package targeting `derive_component_test_surface`,
+  carrying the `DiagnosticsFinalizeSpec.scala` row, exact scalac diagnostics,
+  accepted component-depth carrier field set, and no-broad-regeneration law.
+- T-122: unbound steel-thread/targeted-repair refs fall back to full breadth
+  instead of silently selecting the first module; generic in-scope design
+  failures remain blocking.
+- T-123: graph/vector declarations and operator handoff consume one fallback
+  traversal strategy plan; ABG-selected full breadth cannot be overridden by
+  retry context.
+- B-084: missing module identity and contradictory schema/entity ownership now
+  reject; generic core no longer infers CDME module identity.
+
+Current RC blocker:
+
+Live data_mapper proof remains outstanding. The next reviewable live lane must
+consume the B-085 repair plan, patch `DiagnosticsFinalizeSpec.scala`, rerun
+`sbt "cdme-compiler/test"`, admit pass evidence, and rederive
+`release_depth_parity_surface`. Until then T-041 remains the bounded RC
+envelope, not a closed RC claim.
+
+The May 5 live workspace cannot be resumed as the RC proof path under current
+runtime law. Its event log is valid JSON but fails current ABG event admission
+at line 11 because the old `TraversalModulationResolvedEvent` lacks
+`strategySelectionRef`. No compatibility shim is retained for that stale event
+shape. Use the May 5 run as forensic evidence and run a fresh installed
+data_mapper lane for RC proof.
+
+Current live repair-flow evidence:
+
+- `ODD_SDLC_TS_T115_DATA_MAPPER_LIVE=1 npm run test:t115:data-mapper-repair-live`
+  passed 1/1.
+- Archive:
+  `build_tenants/typescript/test_env/test_runs/t115_live_installed_data_mapper_repair_flow/20260507T004300650Z_pid27149`
+- The lane reached failed test execution, component-test failure attribution,
+  and `component_repair_schedule_surface` with `repair_required`.
+
+This is supporting evidence for the repair schedule path, not bounded RC
+closure. RC still requires the production T-109/T-041 Claude PTY data_mapper
+lane to consume the B-085 repair reentry plan and produce pass evidence.
+
+## Current Blocker Addendum - F_D Disambiguation Assurance - 2026-05-07
+
+The interrupted T-109 live archive
+`build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260507T013551288Z_pid99914`
+showed that the live self-healing loop reached typed same-edge local repair on
+aggregate design, but the third aggregate attempt still blocked on exact
+operation/entity spelling mismatches. Postflight passed; F_D assurance then
+reported missing normalized IDs such as
+`design_flow_operation_missing:operation:bindtypes` even though the carrier used
+an allowed camelCase identity that the input contract had not disambiguated
+away.
+
+That is not RC proof and not a valid closure blocker in its old form. It is a
+ticket-level assurance correction under B-084/T-122 and the owning full-sweep
+blocker B-086:
+
+- F_D may reject missing, contradictory, malformed, or out-of-scope design
+  truth.
+- F_D must not reject solely because equivalent in-scope entity/operation
+  identity appears in a non-canonical but allowed alias form.
+- F_D must not reject solely because a closed design-completeness status carries
+  a selected-scope qualifier such as `satisfied_for_steel_thread`.
+- F_D must not reject solely because a standard notation such as cardinality
+  `1..1`, `0..1`, or `0..*` is used where the handoff did not require the
+  private enum spelling.
+- F_D may enforce a disambiguated output only when that disambiguation is a hard
+  signal in the governing source for the edge; local parser enums, normalized
+  internal forms, examples, and prior worker precedent are not hard source
+  signals.
+- When no hard source signal exists and equivalence is not deterministically
+  provable, F_D must escalate the ambiguity to F_P. It cannot force failure from
+  a semantic distinction it is not authorized to decide.
+- RC live proof must be rerun after the corrected assurance law, and any new
+  blocker must be classified against the disambiguation actually present in the
+  carrier.
+
+Current deterministic evidence after the correction:
+
+- focused design-depth/scope suite passed: 25/25.
+- `npm run test:semantic` passed: 240/240.
+- `npm run test:sandbox` passed: 15/15.
+
+Stopped live archive after this addendum:
+
+- `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260507T023042351Z_pid93685`
+  reached `derive_aggregate_domain_model_surface` with
+  `featureScope.mode: "steel_thread"` and demonstrated ABG-owned same-edge
+  retry, but was stopped because the retry reason was reclassified as another
+  ticket-level F_D disambiguation false failure:
+  `designCompletenessVerdict.flow.status` rejected
+  `satisfied_for_steel_thread`.
+- `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260507T025957794Z_pid37324`
+  reached `derive_implementation_module_surface`; after same-edge repair fixed
+  the missing typed attributes, the run was stopped because F_D rejected
+  `cardinality: "1..1"` even though the handoff did not disambiguate the
+  private `one | optional | many` enum spelling.
+
+T-041 remains active. The next RC live run must prove the corrected F_D path,
+then continue through the B-085 component repair/release-depth parity closure
+bar or block on a new typed product/test failure.
+
+## Current Blocker - 2026-05-06
+
+Still active. The bounded RC cannot close.
+
+Current proof:
+
+- `npm run test:semantic` passed: 216/216.
+- `npm run test:sandbox` passed: 15/15.
+- Live T-109 PTY workspace advanced through vectors 0-30.
+
+Current non-closure evidence:
+
+- `gaps` on
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260505T180726166Z_pid44582/workspace`
+  reports `current_edge: derive_release_depth_parity_surface`.
+- The latest release-depth gap dossier reports
+  `release_depth_parity_blocked`,
+  `release_depth_parity_reason:blocked_test_classes_have_no_pass_evidence`,
+  and
+  `release_depth_parity_reason:shard_compile_failed_no_test_evidence`.
+
+The remaining blocker is a real generated test compile/pass-evidence blocker,
+not a traversal, parser, or PTY runtime proof gap.
 
 T-038 proves a bounded TypeScript package RC. This ticket now carries the
 current bounded closure bar for the live data_mapper build workload.
@@ -137,8 +364,9 @@ invalid `T-090` draft was rejected: `test35` is historical evidence and a
 comparator, not an authority surface to alter, and no design ticket may reopen
 closed-edge semantics without first repricing product/requirement authority.
 
-The current tenant has a bounded public CLI adapter from T-058 and
-side-effecting install/normalize plus release-cut package evidence from T-059.
+The current tenant has a Spec Method entrypoint superseding the old bounded
+public CLI adapter from T-058, plus side-effecting install/normalize and
+release-cut package evidence from T-059.
 T-053 closed the first live external `F_P` data_mapper qualification lane.
 These proofs are preconditions to the current bounded close. T-060 remains
 useful comparison evidence, but it is no longer the closure gate for T-041.
@@ -192,13 +420,15 @@ These tickets prevent bounded RC from hardening around product-local
 leaf functions and TypeScript helper loops instead of reusable GTL/ABG program
 truth.
 
-The bounded TypeScript public CLI adapter is split into and completed by:
+The bounded TypeScript Spec Method entrypoint is split into and under active
+review by:
 
 - `completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`
 
-T-058 proves command grammar over the current graph/query/start surfaces. It
-does not close install/normalize mutation, release-cut packaging, or Python
-comparison.
+T-058 proved command grammar over the current graph/query/start surfaces. T-120
+now corrects that surface so command law lives in `spec_method/entry.ts`, not a
+CLI adapter. It does not close install/normalize mutation, release-cut
+packaging, or Python comparison.
 
 The TypeScript install/normalize and release-cut adapter is split into and
 completed by:
@@ -230,7 +460,7 @@ separate active design ticket.
 
 Closed preconditions:
 
-- public CLI adapter: T-058
+- Spec Method entrypoint: T-058/T-120
 - ABG-populated installed sandbox: T-052
 - live external `F_P` data_mapper qualification single-edge run: T-053
 - install/normalize and release-cut package evidence: T-059

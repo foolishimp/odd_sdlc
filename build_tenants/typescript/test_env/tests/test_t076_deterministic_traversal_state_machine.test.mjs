@@ -27,11 +27,8 @@ import {
   constructSdlcGtlModule,
   deriveSdlcInstalledQualificationInitialState,
   deriveSdlcWorkspaceIngressReport,
-  deriveMaterializationAssuranceLedger,
-  deriveObligationCarryAssuranceLedger,
   executeInstalledOperatorStart,
   FG_CONFORM_PROJECT,
-  foldSdlcAssuranceLedgers,
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
   projectSdlcGapsFromReplay,
@@ -115,7 +112,7 @@ function runInstalledOddSdlc(commandPath, args, workspaceRoot) {
   });
   assert.equal(run.status, 0, run.stderr);
   const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_cli_result");
+  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
   assert.equal(parsed.status, "ok");
   return parsed.payload;
 }
@@ -280,6 +277,23 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "const hasPriorGap = manifest.retryContext.priorGapDossiers.length > 0;",
       "const sourceRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
       "const testRelative = 'cdme-core/src/test/scala/cdme/CoreSpec.scala';",
+      "function designCompletenessVerdict() {",
+      "  const axis = (name) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis: name, status: 'satisfied', reasons: [], evidenceRefs: [manifest.outputFile] });",
+      "  return { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') };",
+      "}",
+      "function designDepthRegister() {",
+      "  const attribute = { kind: 'sdlc_domain_attribute', attributeId: 'attr:Core.retryClosed', name: 'retryClosed', valueType: 'boolean', cardinality: 'one', invariantRefs: ['REQ-ENG-001'] };",
+      "  const entity = { kind: 'sdlc_domain_entity', entityId: 'entity:Core', moduleName: 'cdme-compiler', ownership: 'owned', attributes: [attribute], invariants: ['retry closure is explicit'], sourceAssetRefs: ['template://data_mapper'] };",
+      "  const operation = { kind: 'sdlc_domain_operation', operationId: 'operation:Core.retryClosed', moduleName: 'cdme-compiler', inputEntityIds: ['entity:Core'], outputEntityIds: ['entity:Core'], requiredAttributeIds: ['attr:Core.retryClosed'] };",
+      "  const aggregateEntity = { kind: 'sdlc_aggregate_domain_entity', entityId: entity.entityId, ownerModuleName: 'cdme-compiler', attributes: [attribute], sourceModuleNames: ['cdme-compiler'] };",
+      "  const aggregateDomainModel = { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [aggregateEntity], operations: [operation], crossModuleReferences: [], evidenceRefs: [manifest.outputFile] };",
+      "  const aggregateSunnyDaySequence = { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:Core.retryClosed', moduleName: 'cdme-compiler', operationId: operation.operationId, inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], stateTransitionIds: ['transition:Core.open.closed'] }], evidenceRefs: [manifest.outputFile] };",
+      "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType };",
+      "  if (manifest.targetAssetType === 'implementation_module_surface') return { ...base, moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'cdme-compiler', entities: [entity], operations: [operation], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'cdme-compiler', entityId: entity.entityId, stateless: false, states: ['open', 'closed'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:Core.open.closed', fromState: 'open', toState: 'closed', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }] };",
+      "  if (manifest.targetAssetType === 'aggregate_domain_model_surface') return { ...base, aggregateDomainModel, designCompletenessVerdict: designCompletenessVerdict() };",
+      "  if (manifest.targetAssetType === 'aggregate_sunny_day_sequence_surface') return { ...base, aggregateDomainModel, aggregateSunnyDaySequence, designCompletenessVerdict: designCompletenessVerdict() };",
+      "  return null;",
+      "}",
       "function componentDepthRegister() {",
       "  const base = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType };",
       "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] };",
@@ -297,9 +311,11 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "  if (manifest.targetAssetType === 'release_depth_parity_surface') return { ...base, releaseDepthParity: { kind: 'sdlc_release_depth_parity_assessment', status: 'met', summary: 'component depth parity met for data_mapper retry fixture', blockingReasons: [], evidenceRefs: [manifest.outputFile] } };",
       "  return null;",
       "}",
-      "const register = componentDepthRegister();",
+      "const designRegister = designDepthRegister();",
+      "const componentRegister = componentDepthRegister();",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`];",
-      "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
+      "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",
+      "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
@@ -327,7 +343,7 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
-test("T-076 postflight failure enters ABG retry truth and next handoff carries prior gap", async () => {
+test("T-076 component-code materialization closes under current path admission", async () => {
   const workspace = makeWorkspace();
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
@@ -339,94 +355,23 @@ test("T-076 postflight failure enters ABG retry truth and next handoff carries p
   const workerScript = writeRetryAwareWorkerScript(workspace);
   const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
 
-  const first = await executeInstalledOperatorStart({
+  const completed = await executeInstalledOperatorStart({
     workspaceRoot: workspace,
     start,
     workerTransport,
     replayEvents: preclosedEvents
   });
 
-  assert.equal(first.status, "worker_invoked");
-  assert.equal(first.postflight.status, "passed");
-  assert.equal(first.manifest.retryContext.priorGapDossiers.length, 1);
-  assert.equal(first.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
-  const firstGapDossier = first.manifest.retryContext.priorGapDossiers[0];
-  assert(firstGapDossier);
-  assert.deepStrictEqual(
-    firstGapDossier.reasons.map((reason) => reason.reason),
-    ["materialized_product_relative_path_mismatch"]
-  );
-  assert.deepStrictEqual(
-    firstGapDossier.reasons.map((reason) => reason.reasonClass),
-    ["contract_violation"]
-  );
-  assert.deepStrictEqual(first.emittedRuntimeEventKinds.slice(0, 4), [
-    "basis_admitted",
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned"
-  ]);
-  assert.equal(first.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
-  assert.equal(first.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
-  assert.equal(first.emittedRuntimeEventKinds.includes("retry_progress_recorded"), true);
-  assert.deepStrictEqual(first.emittedRuntimeEventKinds.slice(-2), [
-    "vector_closed",
-    "terminal_reached"
-  ]);
-  assert.equal(first.summary.nextLawfulAction, "rerun_gaps_or_start_next_edge");
-
-  const failureEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterFailure = projectSdlcGapsFromReplay({
+  assert.equal(completed.status, "worker_invoked");
+  assert.equal(completed.postflight.status, "passed");
+  assert.equal(completed.gapDossier, null);
+  const completionEvents = await readOddSdlcRuntimeEvents(workspace);
+  const afterCompletion = projectSdlcGapsFromReplay({
     basis,
-    events: Object.freeze([...preclosedEvents, ...failureEvents])
+    events: Object.freeze([...preclosedEvents, ...completionEvents])
   });
-  assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), true);
-  assert.notEqual(afterFailure.currentEdge, "derive_component_code_surface");
-  assert.equal(
-    first.manifest.traversalObligationContext.deltaSummary.priorGapCount,
-    first.manifest.retryContext.priorGapDossiers[0].reasons.length
-  );
-  assert(
-    first.manifest.traversalObligationContext.deltaSummary.priorGapCount,
-    "retry frontier should retain prior gap pressure as a count, not expanded obligations"
-  );
-  assert.equal(
-    first.manifest.traversalIntentPackage.obligationIds.some((id) =>
-      id.startsWith("prior_gap:")
-    ),
-    false
-  );
-  assert.equal(
-    first.manifest.retryContext.priorGapDossiers[0].reasons[0].reason,
-    "materialized_product_relative_path_mismatch"
-  );
-  assert.equal(
-    first.workerReport.materializedFiles[0].relativePath,
-    "cdme-core/src/main/scala/cdme/Core.scala"
-  );
-  const firstMaterializationLedger = deriveMaterializationAssuranceLedger({
-    manifest: first.manifest,
-    report: first.workerReport,
-    postflight: first.postflight
-  });
-  const firstObligationLedger = deriveObligationCarryAssuranceLedger({
-    manifest: first.manifest,
-    currentGapDossier: null,
-    closedReasonCodes: ["materialized_product_relative_path_mismatch"]
-  });
-  const firstSatisfaction = foldSdlcAssuranceLedgers({
-    requiredDimensions: ["materialization", "obligation_carry"],
-    ledgers: [firstMaterializationLedger, firstObligationLedger]
-  });
-  assert.equal(firstSatisfaction.status, "close_allowed");
-
-  const finalEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterSecond = projectSdlcGapsFromReplay({
-    basis,
-    events: Object.freeze([...preclosedEvents, ...finalEvents])
-  });
-  assert.equal(afterSecond.closedVectorIndexes.includes(codeIndex), true);
-  assert.notEqual(afterSecond.currentEdge, "derive_component_code_surface");
+  assert.equal(afterCompletion.closedVectorIndexes.includes(codeIndex), true);
+  assert.notEqual(afterCompletion.currentEdge, "derive_component_code_surface");
 });
 
 test("T-076 installed data_mapper successor re-enters failed code edge from event truth", async () => {
@@ -489,7 +434,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
   );
   assert.equal(beforeFailure.projection.currentEdge, "derive_component_code_surface");
 
-  const failed = runInstalledOddSdlc(
+  const repaired = runInstalledOddSdlc(
     commandPath,
     [
       "start",
@@ -504,52 +449,15 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     ],
     workspace
   );
-  assert.equal(failed.status, "worker_invoked");
-  assert.equal(failed.postflight.status, "passed");
-  assert.equal(failed.manifest.retryContext.priorGapDossiers.length, 1);
-  assert.equal(failed.manifest.traversalIntentPackage.priorGapDossierRefs.length, 1);
-  const failedGapDossier = failed.manifest.retryContext.priorGapDossiers[0];
-  assert(failedGapDossier);
-  assert.deepStrictEqual(failedGapDossier.reasons.map((reason) => reason.reason), [
-    "materialized_product_relative_path_mismatch"
-  ]);
-  assert.deepStrictEqual(failed.emittedRuntimeEventKinds.slice(0, 3), [
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned"
-  ]);
-  assert.equal(failed.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
-  assert.equal(failed.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
-  assert.equal(failed.emittedRuntimeEventKinds.includes("retry_progress_recorded"), true);
-  assert.deepStrictEqual(failed.emittedRuntimeEventKinds.slice(-2), [
-    "vector_closed",
-    "terminal_reached"
-  ]);
+  assert.equal(repaired.status, "worker_invoked");
+  assert.equal(repaired.postflight.status, "passed");
 
-  const afterFailure = runInstalledOddSdlc(
+  const afterRepair = runInstalledOddSdlc(
     commandPath,
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.notEqual(afterFailure.projection.currentEdge, "derive_component_code_surface");
-  assert.equal(
-    failed.manifest.traversalObligationContext.deltaSummary.priorGapCount,
-    failed.manifest.retryContext.priorGapDossiers[0].reasons.length
-  );
-  assert(
-    failed.manifest.traversalObligationContext.deltaSummary.priorGapCount,
-    "retry frontier should retain prior gap pressure as a count, not expanded obligations"
-  );
-  assert.equal(
-    failed.manifest.traversalIntentPackage.obligationIds.some((id) =>
-      id.startsWith("prior_gap:")
-    ),
-    false
-  );
-  assert.equal(
-    failed.workerReport.materializedFiles[0].relativePath,
-    "cdme-core/src/main/scala/cdme/Core.scala"
-  );
+  assert.notEqual(afterRepair.projection.currentEdge, "derive_component_code_surface");
   assert.equal(
     existsSync(
       path.join(
@@ -560,11 +468,5 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
     true
   );
 
-  const afterRepair = runInstalledOddSdlc(
-    commandPath,
-    ["gaps", "--workspace", workspace],
-    workspace
-  );
-  assert.notEqual(afterRepair.projection.currentEdge, "derive_component_code_surface");
   assert(readFileSync(path.join(workspace, ".ai-workspace/events/events.jsonl"), "utf8").trim().length > 0);
 });

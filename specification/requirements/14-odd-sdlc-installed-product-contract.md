@@ -73,9 +73,11 @@ Acceptance criteria:
   project-owned specification/source truth, ABG-owned substrate truth, and
   `odd_sdlc`-owned domain install truth
 - AC-3: the instruction sections map operator `gaps` to the installed
-  `odd-sdlc-ts gaps --workspace .` command
+  Spec Method entrypoint, which may be launched locally as
+  `odd-sdlc-ts gaps --workspace .`
 - AC-4: the instruction sections map operator `start` to the installed
-  `odd-sdlc-ts start --workspace . --target next --until blocked` command
+  Spec Method entrypoint, which may be launched locally as
+  `odd-sdlc-ts start --workspace . --target next --until blocked`
 - AC-5: instruction sections reference shared method through
   `workspace://.abiogenesis/docs/standards/...`, not through absolute source
   workspace paths
@@ -182,12 +184,14 @@ Acceptance criteria:
   edge
 - AC-4: installed command proof is distinct from source-line unit tests and
   private harness proof
-- AC-5: the installed operator handoff shall support both
-  `Agentic_Coder_CLI` and plain CLI bindings over the same installed
-  command/callable contract:
-  `User -> [Agentic_Coder_CLI | Plain CLI] -> installed odd_sdlc contract -> ABG`
+- AC-5: the installed operator handoff shall support the agentic coder as the
+  user interface over the same installed Spec Method/ABG contract:
+  `User -> Agentic_Coder_CLI -> Spec Method command intent -> installed odd_sdlc contract -> ABG`
 - AC-6: the agentic coder CLI shall be treated as the user interface over
   installed product truth, not as a second runtime or hidden controller
+- AC-7: plain shell execution may launch the same installed entrypoint, but it
+  shall not define command law, own retry/reentry, or become compatibility
+  facade truth
 
 ### REQ-F-ODDSDLC-052 - supplied worker transport triggers governed execution
 

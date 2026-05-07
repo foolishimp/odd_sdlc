@@ -123,14 +123,15 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
   const report = describeOddSdlcTypescriptRcQualification();
 
   assert.equal(report.kind, "odd_sdlc_typescript_rc_qualification_report");
-  assert.equal(report.verdict, "bounded_rc_ready");
+  assert.equal(report.verdict, "blocked_pending_b085_component_test_repair");
   assert(!report.nonClaimedScope.includes("live probabilistic data_mapper generation with an external F_P worker"));
   assert(!report.nonClaimedScope.includes("side-effecting installed-workspace CLI replacement for the Python tenant"));
   assert(report.gates.some((gate) => gate.name === "T-038 composed harnessed sandbox" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-052 ABG-populated installed sandbox contract" && gate.status === "passed"));
-  assert(report.gates.some((gate) => gate.name === "T-058 bounded public CLI adapter" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-058/T-120 Spec Method entrypoint" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-059 install and release-cut adapter" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "live F_P worker traversal" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "B-085 current live data_mapper release-depth parity" && gate.status === "blocked"));
   assert(report.gates.some((gate) => gate.name === "T-060 TypeScript/Python archive comparison" && gate.status === "passed"));
 
   for (const gap of remainingOddSdlcTypescriptRcGaps()) {

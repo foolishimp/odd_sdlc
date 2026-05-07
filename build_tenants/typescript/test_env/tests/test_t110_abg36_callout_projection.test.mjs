@@ -1,5 +1,5 @@
 // Validates: T-110
-// Validates: ABG-3.5-typed-callout-outcome-projection
+// Validates: ABG-3.6-typed-callout-outcome-projection
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -110,7 +110,7 @@ function withEnv(overrides, callback) {
 }
 
 async function runStart(workspace, worker) {
-  return runOddSdlcCliAsync([
+  return invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,

@@ -6,25 +6,26 @@
 
 ## Problem
 
-The public CLI adapter can project `start` and `gaps`, but an installed
+The Spec Method entrypoint can project `start` and `gaps`, but an installed
 operator needs an executable loop:
 
 ```text
-User -> [Agentic_Coder_CLI | Plain CLI]
-  -> installed odd_sdlc command/callable contract
+User -> Agentic_Coder_CLI
+  -> Spec Method command intent
+  -> installed odd_sdlc callable contract
   -> ABG runtime truth
   -> GTL graph-function edge
   -> IoC worker/plugin execution
   -> materialized asset + worker result report
   -> ABG event/projection truth
-  -> [Agentic_Coder_CLI | Plain CLI]
+  -> Agentic_Coder_CLI
   -> User
 ```
 
-`ODD_SDLC_TYPESCRIPT_PUBLIC_CLI_ADAPTER.md` remains the bounded read/query
-adapter design. This design adds the installed operator slice above it. The
-operator slice may invoke workers and append ABG-compatible runtime events, but
-it does not choose graph traversal outside replay-derived ABG projection.
+`ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md` owns the single method command
+entry. This design adds the installed operator slice below it. The operator
+slice may invoke workers and append ABG-compatible runtime events, but it does
+not choose graph traversal outside replay-derived ABG projection.
 
 This is an `STDO-UX` boundary. The agentic coder CLI is the primary flexible
 user interface over installed product truth. It accepts user intent, reads
@@ -48,10 +49,10 @@ classDiagram
   class AgenticCoderCli {
     transport
     readsBootstrapProvenance
-    invokesInstalledCommands
+    invokesSpecMethodEntrypoint
   }
 
-  class OddSdlcCliRequest {
+  class OddSdlcSpecMethodRequest {
     command
     workspaceRoot
     target
@@ -141,9 +142,9 @@ classDiagram
   }
 
   UserIntent --> AgenticCoderCli
-  UserIntent --> OddSdlcCliRequest
-  AgenticCoderCli --> OddSdlcCliRequest
-  OddSdlcCliRequest --> SdlcPublicStartOutcome
+  UserIntent --> OddSdlcSpecMethodRequest
+  AgenticCoderCli --> OddSdlcSpecMethodRequest
+  OddSdlcSpecMethodRequest --> SdlcPublicStartOutcome
   SdlcPublicStartOutcome --> SdlcInstalledOperatorRun
   SdlcInstalledOperatorRun --> SdlcWorkerTransportContract
   SdlcInstalledOperatorRun --> SdlcWorkerHandoffManifest
@@ -161,7 +162,7 @@ classDiagram
 | --- | --- | --- | --- | --- |
 | `UserIntent` | UI/operator | operator requested outcome | natural language lowered through bootstrap provenance and installed command contract | prompt-only execution without installed command/projection truth |
 | `AgenticCoderCli` | UI/operator binding | interface transport | generated `AGENTS.md`/`CLAUDE.md` plus installed manifest/provenance | rival controller or hidden workflow runtime |
-| `OddSdlcCliRequest` | CLI adapter | command intent | existing CLI request admission | private test harness command |
+| `OddSdlcSpecMethodRequest` | Spec Method entrypoint | command intent | Spec Method request admission | private test harness command |
 | `SdlcPublicStartOutcome` | start projection | selected graph-function basis | existing public start carrier | local traversal selection |
 | `SdlcWorkerTransportContract` | operator execution | worker process binding | `process://...` URI admission | ambient command string |
 | `SdlcWorkerHandoffManifest` | operator execution | graph edge handoff | derived from execution basis and hook contract | prompt-only authority |
@@ -174,8 +175,8 @@ classDiagram
 
 ## Module Responsibilities
 
-- `cli/command.ts` admits commands and routes `start` with a supplied worker to
-  the installed operator slice.
+- `spec_method/entry.ts` admits method command intent and routes `start` with a
+  supplied worker to the installed operator slice.
 - `operator/event_store.ts` reads and appends the installed ABG event log at
   `.ai-workspace/events/events.jsonl`.
 - `operator/transport.ts` admits worker process transports and invokes the
@@ -261,7 +262,7 @@ bar; that remains tracked by `T-041` and `T-066`.
 
 Local optimization:
 
-- keep worker transport and result parsing out of `cli/command.ts`
+- keep worker transport and result parsing out of `spec_method/entry.ts`
 - reuse hook contracts and hook postflight instead of making a second SDLC
   evaluator family
 - use the existing ABG `RuntimeEvent` family and event log path

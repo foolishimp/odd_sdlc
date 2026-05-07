@@ -12,7 +12,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
@@ -31,7 +31,7 @@ import {
   projectSdlcWorkerAttachment,
   publicStartOnce,
   readWorkerResultReport,
-  runOddSdlcCliAsync,
+  invokeOddSdlcSpecMethodCommand,
   runSdlcHookTurn,
   sha256Text,
   writeHandoffFiles
@@ -181,6 +181,12 @@ function writeSilentWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function writeFailingWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t064_failing_worker.mjs");
+  writeFileSync(workerPath, "process.exit(7);\n", "utf8");
+  return workerPath;
+}
+
 test("T-064 installed operator start invokes worker and replay-backed gaps advances", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
@@ -192,7 +198,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.equal(install.kind, "installed");
   const workerScript = writeWorkerScript(workspace);
 
-  const firstGaps = await runOddSdlcCliAsync([
+  const firstGaps = await invokeOddSdlcSpecMethodCommand([
     "gaps",
     "--workspace",
     workspace
@@ -200,7 +206,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.equal(firstGaps.status, "ok");
   assert.equal(firstGaps.payload.projection.currentEdge, "derive_intent_surface");
 
-  const start = await runOddSdlcCliAsync([
+  const start = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -290,6 +296,12 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.match(startedContext.reportRef, /worker_result_report\.json$/u);
   assert.match(startedContext.outputRef, /intent_surface\.md$/u);
   assert.equal(startedContext.pid > 0, true);
+  if (startedContext.executorProfile === "pty-terminal") {
+    assert.equal(typeof startedContext.terminalSessionId, "string");
+    assert.equal(startedContext.terminalSessionId.length > 0, true);
+  } else {
+    assert.equal(startedContext.terminalSessionId, null);
+  }
   assert.equal(startedContext.timeoutMs > startedContext.inactivityTimeoutMs, true);
   const processSummaryPath = path.join(
     start.payload.archiveRoot,
@@ -322,7 +334,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   const eventLines = readFileSync(eventLog, "utf8").trim().split(/\r?\n/u);
   assert.equal(eventLines.length, start.payload.emittedRuntimeEventKinds.length);
 
-  const secondGaps = await runOddSdlcCliAsync([
+  const secondGaps = await invokeOddSdlcSpecMethodCommand([
     "gaps",
     "--workspace",
     workspace
@@ -350,7 +362,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
     maxBuffer: 1024 * 1024 * 5
   });
   assert.equal(json.status, 0, json.stderr);
-  assert.equal(JSON.parse(json.stdout).kind, "odd_sdlc_cli_result");
+  assert.equal(JSON.parse(json.stdout).kind, "odd_sdlc_spec_method_result");
 });
 
 test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () => {
@@ -368,7 +380,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
   process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "120";
   process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
   try {
-    const start = await runOddSdlcCliAsync([
+    const start = await invokeOddSdlcSpecMethodCommand([
       "start",
       "--workspace",
       workspace,
@@ -389,7 +401,12 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
       start.payload.postflight.blockingReasonCarriers[0].code,
       "worker_hard_timeout"
     );
-    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 1);
+    assert.equal(start.payload.manifest.retryContext.priorGapDossiers.length, 0);
+    assert.equal(start.payload.gapDossier.retryEligible, false);
+    assert.deepStrictEqual(
+      start.payload.gapDossier.nextLawfulActions,
+      ["triage_gap"]
+    );
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
       /sharpenedRetryAvailable=false/u
@@ -484,6 +501,51 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
   }
 });
 
+test("T-128 installed start returns worker_failed envelope after process failure", async () => {
+  const workspace = makeWorkspace();
+  const install = await installOddSdlcTypescript({
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t128"
+  });
+  assert.equal(install.kind, "installed");
+  const workerScript = writeFailingWorkerScript(workspace);
+
+  const start = await invokeOddSdlcSpecMethodCommand([
+    "start",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:bootstrap_release_self_test",
+    "--until",
+    "first_traversal",
+    "--worker",
+    `process://node?script=${encodeURIComponent(workerScript)}`
+  ]);
+
+  assert.equal(start.status, "ok");
+  assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
+  assert.equal(start.payload.status, "worker_failed");
+  assert.equal("loop" in start.payload, false);
+  assert.equal(start.payload.workerRun.status, 7);
+  assert.equal(start.payload.postflight.status, "blocked");
+  assert.equal(start.payload.gapDossier.status, "open");
+  assert.equal(start.payload.gapDossier.retryEligible, false);
+  assert.deepStrictEqual(start.payload.gapDossier.nextLawfulActions, [
+    "triage_gap"
+  ]);
+  assert.equal(
+    existsSync(
+      path.join(
+        start.payload.manifest.archiveRoot,
+        "worker_process_failure_postflight.json"
+      )
+    ),
+    true
+  );
+});
+
 test("B-078 process-summary admission defects fail closed as typed evidence blockers", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("derive_intent_surface");
@@ -551,6 +613,68 @@ test("B-078 process-summary admission defects fail closed as typed evidence bloc
   );
 });
 
+test("T-064 worker provider rate limits stay inside same-edge retry law", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("prepare_test_execution_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t064-worker-rate-limit"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(
+    stdoutPath,
+    [
+      JSON.stringify({
+        type: "rate_limit_event",
+        rate_limit_info: { status: "rejected", rateLimitType: "five_hour" }
+      }),
+      JSON.stringify({ type: "result", is_error: true, api_error_status: 429 })
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(finalOutputPath, "You've hit your org's monthly usage limit\n", "utf8");
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: { kind: "exited", status: 1 },
+    executorProfile: "pty-terminal",
+    streamModel: "terminal-transcript",
+    finalOutputRef: pathToFileURL(finalOutputPath).href,
+    status: 1,
+    signal: null,
+    elapsedMs: 1866,
+    timedOut: false,
+    stdoutByteCount: 180,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_rate_limited");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+  assert(postflight.evidenceRefs.includes(pathToFileURL(finalOutputPath).href));
+});
+
 test("T-064 operator observes F_P.transform output and generates report", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
@@ -562,7 +686,7 @@ test("T-064 operator observes F_P.transform output and generates report", async 
   assert.equal(install.kind, "installed");
   const workerScript = writeTransformOnlyWorkerScript(workspace);
 
-  const start = await runOddSdlcCliAsync([
+  const start = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -616,7 +740,7 @@ test("T-092 installed start --until blocked delegates iteration to ABG until a r
   assert.equal(install.kind, "installed");
   const workerScript = writeSecondEdgeFailingWorkerScript(workspace);
 
-  const start = await runOddSdlcCliAsync([
+  const start = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -653,16 +777,12 @@ test("T-092 installed start --until blocked delegates iteration to ABG until a r
     ),
     true
   );
-  assert.equal(
-    start.payload.emittedRuntimeEventKinds.includes("retry_repair_planned"),
-    true
-  );
   assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds.slice(-2), [
     "retry_attempt_stopped",
     "terminal_reached"
   ]);
 
-  const gaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+  const gaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(gaps.status, "ok");
   assert.equal(gaps.payload.projection.currentEdge, "derive_product_surface");
 

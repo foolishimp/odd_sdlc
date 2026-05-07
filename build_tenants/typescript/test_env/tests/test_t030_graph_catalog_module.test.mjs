@@ -204,7 +204,7 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   const bootstrapProbe = deriveTraversalStructureProbe(bootstrapBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
-  assert.equal(bootstrapBasis.graph.vectors.length, 31);
+  assert.equal(bootstrapBasis.graph.vectors.length, 33);
   assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");
   assert.equal(operationalProbe.edge, "prepare_build_execution_surface");
@@ -212,19 +212,19 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   assert.equal(operationalProbe.transitionKind, "fp_dispatch");
 });
 
-test("T-107 SDLC vectors declare ABG traversal modulation and runner passes an attempt envelope", async () => {
+test("T-107 SDLC vectors declare ABG traversal strategy and runner passes an attempt envelope", async () => {
   const module = constructSdlcGtlModule();
   const basis = basisFor(module, "bootstrap_release_self_test");
   const firstVector = basis.graph.vectors[0];
   assert(firstVector);
   const qualifier = firstVector.declarations.entries.find(
-    (entry) => entry.key === "abg.traversal_modulation"
+    (entry) => entry.key === "abg.traversal_strategy"
   );
   assert(qualifier);
   assert.equal(qualifier.value.kind, "hook_ref");
   assert.equal(
     qualifier.value.value.ref,
-    "strategy://odd_sdlc/derive_intent_surface/single_vertical_slice"
+    "strategy://odd_sdlc/derive_intent_surface/full_breadth"
   );
 
   const pluginInputs = [];
@@ -257,7 +257,7 @@ test("T-107 SDLC vectors declare ABG traversal modulation and runner passes an a
   assert(pluginInputs[0].traversalAttemptEnvelope);
   assert.equal(
     pluginInputs[0].traversalAttemptEnvelope.strategyDirectiveRef,
-    "strategy://odd_sdlc/derive_intent_surface/single_vertical_slice"
+    "strategy://odd_sdlc/derive_intent_surface/full_breadth"
   );
   assert.deepStrictEqual(
     pluginInputs[0].traversalAttemptEnvelope.selectedScheduleItemRefs,

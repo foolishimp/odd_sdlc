@@ -15,6 +15,7 @@ import {
   foldSdlcAssuranceLedgers,
   type SdlcAssuranceLedger,
   type SdlcAssuranceLedgerDimension,
+  type SdlcAssuranceLedgerReason,
   type SdlcTraversalRequirementSatisfaction,
   type SdlcObservedCapability,
   type SdlcRealizationTextSurface,
@@ -392,6 +393,56 @@ function currentAssuranceReasonCodes(
   );
 }
 
+function blockingReentryForAssuranceReason(
+  reason: SdlcAssuranceLedgerReason
+):
+  | "same_edge_retry"
+  | "escalate_to_fp"
+  | "repair_worker_output"
+  | "reprice_requirement_or_design"
+  | "operator_blocked" {
+  if (
+    reason.lawfulReentryPoint === "requirement_reprice" ||
+    reason.lawfulReentryPoint === "design_reframe"
+  ) {
+    return "reprice_requirement_or_design";
+  }
+  return reason.lawfulReentryPoint;
+}
+
+function orderedSatisfactionReasons(
+  satisfaction: SdlcTraversalRequirementSatisfaction
+): readonly SdlcAssuranceLedgerReason[] {
+  const reasonByCode = new Map<string, SdlcAssuranceLedgerReason>();
+  for (const reason of [
+    ...satisfaction.gapReasons,
+    ...satisfaction.blockingReasons,
+    ...satisfaction.repriceReasons,
+    ...satisfaction.fpEscalationReasons
+  ]) {
+    reasonByCode.set(reason.code, reason);
+  }
+  return Object.freeze(
+    satisfaction.retryHandoff.reasonCodes.map((reasonCode) => {
+      const reason = reasonByCode.get(reasonCode);
+      if (reason === undefined) {
+        return assuranceReason({
+          code: reasonCode,
+          message: `Assurance ledger reason ${reasonCode} was present in retry handoff without full reason detail.`,
+          evidenceRefs: satisfaction.retryHandoff.evidenceRefs,
+          lawfulReentryPoint:
+            satisfaction.status === "reprice_required"
+              ? "requirement_reprice"
+              : satisfaction.status === "fp_escalation"
+                ? "escalate_to_fp"
+              : "same_edge_retry"
+        });
+      }
+      return reason;
+    })
+  );
+}
+
 function postflightFromSatisfaction(
   satisfaction: SdlcTraversalRequirementSatisfaction
 ): SdlcPostflightResult | null {
@@ -401,15 +452,17 @@ function postflightFromSatisfaction(
   ) {
     return null;
   }
-  const carriers = satisfaction.retryHandoff.reasonCodes.map((reasonCode) =>
+  const carriers = orderedSatisfactionReasons(satisfaction).map((reason) =>
     makeSdlcBlockingReason({
       code: "assurance_ledger_reason",
-      detail: reasonCode,
-      evidenceRefs: satisfaction.retryHandoff.evidenceRefs,
-      lawfulReentryPoint:
-        satisfaction.status === "reprice_required"
-          ? "reprice_requirement_or_design"
-          : "same_edge_retry"
+      detail: reason.code,
+      evidenceRefs: uniqueSorted([
+        ...satisfaction.retryHandoff.evidenceRefs,
+        ...reason.evidenceRefs
+      ]),
+      lawfulReentryPoint: blockingReentryForAssuranceReason(reason),
+      message: reason.message,
+      reasonClass: "assurance"
     })
   );
   return Object.freeze({

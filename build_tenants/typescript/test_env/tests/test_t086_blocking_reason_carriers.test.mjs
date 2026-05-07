@@ -2,6 +2,7 @@
 // Validates: REQ-F-ODDSDLC-053
 // Validates: T-086
 // Validates: T-114
+// Validates: B-086
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +25,7 @@ import {
   installOddSdlcTypescript,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
-  runOddSdlcCliAsync,
+  invokeOddSdlcSpecMethodCommand,
   sha256Text,
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
@@ -229,6 +230,43 @@ test("T-086/T-114 postflight classifies from typed truth, not report prose", () 
   );
 });
 
+test("B-086 postflight gap dossier preserves F_P escalation as lawful reentry", () => {
+  const root = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_aggregate_domain_model_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: root,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_aggregate_domain_model_surface",
+    vectorIndex: 0,
+    contract
+  });
+  const blockingReason = makeSdlcBlockingReason({
+    code: "assurance_ledger_reason",
+    detail: "design_completeness_attribute_partial",
+    evidenceRefs: ["proof://fd-ambiguity"],
+    lawfulReentryPoint: "escalate_to_fp",
+    message:
+      "F_D observed semantic incompleteness without hard source disambiguation.",
+    reasonClass: "assurance"
+  });
+  const postflight = {
+    kind: "sdlc_operator_postflight_result",
+    status: "blocked",
+    blockingReasons: [legacyBlockingReasonCode(blockingReason)],
+    blockingReasonCarriers: [blockingReason],
+    evidenceRefs: ["proof://fd-ambiguity"]
+  };
+
+  const dossier = constructPostflightGapDossier({ manifest, postflight });
+
+  assert.equal(dossier.retryEligible, true);
+  assert.deepEqual(dossier.nextLawfulActions, ["escalate_to_fp"]);
+  assert.equal(
+    dossier.reasons[0].blockingReason.lawfulReentryPoint,
+    "escalate_to_fp"
+  );
+});
+
 test("T-086 rejected install exposes typed blocking reason", async () => {
   const root = makeWorkspace();
   const outcome = await installOddSdlcTypescript({
@@ -249,7 +287,7 @@ test("T-086 rejected install exposes typed blocking reason", async () => {
 
 test("T-086 CLI JSON preserves typed summary blocking reasons", async () => {
   const root = makeWorkspace();
-  const result = await runOddSdlcCliAsync([
+  const result = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     root,

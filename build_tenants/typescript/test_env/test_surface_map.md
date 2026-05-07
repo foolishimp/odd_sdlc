@@ -507,27 +507,27 @@ run summary, and postmortem. It proves a live external `F_P` traversal class; it
 does not prove full installed `odd_sdlc` CLI replacement, release-cut
 packaging, or Python archive equivalence.
 
-## T-058 Public CLI Adapter Lane
+## T-058 Spec Method Entrypoint Lane
 
 Derives from:
 
 - `.ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md`
-- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_PUBLIC_CLI_ADAPTER.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_SPEC_METHOD_ENTRYPOINT.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_POLICY_SURFACES.md`
 
 Canonical file:
 
-- `test_env/tests/test_t058_public_cli_adapter.test.mjs`
+- `test_env/tests/test_t058_spec_method_entrypoint.test.mjs`
 
 Canonical command:
 
 - `npm run test:t058`
 
-The lane proves the bounded `odd-sdlc-ts` public CLI adapter for `catalog`,
-`query-domain`, `gaps`, `start`, and `rc-report`. The adapter reads workspace
-authority surfaces into existing source-input and ingress carriers, projects
-query-domain and gap surfaces through existing modules, and calls
-`publicStartOnce` for start projection.
+The lane proves the bounded installed Spec Method entrypoint for `catalog`,
+`query-domain`, `gaps`, `start`, and `rc-report`. The shell binary is only a
+process launcher over the same entrypoint. Command law, traversal selection,
+retry/reentry, and runtime projection stay behind the installed
+odd_sdlc/ABG boundary.
 
 The lane also proves the package binary returns JSON, propagates command
 errors, and does not contain local iteration or a hidden ABG runner.

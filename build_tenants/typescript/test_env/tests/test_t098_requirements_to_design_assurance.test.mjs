@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -59,8 +59,8 @@ function makeWorkspace() {
     [
       "# Design Requirements",
       "",
-      "REQ-T098-001: Derive a design surface from admitted requirements.",
-      "REQ-T098-002: Preserve feature decomposition pressure in the design traversal."
+      "REQ-T098-001: Derive an app-core design surface from admitted requirements.",
+      "REQ-T098-002: Preserve app-core feature decomposition pressure in the design traversal."
     ].join("\n"),
     "utf8"
   );
@@ -111,7 +111,7 @@ function writeWorkerScript(workspaceRoot) {
 }
 
 async function startOne(workspace, workerScript) {
-  return runOddSdlcCliAsync([
+  return invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -138,7 +138,7 @@ test("T-098 requirements-to-design closes through existing assurance ledgers", a
   let designRun = null;
   const visitedEdges = [];
   for (let index = 0; index < 8; index += 1) {
-    const gaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+    const gaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
     assert.equal(gaps.status, "ok");
     const edge = gaps.payload.projection.currentEdge;
     visitedEdges.push(edge);

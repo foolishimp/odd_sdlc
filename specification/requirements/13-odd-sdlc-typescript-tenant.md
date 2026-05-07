@@ -24,8 +24,8 @@ Acceptance criteria:
 - AC-1: the TypeScript tenant is registered under `build_tenants/`
 - AC-2: the tenant does not define a rival `WHAT` surface
 - AC-3: operative SDLC behavior is expressed through GTL graph functions
-- AC-4: public command or service bindings remain adapters over graph-function
-  and ABG truth
+- AC-4: public service or agentic-command bindings invoke the installed
+  Spec Method/ABG entrypoint and do not define a second command truth
 
 ### REQ-F-ODDSDLC-041 - Python is discovery evidence, not TypeScript architecture
 

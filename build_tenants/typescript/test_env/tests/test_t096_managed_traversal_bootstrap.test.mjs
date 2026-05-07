@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -97,12 +97,12 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
   });
   assert.equal(install.kind, "installed");
 
-  const firstGaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+  const firstGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(firstGaps.status, "ok");
   assert.equal(firstGaps.payload.start.executionContract.targetGraphFunction, FG_CONFORM_PROJECT);
   assert.equal(firstGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT);
 
-  const induction = await runOddSdlcCliAsync(["start", "--workspace", workspace]);
+  const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
   assert.equal(induction.status, "ok");
   assert.equal(induction.payload.summary.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(induction.payload.status, "converged");
@@ -152,7 +152,7 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
     )
   );
 
-  const secondGaps = await runOddSdlcCliAsync(["gaps", "--workspace", workspace]);
+  const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok");
   assert.equal(
     secondGaps.payload.start.executionContract.targetGraphFunction,

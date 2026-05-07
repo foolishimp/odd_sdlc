@@ -4,7 +4,7 @@ title: Add per-module attribute schema and state diagram, plus aggregate domain 
 type: feature
 ticket_category: design_phase_completeness
 status: active
-review_status: steel_thread_passed_pending_widening
+review_status: reopened_codex_rc_completeness_review
 goal: typescript-rc-design-completeness-before-realization
 build_tenant: typescript
 owner: unassigned
@@ -15,7 +15,7 @@ affected_boundary: bootstrap_release_self_test graph topology, derive_implementa
 priority: high
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-05
+updated_at: 2026-05-07
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -55,6 +55,26 @@ non_closure_conditions:
   - downstream schedule edges that bypass the aggregate surfaces and reason from derive_design_surface narrative directly
   - new edges added without binding their outputs as inputs to realization scheduling and code/test materialization
 ---
+
+## Closure Note - 2026-05-06
+
+Closed under STDO for the proven steel-thread design-depth slice. Full-breadth
+widening is not claimed here and is carried by
+`backlog/T-130-widen-design-depth-from-steel-thread-to-full-breadth.md`.
+
+Current proof:
+
+- `test_t116_design_depth_steel_thread.test.mjs` passed in the semantic suite.
+- `test_t122_feature_scope_closure.test.mjs` passed with scoped design-depth
+  positive and negative cases.
+- `npm run test:semantic` passed: 216/216.
+- `npm run test:sandbox` passed: 15/15.
+- The live T-109 PTY workspace advanced through the aggregate domain and
+  sunny-day sequence surfaces before blocking at release-depth parity.
+
+Closure boundary: typed design-depth carriers, aggregate design edges, scoped
+assurance, and live traversal through those surfaces are proven. Full-breadth
+all-module widening remains backlog scope.
 
 # T-116: Add Per-Module Domain Schema/State Diagram And Aggregate Design Surfaces
 
@@ -337,3 +357,53 @@ outputs of `derive_design_surface`.
   Module declarations at every design edge; T-116 is the smallest lawful
   step in that direction that does not require constitutional method
   amendment.
+
+## Test69 Admission Bug Link
+
+The fresh `data_mapper.test69.TS.cx` Claude PTY run exposed a lifecycle bug in
+the design-depth admission boundary. `derive_implementation_module_surface`
+produced useful module/entity/attribute facts, but postflight rejected them as
+schema-invalid because the worker used a relational `entities[] + attributes[]`
+shape and extra root metadata.
+
+That bug is tracked by
+`B-084-admit-ambiguous-design-depth-candidates-before-strict-closure.md`.
+
+T-116 cannot close on design-depth surfaces until B-084 is proven, because
+strict final closure is correct but strict first-gate rejection prevents lawful
+ambiguity management and same-edge detail forcing.
+
+## Codex RC Completeness Review - 2026-05-07
+
+Status: reopened to active for RC completeness review.
+
+Observations:
+
+- Focused proof refreshed on 2026-05-07: `node --test
+  test_env/tests/test_t116_design_depth_steel_thread.test.mjs` passed.
+- The steel-thread implementation is real: typed design-depth carriers exist,
+  aggregate edges are present, and deterministic negative tests cover missing
+  attributes and skipped flow operation.
+- The ticket target truth and closure law are broader than the closure note.
+  They require every module to declare typed schema/state semantics and
+  downstream schedule edges to consume aggregate surfaces. The closure note only
+  claims a proven steel-thread slice and defers full breadth to T-130.
+- Because the current ticket still states full design-phase completeness, it
+  should remain active unless the ticket is repriced/narrowed and T-130 becomes
+  the explicit owner of the full-breadth remainder.
+- Adjacent review found design-depth admission/scope risks that affect this
+  ticket's closure surface: missing module identity can be normalized to
+  `unnamed-module`, and scoped completeness filtering relies on reason-text
+  token matching. Those must be addressed or excluded before final T-116
+  closure.
+
+Checklist before re-closing:
+
+- [ ] Decide whether T-116 is the full design-depth ticket or reprice it to the
+      steel-thread slice with T-130 owning full breadth.
+- [ ] Add full-breadth per-module schema/state tests or link the active T-130
+      acceptance criteria as the owner.
+- [ ] Fix or explicitly ticket the `unnamed-module` admission and token-filter
+      assurance risks.
+- [ ] Re-run focused design-depth tests plus the live data-mapper design-depth
+      lane used for closure.

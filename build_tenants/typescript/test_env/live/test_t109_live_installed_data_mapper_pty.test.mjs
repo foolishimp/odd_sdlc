@@ -1,5 +1,7 @@
 // Validates: T-109
 // Validates: T-041
+// Validates: T-120
+// Validates: B-085
 // Validates: live-installed-data-mapper-pty-traversal
 
 import test from "node:test";
@@ -22,6 +24,7 @@ import {
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
+import { liveTestArchiveRoot } from "./archive_root.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -35,7 +38,7 @@ const DATA_MAPPER_TEMPLATE_ROOT =
   process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
   "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
 const MAX_STEPS = Number.parseInt(
-  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_MAX_STEPS"] ?? "24",
+  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_MAX_STEPS"] ?? "56",
   10
 );
 const COMMAND_TIMEOUT_MS = Number.parseInt(
@@ -92,6 +95,246 @@ function latestMtimeMs(candidatePath) {
     }
   }
   return latest;
+}
+
+function listFilesRecursively(root) {
+  if (!existsSync(root)) {
+    return [];
+  }
+  const files = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const child = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(child);
+      } else if (entry.isFile()) {
+        files.push(child);
+      }
+    }
+  }
+  return files.sort();
+}
+
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function runtimeRoot(workspace) {
+  return path.join(workspace, ".ai-workspace/runtime/odd_sdlc");
+}
+
+function runtimeFilesNamed(workspace, fileName) {
+  return listFilesRecursively(runtimeRoot(workspace)).filter(
+    (candidate) => path.basename(candidate) === fileName
+  );
+}
+
+function markdownJsonBlocks(filePath) {
+  const text = readFileSync(filePath, "utf8");
+  const blocks = [];
+  const blockPattern = /```(?:json(?:\s+[^\n`]+)?)?\n([\s\S]*?)```/gu;
+  for (const match of text.matchAll(blockPattern)) {
+    const raw = match[1]?.trim() ?? "";
+    if (raw.length === 0) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        blocks.push(parsed);
+      }
+    } catch {
+      // Non-JSON diagnostic fences are valid markdown evidence, not carrier blocks.
+    }
+  }
+  return blocks;
+}
+
+function markdownCarrierRecords(workspace, fileName, select) {
+  return runtimeFilesNamed(workspace, fileName)
+    .flatMap((filePath) =>
+      markdownJsonBlocks(filePath)
+        .map((record) => select(record))
+        .filter((record) => record !== null)
+        .map((record) => ({
+          filePath,
+          mtimeMs: statSync(filePath).mtimeMs,
+          record
+        }))
+    )
+    .sort((left, right) => left.mtimeMs - right.mtimeMs || left.filePath.localeCompare(right.filePath));
+}
+
+function latestRuntimeRecord(records) {
+  return records[records.length - 1] ?? null;
+}
+
+function invocationPackages(workspace) {
+  return runtimeFilesNamed(workspace, "worker_invocation_package.json").map((filePath) => ({
+    filePath,
+    mtimeMs: statSync(filePath).mtimeMs,
+    package: readJsonFile(filePath)
+  }));
+}
+
+function workerPrompts(workspace) {
+  return runtimeFilesNamed(workspace, "worker_prompt.md").map((filePath) => ({
+    filePath,
+    text: readFileSync(filePath, "utf8")
+  }));
+}
+
+function releaseDepthRecords(workspace) {
+  return markdownCarrierRecords(workspace, "release_depth_parity_surface.md", (record) => {
+    if (
+      record.kind === "sdlc_release_depth_parity" ||
+      record.targetAssetType === "release_depth_parity_surface" ||
+      record.releaseDepthParity !== undefined
+    ) {
+      return record;
+    }
+    return null;
+  });
+}
+
+function componentRepairScheduleRecords(workspace) {
+  return markdownCarrierRecords(workspace, "component_repair_schedule_surface.md", (record) => {
+    if (record.componentRepairSchedule !== undefined) {
+      return record.componentRepairSchedule;
+    }
+    if (record.kind === "sdlc_component_repair_schedule") {
+      return record;
+    }
+    return null;
+  });
+}
+
+function testExecutionEvidenceRecords(workspace) {
+  return markdownCarrierRecords(workspace, "test_execution_result_surface.md", (record) =>
+    record.kind === "sdlc_worker_execution_evidence" ? record : null
+  );
+}
+
+function isB085RepairPlan(plan) {
+  return (
+    plan?.kind === "sdlc_component_repair_reentry_plan" &&
+    plan.targetEdgeName === "derive_component_test_surface" &&
+    plan.targetAssetType === "component_test_surface" &&
+    plan.repairTarget === "component_test" &&
+    plan.noBroadRegeneration === true &&
+    Array.isArray(plan.testRefs) &&
+    plan.testRefs.some((ref) => ref.endsWith("DiagnosticsFinalizeSpec.scala")) &&
+    /type mismatch/u.test(plan.diagnosticExcerpt ?? "") &&
+    /Cannot prove that Int <:< AnyRef/u.test(plan.diagnosticExcerpt ?? "")
+  );
+}
+
+function rcProofState(workspace) {
+  const packages = invocationPackages(workspace);
+  const repairPlanPackages = packages.filter((entry) =>
+    (entry.package.repairReentryPlans ?? []).some(isB085RepairPlan)
+  );
+  const consumedRepairPlanPackages = repairPlanPackages.filter(
+    (entry) => entry.package.edgeName === "derive_component_test_surface"
+  );
+  const prompts = workerPrompts(workspace);
+  const repairPromptObserved = prompts.some(
+    (entry) =>
+      /repairReentryPlans is non-empty/u.test(entry.text) &&
+      /diagnosticEvidenceRefs/u.test(entry.text)
+  );
+  const schedules = componentRepairScheduleRecords(workspace);
+  const latestSchedule = latestRuntimeRecord(schedules);
+  const repairRequiredObserved = schedules.some(
+    (entry) =>
+      entry.record.scheduleStatus === "repair_required" &&
+      Array.isArray(entry.record.repairRows) &&
+      entry.record.repairRows.length > 0
+  );
+  const executionEvidence = testExecutionEvidenceRecords(workspace);
+  const cdmeCompilerPassEvidence = executionEvidence.some((entry) => {
+    const evidence = entry.record;
+    const shardEvidence = Array.isArray(evidence.shardEvidence)
+      ? evidence.shardEvidence
+      : [];
+    return (
+      evidence.status === "succeeded" &&
+      /sbt\s+"cdme-compiler\/test"/u.test(evidence.command ?? "") &&
+      shardEvidence.some(
+        (shard) =>
+          shard.moduleName === "cdme-compiler" &&
+          shard.status === "succeeded" &&
+          /sbt\s+"cdme-compiler\/test"/u.test(shard.command ?? "") &&
+          Number(shard.passedCount ?? 0) > 0
+      )
+    );
+  });
+  const releaseDepth = releaseDepthRecords(workspace);
+  const latestReleaseDepth = latestRuntimeRecord(releaseDepth);
+  const releaseDepthParityMet =
+    latestReleaseDepth?.record?.releaseDepthParity?.status === "met";
+  return {
+    repairRequiredObserved,
+    b085RepairPlanObserved: repairPlanPackages.length > 0,
+    b085RepairPlanConsumed: consumedRepairPlanPackages.length > 0,
+    repairPromptObserved,
+    latestRepairScheduleStatus: latestSchedule?.record?.scheduleStatus ?? null,
+    cdmeCompilerPassEvidence,
+    releaseDepthParityMet,
+    latestReleaseDepthRef:
+      latestReleaseDepth === null ? null : path.relative(workspace, latestReleaseDepth.filePath),
+    latestRepairScheduleRef:
+      latestSchedule === null ? null : path.relative(workspace, latestSchedule.filePath),
+    repairPlanPackageRefs: repairPlanPackages.map((entry) =>
+      path.relative(workspace, entry.filePath)
+    ),
+    consumedRepairPlanPackageRefs: consumedRepairPlanPackages.map((entry) =>
+      path.relative(workspace, entry.filePath)
+    ),
+    executionEvidenceRefs: executionEvidence.map((entry) =>
+      path.relative(workspace, entry.filePath)
+    )
+  };
+}
+
+function assertTicketedRcProof(workspace, archiveRoot) {
+  const proof = rcProofState(workspace);
+  writeJson(path.join(archiveRoot, "ticketed_rc_proof_state.json"), proof);
+  if (proof.repairRequiredObserved) {
+    assert.equal(
+      proof.b085RepairPlanObserved,
+      true,
+      `B-085 repair schedule was observed but no typed repairReentryPlans package was found: ${JSON.stringify(proof, null, 2)}`
+    );
+    assert.equal(
+      proof.b085RepairPlanConsumed,
+      true,
+      `B-085 repair plan was not consumed by derive_component_test_surface: ${JSON.stringify(proof, null, 2)}`
+    );
+    assert.equal(
+      proof.repairPromptObserved,
+      true,
+      `B-085 repair prompt did not name repairReentryPlans/diagnosticEvidenceRefs: ${JSON.stringify(proof, null, 2)}`
+    );
+  }
+  assert.notEqual(
+    proof.latestRepairScheduleStatus,
+    "repair_required",
+    `latest component repair schedule remains open: ${JSON.stringify(proof, null, 2)}`
+  );
+  assert.equal(
+    proof.cdmeCompilerPassEvidence,
+    true,
+    `missing admitted pass evidence for sbt "cdme-compiler/test": ${JSON.stringify(proof, null, 2)}`
+  );
+  assert.equal(
+    proof.releaseDepthParityMet,
+    true,
+    `releaseDepthParity.status is not met: ${JSON.stringify(proof, null, 2)}`
+  );
+  return proof;
 }
 
 function snapshotSourceRootHygiene() {
@@ -187,7 +430,7 @@ function runInstalled(commandPath, args, workspace, archiveRoot, label, sourceRo
   assertSourceRootHygieneUnchanged(sourceRootHygieneBaseline, archiveRoot, label);
   assert.equal(run.status, 0, run.stderr || JSON.stringify(record, null, 2));
   const parsed = JSON.parse(run.stdout);
-  assert.equal(parsed.kind, "odd_sdlc_cli_result");
+  assert.equal(parsed.kind, "odd_sdlc_spec_method_result");
   assert.equal(parsed.status, "ok", JSON.stringify(parsed, null, 2));
   return parsed.payload;
 }
@@ -209,10 +452,10 @@ test(
   "T-109/T-041 live installed data_mapper traverses through Claude PTY on the production operator path",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T109_DATA_MAPPER_LIVE=1 not set" },
   async () => {
-    const archiveRoot = path.join(
-      PACKAGE_ROOT,
-      "test_env/test_runs/t109_live_installed_data_mapper_pty",
-      `${archiveTimestamp()}_pid${process.pid}`
+    const archiveRoot = liveTestArchiveRoot(
+      "t109_live_installed_data_mapper_pty",
+      archiveTimestamp(),
+      process.pid
     );
     mkdirSync(archiveRoot, { recursive: true });
     const workspace = freshDataMapperWorkspace(archiveRoot);
@@ -229,11 +472,15 @@ test(
     const requiredEdges = new Set([
       "derive_code_surface",
       "derive_test_module_surface",
+      "derive_component_test_surface",
       "derive_test_execution_result_surface",
+      "derive_component_repair_schedule_surface",
+      "derive_release_depth_parity_surface",
       "derive_test_run_archive_surface"
     ]);
     const reachedEdges = new Set();
     const steps = [];
+    let terminalProof = null;
 
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const gaps = runInstalled(
@@ -282,14 +529,41 @@ test(
       );
       steps.push({ step, phase: "start", requestedEdge: currentEdge, ...edgeSummary(start) });
       writeJson(path.join(archiveRoot, "steps.json"), steps);
-      assert.equal(start.status, "worker_invoked", JSON.stringify(start, null, 2));
-      assert.equal(start.workerRun.executorProfile, "pty-terminal");
-      assert.equal(start.workerRun.streamModel, "terminal-transcript");
-      assert.equal(start.workerRun.outcome.kind, "exited");
-      assert.equal(start.workerRun.outcome.status, 0);
-      assert.equal(start.postflight.status, "passed", JSON.stringify(start, null, 2));
-      reachedEdges.add(currentEdge);
-      if ([...requiredEdges].every((edge) => reachedEdges.has(edge))) {
+      assert(
+        start.status === "worker_invoked" || start.status === "converged",
+        JSON.stringify(start, null, 2)
+      );
+      if (start.workerRun !== null) {
+        assert.equal(start.workerRun.executorProfile, "pty-terminal");
+        assert.equal(start.workerRun.streamModel, "terminal-transcript");
+        assert.equal(start.workerRun.outcome.kind, "exited");
+        assert.equal(start.workerRun.outcome.status, 0);
+      }
+      if (start.postflight !== null) {
+        assert.equal(start.postflight.status, "passed", JSON.stringify(start, null, 2));
+      }
+      if (Array.isArray(start.loop?.attempts)) {
+        assert(
+          start.loop.attempts.every((attempt) =>
+            [
+              "worker_invoked",
+              "postflight_failed",
+              "converged",
+              "blocked"
+            ].includes(attempt.status)
+          ),
+          JSON.stringify(start.loop, null, 2)
+        );
+      }
+      reachedEdges.add(start.manifest?.edgeName ?? currentEdge);
+      const proof = rcProofState(workspace);
+      writeJson(path.join(archiveRoot, `step-${String(step).padStart(2, "0")}-proof.json`), proof);
+      if (
+        proof.cdmeCompilerPassEvidence &&
+        proof.releaseDepthParityMet &&
+        proof.latestRepairScheduleStatus !== "repair_required"
+      ) {
+        terminalProof = proof;
         break;
       }
     }
@@ -299,28 +573,35 @@ test(
     for (const edge of requiredEdges) {
       assert.equal(reachedEdges.has(edge), true, `required live edge not reached: ${edge}`);
     }
-    assert.equal(
-      existsSync(
-        path.join(
-          workspace,
-          "build_tenants/scala_spark/cdme-core/src/main/scala/cdme/Core.scala"
-        )
-      ),
-      true
+    const cdmeCompilerSourceFiles = listFilesRecursively(
+      path.join(workspace, "build_tenants/scala_spark/cdme-compiler/src/main/scala")
+    ).filter((candidate) => candidate.endsWith(".scala"));
+    const cdmeCompilerTestFiles = listFilesRecursively(
+      path.join(workspace, "build_tenants/scala_spark/cdme-compiler/src/test/scala")
+    ).filter((candidate) => candidate.endsWith(".scala"));
+    assert(
+      cdmeCompilerSourceFiles.length > 0,
+      "expected cdme-compiler Scala source materialization"
     );
-    assert.equal(
-      existsSync(
-        path.join(
-          workspace,
-          "build_tenants/scala_spark/cdme-core/src/test/scala/cdme/CoreSpec.scala"
-        )
-      ),
-      true
+    assert(
+      cdmeCompilerTestFiles.length > 0,
+      "expected cdme-compiler Scala test materialization"
     );
+    const proof = terminalProof ?? assertTicketedRcProof(workspace, archiveRoot);
+    if (terminalProof !== null) {
+      assertTicketedRcProof(workspace, archiveRoot);
+    }
     writeJson(path.join(archiveRoot, "run_summary.json"), {
       verdict: "passed",
       workspace,
       reachedEdges: [...reachedEdges].sort(),
+      cdmeCompilerSourceFiles: cdmeCompilerSourceFiles.map((candidate) =>
+        path.relative(workspace, candidate)
+      ),
+      cdmeCompilerTestFiles: cdmeCompilerTestFiles.map((candidate) =>
+        path.relative(workspace, candidate)
+      ),
+      ticketedRcProof: proof,
       maxSteps: MAX_STEPS
     });
   }

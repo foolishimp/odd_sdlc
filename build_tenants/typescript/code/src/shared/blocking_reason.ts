@@ -58,6 +58,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "project_conformance_gaps",
   "unsupported_transition",
   "fp_worker_unattached",
+  "worker_rate_limited",
   "worker_process_failed",
   "worker_hard_timeout",
   "worker_executor_unavailable",
@@ -93,6 +94,7 @@ export type SdlcBlockingReasonClass =
 
 export const SDLC_BLOCKING_REASON_REENTRY_POINTS = Object.freeze([
   "same_edge_retry",
+  "escalate_to_fp",
   "repair_worker_output",
   "attach_worker",
   "repair_installed_topology",
@@ -307,6 +309,13 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "contract_violation",
       lawfulReentryPoint: "inspect_worker_archive",
       message: "Worker process summary evidence could not be admitted."
+    });
+  }
+  if (code === "worker_rate_limited") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Worker provider rate limit or quota exhaustion prevented the actor from completing."
     });
   }
   if (code === "worker_process_failed") {

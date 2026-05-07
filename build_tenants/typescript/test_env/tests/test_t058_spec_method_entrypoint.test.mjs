@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
-  runOddSdlcCli
+  invokeOddSdlcSpecMethodCommandSync
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -57,7 +57,7 @@ function makeConformantWorkspace() {
   const root = makeWorkspace();
   writeFileSync(
     path.join(root, "specification/GOALS.md"),
-    ["# Goals", "", "GOAL-CLI-001: Exercise public CLI adapter."].join("\n"),
+    ["# Goals", "", "GOAL-CLI-001: Exercise Spec Method entrypoint."].join("\n"),
     "utf8"
   );
   writeFileSync(
@@ -83,8 +83,8 @@ function makeConformantWorkspace() {
   return root;
 }
 
-test("T-058 CLI catalog command reads graph catalog without workspace mutation", () => {
-  const result = runOddSdlcCli(["catalog"]);
+test("T-058 Spec Method catalog command reads graph catalog without workspace mutation", () => {
+  const result = invokeOddSdlcSpecMethodCommandSync(["catalog"]);
 
   assert.equal(result.status, "ok");
   assert.equal(result.command, "catalog");
@@ -101,9 +101,9 @@ test("T-058 CLI catalog command reads graph catalog without workspace mutation",
   );
 });
 
-test("T-058 CLI query-domain command projects admitted workspace sources", () => {
+test("T-058 Spec Method query-domain command projects admitted workspace sources", () => {
   const workspace = makeConformantWorkspace();
-  const result = runOddSdlcCli(["query-domain", "--workspace", workspace]);
+  const result = invokeOddSdlcSpecMethodCommandSync(["query-domain", "--workspace", workspace]);
 
   assert.equal(result.status, "ok");
   assert.equal(result.payload.kind, "sdlc_query_domain_projection");
@@ -118,9 +118,9 @@ test("T-058 CLI query-domain command projects admitted workspace sources", () =>
   );
 });
 
-test("T-058 CLI gaps command emits read-only dossier without choosing traversal", () => {
+test("T-058 Spec Method gaps command emits read-only dossier without choosing traversal", () => {
   const workspace = makeConformantWorkspace();
-  const result = runOddSdlcCli(["gaps", "--workspace", workspace]);
+  const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
 
   assert.equal(result.status, "ok");
   assert.equal(result.payload.start.kind, "sdlc_public_start_blocked");
@@ -129,9 +129,9 @@ test("T-058 CLI gaps command emits read-only dossier without choosing traversal"
   assert.equal(result.payload.dossier.choosesNextTraversal, false);
 });
 
-test("T-058 CLI start command is a public-start adapter over worker attachment", () => {
+test("T-058 Spec Method start command is an ABG entrypoint over worker attachment", () => {
   const workspace = makeConformantWorkspace();
-  const blocked = runOddSdlcCli([
+  const blocked = invokeOddSdlcSpecMethodCommandSync([
     "start",
     "--workspace",
     workspace,
@@ -144,7 +144,7 @@ test("T-058 CLI start command is a public-start adapter over worker attachment",
   assert.equal(blocked.payload.kind, "sdlc_public_start_blocked");
   assert.equal(blocked.payload.blockingReason, "fp_worker_unattached");
 
-  const attached = runOddSdlcCli([
+  const attached = invokeOddSdlcSpecMethodCommandSync([
     "start",
     "--workspace",
     workspace,
@@ -171,7 +171,7 @@ test("T-058 package binary returns JSON and propagates command errors", () => {
   });
   assert.equal(okRun.status, 0);
   const okPayload = JSON.parse(okRun.stdout);
-  assert.equal(okPayload.kind, "odd_sdlc_cli_result");
+  assert.equal(okPayload.kind, "odd_sdlc_spec_method_result");
   assert.equal(okPayload.command, "rc-report");
   assert.equal(okPayload.status, "ok");
 
@@ -184,12 +184,14 @@ test("T-058 package binary returns JSON and propagates command errors", () => {
   assert.equal(badPayload.status, "error");
 });
 
-test("T-058 CLI module stays free of local iteration or direct ABG runner authority", () => {
+test("T-058 Spec Method entry stays free of retry/control authority", () => {
   const source = readFileSync(
-    resolve(PACKAGE_ROOT, "code/src/cli/command.ts"),
+    resolve(PACKAGE_ROOT, "code/src/spec_method/entry.ts"),
     "utf8"
   );
   assert(!source.includes("deriveAdvancementTransition("));
   assert(!source.includes("installAbiogenesis"));
   assert(!source.includes("while ("));
+  assert(!source.includes("retryContextOverride"));
+  assert(!source.includes("MAX_INSTALLED_START_SELF_HEAL_ATTEMPTS"));
 });

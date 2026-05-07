@@ -20,7 +20,7 @@ import {
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   installOddSdlcTypescript,
-  runOddSdlcCliAsync,
+  invokeOddSdlcSpecMethodCommand,
   SDLC_HOOK_TARGET_POLICY
 } from "../../build/semantic/code/src/index.js";
 
@@ -298,7 +298,7 @@ test("T-093 ABG-owned start produces and consumes schedule surfaces", async () =
   assert.equal(install.kind, "installed");
   const workerScript = writeWorkerScript(workspace);
 
-  const start = await runOddSdlcCliAsync([
+  const start = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,

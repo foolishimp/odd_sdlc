@@ -116,12 +116,16 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
     )
   );
 
-  assert.match(prompt, /Read the full handoff manifest before writing output/);
+  assert.match(prompt, /Read the compact worker invocation package first/);
+  assert.match(prompt, /Use those files as the normal worker-facing authority/);
+  assert.match(prompt, /full forensic handoff manifest remains archived by reference/);
   assert.match(prompt, /must start with a `## Execution Plan` section/);
   assert.match(prompt, /Do not keep this plan private/);
-  assert.match(prompt, /Compact prompt pressure projection/);
-  assert.match(prompt, /"projectionVersion": "ts-prompt-projection-v1"/);
+  assert.match(prompt, /Compact worker invocation package/);
+  assert.match(prompt, /"packageVersion": "ts-invocation-v1"/);
   assert.match(prompt, /"omittedObligationCount":/);
+  assert.match(prompt, /"requirementTraceObligationIds":/);
+  assert.match(prompt, /"requirement:REQ-T099-050"/);
   assert.match(prompt, /"trancheKeys":/);
   assert.doesNotMatch(prompt, /VERY_LONG_T099_MARKER_050/);
   assert.match(manifestText, /VERY_LONG_T099_MARKER_050/);

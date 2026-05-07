@@ -119,21 +119,26 @@ topology.
 The installed operator handoff is:
 
 ```text
-User -> [Agentic_Coder_CLI | Plain CLI]
-  -> installed odd_sdlc command/callable contract
+User -> Agentic_Coder_CLI
+  -> Spec Method command intent
+  -> installed odd_sdlc callable contract
   -> ABG runtime truth
   -> GTL graph-function edge
   -> IoC worker/plugin execution
   -> materialized asset + worker result report
   -> ABG event/projection truth
-  -> [Agentic_Coder_CLI | Plain CLI]
+  -> Agentic_Coder_CLI
   -> User
 ```
 
 The agentic coder CLI is the primary flexible UI for this product line. It
-accepts user intent, reads installed bootstrap provenance, invokes installed
-commands, inspects archives, and reports the next lawful state. It is not a
-second SDLC runtime.
+accepts user intent, reads installed bootstrap provenance, invokes the installed
+Spec Method entrypoint, inspects archives, and reports the next lawful state.
+It is not a second SDLC runtime.
+
+Plain shell execution may launch the same installed entrypoint for local
+operation, but it is not a second command truth and must not accumulate SDLC
+policy, retry policy, traversal control, or compatibility facade behavior.
 
 The same model-backed executable may also be used as an `F_P` worker/plugin
 when ABG dispatches a graph-function edge. That worker role is distinct from

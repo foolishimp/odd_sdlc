@@ -39,6 +39,7 @@ export function assuranceLedger(input: {
 export function verdictFromReasons(input: {
   readonly blockedReasonCodes: readonly string[];
   readonly openGapReasonCodes: readonly string[];
+  readonly fpEscalationReasonCodes?: readonly string[];
   readonly repriceReasonCodes?: readonly string[];
 }): SdlcAssuranceLedgerVerdict {
   if (input.blockedReasonCodes.length > 0) {
@@ -46,6 +47,9 @@ export function verdictFromReasons(input: {
   }
   if ((input.repriceReasonCodes ?? []).length > 0) {
     return "reprice_required";
+  }
+  if ((input.fpEscalationReasonCodes ?? []).length > 0) {
+    return "fp_escalation";
   }
   if (input.openGapReasonCodes.length > 0) {
     return "open_gap";

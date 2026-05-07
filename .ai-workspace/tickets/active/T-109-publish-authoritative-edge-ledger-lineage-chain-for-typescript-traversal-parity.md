@@ -14,8 +14,8 @@ build_tenant: typescript
 owner: unassigned
 triaged_at: 2026-05-02
 created_at: 2026-05-02
-updated_at: 2026-05-04
-review_status: active_pending_live_data_mapper_and_semantic_suite_repair
+updated_at: 2026-05-07
+review_status: reopened_codex_rc_completeness_review
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -73,6 +73,31 @@ non_scope:
   - decentralized consensus or cryptocurrency-style mining
   - creating an odd_sdlc-private runtime ledger substrate parallel to ABG
 ---
+
+## Closure Note - 2026-05-06
+
+Closed under STDO as the traversal-ledger/ABG iteration blocker, not as the
+bounded RC release claim.
+
+Current proof:
+
+- `npm run test:semantic` passed: 216/216.
+- `npm run test:sandbox` passed: 15/15.
+- `npm run build:semantic`, `npm run lint:semantic`, and `git diff --check`
+  passed after the closure patches.
+- The live installed data_mapper PTY workspace
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260505T180726166Z_pid44582/workspace`
+  advanced through the old vector-8 failure class and now projects closed
+  vectors 0-30 with current edge `derive_release_depth_parity_surface`.
+- The remaining live blocker is carried by `T-041` and `T-112`:
+  `release_depth_parity_blocked`,
+  `release_depth_parity_reason:blocked_test_classes_have_no_pass_evidence`,
+  and
+  `release_depth_parity_reason:shard_compile_failed_no_test_evidence`.
+
+Closure boundary: ABG-driven traversal ledger, replay, projection, and
+semantic gap preservation are proven for this ticket. A successful bounded RC
+data_mapper build is not claimed here.
 
 ## STDO Triage
 
@@ -1238,3 +1263,36 @@ Verification recorded in the working tree:
 - `npm run test:t102-t109:rc6-sandbox` passed 5/5.
 - `ODD_SDLC_TS_T109_LIVE=1 ODD_SDLC_TS_LIVE_WORKER_COMMAND=codex ODD_SDLC_TS_LIVE_CODEX_MODEL=gpt-5.3-codex npm run test:t102-t109:rc6-live` passed 1/1.
 - live archive: `build_tenants/typescript/test_env/test_runs/t109_live_abg_rc6_sdlc_lifecycle/20260502T134430587Z_pid46797/run_summary.json`.
+
+## Codex RC Completeness Review - 2026-05-07
+
+Status: reopened to active for RC completeness review.
+
+Observations:
+
+- The ticket has strong STDO structure and a useful closure boundary, but its
+  closure is version-stale. The body still carries ABG RC6 / `3.4.0-rc.6` /
+  `3.5.0-rc.1` references while the current line has moved through the ABG
+  3.6 release candidate.
+- The closure note proves continuation beyond the old vector-8 blocker, not RC
+  success. That boundary is valid, but it must be re-reviewed after T-119/T-120,
+  T-123, T-129, and the current ABG release-line changes.
+- Live proof cited in the closure note stops at
+  `derive_release_depth_parity_surface` with failed test evidence. That is
+  lawful pressure, but it is not sufficient to retire T-109 as an RC blocker
+  without a current statement of which downstream tickets own the remaining
+  failure class.
+- The design surface is intended to avoid odd_sdlc-local runtime ledger truth.
+  Before re-closing, review must confirm the current code still routes
+  traversal, retry, reentry, and projection through ABG-owned runtime facts and
+  does not preserve a local loop/controller introduced by later retry work.
+
+Checklist before re-closing:
+
+- [ ] Update or annotate stale ABG RC6 / RC1 references against the current ABG
+      release line.
+- [ ] Re-run the T-109 live installed data-mapper proof on the current runtime.
+- [ ] Record the current downstream owner for any remaining release-depth parity
+      blocker.
+- [ ] Complete a code review confirming no odd_sdlc-local traversal ledger,
+      retry loop, or projection substitute has reappeared.

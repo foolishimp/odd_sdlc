@@ -31,6 +31,11 @@ import {
   FG_CONFORM_PROJECT,
   type SdlcReusableGraphFunctionCatalogEntry
 } from "./library.js";
+import {
+  defaultSdlcTraversalScopeRefsForName,
+  defaultSdlcTraversalStrategyForName,
+  type OddSdlcDefaultTraversalStrategy
+} from "../shared/traversal_strategy_plan.js";
 
 const BUILDER_OPERATOR = admitOperator({
   name: "odd_sdlc_typescript_builder",
@@ -134,20 +139,35 @@ function fpEvaluator(entry: SdlcFunctionCatalogEntry): Evaluator {
   });
 }
 
+function enforcementPrimitivesForStrategy(
+  strategy: OddSdlcDefaultTraversalStrategy
+): readonly string[] {
+  if (strategy === "full_breadth") {
+    return Object.freeze(["atomic_attempt", "bounded_batch"]);
+  }
+  if (strategy === "targeted_repair") {
+    return Object.freeze(["atomic_attempt", "gap_repair_slice"]);
+  }
+  return Object.freeze(["atomic_attempt", "single_vertical_slice"]);
+}
+
 function traversalModulationDeclaration(
   name: string
 ): SerializedAttrEntry {
+  const strategy = defaultSdlcTraversalStrategyForName(name);
   return attr(
-    "abg.traversal_modulation",
-    hookRefValue(`strategy://odd_sdlc/${name}/single_vertical_slice`, [
+    "abg.traversal_strategy",
+    hookRefValue(`strategy://odd_sdlc/${name}/${strategy}`, [
       attr("strategy_owner_ref", scalarValue("product://odd_sdlc")),
-      attr("strategy_label", scalarValue("single_vertical_slice")),
-      attr("enforcement_primitives", stringListValue([
-        "single_vertical_slice"
-      ])),
-      attr("obligation_schedule_refs", stringListValue([
-        `schedule://odd_sdlc/${name}/primary`
-      ]))
+      attr("strategy_label", scalarValue(strategy)),
+      attr(
+        "enforcement_primitives",
+        stringListValue(enforcementPrimitivesForStrategy(strategy))
+      ),
+      attr(
+        "obligation_schedule_refs",
+        stringListValue(defaultSdlcTraversalScopeRefsForName(name))
+      )
     ])
   );
 }

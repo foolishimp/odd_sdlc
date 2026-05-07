@@ -26,19 +26,47 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.4.0-rc.7"
+    "3.6.0-rc.1"
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.runtimeTruthAuthority,
     "abiogenesis"
+  );
+  assert.equal(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.temporalTruthAuthority,
+    "abiogenesis"
+  );
+  assert.equal(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.eventCalculusTruthAuthority,
+    "abiogenesis_replay_projection"
   );
   assert.deepStrictEqual(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.localRuntimeEventFamilies,
     []
   );
   assert.equal(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.localTemporalAuthority,
+    false
+  );
+  assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.choosesNextVectorLocally,
     false
+  );
+  assert.deepStrictEqual(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.temporalConstraintVectorAttrKeys,
+    ["abg.temporal_constraint"]
+  );
+  assert.deepStrictEqual(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.temporalConstraintConfigKeys,
+    [
+      "constraint_ref",
+      "operator",
+      "not_before_ref",
+      "deadline_ref",
+      "schedule_policy_ref",
+      "timer_provider_ref",
+      "deadline_breach_action"
+    ]
   );
   assert(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
@@ -58,6 +86,16 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   assert(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
       entry.includes("T-107")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-119")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-120")
     )
   );
 });

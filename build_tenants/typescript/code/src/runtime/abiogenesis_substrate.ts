@@ -17,6 +17,8 @@ import {
   graphFunctionForVector,
   runtimeEventsForIterationDecision,
   runtimeEventsForTransition,
+  TEMPORAL_CONSTRAINT_CONFIG_KEY_VALUES,
+  TEMPORAL_CONSTRAINT_VECTOR_ATTR_KEYS,
   type AdvancementTransition,
   type ExecutionBasis,
   type Graph,
@@ -32,16 +34,25 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.4.0-rc.7",
+  packageVersion: "3.6.0-rc.1",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
+  temporalTruthAuthority: "abiogenesis",
+  eventCalculusTruthAuthority: "abiogenesis_replay_projection",
   localRuntimeEventFamilies: Object.freeze([]),
+  localTemporalAuthority: false,
   choosesNextVectorLocally: false,
+  temporalConstraintVectorAttrKeys: TEMPORAL_CONSTRAINT_VECTOR_ATTR_KEYS,
+  temporalConstraintConfigKeys: TEMPORAL_CONSTRAINT_CONFIG_KEY_VALUES,
   sourceAssumptions: Object.freeze([
     "ABIogenesis T-060 no_compute_basis fails closed",
     "ABIogenesis T-065 traversal probe is complete for structural diagnostics",
     "ABIogenesis T-066 internal control loop owns iteration sufficiency",
-    "ABIogenesis T-107 traversal attempt envelopes are ABG-derived from GTL qualifiers"
+    "ABIogenesis T-107 traversal attempt envelopes are ABG-derived from GTL qualifiers",
+    "ABIogenesis T-119 temporal GTL algebra is admitted through ABG runtime events",
+    "ABIogenesis T-120 Event Calculus replay derives HoldsAt truth from admitted events",
+    "ABIogenesis T-122 deadline pressure is replay-derived temporal projection truth",
+    "ABIogenesis T-125 proves temporal and non-temporal GTL live lanes under 3.6.0-rc.1"
   ])
 } as const);
 

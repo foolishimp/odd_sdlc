@@ -1,0 +1,156 @@
+// Implements: T-123
+
+import type {
+  SdlcTraversalStrategy,
+  SdlcTraversalStrategyDecision,
+  SdlcTraversalStrategyPlan,
+  SdlcWorkerRetryContext
+} from "./carriers.js";
+import {
+  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN
+} from "../shared/traversal_strategy_plan.js";
+
+export { ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN };
+
+function uniqueSorted(values: readonly string[]): readonly string[] {
+  return Object.freeze(
+    [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
+  );
+}
+
+export function parseSdlcTraversalStrategyDirective(
+  strategyDirectiveRef: string | null
+): SdlcTraversalStrategy | null {
+  if (strategyDirectiveRef === null) {
+    return null;
+  }
+  if (/(?:targeted[-_]?repair|repair[-_]?local|same[-_]?edge[-_]?repair)/iu.test(strategyDirectiveRef)) {
+    return "targeted_repair";
+  }
+  if (/(?:steel[-_]?thread|single[-_]?vertical[-_]?slice|vertical[-_]?slice)/iu.test(strategyDirectiveRef)) {
+    return "steel_thread";
+  }
+  if (/(?:full[-_]?breadth|broad[-_]?induction|complete[-_]?breadth)/iu.test(strategyDirectiveRef)) {
+    return "full_breadth";
+  }
+  return null;
+}
+
+function strategyForEdge(input: {
+  readonly plan: SdlcTraversalStrategyPlan;
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+}): SdlcTraversalStrategy {
+  return (
+    input.plan.edgeStrategies[input.edgeName] ??
+    input.plan.edgeStrategies[input.targetAssetType] ??
+    input.plan.defaultStrategy
+  );
+}
+
+function featureScopeRequired(strategy: SdlcTraversalStrategy): boolean {
+  return strategy === "steel_thread" || strategy === "targeted_repair";
+}
+
+const RETRY_TARGETED_REPAIR_EDGES = new Set([
+  "derive_feature_decomp_surface",
+  "derive_uat_testcases_surface",
+  "derive_design_surface",
+  "derive_scenario_surface",
+  "derive_implementation_design_surface",
+  "derive_implementation_module_surface",
+  "derive_aggregate_domain_model_surface",
+  "derive_aggregate_sunny_day_sequence_surface",
+  "derive_implementation_component_topology_surface",
+  "derive_component_code_surface",
+  "derive_component_test_surface",
+  "derive_code_surface",
+  "derive_test_schedule_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "derive_test_run_archive_surface",
+  "feature_decomp_surface",
+  "uat_testcases_surface",
+  "design_surface",
+  "scenario_surface",
+  "implementation_design_surface",
+  "implementation_module_surface",
+  "aggregate_domain_model_surface",
+  "aggregate_sunny_day_sequence_surface",
+  "implementation_component_topology_surface",
+  "component_code_surface",
+  "component_test_surface",
+  "code_surface",
+  "test_schedule_surface",
+  "test_execution_surface",
+  "test_execution_result_surface",
+  "test_run_archive_surface"
+]);
+
+function retryContextSelectsTargetedRepair(input: {
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+  readonly retryContext: SdlcWorkerRetryContext | undefined;
+}): boolean {
+  if ((input.retryContext?.priorGapDossiers.length ?? 0) === 0) {
+    return false;
+  }
+  return (
+    RETRY_TARGETED_REPAIR_EDGES.has(input.edgeName) ||
+    RETRY_TARGETED_REPAIR_EDGES.has(input.targetAssetType)
+  );
+}
+
+export function deriveSdlcTraversalStrategyDecision(input: {
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+  readonly strategyDirectiveRef?: string | null | undefined;
+  readonly selectedScheduleItemRefs?: readonly string[] | undefined;
+  readonly requiredProgressArtifactRefs?: readonly string[] | undefined;
+  readonly retryContext?: SdlcWorkerRetryContext | undefined;
+  readonly fallbackPlan?: SdlcTraversalStrategyPlan | undefined;
+}): SdlcTraversalStrategyDecision {
+  const fallbackPlan =
+    input.fallbackPlan ?? ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN;
+  const directiveRef = input.strategyDirectiveRef ?? null;
+  const abgSelectedStrategy = parseSdlcTraversalStrategyDirective(directiveRef);
+  const retryTargetedRepair = retryContextSelectsTargetedRepair({
+    edgeName: input.edgeName,
+    targetAssetType: input.targetAssetType,
+    retryContext: input.retryContext
+  });
+  const selectedStrategy =
+    abgSelectedStrategy ??
+    (retryTargetedRepair
+      ? "targeted_repair"
+      : strategyForEdge({
+          plan: fallbackPlan,
+          edgeName: input.edgeName,
+          targetAssetType: input.targetAssetType
+        }));
+  const decisionSource =
+    abgSelectedStrategy === null ? "odd_sdlc_fallback_plan" : "abg_selected";
+  const basisRefs = uniqueSorted([
+    fallbackPlan.planRef,
+    ...(directiveRef === null ? [] : [directiveRef]),
+    ...(input.selectedScheduleItemRefs ?? Object.freeze([])),
+    ...(input.requiredProgressArtifactRefs ?? Object.freeze([])),
+    ...(input.retryContext?.priorGapDossiers.map(
+      (dossier) => dossier.currentGapDossierRef
+    ) ?? Object.freeze([]))
+  ]);
+  const requiresScope = featureScopeRequired(selectedStrategy);
+  return Object.freeze({
+    kind: "sdlc_traversal_strategy_decision" as const,
+    decisionVersion: "ts-strategy-decision-v1" as const,
+    edgeName: input.edgeName,
+    targetAssetType: input.targetAssetType,
+    selectedStrategy,
+    decisionSource,
+    strategyPlanRef: fallbackPlan.planRef,
+    strategyDirectiveRef: directiveRef,
+    featureScopeRequired: requiresScope,
+    featureScopeDerived: requiresScope,
+    basisRefs
+  });
+}

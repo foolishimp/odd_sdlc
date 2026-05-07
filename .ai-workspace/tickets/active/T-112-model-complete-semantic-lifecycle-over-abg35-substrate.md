@@ -12,7 +12,7 @@ affected_boundary: installed operator lifecycle, assurance ledgers, retry fronti
 priority: critical
 triaged_at: 2026-05-03
 created_at: 2026-05-03
-updated_at: 2026-05-04
+updated_at: 2026-05-06
 build_tenant: typescript
 owner: unassigned
 review_status: active_design_pending
@@ -49,6 +49,27 @@ non_closure_conditions:
 ---
 
 # T-112: Model Complete Semantic Lifecycle Over ABG 3.5 Substrate
+
+## Current Blocker - 2026-05-06
+
+Still active. The lifecycle model is substantially proven through process
+truth, transform admission, semantic evaluation, component-depth repair, and
+release-depth blocking, but release closure remains open.
+
+Current proof:
+
+- `npm run test:semantic` passed: 216/216.
+- `npm run test:sandbox` passed: 15/15.
+- `ODD_SDLC_TS_T115_DATA_MAPPER_LIVE=1 npm run test:t115:data-mapper-repair-live`
+  passed and proved failed governed execution flowing into component failure
+  attribution and repair schedule truth.
+
+Current non-closure evidence:
+
+- Live T-109 remains at `derive_release_depth_parity_surface`.
+- Release-depth parity is blocked by missing pass evidence after a generated
+  test compile failure. This keeps release qualification open under the T-112
+  closure law.
 
 ## Dependency Checkpoint - 2026-05-04
 
@@ -150,3 +171,34 @@ Minimum owner split:
 - Executor implementation details.
 - Sticky-session optimization.
 - UI redesign.
+
+## 2026-05-07 Lifecycle Boundary Checkpoint
+
+The current ticket wave strengthened the lifecycle boundary but does not close
+T-112.
+
+Implemented/reconciled surfaces:
+
+- T-120 removed the old `cli/command.ts` command/control module.
+- `spec_method/entry.ts` now admits operator intent and calls the installed
+  odd_sdlc/ABG boundary; it does not own retry iteration, retry budget,
+  traversal selection, or retry context synthesis.
+- `operator/installed_operator.ts` owns installed retry/reentry projection
+  behind the ABG/runtime boundary.
+- B-085 adds `SdlcComponentRepairReentryPlan` so semantic failure at
+  release-depth parity can become a typed repair-reentry package rather than
+  worker prose or process success.
+- T-123 now treats ABG-selected traversal strategy as authoritative; retry
+  context cannot override ABG-selected full breadth.
+
+Verification:
+
+- combined focused suite passed: 57/57
+- `npm run test:semantic` passed: 239/239
+- `npm run test:sandbox` passed: 15/15
+
+Remaining T-112 work:
+
+The lifecycle design still needs review as a complete phase map from operator
+intent through closure/reentry, and live data_mapper proof still must show the
+B-085 semantic failure route consumed by the installed product path.

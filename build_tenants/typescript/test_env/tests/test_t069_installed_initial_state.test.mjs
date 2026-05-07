@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   deriveSdlcInstalledQualificationInitialState,
   installOddSdlcTypescript,
-  runOddSdlcCliAsync,
+  invokeOddSdlcSpecMethodCommand,
   writeSdlcInstalledQualificationInitialStateArchive
 } from "../../build/semantic/code/src/index.js";
 
@@ -115,7 +115,7 @@ test("T-069 initial-state validation fails closed without installed topology", (
 
 test("T-069 CLI worker start blocks before graph execution when install topology is absent", async () => {
   const workspaceRoot = freshDataMapperWorkspace();
-  const started = await runOddSdlcCliAsync([
+  const started = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspaceRoot,

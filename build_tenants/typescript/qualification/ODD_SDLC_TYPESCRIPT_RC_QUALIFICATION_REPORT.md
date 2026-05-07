@@ -7,9 +7,32 @@
 **Blocker Map**: `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_PYTHON_PARITY_RC_BLOCKER_MAP.md`
 **Archive Comparison**: `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_LIVE_PYTHON_ARCHIVE_COMPARISON.md`
 
+## Current RC Blocker - 2026-05-06
+
+The earlier bounded package-surface claim remains historical proof, but the
+current full operational RC lane is blocked by B-085.
+
+Live `data_mapper` replay is stopped at
+`derive_release_depth_parity_surface` with vectors `0-30` closed. The current
+blocker is not PTY, ABG traversal, or parser/runtime truth; it is missing
+admitted pass evidence after a generated Scala test compile failure in
+`DiagnosticsFinalizeSpec.scala`.
+
+Current closure requires consuming the typed component repair schedule, repairing
+only the implicated generated test source, rerunning the `cdme-compiler` shard,
+admitting pass evidence, and rederiving release-depth parity.
+
+Active control tickets:
+
+- `.ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
+- `.ai-workspace/tickets/active/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md`
+
 ## Verdict
 
-The TypeScript tenant is RC-qualified for a bounded ODD-native package claim.
+The TypeScript tenant is blocked for the current full operational RC lane.
+
+The TypeScript tenant was previously qualified for a bounded ODD-native package
+claim.
 
 That claim includes strict build, graph publication, pure workspace ingress,
 read/query projections, public ABG handoff, hook contracts, traceability

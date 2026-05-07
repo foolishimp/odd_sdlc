@@ -1,6 +1,6 @@
 // Validates: T-102
 // Validates: T-109
-// Validates: ABG-RC7-live-FP-semantic-evaluation
+// Validates: ABG-3.6-live-FP-semantic-evaluation
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -14,9 +14,8 @@ import {
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { dirname, resolve } from "node:path";
+import path, { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 
 import {
   admitExecutionBasis,
@@ -43,10 +42,9 @@ import {
   SDLC_REQUIREMENTS,
   edgePayloadFromRows,
   evaluateSemanticRows
-} from "../fixtures/t102_t109_rc7_mini_sdlc_lifecycle.mjs";
+} from "../fixtures/t102_t109_abg36_mini_sdlc_lifecycle.mjs";
+import { liveTestArchiveRoot } from "./archive_root.mjs";
 
-const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_LIVE"] === "1";
 const WORKER_COMMAND = process.env["ODD_SDLC_TS_LIVE_WORKER_COMMAND"] ?? "codex";
 const CODEX_MODEL = process.env["ODD_SDLC_TS_LIVE_CODEX_MODEL"] ?? "gpt-5.3-codex";
@@ -75,7 +73,7 @@ function node(name, assetType) {
       standardsRefs: [],
       outputContractRefs: []
     },
-    tags: ["t109-rc7-live-sdlc"],
+    tags: ["t109-abg36-live-sdlc"],
     id: `node:live:t109:${name}`
   });
 }
@@ -106,7 +104,7 @@ function fpVector(name, source, target) {
     rule: null,
     allowsSubwork: true,
     declarations: emptySerializedAttrs(),
-    tags: ["t109-rc7-live-sdlc"],
+    tags: ["t109-abg36-live-sdlc"],
     id: `vector:live:t109:${name}`
   });
 }
@@ -147,11 +145,11 @@ function liveModule() {
     contexts: [],
     rules: [],
     effects: [],
-    tags: ["t109-rc7-live-sdlc"],
+    tags: ["t109-abg36-live-sdlc"],
     id: "graph:live:t109:mini-odd-sdlc-lifecycle"
   });
   const graphFunction = constructGraphFunction({
-    name: "live_mini_odd_sdlc_lifecycle_rc7",
+    name: "live_mini_odd_sdlc_lifecycle_abg36",
     environment: {
       requires: [bootstrap],
       provides: [qualification],
@@ -174,18 +172,18 @@ function liveModule() {
     },
     effects: [],
     declarations: emptySerializedAttrs(),
-    tags: ["t109-rc7-live-sdlc"],
-    id: "graph-function:live:t109:mini-odd-sdlc-lifecycle-rc7"
+    tags: ["t109-abg36-live-sdlc"],
+    id: "graph-function:live:t109:mini-odd-sdlc-lifecycle-abg36"
   });
   const job = constructJob({
-    name: "live_mini_odd_sdlc_lifecycle_rc7_job",
+    name: "live_mini_odd_sdlc_lifecycle_abg36_job",
     contracts: [{ kind: "graph_function", targetId: graphFunction.id }],
     roles: [],
-    tags: ["t109-rc7-live-sdlc"],
-    id: "job:live:t109:mini-odd-sdlc-lifecycle-rc7"
+    tags: ["t109-abg36-live-sdlc"],
+    id: "job:live:t109:mini-odd-sdlc-lifecycle-abg36"
   });
   return constructModule({
-    name: "odd_sdlc_t109_rc7_live_sdlc",
+    name: "odd_sdlc_t109_abg36_live_sdlc",
     graphs: [graph],
     graphFunctions: [graphFunction],
     refinementBoundaries: [],
@@ -210,7 +208,7 @@ function basisFor(inputWorkspaceRoot, outputWorkspaceRoot) {
         workspaceRoot: inputWorkspaceRoot,
         moduleName: module.name
       },
-      target: { kind: "graph_function", handle: "live_mini_odd_sdlc_lifecycle_rc7" },
+      target: { kind: "graph_function", handle: "live_mini_odd_sdlc_lifecycle_abg36" },
       until: "converged",
       inputBindings: [
         {
@@ -235,19 +233,19 @@ function basisFor(inputWorkspaceRoot, outputWorkspaceRoot) {
     runtimeIdentity: {
       workerId: "worker://codex/gpt-5.3-codex",
       backendId: "backend://codex-cli",
-      buildId: "build://odd-sdlc/t109-rc7-live-sdlc",
-      resolvedRuntimeRef: "runtime://abg-rc7-live"
+      buildId: "build://odd-sdlc/t109-abg36-live-sdlc",
+      resolvedRuntimeRef: "runtime://abg-3-6-live"
     },
     resolvedPolicy: {
-      resolvedPolicyBundleRef: "policy://odd-sdlc/t109-rc7-live",
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t109-abg36-live",
       defaultRegime: "F_P",
-      dispatchRef: "dispatch://odd-sdlc/t109-rc7-live",
+      dispatchRef: "dispatch://odd-sdlc/t109-abg36-live",
       approvalSubjectRef: null
     },
-    runId: "run:t109-rc7-live-sdlc",
-    workKey: "work:t109-rc7-live-sdlc",
-    frameId: "frame:t109-rc7-live-sdlc",
-    frameLineageId: "frame-lineage:t109-rc7-live-sdlc"
+    runId: "run:t109-abg36-live-sdlc",
+    workKey: "work:t109-abg36-live-sdlc",
+    frameId: "frame:t109-abg36-live-sdlc",
+    frameLineageId: "frame-lineage:t109-abg36-live-sdlc"
   });
 }
 
@@ -340,16 +338,16 @@ function runLiveWorker(input) {
 }
 
 test(
-  "T-102/T-109 live ABG rc7 path admits codex F_P output for the same SDLC lifecycle bundle as sandbox",
+  "T-102/T-109 live ABG 3.6 path admits codex F_P output for the same SDLC lifecycle bundle as sandbox",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T109_LIVE=1 not set" },
   () => {
     assert.equal(WORKER_COMMAND, "codex", "T-109 live proof is pinned to codex");
     assert.equal(CODEX_MODEL, "gpt-5.3-codex", "codex live proof must use gpt-5.3-codex");
 
-    const archiveRoot = path.join(
-      PACKAGE_ROOT,
-      "test_env/test_runs/t109_live_abg_rc7_sdlc_lifecycle",
-      `${archiveTimestamp()}_pid${process.pid}`
+    const archiveRoot = liveTestArchiveRoot(
+      "t109_live_abg36_sdlc_lifecycle",
+      archiveTimestamp(),
+      process.pid
     );
     const inputWorkspaceRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t109-live-input-"));
     const outputWorkspaceRoot = path.join(archiveRoot, "output_workspace");
@@ -439,7 +437,7 @@ test(
     writeJson(path.join(archiveRoot, "sdlc_semantic_rows.json"), rows);
     writeJson(path.join(archiveRoot, "sdlc_edge_payload.json"), payload);
     writeJson(path.join(archiveRoot, "run_summary.json"), {
-      kind: "odd_sdlc_t109_live_abg_rc7_sdlc_lifecycle_archive",
+      kind: "odd_sdlc_t109_live_abg36_sdlc_lifecycle_archive",
       verdict: "passed",
       worker: {
         command: WORKER_COMMAND,

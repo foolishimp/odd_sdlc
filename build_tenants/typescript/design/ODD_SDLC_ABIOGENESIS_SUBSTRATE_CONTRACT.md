@@ -1,8 +1,8 @@
 # odd_sdlc TypeScript ABIogenesis Substrate Contract
 
 **Status**: Active
-**Date**: 2026-04-26
-**Authority**: T-028
+**Date**: 2026-05-07
+**Authority**: T-028, T-129
 
 ## Claim
 
@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `3.5.0-rc.1` |
+| Version | `3.6.0-rc.1` |
 | Dependency form | local source product dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -63,9 +63,12 @@ The adapter relies on ABIogenesis TypeScript evidence:
 
 These assumptions are dependencies, not copied law.
 
-## ABG 3.5 Process Callout Substrate
+## ABG 3.6 Runtime, Temporal, Process Callout, And Defaults Substrate
 
-As of ABG `3.5.0-rc.1`, worker process execution is also substrate-owned.
+As of ABG `3.6.0-rc.1`, worker process execution remains substrate-owned, the
+first ABG defaults bundle slice remains visible installed configuration, and
+temporal/time-related runtime truth is ABG-owned event and replay projection
+truth.
 
 `odd_sdlc.TS` admits SDLC worker bindings such as `process://claude`, derives
 SDLC handoff manifests and domain postflight projections, then lowers the
@@ -73,6 +76,16 @@ process call to ABG traced actor/worker callout semantics.
 
 ABG owns:
 
+- Event Calculus law over admitted runtime events and replay-derived `HoldsAt`
+  truth
+- GTL temporal syntax through
+  `GraphVector.declarations["abg.temporal_constraint"]`
+- timer intent, timer outcome, deadline breach, and scheduled continuation
+  carriers and admitted runtime events
+- replay-derived temporal projection rows for eligibility and deadline breach
+  truth
+- homeostatic temporal drift/deadline pressure over replay-derived temporal
+  rows
 - `runAgentActorWorkerCallout`
 - `TracedProcessOutcome`
 - `local-spawn` and `pty-terminal` executor profiles
@@ -81,6 +94,38 @@ ABG owns:
 - trace archive paths
 - hard timeout, inactivity timeout, executor-unavailable, launch-failed, and
   lost-terminal process outcomes
+- successful PTY `terminalSessionId` on `actor_process_started` event and
+  projection truth
+- installed `.abiogenesis/config/abg.fallbacks.json` and the shipped
+  `abg.reference-fallbacks.json` source bundle for plugin traversal observer
+  fallbacks
+- `plugin_traversal_prompt_materialized` event truth when ABG observer fallback
+  or GTL observer bindings are explicitly activated
 
 `odd_sdlc.TS` may preserve worker archive filenames as compatibility
 read-models, but their process facts are projections over ABG trace truth.
+
+`odd_sdlc.TS` does not own a local wall-clock, timer, schedule, deadline, or
+temporal continuation controller. Provider receipts, queue callbacks, cron
+payloads, or terminal-local timing facts do not authorize temporal truth until
+ABG admits the corresponding runtime event and replay derives the projection.
+Temporal eligibility or schedule pressure does not close vectors or advance
+graph traversal by itself; only ABG traversal/runtime events and replay
+projection can do that.
+
+ABG `3.6.0-rc.1` does not claim recurrence, window policy, cloud durable timer
+provider semantics, sticky sessions, warm pools, or automatic session affinity.
+odd_sdlc must not project any of those as product capability through this
+migration.
+
+ABG `3.6.0-rc.1` does not make all ABG defaults configurable, and it does not
+ship the ABG-side per-edge traversal strategy carrier. odd_sdlc keeps an
+explicit fallback traversal strategy plan until that ABG substrate exists.
+
+The fallback plan is still a carrier boundary. It must be one resolved plan
+surface consumed by both GTL/vector modulation and installed-operator handoff.
+It must not become duplicated edge-name lists in graph construction and operator
+runtime code. When ABG supplies an edge strategy directive, that directive is
+authoritative over the odd_sdlc fallback. Targeted repair enters as ABG-visible
+repair/reentry truth, not as an adapter-local override of an explicit ABG
+selection.

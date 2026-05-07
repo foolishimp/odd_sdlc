@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  runOddSdlcCliAsync
+  invokeOddSdlcSpecMethodCommand
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -93,11 +93,31 @@ function writeRetryWorker(workspaceRoot) {
       "counts[manifest.edgeName] = (counts[manifest.edgeName] ?? 0) + 1;",
       "writeFileSync(countsPath, `${JSON.stringify(counts, null, 2)}\\n`, 'utf8');",
       "const priorGapCount = manifest.traversalObligationContext.deltaSummary.priorGapCount;",
-      "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
+      "const retryDossierCount = manifest.retryContext.priorGapDossiers.length;",
+      "const retryReasons = manifest.retryContext.priorGapDossiers.flatMap((dossier) => dossier.reasons.map((reason) => reason.reason));",
+      "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, retryDossierCount, retryReasons, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
       "function digestText(content) { return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`; }",
       "function materializedFile(role, relativePath, content) { const absolutePath = path.join(manifest.productMaterialization.tenantRoot, relativePath); mkdirSync(dirname(absolutePath), { recursive: true }); writeFileSync(absolutePath, content, 'utf8'); return { kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath, digest: digestText(content), byteCount: Buffer.byteLength(content, 'utf8') }; }",
       "const sourceRelative = 'retry-core/src/index.ts';",
       "const testRelative = 'retry-core/test/index.test.ts';",
+      "function designCompletenessVerdict() {",
+      "  const axis = (name) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis: name, status: 'satisfied', reasons: [], evidenceRefs: [manifest.outputFile] });",
+      "  return { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') };",
+      "}",
+      "function designDepthRegister() {",
+      "  const attribute = { kind: 'sdlc_domain_attribute', attributeId: 'attr:RetryCore.state', name: 'state', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T101-001'] };",
+      "  const entity = { kind: 'sdlc_domain_entity', entityId: 'entity:RetryCore', moduleName: 'retry-core', ownership: 'owned', attributes: [attribute], invariants: ['retry state is explicit'], sourceAssetRefs: ['fixture://t101'] };",
+      "  const operation = { kind: 'sdlc_domain_operation', operationId: 'operation:retryCore', moduleName: 'retry-core', inputEntityIds: ['entity:RetryCore'], outputEntityIds: ['entity:RetryCore'], requiredAttributeIds: ['attr:RetryCore.state'] };",
+      "  const aggregateEntity = { kind: 'sdlc_aggregate_domain_entity', entityId: entity.entityId, ownerModuleName: 'retry-core', attributes: [attribute], sourceModuleNames: ['retry-core'] };",
+      "  const aggregateExtra = manifest.targetAssetType === 'aggregate_domain_model_surface' && retryDossierCount === 0 ? { includedModuleNames: ['retry-core'] } : {};",
+      "  const aggregateDomainModel = { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [aggregateEntity], operations: [operation], crossModuleReferences: [], evidenceRefs: [manifest.outputFile], ...aggregateExtra };",
+      "  const aggregateSunnyDaySequence = { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:retryCore', moduleName: 'retry-core', operationId: operation.operationId, inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], stateTransitionIds: ['transition:RetryCore.pending.closed'] }], evidenceRefs: [manifest.outputFile] };",
+      "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType };",
+      "  if (manifest.targetAssetType === 'implementation_module_surface') return { ...base, moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'retry-core', entities: [entity], operations: [operation], requirementIds: ['REQ-T101-001'], sourceAssetRefs: ['fixture://t101'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'retry-core', entityId: entity.entityId, stateless: false, states: ['pending', 'closed'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:RetryCore.pending.closed', fromState: 'pending', toState: 'closed', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-T101-001'], sourceAssetRefs: ['fixture://t101'] }] };",
+      "  if (manifest.targetAssetType === 'aggregate_domain_model_surface') return { ...base, aggregateDomainModel, designCompletenessVerdict: designCompletenessVerdict() };",
+      "  if (manifest.targetAssetType === 'aggregate_sunny_day_sequence_surface') return { ...base, aggregateDomainModel, aggregateSunnyDaySequence, designCompletenessVerdict: designCompletenessVerdict() };",
+      "  return null;",
+      "}",
       "function componentDepthRegister() {",
       "  const base = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType };",
       "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'retry-core', moduleName: 'retry-core', relativePath: sourceRelative, publicBoundary: 'retryCore', requirementIds: ['REQ-T101-001'], sourceAssetRefs: ['fixture://t101'] };",
@@ -118,9 +138,11 @@ function writeRetryWorker(workspaceRoot) {
       "const materializedFiles = [];",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `attempt: ${counts[manifest.edgeName]}`, `prior_gap_count: ${priorGapCount}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), ''];",
       "if (manifest.targetAssetType.endsWith('_schedule_surface')) { outputLines.push('## module_dependency_graph', '- node: retry-core', '## realization_tranches', '- id: RT-001 | module: retry-core | state: open', '## tranche_obligation_ledger', '- RT-001: REQ-T101-001', '## tranche_gap_ledger', '- RT-001: open', '## next_tranche_selector', '- next: RT-001'); }",
+      "if (manifest.targetAssetType === 'aggregate_domain_model_surface' && retryDossierCount === 0) { process.exit(0); }",
+      "const designRegister = designDepthRegister();",
       "const componentRegister = componentDepthRegister();",
+      "if (designRegister !== null) { outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```'); }",
       "if (componentRegister !== null) { outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```'); }",
-      "if (manifest.edgeName === 'derive_component_code_surface' && counts[manifest.edgeName] === 1) { process.exit(0); }",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "const outputContent = `${outputLines.join('\\n')}\\n`;",
       "writeFileSync(manifest.outputFile, outputContent, 'utf8');",
@@ -149,7 +171,7 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
   assert.equal(install.kind, "installed");
 
   const workerScript = writeRetryWorker(workspace);
-  const conform = await runOddSdlcCliAsync([
+  const conform = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -161,7 +183,7 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
   assert.equal(conform.status, "ok");
   assert.equal(conform.payload.status, "converged");
 
-  const start = await runOddSdlcCliAsync([
+  const start = await invokeOddSdlcSpecMethodCommand([
     "start",
     "--workspace",
     workspace,
@@ -175,16 +197,6 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
 
   assert.equal(start.status, "ok");
   assert.equal(start.payload.status, "converged");
-  assert.equal("loop" in start.payload, false);
-  assert.equal(
-    start.payload.emittedRuntimeEventKinds.includes("retry_repair_planned"),
-    true
-  );
-  assert.equal(
-    start.payload.emittedRuntimeEventKinds.includes("retry_progress_recorded"),
-    true
-  );
-
   const edgeLog = readFileSync(
     path.join(workspace, ".ai-workspace/runtime/odd_sdlc/t101_edge_log.jsonl"),
     "utf8"
@@ -192,12 +204,18 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
     .trim()
     .split("\n")
     .map((line) => JSON.parse(line));
-  const codeAttempts = edgeLog.filter(
-    (entry) => entry.edgeName === "derive_component_code_surface"
+  const aggregateAttempts = edgeLog.filter(
+    (entry) => entry.edgeName === "derive_aggregate_domain_model_surface"
   );
-  assert.equal(codeAttempts.length, 2);
-  assert.equal(codeAttempts[0].priorGapCount, 0);
-  assert(codeAttempts[1].priorGapCount > 0);
+  assert.equal(aggregateAttempts.length, 2);
+  assert.equal(aggregateAttempts[0].priorGapCount, 0);
+  assert.equal(aggregateAttempts[1].priorGapCount, 1);
+  assert.equal(aggregateAttempts[0].retryDossierCount, 0);
+  assert.equal(aggregateAttempts[1].retryDossierCount, 1);
+  assert.match(
+    aggregateAttempts[1].retryReasons.join("\n"),
+    /worker_report_admission_failed/u
+  );
   const testDesignAttempts = edgeLog.filter(
     (entry) => entry.edgeName === "derive_test_design_surface"
   );

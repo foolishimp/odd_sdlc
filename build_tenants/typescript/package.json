@@ -9,9 +9,9 @@
       "types": "./build/semantic/code/src/index.d.ts",
       "import": "./build/semantic/code/src/index.js"
     },
-    "./cli": {
-      "types": "./build/semantic/code/src/cli/index.d.ts",
-      "import": "./build/semantic/code/src/cli/index.js"
+    "./spec-method": {
+      "types": "./build/semantic/code/src/spec_method/index.d.ts",
+      "import": "./build/semantic/code/src/spec_method/index.js"
     },
     "./install": {
       "types": "./build/semantic/code/src/install/index.d.ts",
@@ -49,7 +49,7 @@
     "test:t038": "npm run build:semantic && node --test test_env/tests/test_t038_rc_qualification.test.mjs",
     "test:t039": "npm run build:semantic && node --test test_env/tests/test_t039_query_domain_structural_drift.test.mjs",
     "test:t040": "npm run build:semantic && node --test test_env/tests/test_t040_fixture_portability.test.mjs",
-    "test:t058": "npm run build:semantic && node --test test_env/tests/test_t058_public_cli_adapter.test.mjs",
+    "test:t058": "npm run build:semantic && node --test test_env/tests/test_t058_spec_method_entrypoint.test.mjs",
     "test:t059": "npm run build:semantic && node --test test_env/tests/test_t059_install_release_adapter.test.mjs",
     "test:t064": "npm run build:semantic && node --test test_env/tests/test_t064_installed_operator_ux.test.mjs",
     "test:t066": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
@@ -71,13 +71,14 @@
     "test:t099": "npm run build:semantic && node --test test_env/tests/test_t099_tranched_indexed_pressure.test.mjs",
     "test:t100": "npm run build:semantic && node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
     "test:t101": "npm run build:semantic && node --test test_env/tests/test_t101_retry_report_rejection_loop.test.mjs",
-    "test:t102-t110:abg35-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t102_t109_abg_rc7_semantic_ledger_sandbox.test.mjs",
-    "test:t102-t110:abg35-live": "npm run build:semantic && node --test test_env/live/test_t102_t109_abg_rc7_live_semantic_ledger.test.mjs",
-    "test:t110:abg35-sandbox": "npm run build:semantic && node --test test_env/tests/test_t110_abg35_callout_projection.test.mjs",
-    "test:t110:abg35-live": "npm run build:semantic && node --test test_env/live/test_t110_live_claude_pty_installed_operator.test.mjs",
+    "test:t102-t110:abg36-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_t102_t109_abg36_semantic_ledger_sandbox.test.mjs",
+    "test:t102-t110:abg36-live": "npm run build:semantic && node --test test_env/live/test_t102_t109_abg36_live_semantic_ledger.test.mjs",
+    "test:t110:abg36-sandbox": "npm run build:semantic && node --test test_env/tests/test_t110_abg36_callout_projection.test.mjs",
+    "test:t110:abg36-live": "npm run build:semantic && node --test test_env/live/test_t110_live_claude_pty_installed_operator.test.mjs",
     "test:t109:data-mapper-live": "npm run build:semantic && node --test test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs",
     "test:t115:data-mapper-repair-live": "npm run build:semantic && node --test test_env/live/test_t115_live_installed_data_mapper_repair_flow.test.mjs",
     "test:t122": "npm run build:semantic && node --test test_env/tests/test_t122_feature_scope_closure.test.mjs",
+    "test:t129": "npm run build:semantic && node --test test_env/tests/test_t129_abg36_temporal_substrate.test.mjs",
     "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",
     "test:live": "npm run build:semantic && node --test test_env/live/*.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"

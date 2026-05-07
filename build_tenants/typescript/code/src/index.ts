@@ -18,7 +18,7 @@ export const ODD_SDLC_TYPESCRIPT_TENANT_CAPABILITIES = Object.freeze([
   "traceability_requirement_closure",
   "gap_triage_route_binding",
   "operational_transition_runtime_return",
-  "public_cli_adapter",
+  "spec_method_installed_entrypoint",
   "typescript_install_adapter",
   "installed_operator_execution",
   "assurance_ledger_composition",
@@ -59,4 +59,4 @@ export * from "./install/index.js";
 export * from "./operator/index.js";
 export * from "./assurance/index.js";
 export * from "./release/index.js";
-export * from "./cli/index.js";
+export * from "./spec_method/index.js";

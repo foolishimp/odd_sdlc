@@ -12,10 +12,10 @@ affected_boundary: odd_sdlc TypeScript graph-function catalog, installed operato
 priority: critical
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-04
+updated_at: 2026-05-07
 build_tenant: typescript
 owner: unassigned
-review_status: active_first_slice
+review_status: reopened_codex_rc_completeness_review
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -63,6 +63,30 @@ non_closure_conditions:
   - Closing by requiring an ABG bump instead of using the ABG 3.5 substrate already available.
   - Closing without a live data_mapper run that reaches code/test/release with component-depth evidence.
 ---
+
+## Closure Note - 2026-05-06
+
+Closed under STDO for the component-depth graph-function and repair-flow
+surface. This is not a release-success claim.
+
+Current proof:
+
+- `npm run test:semantic` passed: 216/216.
+- `npm run test:sandbox` passed: 15/15.
+- Focused component-depth bundle passed with
+  `test_t113_component_depth_register_admission`,
+  `test_t115_component_execution_failure_repair_flow`, and the product
+  materialization contract tests.
+- Live installed proof passed:
+  `ODD_SDLC_TS_T115_DATA_MAPPER_LIVE=1 npm run test:t115:data-mapper-repair-live`.
+  The archive
+  `build_tenants/typescript/test_env/test_runs/t115_live_installed_data_mapper_repair_flow/20260505T210813256Z_pid33268`
+  reached failed governed execution, component execution failure attribution,
+  and `repair_required` component repair schedule truth.
+- The live T-109 PTY workspace reached `derive_release_depth_parity_surface`
+  with component-depth evidence and now blocks lawfully on failed test evidence.
+
+Open release work remains in `T-041` and `T-112`.
 
 # T-113: Restore test35 Production-Depth Realization Through Component-Forcing Graph Functions
 
@@ -427,3 +451,36 @@ use a fresh installed workspace and the `pty-terminal` executor profile.
   than T109?
 - Does release qualification carry any remaining depth gap as lawful pressure
   instead of hiding it behind full graph traversal success?
+
+## Codex RC Completeness Review - 2026-05-07
+
+Status: reopened to active for RC completeness review.
+
+Observations:
+
+- Focused proof refreshed on 2026-05-07: component-depth admission and repair
+  flow tests passed (`test_t113_component_depth_register_admission.test.mjs`
+  plus `test_t115_component_execution_failure_repair_flow.test.mjs`).
+- The code has real T-113 traceability in `component_depth_register.ts`,
+  `component_depth.ts`, and focused tests.
+- The closure note narrows the claim to component-depth graph-function and
+  repair-flow surfaces, but the ticket closure law requires a fresh data-mapper
+  live run that demonstrates materially deeper generated Scala code than T109.
+  The cited T115 repair-flow proof reaches governed failed execution and repair
+  scheduling; it does not prove successful production-depth parity.
+- The ticket's own proof commands expect a T113 live PTY lane. Closure evidence
+  cites a T115 live lane instead.
+- Re-close needs a current check that generic `odd_sdlc` core is not embedding
+  tenant-specific Scala/CDME rules outside tenant-owned validation policy.
+
+Checklist before re-closing:
+
+- [ ] Either narrow the ticket target truth/closure law to the proven component
+      depth slice or supply the missing fresh T113 live PTY production-depth
+      proof.
+- [ ] Add or cite evidence that generated code/test topology is materially
+      deeper than the T109 baseline.
+- [ ] Verify component-depth enforcement remains product-domain policy over ABG
+      runtime truth, not a hidden local traversal controller.
+- [ ] Re-run focused component-depth tests and the live lane selected for
+      closure.

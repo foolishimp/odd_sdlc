@@ -26,7 +26,7 @@ classify the behavior into an ODD role:
 - projection/read model
 - triage decision
 - operational command/result
-- CLI adapter
+- Spec Method entrypoint
 - qualification proof
 
 After classification, the implementation must look for local and global
