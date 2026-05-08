@@ -16,7 +16,7 @@ structure probes.
 | Surface | Binding |
 | --- | --- |
 | Package | `@abiogenesis/typescript-tenant` |
-| Version | `3.6.0-rc.1` |
+| Version | `3.7.0-rc.1` |
 | Dependency form | local source product dependency |
 | odd_sdlc role | domain product over ABIogenesis substrate |
 | ABIogenesis role | GTL/ABG carrier and runtime truth authority |
@@ -63,12 +63,15 @@ The adapter relies on ABIogenesis TypeScript evidence:
 
 These assumptions are dependencies, not copied law.
 
-## ABG 3.6 Runtime, Temporal, Process Callout, And Defaults Substrate
+## ABG 3.7 Runtime, Temporal, Process Callout, Defaults, And Evaluator Substrate
 
-As of ABG `3.6.0-rc.1`, worker process execution remains substrate-owned, the
+As of ABG `3.7.0-rc.1`, worker process execution remains substrate-owned, the
 first ABG defaults bundle slice remains visible installed configuration, and
 temporal/time-related runtime truth is ABG-owned event and replay projection
-truth.
+truth. ABG 3.7 also publishes the T-127 F_P construction evaluator substrate:
+construction observation snapshots, action catalog rows, observation-to-action
+binding, configured priority and affect adjustment, and the construction
+priority projection.
 
 `odd_sdlc.TS` admits SDLC worker bindings such as `process://claude`, derives
 SDLC handoff manifests and domain postflight projections, then lowers the
@@ -78,6 +81,11 @@ ABG owns:
 
 - Event Calculus law over admitted runtime events and replay-derived `HoldsAt`
   truth
+- F_P construction evaluator carrier admission and projection truth
+- read-only public gaps evaluator ranking over typed asset gaps and lawful
+  candidate graph actions
+- construction observation snapshots, action catalogs, binding projections,
+  priority schemes, affect policies, and construction priority projections
 - GTL temporal syntax through
   `GraphVector.declarations["abg.temporal_constraint"]`
 - timer intent, timer outcome, deadline breach, and scheduled continuation
@@ -105,6 +113,14 @@ ABG owns:
 `odd_sdlc.TS` may preserve worker archive filenames as compatibility
 read-models, but their process facts are projections over ABG trace truth.
 
+`odd_sdlc.TS` may project SDLC domain gap dossiers, repair schedule rows,
+assurance findings, and traversal strategy labels into ABG construction
+observation/action/policy carriers. It must not use those read models to create
+a second ranking authority. Where odd_sdlc renders a next asset, action, graph
+function, graph vector, repair route, or bootstrap induction preview, that view
+must either carry an ABG `ConstructionPriorityProjection` source reference or
+explicitly declare that it is a narrower non-ranking preview.
+
 `odd_sdlc.TS` does not own a local wall-clock, timer, schedule, deadline, or
 temporal continuation controller. Provider receipts, queue callbacks, cron
 payloads, or terminal-local timing facts do not authorize temporal truth until
@@ -113,14 +129,21 @@ Temporal eligibility or schedule pressure does not close vectors or advance
 graph traversal by itself; only ABG traversal/runtime events and replay
 projection can do that.
 
-ABG `3.6.0-rc.1` does not claim recurrence, window policy, cloud durable timer
+ABG `3.7.0-rc.1` does not claim recurrence, window policy, cloud durable timer
 provider semantics, sticky sessions, warm pools, or automatic session affinity.
 odd_sdlc must not project any of those as product capability through this
 migration.
 
-ABG `3.6.0-rc.1` does not make all ABG defaults configurable, and it does not
-ship the ABG-side per-edge traversal strategy carrier. odd_sdlc keeps an
-explicit fallback traversal strategy plan until that ABG substrate exists.
+ABG `3.7.0-rc.1` does not claim the post-3.7 T-128 installed construction
+runner. The evaluator projection can rank the next lawful construction action;
+it does not itself start work, append runtime events, dispatch workers, or own
+retry iteration. odd_sdlc installed runner bridges that remain before ABG T-128
+must be treated as temporary invocation adapters, not ranking truth.
+
+ABG `3.7.0-rc.1` does not make all ABG defaults configurable, and it does not
+ship an odd_sdlc-specific per-edge traversal strategy carrier. odd_sdlc keeps an
+explicit fallback traversal strategy plan until that policy is repriced into
+ABG-visible evaluator input.
 
 The fallback plan is still a carrier boundary. It must be one resolved plan
 surface consumed by both GTL/vector modulation and installed-operator handoff.

@@ -27,7 +27,7 @@ implementation.
 | `SdlcWorkReport` | `hooks/` | bounded constructor/evaluator hook evidence |
 | `SdlcLineageLedger` | `hooks/` | source/traversal/asset-element lineage |
 | `SdlcRequirementClosureRegister` | `projection/` | current requirement closure truth |
-| `SdlcGapDossier` | `projection/` | current edge or span review surface |
+| `SdlcGapDossier` | `projection/` | current edge/span read-only evaluator view over ABG construction priority truth |
 | `SdlcTriageDecision` | `triage/` | downstream product decision over gap truth |
 | `SdlcOperationalTransitionCommand` | `operational/` | requested side-effect transition |
 | `SdlcOperationalResult` | `operational/` | admitted returned operational evidence |
@@ -48,6 +48,13 @@ These are consumed from ABIogenesis TypeScript and are not redefined:
 - `RuntimeAggregateProjection`
 - `IterationAdvanceDecision`
 - `TraversalStructureProbe`
+- `ConstructionObservationSnapshot`
+- `ConstructionActionCatalogProjection`
+- `ObservationToActionBindingProjection`
+- `ConstructionPriorityScheme`
+- `AffectPriorityPolicy`
+- `ConstructionPriorityProjection`
+- `ConstructionPriorityRow`
 
 ## Subordinate Payloads
 
@@ -71,6 +78,8 @@ These are consumed from ABIogenesis TypeScript and are not redefined:
 - Operational results are admitted separately from operational commands.
 - Requirement closure reads admitted lineage, tests, and behavior evidence.
 - Gap triage reads projections and emits product decisions, not ABG facts.
+- Gap dossier next-asset/action preview must read ABG construction priority
+  projection truth, or explicitly declare a narrower non-ranking preview.
 
 ## Effect Boundaries
 
@@ -84,6 +93,11 @@ Only these groups may write durable state:
 
 No group may emit ABG runtime events except through the ABIogenesis substrate
 adapter and its public emission contract.
+
+No group may rank construction actions locally when an ABG construction
+priority projection is available. odd_sdlc may contribute domain observation
+pressure, action rows, and policy labels, but ABG owns binding and priority
+projection truth.
 
 ## Promotion Rule
 

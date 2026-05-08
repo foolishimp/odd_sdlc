@@ -1,5 +1,5 @@
 // Validates: T-129
-// Validates: ABG-3.6-temporal-runtime-substrate
+// Validates: ABG-3.7-temporal-runtime-substrate
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -13,9 +13,17 @@ import {
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
   assertRuntimeEvent,
+  constructConstructionPriorityRule,
+  constructConstructionPriorityScheme,
   constructDeadlineBreach,
   constructDeadlineBreachAdmittedEvent,
   constructFrameOpenedEvent,
+  constructGraph,
+  constructGraphFunction,
+  constructGraphVector,
+  constructJob,
+  constructModule,
+  constructNode,
   constructGraphCallOpenedEvent,
   constructScheduledContinuation,
   constructScheduledContinuationReopenedEvent,
@@ -27,11 +35,18 @@ import {
   deriveTemporalConstraintFromGtl,
   deriveTemporalHomeostaticProjection,
   deriveTemporalProjection,
+  emptySerializedAttrs,
   edge,
   graphFunctionForVector,
   temporalProjectionHoldsEligibility,
   tryDeriveTemporalConstraintFromGtl
 } from "@abiogenesis/typescript-tenant";
+
+import {
+  constructOddSdlcAbiogenesisExecutionBasis,
+  deriveSdlcGapDossier,
+  deriveOddSdlcConstructionEvaluatorReport
+} from "../../build/semantic/code/src/index.js";
 
 function attrs(entries = []) {
   return Object.freeze({ entries: Object.freeze(entries) });
@@ -103,7 +118,7 @@ function typedNode(id, name, kind, markov) {
   });
 }
 
-function buildOddSdlcAbg36Basis(input) {
+function buildOddSdlcAbg37Basis(input) {
   const source = typedNode(
     `node:t129/${input.name}/source`,
     `${input.name}_source`,
@@ -200,8 +215,482 @@ function graphOpenedEvents(basis) {
   return [constructGraphCallOpenedEvent(basis), constructFrameOpenedEvent(basis)];
 }
 
-test("T-129 substrate boundary consumes ABG 3.6 temporal GTL syntax and event-calculus eligibility", () => {
-  const { basis, vector } = buildOddSdlcAbg36Basis({
+function publicGapNode(id, name, assetType) {
+  return constructNode({
+    id,
+    name,
+    schema: { kind: "symbolic", ref: `schema://odd_sdlc/t129/${assetType}` },
+    markov: [],
+    assetSurface: {
+      kind: assetType,
+      requiredContexts: [],
+      standardsRefs: [],
+      outputContractRefs: []
+    },
+    tags: ["t129", "public-gap-evaluator"]
+  });
+}
+
+function publicGapVector(id, name, source, target) {
+  return constructGraphVector({
+    id,
+    name,
+    source: [source],
+    target,
+    operators: [
+      {
+        name: `${name}_fp_transform`,
+        regime: "F_P",
+        binding: "plugin://odd-sdlc/t129/public-gap-transform",
+        tags: []
+      }
+    ],
+    evaluators: [],
+    contexts: [],
+    rule: null,
+    allowsSubwork: true,
+    declarations: emptySerializedAttrs(),
+    tags: ["t129", "public-gap-evaluator"]
+  });
+}
+
+function publicGapsMultiCandidateBasis() {
+  const inputA = publicGapNode(
+    "node:t129/public-gaps/input-a",
+    "InputA",
+    "input_a"
+  );
+  const inputB = publicGapNode(
+    "node:t129/public-gaps/input-b",
+    "InputB",
+    "input_b"
+  );
+  const alpha = publicGapNode(
+    "node:t129/public-gaps/alpha",
+    "AlphaSurface",
+    "alpha_surface"
+  );
+  const release = publicGapNode(
+    "node:t129/public-gaps/release-depth",
+    "ReleaseDepthSurface",
+    "release_depth_surface"
+  );
+  const alphaVector = publicGapVector(
+    "vector:t129/public-gaps/alpha",
+    "derive_alpha_surface",
+    inputA,
+    alpha
+  );
+  const releaseVector = publicGapVector(
+    "vector:t129/public-gaps/release-depth",
+    "derive_release_depth_surface",
+    inputB,
+    release
+  );
+  const graph = constructGraph({
+    id: "graph:t129/public-gaps/multi-candidate",
+    name: "t129_public_gaps_multi_candidate",
+    inputs: [inputA, inputB],
+    outputs: [alpha, release],
+    nodes: [inputA, inputB, alpha, release],
+    vectors: [alphaVector, releaseVector],
+    contexts: [],
+    rules: [],
+    effects: [],
+    tags: ["t129", "public-gap-evaluator"]
+  });
+  const graphFunction = constructGraphFunction({
+    id: "graph-function:t129/public-gaps/multi-candidate",
+    name: "t129_public_gaps_multi_candidate",
+    environment: {
+      requires: [inputA, inputB],
+      provides: [alpha, release],
+      carries: [inputA, inputB, alpha, release]
+    },
+    inputs: [inputA, inputB],
+    outputs: [alpha, release],
+    template: {
+      kind: "inline_graph",
+      ref: "template://odd-sdlc/t129/public-gaps/multi-candidate",
+      graph,
+      version: null
+    },
+    effects: [],
+    declarations: emptySerializedAttrs(),
+    tags: ["t129", "public-gap-evaluator"]
+  });
+  const job = constructJob({
+    id: "job:t129/public-gaps/multi-candidate",
+    name: "t129_public_gaps_multi_candidate_job",
+    contracts: [{ kind: "graph_function", targetId: graphFunction.id }],
+    roles: [],
+    tags: ["t129", "public-gap-evaluator"],
+    policyHooks: emptySerializedAttrs(),
+    metadata: emptySerializedAttrs()
+  });
+  const module = constructModule({
+    name: "t129_public_gaps_multi_candidate_module",
+    graphs: [graph],
+    graphFunctions: [graphFunction],
+    refinementBoundaries: [],
+    candidateFamilies: [],
+    jobs: [job],
+    roles: [],
+    operators: [],
+    evaluators: [],
+    rules: [],
+    imports: [],
+    policyHooks: emptySerializedAttrs(),
+    metadata: emptySerializedAttrs()
+  });
+  return admitExecutionBasis({
+    module,
+    startIntent: {
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/odd-sdlc/t129/public-gaps",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle: graphFunction.name
+      },
+      until: "converged"
+    },
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/t129/public-gaps",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/typescript",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t129/public-gaps",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t129/public-gaps",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t129/public-gaps",
+    workKey: "wk://odd-sdlc/t129/public-gaps",
+    frameId: null,
+    frameLineageId: null
+  });
+}
+
+function publicGapsLexicalTrapBasis() {
+  const inputA = publicGapNode(
+    "node:t129/public-gaps/default/input-a",
+    "InputA",
+    "input_a"
+  );
+  const inputB = publicGapNode(
+    "node:t129/public-gaps/default/input-b",
+    "InputB",
+    "input_b"
+  );
+  const zeta = publicGapNode(
+    "node:t129/public-gaps/default/zeta",
+    "ZetaSurface",
+    "zeta_surface"
+  );
+  const alpha = publicGapNode(
+    "node:t129/public-gaps/default/alpha",
+    "AlphaSurface",
+    "alpha_surface"
+  );
+  const zetaVector = publicGapVector(
+    "vector:t129/public-gaps/default/zeta",
+    "derive_zeta_surface",
+    inputA,
+    zeta
+  );
+  const alphaVector = publicGapVector(
+    "vector:t129/public-gaps/default/alpha",
+    "derive_alpha_surface",
+    inputB,
+    alpha
+  );
+  const graph = constructGraph({
+    id: "graph:t129/public-gaps/default-follow",
+    name: "t129_public_gaps_default_follow",
+    inputs: [inputA, inputB],
+    outputs: [zeta, alpha],
+    nodes: [inputA, inputB, zeta, alpha],
+    vectors: [zetaVector, alphaVector],
+    contexts: [],
+    rules: [],
+    effects: [],
+    tags: ["t129", "public-gap-evaluator", "default-follow"]
+  });
+  const graphFunction = constructGraphFunction({
+    id: "graph-function:t129/public-gaps/default-follow",
+    name: "t129_public_gaps_default_follow",
+    environment: {
+      requires: [inputA, inputB],
+      provides: [zeta, alpha],
+      carries: [inputA, inputB, zeta, alpha]
+    },
+    inputs: [inputA, inputB],
+    outputs: [zeta, alpha],
+    template: {
+      kind: "inline_graph",
+      ref: "template://odd-sdlc/t129/public-gaps/default-follow",
+      graph,
+      version: null
+    },
+    effects: [],
+    declarations: emptySerializedAttrs(),
+    tags: ["t129", "public-gap-evaluator", "default-follow"]
+  });
+  const job = constructJob({
+    id: "job:t129/public-gaps/default-follow",
+    name: "t129_public_gaps_default_follow_job",
+    contracts: [{ kind: "graph_function", targetId: graphFunction.id }],
+    roles: [],
+    tags: ["t129", "public-gap-evaluator", "default-follow"],
+    policyHooks: emptySerializedAttrs(),
+    metadata: emptySerializedAttrs()
+  });
+  const module = constructModule({
+    name: "t129_public_gaps_default_follow_module",
+    graphs: [graph],
+    graphFunctions: [graphFunction],
+    refinementBoundaries: [],
+    candidateFamilies: [],
+    jobs: [job],
+    roles: [],
+    operators: [],
+    evaluators: [],
+    rules: [],
+    imports: [],
+    policyHooks: emptySerializedAttrs(),
+    metadata: emptySerializedAttrs()
+  });
+  return admitExecutionBasis({
+    module,
+    startIntent: {
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/odd-sdlc/t129/public-gaps-default-follow",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle: graphFunction.name
+      },
+      until: "converged"
+    },
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/t129/public-gaps-default-follow",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/typescript",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t129/public-gaps-default-follow",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t129/public-gaps-default-follow",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t129/public-gaps-default-follow",
+    workKey: "wk://odd-sdlc/t129/public-gaps-default-follow",
+    frameId: null,
+    frameLineageId: null
+  });
+}
+
+test("T-129 substrate boundary consumes ABG 3.7 construction evaluator priority truth", () => {
+  const basis = constructOddSdlcAbiogenesisExecutionBasis({
+    workspaceRoot: "/workspace/odd-sdlc/t129/evaluator",
+    defaultRegime: "F_P",
+    runId: "run://odd-sdlc/t129/evaluator",
+    workKey: "wk://odd-sdlc/t129/evaluator",
+    frameId: null,
+    frameLineageId: null
+  });
+  const priorityScheme = constructConstructionPriorityScheme({
+    schemeRef: "priority-scheme://odd-sdlc/t129/release-first",
+    sourcePolicyRef: "policy://odd-sdlc/t129/release-first",
+    rules: Object.freeze([
+      constructConstructionPriorityRule({
+        priorityRuleRef: "priority-rule://odd-sdlc/t129/release-depth",
+        axis: "release_blocking",
+        weight: 20,
+        appliesToActionKinds: Object.freeze(["continue_graph_call"]),
+        appliesToOutcomeRefs: Object.freeze([
+          "outcome://odd-sdlc/t129/release-depth"
+        ]),
+        sourcePolicyRef: "policy://odd-sdlc/t129/release-first",
+        strategyLabel: "release_depth_first"
+      })
+    ])
+  });
+  const report = deriveOddSdlcConstructionEvaluatorReport({
+    basis,
+    events: graphOpenedEvents(basis),
+    episodeId: "construction-episode://odd-sdlc/t129/evaluator",
+    observationId: "construction-observation://odd-sdlc/t129/evaluator/0",
+    priorityScheme,
+    pressures: Object.freeze([
+      {
+        pressureRef: "pressure://odd-sdlc/t129/multi-gap",
+        pressureKind: "gap_row",
+        sourceRef: "gap://odd-sdlc/t129",
+        affectedAssetRefs: Object.freeze([
+          "asset://odd-sdlc/t129/alpha",
+          "asset://odd-sdlc/t129/release-depth"
+        ]),
+        targetOutcomeRefs: Object.freeze([
+          "outcome://odd-sdlc/t129/alpha",
+          "outcome://odd-sdlc/t129/release-depth"
+        ]),
+        evidenceRefs: Object.freeze(["event://odd-sdlc/t129/gap"]),
+        severity: 1
+      }
+    ]),
+    actions: Object.freeze([
+      {
+        actionRef: "construction-action://odd-sdlc/t129/a-alpha",
+        actionKind: "continue_graph_call",
+        graphFunctionRef: "graph-function://odd-sdlc/t129/alpha",
+        graphVectorRef: "vector://odd-sdlc/t129/alpha",
+        publishedTraversalTargetRef:
+          "published-traversal-target://odd-sdlc/t129/alpha",
+        targetOutcomeRef: "outcome://odd-sdlc/t129/alpha",
+        expectedOutputAssetRefs: Object.freeze(["asset://odd-sdlc/t129/alpha"])
+      },
+      {
+        actionRef: "construction-action://odd-sdlc/t129/z-release-depth",
+        actionKind: "continue_graph_call",
+        graphFunctionRef: "graph-function://odd-sdlc/t129/release-depth",
+        graphVectorRef: "vector://odd-sdlc/t129/release-depth",
+        publishedTraversalTargetRef:
+          "published-traversal-target://odd-sdlc/t129/release-depth",
+        targetOutcomeRef: "outcome://odd-sdlc/t129/release-depth",
+        expectedOutputAssetRefs: Object.freeze([
+          "asset://odd-sdlc/t129/release-depth"
+        ])
+      }
+    ])
+  });
+
+  assert.equal(report.rankingAuthority, "abiogenesis_construction_priority_projection");
+  assert.equal(report.localRankingAuthority, false);
+  assert.equal(
+    report.policyCarrierRef,
+    "policy-carrier://odd-sdlc/construction-evaluator/source-default/abg-3.7"
+  );
+  assert.equal(
+    report.policyVisibility,
+    "visible_source_default_when_no_runtime_policy"
+  );
+  assert.equal(
+    report.priorityProjection.prioritySchemeRef,
+    "priority-scheme://odd-sdlc/t129/release-first"
+  );
+  assert.equal(
+    report.selectedPriorityRow.actionRef,
+    "construction-action://odd-sdlc/t129/z-release-depth"
+  );
+  assert.equal(
+    report.bestGraphFunctionRef,
+    "graph-function://odd-sdlc/t129/release-depth"
+  );
+  assert.deepEqual(report.nextLawfulActionRefs, [
+    "construction-action://odd-sdlc/t129/z-release-depth"
+  ]);
+  assert(
+    report.selectedPriorityRow.rankReasonRefs.includes(
+      "priority-rule://odd-sdlc/t129/release-depth"
+    )
+  );
+});
+
+test("T-129 public gap dossier follows graph order by default when no priority action overrides it", () => {
+  const basis = publicGapsLexicalTrapBasis();
+  const dossier = deriveSdlcGapDossier({
+    basis,
+    events: graphOpenedEvents(basis),
+    triageInput: "t129-public-gap-default-follow",
+    evidenceRefs: Object.freeze(["event://odd-sdlc/t129/public-gap-default-follow"])
+  });
+
+  assert.equal(dossier.readOnly, true);
+  assert.equal(dossier.choosesNextTraversal, false);
+  assert.equal(dossier.edge, "derive_zeta_surface");
+  assert.equal(
+    dossier.rankingAuthority,
+    "abiogenesis_construction_priority_projection"
+  );
+  assert.equal(dossier.localRankingAuthority, false);
+  assert.equal(
+    dossier.bestGraphVectorRef,
+    "vector:t129/public-gaps/default/zeta"
+  );
+  assert.notEqual(dossier.bestGraphVectorRef, "vector:t129/public-gaps/default/alpha");
+  assert.deepEqual(dossier.nextLawfulActions, [
+    "construction-action:graph-function:t129/public-gaps/default-follow:vector:t129/public-gaps/default/zeta"
+  ]);
+  assert(
+    dossier.rankingReasonRefs.some((ref) =>
+      ref.includes("priority-rule://odd-sdlc/default-follow-graph/")
+    )
+  );
+});
+
+test("T-129 public gap dossier ranks competing graph actions through the ABG evaluator projection", () => {
+  const basis = publicGapsMultiCandidateBasis();
+  const priorityScheme = constructConstructionPriorityScheme({
+    schemeRef: "priority-scheme://odd-sdlc/t129/public-gaps/release-first",
+    sourcePolicyRef: "policy://odd-sdlc/t129/public-gaps/release-first",
+    rules: Object.freeze([
+      constructConstructionPriorityRule({
+        priorityRuleRef:
+          "priority-rule://odd-sdlc/t129/public-gaps/release-depth",
+        axis: "release_blocking",
+        weight: 30,
+        appliesToActionKinds: Object.freeze(["continue_graph_call"]),
+        appliesToOutcomeRefs: Object.freeze([
+          "outcome://odd-sdlc/graph-function:t129/public-gaps/multi-candidate/node:t129/public-gaps/release-depth"
+        ]),
+        sourcePolicyRef: "policy://odd-sdlc/t129/public-gaps/release-first",
+        strategyLabel: "public_gap_release_depth_first"
+      })
+    ])
+  });
+  const dossier = deriveSdlcGapDossier({
+    basis,
+    events: graphOpenedEvents(basis),
+    triageInput: "t129-public-gap-multi-candidate",
+    evidenceRefs: Object.freeze(["event://odd-sdlc/t129/public-gap"]),
+    priorityScheme
+  });
+
+  assert.equal(dossier.readOnly, true);
+  assert.equal(dossier.choosesNextTraversal, false);
+  assert.equal(dossier.edge, "derive_alpha_surface");
+  assert.equal(
+    dossier.rankingAuthority,
+    "abiogenesis_construction_priority_projection"
+  );
+  assert.equal(dossier.localRankingAuthority, false);
+  assert.match(dossier.evaluatorProjectionRef, /^construction-priority-projection:/);
+  assert.equal(
+    dossier.bestGraphVectorRef,
+    "vector:t129/public-gaps/release-depth"
+  );
+  assert.notEqual(dossier.bestGraphVectorRef, "vector:t129/public-gaps/alpha");
+  assert.deepEqual(dossier.nextLawfulActions, [
+    "construction-action:graph-function:t129/public-gaps/multi-candidate:vector:t129/public-gaps/release-depth"
+  ]);
+  assert(
+    dossier.rankingReasonRefs.includes(
+      "priority-rule://odd-sdlc/t129/public-gaps/release-depth"
+    )
+  );
+});
+
+test("T-129 substrate boundary consumes ABG 3.7 temporal GTL syntax and event-calculus eligibility", () => {
+  const { basis, vector } = buildOddSdlcAbg37Basis({
     name: "temporal_eligibility",
     declarations: attrs([temporalHookEntry("eligibility")])
   });
@@ -288,7 +777,7 @@ test("T-129 substrate boundary consumes ABG 3.6 temporal GTL syntax and event-ca
 });
 
 test("T-129 substrate boundary rejects provider receipts and non-temporal GTL as temporal authority", () => {
-  const temporal = buildOddSdlcAbg36Basis({
+  const temporal = buildOddSdlcAbg37Basis({
     name: "provider_receipt_only",
     declarations: attrs([temporalHookEntry("provider-receipt-only")])
   });
@@ -322,7 +811,7 @@ test("T-129 substrate boundary rejects provider receipts and non-temporal GTL as
   assert.deepEqual(providerOnlyProjection.eligibleVectorIndexes, []);
   assert.deepEqual(providerOnlyProjection.firedTimerOutcomeRefs, []);
 
-  const nonTemporal = buildOddSdlcAbg36Basis({
+  const nonTemporal = buildOddSdlcAbg37Basis({
     name: "non_temporal",
     declarations: attrs()
   });
@@ -343,7 +832,7 @@ test("T-129 substrate boundary rejects provider receipts and non-temporal GTL as
 });
 
 test("T-129 substrate boundary keeps scheduled continuation replay out of local iteration control", () => {
-  const { basis, vector } = buildOddSdlcAbg36Basis({
+  const { basis, vector } = buildOddSdlcAbg37Basis({
     name: "scheduled_continuation",
     declarations: attrs([temporalHookEntry("scheduled-continuation")])
   });
@@ -403,7 +892,7 @@ test("T-129 substrate boundary keeps scheduled continuation replay out of local 
 });
 
 test("T-129 substrate boundary projects admitted deadline breach F_H pressure without caller-policy rewrite", () => {
-  const { basis, vector } = buildOddSdlcAbg36Basis({
+  const { basis, vector } = buildOddSdlcAbg37Basis({
     name: "deadline_pressure",
     declarations: attrs([
       temporalHookEntry("deadline-pressure", {
@@ -476,7 +965,7 @@ test("T-129 substrate boundary projects admitted deadline breach F_H pressure wi
 });
 
 test("T-129 substrate boundary fails closed without ABG temporal identity fields", () => {
-  const { basis, vector } = buildOddSdlcAbg36Basis({
+  const { basis, vector } = buildOddSdlcAbg37Basis({
     name: "identity_rejection",
     declarations: attrs([
       temporalHookEntry("identity-rejection", {

@@ -22,6 +22,7 @@ flowchart TD
   Workspace[Workspace ingress carriers]
   Start[SdlcPublicStartRequest / SdlcExecutionContract]
   ABG[ABG ExecutionBasis + RuntimeEvent + Projection]
+  Evaluator[ABG ConstructionObservation + ActionCatalog + Binding + PriorityProjection]
   Hooks[SdlcWorkReport + SdlcLineageLedger]
   Projection[SdlcGapDossier + QueryDomain + RequirementClosure]
   Triage[SdlcTriageDecision]
@@ -47,6 +48,10 @@ flowchart TD
   Start --> ABG
   ABG --> Hooks
   Hooks --> ABG
+  ABG --> Evaluator
+  Domain --> Evaluator
+  Graph --> Evaluator
+  Evaluator --> Projection
   ABG --> Projection
   Domain --> Projection
   Projection --> Triage
@@ -65,10 +70,14 @@ flowchart TD
 - `SdlcGraphFunctionCatalog` is SDLC program publication.
 - `SdlcPublicStartRequest` is public ignition only.
 - ABG owns runtime traversal and replay projection.
+- ABG owns construction observation-to-action binding and priority projection.
+- odd_sdlc may contribute domain pressure/action/policy rows; it does not rank
+  construction actions locally when ABG evaluator truth is available.
 - `SdlcWorkReport` and `SdlcLineageLedger` are hook evidence from one
   ABG-selected vector.
 - `SdlcGapDossier`, query-domain, and requirement closure are read models over
-  admitted truth.
+  admitted truth; gap/next-action previews read the ABG construction priority
+  projection or explicitly declare a narrower non-ranking preview.
 - `SdlcTriageDecision` is downstream product policy over gap truth.
 - Operational command/result/projection surfaces are separate.
 - Qualification proves the current release claim; it does not define product
@@ -84,3 +93,8 @@ If a future TypeScript module:
 
 then it is a shadow-runtime risk and must have explicit design authority before
 implementation closure.
+
+If a future TypeScript module observes gaps and locally sorts candidate graph
+functions, vectors, repair routes, or bootstrap actions, then it is a
+single-surface violation unless it is a read-only rendering of ABG construction
+priority projection truth.

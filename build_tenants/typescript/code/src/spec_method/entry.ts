@@ -9,7 +9,15 @@ import {
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { ExecutionBasis, RuntimeEvent } from "@abiogenesis/typescript-tenant";
+import {
+  constructConstructionPriorityRule,
+  constructConstructionPriorityScheme
+} from "@abiogenesis/typescript-tenant";
+import type {
+  ConstructionPriorityScheme,
+  ExecutionBasis,
+  RuntimeEvent
+} from "@abiogenesis/typescript-tenant";
 import {
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
@@ -76,6 +84,7 @@ export interface OddSdlcSpecMethodTraversalRequest {
   };
   readonly until: SdlcPublicStartUntil;
   readonly workerTransport: string | null;
+  readonly evaluatorPriorityEdge: string | null;
 }
 
 export interface OddSdlcSpecMethodInstallRequest {
@@ -113,6 +122,7 @@ interface SpecMethodOptionReadModel {
   readonly target: string;
   readonly until: SdlcPublicStartUntil;
   readonly workerTransport: string | null;
+  readonly evaluatorPriorityEdge: string | null;
 }
 
 interface SpecMethodInstallOptionReadModel {
@@ -246,12 +256,28 @@ function parseUntil(value: string): SdlcPublicStartUntil {
   throw new TypeError(`--until expected first_traversal, blocked, or converged`);
 }
 
-function parseOptions(argv: readonly string[]): SpecMethodOptionReadModel {
+function parseNonEmptyOptionValue(
+  argv: readonly string[],
+  index: number,
+  option: string
+): string {
+  const value = requireOptionValue(argv, index, option).trim();
+  if (value.length === 0) {
+    throw new TypeError(`${option} requires a non-empty value`);
+  }
+  return value;
+}
+
+function parseOptions(
+  command: OddSdlcSpecMethodCommand,
+  argv: readonly string[]
+): SpecMethodOptionReadModel {
   let workspaceRoot = ".";
   let outputWorkspaceRoot: string | null = null;
   let target = "next";
   let until: SdlcPublicStartUntil = "blocked";
   let workerTransport: string | null = null;
+  let evaluatorPriorityEdge: string | null = null;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--workspace") {
@@ -269,6 +295,19 @@ function parseOptions(argv: readonly string[]): SpecMethodOptionReadModel {
     } else if (token === "--worker") {
       workerTransport = requireOptionValue(argv, index, "--worker");
       index += 1;
+    } else if (token === "--evaluator-priority-edge") {
+      if (command !== "gaps") {
+        throw new TypeError("--evaluator-priority-edge is only valid for gaps");
+      }
+      if (evaluatorPriorityEdge !== null) {
+        throw new TypeError("--evaluator-priority-edge may be declared once");
+      }
+      evaluatorPriorityEdge = parseNonEmptyOptionValue(
+        argv,
+        index,
+        "--evaluator-priority-edge"
+      );
+      index += 1;
     } else {
       throw new TypeError(`unknown option: ${token ?? ""}`);
     }
@@ -278,7 +317,8 @@ function parseOptions(argv: readonly string[]): SpecMethodOptionReadModel {
     outputWorkspaceRoot,
     target,
     until,
-    workerTransport
+    workerTransport,
+    evaluatorPriorityEdge
   });
 }
 
@@ -386,7 +426,7 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       packageSourceRoot: resolve(options.packageSourceRoot)
     });
   }
-  const options = parseOptions(argv.slice(1));
+  const options = parseOptions(command, argv.slice(1));
   return Object.freeze({
     kind: "odd_sdlc_spec_method_request",
     command,
@@ -395,7 +435,8 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       options.outputWorkspaceRoot === null ? null : resolve(options.outputWorkspaceRoot),
     target: parseTarget(options.target),
     until: options.until,
-    workerTransport: options.workerTransport
+    workerTransport: options.workerTransport,
+    evaluatorPriorityEdge: options.evaluatorPriorityEdge
   });
 }
 
@@ -599,6 +640,59 @@ function replayEventsForBasis(
   );
 }
 
+function constructionPrioritySchemeForSpecMethodGaps(input: {
+  readonly request: OddSdlcSpecMethodTraversalRequest;
+  readonly basis: ExecutionBasis;
+  readonly closedVectorIndexes: readonly number[];
+}): ConstructionPriorityScheme | undefined {
+  if (input.request.evaluatorPriorityEdge === null) {
+    return undefined;
+  }
+  const matches = input.basis.graph.vectors
+    .map((vector, index) => Object.freeze({ vector, index }))
+    .filter(({ vector }) => vector.name === input.request.evaluatorPriorityEdge);
+  if (matches.length === 0) {
+    throw new TypeError(
+      `--evaluator-priority-edge does not name a published graph edge: ${input.request.evaluatorPriorityEdge}`
+    );
+  }
+  if (matches.length > 1) {
+    throw new TypeError(
+      `--evaluator-priority-edge is ambiguous: ${input.request.evaluatorPriorityEdge}`
+    );
+  }
+  const selected = matches[0];
+  if (selected === undefined) {
+    throw new TypeError("--evaluator-priority-edge did not resolve to a graph edge");
+  }
+  if (input.closedVectorIndexes.includes(selected.index)) {
+    throw new TypeError(
+      `--evaluator-priority-edge names an already closed graph edge: ${selected.vector.name}`
+    );
+  }
+  const sourcePolicyRef =
+    `spec-method://odd-sdlc/gaps/evaluator-priority-edge/${selected.vector.name}`;
+  return constructConstructionPriorityScheme({
+    schemeRef:
+      `priority-scheme://odd-sdlc/spec-method/gaps/${input.basis.graphFunction.id}/${selected.vector.id}`,
+    sourcePolicyRef,
+    rules: Object.freeze([
+      constructConstructionPriorityRule({
+        priorityRuleRef:
+          `priority-rule://odd-sdlc/spec-method/gaps/${input.basis.graphFunction.id}/${selected.vector.id}`,
+        axis: "gap_repair",
+        weight: 1000,
+        appliesToActionKinds: Object.freeze(["continue_graph_call"]),
+        appliesToOutcomeRefs: Object.freeze([
+          `outcome://odd-sdlc/${input.basis.graphFunction.id}/${selected.vector.target.id}`
+        ]),
+        sourcePolicyRef,
+        strategyLabel: "spec_method_evaluator_priority_edge"
+      })
+    ])
+  });
+}
+
 async function installedStartPayloadFor(
   request: OddSdlcSpecMethodTraversalRequest
 ): Promise<unknown> {
@@ -666,11 +760,17 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     basis: start.executionContract.basis,
     events
   });
+  const priorityScheme = constructionPrioritySchemeForSpecMethodGaps({
+    request,
+    basis: start.executionContract.basis,
+    closedVectorIndexes: projection.closedVectorIndexes
+  });
   const dossier = deriveSdlcGapDossier({
     basis: start.executionContract.basis,
     events,
     triageInput: "spec_method:gaps",
-    evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"]
+    evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"],
+    ...(priorityScheme === undefined ? {} : { priorityScheme })
   });
   return Object.freeze({
     start,

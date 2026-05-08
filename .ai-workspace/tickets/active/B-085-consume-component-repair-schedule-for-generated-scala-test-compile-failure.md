@@ -13,7 +13,7 @@ affected_boundary: component_test_surface generation, component_repair_schedule_
 priority: critical
 triaged_at: 2026-05-06
 created_at: 2026-05-06
-updated_at: 2026-05-07
+updated_at: 2026-05-08
 build_tenant: typescript
 owner: odd_sdlc
 governance_scope: STDO Method
@@ -295,3 +295,26 @@ This proves installed repair-schedule truth under the current event schema. It
 still does not close B-085 because it uses the T-115 local repair-flow worker,
 not the final production Claude data_mapper lane that must consume the B-085
 repair-reentry plan and produce pass evidence.
+
+## ABG 3.7 Evaluator Boundary - 2026-05-08
+
+T-129's ABG 3.7 migration gives odd_sdlc a read-only evaluator projection for
+gap/action ranking. It does not consume the component repair schedule into the
+installed runner.
+
+Closure expectation update:
+
+- `component_repair_row_open:*` and `repair_worker_output` must become typed
+  repair/reentry pressure for the evaluator or an ABG T-128 admitted
+  construction intent. They must not be consumed by public `gaps` as a dispatch
+  instruction.
+- The installed operator's current repair/reentry loop is temporary adapter
+  debt. B-085 cannot close by teaching that adapter to rank repair routes
+  locally.
+- The production data_mapper lane must still prove that the
+  `DiagnosticsFinalizeSpec.scala` repair row is carried into the next worker
+  package, the implicated shard is rerun, pass evidence is admitted, and
+  release-depth parity is rederived.
+- If ABG T-128 is not available, B-085 may close only on production repair
+  consumption evidence plus an explicit note that runner-level evaluator-driven
+  traversal remains deferred.

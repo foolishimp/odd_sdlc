@@ -9,8 +9,18 @@ import {
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
   admitStartIntent,
+  constructConstructionActionCatalogProjection,
+  constructConstructionActionRefForTraversalTarget,
+  constructConstructionActionRow,
+  constructConstructionObservationSnapshot,
+  constructConstructionPriorityRule,
+  constructConstructionPriorityScheme,
+  constructObservationPressureRow,
   deriveAdvancementTransition,
+  deriveConstructionObservationAssetRefsFromRuntimeTruth,
+  deriveConstructionPriorityProjection,
   deriveIterationAdvanceDecision,
+  deriveObservationToActionBindingProjection,
   deriveRuntimeAggregateProjection,
   deriveTraversalStructureProbe,
   edge,
@@ -20,6 +30,13 @@ import {
   TEMPORAL_CONSTRAINT_CONFIG_KEY_VALUES,
   TEMPORAL_CONSTRAINT_VECTOR_ATTR_KEYS,
   type AdvancementTransition,
+  type ConstructionActionCatalogProjection,
+  type ConstructionActionKind,
+  type ConstructionObservationSnapshot,
+  type ConstructionPressureKind,
+  type ConstructionPriorityProjection,
+  type ConstructionPriorityScheme,
+  type ConstructionPriorityRow,
   type ExecutionBasis,
   type Graph,
   type GraphFunction,
@@ -29,19 +46,23 @@ import {
   type RuntimeAggregateProjection,
   type RuntimeEvent,
   type RuntimeRegime,
+  type ObservationToActionBindingProjection,
   type TraversalStructureProbe
 } from "@abiogenesis/typescript-tenant";
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.6.0-rc.1",
+  packageVersion: "3.7.0-rc.1",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   temporalTruthAuthority: "abiogenesis",
   eventCalculusTruthAuthority: "abiogenesis_replay_projection",
+  constructionEvaluatorTruthAuthority:
+    "abiogenesis_construction_priority_projection",
   localRuntimeEventFamilies: Object.freeze([]),
   localTemporalAuthority: false,
   choosesNextVectorLocally: false,
+  localConstructionRankingAuthority: false,
   temporalConstraintVectorAttrKeys: TEMPORAL_CONSTRAINT_VECTOR_ATTR_KEYS,
   temporalConstraintConfigKeys: TEMPORAL_CONSTRAINT_CONFIG_KEY_VALUES,
   sourceAssumptions: Object.freeze([
@@ -52,7 +73,8 @@ export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
     "ABIogenesis T-119 temporal GTL algebra is admitted through ABG runtime events",
     "ABIogenesis T-120 Event Calculus replay derives HoldsAt truth from admitted events",
     "ABIogenesis T-122 deadline pressure is replay-derived temporal projection truth",
-    "ABIogenesis T-125 proves temporal and non-temporal GTL live lanes under 3.6.0-rc.1"
+    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs for 3.7.0-rc.1",
+    "ABIogenesis T-127 publishes the F_P construction evaluator and read-only public gaps ranking substrate under 3.7.0-rc.1"
   ])
 } as const);
 
@@ -75,6 +97,101 @@ export interface OddSdlcAbiogenesisSubstrateReport {
   readonly iterationEventKinds: readonly RuntimeEvent["kind"][];
   readonly transitionEventKinds: readonly RuntimeEvent["kind"][];
 }
+
+export interface OddSdlcConstructionEvaluatorPressureInput {
+  readonly pressureRef: string;
+  readonly pressureKind: ConstructionPressureKind;
+  readonly sourceRef: string;
+  readonly affectedAssetRefs?: readonly string[];
+  readonly targetOutcomeRefs: readonly string[];
+  readonly evidenceRefs?: readonly string[];
+  readonly severity?: number;
+}
+
+export interface OddSdlcConstructionEvaluatorActionInput {
+  readonly actionRef?: string;
+  readonly actionKind: ConstructionActionKind;
+  readonly graphFunctionRef?: string | null;
+  readonly graphVectorRef?: string | null;
+  readonly publishedTraversalTargetRef?: string | null;
+  readonly targetOutcomeRef: string;
+  readonly inputAssetRefs?: readonly string[];
+  readonly expectedOutputAssetRefs?: readonly string[];
+  readonly requiredAuthorityRefs?: readonly string[];
+  readonly eligibleReasonRefs?: readonly string[];
+  readonly ineligibleReasonRefs?: readonly string[];
+}
+
+export interface OddSdlcConstructionEvaluatorPolicyCarrier {
+  readonly kind: "odd_sdlc_construction_evaluator_policy_carrier";
+  readonly carrierRef: string;
+  readonly sourceKind: "source_default";
+  readonly visibility: "visible_source_default_when_no_runtime_policy";
+  readonly hookResolutionRef: string;
+  readonly sourceDefaultConfigDigest: string;
+  readonly authorityDigest: string;
+  readonly priorityScheme: ConstructionPriorityScheme;
+}
+
+export interface OddSdlcConstructionEvaluatorInput {
+  readonly basis: ExecutionBasis;
+  readonly events: readonly RuntimeEvent[];
+  readonly episodeId?: string;
+  readonly observationId?: string;
+  readonly actionCatalogRef?: string;
+  readonly hookResolutionRef?: string;
+  readonly fallbackConfigDigest?: string;
+  readonly authorityDigest?: string;
+  readonly policyCarrier?: OddSdlcConstructionEvaluatorPolicyCarrier;
+  readonly priorityScheme?: ConstructionPriorityScheme;
+  readonly pressures: readonly OddSdlcConstructionEvaluatorPressureInput[];
+  readonly actions: readonly OddSdlcConstructionEvaluatorActionInput[];
+}
+
+export interface OddSdlcConstructionEvaluatorReport {
+  readonly kind: "odd_sdlc_construction_evaluator_report";
+  readonly rankingAuthority: "abiogenesis_construction_priority_projection";
+  readonly localRankingAuthority: false;
+  readonly observation: ConstructionObservationSnapshot;
+  readonly actionCatalog: ConstructionActionCatalogProjection;
+  readonly bindingProjection: ObservationToActionBindingProjection;
+  readonly priorityProjection: ConstructionPriorityProjection;
+  readonly policyCarrierRef: string;
+  readonly policyVisibility: OddSdlcConstructionEvaluatorPolicyCarrier["visibility"];
+  readonly selectedPriorityRow: ConstructionPriorityRow | null;
+  readonly nextLawfulActionRefs: readonly string[];
+  readonly bestGraphFunctionRef: string | null;
+  readonly bestGraphVectorRef: string | null;
+}
+
+export const ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY =
+  Object.freeze({
+    kind: "odd_sdlc_construction_evaluator_policy_carrier",
+    carrierRef: "policy-carrier://odd-sdlc/construction-evaluator/source-default/abg-3.7",
+    sourceKind: "source_default",
+    visibility: "visible_source_default_when_no_runtime_policy",
+    hookResolutionRef: "hook-resolution://odd-sdlc/source-default/abg-3.7",
+    sourceDefaultConfigDigest: "sha256:odd-sdlc-source-default-construction-evaluator-abg-3.7",
+    authorityDigest: "sha256:odd-sdlc-abg-3.7-evaluator-adapter",
+    priorityScheme: constructConstructionPriorityScheme({
+    schemeRef: "priority-scheme://odd-sdlc/default/abg-3.7",
+    sourcePolicyRef: "policy://odd-sdlc/default-construction-evaluator",
+    rules: Object.freeze([
+      constructConstructionPriorityRule({
+        priorityRuleRef: "priority-rule://odd-sdlc/default/gap-repair",
+        axis: "gap_repair",
+        weight: 1,
+        appliesToActionKinds: Object.freeze([]),
+        appliesToOutcomeRefs: Object.freeze([]),
+        sourcePolicyRef: "policy://odd-sdlc/default-construction-evaluator",
+        strategyLabel: "odd_sdlc_default_gap_repair"
+      })
+    ])
+  })
+  }) satisfies OddSdlcConstructionEvaluatorPolicyCarrier;
+
+export const ODD_SDLC_DEFAULT_CONSTRUCTION_PRIORITY_SCHEME =
+  ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY.priorityScheme;
 
 function typedSdlcNode(id: string, name: string, typeName: string) {
   return admitNode({
@@ -205,6 +322,39 @@ function eventKinds(events: readonly RuntimeEvent[]): readonly RuntimeEvent["kin
   return Object.freeze(events.map((event) => event.kind));
 }
 
+function defaultConstructionEpisodeId(basis: ExecutionBasis): string {
+  return `construction-episode://odd-sdlc/${basis.runId ?? basis.workKey ?? basis.graphFunction.id}`;
+}
+
+function defaultConstructionObservationId(input: {
+  readonly basis: ExecutionBasis;
+  readonly events: readonly RuntimeEvent[];
+}): string {
+  return [
+    "construction-observation://odd-sdlc",
+    input.basis.graphFunction.id,
+    String(input.events.length)
+  ].join("/");
+}
+
+function actionRefFor(input: OddSdlcConstructionEvaluatorActionInput): string {
+  if (input.actionRef !== undefined) {
+    return input.actionRef;
+  }
+  if (
+    input.graphFunctionRef !== undefined &&
+    input.graphFunctionRef !== null &&
+    input.graphVectorRef !== undefined &&
+    input.graphVectorRef !== null
+  ) {
+    return constructConstructionActionRefForTraversalTarget({
+      graphFunctionRef: input.graphFunctionRef,
+      graphVectorRef: input.graphVectorRef
+    });
+  }
+  return `construction-action://odd-sdlc/${input.targetOutcomeRef}`;
+}
+
 export function deriveOddSdlcAbiogenesisSubstrateReport(input: {
   readonly basis: ExecutionBasis;
   readonly events: readonly RuntimeEvent[];
@@ -227,5 +377,120 @@ export function deriveOddSdlcAbiogenesisSubstrateReport(input: {
     transitionEventKinds: eventKinds(
       runtimeEventsForTransition(input.basis, transition)
     )
+  });
+}
+
+export function deriveOddSdlcConstructionEvaluatorReport(
+  input: OddSdlcConstructionEvaluatorInput
+): OddSdlcConstructionEvaluatorReport {
+  const projection = deriveRuntimeAggregateProjection(input.basis, input.events);
+  const policyCarrier =
+    input.policyCarrier ?? ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY;
+  const assetRefs = deriveConstructionObservationAssetRefsFromRuntimeTruth({
+    basis: input.basis,
+    projection
+  });
+  const episodeId = input.episodeId ?? defaultConstructionEpisodeId(input.basis);
+  const observationId =
+    input.observationId ??
+    defaultConstructionObservationId({
+      basis: input.basis,
+      events: input.events
+    });
+  const actionCatalogRef =
+    input.actionCatalogRef ?? `construction-action-catalog://odd-sdlc/${episodeId}`;
+  const pressureRows = Object.freeze(
+    input.pressures.map((pressure) =>
+      constructObservationPressureRow({
+        pressureRef: pressure.pressureRef,
+        pressureKind: pressure.pressureKind,
+        sourceRef: pressure.sourceRef,
+        affectedAssetRefs: pressure.affectedAssetRefs ?? Object.freeze([]),
+        targetOutcomeRefs: pressure.targetOutcomeRefs,
+        evidenceRefs: pressure.evidenceRefs ?? Object.freeze([]),
+        severity: pressure.severity ?? 1
+      })
+    )
+  );
+  const actionRows = Object.freeze(
+    input.actions.map((action) =>
+      constructConstructionActionRow({
+        actionRef: actionRefFor(action),
+        actionKind: action.actionKind,
+        graphFunctionRef: action.graphFunctionRef ?? null,
+        graphVectorRef: action.graphVectorRef ?? null,
+        publishedTraversalTargetRef: action.publishedTraversalTargetRef ?? null,
+        targetOutcomeRef: action.targetOutcomeRef,
+        inputAssetRefs: action.inputAssetRefs ?? Object.freeze([]),
+        expectedOutputAssetRefs: action.expectedOutputAssetRefs ?? Object.freeze([]),
+        requiredAuthorityRefs: action.requiredAuthorityRefs ?? Object.freeze([]),
+        eligibleReasonRefs: action.eligibleReasonRefs ?? Object.freeze([]),
+        ineligibleReasonRefs: action.ineligibleReasonRefs ?? Object.freeze([])
+      })
+    )
+  );
+  const actionCatalog = constructConstructionActionCatalogProjection({
+    catalogRef: actionCatalogRef,
+    episodeId,
+    hookResolutionRef: input.hookResolutionRef ?? policyCarrier.hookResolutionRef,
+    fallbackConfigDigest:
+      input.fallbackConfigDigest ?? policyCarrier.sourceDefaultConfigDigest,
+    rows: actionRows
+  });
+  const observation = constructConstructionObservationSnapshot({
+    episodeId,
+    observationId,
+    basisRef: `execution-basis://odd-sdlc/${input.basis.graphFunction.id}`,
+    currentProjectionRef: `runtime-aggregate://odd-sdlc/${input.basis.graphFunction.id}/${input.events.length}`,
+    iterationOrdinal: projection.closedVectorIndexes.length,
+    basisProjectionRef: `basis-projection://odd-sdlc/${input.basis.graphFunction.id}`,
+    priorIntentId: null,
+    causationRef: `causation://odd-sdlc/${input.basis.graphFunction.id}`,
+    correlationId: input.basis.runId ?? input.basis.workKey ?? episodeId,
+    runtimeAggregateRefs: Object.freeze([
+      `runtime-aggregate://odd-sdlc/${input.basis.graphFunction.id}/${input.events.length}`
+    ]),
+    linkedAssetRefs: assetRefs.linkedAssetRefs,
+    passedInputRefs: assetRefs.passedInputRefs,
+    gapProjectionRefs: Object.freeze([]),
+    actionCatalogRef,
+    authorityDigest: input.authorityDigest ?? policyCarrier.authorityDigest,
+    pressureRows
+  });
+  const bindingProjection = deriveObservationToActionBindingProjection({
+    observation,
+    actionCatalog
+  });
+  const priorityProjection = deriveConstructionPriorityProjection({
+    observation,
+    actionCatalog,
+    bindingProjection,
+    priorityScheme:
+      input.priorityScheme ?? policyCarrier.priorityScheme
+  });
+  const selectedPriorityRow = priorityProjection.rows[0] ?? null;
+  const selectedAction =
+    selectedPriorityRow === null
+      ? null
+      : actionCatalog.rows.find(
+          (action) => action.actionRef === selectedPriorityRow.actionRef
+        ) ?? null;
+
+  return Object.freeze({
+    kind: "odd_sdlc_construction_evaluator_report",
+    rankingAuthority: "abiogenesis_construction_priority_projection",
+    localRankingAuthority: false,
+    observation,
+    actionCatalog,
+    bindingProjection,
+    priorityProjection,
+    policyCarrierRef: policyCarrier.carrierRef,
+    policyVisibility: policyCarrier.visibility,
+    selectedPriorityRow,
+    nextLawfulActionRefs: Object.freeze(
+      selectedPriorityRow === null ? [] : [selectedPriorityRow.actionRef]
+    ),
+    bestGraphFunctionRef: selectedAction?.graphFunctionRef ?? null,
+    bestGraphVectorRef: selectedAction?.graphVectorRef ?? null
   });
 }

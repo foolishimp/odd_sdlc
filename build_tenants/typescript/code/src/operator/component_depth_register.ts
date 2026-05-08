@@ -560,18 +560,74 @@ function objectRecord(input: unknown): Record<string, unknown> | null {
   return Object.fromEntries(Object.entries(input));
 }
 
+function optionalTrimmedString(input: unknown): string | null {
+  if (typeof input !== "string") {
+    return null;
+  }
+  const trimmed = input.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeComponentPublicBoundary(input: unknown): unknown {
+  if (typeof input === "boolean") {
+    return input ? "public" : "internal";
+  }
+  return input;
+}
+
+function normalizeComponentConcernRole(input: unknown): unknown {
+  const value = optionalTrimmedString(input);
+  if (value === null) {
+    return input;
+  }
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "_")
+    .replace(/^_+|_+$/gu, "");
+  const aliases: Readonly<Record<string, string>> = Object.freeze({
+    parse: "parser",
+    parsing: "parser",
+    parser: "parser",
+    validate: "validator",
+    validation: "validator",
+    validator: "validator",
+    map: "mapper",
+    mapping: "mapper",
+    mapper: "mapper",
+    error: "error_model",
+    error_model: "error_model",
+    error_reporting: "reporting",
+    reporting: "reporting",
+    report: "reporting",
+    io: "io_adapter",
+    io_adapter: "io_adapter",
+    adapter: "io_adapter",
+    domain: "domain_model",
+    domain_model: "domain_model",
+    model: "domain_model",
+    other: "other",
+    public_boundary: "other"
+  });
+  return aliases[normalized] ?? input;
+}
+
 function normalizeComponentTopologyRow(input: unknown): unknown {
   const record = objectRecord(input);
   if (record === null) {
     return input;
   }
+  const concernRole =
+    record["concernRole"] ??
+    record["concern"] ??
+    record["domainCarrier"] ??
+    record["adapter"];
   return Object.freeze({
-    kind: record["kind"],
+    kind: record["kind"] ?? "sdlc_component_topology_row",
     componentId: record["componentId"],
     moduleName: record["moduleName"],
     relativePath: record["relativePath"],
-    publicBoundary: record["publicBoundary"],
-    concernRole: record["concernRole"],
+    publicBoundary: normalizeComponentPublicBoundary(record["publicBoundary"]),
+    concernRole: normalizeComponentConcernRole(concernRole),
     requirementIds: record["requirementIds"],
     sourceAssetRefs: record["sourceAssetRefs"]
   });

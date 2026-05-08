@@ -12,6 +12,7 @@ import path from "node:path";
 
 import {
   admitComponentDepthRegisterFromArtifact,
+  componentRepairReentryPlansForGapDossier,
   constructPostflightGapDossier,
   deriveComponentDepthAssuranceLedger,
   deriveSdlcOperatorAssuranceGate,
@@ -612,4 +613,126 @@ test("B-085 release-depth parity repair rows route to repair worker output", () 
       (reason) => reason.blockingReason.lawfulReentryPoint === "repair_worker_output"
     )
   );
+});
+
+test("B-085 release-depth parity consumes source repair schedule without duplicate carrier copy", () => {
+  const root = workspace();
+  const scheduleHandoff = manifest(root, "derive_component_repair_schedule_surface");
+  const scheduleOutput = writeRegister(scheduleHandoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_repair_schedule_surface",
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "repair_required",
+      repairRows: [
+        {
+          kind: "sdlc_component_repair_schedule_row",
+          scheduleId: "schedule.compiler.diagnostics.scalac.001",
+          failureId: "fail.compiler.diagnostics.scalac.001",
+          repairTarget:
+            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
+          lawfulReentryPoint: "realization_refactor",
+          attributionConfidence: "high",
+          testcaseIds: ["TC-DM-DIAG-001"],
+          componentIds: ["cdme-diagnostics"],
+          requirementIds: ["REQ-T115-001"],
+          sourceRefs: [
+            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala"
+          ],
+          testRefs: [
+            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala"
+          ],
+          evidenceRefs: ["asset://test_execution_result_surface#shardEvidence/test-shard-01-cdme-compiler"]
+        }
+      ],
+      evidenceRefs: ["asset://test_execution_result_surface#shardEvidence/test-shard-01-cdme-compiler"]
+    }
+  });
+  assert.equal(
+    admitComponentDepthRegisterFromArtifact({
+      targetAssetType: scheduleHandoff.targetAssetType,
+      outputFile: scheduleHandoff.outputFile
+    }).status,
+    "admitted"
+  );
+
+  const releaseHandoff = manifest(root, "derive_release_depth_parity_surface");
+  const releaseOutput = writeRegister(releaseHandoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "release_depth_parity_surface",
+    releaseDepthParity: {
+      kind: "sdlc_release_depth_parity_assessment",
+      status: "blocked",
+      scope: "release_surface",
+      blockerCodes: ["blocked_test_classes_have_no_pass_evidence"],
+      blockerDetail: "component repair schedule is still repair_required",
+      decisionBasis: [
+        `file://${scheduleHandoff.outputFile}`,
+        "asset://test_execution_result_surface#shardEvidence/test-shard-01-cdme-compiler"
+      ],
+      metPrecondition: false,
+      repricedRequested: false
+    }
+  });
+  const releaseOutputRef = `file://${releaseHandoff.outputFile}`;
+  const gate = deriveSdlcOperatorAssuranceGate({
+    manifest: releaseHandoff,
+    report: {
+      ...reportFor(releaseHandoff, releaseOutput),
+      obligationAssessments: fulfilledObligationAssessments(releaseHandoff, [
+        releaseOutputRef,
+        `file://${scheduleHandoff.outputFile}`
+      ])
+    },
+    postflight: {
+      kind: "sdlc_operator_postflight_result",
+      status: "passed",
+      blockingReasons: [],
+      blockingReasonCarriers: [],
+      evidenceRefs: [releaseOutputRef, `file://${scheduleHandoff.outputFile}`]
+    }
+  });
+  assert(gate.blockingPostflight);
+  assert(
+    gate.blockingPostflight.blockingReasonCarriers.some(
+      (reason) =>
+        reason.detail ===
+        "component_repair_row_open:fail.compiler.diagnostics.scalac.001"
+    )
+  );
+
+  const dossier = constructPostflightGapDossier({
+    manifest: releaseHandoff,
+    postflight: gate.blockingPostflight
+  });
+  deriveWorkerHandoffManifest({
+    workspaceRoot: root,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_component_test_surface",
+    vectorIndex: 23,
+    contract: hookContractByEdgeName("derive_component_test_surface"),
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [dossier]
+    },
+    runId: "t115-source-schedule-reentry"
+  });
+  const plans = componentRepairReentryPlansForGapDossier({
+    manifest: releaseHandoff,
+    dossier
+  });
+  assert.equal(plans.length, 1);
+  assert.equal(
+    plans[0].targetEdgeName,
+    "derive_component_test_surface"
+  );
+  assert.equal(
+    plans[0].failureId,
+    "fail.compiler.diagnostics.scalac.001"
+  );
+  assert.equal(sha256Text(scheduleOutput).length, 71);
 });

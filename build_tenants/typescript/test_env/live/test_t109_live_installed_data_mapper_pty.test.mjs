@@ -34,6 +34,8 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_DATA_MAPPER_LIVE"] === "1";
+const WORKER_TRANSPORT =
+  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_WORKER"] ?? "process://claude";
 const DATA_MAPPER_TEMPLATE_ROOT =
   process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
   "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
@@ -59,11 +61,11 @@ const SOURCE_ROOT_FIXED_LEAK_PATHS = [
   ".abiogenesis",
   ".bloop",
   ".genesis",
-  ".metals",
   ".scala-build",
   "build_tenants/scala_spark",
   "target"
 ];
+const SOURCE_ROOT_EXTERNAL_TOOLING_PATHS = [".metals"];
 
 function sourceRootLeakPaths() {
   const paths = new Set(SOURCE_ROOT_FIXED_LEAK_PATHS);
@@ -345,6 +347,14 @@ function snapshotSourceRootHygiene() {
   return snapshot;
 }
 
+function snapshotSourceRootExternalTooling() {
+  const snapshot = {};
+  for (const relativePath of SOURCE_ROOT_EXTERNAL_TOOLING_PATHS) {
+    snapshot[relativePath] = latestMtimeMs(path.join(REPO_ROOT, relativePath));
+  }
+  return snapshot;
+}
+
 function assertSourceRootHygieneUnchanged(baseline, archiveRoot, label) {
   const current = snapshotSourceRootHygiene();
   const offenders = [];
@@ -362,6 +372,7 @@ function assertSourceRootHygieneUnchanged(baseline, archiveRoot, label) {
     repoRoot: REPO_ROOT,
     baseline,
     current,
+    externalToolingExceptions: snapshotSourceRootExternalTooling(),
     offenders
   });
   assert.deepEqual(
@@ -493,7 +504,7 @@ test(
       );
       const currentEdge = gaps.projection.currentEdge;
       steps.push({ step, phase: "gaps", ...edgeSummary(gaps) });
-      if (currentEdge === null || currentEdge === "qualify_testcase_authority") {
+      if (currentEdge === null) {
         break;
       }
       if (currentEdge === FG_CONFORM_PROJECT) {
@@ -520,7 +531,7 @@ test(
           "--until",
           "first_traversal",
           "--worker",
-          "process://claude"
+          WORKER_TRANSPORT
         ],
         workspace,
         archiveRoot,

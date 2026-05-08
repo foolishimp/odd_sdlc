@@ -2,8 +2,11 @@
 // Implements: REQ-F-ODDSDLC-035
 
 import {
+  constructConstructionPriorityRule,
+  constructConstructionPriorityScheme,
   deriveRuntimeAggregateProjection,
   materializeGraphFunction,
+  type ConstructionPriorityScheme,
   type ExecutionBasis,
   type GraphFunction,
   type GraphVector,
@@ -22,6 +25,10 @@ import {
   constructSdlcGtlModule,
   type SdlcGraphFunctionCatalog
 } from "../graph/index.js";
+import {
+  deriveOddSdlcConstructionEvaluatorReport,
+  type OddSdlcConstructionEvaluatorReport
+} from "../runtime/index.js";
 import type {
   SdlcConformProjectReport,
   SdlcWorkspaceIngressReport
@@ -85,10 +92,18 @@ export interface SdlcGapDossier {
   readonly kind: "sdlc_gap_dossier";
   readonly readOnly: true;
   readonly choosesNextTraversal: false;
+  readonly rankingAuthority: "abiogenesis_construction_priority_projection";
+  readonly localRankingAuthority: false;
   readonly edge: string | null;
   readonly status: SdlcGapStatus;
   readonly evidenceRefs: readonly string[];
   readonly triageInput: string;
+  readonly evaluatorProjectionRef: string | null;
+  readonly prioritySchemeRef: string | null;
+  readonly bestActionRef: string | null;
+  readonly bestGraphFunctionRef: string | null;
+  readonly bestGraphVectorRef: string | null;
+  readonly rankingReasonRefs: readonly string[];
   readonly nextLawfulActions: readonly string[];
 }
 
@@ -434,23 +449,135 @@ export function deriveSdlcGapDossier(input: {
   readonly events: readonly RuntimeEvent[];
   readonly triageInput: string;
   readonly evidenceRefs: readonly string[];
+  readonly priorityScheme?: ConstructionPriorityScheme;
 }): SdlcGapDossier {
   const gaps = projectSdlcGapsFromReplay({
     basis: input.basis,
     events: input.events
   });
+  const evaluator =
+    gaps.nextVectorIndex === null
+      ? null
+      : deriveSdlcGapEvaluator(
+          {
+            basis: input.basis,
+            events: input.events,
+            vectorIndex: gaps.nextVectorIndex,
+            closedVectorIndexes: gaps.closedVectorIndexes,
+            triageInput: input.triageInput,
+            evidenceRefs: input.evidenceRefs
+          },
+          input.priorityScheme
+        );
   return Object.freeze({
     kind: "sdlc_gap_dossier",
     readOnly: true,
     choosesNextTraversal: false,
+    rankingAuthority: "abiogenesis_construction_priority_projection",
+    localRankingAuthority: false,
     edge: gaps.currentEdge,
     status: gaps.status,
     evidenceRefs: Object.freeze([...input.evidenceRefs]),
     triageInput: input.triageInput,
+    evaluatorProjectionRef: evaluator?.priorityProjection.projectionRef ?? null,
+    prioritySchemeRef: evaluator?.priorityProjection.prioritySchemeRef ?? null,
+    bestActionRef: evaluator?.selectedPriorityRow?.actionRef ?? null,
+    bestGraphFunctionRef: evaluator?.bestGraphFunctionRef ?? null,
+    bestGraphVectorRef: evaluator?.bestGraphVectorRef ?? null,
+    rankingReasonRefs: Object.freeze(
+      evaluator?.selectedPriorityRow?.rankReasonRefs ?? []
+    ),
     nextLawfulActions: Object.freeze(
-      gaps.status === "converged"
-        ? ["close_or_reprice"]
-        : ["review_dossier", "triage_gap", "start_declared_target"]
+      evaluator === null ? ["close_or_reprice"] : evaluator.nextLawfulActionRefs
+    )
+  });
+}
+
+function deriveSdlcGapEvaluator(
+  input: {
+    readonly basis: ExecutionBasis;
+    readonly events: readonly RuntimeEvent[];
+    readonly vectorIndex: number;
+    readonly closedVectorIndexes: readonly number[];
+    readonly triageInput: string;
+    readonly evidenceRefs: readonly string[];
+  },
+  priorityScheme?: ConstructionPriorityScheme
+): OddSdlcConstructionEvaluatorReport {
+  const vector = input.basis.graph.vectors[input.vectorIndex];
+  if (vector === undefined) {
+    throw new TypeError("SdlcGapDossier evaluator requires a published graph vector");
+  }
+  const closedVectorIndexSet = new Set(input.closedVectorIndexes);
+  const candidateVectors = input.basis.graph.vectors
+    .map((candidate, index) => Object.freeze({ candidate, index }))
+    .filter(({ index }) => !closedVectorIndexSet.has(index));
+  const targetOutcomeRefs = Object.freeze(
+    candidateVectors.map(
+      ({ candidate }) =>
+        `outcome://odd-sdlc/${input.basis.graphFunction.id}/${candidate.target.id}`
+    )
+  );
+  const currentTargetOutcomeRef =
+    `outcome://odd-sdlc/${input.basis.graphFunction.id}/${vector.target.id}`;
+  const effectivePriorityScheme =
+    priorityScheme ??
+    constructConstructionPriorityScheme({
+      schemeRef:
+        `priority-scheme://odd-sdlc/default-follow-graph/${input.basis.graphFunction.id}/${vector.id}`,
+      sourcePolicyRef: "policy://odd-sdlc/default-follow-graph",
+      rules: Object.freeze([
+        constructConstructionPriorityRule({
+          priorityRuleRef:
+            `priority-rule://odd-sdlc/default-follow-graph/${input.basis.graphFunction.id}/${vector.id}`,
+          axis: "gap_repair",
+          weight: 100,
+          appliesToActionKinds: Object.freeze(["continue_graph_call"]),
+          appliesToOutcomeRefs: Object.freeze([currentTargetOutcomeRef]),
+          sourcePolicyRef: "policy://odd-sdlc/default-follow-graph",
+          strategyLabel: "follow_current_graph_edge"
+        })
+      ])
+    });
+  return deriveOddSdlcConstructionEvaluatorReport({
+    basis: input.basis,
+    events: input.events,
+    episodeId: `construction-episode://odd-sdlc/gaps/${input.basis.graphFunction.id}`,
+    observationId: `construction-observation://odd-sdlc/gaps/${input.basis.graphFunction.id}/${input.vectorIndex}/${input.events.length}`,
+    priorityScheme: effectivePriorityScheme,
+    pressures: Object.freeze([
+      {
+        pressureRef: `pressure://odd-sdlc/gap/${input.basis.graphFunction.id}/${vector.id}`,
+        pressureKind: "gap_row",
+        sourceRef: `sdlc-gap-dossier://odd-sdlc/${input.triageInput}`,
+        affectedAssetRefs: Object.freeze(
+          candidateVectors.map(({ candidate }) => candidate.target.id)
+        ),
+        targetOutcomeRefs,
+        evidenceRefs: input.evidenceRefs,
+        severity: 1
+      }
+    ]),
+    actions: Object.freeze(
+      candidateVectors.map(({ candidate }) => {
+        const targetOutcomeRef =
+          `outcome://odd-sdlc/${input.basis.graphFunction.id}/${candidate.target.id}`;
+        const publishedTraversalTargetRef =
+          `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${candidate.id}`;
+        return {
+          actionKind: "continue_graph_call" as const,
+          graphFunctionRef: input.basis.graphFunction.id,
+          graphVectorRef: candidate.id,
+          publishedTraversalTargetRef,
+          targetOutcomeRef,
+          inputAssetRefs: Object.freeze(candidate.source.map((node) => node.id)),
+          expectedOutputAssetRefs: Object.freeze([candidate.target.id]),
+          requiredAuthorityRefs: Object.freeze([publishedTraversalTargetRef]),
+          eligibleReasonRefs: Object.freeze([
+            "odd_sdlc_gap_dossier_read_only_evaluator_view"
+          ])
+        };
+      })
     )
   });
 }

@@ -12,7 +12,7 @@ affected_boundary: TypeScript CLI/install adapter, installed workspace normaliza
 priority: medium
 triaged_at: 2026-04-26
 created_at: 2026-04-26
-updated_at: 2026-05-07
+updated_at: 2026-05-08
 dependencies:
   - T-087 completed first-traversal induction packet
   - T-088 completed
@@ -40,6 +40,7 @@ dependencies:
   - T-110 completed ABG 3.5 traced callout proof
   - T-122 active feature scope carrier closure correction
   - T-123 active traversal strategy authority correction
+  - T-129 active ABG 3.7 F_P construction evaluator substrate migration
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -137,6 +138,26 @@ ticket claim is not lawful because:
 RC cannot close until T-122 proves feature-scope derivation and assurance
 filtering through deterministic tests plus live data_mapper handoff evidence that
 actually carries the scope and strategy carriers.
+
+## Current Blocker Addendum - T-129 - 2026-05-08
+
+T-129 is now an RC-adjacent migration blocker for truthful next-action and gap
+reporting. It does not by itself close the RC lane.
+
+RC closure expectation update:
+
+- RC reports and `gaps` output must render the ABG construction evaluator
+  projection or an explicitly scoped read model over it. They must not preserve
+  a separate local blocker ranking or next-action selector.
+- Installed traversal is not yet evaluator-driven end to end. T-129 explicitly
+  defers runner-level consumption of admitted construction intent to ABG T-128;
+  T-041 must not claim that behavior until it exists and odd_sdlc consumes it.
+- A successful data_mapper RC proof must still come from the production
+  installed operator path with live worker evidence, admitted runtime facts,
+  and truthful postmortem archives.
+- If the live run reaches a public-gaps/evaluator divergence, that divergence
+  is read-only evidence unless an ABG-owned runner/admitted-intent surface
+  consumes the selected action.
 
 ## Current Blocker Addendum - 2026-05-07
 

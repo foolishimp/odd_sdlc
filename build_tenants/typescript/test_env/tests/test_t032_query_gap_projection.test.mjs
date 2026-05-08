@@ -143,11 +143,23 @@ test("T-032 gaps and dossiers read ABI replay truth without emitting events", ()
   assert.equal(partial.currentEdge, "derive_product_surface");
   assert.equal(dossier.edge, "derive_product_surface");
   assert.equal(dossier.choosesNextTraversal, false);
-  assert.deepStrictEqual(dossier.nextLawfulActions, [
-    "review_dossier",
-    "triage_gap",
-    "start_declared_target"
-  ]);
+  assert.equal(
+    dossier.rankingAuthority,
+    "abiogenesis_construction_priority_projection"
+  );
+  assert.equal(dossier.localRankingAuthority, false);
+  assert.match(dossier.evaluatorProjectionRef, /^construction-priority-projection:/);
+  assert.equal(dossier.bestGraphFunctionRef, basis.graphFunction.id);
+  assert.equal(
+    dossier.bestGraphVectorRef,
+    basis.graph.vectors[1].id
+  );
+  assert.deepStrictEqual(dossier.nextLawfulActions, [dossier.bestActionRef]);
+  assert(
+    dossier.rankingReasonRefs.some((ref) =>
+      ref.includes("priority-rule://odd-sdlc/default-follow-graph/")
+    )
+  );
 });
 
 test("T-032 span analysis supports bounded edge selectors and rejects invalid spans", () => {

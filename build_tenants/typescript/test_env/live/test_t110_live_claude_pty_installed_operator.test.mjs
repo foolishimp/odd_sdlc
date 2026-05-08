@@ -1,5 +1,5 @@
 // Validates: T-110
-// Validates: ABG-3.6-live-Claude-PTY-installed-operator
+// Validates: ABG-3.7-live-Claude-PTY-installed-operator
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -26,7 +26,7 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const EXPECTED_ABG_VERSION = "3.6.0-rc.1";
+const EXPECTED_ABG_VERSION = "3.7.0-rc.1";
 const EXPECTED_FALLBACK_CONFIG_DIGEST =
   "sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T110_LIVE"] === "1";
@@ -57,7 +57,7 @@ function makeWorkspace(root) {
     [
       "# T-110 Live Claude PTY Fixture",
       "",
-      "This workspace proves the installed odd_sdlc TypeScript operator can invoke Claude through the ABG 3.6 pty-terminal callout substrate."
+      "This workspace proves the installed odd_sdlc TypeScript operator can invoke Claude through the ABG 3.7 pty-terminal callout substrate."
     ].join("\n"),
     "utf8"
   );
@@ -84,7 +84,7 @@ function makeWorkspace(root) {
     [
       "# Goals",
       "",
-      "- prove ABG 3.6 pty-terminal execution through process://claude",
+      "- prove ABG 3.7 pty-terminal execution through process://claude",
       "- preserve trace evidence without requiring an exact Claude prose response"
     ].join("\n"),
     "utf8"

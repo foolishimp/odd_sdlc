@@ -144,7 +144,12 @@ function normalizeAttributeCandidate(input: {
   const name =
     stringFromRecord(record, ["name", "attribute", "attributeName"]) ??
     (explicitAttributeId === null ? null : attributeNameFromId(explicitAttributeId));
-  const valueType = stringFromRecord(record, ["valueType", "type", "baseType"]);
+  const valueType = stringFromRecord(record, [
+    "valueType",
+    "type",
+    "typeRef",
+    "baseType"
+  ]);
   if (name === null || valueType === null) {
     return input.candidate;
   }
@@ -158,6 +163,8 @@ function normalizeAttributeCandidate(input: {
     ? record["invariantRefs"]
     : Array.isArray(record["requirementRefs"])
       ? record["requirementRefs"]
+      : Array.isArray(record["requirementIds"])
+        ? record["requirementIds"]
       : [];
   return Object.freeze({
     kind: "sdlc_domain_attribute" as const,
@@ -183,7 +190,9 @@ function normalizeAttributeCardinalityCandidate(
     normalized === "1..1" ||
     normalized === "required" ||
     normalized === "single" ||
-    normalized === "exactly-one"
+    normalized === "exactly-one" ||
+    normalized === "one-to-one" ||
+    normalized === "1-to-1"
   ) {
     return "one";
   }
@@ -191,6 +200,8 @@ function normalizeAttributeCardinalityCandidate(
     normalized === "optional" ||
     normalized === "0..1" ||
     normalized === "zero-or-one" ||
+    normalized === "zero-to-one" ||
+    normalized === "0-to-1" ||
     normalized === "maybe"
   ) {
     return "optional";
@@ -202,12 +213,40 @@ function normalizeAttributeCardinalityCandidate(
     normalized === "1..*" ||
     normalized === "zero-or-more" ||
     normalized === "one-or-more" ||
+    normalized === "zero-to-many" ||
+    normalized === "one-to-many" ||
+    normalized === "0-to-many" ||
+    normalized === "1-to-many" ||
     normalized === "list" ||
-    normalized === "set"
+    normalized === "set" ||
+    normalized === "array" ||
+    normalized === "collection"
   ) {
     return "many";
   }
   return input;
+}
+
+function normalizeEntityOwnershipCandidate(input: {
+  readonly ownership: string;
+  readonly moduleName: string;
+}): string {
+  const normalized = slugPart(input.ownership);
+  const moduleSlug = slugPart(input.moduleName);
+  if (normalized === "owned") {
+    return "owned";
+  }
+  if (normalized === "referenced") {
+    return "referenced";
+  }
+  if (
+    normalized === moduleSlug ||
+    normalized === `module-${moduleSlug}` ||
+    normalized === `owner-${moduleSlug}`
+  ) {
+    return "owned";
+  }
+  return input.ownership;
 }
 
 function normalizeEntityCandidate(input: {
@@ -247,17 +286,15 @@ function normalizeEntityCandidate(input: {
   if (record === null) {
     return input.candidate;
   }
-  if (record["kind"] === "sdlc_domain_entity") {
-    return input.candidate;
-  }
   const entityName = stringFromRecord(record, ["entityId", "name", "entity"]);
   if (entityName === null) {
     return input.candidate;
   }
+  const moduleName = optionalString(record["moduleName"]) ?? input.moduleName;
   const attributes = Array.isArray(record["attributes"])
     ? record["attributes"].map((attribute) =>
         normalizeAttributeCandidate({
-          moduleName: input.moduleName,
+          moduleName,
           entityName,
           candidate: attribute
         })
@@ -273,18 +310,22 @@ function normalizeEntityCandidate(input: {
         })
         .map((attribute) =>
           normalizeAttributeCandidate({
-            moduleName: input.moduleName,
+            moduleName,
             entityName,
             candidate: attribute
           })
         );
+  const ownership = normalizeEntityOwnershipCandidate({
+    ownership: optionalString(record["ownership"]) ?? "owned",
+    moduleName
+  });
   return Object.freeze({
     kind: "sdlc_domain_entity" as const,
     entityId: entityName.startsWith("entity:")
       ? entityName
-      : `entity:${slugPart(input.moduleName)}.${slugPart(entityName)}`,
-    moduleName: optionalString(record["moduleName"]) ?? input.moduleName,
-    ownership: optionalString(record["ownership"]) ?? "owned",
+      : `entity:${slugPart(moduleName)}.${slugPart(entityName)}`,
+    moduleName,
+    ownership,
     attributes: Object.freeze(attributes),
     invariants: Array.isArray(record["invariants"]) ? record["invariants"] : Object.freeze([]),
     sourceAssetRefs: Array.isArray(record["sourceAssetRefs"])
@@ -367,10 +408,7 @@ function normalizeStateDiagramCandidate(input: {
   readonly defaultModuleName: string;
 }): unknown {
   const record = mutableRecord(input.candidate);
-  if (
-    record === null ||
-    record["kind"] === "sdlc_module_state_diagram_fragment"
-  ) {
+  if (record === null) {
     return input.candidate;
   }
   const entityId = stringFromRecord(record, ["entityId", "entity", "name"]);
@@ -385,7 +423,9 @@ function normalizeStateDiagramCandidate(input: {
     entityId,
     stateless:
       typeof record["stateless"] === "boolean" ? record["stateless"] : false,
-    states: Array.isArray(record["states"]) ? record["states"] : Object.freeze([]),
+    states: Array.isArray(record["states"])
+      ? Object.freeze(record["states"].map(normalizeStateCandidate))
+      : Object.freeze([]),
     transitions: Array.isArray(record["transitions"])
       ? Object.freeze(
           record["transitions"].map((transition) =>
@@ -402,10 +442,24 @@ function normalizeStateDiagramCandidate(input: {
   });
 }
 
-function normalizedAggregateEntityCandidate(input: unknown): unknown {
-  const record = mutableRecord(input);
-  if (record === null || record["kind"] === "sdlc_aggregate_domain_entity") {
+function normalizeStateCandidate(input: unknown): unknown {
+  if (typeof input === "string") {
     return input;
+  }
+  const record = mutableRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return stringFromRecord(record, ["stateId", "id", "name", "state"]) ?? input;
+}
+
+function normalizedAggregateEntityCandidate(input: {
+  readonly candidate: unknown;
+  readonly aggregateAttributes: readonly unknown[];
+}): unknown {
+  const record = mutableRecord(input.candidate);
+  if (record === null) {
+    return input.candidate;
   }
   const entityId = stringFromRecord(record, ["entityId", "id", "name"]);
   const ownerModuleName = stringFromRecord(record, [
@@ -413,23 +467,35 @@ function normalizedAggregateEntityCandidate(input: unknown): unknown {
     "moduleName"
   ]);
   if (entityId === null || ownerModuleName === null) {
-    return input;
+    return input.candidate;
   }
+  const attributes = Array.isArray(record["attributes"])
+    ? record["attributes"]
+    : input.aggregateAttributes.filter((attribute) => {
+        const attributeRecord = mutableRecord(attribute);
+        if (attributeRecord === null) {
+          return false;
+        }
+        const owner = stringFromRecord(attributeRecord, [
+          "entityId",
+          "entity",
+          "entityName"
+        ]);
+        return owner === entityId || slugPart(owner ?? "") === slugPart(entityId);
+      });
   return Object.freeze({
     kind: "sdlc_aggregate_domain_entity" as const,
     entityId,
     ownerModuleName,
-    attributes: Array.isArray(record["attributes"])
-      ? Object.freeze(
-          record["attributes"].map((attribute) =>
-            normalizeAttributeCandidate({
-              moduleName: ownerModuleName,
-              entityName: entityId,
-              candidate: attribute
-            })
-          )
-        )
-      : Object.freeze([]),
+    attributes: Object.freeze(
+      attributes.map((attribute) =>
+        normalizeAttributeCandidate({
+          moduleName: ownerModuleName,
+          entityName: entityId,
+          candidate: attribute
+        })
+      )
+    ),
     sourceModuleNames: Array.isArray(record["sourceModuleNames"])
       ? record["sourceModuleNames"]
       : Object.freeze([ownerModuleName])
@@ -481,7 +547,7 @@ function normalizedAggregateOperationCandidate(input: {
   readonly entities: readonly SdlcAggregateDomainEntity[];
 }): unknown {
   const record = mutableRecord(input.candidate);
-  if (record === null || record["kind"] === "sdlc_domain_operation") {
+  if (record === null) {
     return input.candidate;
   }
   const moduleName = stringFromRecord(record, [
@@ -500,9 +566,13 @@ function normalizedAggregateOperationCandidate(input: {
   const signature = optionalString(record["signature"]);
   const inputEntityIds = Array.isArray(record["inputEntityIds"])
     ? record["inputEntityIds"]
+    : Array.isArray(record["inputs"])
+      ? record["inputs"]
     : signatureEntityIds({ signature, entityIds, side: "input" });
   const outputEntityIds = Array.isArray(record["outputEntityIds"])
     ? record["outputEntityIds"]
+    : Array.isArray(record["outputs"])
+      ? record["outputs"]
     : signatureEntityIds({ signature, entityIds, side: "output" });
   const operationEntityIds = new Set([...inputEntityIds, ...outputEntityIds]);
   const requiredAttributeIds = Array.isArray(record["requiredAttributeIds"])
@@ -577,12 +647,16 @@ function normalizeAggregateDomainModelCandidate(input: unknown): unknown {
   if (record === null) {
     return input ?? null;
   }
-  if (record["kind"] === "sdlc_aggregate_domain_model") {
-    return input;
-  }
   const entities = Object.freeze(
     (Array.isArray(record["entities"]) ? record["entities"] : [])
-      .map(normalizedAggregateEntityCandidate)
+      .map((entity) =>
+        normalizedAggregateEntityCandidate({
+          candidate: entity,
+          aggregateAttributes: Array.isArray(record["attributes"])
+            ? record["attributes"]
+            : Object.freeze([])
+        })
+      )
       .filter((entity): entity is SdlcAggregateDomainEntity => {
         const entityRecord = mutableRecord(entity);
         return entityRecord?.["kind"] === "sdlc_aggregate_domain_entity";
@@ -624,17 +698,27 @@ function normalizeAxisVerdictCandidate(input: {
     return input.candidate;
   }
   if (record["kind"] === "sdlc_design_completeness_axis_verdict") {
-    const status = optionalString(record["status"]);
-    if (status === null) {
-      return input.candidate;
-    }
+    const status =
+      stringFromRecord(record, ["status", "verdict"]) ?? "partial";
     const normalizedStatus = normalizeCompletenessStatusCandidate(status);
-    return normalizedStatus === status
-      ? input.candidate
-      : Object.freeze({
-          ...record,
-          status: normalizedStatus
-        });
+    const rationale = stringFromRecord(record, ["rationale", "reason", "summary"]);
+    const reasons = Array.isArray(record["reasons"])
+      ? record["reasons"]
+      : rationale === null
+        ? Object.freeze([])
+        : Object.freeze([rationale]);
+    const evidenceRefs = Array.isArray(record["evidenceRefs"])
+      ? record["evidenceRefs"]
+      : Array.isArray(record["sourceAssetRefs"])
+        ? record["sourceAssetRefs"]
+        : Object.freeze([]);
+    return Object.freeze({
+      kind: "sdlc_design_completeness_axis_verdict" as const,
+      axis: optionalString(record["axis"]) ?? input.axis,
+      status: normalizedStatus,
+      reasons,
+      evidenceRefs
+    });
   }
   const status = normalizeCompletenessStatusCandidate(
     stringFromRecord(record, ["status", "verdict"]) ?? "partial"
@@ -684,23 +768,24 @@ function normalizeCompletenessVerdictCandidate(input: unknown): unknown {
   if (record === null) {
     return input ?? null;
   }
-  if (record["kind"] === "sdlc_design_completeness_verdict") {
-    return input;
-  }
+  const axisVerdicts = mutableRecord(record["axisVerdicts"]);
   return Object.freeze({
     kind: "sdlc_design_completeness_verdict" as const,
     verdictVersion: "ts-design-depth-v1" as const,
     entity: normalizeAxisVerdictCandidate({
       axis: "entity",
-      candidate: record["entity"] ?? record["entityAxis"]
+      candidate: record["entity"] ?? record["entityAxis"] ?? axisVerdicts?.["entity"]
     }),
     attribute: normalizeAxisVerdictCandidate({
       axis: "attribute",
-      candidate: record["attribute"] ?? record["attributeAxis"]
+      candidate:
+        record["attribute"] ??
+        record["attributeAxis"] ??
+        axisVerdicts?.["attribute"]
     }),
     flow: normalizeAxisVerdictCandidate({
       axis: "flow",
-      candidate: record["flow"] ?? record["flowAxis"]
+      candidate: record["flow"] ?? record["flowAxis"] ?? axisVerdicts?.["flow"]
     })
   });
 }

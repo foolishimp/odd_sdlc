@@ -1,11 +1,11 @@
 ---
 id: T-129
-title: Migrate odd_sdlc TypeScript to ABG 3.7.0-rc.1 F_P consciousness evaluator substrate
+title: Migrate odd_sdlc TypeScript to ABG 3.7.1-rc.1 evaluator and liveness observer substrate
 type: migration
 ticket_category: implementation_migration
 status: active
 goal: typescript-rc-runtime-architecture
-change_intent: Reprice active T-129 from the ABG 3.6.0-rc.1 temporal/runtime checkpoint to ABG 3.7.0-rc.1 after the v3.7.0-rc.1 release cut, and consume the current temporal/runtime/F_P consciousness evaluator/public-gaps contract without creating odd_sdlc-local shadow truth.
+change_intent: Reprice active T-129 from the ABG 3.7.0-rc.1 construction-evaluator checkpoint to ABG 3.7.1-rc.1 after the v3.7.1-rc.1 release cut, and consume the current temporal/runtime/F_P consciousness evaluator/public-gaps/liveness-observer contract without creating odd_sdlc-local shadow truth.
 change_class: design_reframe
 re_entry_point: design
 affected_boundary:
@@ -24,7 +24,7 @@ triaged_at: 2026-05-06
 created_at: 2026-05-06
 updated_at: 2026-05-08
 completed_at: null
-review_status: implemented_deterministic_and_t110_live_pending_review
+review_status: live_evaluator_projection_proven_runner_level_consumption_deferred
 owning_repo: odd_sdlc
 governance_scope: STDO Method
 governance_scope_expansion:
@@ -33,6 +33,8 @@ governance_scope_expansion:
   - D: DESIGN_MODULE_METHOD.md
   - O: ODD_METHOD.md
 dependencies:
+  - ABG release cut v3.7.1-rc.1
+  - ABG T-129 completed system probe observer liveness law
   - ABG release cut v3.7.0-rc.1
   - ABG T-127 generic F_P consciousness evaluator substrate
   - ABG T-128 post-3.7 runner-level construction intent execution follow-up
@@ -48,11 +50,11 @@ related_tickets:
   - ABG T-128 realize F_P consciousness runner over admitted construction intent
 library_usage: consume
 migration_strategy: consume_current_abg_release_line_without_local_runtime_shadow
-governing_library: ABG 3.7.0-rc.1 TypeScript temporal/runtime/F_P consciousness evaluator substrate
-intake_source: Current sibling ABIogenesis TypeScript source reports 3.7.0-rc.1 at commit b3182fe on branch rc/3.7.0 with tag v3.7.0-rc.1; prior T-129 3.6.0-rc.1 proof is historical checkpoint evidence, not current closure proof.
-target_truth: odd_sdlc TypeScript consumes ABG 3.7.0-rc.1 as the sole substrate for runtime events, temporal/time-related replay truth, actor/worker process facts, successful terminal session identity, plugin traversal prompt materialization truth, installed ABG fallback config, and the ABG F_P construction evaluator/public-gaps read-only ranking surface where odd_sdlc projects gap or next-action previews. odd_sdlc keeps SDLC domain policy, handoff, postflight, gap dossier, repair-prompt packaging, and operator-facing read-model semantics.
-superseded_truth: T-129 remains only a closed ABG 3.5.0-rc.2 or 3.6.0-rc.1 checkpoint, the active design contract still names RC2/3.6 as the current target, odd_sdlc consumes temporal/runtime/evaluator behavior through local shadow code instead of ABG substrate truth, or public gaps/next-action ranking is rebuilt in odd_sdlc when ABG 3.7 evaluator truth is available.
-closure_law: Close only when odd_sdlc TypeScript lock/design/test/live surfaces name and consume ABG 3.7.0-rc.1, installed workspaces prove the ABG fallback config is present and refresh-safe, successful PTY terminalSessionId is projected from ABG runtime event truth into odd_sdlc operator evidence, temporal/time-related substrate boundaries are documented as ABG-owned, ABG 3.7 F_P construction evaluator/public-gaps truth is either consumed as the one ranking surface or explicitly declared out of scope for a given odd_sdlc view, and deterministic plus live installed lanes pass.
+governing_library: ABG 3.7.1-rc.1 TypeScript temporal/runtime/F_P consciousness evaluator and liveness observer substrate
+intake_source: Current sibling ABIogenesis TypeScript source reports 3.7.1-rc.1 after the ABG T-129 system probe observer liveness law cut; prior 3.7.0-rc.1 evaluator proof remains historical checkpoint evidence, not current closure proof.
+target_truth: odd_sdlc TypeScript consumes ABG 3.7.1-rc.1 as the sole substrate for runtime events, temporal/time-related replay truth, actor/worker process facts, successful terminal session identity, plugin traversal prompt materialization truth, installed ABG fallback config, ABG F_P construction evaluator/public-gaps read-only ranking truth, and ABG RuntimeLivenessObserverProjection where odd_sdlc renders or governs runtime liveness, inactivity, timeout, interruption, retry, or continuation. odd_sdlc keeps SDLC domain policy, handoff, postflight, gap dossier, repair-prompt packaging, and operator-facing read-model semantics.
+superseded_truth: T-129 remains only a closed ABG 3.5.0-rc.2, 3.6.0-rc.1, or 3.7.0-rc.1 checkpoint, the active design contract still names an older ABG release as the current target, odd_sdlc consumes temporal/runtime/evaluator/liveness behavior through local shadow code instead of ABG substrate truth, public gaps/next-action ranking is rebuilt in odd_sdlc when ABG evaluator truth is available, or worker liveness is inferred from local flat timeout/silence when ABG RuntimeLivenessObserverProjection is available.
+closure_law: Close only when odd_sdlc TypeScript lock/design/test/live surfaces name and consume ABG 3.7.1-rc.1, installed workspaces prove the ABG fallback config is present and refresh-safe, successful PTY terminalSessionId is projected from ABG runtime event truth into odd_sdlc operator evidence, temporal/time-related substrate boundaries are documented as ABG-owned, ABG 3.7 F_P construction evaluator/public-gaps truth is consumed as the one ranking/action-decision surface or explicitly declared out of scope for a given odd_sdlc view, ABG 3.7.1 RuntimeLivenessObserverProjection is consumed or relayed wherever odd_sdlc presents runtime liveness/interruption/timeout disposition, no second live path drives evaluator interpretation, action selection, or liveness decisions, and deterministic plus live installed lanes pass.
 non_closure_conditions:
   - Claiming migration by relying on a file dependency while package-lock, installed package metadata, design, or live proof still records 3.5.0-rc.2 or 3.6.0-rc.1 as the current target.
   - Updating docs/version strings without running the installed TypeScript installer proof.
@@ -61,13 +63,19 @@ non_closure_conditions:
   - Allowing odd_sdlc-local worker archives to compete with ABG trace/archive authority.
   - Adding odd_sdlc-local timer, schedule, or wall-clock authority instead of consuming ABG temporal substrate truth.
   - Rebuilding public gaps, repair-route ranking, next-action priority, or bootstrap induction as odd_sdlc-local controller logic when the ABG 3.7 evaluator surface is the declared authority.
-  - Claiming ABG T-128 installed construction-runner behavior as available through 3.7.0-rc.1; T-128 is post-3.7 and not part of this migration target.
+  - Preserving more than one live action-decision path for the same evaluator boundary: public gaps, query-domain, installed operator, repair/reentry, and RC reporting must consume the same ABG construction evaluator projection or explicitly declare the view out of scope.
+  - Claiming ABG T-128 installed construction-runner behavior as available through 3.7.1-rc.1; T-128 remains separate runner-level construction-intent execution work and is not part of this migration target.
+  - Claiming installed evaluator-driven traversal is closed when the installed runner still executes sequential/current-edge traversal rather than consuming an admitted ABG construction intent, unless that runner-level behavior is explicitly deferred to ABG T-128 and scoped out of T-129 closure.
+  - Implementing an odd_sdlc-local traversal decider to make the installed runner follow public-gaps evaluator output instead of consuming an ABG-owned T-128 runner/admitted construction-intent surface.
+  - Letting a parent-process flat timeout, local worker silence rule, transcript polling loop, or harness timer become liveness/retry/block authority when ABG RuntimeLivenessObserverProjection and typed interruption evidence are available.
+  - Treating ABG 3.7.0-rc.1 version assertions as acceptable after the 3.7.1-rc.1 release cut.
   - Breaking the T-124 default sibling ABG source-root behavior.
 proof_commands:
   - npm install
   - npm run build:semantic
   - npm run lint:semantic
   - npm run test:t028
+  - npm run test:t058
   - npm run test:t059
   - npm run test:t129
   - npm run test:t110:abg37-sandbox
@@ -79,7 +87,48 @@ proof_commands:
   - git diff --check
 ---
 
-# T-129: Migrate odd_sdlc TypeScript To ABG 3.7.0-rc.1
+# T-129: Migrate odd_sdlc TypeScript To ABG 3.7.1-rc.1
+
+## Repriced For 3.7.1 Liveness Observer Release - 2026-05-08
+
+T-129 remains the controlling odd_sdlc migration ticket for the ABG 3.7 release
+line. No duplicate odd_sdlc migration ticket is opened.
+
+The ABG `3.7.0-rc.1` checkpoint introduced the F_P construction evaluator and
+read-only public gaps over evaluator truth. ABG `3.7.1-rc.1` is now the current
+release target because it adds T-129 system probe observer liveness law:
+
+```text
+runtime systems + runtime assets -> declared probes -> RuntimeLivenessObserverProjection -> disposition
+```
+
+Current upstream evidence:
+
+- `/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript/package.json`
+  reports `3.7.1-rc.1`.
+- `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-129-define-abg-system-probe-observer-liveness-law.md`
+  records ABG substrate closure for `3.7.1-rc.1`.
+- ABG `3.7.1-rc.1` preserves the 3.7 construction evaluator substrate and adds
+  the replay-derived liveness observer with admitted sensor reset behavior.
+
+Current target:
+
+- refresh odd_sdlc's ABG substrate design contract from `3.7.0-rc.1` to
+  `3.7.1-rc.1`;
+- update dependency, lockfile, installed metadata, and test assertions to the
+  ABG 3.7.1 package identity;
+- preserve the 3.7 evaluator proof as a regression boundary under the 3.7.1
+  package identity;
+- consume or relay ABG `RuntimeLivenessObserverProjection` wherever odd_sdlc
+  renders runtime liveness, interruption, timeout, retry, or continuation
+  disposition;
+- prevent parent-process flat timeouts, transcript polling, local worker
+  silence rules, or harness timers from becoming liveness authority when ABG
+  liveness truth is available;
+- keep odd_sdlc-owned SDLC semantics limited to domain policy, handoff,
+  postflight, gap dossier, repair-prompt packaging, and operator read models;
+- do not claim the ABG T-128 installed construction runner. That is still
+  separate runner-level construction-intent execution work.
 
 ## Repriced For 3.7 Migration - 2026-05-08
 
@@ -250,13 +299,13 @@ change `odd_sdlc` product semantics, steel-thread policy, feature-scope law,
 SDLC domain closure rules, or scheduling policy semantics except where those
 surfaces consume new ABG temporal/event/installer/evaluator truth.
 
-## ABG 3.7 Surfaces To Consume
+## ABG 3.7 / 3.7.1 Surfaces To Consume
 
-ABG `v3.7.0-rc.1` is the current target substrate. This ticket must update the
+ABG `v3.7.1-rc.1` is the current target substrate. This ticket must update the
 odd_sdlc design and proof surfaces against the current ABG release line before
 claiming closure.
 
-Minimum 3.7 migration posture:
+Minimum 3.7.1 migration posture:
 
 - consume ABG as the sole source of runtime events, projection facts,
   continuations, and temporal/time-related substrate truth;
@@ -270,6 +319,11 @@ Minimum 3.7 migration posture:
 - preserve the RC2 PTY `terminalSessionId`, fallback config, and plugin
   observer consumption checks as regression evidence under the 3.7 package
   identity;
+- consume or relay ABG `RuntimeLivenessObserverProjection` for runtime
+  liveness, inactivity, external interruption, controlled termination, retry
+  budget exhaustion, and artifact-salvage-before-retry display;
+- do not add odd_sdlc-local sensor/observer code that competes with ABG probe
+  contracts or liveness projection truth;
 - keep odd_sdlc-owned domain interpretation limited to SDLC policy, handoff,
   postflight, gap dossier, repair-prompt packaging, and operator read-model
   semantics.
@@ -297,11 +351,24 @@ highest-value typed asset gap, candidate graph function/vector, blockers,
 ranking reasons, and repair pressure. It must not append events, admit intent,
 dispatch graph work, synthesize retry context, or own a retry loop.
 
-The evaluator is therefore the single surface that maps current ledger state,
-error state, workspace state, typed asset gaps, and declared policy to a lawful
-next graph-function candidate. odd_sdlc may add SDLC domain meaning to the
-observation rows and to the rendered operator view, but it must not create a
-parallel selector.
+The evaluator is therefore the single surface and single action-decision path
+that maps current ledger state, error state, workspace state, typed asset gaps,
+and declared policy to a lawful next graph-function candidate. odd_sdlc may add
+SDLC domain meaning to the observation rows and to the rendered operator view,
+but it must not create a parallel selector, shadow ranking path, or secondary
+repair/reentry decision path.
+
+The evaluator decision surface must be total over admitted gap states:
+
+- if replay is converged, project a terminal close/reprice disposition;
+- if replay exposes a current `nextVectorIndex` and no stronger admitted
+  priority, affect, repair, reentry, or F_H/F_P route applies, follow the graph
+  by selecting the current graph vector;
+- if a stronger admitted route applies, select the highest-ranked lawful action
+  from the same ABG construction priority projection;
+- if no lawful action can bind, emit a typed blocked/deferred disposition rather
+  than falling back to caller order, lexical tie-breaks, prompt prose, or
+  odd_sdlc-local controller logic.
 
 ### Points Of Impact On odd_sdlc Evaluator Boundaries
 
@@ -485,8 +552,8 @@ ABG `v3.5.0-rc.2` publishes these downstream-relevant changes:
 
 ### F1: Dependency And Design Contract Rebase
 
-Update TypeScript dependency truth and design prose from the historical RC2/3.6
-checkpoints to ABG `3.7.0-rc.1`.
+Update TypeScript dependency truth and design prose from the historical
+RC2/3.6/3.7.0 checkpoints to ABG `3.7.1-rc.1`.
 
 Required surfaces:
 
@@ -495,7 +562,7 @@ Required surfaces:
 - tests and package scripts that assert or advertise the installed ABG line
 
 The package dependency may remain a sibling source `file:` dependency, but the
-lockfile and installed package metadata must record the `3.7.0-rc.1` package
+lockfile and installed package metadata must record the `3.7.1-rc.1` package
 identity after `npm install`.
 
 ### F1a: Temporal Substrate Boundary
@@ -586,6 +653,7 @@ Run from `build_tenants/typescript`:
 npm install
 npm run build:semantic
 npm run lint:semantic
+npm run test:t058
 npm run test:t059
 npm run test:t129
 npm run test:t110:abg37-sandbox
@@ -604,13 +672,15 @@ npm run test:t109:data-mapper-live
 The final closure checkpoint must include:
 
 - exact installed workspace path;
-- ABG package version `3.7.0-rc.1` observed from installed `node_modules`;
+- ABG package version `3.7.1-rc.1` observed from installed `node_modules`;
 - ABG fallback config path and digest;
 - worker process started context path;
 - successful PTY `terminalSessionId`;
 - temporal/runtime substrate boundary evidence;
 - F_P construction evaluator/public-gaps read-only boundary evidence, or an
   explicit out-of-scope statement for views that do not consume that surface;
+- ABG liveness observer evidence, including admitted activity/reset or typed
+  external interruption projection where runtime liveness is rendered;
 - live operator-run archive path;
 - `git diff --check` result.
 
@@ -618,46 +688,296 @@ The final closure checkpoint must include:
 
 This ticket is not closed by a package bump alone. It closes only when
 `odd_sdlc` has proved that its installed operator and installer consume ABG
-`3.7.0-rc.1` runtime/defaults/temporal/evaluator truth while preserving the
+`3.7.1-rc.1` runtime/defaults/temporal/evaluator/liveness truth while preserving the
 product boundary: ABG owns runtime facts, temporal substrate truth, substrate
-config, and the construction evaluator/public-gaps ranking carrier; `odd_sdlc`
-owns SDLC domain interpretation and operator-facing read models.
+config, the construction evaluator/public-gaps ranking carrier, and the runtime
+liveness observer; `odd_sdlc` owns SDLC domain interpretation and
+operator-facing read models.
 
-## Current 3.7 Checklist
+## Current 3.7.1 Checklist
 
 - [ ] Run `npm install` from `build_tenants/typescript` so the lockfile records
-      installed ABG package identity `3.7.0-rc.1`.
+      installed ABG package identity `3.7.1-rc.1`.
 - [ ] Update `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts`
-      from ABG `3.6.0-rc.1` to `3.7.0-rc.1`.
+      from ABG `3.7.0-rc.1` to `3.7.1-rc.1`, preserving the 3.7 evaluator
+      source assumptions and adding the ABG T-129 liveness observer assumption.
 - [ ] Update
+      `build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
+      to name ABG `3.7.1-rc.1` and the
+      `RuntimeLivenessObserverProjection` boundary.
+- [ ] Update package-version assertions in deterministic and live tests,
+      including T-028, T-052, T-102/T-109 ABG sandbox, and T-110 live.
+- [ ] Add focused odd_sdlc proof that ABG runtime activity probe/interruption
+      event kinds are admitted or relayed without odd_sdlc-local liveness
+      authority.
+- [ ] Add focused odd_sdlc proof that an admitted ABG liveness activity row can
+      reset an inactivity disposition in the consumer-facing projection, or
+      explicitly document the first odd_sdlc public surface that remains
+      out-of-scope pending implementation.
+- [ ] Audit installed operator/live harness timeout paths and replace any
+      liveness decision based on flat timeout, transcript silence, or local
+      worker polling with ABG liveness projection consumption, or record a
+      typed external interruption when a harness safety cap fires.
+- [ ] Preserve the already-proven ABG 3.7 evaluator/public-gaps tests under the
+      3.7.1 package identity.
+- [ ] Run deterministic proof: `npm run build:semantic`,
+      `npm run lint:semantic`, `npm run test:t028`, `npm run test:t058`,
+      `npm run test:t059`, `npm run test:t129`,
+      `npm run test:t110:abg37-sandbox`,
+      `npm run test:t102-t110:abg37-sandbox`, `npm run test:semantic`, and
+      `npm run test:sandbox`.
+- [ ] Run live proof: `ODD_SDLC_TS_T110_LIVE=1 npm run test:t110:abg37-live`
+      and `npm run test:t109:data-mapper-live`, or explicitly narrow the live
+      proof for this release cut with operator approval.
+- [ ] Record final installed workspace path, ABG version, fallback config path
+      and digest, liveness projection evidence, terminalSessionId,
+      operator-run archive, and `git diff --check`.
+- [ ] Operator review before closure.
+
+## Historical 3.7.0 Checklist
+
+- [x] Run `npm install` from `build_tenants/typescript` so the lockfile records
+      installed ABG package identity `3.7.0-rc.1`.
+- [x] Update `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts`
+      from ABG `3.6.0-rc.1` to `3.7.0-rc.1`.
+- [x] Update
       `build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
       to name ABG 3.7 and the F_P construction evaluator/public-gaps read-only
       boundary.
-- [ ] Rename or supersede `abg36` fixture/test/script names that are now the
+- [x] Reconcile design-module IACS and structural diagram surfaces so the ABG
+      3.7 construction observation/action/binding/priority carriers appear in
+      the TypeScript tenant boundary.
+- [x] Rename or supersede `abg36` fixture/test/script names that are now the
       active migration lane, or explicitly mark them historical.
-- [ ] Keep the ABG 3.6 temporal/runtime tests as regression coverage under the
+- [x] Keep the ABG 3.6 temporal/runtime tests as regression coverage under the
       ABG 3.7 package identity.
-- [ ] Add focused downstream coverage that odd_sdlc does not rebuild ABG 3.7
-      construction-evaluator ranking in CLI/operator glue.
-- [ ] Audit and either retire or explicitly justify each local iteration-forcing
+- [x] Add focused downstream coverage that query-domain/gaps consumes ABG 3.7
+      construction-evaluator ranking rather than local next-action sorting.
+- [x] Record installed live evidence that public gaps now exposes ABG 3.7
+      construction-priority projection truth and can rank a different lawful
+      candidate than the current sequential ABG edge.
+- [x] Encode the evaluator/read-only/divergence behavior in deterministic
+      assurance: `npm run test:t129` must assert that public gaps is read-only,
+      does not choose traversal, consumes ABG construction-priority projection,
+      and may rank a lawful candidate vector different from the sequential
+      current edge.
+- [x] Encode the total-function default in deterministic assurance:
+      `npm run test:t129` must assert that, absent stronger admitted priority or
+      repair/reentry pressure, public gaps follows the current graph vector even
+      when a later candidate would win a lexical tie-break.
+- [x] Wire Spec Method `gaps` as the single public priority ingress for
+      read-only evaluator customization. `--evaluator-priority-edge <edge-name>`
+      creates a typed ABG construction priority scheme from a published
+      odd_sdlc graph edge, feeds that scheme into `deriveSdlcGapDossier()`, and
+      is rejected outside `gaps` so command adapters cannot accumulate a second
+      action-decision path.
+- [x] Ensure gap candidate openness is derived from ABG replay projection truth,
+      not raw `vector_closed` event scans. `deriveSdlcGapDossier()` and Spec
+      Method priority admission consume `closedVectorIndexes` from
+      `projectSdlcGapsFromReplay()`.
+- [x] Add fail-closed Spec Method coverage for invalid evaluator priority edge
+      selectors: unknown edge, duplicate option, non-`gaps` command, and an
+      already-closed edge from admitted runtime replay truth.
+- [ ] Wire installed traversal to consume the ABG evaluator-selected/admitted
+      construction action, or prove from ABG 3.7 source authority that this is
+      unavailable and must move to ABG T-128. T-129 must not close on public
+      gaps preview alone.
+- [ ] Add installed-operator/runner-level proof that local repair-route
+      iteration is replaced by evaluator-selected/admitted action truth, or is
+      explicitly narrowed as a temporary adapter because ABG 3.7 lacks the
+      required runner surface.
+- [x] Audit and either retire or explicitly justify each local iteration-forcing
       seam listed in "Tech Debt Retirement Opened By This Migration".
-- [ ] Update active T-120, T-123, B-085, B-086, and T-041 closure expectations
+- [x] Update active T-120, T-123, B-085, B-086, and T-041 closure expectations
       where their current implementation depends on local retry/ranking/fold
       behavior superseded by the evaluator-driven model.
-- [ ] Add or update live T-110 assertions to require installed ABG
+- [x] Add or update live T-110 assertions to require installed ABG
       `3.7.0-rc.1`, installed fallback config path/digest, and successful PTY
       terminalSessionId from ABG runtime truth.
-- [ ] Run deterministic proof: `npm run build:semantic`,
+- [x] Run deterministic proof: `npm run build:semantic`,
       `npm run lint:semantic`, `npm run test:t028`, `npm run test:t059`,
       `npm run test:t129`, `npm run test:t110:abg37-sandbox`,
       `npm run test:t102-t110:abg37-sandbox`, `npm run test:semantic`, and
-      `npm run test:sandbox`.
+      `npm run test:sandbox`. Note: `npm run test:t059` passed inside
+      `npm run test:semantic` in this checkpoint rather than as a separate
+      command invocation.
 - [ ] Run live proof: `ODD_SDLC_TS_T110_LIVE=1 npm run test:t110:abg37-live`
       and `npm run test:t109:data-mapper-live`.
 - [ ] Record final installed workspace path, ABG version, fallback config path
       and digest, worker process context path, terminalSessionId, operator-run
       archive, and `git diff --check`.
 - [ ] Operator review before closure.
+
+## 2026-05-08 ABG 3.7 Evaluator Checkpoint
+
+Review findings applied in this checkpoint:
+
+- Durable migration truth now names ABG `3.7.0-rc.1` in the lockfile,
+  substrate contract, design contract, package scripts, and focused test lanes.
+- The active `abg36` deterministic/sandbox/live lane names were renamed to
+  `abg37`; the temporal regression remains covered under the ABG 3.7 package
+  identity.
+- `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts` now
+  exposes an odd_sdlc adapter over ABG construction observation, action catalog,
+  binding, and priority projection carriers. The adapter may create SDLC-domain
+  pressure/action rows, but ABG derives binding and ranking. The adapter now
+  uses a visible `odd_sdlc_construction_evaluator_policy_carrier`
+  source-default policy when no runtime policy is supplied.
+- `deriveSdlcGapDossier()` now carries ABG construction priority projection
+  provenance and reports the selected action/vector/function from that
+  projection instead of a fixed local next-action list. Focused coverage now
+  proves a public gap dossier can rank competing candidate vectors through a
+  supplied ABG construction priority scheme.
+- The TypeScript tenant IACS and structural carrier diagram now name the ABG
+  construction evaluator carriers as consumed substrate surfaces.
+
+Remaining non-closure items:
+
+- Live T-109 evidence now proves the public gaps evaluator is working as a
+  read-only ABG 3.7 ranking surface, but also proves installed traversal is not
+  evaluator-driven end-to-end. At
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T005833001Z_pid86518/step-06-gaps.stdout.json`,
+  the runtime projection reports current edge `derive_uat_testcases_surface`
+  with closed vectors `[0,1,2,3,4]`, while the evaluator projection reports
+  `bestGraphVectorRef: vector:odd_sdlc:derive_design_surface`,
+  `bestActionRef` as
+  `construction-action:graph-function:odd_sdlc:bootstrap_release_self_test:vector:odd_sdlc:derive_design_surface`,
+  `rankingAuthority: abiogenesis_construction_priority_projection`, and
+  `localRankingAuthority: false`. This is valid read-only evaluator behavior,
+  not runner-level consumption.
+- T-129 closure may claim read-only evaluator consumption and installed
+  divergence evidence. It must not claim evaluator-driven installed traversal
+  until ABG T-128 supplies the runner/admitted construction-intent surface and
+  odd_sdlc consumes it.
+- Delivery assurance is part of closure, not optional supporting evidence.
+  `npm run test:t129` must stay green with assertions that the public gap
+  dossier is `readOnly: true`, `choosesNextTraversal: false`, ranked by
+  `abiogenesis_construction_priority_projection`, and able to expose a
+  best-action/current-edge divergence without dispatching work. The assurance
+  surface must confirm there is one evaluator/action-decision path for a given
+  boundary: downstream views may render or defer the ABG evaluator projection,
+  but they must not independently select, rank, or drive graph actions. Full
+  closure still requires reviewed live proof from the installed lanes named
+  below.
+- The same assurance must prove the evaluator decision is total for the default
+  graph case: when no stronger admitted action is present, the selected
+  `bestGraphVectorRef` is the current graph vector, not a lexical or caller
+  order artifact.
+- Installed operator repair/reentry iteration is not yet migrated to the ABG
+  evaluator action-decision surface. Public gaps proves the evaluator projection
+  is available, but installed `start` still runs through the older
+  replay/current-edge iterate path unless repair/reentry events force a graph
+  frontier.
+- The source-default evaluator policy carrier is visible. Installed/runtime
+  policy admission remains follow-up work unless supplied by an already-admitted
+  runtime policy carrier.
+- The broader tech-debt audit across T-120, T-123, B-085, B-086, and T-041 is
+  now recorded in those active tickets. Those tickets should not close claims
+  that depend on local ranking/fold behavior superseded by the evaluator model.
+- Live proof remains outstanding: `ODD_SDLC_TS_T110_LIVE=1 npm run
+  test:t110:abg37-live` has passed for the installed PTY slice. A partial
+  Sonnet 4.6/high T-109 run reached `step-06-gaps` and was intentionally
+  stopped after proving evaluator/runner divergence to avoid further quota use;
+  `npm run test:t109:data-mapper-live` remains outstanding for full closure.
+
+Deterministic proof run in this checkpoint:
+
+- `npm install` passed and refreshed the lockfile to ABG `3.7.0-rc.1`.
+- `npm run build:semantic` passed.
+- `npm run lint:semantic` passed.
+- `npm run test:t028` passed: 3/3.
+- `npm run test:t032` passed: 4/4.
+- `npm run test:t058` passed: 8/8 after adding the Spec Method
+  `--evaluator-priority-edge` proof, the negative assertion that the option is
+  not admitted on `start`, and fail-closed coverage for unknown, duplicate, and
+  already-closed edge selectors.
+- `npm run test:t129` passed: 8/8 after adding visible policy-carrier,
+  public multi-candidate gap ranking coverage, read-only evaluator/current edge
+  divergence assurance, and default follow-graph total-function assurance.
+- `npm run test:t110:abg37-sandbox` passed: 2/2.
+- `npm run test:t102-t110:abg37-sandbox` passed: 5/5 after adding ABG 3.7
+  policy hook metadata to the sandbox/live GTL job/module fixtures.
+- `npm run test:semantic` passed: 271/271 after reconciling T-032 default
+  gap-ranking assurance to the current default follow-graph priority rule and
+  adding T-058 fail-closed selector coverage.
+- `npm run test:sandbox` passed: 15/15.
+- `ODD_SDLC_TS_T110_LIVE=1 npm run test:t110:abg37-live` passed: 1/1.
+  Installed archive:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_claude_pty_installed_operator/20260507T172001231Z_pid19571`.
+  Installed ABG version: `3.7.0-rc.1`. Fallback config digest:
+  `sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245`.
+  Worker process context:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_claude_pty_installed_operator/20260507T172001231Z_pid19571/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260507T172002618Z_pid19571/worker_process_started_context.json`.
+  Successful PTY `terminalSessionId`: `abg-movr4m66-8jbjs4pd7k`.
+
+### Closure Boundary Correction - 2026-05-08
+
+Operator correction: ABG `3.7.0-rc.1` implements the evaluator
+observation-to-action selection surface. The migration target is not merely a
+read-only preview. The read-only `gaps` view is only the operator display of the
+same evaluator decision surface. The installed traversal path must consume the
+evaluator-selected/admitted construction action as the action decision.
+
+Current odd_sdlc code is therefore incomplete for the full T-129 target:
+
+- it consumes `ConstructionPriorityProjection` in public/query gap projection;
+- it does not yet construct/admit a `ConstructionIntentCandidate` as the
+  installed action decision;
+- it does not yet make installed `start` consume that admitted construction
+  intent instead of relying on the current ABG iterate frontier;
+- any claim that this is fully deferred to ABG T-128 must be backed by current
+  ABG 3.7 source authority, not assumed from public-gaps read-only behavior.
+
+The lawful correction is:
+
+```text
+runtime/workspace truth
+  -> construction observation
+  -> lawful action catalog
+  -> binding
+  -> priority/affect
+  -> selected/admitted construction intent
+  -> installed graph action invocation or explicit ABG T-128 blocker
+```
+
+Public `gaps` remains read-only because it must not dispatch work. But the
+selected/admitted construction intent is not "only preview"; it is the single
+action-decision truth that runner-facing code must consume.
+
+Local iteration-forcing seam audit:
+
+- Public `gaps` / query-domain next-action ranking: retired under T-129 by
+  routing `deriveSdlcGapDossier()` through the ABG construction priority
+  projection. The default total-function rule follows the current graph vector
+  when no stronger admitted priority/repair/reentry route applies.
+- Spec Method priority customization: realized only on the `gaps` request
+  surface through `--evaluator-priority-edge <edge-name>`. The option is a
+  domain policy input that ABG projects into priority truth; it is not a local
+  sorter and it is not admitted on `start`. Candidate openness now comes from
+  the ABG-derived `closedVectorIndexes` projection, not a second raw-event
+  closure scan. `nextLawfulActions` in the Spec Method gap dossier remains
+  read-only evaluator preview truth and must not be fed into installed runner
+  control.
+- Package/test lane naming: active ABG 3.6 lane names were replaced by ABG 3.7
+  names; historical 3.6 text remains checkpoint evidence only.
+- Installed operator retry/reentry loop:
+  `executeInstalledOperatorStartWithReentry()` remains the main unresolved
+  migration seam. It must either consume the selected/admitted construction
+  intent or be explicitly blocked on missing ABG T-128 runner support.
+- Repair-route selection from gap dossiers: must become evaluator input and
+  selected/admitted construction intent truth for T-120/B-085, not a local
+  route selector hidden in installed operator fallback logic.
+- Per-edge traversal strategy: deferred to T-123. Strategy rows are product
+  policy/admissibility input to the evaluator, not a second selector.
+- F_D/F_P assurance fold: deferred to B-086. Deterministic ambiguity or alias
+  handling may create evaluator pressure or F_P escalation; it must not force
+  iteration by local failure when source authority did not disambiguate.
+- RC qualification: deferred to T-041. RC reports must render evaluator/gap
+  truth and live proof state, not preserve a local ranked blocker list as
+  decision authority.
+
+The active dependent tickets have been updated with this disposition so T-129's
+read-only evaluator migration does not erase their remaining closure bars.
 
 ## Historical 3.6 Completeness Review - 2026-05-07
 

@@ -1459,7 +1459,8 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
       "The output MUST include a fenced JSON block named component_depth_register.",
       "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, targetAssetType, and componentTopologyRows.",
       "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
-      "Each row MUST name componentId, moduleName, relativePath, publicBoundary, domainCarrier or adapter role, sourceAssetRefs, and requirement ids.",
+      "Each componentTopologyRows entry MUST cite kind `sdlc_component_topology_row`, componentId, moduleName, relativePath, publicBoundary, concernRole, sourceAssetRefs, and requirementIds.",
+      "Use concernRole for the typed concern value; prose sidecars may mention domainCarrier or adapter, but the JSON carrier must use concernRole.",
       "The topology must be production-shaped: separate parsing, validation, mapping, error/reporting, and IO/adapter concerns when those concerns are present in requirements or design.",
       "Do not use line count or file count as the authority. The authority is explicit concern separation and requirement allocation."
     ].join("\n");
@@ -1535,12 +1536,15 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
       "This edge derives component repair schedule truth from admitted execution failure rows.",
       "The output MUST include a fenced JSON block named component_depth_register with componentRepairSchedule.",
       "That JSON block MUST contain only the component-depth carrier fields accepted for this target: kind, registerVersion, targetAssetType, and componentRepairSchedule.",
+      "The component_depth_register JSON block kind MUST be sdlc_component_depth_register and registerVersion MUST be ts-component-depth-v1.",
       "Keep module_dependency_graph, tranche ledgers, and explanatory schedule prose outside the component_depth_register JSON block.",
+      "If you emit schedule metadata as a fenced block, its info string MUST NOT start with json; use schedule_surface so the component-depth parser does not treat it as carrier authority.",
       "componentRepairSchedule.kind MUST be sdlc_component_repair_schedule and registerVersion MUST be ts-component-depth-v1.",
       "componentRepairSchedule.scheduleStatus MUST be one of repair_required, no_repair_required, or triage_gap.",
       "If no repairable failure rows are open, use scheduleStatus no_repair_required with repairRows [].",
       "If repair is required, use scheduleStatus repair_required and emit one repair row per admitted high-confidence failure row.",
       "Do not convert prior postflight gaps, schema rejections, or module-build notes into repair rows; repair rows only derive from admitted componentExecutionFailureRegister.failureRows.",
+      "Each repair row kind MUST be sdlc_component_repair_schedule_row.",
       "Each repair row MUST bind scheduleId, failureId, repairTarget, lawfulReentryPoint, attributionConfidence, testcaseIds, componentIds, requirementIds, sourceRefs, testRefs, and evidenceRefs.",
       "repairTarget MUST be one of component_code, component_test, test_schedule, test_execution_surface, implementation_design, testcase_authority, requirement_reprice, worker_archive, or transport_retry.",
       "Rows that do not bind testcaseId + componentId + requirementId are not repair authority; do not emit them in repairRows. If deterministic evidence cannot bind them, set scheduleStatus triage_gap with repairRows [].",
@@ -1551,6 +1555,8 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
     return [
       "This edge derives release depth parity evidence.",
       "The output MUST include a fenced JSON block named component_depth_register with releaseDepthParity.",
+      "The component_depth_register JSON block kind MUST be sdlc_component_depth_register and registerVersion MUST be ts-component-depth-v1.",
+      "releaseDepthParity.kind MUST be sdlc_release_depth_parity_assessment.",
       "releaseDepthParity.status MUST be one of: met, blocked, repriced.",
       "Compare component topology, component realization qualification, component test qualification, component repair schedule, and test run archive truth.",
       "If componentRepairSchedule has scheduleStatus repair_required, releaseDepthParity.status MUST NOT be met.",
@@ -1706,6 +1712,7 @@ function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
     "- tranche_obligation_ledger mapping tranche ids to requirement/design/module obligation ids",
     "- tranche_gap_ledger with open, done, blocked, and carry-forward states",
     "- next_tranche_selector describing the lawful next tranche and re-entry condition",
+    "If this schedule surface also carries a typed admission JSON block, do not fence schedule metadata as json; use prose, tables, or a non-json fence such as schedule_surface.",
     "Do not collapse the schedule into a flat checklist when dependency tranches can be derived."
   ].join("\n");
 }

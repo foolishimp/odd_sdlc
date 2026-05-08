@@ -12,6 +12,13 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  constructFrameOpenedEvent,
+  constructGraphCallOpenedEvent,
+  constructVectorClosedEvent,
+  constructVectorTraversalPlannedEvent
+} from "@abiogenesis/typescript-tenant";
+
+import {
   invokeOddSdlcSpecMethodCommandSync
 } from "../../build/semantic/code/src/index.js";
 
@@ -83,6 +90,16 @@ function makeConformantWorkspace() {
   return root;
 }
 
+function writeRuntimeEvents(workspace, events) {
+  const eventsRoot = path.join(workspace, ".ai-workspace/events");
+  mkdirSync(eventsRoot, { recursive: true });
+  writeFileSync(
+    path.join(eventsRoot, "events.jsonl"),
+    `${events.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    "utf8"
+  );
+}
+
 test("T-058 Spec Method catalog command reads graph catalog without workspace mutation", () => {
   const result = invokeOddSdlcSpecMethodCommandSync(["catalog"]);
 
@@ -127,6 +144,104 @@ test("T-058 Spec Method gaps command emits read-only dossier without choosing tr
   assert.equal(result.payload.projection.kind, "sdlc_gap_projection");
   assert.equal(result.payload.dossier.kind, "sdlc_gap_dossier");
   assert.equal(result.payload.dossier.choosesNextTraversal, false);
+});
+
+test("T-058 Spec Method gaps command admits one evaluator priority surface", () => {
+  const workspace = makeConformantWorkspace();
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--evaluator-priority-edge",
+    "derive_release_depth_parity_surface"
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(result.payload.dossier.choosesNextTraversal, false);
+  assert.equal(
+    result.payload.dossier.rankingAuthority,
+    "abiogenesis_construction_priority_projection"
+  );
+  assert.equal(result.payload.dossier.localRankingAuthority, false);
+  assert.match(
+    result.payload.dossier.prioritySchemeRef,
+    /^priority-scheme:\/\/odd-sdlc\/spec-method\/gaps\//
+  );
+  assert.equal(
+    result.payload.dossier.bestGraphVectorRef,
+    "vector:odd_sdlc:derive_release_depth_parity_surface"
+  );
+  assert.deepEqual(result.payload.dossier.nextLawfulActions, [
+    "construction-action:graph-function:odd_sdlc:bootstrap_release_self_test:vector:odd_sdlc:derive_release_depth_parity_surface"
+  ]);
+  assert(
+    result.payload.dossier.rankingReasonRefs.includes(
+      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/derive_release_depth_parity_surface"
+    )
+  );
+
+  const rejected = invokeOddSdlcSpecMethodCommandSync([
+    "start",
+    "--workspace",
+    workspace,
+    "--evaluator-priority-edge",
+    "derive_release_depth_parity_surface"
+  ]);
+  assert.equal(rejected.status, "error");
+  assert.match(rejected.payload.error, /only valid for gaps/);
+});
+
+test("T-058 Spec Method gaps priority fails closed on invalid edge selectors", () => {
+  const unknownWorkspace = makeConformantWorkspace();
+  const unknown = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    unknownWorkspace,
+    "--evaluator-priority-edge",
+    "missing_edge"
+  ]);
+  assert.equal(unknown.status, "error");
+  assert.match(unknown.payload.error, /does not name a published graph edge/);
+
+  const duplicate = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    makeConformantWorkspace(),
+    "--evaluator-priority-edge",
+    "derive_design_surface",
+    "--evaluator-priority-edge",
+    "derive_release_depth_parity_surface"
+  ]);
+  assert.equal(duplicate.status, "error");
+  assert.match(duplicate.payload.error, /may be declared once/);
+
+  const closedWorkspace = makeConformantWorkspace();
+  const initial = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    closedWorkspace
+  ]);
+  const basis = initial.payload.start.executionContract.basis;
+  writeRuntimeEvents(closedWorkspace, [
+    constructGraphCallOpenedEvent(basis),
+    constructFrameOpenedEvent(basis),
+    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 }),
+    constructVectorClosedEvent({
+      basis,
+      vectorIndex: 0,
+      closureKind: "advanced"
+    })
+  ]);
+  const closed = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    closedWorkspace,
+    "--evaluator-priority-edge",
+    "derive_intent_surface"
+  ]);
+  assert.equal(closed.status, "error");
+  assert.match(closed.payload.error, /already closed graph edge/);
 });
 
 test("T-058 Spec Method start command is an ABG entrypoint over worker attachment", () => {

@@ -15,7 +15,7 @@ affected_boundary: ABG-visible retry/reentry frontier, worker_prompt.md, compone
 priority: high
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-07
+updated_at: 2026-05-08
 governance_scope: STDO Method
 depends_on:
   - T-101 honor retry-eligible worker report rejection in autonomous start loop
@@ -398,3 +398,25 @@ The solution is not:
   repair surface
 - broad regeneration when the gap dossier names a schema-local carrier defect
 - accepting worker prose, process success, or report shape as closure authority
+
+## ABG 3.7 Evaluator Boundary - 2026-05-08
+
+T-129 moves public gap/next-action preview to the ABG 3.7 construction
+evaluator projection, but it does not close T-120. Retry-local repair remains
+open until typed gap dossier pressure and retry repair instructions are consumed
+by a live installed repair attempt.
+
+Closure expectation update:
+
+- `deriveSdlcGapDossier()` may now expose ABG construction priority projection
+  truth, but public `gaps` remains read-only and must not dispatch repair work.
+- The installed operator retry/reentry loop is classified under T-129 as a
+  temporary invocation adapter pending ABG T-128. It is not closure proof for
+  T-120's lawful self-healing requirement.
+- T-120 closure must show that a retry-eligible typed postflight gap produces a
+  non-empty `retryRepairInstructions` / `repairReentryPlans` package and that
+  the worker consumes that package on the next attempt.
+- Any future evaluator-driven repair-route ranking must be a read model over
+  ABG construction priority projection or ABG T-128 admitted intent. It must
+  not be implemented as Spec Method entrypoint logic, prompt prose, or a
+  public-gaps controller.

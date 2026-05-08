@@ -664,6 +664,85 @@ test("B-086 component-depth exact protocol accepts canonical carrier and rejects
   );
 });
 
+test("B-086 component topology admits generic role and boundary aliases without tenant guesses", () => {
+  const root = workspace();
+  const handoff = manifest(root, "derive_implementation_component_topology_surface");
+  writeComponentRegister(handoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "implementation_component_topology_surface",
+    componentTopologyRows: [
+      {
+        componentId: "component://parser",
+        moduleName: "example-module",
+        relativePath: "src/main/scala/example/Parser.scala",
+        publicBoundary: false,
+        concern: "parsing",
+        requirementIds: ["REQ-B086-001"],
+        sourceAssetRefs: ["fixture://b086/component-topology"]
+      },
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "component://boundary",
+        moduleName: "example-module",
+        relativePath: "src/main/scala/example/PublicApi.scala",
+        publicBoundary: true,
+        concern: "public_boundary",
+        requirementIds: ["REQ-B086-002"],
+        sourceAssetRefs: ["fixture://b086/component-topology"]
+      },
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "component://diagnostics",
+        moduleName: "example-module",
+        relativePath: "src/main/scala/example/Diagnostics.scala",
+        publicBoundary: "internal",
+        concernRole: "error_reporting",
+        requirementIds: ["REQ-B086-003"],
+        sourceAssetRefs: ["fixture://b086/component-topology"]
+      }
+    ]
+  });
+
+  const admitted = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: handoff.targetAssetType,
+    outputFile: handoff.outputFile
+  });
+  assert.equal(admitted.status, "admitted");
+  assert.deepEqual(
+    admitted.register.componentTopologyRows.map((row) => row.publicBoundary),
+    ["internal", "public", "internal"]
+  );
+  assert.deepEqual(
+    admitted.register.componentTopologyRows.map((row) => row.concernRole),
+    ["parser", "other", "reporting"]
+  );
+
+  writeComponentRegister(handoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "implementation_component_topology_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "component://tenant-vocab",
+        moduleName: "example-module",
+        relativePath: "src/main/scala/example/TenantVocab.scala",
+        publicBoundary: "internal",
+        concernRole: "lineage",
+        requirementIds: ["REQ-B086-004"],
+        sourceAssetRefs: ["fixture://b086/component-topology"]
+      }
+    ]
+  });
+  const rejected = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: handoff.targetAssetType,
+    outputFile: handoff.outputFile
+  });
+  assert.equal(rejected.status, "rejected");
+  assert.match(rejected.blockingReasons.join(","), /concernRole/u);
+});
+
 test("B-086 component failure F_D admits declared path aliases and rejects tenant-specific guesses", () => {
   const root = workspace();
   const handoff = manifest(root, "qualify_component_test_execution_surface");
@@ -1069,11 +1148,29 @@ test("B-086 design-depth admission accepts declared aliases and rejects missing 
           entities: [
             {
               name: "MappingSource",
+              moduleName: "cdme-compiler",
+              ownership: "cdme-compiler",
               attributes: [
                 {
                   name: "designSurfaceRef",
                   valueType: "ref:design_surface",
                   cardinality: "1..1"
+                },
+                {
+                  name: "sourceRows",
+                  valueType: "List<SourceRow>",
+                  cardinality: "one_to_many"
+                },
+                {
+                  name: "optionalProjection",
+                  valueType: "ProjectionRef",
+                  cardinality: "zero_to_one"
+                },
+                {
+                  entityId: "MappingSource",
+                  attributeId: "compilerState",
+                  typeRef: "CompilerState",
+                  requirementIds: ["REQ-B086-001"]
                 }
               ]
             }
@@ -1096,9 +1193,18 @@ test("B-086 design-depth admission accepts declared aliases and rejects missing 
         {
           moduleName: "cdme-compiler",
           entityId: "entity:cdme-compiler.mapping-source",
-          stateless: true,
-          states: [],
-          transitions: [],
+          stateless: false,
+          states: [{ stateId: "draft" }, { stateId: "bound" }],
+          transitions: [
+            {
+              kind: "sdlc_module_state_transition",
+              transitionId: "transition:mapping-source.draft.bound",
+              fromState: "draft",
+              toState: "bound",
+              operationId: "bindTypes",
+              entityId: "entity:cdme-compiler.mapping-source"
+            }
+          ],
           requirementIds: ["REQ-B086-001"],
           sourceAssetRefs: ["fixture://b086/state-alias"]
         }
@@ -1114,6 +1220,38 @@ test("B-086 design-depth admission accepts declared aliases and rejects missing 
     admitted.register.moduleSchemaFragments[0].entities[0].attributes[0]
       .cardinality,
     "one"
+  );
+  assert.equal(
+    admitted.register.moduleSchemaFragments[0].entities[0].ownership,
+    "owned"
+  );
+  assert.equal(
+    admitted.register.moduleSchemaFragments[0].entities[0].attributes[1]
+      .cardinality,
+    "many"
+  );
+  assert.equal(
+    admitted.register.moduleSchemaFragments[0].entities[0].attributes[2]
+      .cardinality,
+    "optional"
+  );
+  assert.equal(
+    admitted.register.moduleSchemaFragments[0].entities[0].attributes[3]
+      .valueType,
+    "CompilerState"
+  );
+  assert.deepEqual(
+    admitted.register.moduleSchemaFragments[0].entities[0].attributes[3]
+      .invariantRefs,
+    ["REQ-B086-001"]
+  );
+  assert.deepEqual(admitted.register.moduleStateDiagramFragments[0].states, [
+    "draft",
+    "bound"
+  ]);
+  assert.equal(
+    admitted.register.moduleStateDiagramFragments[0].transitions[0].kind,
+    "sdlc_entity_state_transition"
   );
   assert.equal(
     admitted.register.moduleSchemaFragments[0].operations[0].operationId,
@@ -1140,6 +1278,140 @@ test("B-086 design-depth admission accepts declared aliases and rejects missing 
   });
   assert.equal(missingIdentity.status, "rejected");
   assert.match(missingIdentity.blockingReasons.join(","), /moduleName/u);
+});
+
+test("B-086 aggregate-domain admission normalizes redundant summaries and aggregate aliases", () => {
+  const root = workspace();
+  const handoff = manifest(root, "derive_aggregate_domain_model_surface");
+  writeDesignRegister(handoff, {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "aggregate_domain_model_surface",
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: {
+      kind: "sdlc_aggregate_domain_model",
+      ownerModuleNames: ["cdme-compiler"],
+      entities: [
+        {
+          kind: "sdlc_aggregate_entity",
+          entityId: "entity:MappingSource",
+          ownerModuleName: "cdme-compiler",
+          ownership: "owned",
+          attributes: [
+            {
+              kind: "sdlc_aggregate_attribute",
+              attributeId: "attr:MappingSource.sourceRows",
+              ownerModuleName: "cdme-compiler",
+              name: "sourceRows",
+              valueType: "List<SourceRow>",
+              cardinality: "one_to_many",
+              invariantRefs: ["REQ-B086-001"]
+            }
+          ],
+          sourceModuleFragmentRefs: ["module-fragment://cdme-compiler/source"]
+        },
+        {
+          entityId: "AggregateReference",
+          ownerModuleName: "cdme-compiler"
+        }
+      ],
+      attributes: [
+        {
+          entityId: "AggregateReference",
+          name: "referenceDigest",
+          type: "string"
+        }
+      ],
+      operations: [
+        {
+          kind: "sdlc_aggregate_operation",
+          operationId: "cdme-compiler.bindTypes",
+          ownerModuleName: "cdme-compiler",
+          inputEntityIds: ["entity:MappingSource"],
+          outputEntityIds: ["entity:MappingSource"],
+          requiredAttributeIds: ["attr:MappingSource.sourceRows"]
+        },
+        {
+          operationId: "cdme-compiler.linkReference",
+          ownerModuleName: "cdme-compiler",
+          inputs: ["AggregateReference"],
+          outputs: ["AggregateReference"]
+        }
+      ],
+      stateFlows: [
+        {
+          entityId: "entity:MappingSource",
+          states: ["draft", "bound"]
+        }
+      ],
+      crossModuleReferences: [],
+      evidenceRefs: ["fixture://b086/aggregate-alias"]
+    },
+    aggregateSunnyDaySequence: null,
+    designCompletenessVerdict: {
+      kind: "sdlc_design_completeness_verdict",
+      verdictVersion: "ts-design-completeness-v1",
+      scopeMode: "steel_thread",
+      scopedModuleNames: ["cdme-compiler"],
+      deferredModuleNames: ["cdme-assurance"],
+      entity: {
+        kind: "sdlc_design_completeness_axis_verdict",
+        axis: "entity",
+        verdict: "satisfied",
+        rationale: "entity surface complete",
+        scope: "steel_thread:cdme-compiler"
+      },
+      attribute: {
+        kind: "sdlc_design_completeness_axis_verdict",
+        axis: "attribute",
+        verdict: "satisfied",
+        rationale: "attribute surface complete",
+        scope: "steel_thread:cdme-compiler"
+      },
+      axisVerdicts: {
+        flow: {
+          verdict: "satisfied_for_included_lifecycles",
+          evidence: "scoped flow complete"
+        }
+      }
+    }
+  });
+
+  const admitted = admitDesignDepthRegisterFromArtifact({
+    targetAssetType: handoff.targetAssetType,
+    outputFile: handoff.outputFile
+  });
+  assert.equal(admitted.status, "admitted");
+  assert.equal(admitted.register.aggregateDomainModel.modelVersion, "ts-design-depth-v1");
+  assert.equal(
+    admitted.register.aggregateDomainModel.entities[0].kind,
+    "sdlc_aggregate_domain_entity"
+  );
+  assert.equal(
+    admitted.register.aggregateDomainModel.entities[0].attributes[0].cardinality,
+    "many"
+  );
+  assert.equal(
+    admitted.register.aggregateDomainModel.operations[0].kind,
+    "sdlc_domain_operation"
+  );
+  assert.equal(
+    admitted.register.aggregateDomainModel.entities[1].attributes[0].name,
+    "referenceDigest"
+  );
+  assert.deepEqual(
+    admitted.register.aggregateDomainModel.operations[1].requiredAttributeIds,
+    ["attr:cdme-compiler.aggregatereference.referencedigest"]
+  );
+  assert.equal(admitted.register.designCompletenessVerdict.entity.status, "satisfied");
+  assert.deepEqual(admitted.register.designCompletenessVerdict.entity.reasons, [
+    "entity surface complete"
+  ]);
+  assert.equal(
+    admitted.register.designCompletenessVerdict.flow.status,
+    "satisfied"
+  );
 });
 
 test("B-086 design completeness accepts allowed operation/entity aliases and rejects disambiguated mismatch", () => {
@@ -1220,11 +1492,18 @@ test("B-086 worker-authored design completeness partial escalates to F_P instead
   writeDesignRegister(
     handoff,
     sunnyDayRegister({
-      designCompletenessVerdict: designVerdict({
-        attribute: designAxis("attribute", "partial", [
-          "attribute selection remains underdisambiguated"
-        ])
-      })
+      designCompletenessVerdict: {
+        kind: "sdlc_design_completeness_verdict",
+        verdictVersion: "ts-design-completeness-v1",
+        axisVerdicts: {
+          entity: { verdict: "satisfied", evidence: "entity flow bound" },
+          attribute: {
+            verdict: "partial",
+            evidence: "attribute selection remains underdisambiguated"
+          },
+          flow: { verdict: "satisfied", evidence: "flow bound" }
+        }
+      }
     })
   );
   const ledger = deriveDesignCompletenessAssuranceLedger({
@@ -1249,7 +1528,9 @@ test("B-086 worker-authored design completeness partial escalates to F_P instead
       designCompletenessVerdict: {
         kind: "sdlc_design_completeness_verdict",
         verdictVersion: "ts-design-depth-v1",
-        axisVerdicts: [designAxis("entity")]
+        axisVerdicts: {
+          entity: { verdict: "satisfied", evidence: "entity bound" }
+        }
       }
     })
   );
@@ -1258,7 +1539,7 @@ test("B-086 worker-authored design completeness partial escalates to F_P instead
     outputFile: handoff.outputFile
   });
   assert.equal(malformed.status, "rejected");
-  assert.match(malformed.blockingReasons.join(","), /axisVerdicts/u);
+  assert.match(malformed.blockingReasons.join(","), /attribute|flow/u);
 });
 
 test("B-086 assurance dimensions expose positive and negative F_D outcomes", () => {

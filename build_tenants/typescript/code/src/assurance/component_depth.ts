@@ -2,6 +2,8 @@
 // Implements: REQ-F-ODDSDLC-051
 // Implements: T-113
 
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { admitComponentDepthRegisterFromArtifact } from "../operator/component_depth_register.js";
 import type {
@@ -512,19 +514,77 @@ function componentRepairScheduleReasons(input: {
   ]);
 }
 
+function latestAdmittedComponentRepairSchedule(input: {
+  readonly workspaceRoot: string;
+}): { readonly schedule: SdlcComponentRepairSchedule; readonly evidenceRefs: readonly string[] } | null {
+  const assetsRoot = join(
+    input.workspaceRoot,
+    ".ai-workspace",
+    "runtime",
+    "odd_sdlc",
+    "assets"
+  );
+  if (!existsSync(assetsRoot) || !statSync(assetsRoot).isDirectory()) {
+    return null;
+  }
+  const candidates: { readonly filePath: string; readonly mtimeMs: number }[] = [];
+  for (const runId of readdirSync(assetsRoot)) {
+    const filePath = join(
+      assetsRoot,
+      runId,
+      "component_repair_schedule_surface.md"
+    );
+    if (existsSync(filePath) && statSync(filePath).isFile()) {
+      candidates.push(Object.freeze({
+        filePath,
+        mtimeMs: statSync(filePath).mtimeMs
+      }));
+    }
+  }
+  for (const candidate of candidates.sort((left, right) => right.mtimeMs - left.mtimeMs)) {
+    const admission = admitComponentDepthRegisterFromArtifact({
+      targetAssetType: "component_repair_schedule_surface",
+      outputFile: candidate.filePath
+    });
+    if (
+      admission.status === "admitted" &&
+      admission.register !== null &&
+      admission.register.componentRepairSchedule !== null
+    ) {
+      return Object.freeze({
+        schedule: admission.register.componentRepairSchedule,
+        evidenceRefs: uniqueSorted([candidate.filePath, ...admission.evidenceRefs])
+      });
+    }
+  }
+  return null;
+}
+
 function releaseDepthParityReasons(input: {
   readonly register: SdlcComponentDepthRegister;
+  readonly manifest: SdlcWorkerHandoffManifest;
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
   const parity = input.register.releaseDepthParity;
-  const schedule = input.register.componentRepairSchedule;
+  const sourceSchedule =
+    input.register.componentRepairSchedule === null
+      ? latestAdmittedComponentRepairSchedule({
+          workspaceRoot: input.manifest.workspaceRoot
+        })
+      : null;
+  const schedule = input.register.componentRepairSchedule ?? sourceSchedule?.schedule ?? null;
+  const scheduleEvidenceRefs = sourceSchedule?.evidenceRefs ?? Object.freeze([]);
   const repairScheduleReasons =
     schedule?.scheduleStatus === "repair_required" && schedule.repairRows.length > 0
       ? schedule.repairRows.map((row) =>
           reason({
             code: `component_repair_row_open:${row.failureId}`,
             message: `Repair row ${row.scheduleId} remains open for failure ${row.failureId}.`,
-            evidenceRefs: uniqueSorted([...input.evidenceRefs, ...row.evidenceRefs])
+            evidenceRefs: uniqueSorted([
+              ...input.evidenceRefs,
+              ...scheduleEvidenceRefs,
+              ...row.evidenceRefs
+            ])
           })
         )
       : [];
@@ -601,6 +661,7 @@ function comparisonReasons(input: {
     case "release_depth_parity_surface":
       return releaseDepthParityReasons({
         register: input.register,
+        manifest: input.manifest,
         evidenceRefs: input.evidenceRefs
       });
     default:

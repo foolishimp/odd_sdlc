@@ -22,7 +22,7 @@ priority: high
 build_tenant: typescript
 triaged_at: 2026-05-05
 created_at: 2026-05-05
-updated_at: 2026-05-07
+updated_at: 2026-05-08
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -426,3 +426,23 @@ Verification:
 
 Status: deterministic and sandbox proof refreshed. Live data_mapper proof
 remains outstanding for full closure.
+
+## ABG 3.7 Evaluator Boundary - 2026-05-08
+
+T-129 reclassifies traversal strategy as policy/admissibility input to the ABG
+construction evaluator whenever odd_sdlc renders next-action or public gaps
+truth. Strategy must not remain a second action selector.
+
+Closure expectation update:
+
+- The authoritative `SdlcTraversalStrategyPlan` may still be odd_sdlc product
+  policy, but its selected effect must be visible as evaluator pressure,
+  admissibility, or ABG-selected traversal metadata.
+- Public gap/query-domain ranking must consume the ABG construction priority
+  projection; T-123 must not add another edge-name ordering map to decide the
+  next graph function.
+- Targeted repair is a repair/reentry policy input. It does not override an
+  explicit ABG-selected strategy except through admitted repair/reentry truth.
+- Live closure evidence must prove the same plan surface is consumed by GTL
+  vector declarations, worker handoff, feature-scope derivation, and the
+  evaluator/read-model boundary.

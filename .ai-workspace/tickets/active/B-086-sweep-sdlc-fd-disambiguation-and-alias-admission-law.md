@@ -18,7 +18,7 @@ affected_boundary:
 priority: critical
 triaged_at: 2026-05-07
 created_at: 2026-05-07
-updated_at: 2026-05-07
+updated_at: 2026-05-08
 build_tenant: typescript
 owner: odd_sdlc
 governance_scope: STDO Method
@@ -513,3 +513,23 @@ Remaining non-closure:
   closure.
 - This ticket must remain active until the live lane proves the corrected
   behavior against the RC path.
+
+## ABG 3.7 Evaluator Boundary - 2026-05-08
+
+T-129's evaluator migration sharpens B-086's closure law: F_D is not an
+action-decision path. It may admit, reject exact protocol defects, or emit
+typed ambiguity / F_P escalation pressure. It must not force iteration by
+locally deciding that an allowed ambiguity is a failure.
+
+Closure expectation update:
+
+- Alias-admissible or underdisambiguated semantic cases should become admitted
+  truth, typed ambiguity, or F_P/evaluator pressure, not local retry ranking.
+- F_P escalation rows must remain visible through the same gap/evaluator
+  projection path used by public gaps and RC reporting.
+- Tests must continue to distinguish exact private protocol discriminators from
+  public semantic identity aliases; passing deterministic tests is not RC proof
+  without the fresh live T-109 lane.
+- Any future assurance fold that ranks repair/reentry must consume ABG
+  construction priority projection truth or be explicitly scoped as temporary
+  adapter debt pending ABG T-128.

@@ -26,7 +26,7 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.6.0-rc.1"
+    "3.7.0-rc.1"
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.runtimeTruthAuthority,
@@ -40,6 +40,10 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.eventCalculusTruthAuthority,
     "abiogenesis_replay_projection"
   );
+  assert.equal(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.constructionEvaluatorTruthAuthority,
+    "abiogenesis_construction_priority_projection"
+  );
   assert.deepStrictEqual(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.localRuntimeEventFamilies,
     []
@@ -50,6 +54,10 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.choosesNextVectorLocally,
+    false
+  );
+  assert.equal(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.localConstructionRankingAuthority,
     false
   );
   assert.deepStrictEqual(
@@ -96,6 +104,11 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   assert(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
       entry.includes("T-120")
+    )
+  );
+  assert(
+    ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.sourceAssumptions.some((entry) =>
+      entry.includes("T-127")
     )
   );
 });
