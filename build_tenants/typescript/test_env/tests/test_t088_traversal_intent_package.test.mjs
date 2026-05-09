@@ -141,8 +141,10 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   );
   assert.equal(archivedIntent.packageDigest, packageDigest);
   assert.equal(existsSync(intentPath), true);
+  assert.equal(existsSync(files.workerBriefPath), true);
+  assert.match(prompt, /Read the worker brief first:/u);
   assert.match(prompt, /typed cumulative intent package/u);
-  assert.match(prompt, /traversalIntentPackage/u);
+  assert.match(prompt, /traversal_intent_package\.json/u);
   assert(
     manifest.traversalIntentPackage.authorityRefs.some((ref) =>
       ref.endsWith("specification/requirements/00-imported-sources.md")

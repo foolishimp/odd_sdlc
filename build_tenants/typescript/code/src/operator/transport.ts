@@ -132,7 +132,7 @@ function codexArgs(input: {
     input.workspaceRoot,
     "--output-last-message",
     input.outputLastMessagePath,
-    readFileSync(input.promptPath, "utf8")
+    "-"
   ]);
 }
 
@@ -188,8 +188,50 @@ export function stdinForWorker(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly promptPath: string;
 }): string | null {
-  void input;
+  if (input.transport.args.length === 0 && input.transport.agentKey === "codex") {
+    return readFileSync(input.promptPath, "utf8");
+  }
   return null;
+}
+
+export interface SdlcWorkerProcessLaunch {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly stdin: string | null;
+}
+
+export function processLaunchForWorker(input: {
+  readonly transport: SdlcWorkerTransportContract;
+  readonly manifestPath: string;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly promptPath: string;
+  readonly outputLastMessagePath: string;
+  readonly executorProfile: TracedProcessExecutorProfile;
+}): SdlcWorkerProcessLaunch {
+  const args = argsForWorker(input);
+  const stdin = stdinForWorker({
+    transport: input.transport,
+    promptPath: input.promptPath
+  });
+  if (input.executorProfile !== "pty-terminal" || stdin === null) {
+    return Object.freeze({
+      command: input.transport.command,
+      args,
+      stdin
+    });
+  }
+  return Object.freeze({
+    command: "/bin/sh",
+    args: Object.freeze([
+      "-lc",
+      'prompt_file=$1; shift; exec "$@" < "$prompt_file"',
+      "odd-sdlc-worker-stdin",
+      input.promptPath,
+      input.transport.command,
+      ...args
+    ]),
+    stdin: null
+  });
 }
 
 export function parserForWorkerTransport(

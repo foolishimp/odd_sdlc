@@ -89,6 +89,9 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   const prompt = readFileSync(files.promptPath, "utf8");
   const manifestText = readFileSync(files.manifestPath, "utf8");
   const manifestOnDisk = JSON.parse(manifestText);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
 
   assert.equal(existsSync(files.manifestPath), true);
   assert.equal(
@@ -116,18 +119,32 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
     )
   );
 
-  assert.match(prompt, /Read the compact worker invocation package first/);
-  assert.match(prompt, /Use those files as the normal worker-facing authority/);
+  assert.match(prompt, /Read the worker brief first:/);
+  assert.match(prompt, /Then read the compact worker invocation package:/);
+  assert.match(prompt, /Use those files as worker-facing authority/);
   assert.match(prompt, /full forensic handoff manifest remains archived by reference/);
   assert.match(prompt, /must start with a `## Execution Plan` section/);
   assert.match(prompt, /Do not keep this plan private/);
-  assert.match(prompt, /Compact worker invocation package/);
-  assert.match(prompt, /"packageVersion": "ts-invocation-v1"/);
-  assert.match(prompt, /"omittedObligationCount":/);
-  assert.match(prompt, /"requirementTraceObligationIds":/);
-  assert.match(prompt, /"requirement:REQ-T099-050"/);
-  assert.match(prompt, /"trancheKeys":/);
+  assert.doesNotMatch(prompt, /Compact worker invocation package/);
+  assert.doesNotMatch(prompt, /"packageVersion": "ts-invocation-v1"/);
+  assert.doesNotMatch(prompt, /"omittedObligationCount":/);
+  assert.doesNotMatch(prompt, /"requirementTraceObligationIds":/);
+  assert.doesNotMatch(prompt, /"requirement:REQ-T099-050"/);
+  assert.doesNotMatch(prompt, /"trancheKeys":/);
   assert.doesNotMatch(prompt, /VERY_LONG_T099_MARKER_050/);
+  assert.equal(invocationPackage.packageVersion, "ts-invocation-v1");
+  assert.equal(typeof invocationPackage.omittedObligationCount, "number");
+  assert(
+    invocationPackage.requirementTraceObligationIds.includes(
+      "requirement:REQ-T099-050"
+    )
+  );
+  assert(
+    invocationPackage.retrievalHints.every(
+      (hint) => hint.obligationIds.length <= 12
+    )
+  );
+  assert(invocationPackage.trancheKeys.length > 0);
   assert.match(manifestText, /VERY_LONG_T099_MARKER_050/);
   assert.deepEqual(
     manifestOnDisk.traversalObligationContext.trancheKeys,

@@ -82,29 +82,49 @@ function manifestForLargeSurface() {
 test("T-118 writes a compact worker invocation package while preserving the full manifest by reference", () => {
   const manifest = manifestForLargeSurface();
   const files = writeHandoffFiles(manifest);
+  const relativeToWorkspace = (filePath) =>
+    path.relative(manifest.workspaceRoot, filePath);
   const fullManifestSize = statSync(files.manifestPath).size;
   const invocationPackageSize = statSync(files.invocationPackagePath).size;
+  const workerBriefSize = statSync(files.workerBriefPath).size;
   const invocationPackage = JSON.parse(
     readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const workerBrief = JSON.parse(readFileSync(files.workerBriefPath, "utf8"));
+  const escapedWorkspaceRoot = new RegExp(
+    manifest.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"),
+    "u"
   );
   const { packageDigest, ...digestBasis } = invocationPackage;
 
   assert(fullManifestSize > 256 * 1024);
-  assert(invocationPackageSize < 96 * 1024);
+  assert(invocationPackageSize < 32 * 1024);
+  assert(workerBriefSize < 4 * 1024);
   assert.equal(invocationPackage.kind, "sdlc_worker_invocation_package");
   assert.equal(invocationPackage.packageVersion, "ts-invocation-v1");
-  assert.equal(invocationPackage.manifestPath, files.manifestPath);
+  assert.equal(invocationPackage.manifestPath, relativeToWorkspace(files.manifestPath));
+  assert.equal(
+    invocationPackage.manifestRef,
+    `workspace://${relativeToWorkspace(files.manifestPath)}`
+  );
+  assert.equal(path.isAbsolute(invocationPackage.manifestPath), false);
   assert.equal(invocationPackage.traversalIntentPackagePath.endsWith("traversal_intent_package.json"), true);
   assert.equal(
     invocationPackage.manifestDigest,
     sha256Text(readFileSync(files.manifestPath, "utf8"))
   );
   assert.equal(packageDigest, sha256Text(stableOperatorJson(digestBasis)));
-  assert.equal(invocationPackage.outputContract.outputFile, manifest.outputFile);
-  assert.equal(invocationPackage.outputContract.reportFile, manifest.reportFile);
+  assert.equal(
+    invocationPackage.outputContract.outputFile,
+    relativeToWorkspace(manifest.outputFile)
+  );
+  assert.equal(
+    invocationPackage.outputContract.reportFile,
+    relativeToWorkspace(manifest.reportFile)
+  );
   assert.deepStrictEqual(
     invocationPackage.allowedWriteRoots,
-    manifest.allowedWriteRoots
+    manifest.allowedWriteRoots.map(relativeToWorkspace)
   );
   assert.equal(invocationPackage.retryFrontier.kind, "sdlc_worker_invocation_retry_frontier");
   assert(invocationPackage.inlineObligations.length <= 24);
@@ -116,6 +136,23 @@ test("T-118 writes a compact worker invocation package while preserving the full
   );
   assert.equal(invocationPackage.requirementTraceObligationIds.length, 160);
   assert(invocationPackage.omittedObligationCount > 100);
+  assert.equal(workerBrief.kind, "sdlc_worker_brief");
+  assert.equal(
+    workerBrief.refs.workerInvocationPackagePath,
+    relativeToWorkspace(files.invocationPackagePath)
+  );
+  assert.equal(workerBrief.refs.handoffManifestPath, relativeToWorkspace(files.manifestPath));
+  assert.equal(path.isAbsolute(workerBrief.outputFile), false);
+  assert.equal(
+    workerBrief.digests.workerInvocationPackageDigest,
+    invocationPackage.packageDigest
+  );
+  assert.deepEqual(workerBrief.requiredSchema, manifest.resultReportSchema);
+  assert.doesNotMatch(
+    readFileSync(files.invocationPackagePath, "utf8"),
+    escapedWorkspaceRoot
+  );
+  assert.doesNotMatch(readFileSync(files.workerBriefPath, "utf8"), escapedWorkspaceRoot);
 });
 
 test("T-118 prompt points workers to the compact package before the forensic manifest", () => {
@@ -123,9 +160,16 @@ test("T-118 prompt points workers to the compact package before the forensic man
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
 
-  assert.match(prompt, /Read the compact worker invocation package first:/u);
+  assert(Buffer.byteLength(prompt, "utf8") < 8 * 1024);
+  assert.doesNotMatch(prompt, new RegExp(manifest.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.match(prompt, /Read the worker brief first:/u);
   assert.match(prompt, /worker_invocation_package\.json/u);
+  assert.match(prompt, /worker_brief\.json/u);
   assert.match(prompt, /full forensic handoff manifest remains archived by reference/u);
   assert.doesNotMatch(prompt, /Read the full handoff manifest before writing output/u);
   assert.match(prompt, /Use workerInvocationPackage\.requirementTraceObligationIds/u);
+  assert.doesNotMatch(prompt, /Compact worker invocation package:/u);
+  assert.doesNotMatch(prompt, /Legacy compact prompt pressure projection:/u);
+  assert.doesNotMatch(prompt, /"kind": "sdlc_worker_invocation_package"/u);
+  assert.doesNotMatch(prompt, /sdlc_worker_prompt_pressure_projection/u);
 });

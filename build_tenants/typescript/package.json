@@ -83,6 +83,8 @@
     "test:t131:guided-odd-chat-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_LIVE=1 npm run test:t131",
     "test:t132": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} npm run build:semantic && ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} node --test test_env/live/test_t132_hello_world_five_language_suite_live_build.test.mjs",
     "test:t132:hello-world-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} ODD_SDLC_TS_T132_HELLO_WORLD_SUITE_LIVE=1 npm run test:t132",
+    "test:t133": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} npm run build:semantic && ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} node --test test_env/live/test_t133_rust_hello_world_minimal_live_build.test.mjs",
+    "test:t133:rust-live": "ODD_SDLC_TS_TEST_RUN_ROOT=${ODD_SDLC_TS_TEST_RUN_ROOT:-test_env/test_runs} ODD_SDLC_TS_T133_RUST_HELLO_WORLD_LIVE=1 npm run test:t133",
     "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",
     "test:live": "npm run build:semantic && node --test test_env/live/*.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"

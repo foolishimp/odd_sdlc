@@ -28,6 +28,7 @@ dependencies:
 related_tickets:
   - T-041 remains open for data_mapper end-goal/stress proof
   - T-131 remains open for guided odd_chat product build proof
+  - T-133 is the one-tenant Rust minimum-overhead baseline; it does not replace this broader five-language escalation lane.
 intake_source: The operator requested a simpler new test rather than further unpacking the long odd_chat/data_mapper lanes. The desired proof is for odd_sdlc to create a hello-world suite using five programming languages and test the output. During the first live attempt, the fixture incorrectly collapsed all languages into one `hello_world_suite` tenant; the operator corrected the expected proof shape to one build tenant per language, with design, ADR, and module surfaces inside each tenant.
 target_truth: odd_sdlc has a small canonical live-build candidate where one bootstrap document is the scenario source of truth. The standard project profile/template declares the runtime layout: transform assets are admitted under `.ai-workspace/runtime/odd_sdlc/assets`, operator run archives under `.ai-workspace/runtime/odd_sdlc/operator-runs`, and product materialization uses `selected_output_root`. The live lane creates a fresh sandbox, installs odd_sdlc into that sandbox as builder, runs installed odd_sdlc traversal from the bootstrap, requires five separate generated build tenant roots for JavaScript, Python, Ruby, Bash, and Java, requires each tenant to contain its own design module file, ADR file, and source file, then executes each generated program and asserts the exact `Hello, world!` output.
 superseded_truth: A broad data_mapper or odd_chat run is the only valid live proof, or a fixture can count as proof by carrying prebuilt hello-world source files without installed odd_sdlc construction and execution evidence.
@@ -60,6 +61,8 @@ non_closure_conditions:
   - The live lane bypasses installed odd_sdlc and writes implementation files from the harness as proof.
   - A language is skipped silently because its runtime is unavailable.
   - The worker narrative is treated as output proof without process execution.
+  - Worker prompts embed `worker_invocation_package.json`, legacy prompt pressure projection JSON, or other stable archived packages inline instead of referencing them.
+  - Codex worker transport passes the full prompt as a positional argv value, causing command logs and PTY transcripts to duplicate prompt payload.
   - The ticket is used to close T-041 or T-131 without separate review.
 ---
 
@@ -85,6 +88,22 @@ bootstrap start document
 
 This is not a replacement for the data_mapper end-goal lane. It is a bounded
 release-confidence lane for installed construction and execution evidence.
+
+## Escalation Role
+
+This ticket is intentionally preserved as the broader hello-world use case. It
+should remain available for an escalating scenario ladder:
+
+```text
+T-133: one Rust tenant, minimal product materialization and execution proof
+  -> T-132: five independent language tenants with per-tenant design/ADR/module surfaces
+  -> T-131: guided odd_chat product workflow
+  -> T-041: data_mapper end-goal and RC stress proof
+```
+
+T-132 must not be deleted or collapsed into T-133. T-133 measures the floor cost
+of bringing odd_sdlc to a new product; T-132 measures whether the same installed
+builder can scale to a small multi-tenant suite with richer SDLC evidence.
 
 ## Initial Implementation Slice
 
@@ -137,3 +156,27 @@ runtime:
   operator_run_root: .ai-workspace/runtime/odd_sdlc/operator-runs
   product_materialization_root_policy: selected_output_root
 ```
+
+## Performance Tuning Finding - 2026-05-09
+
+The T-132 run bed exposed prompt/log bloat in the generic worker handoff path.
+The live process was sending a large prompt that said to read compact package
+files, then embedded those same package contents inline. Codex transport also
+passed prompt text as a positional argv value, which caused command archives and
+PTY transcripts to carry the full prompt payload.
+
+Required tuning checklist:
+
+- [ ] `worker_prompt.md` stays under 8 KiB for a large requirement surface.
+- [ ] `worker_prompt.md` contains no embedded `sdlc_worker_invocation_package`
+  JSON and no legacy `sdlc_worker_prompt_pressure_projection`.
+- [ ] `worker_invocation_package.json` stays under 32 KiB for a large
+  requirement surface.
+- [ ] `worker_brief.json` exists and stays under 4 KiB, carrying only current
+  edge, target asset, output/report files, product materialization flag,
+  allowed write roots, required schema, and exact package/manifest refs to read.
+- [ ] Codex worker transport uses stdin with `codex exec -`; prompt text is not
+  a positional argv value.
+- [ ] For a no-retry live edge, PTY `screenlog.0` remains below 100 KiB unless
+  product output itself is the cause, in which case the run summary records the
+  exception explicitly.

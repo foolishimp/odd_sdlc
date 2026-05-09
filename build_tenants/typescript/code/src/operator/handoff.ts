@@ -57,6 +57,7 @@ import {
 import type { SdlcProjectConstraints } from "../workspace/index.js";
 import {
   deriveSdlcConformProjectProfileFromWorkspace,
+  standardSdlcRuntimeLayout,
   type SdlcConformProjectProfile
 } from "../workspace/index.js";
 import type {
@@ -78,6 +79,7 @@ import type {
   SdlcTraversalObligationContext,
   SdlcTraversalStrategyDecision,
   SdlcRetrievalHint,
+  SdlcWorkerBrief,
   SdlcWorkerInvocationObligation,
   SdlcWorkerInvocationPackage,
   SdlcWorkerRetryRepairInstruction,
@@ -1254,7 +1256,7 @@ export function deriveWorkerHandoffManifest(input: {
 }): SdlcWorkerHandoffManifest {
   const runId = input.runId ?? operatorRunId();
   const conformedProject =
-    input.conformedProject ??
+    normalizeConformedProjectRuntimeLayout(input.conformedProject) ??
     deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot);
   const archiveRoot = join(
     input.workspaceRoot,
@@ -1372,6 +1374,22 @@ export function deriveWorkerHandoffManifest(input: {
   });
 }
 
+function normalizeConformedProjectRuntimeLayout(
+  project: SdlcConformProjectProfile | undefined
+): SdlcConformProjectProfile | undefined {
+  if (project === undefined) {
+    return undefined;
+  }
+  const runtimeLayout = (project as { readonly runtimeLayout?: unknown }).runtimeLayout;
+  if (runtimeLayout !== undefined) {
+    return project;
+  }
+  return Object.freeze({
+    ...project,
+    runtimeLayout: standardSdlcRuntimeLayout()
+  });
+}
+
 function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): string {
   if (!manifest.productMaterialization.required) {
     const lines = [
@@ -1394,7 +1412,7 @@ function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): stri
   }
   const lines = [
     "Product materialization is REQUIRED for this edge.",
-    `Tenant root: ${manifest.productMaterialization.tenantRoot}`,
+    `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}`,
     `Selected output root: ${manifest.productMaterialization.selectedOutputRoot}`,
     "materializedFiles.relativePath MUST be relative to the tenant root, not the workspace root.",
     `relativePath basis: ${manifest.productMaterialization.relativePathBasis}`,
@@ -1713,18 +1731,30 @@ function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
 }
 
 function compactObligation(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
   obligation: SdlcTraversalObligation
 ): SdlcWorkerInvocationObligation {
   return Object.freeze({
     kind: "sdlc_worker_invocation_obligation" as const,
     obligationId: obligation.obligationId,
     obligationKind: obligation.obligationKind,
-    summary: obligation.summary,
-    evidenceRefs: obligation.evidenceRefs,
-    sourceRefs: obligation.payload.sourceRefs.slice(0, 3),
+    summary: compactPromptText(obligation.summary, 180),
+    evidenceRefs: workerFacingRefs(manifest, obligation.evidenceRefs.slice(0, 1)),
+    sourceRefs: workerFacingRefs(manifest, obligation.payload.sourceRefs.slice(0, 1)),
     sourceSnippetCount: obligation.payload.sourceSnippets.length,
-    coverageExpectation: obligation.payload.coverageExpectation
+    coverageExpectation: compactPromptText(
+      obligation.payload.coverageExpectation,
+      120
+    )
   });
+}
+
+function compactPromptText(input: string, maxLength: number): string {
+  const normalized = input.replace(/\s+/gu, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 }
 
 function inlineObligationsForPrompt(
@@ -1749,69 +1779,21 @@ function requirementTraceObligationIdsForPrompt(
   );
 }
 
-function promptPressureProjection(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly manifestPath: string;
-  readonly traversalIntentPath: string;
-}): unknown {
-  const inlineObligations = inlineObligationsForPrompt(input.manifest);
-  const requirementTraceObligationIds = requirementTraceObligationIdsForPrompt(
-    input.manifest
+function compactRetrievalHints(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  hints: readonly SdlcRetrievalHint[]
+): readonly SdlcRetrievalHint[] {
+  return Object.freeze(
+    hints.slice(0, 4).map((hint) =>
+      Object.freeze({
+        kind: "sdlc_retrieval_hint" as const,
+        key: hint.key,
+        ref: workerFacingRef(manifest, hint.ref),
+        reason: hint.reason,
+        obligationIds: hint.obligationIds.slice(0, 12)
+      })
+    )
   );
-  const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
-  return Object.freeze({
-    kind: "sdlc_worker_prompt_pressure_projection",
-    projectionVersion: "ts-prompt-projection-v1",
-    manifestPath: input.manifestPath,
-    traversalIntentPackagePath: input.traversalIntentPath,
-    graphFunctionName: input.manifest.graphFunctionName,
-    edgeName: input.manifest.edgeName,
-    vectorIndex: input.manifest.vectorIndex,
-    sourceAssetTypes: input.manifest.inputAssetTypes,
-    targetAssetType: input.manifest.targetAssetType,
-    authorityIndex: input.manifest.traversalObligationContext.authorityIndex,
-    trancheKeys: input.manifest.traversalObligationContext.trancheKeys,
-    inlineObligationIds: inlineObligations.map(
-      (obligation) => obligation.obligationId
-    ),
-    requirementTraceObligationIds,
-    inlineObligations: inlineObligations.map(compactObligation),
-    retrievalHints: input.manifest.traversalObligationContext.retrievalHints,
-    priorGapFrontier: Object.freeze({
-      kind: "sdlc_prior_gap_frontier_projection",
-      reasonCount: priorGapReasons.length,
-      dossierRefs: priorGapDossierRefs(input.manifest.retryContext),
-      sampleReasonCodes: priorGapReasons.slice(0, 20),
-      omittedReasonCount: Math.max(0, priorGapReasons.length - 20)
-    }),
-    omittedObligationCount:
-      input.manifest.traversalObligationContext.obligations.length -
-      inlineObligations.length,
-    obligationDeltaSummary:
-      input.manifest.traversalObligationContext.deltaSummary,
-    traversalStrategyDecision: input.manifest.traversalStrategyDecision,
-    traversalAttemptEnvelope:
-      input.manifest.traversalAttemptEnvelope === null
-        ? null
-        : Object.freeze({
-            envelopeRef: input.manifest.traversalAttemptEnvelope.envelopeRef,
-            profileRef: input.manifest.traversalAttemptEnvelope.profileRef,
-            strategyDirectiveRef:
-              input.manifest.traversalAttemptEnvelope.strategyDirectiveRef,
-            selectedScheduleItemRefs:
-              input.manifest.traversalAttemptEnvelope.selectedScheduleItemRefs,
-            phaseGateRefs: input.manifest.traversalAttemptEnvelope.phaseGateRefs,
-            requiredProgressArtifactRefs:
-              input.manifest.traversalAttemptEnvelope.requiredProgressArtifactRefs,
-            retryBudgetRemaining:
-              input.manifest.traversalAttemptEnvelope.retryBudgetRemaining,
-            mustExitAfterBoundedAttempt:
-              input.manifest.traversalAttemptEnvelope.mustExitAfterBoundedAttempt
-          }),
-    featureScope: input.manifest.featureScope,
-    productMaterialization: input.manifest.productMaterialization,
-    resultReportSchema: input.manifest.resultReportSchema
-  });
 }
 
 function retryRepairScopeForReason(
@@ -2482,7 +2464,7 @@ export function constructWorkerInvocationPackage(input: {
     input.traversalIntentPath ??
     join(input.manifest.archiveRoot, "traversal_intent_package.json");
   const inlineObligations = inlineObligationsForPrompt(input.manifest).map(
-    compactObligation
+    (obligation) => compactObligation(input.manifest, obligation)
   );
   const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
   const repairReentryPlans = repairReentryPlansForContext(input.manifest);
@@ -2495,22 +2477,37 @@ export function constructWorkerInvocationPackage(input: {
     vectorIndex: input.manifest.vectorIndex,
     sourceAssetTypes: input.manifest.inputAssetTypes,
     targetAssetType: input.manifest.targetAssetType,
-    manifestPath,
-    manifestRef: pathToFileURL(manifestPath).href,
+    manifestPath: workerFacingPath(input.manifest, manifestPath),
+    manifestRef: workerFacingRef(input.manifest, pathToFileURL(manifestPath).href),
     manifestDigest: sha256Text(stableOperatorJson(input.manifest)),
-    traversalIntentPackagePath: traversalIntentPath,
-    traversalIntentPackageRef: pathToFileURL(traversalIntentPath).href,
+    traversalIntentPackagePath: workerFacingPath(input.manifest, traversalIntentPath),
+    traversalIntentPackageRef: workerFacingRef(
+      input.manifest,
+      pathToFileURL(traversalIntentPath).href
+    ),
     traversalIntentPackageDigest:
       input.manifest.traversalIntentPackage.packageDigest,
     outputContract: Object.freeze({
       kind: "sdlc_worker_invocation_output_contract" as const,
-      outputFile: input.manifest.outputFile,
-      reportFile: input.manifest.reportFile,
-      fpTransformRequestFile: input.manifest.fpTransformRequestFile,
-      fpTransformResultFile: input.manifest.fpTransformResultFile,
-      fpEvaluateResultFile: input.manifest.fpEvaluateResultFile,
+      outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
+      reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+      fpTransformRequestFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpTransformRequestFile
+      ),
+      fpTransformResultFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpTransformResultFile
+      ),
+      fpEvaluateResultFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpEvaluateResultFile
+      ),
       materializationRequired: input.manifest.productMaterialization.required,
-      tenantRoot: input.manifest.productMaterialization.tenantRoot,
+      tenantRoot: workerFacingPath(
+        input.manifest,
+        input.manifest.productMaterialization.tenantRoot
+      ),
       selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
       requiredRoles: input.manifest.productMaterialization.requiredRoles,
       buildExecutionContract:
@@ -2518,38 +2515,64 @@ export function constructWorkerInvocationPackage(input: {
       testExecutionContract:
         input.manifest.productMaterialization.testExecutionContract
     }),
-    allowedWriteRoots: input.manifest.allowedWriteRoots,
-    traversalStrategyDecision: input.manifest.traversalStrategyDecision,
-    featureScope: input.manifest.featureScope,
+    allowedWriteRoots: input.manifest.allowedWriteRoots.map((root) =>
+      workerFacingPath(input.manifest, root)
+    ),
+    traversalStrategyDecision: workerFacingTraversalStrategyDecision(
+      input.manifest,
+      input.manifest.traversalStrategyDecision
+    ),
+    featureScope: workerFacingFeatureScope(
+      input.manifest,
+      input.manifest.featureScope
+    ),
     retryFrontier: Object.freeze({
       kind: "sdlc_worker_invocation_retry_frontier" as const,
-      retryAttemptRefs: input.manifest.retryContext.retryAttemptRefs.map(
-        (ref) => ref.manifestId
+      retryAttemptRefs: input.manifest.retryContext.retryAttemptRefs.map((ref) =>
+        workerFacingRef(input.manifest, ref.manifestId)
       ),
-      dossierRefs: priorGapDossierRefs(input.manifest.retryContext),
+      dossierRefs: workerFacingRefs(
+        input.manifest,
+        priorGapDossierRefs(input.manifest.retryContext)
+      ),
       reasonCount: priorGapReasons.length,
       sampleReasonCodes: priorGapReasons.slice(0, 20),
       omittedReasonCount: Math.max(0, priorGapReasons.length - 20)
     }),
-    repairReentryPlans,
-    retryRepairInstructions,
+    repairReentryPlans: workerFacingRepairReentryPlans(
+      input.manifest,
+      repairReentryPlans
+    ),
+    retryRepairInstructions: workerFacingRetryRepairInstructions(
+      input.manifest,
+      retryRepairInstructions
+    ),
     inlineObligations,
     inlineObligationIds: inlineObligations.map(
       (obligation) => obligation.obligationId
     ),
     requirementTraceObligationIds:
       requirementTraceObligationIdsForPrompt(input.manifest),
+    trancheKeys: input.manifest.traversalObligationContext.trancheKeys,
     omittedObligationCount:
       input.manifest.traversalObligationContext.obligations.length -
       inlineObligations.length,
-    retrievalHints: input.manifest.traversalObligationContext.retrievalHints,
+    retrievalHints: compactRetrievalHints(
+      input.manifest,
+      input.manifest.traversalObligationContext.retrievalHints
+    ),
     obligationDeltaSummary:
       input.manifest.traversalObligationContext.deltaSummary,
     authorityRefCount:
       input.manifest.traversalObligationContext.authorityRefs.length,
-    runtimeContextRefs:
-      input.manifest.traversalObligationContext.runtimeContextRefs,
-    priorEdgeRefs: input.manifest.traversalObligationContext.priorEdgeRefs,
+    runtimeContextRefs: workerFacingRefs(
+      input.manifest,
+      input.manifest.traversalObligationContext.runtimeContextRefs
+    ),
+    priorEdgeRefs: workerFacingRefs(
+      input.manifest,
+      input.manifest.traversalObligationContext.priorEdgeRefs
+    ),
     resultReportSchema: input.manifest.resultReportSchema
   });
   return Object.freeze({
@@ -2558,27 +2581,206 @@ export function constructWorkerInvocationPackage(input: {
   });
 }
 
+export function constructWorkerBrief(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath: string;
+  readonly workerInvocationPackagePath: string;
+  readonly traversalIntentPath: string;
+  readonly conformedProjectPath: string;
+  readonly invocationPackage: SdlcWorkerInvocationPackage;
+}): SdlcWorkerBrief {
+  return Object.freeze({
+    kind: "sdlc_worker_brief" as const,
+    briefVersion: "ts-worker-brief-v1" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    vectorIndex: input.manifest.vectorIndex,
+    sourceAssetTypes: input.manifest.inputAssetTypes,
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
+    reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+    materializationRequired: input.manifest.productMaterialization.required,
+    allowedWriteRoots: input.manifest.allowedWriteRoots.map((root) =>
+      workerFacingPath(input.manifest, root)
+    ),
+    requiredSchema: input.manifest.resultReportSchema,
+    refs: Object.freeze({
+      workerInvocationPackagePath: workerFacingPath(
+        input.manifest,
+        input.workerInvocationPackagePath
+      ),
+      traversalIntentPackagePath: workerFacingPath(
+        input.manifest,
+        input.traversalIntentPath
+      ),
+      handoffManifestPath: workerFacingPath(input.manifest, input.manifestPath),
+      conformedProjectPath: workerFacingPath(input.manifest, input.conformedProjectPath),
+      fpTransformRequestFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpTransformRequestFile
+      ),
+      fpTransformResultFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpTransformResultFile
+      ),
+      fpEvaluateResultFile: workerFacingPath(
+        input.manifest,
+        input.manifest.fpEvaluateResultFile
+      )
+    }),
+    digests: Object.freeze({
+      workerInvocationPackageDigest: input.invocationPackage.packageDigest,
+      traversalIntentPackageDigest:
+        input.manifest.traversalIntentPackage.packageDigest,
+      handoffManifestDigest: input.invocationPackage.manifestDigest
+    }),
+    retryInstructionCount: input.invocationPackage.retryRepairInstructions.length,
+    repairReentryPlanCount: input.invocationPackage.repairReentryPlans.length
+  });
+}
+
+function workerFacingPath(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  filePath: string
+): string {
+  const workspaceRoot = resolve(manifest.workspaceRoot);
+  const resolvedPath = resolve(filePath);
+  const relativePath = relative(workspaceRoot, resolvedPath);
+  if (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
+  ) {
+    return relativePath === "" ? "." : relativePath;
+  }
+  return filePath;
+}
+
+function workerFacingRef(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  ref: string
+): string {
+  const workspaceRoot = resolve(manifest.workspaceRoot);
+  const workspaceUrl = pathToFileURL(workspaceRoot).href;
+  const workspaceUrlPrefix = `${workspaceUrl}/`;
+  if (ref === workspaceUrl) {
+    return "workspace://.";
+  }
+  if (ref.startsWith(workspaceUrlPrefix)) {
+    return `workspace://${ref.slice(workspaceUrlPrefix.length)}`;
+  }
+  if (ref.startsWith("file://")) {
+    try {
+      const filePath = fileURLToPath(ref);
+      const relativePath = workerFacingPath(manifest, filePath);
+      if (relativePath !== filePath) {
+        return `workspace://${relativePath}`;
+      }
+    } catch {
+      return ref;
+    }
+  }
+  if (isAbsolute(ref)) {
+    const relativePath = workerFacingPath(manifest, ref);
+    if (relativePath !== ref) {
+      return `workspace://${relativePath}`;
+    }
+  }
+  if (ref.includes(workspaceUrlPrefix)) {
+    return ref.split(workspaceUrlPrefix).join("workspace://");
+  }
+  if (ref.includes(workspaceRoot)) {
+    return ref.split(workspaceRoot).join(".");
+  }
+  return ref;
+}
+
+function workerFacingRefs(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  refs: readonly string[]
+): readonly string[] {
+  return Object.freeze(refs.map((ref) => workerFacingRef(manifest, ref)));
+}
+
+function workerFacingTraversalStrategyDecision(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  decision: SdlcTraversalStrategyDecision
+): SdlcTraversalStrategyDecision {
+  return Object.freeze({
+    ...decision,
+    basisRefs: workerFacingRefs(manifest, decision.basisRefs)
+  });
+}
+
+function workerFacingFeatureScope(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  scope: SdlcWorkerHandoffManifest["featureScope"]
+): SdlcWorkerHandoffManifest["featureScope"] {
+  return Object.freeze({
+    ...scope,
+    basisRefs: workerFacingRefs(manifest, scope.basisRefs)
+  });
+}
+
+function workerFacingRetryRepairInstructions(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  instructions: readonly SdlcWorkerRetryRepairInstruction[]
+): readonly SdlcWorkerRetryRepairInstruction[] {
+  return Object.freeze(
+    instructions.map((instruction) =>
+      Object.freeze({
+        ...instruction,
+        gapDossierRef: workerFacingRef(manifest, instruction.gapDossierRef),
+        rejectedArtifactRefs: workerFacingRefs(
+          manifest,
+          instruction.rejectedArtifactRefs
+        )
+      })
+    )
+  );
+}
+
+function workerFacingRepairReentryPlans(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  plans: readonly SdlcComponentRepairReentryPlan[]
+): readonly SdlcComponentRepairReentryPlan[] {
+  return Object.freeze(
+    plans.map((plan) =>
+      Object.freeze({
+        ...plan,
+        sourceGapDossierRef: workerFacingRef(manifest, plan.sourceGapDossierRef),
+        sourceRefs: workerFacingRefs(manifest, plan.sourceRefs),
+        testRefs: workerFacingRefs(manifest, plan.testRefs),
+        repairRowEvidenceRefs: workerFacingRefs(
+          manifest,
+          plan.repairRowEvidenceRefs
+        ),
+        diagnosticEvidenceRefs: workerFacingRefs(
+          manifest,
+          plan.diagnosticEvidenceRefs
+        )
+      })
+    )
+  );
+}
+
 export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   const manifestPath = join(manifest.archiveRoot, "handoff_manifest.json");
   const invocationPackagePath = join(
     manifest.archiveRoot,
     "worker_invocation_package.json"
   );
+  const workerBriefPath = join(manifest.archiveRoot, "worker_brief.json");
   const traversalIntentPath = join(
     manifest.archiveRoot,
     "traversal_intent_package.json"
   );
-  const invocationPackage = constructWorkerInvocationPackage({
-    manifest,
-    manifestPath,
-    traversalIntentPath
-  });
   return [
     "You are the F_P worker for an installed odd_sdlc TypeScript operator run.",
-    `Read the compact worker invocation package first: ${invocationPackagePath}`,
-    `Read the traversal intent package before writing output: ${traversalIntentPath}`,
-    "Use those files as the normal worker-facing authority.",
-    `The full forensic handoff manifest remains archived by reference: ${manifestPath}`,
+    `Read the worker brief first: ${workerFacingPath(manifest, workerBriefPath)}`,
+    `Then read the compact worker invocation package: ${workerFacingPath(manifest, invocationPackagePath)}`,
+    `Read the traversal intent package before writing output: ${workerFacingPath(manifest, traversalIntentPath)}`,
+    "Use those files as worker-facing authority. This prompt is only the launch contract.",
+    `The full forensic handoff manifest remains archived by reference: ${workerFacingPath(manifest, manifestPath)}`,
     "Read the full manifest only when the compact package points you to a specific field or when you need forensic detail that is not in the compact package.",
     "The traversal intent package is the typed cumulative intent package for this edge.",
     "The compact package traversalStrategyDecision is the selected per-edge traversal strategy.",
@@ -2602,17 +2804,17 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "The Requirement Trace Register is observational evidence only, not a closure decision or obligation assessment.",
     "Use workerInvocationPackage.requirementTraceObligationIds as the complete checklist for requirement trace markers, including ids omitted from compact inlineObligations.",
     "For every requirementTraceObligationIds entry whose obligationId starts with `requirement:`, copy the full obligationId and exact requirement id verbatim; do not abbreviate, wildcard, or collapse requirement families.",
-    `ABG F_P transform request carrier: ${manifest.fpTransformRequestFile}`,
-    `ABG F_P transform result carrier written by framework: ${manifest.fpTransformResultFile}`,
-    `odd_sdlc F_P.evaluate result carrier written by framework: ${manifest.fpEvaluateResultFile}`,
+    `ABG F_P transform request carrier: ${workerFacingPath(manifest, manifest.fpTransformRequestFile)}`,
+    `ABG F_P transform result carrier written by framework: ${workerFacingPath(manifest, manifest.fpTransformResultFile)}`,
+    `odd_sdlc F_P.evaluate result carrier written by framework: ${workerFacingPath(manifest, manifest.fpEvaluateResultFile)}`,
     "If manifest.traversalAttemptEnvelope is present, treat its selected schedule refs, phase gates, required progress artifacts, retry budget, and bounded-exit flag as ABG replay authority for this attempt.",
     "Write only the requested transform artifact and product files unless the manifest says otherwise.",
-    `Output artifact: ${manifest.outputFile}`,
+    `Output artifact: ${workerFacingPath(manifest, manifest.outputFile)}`,
     "Before executing the transform or editing product files, write an explicit execution plan into the output artifact.",
     "The output artifact must start with a `## Execution Plan` section that names the bounded steps, authority files read, and first materialization target.",
     "Do not keep this plan private. If you cannot form that plan, write the blocker into the output artifact and exit.",
     "After the plan section is written, continue the requested transform in the same artifact.",
-    `Framework-generated result report path: ${manifest.reportFile}`,
+    `Framework-generated result report path: ${workerFacingPath(manifest, manifest.reportFile)}`,
     "Do not write the result report. The framework writes it after observing this transform.",
     "If you cannot complete the requested transformation in this turn, write the best bounded transform artifact you can, leave remaining work in that artifact, and exit.",
     "Use conformedProject as the generic project profile. Do not infer product identity from this prompt's examples.",
@@ -2624,18 +2826,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     executionEvidenceTransformPrompt(manifest),
     "",
-    scheduleSurfacePrompt(manifest),
-    "",
-    "Compact worker invocation package:",
-    stableOperatorJson(invocationPackage),
-    "Legacy compact prompt pressure projection:",
-    stableOperatorJson(
-      promptPressureProjection({
-        manifest,
-        manifestPath,
-        traversalIntentPath
-      })
-    )
+    scheduleSurfacePrompt(manifest)
   ].join("\n");
 }
 
@@ -2643,6 +2834,7 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   readonly manifestPath: string;
   readonly promptPath: string;
   readonly invocationPackagePath: string;
+  readonly workerBriefPath: string;
 } {
   assertTraversalIntentPackagePressure(manifest);
   mkdirSync(manifest.archiveRoot, { recursive: true });
@@ -2654,6 +2846,7 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     manifest.archiveRoot,
     "worker_invocation_package.json"
   );
+  const workerBriefPath = join(manifest.archiveRoot, "worker_brief.json");
   const promptPath = join(manifest.archiveRoot, "worker_prompt.md");
   const conformedProjectPath = join(manifest.archiveRoot, "conformed_project.json");
   const traversalIntentPath = join(manifest.archiveRoot, "traversal_intent_package.json");
@@ -2662,8 +2855,17 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     manifestPath,
     traversalIntentPath
   });
+  const workerBrief = constructWorkerBrief({
+    manifest,
+    manifestPath,
+    workerInvocationPackagePath: invocationPackagePath,
+    traversalIntentPath,
+    conformedProjectPath,
+    invocationPackage
+  });
   writeFileSync(manifestPath, stableOperatorJson(manifest), "utf8");
   writeFileSync(invocationPackagePath, stableOperatorJson(invocationPackage), "utf8");
+  writeFileSync(workerBriefPath, stableOperatorJson(workerBrief), "utf8");
   writeFileSync(promptPath, promptForHandoff(manifest), "utf8");
   writeFileSync(conformedProjectPath, stableOperatorJson(manifest.conformedProject), "utf8");
   writeFileSync(
@@ -2678,7 +2880,12 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
       "utf8"
     );
   }
-  return Object.freeze({ manifestPath, promptPath, invocationPackagePath });
+  return Object.freeze({
+    manifestPath,
+    promptPath,
+    invocationPackagePath,
+    workerBriefPath
+  });
 }
 
 function parseNonNegativeInteger(input: unknown, label: string): number {

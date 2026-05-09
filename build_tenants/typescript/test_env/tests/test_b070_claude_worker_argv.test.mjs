@@ -12,6 +12,7 @@ import {
   admitWorkerTransport,
   argsForWorker,
   parserForWorkerTransport,
+  processLaunchForWorker,
   selectedWorkerExecutorProfile,
   stdinForWorker
 } from "../../build/semantic/code/src/index.js";
@@ -123,9 +124,62 @@ test("B-070 process://codex argv shape is preserved (regression guard)", () => {
   assert.equal(args[olmIndex + 1], fx.outputLastMessagePath);
   assert.equal(
     args[args.length - 1],
-    "CODEX-PROMPT\n",
-    "codex final positional arg is prompt content"
+    "-",
+    "codex reads prompt content from stdin instead of argv"
   );
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CODEX-PROMPT\n"
+  );
+});
+
+test("B-070 process://codex PTY launch redirects prompt file to stdin without prompt argv", () => {
+  const fx = makeFixture("CODEX-PTY-PROMPT\n");
+  const transport = admitWorkerTransport("process://codex");
+
+  const launch = processLaunchForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath,
+    executorProfile: "pty-terminal"
+  });
+
+  assert.equal(launch.command, "/bin/sh");
+  assert.equal(launch.stdin, null);
+  assert.deepEqual(launch.args.slice(0, 4), [
+    "-lc",
+    'prompt_file=$1; shift; exec "$@" < "$prompt_file"',
+    "odd-sdlc-worker-stdin",
+    fx.promptPath
+  ]);
+  assert.equal(launch.args[4], "codex");
+  assert(launch.args.includes("exec"));
+  assert.equal(launch.args[launch.args.length - 1], "-");
+  assert(!launch.args.includes("CODEX-PTY-PROMPT\n"));
+});
+
+test("B-070 process://codex local-spawn launch uses stdin pipe", () => {
+  const fx = makeFixture("CODEX-LOCAL-PROMPT\n");
+  const transport = admitWorkerTransport("process://codex");
+
+  const launch = processLaunchForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath,
+    executorProfile: "local-spawn"
+  });
+
+  assert.equal(launch.command, "codex");
+  assert.equal(launch.args[0], "exec");
+  assert.equal(launch.args[launch.args.length - 1], "-");
+  assert.equal(launch.stdin, "CODEX-LOCAL-PROMPT\n");
 });
 
 test("B-070 process://codex?model=... lowers to codex exec --model", () => {
@@ -150,8 +204,15 @@ test("B-070 process://codex?model=... lowers to codex exec --model", () => {
   assert.equal(args[modelIndex + 1], "gpt-5.3-codex-spark");
   assert.equal(
     args[args.length - 1],
-    "CODEX-SPARK-PROMPT\n",
-    "codex final positional arg remains prompt content"
+    "-",
+    "codex model lane reads prompt content from stdin instead of argv"
+  );
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CODEX-SPARK-PROMPT\n"
   );
 });
 
@@ -181,8 +242,15 @@ test("B-070 process://codex?model=...&effort=... lowers Codex reasoning effort c
   assert.equal(args[configIndex + 1], 'model_reasoning_effort="medium"');
   assert.equal(
     args[args.length - 1],
-    "CODEX-GPT55-PROMPT\n",
-    "codex final positional arg remains prompt content"
+    "-",
+    "codex effort lane reads prompt content from stdin instead of argv"
+  );
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CODEX-GPT55-PROMPT\n"
   );
 });
 

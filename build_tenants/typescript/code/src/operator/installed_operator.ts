@@ -91,10 +91,9 @@ import {
 } from "./handoff.js";
 import {
   admitWorkerTransport,
-  argsForWorker,
   parserForWorkerTransport,
-  selectedWorkerExecutorProfile,
-  stdinForWorker
+  processLaunchForWorker,
+  selectedWorkerExecutorProfile
 } from "./transport.js";
 import {
   deriveSdlcInstalledQualificationInitialState,
@@ -1503,12 +1502,13 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   const inactivityPolicy = workerInactivityPolicy();
   const executorProfile = selectedWorkerExecutorProfile();
   let startedContextWritten = false;
-  const args = argsForWorker({
+  const processLaunch = processLaunchForWorker({
     transport: input.transport,
     manifestPath: input.manifestPath,
     manifest: input.manifest,
     promptPath: input.promptPath,
-    outputLastMessagePath: outputLastMessagePath ?? ""
+    outputLastMessagePath: outputLastMessagePath ?? "",
+    executorProfile
   });
   const processResult: SupervisedProcessActorResult =
     await invokeSupervisedProcessActor({
@@ -1516,8 +1516,8 @@ async function invokeWorkerThroughAbgProcessActor(input: {
         pluginInput: input.pluginInput,
         transport: input.transport
       }),
-      command: input.transport.command,
-      args,
+      command: processLaunch.command,
+      args: processLaunch.args,
       cwd: input.manifest.workspaceRoot,
       environment: {
         ...process.env,
@@ -1530,10 +1530,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
           input.manifest.productMaterialization.manifestFile
       },
       environmentPolicy: environmentPolicyForTransport(input.transport),
-      stdin: stdinForWorker({
-        transport: input.transport,
-        promptPath: input.promptPath
-      }),
+      stdin: processLaunch.stdin,
       stdoutPath,
       stderrPath,
       stdoutRef: pathToFileURL(stdoutPath).href,

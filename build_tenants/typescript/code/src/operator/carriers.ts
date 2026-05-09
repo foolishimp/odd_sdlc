@@ -983,6 +983,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly inlineObligations: readonly SdlcWorkerInvocationObligation[];
   readonly inlineObligationIds: readonly string[];
   readonly requirementTraceObligationIds: readonly string[];
+  readonly trancheKeys: readonly string[];
   readonly omittedObligationCount: number;
   readonly retrievalHints: readonly SdlcRetrievalHint[];
   readonly obligationDeltaSummary: SdlcTraversalObligationDeltaSummary;
@@ -991,6 +992,37 @@ export interface SdlcWorkerInvocationPackage {
   readonly priorEdgeRefs: readonly string[];
   readonly resultReportSchema: readonly string[];
   readonly packageDigest: string;
+}
+
+export interface SdlcWorkerBrief {
+  readonly kind: "sdlc_worker_brief";
+  readonly briefVersion: "ts-worker-brief-v1";
+  readonly graphFunctionName: string;
+  readonly edgeName: string;
+  readonly vectorIndex: number;
+  readonly sourceAssetTypes: readonly string[];
+  readonly targetAssetType: string;
+  readonly outputFile: string;
+  readonly reportFile: string;
+  readonly materializationRequired: boolean;
+  readonly allowedWriteRoots: readonly string[];
+  readonly requiredSchema: readonly string[];
+  readonly refs: {
+    readonly workerInvocationPackagePath: string;
+    readonly traversalIntentPackagePath: string;
+    readonly handoffManifestPath: string;
+    readonly conformedProjectPath: string;
+    readonly fpTransformRequestFile: string;
+    readonly fpTransformResultFile: string;
+    readonly fpEvaluateResultFile: string;
+  };
+  readonly digests: {
+    readonly workerInvocationPackageDigest: string;
+    readonly traversalIntentPackageDigest: string;
+    readonly handoffManifestDigest: string;
+  };
+  readonly retryInstructionCount: number;
+  readonly repairReentryPlanCount: number;
 }
 
 export interface SdlcWorkerHandoffManifest {

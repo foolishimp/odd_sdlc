@@ -14,7 +14,7 @@ build_tenant: typescript
 owner: unassigned
 triaged_at: 2026-05-02
 created_at: 2026-05-02
-updated_at: 2026-05-07
+updated_at: 2026-05-09
 review_status: reopened_codex_rc_completeness_review
 governance_scope: STDO Method and ODD_SDLC
 governance_scope_expansion:
@@ -42,6 +42,12 @@ dependencies:
 related_tickets:
   - T-107 split operator handoff into prime domain modules
   - T-108 extract installed operator F_P dispatch closure
+  - T-135 realize evaluator-owned runner traversal spine
+  - T-136 add yield closure disposition and resume basis
+  - T-137 enforce target obligation binding and published action law
+  - T-138 preserve causal chain and replayability for traversal consequence
+  - T-139 consolidate public gaps as read-only evaluator view
+  - T-140 retire local forced-iteration tech debt
 canonical_design_target:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md
 source_design_inputs_to_reconcile:
@@ -433,7 +439,7 @@ Minimum new or reconciled odd_sdlc domain payloads over ABG RC6 carriers:
 | `SdlcEdgeAttemptRecord` | attempt identity, edge identity, parent attempt refs, manifest refs, process refs, output refs, and digest refs |
 | `SdlcEdgeFulfillmentLedger` | admitted closure carrier for one edge attempt/version |
 | `SdlcEdgeFulfillmentObligationRow` | one obligation, status, evidence refs, source refs, and blocking reasons |
-| `SdlcEdgeClosureDecision` | fold output: close, retry_same_edge, carry_loopback_pressure, blocked, reprice_required |
+| `SdlcEdgeClosureDecision` | fold output: close, yield, retry, repair, re-enter, reprice, block |
 | `SdlcRequirementResolutionProjection` | derived current-state view across admitted edge ledgers |
 
 ### Edge Fulfillment Ledger Fields
@@ -472,7 +478,7 @@ Every requirement-bearing edge ledger must include:
   reasons
 - admission basis
 - edge convergence boolean
-- lawful next action
+- closure decision basis refs
 - supersedes refs when applicable
 
 ### Project Construction Ledger Fields
@@ -525,7 +531,7 @@ edge_converged =
 The closure fold may compute these fields, but it must expose them as named
 ledger terms. A generic `close_allowed` boolean is not enough.
 
-### Retry And Loopback Rule
+### Closure Decision And Lawful Iterate Rule
 
 For missing, partial, blocked, or unfulfilled requirement evidence:
 
@@ -533,10 +539,20 @@ For missing, partial, blocked, or unfulfilled requirement evidence:
 semantic gap
   -> admitted edge fulfillment ledger with edge_converged = false
   -> gap dossier or retry frontier entry
-  -> retry_same_edge when repairable
-  -> carry_loopback_pressure when graph law allows advance with unresolved pressure
-  -> typed blocked/exhausted state when retry budget or policy is exhausted
+  -> SdlcEdgeClosureDecision:
+       close when convergence law is met
+       yield when the same edge remains lawfully open with admitted progress or bounded waiting state
+       retry when the same edge should be attempted again with pressure
+       repair when a targeted repair action is required
+       re-enter when graph law requires an earlier/later graph point
+       reprice when product/requirement/design authority must change
+       block when no lawful progress path is currently available
 ```
+
+`yield` is the lawful iterate boundary. It is not closure and not failure. It
+returns control with replay-visible resume truth, such as yield kind, resume
+basis ref, resume policy ref, current edge ref, admitted progress refs, and
+liveness projection ref.
 
 For silent worker inactivity:
 
@@ -965,7 +981,7 @@ flowchart TD
 
   F -- "no" --> G["Construct postflight gap dossier"]
   G --> H["Call writeEdgeFulfillmentLedger(...,<br/>assuranceSatisfaction = null)"]
-  H -.-> H1["HIGH-1<br/>Edge ledger is written as a side effect.<br/>FpDispatchOutcome is then constructed from<br/>postflight/gap branch facts, not from<br/>the returned ledger lawfulNextAction."]
+  H -.-> H1["HIGH-1<br/>Edge ledger is written as a side effect.<br/>FpDispatchOutcome is then constructed from<br/>postflight/gap branch facts, not from<br/>the returned closure decision."]
   H --> I["Return FpDispatchOutcome(dispatched, partial)<br/>from postflight refs and gap dossier"]
   I --> Z1(("stop"))
 
@@ -976,8 +992,8 @@ flowchart TD
 
   K -- "yes" --> L["Write assurance_postflight and gap dossier"]
   L --> M["Call writeEdgeFulfillmentLedger(...,<br/>assuranceGate.satisfaction)"]
-  M -.-> H1B["HIGH-1 repeats<br/>Ledger lawfulNextAction is recorded, but<br/>dispatch result is still selected by<br/>assurance branch logic."]
-  M --> N{"reprice_required?"}
+  M -.-> H1B["HIGH-1 repeats<br/>Closure decision truth is not the<br/>dispatch-result authority; dispatch result is still<br/>selected by assurance branch logic."]
+  M --> N{"reprice?"}
   N -- "yes" --> O["Return FpDispatchOutcome(blocked)<br/>from assurance blocking postflight"]
   N -- "no" --> P["Return FpDispatchOutcome(dispatched, partial)<br/>from assurance blocking postflight"]
   O --> Z2(("stop"))
@@ -1040,8 +1056,83 @@ The ODD_SDLC split remains:
 - odd_sdlc owns SDLC domain meaning, requirement/test/design obligation
   mapping, evaluator plugins, and proof interpretation.
 
+### Axiomatic Closure Target - 2026-05-09
+
+The implementation target is one replayable traversal consequence surface:
+
+```text
+ObservationSnapshot
+-> TargetObligationBinding
+-> PriorityProjection
+-> ConstructionIntent
+-> WorksiteEvidence
+-> SdlcEdgeFulfillmentLedger
+-> SdlcEdgeClosureDecision
+-> EvaluatorProjection
+```
+
+The closure decision vocabulary is:
+
+```text
+close | yield | retry | repair | re-enter | reprice | block
+```
+
+`yield` is the lawful iterate boundary. It keeps the same edge/attempt lawfully
+open through replay-visible resume truth. It is not retry, block, timeout, or a
+local CLI loop.
+
+The evaluator's default totality rule is:
+
+```text
+if active closure decision is yield:
+  resume/yield the same edge from replay-visible resume basis
+else if higher-priority lawful action exists:
+  select it
+else if current graph edge remains lawful:
+  follow the graph
+else if authority is missing:
+  reprice or block
+else:
+  block with typed no-action disposition
+```
+
+When a declared target asset or target action is in scope, published-action law
+governs before default graph following. The current graph edge is not a lawful
+fallback unless binding proves that edge is the published action for the
+declared target.
+
+The edge fulfillment ledger records evidence and convergence. It must not carry
+or decide the next graph action. Next-action selection belongs to evaluator
+projection over the closure decision plus current observed truth.
+
+Each admitted carrier must preserve causal predecessor refs across intent,
+worksite evidence, edge ledger, closure decision, and evaluator projection. A
+broken predecessor chain is hidden state and fails replayability.
+
+Priority projection is ABG evaluator kernel output with odd_sdlc policy as a
+visible input, not co-owned ranking authority.
+
 The feature is complete only when that split is visible in both design and
 code.
+
+### Implementation Decomposition - 2026-05-09
+
+The axiomatic closure target is split into active implementation tickets:
+
+- `T-135`: runner consumes evaluator/closure truth and invokes only admitted
+  construction intent.
+- `T-136`: `yield` becomes a first-class closure disposition and replay-visible
+  resume basis.
+- `T-137`: target obligation binding and published-action law prevent broad
+  fallback for declared target assets/actions.
+- `T-138`: causal predecessor refs make the whole consequence chain replayable.
+- `T-139`: public gaps/query-domain/CLI summaries become read-only evaluator
+  views.
+- `T-140`: local forced-iteration shims are deleted or demoted after the new
+  spine is live.
+
+These tickets are implementation children of T-109. They must not introduce a
+new traversal ledger, new semantic center, or second action-selection surface.
 
 ## ABG RC6 Architecture Rebase - 2026-05-02
 
@@ -1128,8 +1219,8 @@ Minimum pure functions:
   transform evidence, process refs, output refs, and F_P semantic rows
 - compute the five-term edge convergence predicate:
   `carry_converged AND fulfillment_converged AND admitted AND target_certification_passed AND fd_recheck_passed`
-- classify SDLC semantic gap state into close, retry_same_edge,
-  carry_loopback_pressure, blocked, or reprice_required payload terms
+- classify SDLC semantic gap state into close, yield, retry, repair, re-enter,
+  reprice, or block payload terms
 - derive requirement-resolution projection from selected admitted edge payloads
 - validate replay selection and fail closed on supersession/order conflict
 
@@ -1168,12 +1259,12 @@ flowchart TD
   I["ABG admits FpTransformResult<br/>and emits runtime events"]
   J["odd_sdlc F_P semantic evaluator<br/>requirement-by-requirement A.req -> B.result"]
   K["pure SDLC edge fulfillment payload<br/>five-term convergence predicate"]
-  L["ABG retry frontier / foldback / graph reentry projection"]
+  L["ABG closure decision / retry frontier / foldback / graph reentry projection"]
   M{"ABG traversal consequence"}
   N["close edge and advance"]
-  O["retry same edge"]
-  P["carry loopback pressure"]
-  Q["blocked or reprice_required"]
+  O["yield lawful iterate"]
+  P["retry / repair / re-enter"]
+  Q["blocked or reprice"]
 
   A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L --> M
   M --> N

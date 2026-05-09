@@ -67,6 +67,7 @@ TypeScript must copy the successful algorithmic split:
 - worker output is admitted as evidence, not as closure authority
 - fulfillment is projected into an admitted edge ledger
 - edge closure is folded from the admitted ledger
+- lawful iteration is represented by yield, not by hidden local loops
 - incomplete obligations remain typed pressure
 - worker-runtime failure is distinct from semantic edge failure
 - run-wide lineage is append-only and replayable
@@ -80,7 +81,8 @@ TypeScript must improve that split through functional design:
   surfaces
 - pure total construction functions from admitted evidence to edge ledger values
 - pure closure predicates over edge ledger values
-- pure retry classification from typed runtime and semantic failure values
+- pure closure-decision classification from typed runtime and semantic failure
+  values
 - immutable digestable values instead of hidden mutable state
 - effectful process, filesystem, and clock operations isolated at the adapter
   boundary
@@ -97,6 +99,62 @@ Effect adapters
   -> pure closure predicate
   -> typed continuation decision
 ```
+
+## Axiomatic Closure And Iteration Target
+
+The target traversal consequence surface is:
+
+```text
+ObservationSnapshot
+-> TargetObligationBinding
+-> PriorityProjection
+-> ConstructionIntent
+-> WorksiteEvidence
+-> SdlcEdgeFulfillmentLedger
+-> SdlcEdgeClosureDecision
+-> EvaluatorProjection
+```
+
+The closure decision vocabulary is:
+
+```text
+close | yield | retry | repair | re-enter | reprice | block
+```
+
+`yield` is the lawful iterate boundary. It means the same edge or attempt
+remains lawful/open, progress or waiting state is admitted, and resume truth is
+replay-visible. It is not a timeout, retry, block, or local controller pause.
+
+The evaluator defaulting rule is:
+
+```text
+if active closure decision is yield:
+  resume/yield the same edge from replay-visible resume basis
+else if higher-priority lawful action exists:
+  select it
+else if current graph edge remains lawful:
+  follow the graph
+else if authority is missing:
+  reprice or block
+else:
+  block with typed no-action disposition
+```
+
+When a declared target asset or target action is in scope, published-action law
+governs before default graph following. The current graph edge is not a lawful
+fallback unless binding proves that edge is the published action for the
+declared target.
+
+The edge fulfillment ledger records evidence and convergence. It does not carry
+or decide the next graph action. Action selection belongs to evaluator projection
+over the closure decision plus current observed truth.
+
+Each admitted carrier preserves causal predecessor refs across intent, worksite
+evidence, edge ledger, closure decision, and evaluator projection. Replay follows
+those refs; a broken predecessor chain fails replayability.
+
+Priority projection is ABG evaluator kernel output with odd_sdlc policy as a
+visible input, not co-owned ranking authority.
 
 ## Python Discovery Domain Model
 
@@ -366,7 +424,7 @@ classDiagram
     vectorIndex
     reasons
     retryEligible
-    nextLawfulActions
+    candidateActionRefs
   }
 
   class WorkerProcessSummary {
@@ -412,7 +470,7 @@ Current TS assurance has the right first failure classification:
 - missing requirement observation becomes
   `requirement_trace_not_observed:<id>`
 - blocked obligation assessments become assurance reasons
-- gap dossier can select `retry_same_edge`
+- gap dossier currently emits a retry candidate string such as `retry_same_edge`
 
 Current TS process supervision has useful typed runtime evidence:
 
@@ -449,14 +507,14 @@ sequenceDiagram
   Observe->>Postflight: product materialization and report admission
   Postflight->>Assurance: evidence and worker/framework assessments
   Assurance->>Gap: blocked reasons and retry eligibility
-  Gap-->>ABG: retry/continuation pressure
+  Gap-->>ABG: retry/continuation pressure candidate
   ABG-->>Operator: blocked, retry, or continue projection
 
   alt test65 vector 8 first attempt
     Worker-->>Observe: implementation_design_surface.md
     Postflight-->>Assurance: passed base postflight
     Assurance->>Gap: six requirement traces not observed
-    Gap-->>ABG: retry_same_edge
+    Gap-->>ABG: retry_same_edge candidate
   end
 
   alt test65 vector 8 second attempt
@@ -558,7 +616,6 @@ classDiagram
     targetCertificationPassed
     fdRecheckPassed
     edgeConverged
-    lawfulNextAction
     admissionBasis
     supersedesRefs
   }
@@ -591,16 +648,20 @@ classDiagram
     semanticGapRefs
     runtimeFailureRefs
     retryBudgetState
-    nextLawfulActions
+    candidateActionRefs
   }
 
   class SdlcEdgeClosureDecision {
     CloseAllowed
-    RetrySameEdge
-    CarryLoopbackPressure
+    Yield
+    Retry
+    Repair
+    ReEnter
+    Reprice
     Blocked
-    RepriceRequired
-    RetryExhausted
+    yieldKind
+    resumeBasisRef
+    resumePolicyRef
     reasonRefs
   }
 
@@ -747,19 +808,22 @@ sequenceDiagram
   Fold->>ProjectLedger: append closure_decision
   Fold->>Projection: update derived requirement resolution view
 
-  alt edge converged
+  alt close
     Fold-->>ABG: close_allowed from ledger predicate
     ABG->>Operator: advance to next edge
+  else yield
+    Fold->>ProjectLedger: append yield decision with resume refs
+    Fold-->>ABG: lawful iterate / return control with same edge open
   else semantic gap repairable
     Fold->>Frontier: publish semantic gap frontier
     Frontier->>ProjectLedger: append retry_same_edge_planned
     Frontier-->>ABG: retry same edge with prior gap pressure
-  else loopback pressure allowed
-    Fold->>Frontier: publish carry_loopback_pressure
-    Frontier-->>ABG: advance with unresolved pressure preserved
+  else repair or re-entry pressure allowed
+    Fold->>Frontier: publish repair/re-entry pressure
+    Frontier-->>ABG: evaluator selects repair or re-entry action
   else blocked or reprice required
     Fold->>ProjectLedger: append typed stop
-    Fold-->>ABG: blocked or reprice_required
+    Fold-->>ABG: block or reprice
   end
 
   alt worker silent on retry
@@ -782,7 +846,10 @@ attempt 1:
   edge ledger admitted:
     edge_converged = false
     blocked obligations = 6
-    lawful next action = retry_same_edge
+  closure decision:
+    disposition = retry
+  evaluator projection:
+    selected action = retry_same_edge when policy admits it
   semantic gap frontier published
 
 attempt 2:
