@@ -3,8 +3,8 @@ id: T-120
 title: Realize retry-local repair prompts from typed gap dossiers
 type: feature
 ticket_category: lawful_retry_repair
-status: active
-review_status: active_runtime_reentry_authority_split_blocks_closure
+status: completed
+review_status: completed_live_retry_repair_prompt_proof
 goal: typescript-rc-live-lane-retry-quality
 build_tenant: typescript
 owner: unassigned
@@ -15,7 +15,8 @@ affected_boundary: ABG-visible retry/reentry frontier, worker_prompt.md, compone
 priority: high
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-08
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 governance_scope: STDO Method
 depends_on:
   - T-101 honor retry-eligible worker report rejection in autonomous start loop
@@ -44,6 +45,36 @@ non_closure_conditions:
   - retry repair bypasses F_P/F_D postflight
   - accepted schema is embedded as stale prose with no typed source ref or generated field list
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for typed retry-local repair prompt realization.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- Live `worker_invocation_package.json` files contain non-empty
+  `retryRepairInstructions` on retry attempts for:
+  `derive_implementation_module_surface`,
+  `derive_aggregate_sunny_day_sequence_surface`,
+  `derive_component_realization_schedule_surface`,
+  `derive_component_code_surface`,
+  `qualify_component_realization_surface`,
+  `derive_test_component_topology_surface`, and
+  `derive_component_test_surface`.
+- The run repeatedly repaired typed postflight failures and advanced to later
+  edges instead of broad-regenerating or stopping on generic "try again"
+  instructions.
+- The Spec Method entrypoint remains a command/render surface; retry repair
+  package data is carried through installed-operator handoff evidence.
+
+Closure boundary:
+
+- This closes the typed same-edge retry prompt and local repair package slice.
+- It does not close `B-085`; release-depth component repair schedule
+  consumption remains active until the component-test repair reaches pass
+  evidence or a new typed product/test blocker.
 
 ## Runtime Reentry Review - 2026-05-07
 

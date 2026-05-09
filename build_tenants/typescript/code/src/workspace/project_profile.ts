@@ -37,6 +37,10 @@ import {
   type SdlcProjectConstraints,
   type SdlcRealizationMode
 } from "./carriers.js";
+import {
+  admitSdlcRuntimeLayout,
+  standardSdlcRuntimeLayout
+} from "./runtime_layout.js";
 
 const PROJECT_CONSTRAINTS_RELATIVE_PATH =
   ".ai-workspace/context/project_constraints.yml" as const;
@@ -280,6 +284,14 @@ function parseConstraintsText(content: string): ParsedConstraints {
       currentNestedKey = "";
       continue;
     }
+    if (indent === 0 && stripped === "runtime:") {
+      flushDesignTenant();
+      section = "runtime";
+      inDesignTenants = false;
+      currentBuildTenant = null;
+      currentNestedKey = "";
+      continue;
+    }
 
     if (section === "structure" && stripped === "design_tenants:") {
       inDesignTenants = true;
@@ -376,6 +388,12 @@ function parseConstraintsText(content: string): ParsedConstraints {
         currentBuildTenant.capabilityContracts[key] = normalizedScalar(value);
         continue;
       }
+    }
+
+    if (section === "runtime" && indent === 2 && stripped.includes(":")) {
+      const [key, value] = splitKeyValue(stripped);
+      values[`runtime_${key}`] = normalizedScalar(value);
+      continue;
     }
 
     if ((section === "project" || section === "constraints" || indent === 0) && stripped.includes(":")) {
@@ -613,6 +631,23 @@ function realizationRootHasSignal(root: string): boolean {
   return countSourceFiles(root, 4) > 0;
 }
 
+function runtimeLayoutFromValues(values: Record<string, string>) {
+  const standard = standardSdlcRuntimeLayout();
+  return admitSdlcRuntimeLayout({
+    kind: "sdlc_runtime_layout",
+    runtimeRoot: nonEmpty(values["runtime_root"], standard.runtimeRoot),
+    transformAssetRoot: nonEmpty(
+      values["runtime_transform_asset_root"],
+      standard.transformAssetRoot
+    ),
+    operatorRunRoot: nonEmpty(values["runtime_operator_run_root"], standard.operatorRunRoot),
+    productMaterializationRootPolicy: nonEmpty(
+      values["runtime_product_materialization_root_policy"],
+      standard.productMaterializationRootPolicy
+    )
+  });
+}
+
 function countSourceFiles(root: string, limit: number): number {
   let count = 0;
   const ignored = new Set<string>(IGNORED_DIR_NAMES);
@@ -698,6 +733,7 @@ export function conformProjectProfileFromConstraintsText(input: {
     selectedOutputRoot,
     input.constraintsText.trim().length > 0
   );
+  const runtimeLayout = runtimeLayoutFromValues(parsed.values);
   return Object.freeze({
     kind: "sdlc_conform_project_profile",
     workspaceName: path.basename(input.workspaceRoot),
@@ -713,6 +749,7 @@ export function conformProjectProfileFromConstraintsText(input: {
     activeTenant,
     selectedOutputRoot,
     declaredOutputRoot,
+    runtimeLayout,
     buildExecutionContract: executionContracts.buildExecutionContract,
     testExecutionContract: executionContracts.testExecutionContract,
     deploymentContract: executionContracts.deploymentContract,
@@ -759,6 +796,7 @@ export function projectConstraintsFromConformProjectProfile(
     projectSlug: profile.projectSlug,
     activeTenant: profile.activeTenant,
     selectedOutputRoot: profile.selectedOutputRoot,
+    runtimeLayout: profile.runtimeLayout,
     ambiguityRiskAppetite: profile.ambiguityRiskAppetite,
     capabilityContracts: Object.freeze(
       profile.capabilityContracts.map((contract) => contract.name)
@@ -993,6 +1031,11 @@ function canonicalProjectConstraints(profile: SdlcConformProjectProfile): string
     `active_tenant: ${profile.activeTenant}`,
     `selected_output_root: ${profile.selectedOutputRoot}`,
     `ambiguity_risk_appetite: ${profile.ambiguityRiskAppetite}`,
+    "runtime:",
+    `  root: ${profile.runtimeLayout.runtimeRoot}`,
+    `  transform_asset_root: ${profile.runtimeLayout.transformAssetRoot}`,
+    `  operator_run_root: ${profile.runtimeLayout.operatorRunRoot}`,
+    `  product_materialization_root_policy: ${profile.runtimeLayout.productMaterializationRootPolicy}`,
     "build_tenants:",
     `  ${profile.activeTenant}:`,
     `    output_dir: ${profile.selectedOutputRoot}`,
@@ -1306,6 +1349,9 @@ export function materializeSdlcProjectConformance(input: {
     `project_slug: ${profile.projectSlug}`,
     `active_tenant: ${profile.activeTenant}`,
     `selected_output_root: ${profile.selectedOutputRoot}`,
+    `runtime_root: ${profile.runtimeLayout.runtimeRoot}`,
+    `runtime_transform_asset_root: ${profile.runtimeLayout.transformAssetRoot}`,
+    `runtime_operator_run_root: ${profile.runtimeLayout.operatorRunRoot}`,
     "governing_graph_function: Fg_conform_project",
     "",
     "This is an installed read model. It does not outrank specification truth.",
@@ -1379,6 +1425,7 @@ export function admitSdlcConformProjectProfile(
     "activeTenant",
     "selectedOutputRoot",
     "declaredOutputRoot",
+    "runtimeLayout",
     "buildExecutionContract",
     "testExecutionContract",
     "deploymentContract",
@@ -1422,6 +1469,10 @@ export function admitSdlcConformProjectProfile(
       record["declaredOutputRoot"],
       `${label}.declaredOutputRoot`
     ),
+    runtimeLayout:
+      record["runtimeLayout"] === undefined
+        ? standardSdlcRuntimeLayout()
+        : admitSdlcRuntimeLayout(record["runtimeLayout"], `${label}.runtimeLayout`),
     buildExecutionContract: parseNonEmptyString(
       record["buildExecutionContract"],
       `${label}.buildExecutionContract`

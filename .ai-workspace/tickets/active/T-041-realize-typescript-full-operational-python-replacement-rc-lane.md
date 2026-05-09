@@ -34,13 +34,13 @@ dependencies:
   - T-091 completed first-traversal requirement-authority carrier hardening
   - T-096 completed managed traversal bootstrap proof
   - T-102 completed typed F_P transform/evaluate carrier split
-  - B-084 active design-depth admission closure correction
-  - B-086 active SDLC F_D disambiguation and alias admission sweep
+  - B-084 completed design-depth admission closure correction
+  - B-086 completed SDLC F_D disambiguation and alias admission sweep
   - T-109 active ABG-driven traversal-ledger solution
   - T-110 completed ABG 3.5 traced callout proof
-  - T-122 active feature scope carrier closure correction
-  - T-123 active traversal strategy authority correction
-  - T-129 active ABG 3.7 F_P construction evaluator substrate migration
+  - T-122 completed feature scope carrier closure correction
+  - T-123 completed traversal strategy authority correction
+  - T-129 completed ABG 3.7.1 evaluator/liveness substrate migration
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -97,6 +97,34 @@ non_closure_conditions:
 ---
 
 ## STDO Reading
+
+## Closed Candidate Ticket Checkpoint - 2026-05-09
+
+The 2026-05-08 `gpt-5.5` medium data_mapper live archive
+`build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`
+is accepted as closure evidence for the dependent substrate, packaging,
+strategy, scope, design-depth, and F_D tickets:
+
+- `T-129`
+- `T-118`
+- `T-120`
+- `B-084`
+- `B-086`
+- `T-122`
+- `T-123`
+- `T-116`
+
+These tickets are no longer active RC blockers. T-041 remains active because the
+live lane stopped at `derive_component_test_surface` due to the outer Node
+harness timeout before full release-depth parity or typed exhaustion.
+
+Remaining active closure pressure:
+
+- `B-085`: component-test repair schedule consumption / pass evidence.
+- `T-109`: full current-runtime live traversal or typed exhaustion proof.
+- `T-112`: complete lifecycle release/closure proof.
+- `T-113`: component-depth parity only if kept wider than the already closed
+  component-forcing slice.
 
 ## Current Blocker Addendum - B-084 - 2026-05-07
 

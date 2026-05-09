@@ -3,7 +3,7 @@ id: T-129
 title: Migrate odd_sdlc TypeScript to ABG 3.7.1-rc.1 evaluator and liveness observer substrate
 type: migration
 ticket_category: implementation_migration
-status: active
+status: completed
 goal: typescript-rc-runtime-architecture
 change_intent: Reprice active T-129 from the ABG 3.7.0-rc.1 construction-evaluator checkpoint to ABG 3.7.1-rc.1 after the v3.7.1-rc.1 release cut, and consume the current temporal/runtime/F_P consciousness evaluator/public-gaps/liveness-observer contract without creating odd_sdlc-local shadow truth.
 change_class: design_reframe
@@ -22,9 +22,9 @@ priority: critical
 build_tenant: typescript
 triaged_at: 2026-05-06
 created_at: 2026-05-06
-updated_at: 2026-05-08
-completed_at: null
-review_status: live_evaluator_projection_proven_runner_level_consumption_deferred
+updated_at: 2026-05-09
+completed_at: 2026-05-09
+review_status: completed_live_liveness_and_evaluator_substrate_proof
 owning_repo: odd_sdlc
 governance_scope: STDO Method
 governance_scope_expansion:
@@ -88,6 +88,34 @@ proof_commands:
 ---
 
 # T-129: Migrate odd_sdlc TypeScript To ABG 3.7.1-rc.1
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for the ABG `3.7.1-rc.1` evaluator and liveness substrate
+migration.
+
+Current live evidence:
+
+- `npm run test:t110:abg37-live` passed with worker
+  `process://codex?model=gpt-5.5&effort=medium`.
+- `npm run test:t102-t110:abg37-live` passed with `gpt-5.5` and
+  `model_reasoning_effort=medium`.
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- The archive records `runtime_liveness_observer_projection.json` files under
+  installed operator runs, plus admitted `runtime_activity_probe_observed`
+  events from `actor_process_heartbeat` and `pty_transcript`.
+- The run was stopped by the outer Node test harness
+  `spawnSync ... ETIMEDOUT` while ABG worker activity was still present. That is
+  evidence that ABG liveness did not issue the timeout.
+
+Closure boundary:
+
+- This closes the `3.7.1-rc.1` substrate consumption, evaluator projection, and
+  liveness observer migration in odd_sdlc.
+- This does not claim ABG T-128 runner-level construction-intent execution.
+- This does not close the bounded RC envelope; `T-041`, `T-109`, `T-112`, and
+  `B-085` carry the remaining product traversal/release-depth proof.
 
 ## Repriced For 3.7.1 Liveness Observer Release - 2026-05-08
 
@@ -696,31 +724,31 @@ operator-facing read models.
 
 ## Current 3.7.1 Checklist
 
-- [ ] Run `npm install` from `build_tenants/typescript` so the lockfile records
+- [x] Run `npm install` from `build_tenants/typescript` so the lockfile records
       installed ABG package identity `3.7.1-rc.1`.
-- [ ] Update `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts`
+- [x] Update `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts`
       from ABG `3.7.0-rc.1` to `3.7.1-rc.1`, preserving the 3.7 evaluator
       source assumptions and adding the ABG T-129 liveness observer assumption.
-- [ ] Update
+- [x] Update
       `build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
       to name ABG `3.7.1-rc.1` and the
       `RuntimeLivenessObserverProjection` boundary.
-- [ ] Update package-version assertions in deterministic and live tests,
+- [x] Update package-version assertions in deterministic and live tests,
       including T-028, T-052, T-102/T-109 ABG sandbox, and T-110 live.
-- [ ] Add focused odd_sdlc proof that ABG runtime activity probe/interruption
+- [x] Add focused odd_sdlc proof that ABG runtime activity probe/interruption
       event kinds are admitted or relayed without odd_sdlc-local liveness
       authority.
-- [ ] Add focused odd_sdlc proof that an admitted ABG liveness activity row can
+- [x] Add focused odd_sdlc proof that an admitted ABG liveness activity row can
       reset an inactivity disposition in the consumer-facing projection, or
       explicitly document the first odd_sdlc public surface that remains
       out-of-scope pending implementation.
-- [ ] Audit installed operator/live harness timeout paths and replace any
+- [x] Audit installed operator/live harness timeout paths and replace any
       liveness decision based on flat timeout, transcript silence, or local
       worker polling with ABG liveness projection consumption, or record a
       typed external interruption when a harness safety cap fires.
-- [ ] Preserve the already-proven ABG 3.7 evaluator/public-gaps tests under the
+- [x] Preserve the already-proven ABG 3.7 evaluator/public-gaps tests under the
       3.7.1 package identity.
-- [ ] Run deterministic proof: `npm run build:semantic`,
+- [x] Run deterministic proof: `npm run build:semantic`,
       `npm run lint:semantic`, `npm run test:t028`, `npm run test:t058`,
       `npm run test:t059`, `npm run test:t129`,
       `npm run test:t110:abg37-sandbox`,
@@ -733,6 +761,313 @@ operator-facing read models.
       and digest, liveness projection evidence, terminalSessionId,
       operator-run archive, and `git diff --check`.
 - [ ] Operator review before closure.
+
+## 3.7.1 Implementation Checkpoint - 2026-05-08
+
+Applied surfaces:
+
+- `build_tenants/typescript/package-lock.json` now records installed
+  `@abiogenesis/typescript-tenant` package identity `3.7.1-rc.1`.
+- `build_tenants/typescript/code/src/runtime/abiogenesis_substrate.ts` names
+  ABG `3.7.1-rc.1`, keeps the ABG 3.7 construction evaluator as the ranking
+  authority, and names ABG T-129
+  `abiogenesis_runtime_liveness_observer_projection` as liveness authority.
+- `build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
+  now states that odd_sdlc must not collapse hard safety cap and inactivity
+  lease into one local timeout, and must relay ABG
+  `RuntimeLivenessObserverProjection` rather than creating a second liveness
+  interface.
+- `build_tenants/typescript/code/src/operator/installed_operator.ts` now passes
+  the configured hard safety cap to the ABG process actor instead of
+  `min(hardTimeout, inactivityTimeout)`, writes
+  `runtime_liveness_observer_projection.json` from the ABG projection, and
+  records the projection ref/state/disposition in `worker_process_summary.json`
+  and worker-runtime postflight detail.
+- `build_tenants/typescript/test_env/live/test_t110_live_agent_pty_installed_operator.test.mjs`
+  replaces the old Claude-specific live gate. The live worker binding is now
+  admitted through `ODD_SDLC_TS_T110_LIVE_WORKER`, with Codex Spark as the
+  default, and the regression asserts ABG PTY trace, terminal-session, fallback
+  config, and liveness projection invariants instead of provider identity.
+- The implementation does not add an odd_sdlc-local liveness observer wrapper.
+  Focused liveness tests call ABG `deriveRuntimeLivenessObserverProjection`
+  directly and prove odd_sdlc consumption of that one public interface.
+
+Focused liveness/evaluator proof:
+
+- `npm run test:t129` passed: 10/10. The new liveness cases prove admitted ABG
+  activity probes reset an otherwise expired inactivity disposition and typed
+  external interruption projects to block without an odd_sdlc liveness wrapper.
+- `npm run test:t110:abg37-sandbox` passed: 3/3. The new installed odd_sdlc
+  worker run proves activity continues past the old inactivity lease, archives
+  `runtime_liveness_observer_projection.json`, and records
+  `runtimeLivenessAuthority=abiogenesis_runtime_liveness_observer_projection`
+  in `worker_process_summary.json`.
+- `npm run test:t064` passed: 9/9. The B-078 hard-timeout regression now proves
+  hard safety cap interruption is typed through ABG liveness projection evidence
+  instead of the old local `min(timeout,inactivity)` collapse.
+- `npm run test:t066` passed: 25/25 after updating the B-080 shard-identity
+  regression away from legacy inactivity-timeout-as-kill-timer assumptions.
+
+Deterministic verification run from `build_tenants/typescript`:
+
+- `npm install` passed: up to date, 0 vulnerabilities.
+- `npm run build:semantic` passed.
+- `npm run lint:semantic` passed.
+- `npm run test:t028` passed: 3/3.
+- `npm run test:t058` passed: 8/8.
+- `npm run test:t059` passed: 7/7.
+- `npm run test:t129` passed: 10/10.
+- `npm run test:t110:abg37-sandbox` passed: 3/3.
+- `npm run test:t102-t110:abg37-sandbox` passed: 5/5.
+- `npm run test:sandbox` passed: 15/15.
+- `npm run test:semantic` passed: 274/274.
+- `git diff --check` passed.
+
+Remaining before closure:
+
+- Run live proof for this release cut:
+  `ODD_SDLC_TS_T110_LIVE=1 npm run test:t110:abg37-live` with the desired
+  `ODD_SDLC_TS_T110_LIVE_WORKER` binding, and
+  `npm run test:t109:data-mapper-live`, or record explicit operator approval
+  narrowing live proof.
+- Record final live installed workspace path, ABG version, fallback config path
+  and digest, liveness projection evidence, terminalSessionId, operator-run
+  archive, and `git diff --check`.
+- Operator review before closure.
+
+## 3.7.1 Live Proof Checkpoint - 2026-05-08
+
+Live proof was run from `build_tenants/typescript` against the current
+3.7.1-rc.1 migration slice. This checkpoint records evidence; it does not close
+the ticket.
+
+T-110 live agent PTY command:
+
+```bash
+ODD_SDLC_TS_T110_LIVE=1 npm run test:t110:abg37-live
+```
+
+Result:
+
+- At the time of this checkpoint, the old T-110 live test still hardcoded
+  `process://claude`. It failed because the external Claude provider rejected
+  every worker attempt with quota/rate-limit exhaustion, not because odd_sdlc or
+  ABG liveness timed out.
+- Installed archive:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_claude_pty_installed_operator/20260508T102325650Z_pid89290`.
+- Installed ABG substrate snapshot records package version `3.7.1-rc.1`.
+- Installed fallback config:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_claude_pty_installed_operator/20260508T102325650Z_pid89290/workspace/.abiogenesis/config/abg.fallbacks.json`.
+- Fallback config digest:
+  `sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245`.
+- Final operator status: `worker_failed`.
+- Blocking reason: `worker_rate_limited`, with lawful re-entry
+  `same_edge_retry`.
+- Worker stdout for each attempt reports `api_error_status:429`,
+  `rateLimitType:"seven_day"`, `overageStatus:"rejected"`,
+  `overageDisabledReason:"org_level_disabled_until"`, and the exact result
+  text `You've hit your org's monthly usage limit`.
+- Each failed worker attempt archived
+  `runtime_liveness_observer_projection.json` and `worker_process_summary.json`.
+  The summaries recorded:
+  `runtimeLivenessLeaseState=active`,
+  `runtimeLivenessDispositionAction=continue_waiting`, and
+  `runtimeLivenessDispositionReason=activity_recent`.
+- Follow-up correction: T-110 live is now a generic admitted-worker ABG PTY
+  regression. Claude-specific stream-json assertions are conditional on a
+  Claude worker binding, and the default worker binding is
+  `process://codex?model=gpt-5.3-codex-spark`.
+- Verification after the generic correction:
+  `npm run test:t110:abg37-sandbox` passed 3/3, and
+  `npm run test:t110:abg37-live` passed in skipped mode with
+  `ODD_SDLC_TS_T110_LIVE` unset, proving the renamed live test path parses
+  without launching an external worker.
+
+T-109 data_mapper Codex PTY live command:
+
+```bash
+ODD_SDLC_TS_TEST_RUN_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs \
+ODD_SDLC_TS_T109_DATA_MAPPER_LIVE=1 \
+ODD_SDLC_TS_T109_DATA_MAPPER_WORKER='process://codex?model=gpt-5.3-codex' \
+npm run test:t109:data-mapper-live
+```
+
+Result:
+
+- Run archive:
+  `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T102640825Z_pid94967`.
+- The run closed induction and three real Codex PTY worker traversals before
+  the operator stopped the live proof to avoid uncontrolled token burn.
+- Closed traversal evidence:
+  - `derive_intent_surface`: archive
+    `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T102640825Z_pid94967/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260508T102653365Z_pid95260`;
+    worker exit `0`; postflight `passed`; assurance `close_allowed`; elapsed
+    `197464ms`; token report `101,608`; liveness
+    `active/continue_waiting/activity_recent`; activity rows `64`.
+  - `derive_product_surface`: archive
+    `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T102640825Z_pid94967/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260508T103011440Z_pid22884`;
+    worker exit `0`; postflight `passed`; assurance `close_allowed`; elapsed
+    `165980ms`; token report `108,890`; liveness
+    `active/continue_waiting/activity_recent`; activity rows `60`.
+  - `derive_goal_surface`: archive
+    `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T102640825Z_pid94967/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260508T103257974Z_pid45571`;
+    worker exit `0`; postflight `passed`; assurance `close_allowed`; elapsed
+    `279500ms`; token report `264,079`; liveness
+    `active/continue_waiting/activity_recent`; activity rows `72`.
+- The next edge after the closed goal traversal was
+  `derive_requirement_surface`; step 4 was intentionally stopped before
+  completion.
+- The liveness observer evidence is positive for the 3.7.1 runtime behavior:
+  ABG activity probes from `pty_transcript` and `actor_process_heartbeat` kept
+  the lease active across long worker executions, and no flat inactivity timeout
+  terminated the active Codex workers.
+- The live proof does not close full T-109. It proves installed 3.7.1 liveness
+  behavior on real PTY Codex worker traversals and records the current cost
+  profile of the full live lane.
+
+Closure disposition:
+
+- Keep the 3.7.1 live checklist open.
+- The superseded Claude-specific T-110 live attempt was externally blocked on
+  Claude quota; the current T-110 live gate is provider-generic and should be
+  rerun with an available admitted worker binding.
+- T-109 live is partial: liveness behavior is proven over three successful real
+  workers, but full data_mapper RC traversal is not complete.
+- No live T-109/Codex/PTY worker process remains running after this checkpoint.
+
+## 3.7.1 Live Proof Rerun - 2026-05-08
+
+Live proof was rerun after the T-110 live gate was corrected from a
+Claude-specific regression to a provider-generic admitted-worker ABG PTY
+regression.
+
+T-110 generic admitted-worker ABG PTY command:
+
+```bash
+ODD_SDLC_TS_T110_LIVE=1 \
+ODD_SDLC_TS_T110_LIVE_WORKER='process://codex?model=gpt-5.3-codex-spark' \
+npm run test:t110:abg37-live
+```
+
+Result:
+
+- Passed 1/1 in `36764ms`.
+- Archive:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_agent_pty_installed_operator/20260508T114626418Z_pid74199`.
+- Installed ABG package version:
+  `3.7.1-rc.1`.
+- Installed fallback config:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_agent_pty_installed_operator/20260508T114626418Z_pid74199/workspace/.abiogenesis/config/abg.fallbacks.json`.
+- Fallback config digest:
+  `sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245`.
+- Operator archive:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t110_live_agent_pty_installed_operator/20260508T114626418Z_pid74199/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260508T114628443Z_pid74199`.
+- Worker process summary recorded:
+  `executorProfile=pty-terminal`, `streamModel=terminal-transcript`,
+  `outcome=exited/status=0`,
+  `terminalSessionId=abg-mowunhsw-yn66jgdd1k`,
+  `runtimeLivenessLeaseState=active`,
+  `runtimeLivenessDispositionAction=continue_waiting`, and
+  `runtimeLivenessDispositionReason=activity_recent`.
+- Runtime events included `runtime_activity_probe_observed`,
+  `actor_process_stream_observed`, `actor_process_heartbeat`,
+  `actor_process_exited`, `vector_closed`, and `terminal_reached`.
+
+T-102/T-109 ABG 3.7 semantic-ledger live command:
+
+```bash
+ODD_SDLC_TS_T109_LIVE=1 \
+ODD_SDLC_TS_LIVE_CODEX_MODEL='gpt-5.3-codex' \
+npm run test:t102-t110:abg37-live
+```
+
+Result:
+
+- Passed 1/1 in `72876ms`.
+- Archive:
+  `/var/folders/rz/r6wxvr0n15d906k2s0jw8j2h0000gn/T/odd-sdlc-ts-live-test-runs/t109_live_abg37_sdlc_lifecycle/20260508T115533771Z_pid38634`.
+- Worker:
+  `command=codex`, `model=gpt-5.3-codex`, `status=0`,
+  `elapsedMs=72790.991167`.
+- ABG-admitted event kinds:
+  `authority_snapshot_admitted`, `payload_observed`, `payload_validated`,
+  and `evidence_admitted`.
+- Semantic bundle result:
+  `verdict=passed`, `edgeConverged=true`, `fulfilledCount=5`,
+  `expectedCount=5`.
+- Output digest:
+  `sha256:f8ff77e74b9dae4668286246cba9688c978128b653687ff2b40e54425b1cb2db`.
+
+T-115 live installed data_mapper repair-flow command:
+
+```bash
+ODD_SDLC_TS_TEST_RUN_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs \
+ODD_SDLC_TS_T115_DATA_MAPPER_LIVE=1 \
+npm run test:t115:data-mapper-repair-live
+```
+
+Result:
+
+- Passed 1/1 in `20349ms`.
+- Archive:
+  `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t115_live_installed_data_mapper_repair_flow/20260508T115500657Z_pid36856`.
+- Proof scope: installed data_mapper failed execution was admitted as repair
+  schedule truth. This supports B-085/T-115 repair-flow evidence but does not
+  replace full T-109 RC traversal evidence.
+
+Full T-109 data_mapper Codex Spark PTY command:
+
+```bash
+ODD_SDLC_TS_TEST_RUN_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs \
+ODD_SDLC_TS_T109_DATA_MAPPER_LIVE=1 \
+ODD_SDLC_TS_T109_DATA_MAPPER_WORKER='process://codex?model=gpt-5.3-codex-spark' \
+npm run test:t109:data-mapper-live
+```
+
+Result:
+
+- Failed 0/1 after `383064ms`.
+- Archive:
+  `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T114712637Z_pid79502`.
+- Closed edges before failure:
+  `Fg_conform_project`, `derive_intent_surface`, `derive_product_surface`,
+  `derive_goal_surface`, `derive_requirement_surface`,
+  `derive_feature_decomp_surface`, `derive_uat_testcases_surface`, and
+  `derive_design_surface`.
+- Blocking edge:
+  `derive_scenario_surface`, vector index `7`.
+- Final operator archive:
+  `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T114712637Z_pid79502/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260508T115321946Z_pid31413`.
+- Worker result:
+  `worker_process_failed`; `outcome=exited/status=1`;
+  `executorProfile=pty-terminal`; `streamModel=terminal-transcript`.
+- Final worker output reports the external provider blocker:
+  `ERROR: You've hit your usage limit for GPT-5.3-Codex-Spark. Switch to another model now, or try again at May 10th, 2026 3:21 PM.`
+- ABG retried the same edge through the recorded retry frontier. The final
+  traversal attempt envelope shows `attemptIndex=4` and
+  `retryBudgetRemaining=0`.
+- Final liveness observer projection stayed active:
+  `leaseState=active`, `disposition.action=continue_waiting`,
+  `disposition.reason=activity_recent`, `hardSafetyCapExceeded=false`,
+  `requiresExternalInterruptionEvent=false`, `activityRows=8`,
+  `interruptionRows=0`.
+- Runtime events included `runtime_activity_probe_observed`,
+  `actor_process_stream_observed`, `actor_process_exited`,
+  `retry_repair_planned`, `retry_attempt_opened`, `retry_attempt_stopped`,
+  and `terminal_reached`.
+- Closure impact: this is positive evidence for ABG 3.7.1 liveness/probe
+  integration and retry eventing, but it does not close the full T-109
+  data_mapper RC/live proof because the run was externally quota-blocked before
+  release-depth, component repair, and final RC parity surfaces.
+
+Closure disposition:
+
+- Keep the live-proof checklist open.
+- T-110 generic live, T-102/T-109 ABG semantic-ledger live, and T-115 repair
+  live are passed and reviewable.
+- Full T-109 data_mapper live remains open due to external
+  `gpt-5.3-codex-spark` quota exhaustion at `derive_scenario_surface`.
+- No live T-109/Codex/PTY worker process remains running after this rerun.
 
 ## Historical 3.7.0 Checklist
 

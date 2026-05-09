@@ -291,7 +291,7 @@ function requestForFinalEdge(input) {
 }
 
 test("T-102/T-109 sandbox runs an SDLC lifecycle graph and admits the same semantic result expected from live", () => {
-  assert.equal(JSON.parse(readFileSync(ABG_PACKAGE_JSON, "utf8")).version, "3.7.0-rc.1");
+  assert.equal(JSON.parse(readFileSync(ABG_PACKAGE_JSON, "utf8")).version, "3.7.1-rc.1");
 
   const inputWorkspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t109-input-"));
   const outputWorkspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t109-output-"));

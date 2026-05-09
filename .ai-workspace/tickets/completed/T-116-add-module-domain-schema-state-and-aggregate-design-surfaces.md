@@ -3,8 +3,8 @@ id: T-116
 title: Add per-module attribute schema and state diagram, plus aggregate domain model and aggregate sunny-day sequence surfaces
 type: feature
 ticket_category: design_phase_completeness
-status: active
-review_status: reopened_codex_rc_completeness_review
+status: completed
+review_status: completed_live_aggregate_design_surface_proof
 goal: typescript-rc-design-completeness-before-realization
 build_tenant: typescript
 owner: unassigned
@@ -15,7 +15,8 @@ affected_boundary: bootstrap_release_self_test graph topology, derive_implementa
 priority: high
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-07
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -55,6 +56,29 @@ non_closure_conditions:
   - downstream schedule edges that bypass the aggregate surfaces and reason from derive_design_surface narrative directly
   - new edges added without binding their outputs as inputs to realization scheduling and code/test materialization
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for the typed design-depth and aggregate design surface slice.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- The live graph traversed `derive_implementation_module_surface`,
+  `derive_aggregate_domain_model_surface`, and
+  `derive_aggregate_sunny_day_sequence_surface`.
+- Design-depth postflight gaps were repaired and the run continued into
+  component realization scheduling, component code, realization qualification,
+  full code, test design, test module, and test component topology surfaces.
+- Downstream surfaces consumed aggregate design outputs as authority rather than
+  stopping at design narrative.
+
+Closure boundary:
+
+- This closes T-116's typed design-depth and aggregate design graph slice.
+- The broader RC build/release proof remains with `T-041`, `T-109`, `T-112`,
+  and `B-085`.
 
 ## Closure Note - 2026-05-06
 

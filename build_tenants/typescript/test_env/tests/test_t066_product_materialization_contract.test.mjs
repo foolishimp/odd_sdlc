@@ -27,6 +27,8 @@ import {
   constructPostflightGapDossier,
   constructSdlcGtlModule,
   constructorResultFromWorkerOutput,
+  deriveComponentDepthAssuranceLedger,
+  deriveShallowRealizationAssuranceLedger,
   deriveSdlcWorkspaceIngressReport,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
@@ -749,6 +751,159 @@ test("T-066 code-surface postflight rejects markdown-only realization", () => {
     postflight.blockingReasons.includes("materialized_product_role_missing:source"),
     true
   );
+});
+
+test("T-131 shallow realization assurance admits bounded runtime error guards", () => {
+  const closed = deriveShallowRealizationAssuranceLedger({
+    synthesisRequired: false,
+    executableProofRequired: false,
+    surfaces: [
+      {
+        kind: "sdlc_realization_text_surface",
+        role: "source",
+        ref: "file://src/cli/parseArgs.ts",
+        content: [
+          "export function requireName(value: string | undefined): string {",
+          "  if (value === undefined) {",
+          "    throw new Error(\"missing required workspace name\");",
+          "  }",
+          "  return value;",
+          "}"
+        ].join("\n")
+      }
+    ]
+  });
+  const rejected = deriveShallowRealizationAssuranceLedger({
+    synthesisRequired: false,
+    executableProofRequired: false,
+    surfaces: [
+      {
+        kind: "sdlc_realization_text_surface",
+        role: "source",
+        ref: "file://src/cli/parseArgs.ts",
+        content: [
+          "export function requireName(): never {",
+          "  throw new Error(\"not implemented\");",
+          "}"
+        ].join("\n")
+      }
+    ]
+  });
+
+  assert.equal(closed.verdict, "satisfied");
+  assert.equal(rejected.verdict, "open_gap");
+  assert.deepStrictEqual(rejected.reasons.map((reason) => reason.code), [
+    "placeholder_surface:file://src/cli/parseArgs.ts"
+  ]);
+});
+
+test("T-131 component-depth assurance admits already-materialized declared product paths", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t131-incremental-component-code"
+  });
+  writeHandoffFiles(manifest);
+  const sourcePath = path.join(manifest.productMaterialization.tenantRoot, "src/cli.ts");
+  const domainPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "domains/document_to_requirements/domain.json"
+  );
+  const sourceContent = [
+    "// Implements: REQ-T066-001",
+    "export function run(): string {",
+    "  return \"ok\";",
+    "}"
+  ].join("\n");
+  const domainContent = JSON.stringify(
+    {
+      kind: "odd_chat_domain",
+      graphFunctions: [
+        {
+          id: "graph_function:document_to_requirements",
+          name: "document_to_requirements"
+        }
+      ]
+    },
+    null,
+    2
+  );
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  mkdirSync(dirname(domainPath), { recursive: true });
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+  writeFileSync(domainPath, `${domainContent}\n`, "utf8");
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "component:app-core.cli",
+        moduleName: "app-core",
+        relativePath: "src/cli.ts",
+        publicBoundary: "exports the CLI command boundary",
+        requirementIds: ["REQ-T066-001"],
+        sourceAssetRefs: ["asset://t131/bootstrap"]
+      },
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "component:app-core.default-domain-fixture",
+        moduleName: "app-core",
+        relativePath: "domains/document_to_requirements/domain.json",
+        publicBoundary: "provides the default deployed domain fixture",
+        requirementIds: ["REQ-T066-001"],
+        sourceAssetRefs: ["asset://t131/bootstrap"]
+      }
+    ]
+  };
+  const artifact = [
+    "# component_code_surface",
+    "",
+    "```json component_depth_register",
+    JSON.stringify(register, null, 2),
+    "```",
+    ""
+  ].join("\n");
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, artifact, "utf8");
+  writeReport({
+    manifest,
+    digest: sha256Text(artifact),
+    summary: "generated product source with unchanged default domain fixture",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/cli.ts",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${sourceContent}\n`),
+        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
+      }
+    ]
+  });
+
+  const report = readWorkerResultReport(manifest);
+  const ledger = deriveComponentDepthAssuranceLedger({ manifest, report });
+
+  assert(ledger);
+  assert.equal(
+    ledger.reasons.some(
+      (reason) =>
+        reason.code ===
+        "component_declared_path_not_materialized:domains/document_to_requirements/domain.json"
+    ),
+    false,
+    JSON.stringify(ledger.reasons, null, 2)
+  );
+  assert.equal(ledger.verdict, "satisfied");
 });
 
 test("T-102 post-transform observation admits existing discoverable test files", () => {
@@ -2262,9 +2417,12 @@ test("B-080 silent execution-result recovery carries shard identity", async () =
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
   const workerScript = writeSilentWorkerScript(workspace);
-  const previousTimeout = process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+  const previousTimeout = process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
+  const previousInactivityTimeout =
+    process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
   const previousHeartbeat = process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
-  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "50";
+  process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = "50";
+  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "10000";
   process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
   try {
     const result = await executeInstalledOperatorStart({
@@ -2297,6 +2455,18 @@ test("B-080 silent execution-result recovery carries shard identity", async () =
     assert.match(
       result.postflight.blockingReasonCarriers[0].detail,
       /signalSequence=SIGTERM@\d+ms/u
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessAuthority=abiogenesis_runtime_liveness_observer_projection/u
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessProjectionRef=file:.*runtime_liveness_observer_projection\.json/u
+    );
+    assert.match(
+      result.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessLeaseState=externally_interrupted/u
     );
     assert.match(
       result.postflight.blockingReasonCarriers[0].detail,
@@ -2351,9 +2521,15 @@ test("B-080 silent execution-result recovery carries shard identity", async () =
     assert.equal(result.gapDossier.retryEligible, false);
   } finally {
     if (previousTimeout === undefined) {
+      delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = previousTimeout;
+    }
+    if (previousInactivityTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
     } else {
-      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = previousTimeout;
+      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] =
+        previousInactivityTimeout;
     }
     if (previousHeartbeat === undefined) {
       delete process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];

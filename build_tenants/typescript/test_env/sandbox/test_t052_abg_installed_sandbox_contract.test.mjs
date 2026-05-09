@@ -35,8 +35,8 @@ test("T-052 sandbox registry: every TypeScript sandbox consumes the ABG installe
         `${fileName} must consume the public ABG TypeScript package`
       );
       assert(
-        content.includes("3.7.0-rc.1"),
-        `${fileName} must pin the ABG 3.7.0-rc.1 contract it verifies`
+        content.includes("3.7.1-rc.1"),
+        `${fileName} must pin the ABG 3.7.1-rc.1 contract it verifies`
       );
       continue;
     }

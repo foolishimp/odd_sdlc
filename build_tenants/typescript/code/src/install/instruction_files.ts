@@ -115,6 +115,8 @@ function buildInstructionContent(input: OddSdlcInstructionFilesInput): string {
     "- do not describe the project itself as a GTL/ABG app unless project authority says so",
     "- `specification/` is project-owned `WHAT`",
     "- `build_tenants/` is project-owned realization `HOW`",
+    "- `.ai-workspace/runtime/odd_sdlc/assets` is the default transform-asset archive root",
+    "- product files materialize under the conformed `selected_output_root`, normally `build_tenants/<tenant>`",
     "- `.abiogenesis/*` is installed substrate or installed product payload, not mutable project source",
     "- ABG owns traversal, continuation, events, runtime facts, and projection mechanics",
     "",

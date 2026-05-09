@@ -3,8 +3,8 @@ id: B-084
 title: Admit ambiguous design-depth candidates before strict closure
 type: bug
 ticket_category: design_depth_admission
-status: active
-review_status: reopened_closure_evidence_invalid_generic_builder_risks
+status: completed
+review_status: completed_live_design_depth_admission_proof
 goal: odd-sdlc-rc-data-mapper-production-depth
 change_intent: Fix design-depth ingest so useful ambiguous or partial F_P design candidates are admitted, normalized where lawful, archived, and forced into later detail gaps without inventing missing identity, embedding tenant-specific vocabulary, or drifting worker repair schema from parser law.
 change_class: design_reframe
@@ -19,7 +19,8 @@ priority: critical
 build_tenant: typescript
 triaged_at: 2026-05-05
 created_at: 2026-05-05
-updated_at: 2026-05-07
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -81,6 +82,29 @@ non_closure_conditions:
   - forcing F_D failure for semantic disambiguation that must escalate to F_P
   - rerunning live tests without changing the ingest/admission boundary
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for design-depth candidate admission and F_D/F_P boundary
+correction.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- The run advanced through `derive_implementation_module_surface`,
+  `derive_aggregate_domain_model_surface`, and
+  `derive_aggregate_sunny_day_sequence_surface`.
+- Intermediate design-depth parser gaps were carried as typed retry/local repair
+  pressure and repaired; the run continued into realization, code, and test
+  topology surfaces.
+- The prior closure defects around useful partial candidates, alias admission,
+  and parser/prompt drift did not remain terminal blockers in the live lane.
+
+Closure boundary:
+
+- This closes the design-depth admission bug.
+- It does not claim final RC closure or release-depth parity.
 
 ## Reopen Finding - 2026-05-07
 

@@ -3,7 +3,7 @@
 // Implements: T-113
 
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { admitComponentDepthRegisterFromArtifact } from "../operator/component_depth_register.js";
 import type {
@@ -25,6 +25,7 @@ import {
   uniqueSorted,
   verdictFromReasons
 } from "./shared.js";
+import { deriveSdlcConformProjectProfileFromWorkspace } from "../workspace/index.js";
 import type {
   SdlcAssuranceLedger,
   SdlcAssuranceLedgerReason
@@ -93,6 +94,37 @@ function pathSetForRole(input: {
       .filter((file) => file.role === input.role && file.byteCount > 0)
       .map((file) => file.relativePath)
   );
+}
+
+function materializedPathSet(input: {
+  readonly report: SdlcWorkerResultReport;
+}): ReadonlySet<string> {
+  return new Set(
+    input.report.materializedFiles
+      .filter((file) => file.byteCount > 0)
+      .map((file) => file.relativePath)
+  );
+}
+
+function existingProductFileForRelativePath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): boolean {
+  const tenantRoot = resolve(input.manifest.productMaterialization.tenantRoot);
+  const absolutePath = resolve(tenantRoot, input.relativePath);
+  const relativeToRoot = relative(tenantRoot, absolutePath);
+  if (
+    relativeToRoot === "" ||
+    relativeToRoot.startsWith("..") ||
+    isAbsolute(relativeToRoot)
+  ) {
+    return false;
+  }
+  if (!existsSync(absolutePath)) {
+    return false;
+  }
+  const fileStat = statSync(absolutePath);
+  return fileStat.isFile() && fileStat.size > 0;
 }
 
 function duplicateValues(values: readonly string[]): readonly string[] {
@@ -194,19 +226,27 @@ function componentTopologyReasons(input: {
 
 function componentRealizationReasons(input: {
   readonly rows: readonly SdlcComponentRealizationRow[];
+  readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
-  const sourcePaths = pathSetForRole({ report: input.report, role: "source" });
+  const materializedPaths = materializedPathSet({ report: input.report });
   const duplicatePaths = duplicateValues(input.rows.map((row) => row.relativePath));
   return Object.freeze([
     ...componentRealizationMetadataReasons(input),
     ...input.rows
-      .filter((row) => !sourcePaths.has(row.relativePath))
+      .filter(
+        (row) =>
+          !materializedPaths.has(row.relativePath) &&
+          !existingProductFileForRelativePath({
+            manifest: input.manifest,
+            relativePath: row.relativePath
+          })
+      )
       .map((row) =>
         reason({
           code: `component_declared_path_not_materialized:${row.relativePath}`,
-          message: `Component ${row.componentId} declared source path ${row.relativePath}, but it was not materialized as a source file.`,
+          message: `Component ${row.componentId} declared product path ${row.relativePath}, but it was not materialized as a non-empty product file.`,
           evidenceRefs: input.evidenceRefs
         })
       ),
@@ -519,10 +559,8 @@ function latestAdmittedComponentRepairSchedule(input: {
 }): { readonly schedule: SdlcComponentRepairSchedule; readonly evidenceRefs: readonly string[] } | null {
   const assetsRoot = join(
     input.workspaceRoot,
-    ".ai-workspace",
-    "runtime",
-    "odd_sdlc",
-    "assets"
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+      .transformAssetRoot
   );
   if (!existsSync(assetsRoot) || !statSync(assetsRoot).isDirectory()) {
     return null;
@@ -633,6 +671,7 @@ function comparisonReasons(input: {
     case "component_code_surface":
       return componentRealizationReasons({
         rows: input.register.componentRealizationRows,
+        manifest: input.manifest,
         report: input.report,
         evidenceRefs: input.evidenceRefs
       });

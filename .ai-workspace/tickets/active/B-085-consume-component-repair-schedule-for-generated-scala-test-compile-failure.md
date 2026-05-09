@@ -21,7 +21,7 @@ related_tickets:
   - T-041 active bounded RC release claim
   - T-112 active complete semantic lifecycle
   - T-113 completed component-depth repair-flow surface
-  - T-120 active retry-local repair prompts
+  - T-120 completed retry-local repair prompts
   - T-109 completed traversal-ledger proof
 evidence_refs:
   - build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260505T180726166Z_pid44582/workspace/.ai-workspace/runtime/odd_sdlc/assets/20260505T201602058Z_pid70576/test_execution_result_surface.md
@@ -31,6 +31,21 @@ evidence_refs:
 ---
 
 # B-085: Consume Component Repair Schedule For Generated Scala Test Compile Failure
+
+## Dependency Checkpoint - 2026-05-09
+
+T-120 is now closed for typed retry-local repair prompt packaging. B-085 remains
+active because its closure law is narrower and later: the live lane must consume
+the component repair schedule for the generated Scala test failure, target
+`derive_component_test_surface`, rerun the implicated shard, and admit pass
+evidence or a new typed product/test blocker.
+
+Current live archive:
+`build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+
+This archive reached `derive_component_test_surface` and showed retry repair
+instructions on that edge, but it did not reach release-depth parity or pass
+evidence before the outer harness timeout.
 
 ## STDO Triage
 

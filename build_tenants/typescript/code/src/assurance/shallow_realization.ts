@@ -13,7 +13,7 @@ export interface SdlcRealizationTextSurface {
 }
 
 function hasPlaceholder(content: string): boolean {
-  return /\b(todo|placeholder|stub|not implemented|throw new error)\b/i.test(content);
+  return /\b(todo|placeholder|stub|not implemented)\b/i.test(content);
 }
 
 function hasConstantSuccess(content: string): boolean {

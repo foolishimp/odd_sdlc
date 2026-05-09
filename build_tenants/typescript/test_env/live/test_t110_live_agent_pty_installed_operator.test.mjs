@@ -1,5 +1,5 @@
 // Validates: T-110
-// Validates: ABG-3.7-live-Claude-PTY-installed-operator
+// Validates: ABG-3.7-live-agent-PTY-installed-operator
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -26,10 +26,13 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const EXPECTED_ABG_VERSION = "3.7.0-rc.1";
+const EXPECTED_ABG_VERSION = "3.7.1-rc.1";
 const EXPECTED_FALLBACK_CONFIG_DIGEST =
   "sha256:08372a2a641f0dacaa30f1e06be72f3d28e3bb96e704b81cfb55473f62ee0245";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T110_LIVE"] === "1";
+const WORKER_TRANSPORT =
+  process.env["ODD_SDLC_TS_T110_LIVE_WORKER"] ??
+  "process://codex?model=gpt-5.3-codex-spark";
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");
@@ -55,9 +58,9 @@ function makeWorkspace(root) {
   writeFileSync(
     path.join(root, "README.md"),
     [
-      "# T-110 Live Claude PTY Fixture",
+      "# T-110 Live Agent PTY Fixture",
       "",
-      "This workspace proves the installed odd_sdlc TypeScript operator can invoke Claude through the ABG 3.7 pty-terminal callout substrate."
+      "This workspace proves the installed odd_sdlc TypeScript operator can invoke an admitted live worker through the ABG 3.7 PTY callout substrate."
     ].join("\n"),
     "utf8"
   );
@@ -66,7 +69,7 @@ function makeWorkspace(root) {
     [
       "# Intent",
       "",
-      "Create a minimal governed intent surface for the T-110 live Claude PTY proof."
+      "Create a minimal governed intent surface for the T-110 live agent PTY proof."
     ].join("\n"),
     "utf8"
   );
@@ -75,7 +78,7 @@ function makeWorkspace(root) {
     [
       "# Product",
       "",
-      "T-110 live fixture product for installed-operator process callout proof."
+      "T-110 live fixture product for installed-operator live worker callout proof."
     ].join("\n"),
     "utf8"
   );
@@ -84,14 +87,14 @@ function makeWorkspace(root) {
     [
       "# Goals",
       "",
-      "- prove ABG 3.7 pty-terminal execution through process://claude",
-      "- preserve trace evidence without requiring an exact Claude prose response"
+      "- prove ABG 3.7 pty-terminal execution through an admitted worker binding",
+      "- preserve trace evidence without requiring provider-specific prose or stream shape"
     ].join("\n"),
     "utf8"
   );
   writeFileSync(
     path.join(root, "specification/requirements/00-imported-sources.md"),
-    ["# Imported Sources", "", "- fixture://t110-live-claude-pty"].join("\n"),
+    ["# Imported Sources", "", "- fixture://t110-live-agent-pty"].join("\n"),
     "utf8"
   );
   writeFileSync(
@@ -99,22 +102,22 @@ function makeWorkspace(root) {
     [
       "# Live PTY Proof Requirements",
       "",
-      "REQ-T110-001: The installed TypeScript operator invokes Claude through `process://claude` using the ABG `pty-terminal` executor profile.",
+      "REQ-T110-001: The installed TypeScript operator invokes the admitted worker binding using the ABG `pty-terminal` executor profile.",
       "",
-      "REQ-T110-002: The worker output preserves the phrase `T110-CLAUDE-PTY-LIVE-EVIDENCE` somewhere in the generated intent surface."
+      "REQ-T110-002: The worker output materializes the requested intent surface and leaves ABG trace, terminal-session, and liveness projection evidence."
     ].join("\n"),
     "utf8"
   );
   writeFileSync(
     path.join(root, ".ai-workspace/context/project_bootstrap.md"),
-    ["# Project Bootstrap", "", "project_slug: t110_live_claude_pty"].join("\n"),
+    ["# Project Bootstrap", "", "project_slug: t110_live_agent_pty"].join("\n"),
     "utf8"
   );
   writeFileSync(
     path.join(root, ".ai-workspace/context/project_constraints.yml"),
     [
       "project:",
-      "  name: t110_live_claude_pty",
+      "  name: t110_live_agent_pty",
       "active_tenant: typescript",
       "selected_output_root: build_tenants/typescript",
       "ambiguity_risk_appetite: low"
@@ -134,12 +137,16 @@ function pathFromFileRef(fileRef) {
   return fileURLToPath(fileRef);
 }
 
+function isClaudeWorkerBinding(workerTransport) {
+  return /^process:\/\/claude(?:[/?#]|$)/u.test(workerTransport);
+}
+
 test(
-  "T-110 live installed operator invokes process://claude through ABG pty-terminal trace substrate",
+  "T-110 live installed operator invokes an admitted worker through ABG pty-terminal trace substrate",
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T110_LIVE=1 not set" },
   async () => {
     const archiveRoot = liveTestArchiveRoot(
-      "t110_live_claude_pty_installed_operator",
+      "t110_live_agent_pty_installed_operator",
       archiveTimestamp(),
       process.pid
     );
@@ -193,7 +200,7 @@ test(
         "--until",
         "first_traversal",
         "--worker",
-        "process://claude"
+        WORKER_TRANSPORT
       ]);
       writeJson(path.join(archiveRoot, "start_result.json"), start);
 
@@ -210,10 +217,12 @@ test(
       assert.ok(start.payload.workerRun.traceRoot.includes(".trace"));
       assert.equal(start.payload.workerRun.terminalTranscriptRef !== undefined, true);
       assert.equal(start.payload.workerRun.traceResultRef !== undefined, true);
-      assert.ok(
-        start.payload.workerRun.structuredEventCount > 0,
-        "Claude stream-json events should be observed through the PTY transcript"
-      );
+      if (isClaudeWorkerBinding(WORKER_TRANSPORT)) {
+        assert.ok(
+          start.payload.workerRun.structuredEventCount > 0,
+          "Claude stream-json events should be observed through the PTY transcript"
+        );
+      }
 
       const traceResultPath = pathFromFileRef(start.payload.workerRun.traceResultRef);
       assert.equal(existsSync(traceResultPath), true);
@@ -224,6 +233,7 @@ test(
       assert.equal(traceResult.terminalSessionId, start.payload.workerRun.terminalSessionId);
       assert.equal(traceResult.outcome.kind, "exited");
       assert.equal(traceResult.outcome.status, 0);
+
       const startedContextPath = path.join(
         start.payload.archiveRoot,
         "worker_process_started_context.json"
@@ -234,6 +244,36 @@ test(
         startedContext.terminalSessionId,
         start.payload.workerRun.terminalSessionId
       );
+
+      const processSummaryPath = path.join(
+        start.payload.archiveRoot,
+        "worker_process_summary.json"
+      );
+      assert.equal(existsSync(processSummaryPath), true);
+      const processSummary = readJson(processSummaryPath);
+      assert.equal(processSummary.kind, "sdlc_worker_process_summary");
+      assert.equal(
+        processSummary.terminalSessionId,
+        start.payload.workerRun.terminalSessionId
+      );
+      assert.equal(
+        processSummary.runtimeLivenessAuthority,
+        "abiogenesis_runtime_liveness_observer_projection"
+      );
+      assert.equal(processSummary.runtimeLivenessLeaseState, "active");
+      assert.equal(processSummary.runtimeLivenessDispositionAction, "continue_waiting");
+      assert.equal(processSummary.runtimeLivenessDispositionReason, "activity_recent");
+
+      const livenessProjectionPath = path.join(
+        start.payload.archiveRoot,
+        "runtime_liveness_observer_projection.json"
+      );
+      assert.equal(existsSync(livenessProjectionPath), true);
+      const livenessProjection = readJson(livenessProjectionPath);
+      assert.equal(livenessProjection.kind, "runtime_liveness_observer_projection");
+      assert.equal(livenessProjection.leaseState, "active");
+      assert.equal(livenessProjection.disposition.action, "continue_waiting");
+      assert.equal(livenessProjection.disposition.reason, "activity_recent");
     } finally {
       if (previousOddProfile === undefined) {
         delete process.env["ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE"];

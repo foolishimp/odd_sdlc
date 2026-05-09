@@ -23,6 +23,7 @@ import {
   deriveWorkerHandoffManifest,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
+  materializeSdlcProjectConformance,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 
@@ -95,6 +96,13 @@ build_tenants:
   assert.equal(profile.activeTenant, "kotlin_jvm");
   assert.equal(profile.selectedOutputRoot, "build_tenants/kotlin_jvm");
   assert.equal(profile.declaredOutputRoot, "build_tenants/kotlin_jvm");
+  assert.deepStrictEqual(profile.runtimeLayout, {
+    kind: "sdlc_runtime_layout",
+    runtimeRoot: ".ai-workspace/runtime/odd_sdlc",
+    transformAssetRoot: ".ai-workspace/runtime/odd_sdlc/assets",
+    operatorRunRoot: ".ai-workspace/runtime/odd_sdlc/operator-runs",
+    productMaterializationRootPolicy: "selected_output_root"
+  });
   assert.deepStrictEqual(profile.declaredModuleNames, [
     "ingress-core",
     "settlement-engine"
@@ -113,9 +121,81 @@ build_tenants:
 
   assert.equal(constraints.activeTenant, "kotlin_jvm");
   assert.equal(constraints.selectedOutputRoot, "build_tenants/kotlin_jvm");
+  assert.deepStrictEqual(constraints.runtimeLayout, profile.runtimeLayout);
   assert.deepStrictEqual(constraints.capabilityContracts, ["cli_runner", "junit"]);
   assert.equal(report.governingGraphFunction, FG_CONFORM_PROJECT);
   assert.deepStrictEqual(report.conformanceGaps, []);
+});
+
+test("T-068 admits standard runtime layout from project constraints template", () => {
+  const workspace = makeWorkspace(
+    "odd-sdlc-t068-runtime-layout",
+    `
+project:
+  name: runtime layout project
+active_tenant: node_cli
+selected_output_root: build_tenants/node_cli
+runtime:
+  root: .ai-workspace/runtime/odd_sdlc
+  transform_asset_root: .ai-workspace/runtime/odd_sdlc/assets
+  operator_run_root: .ai-workspace/runtime/odd_sdlc/operator-runs
+  product_materialization_root_policy: selected_output_root
+build_tenants:
+  node_cli:
+    output_dir: build_tenants/node_cli
+    language: typescript
+    build_tool: npm
+    test_runner: npm test
+`
+  );
+
+  const profile = deriveSdlcConformProjectProfileFromWorkspace(workspace);
+  assert.equal(profile.runtimeLayout.runtimeRoot, ".ai-workspace/runtime/odd_sdlc");
+  assert.equal(
+    profile.runtimeLayout.transformAssetRoot,
+    ".ai-workspace/runtime/odd_sdlc/assets"
+  );
+  assert.equal(
+    profile.runtimeLayout.operatorRunRoot,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  assert.equal(profile.runtimeLayout.productMaterializationRootPolicy, "selected_output_root");
+});
+
+test("T-068 canonical project constraints template includes runtime layout", () => {
+  const workspace = makeWorkspace(
+    "odd-sdlc-t068-template-runtime-layout",
+    `
+project:
+  name: template runtime layout
+active_tenant: node_cli
+build_tenants:
+  node_cli:
+    output_dir: build_tenants/node_cli
+    language: typescript
+    build_tool: npm
+`
+  );
+
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraintsText = readFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    "utf8"
+  );
+  assert.match(constraintsText, /runtime:\n/);
+  assert.match(constraintsText, /  root: \.ai-workspace\/runtime\/odd_sdlc\n/);
+  assert.match(
+    constraintsText,
+    /  transform_asset_root: \.ai-workspace\/runtime\/odd_sdlc\/assets\n/
+  );
+  assert.match(
+    constraintsText,
+    /  operator_run_root: \.ai-workspace\/runtime\/odd_sdlc\/operator-runs\n/
+  );
+  assert.match(
+    constraintsText,
+    /  product_materialization_root_policy: selected_output_root\n/
+  );
 });
 
 test("T-068 infers execution contracts from selected tenant truth without workload-specific code", () => {
@@ -188,6 +268,18 @@ build_tenants:
 
   assert.equal(manifest.conformedProject.projectSlug, "document_compiler");
   assert.equal(manifest.conformedProject.activeTenant, "node_cli");
+  assert.equal(
+    manifest.archiveRoot.endsWith(
+      ".ai-workspace/runtime/odd_sdlc/operator-runs/t068-conform-project-handoff"
+    ),
+    true
+  );
+  assert.equal(
+    manifest.outputFile.endsWith(
+      ".ai-workspace/runtime/odd_sdlc/assets/t068-conform-project-handoff/component_code_surface.md"
+    ),
+    true
+  );
   assert.equal(manifest.productMaterialization.selectedOutputRoot, "build_tenants/node_cli");
   assert.deepStrictEqual(manifest.productMaterialization.declaredModuleNames, [
     "parser",

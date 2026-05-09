@@ -13,6 +13,10 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   projectConstraintsFromConformProjectProfile
 } from "./project_profile.js";
+import {
+  admitSdlcRuntimeLayout,
+  standardSdlcRuntimeLayout
+} from "./runtime_layout.js";
 
 export function admitSdlcProjectConstraints(
   input: unknown,
@@ -23,6 +27,7 @@ export function admitSdlcProjectConstraints(
     "projectSlug",
     "activeTenant",
     "selectedOutputRoot",
+    "runtimeLayout",
     "ambiguityRiskAppetite",
     "capabilityContracts"
   ]);
@@ -42,6 +47,10 @@ export function admitSdlcProjectConstraints(
     projectSlug: parseNonEmptyString(record["projectSlug"], `${label}.projectSlug`),
     activeTenant,
     selectedOutputRoot,
+    runtimeLayout:
+      record["runtimeLayout"] === undefined
+        ? standardSdlcRuntimeLayout()
+        : admitSdlcRuntimeLayout(record["runtimeLayout"], `${label}.runtimeLayout`),
     ambiguityRiskAppetite: parseEnumValue(
       record["ambiguityRiskAppetite"],
       `${label}.ambiguityRiskAppetite`,

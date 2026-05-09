@@ -3,8 +3,8 @@ id: T-123
 title: Consume per-edge traversal strategy and delay steel-thread scope until after induction
 type: feature
 ticket_category: delivery_strategy_runtime_consumption
-status: active
-review_status: reopened_closure_evidence_invalid_strategy_authority_split
+status: completed
+review_status: completed_live_per_edge_strategy_proof
 goal: odd-sdlc-rc-data-mapper-production-depth
 change_intent: Move odd_sdlc steel-thread behavior from a workspace-wide default into a per-edge traversal strategy plan, so induction and requirement creation stay full-breadth while post-induction construction edges can run scoped steel-thread or targeted repair.
 change_class: design_reframe
@@ -22,7 +22,8 @@ priority: high
 build_tenant: typescript
 triaged_at: 2026-05-05
 created_at: 2026-05-05
-updated_at: 2026-05-08
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 governance_scope: STDO Method
 governance_scope_expansion:
   - S: SPEC_METHOD.md
@@ -60,6 +61,30 @@ non_closure_conditions:
   - post-induction scoped behavior is achieved by deleting obligations rather than carrying deferred breadth
   - GTL/vector declarations and operator handoff read different hard-coded edge strategy lists
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for the per-edge traversal strategy correction.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- Handoff manifests show induction/constitutional edges as `full_breadth`,
+  including `derive_intent_surface`, `derive_product_surface`,
+  `derive_goal_surface`, and `derive_requirement_surface`.
+- Post-induction construction surfaces consume the same strategy plan and select
+  `steel_thread` where declared, including `derive_uat_testcases_surface`,
+  `derive_implementation_design_surface`,
+  `derive_aggregate_domain_model_surface`, and
+  `derive_aggregate_sunny_day_sequence_surface`.
+- Component/test surfaces that require breadth project `full_breadth` explicitly,
+  preserving deferred breadth instead of deleting obligations.
+
+Closure boundary:
+
+- This closes the duplicated-strategy/early-edge narrowing defect.
+- It does not claim RC completion or ABG T-128 runner-level evaluator traversal.
 
 ## Reopen Finding - 2026-05-07
 

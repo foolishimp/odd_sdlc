@@ -15,12 +15,14 @@ import {
   constructGraphSpanEvaluationScheduledEvent,
   constructGraphSpanFoldbackEvaluatedEvent,
   constructFpDispatchOutcome,
+  constructRuntimeWatchdogPolicy,
   constructVectorClosedEvent,
   constructVectorEvaluatedEvent,
   foldGraphSpanAssessments,
   deriveAdvancementTransition,
   deriveIterationAdvanceDecision,
   deriveRuntimeAggregateProjection,
+  deriveRuntimeLivenessObserverProjection,
   invokeSupervisedProcessActor,
   runEngineIterateAsync,
   runtimeEventsForFpTransformResult,
@@ -30,6 +32,7 @@ import {
   type ExecutionBasis,
   type RuntimeAggregateProjection,
   type RuntimeEvent,
+  type RuntimeLivenessObserverProjection,
   type SupervisedProcessActorResult,
   type TracedProcessExecutorProfile,
   type TracedProcessOutcome,
@@ -98,6 +101,7 @@ import {
   writeSdlcInstalledQualificationInitialStateArchive
 } from "../qualification/index.js";
 import {
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveConformProjectManagedTraversalLedger,
   deriveConformProjectManagedTraversalManifest,
   materializeSdlcProjectConformance
@@ -753,6 +757,7 @@ function environmentPolicyForTransport(
 const DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 10;
 const DEFAULT_WORKER_TIMEOUT_MS = 1000 * 60 * 30;
 const DEFAULT_WORKER_HEARTBEAT_MS = 1000 * 30;
+const DEFAULT_WORKER_TERMINATION_GRACE_MS = 1000 * 10;
 
 function positiveIntegerFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -767,6 +772,7 @@ function workerInactivityPolicy(): {
   readonly timeoutMs: number;
   readonly inactivityTimeoutMs: number;
   readonly heartbeatMs: number;
+  readonly terminationGraceMs: number;
 } {
   return Object.freeze({
     timeoutMs: positiveIntegerFromEnv(
@@ -780,6 +786,10 @@ function workerInactivityPolicy(): {
     heartbeatMs: positiveIntegerFromEnv(
       "ODD_SDLC_WORKER_HEARTBEAT_MS",
       DEFAULT_WORKER_HEARTBEAT_MS
+    ),
+    terminationGraceMs: positiveIntegerFromEnv(
+      "ODD_SDLC_WORKER_TERMINATION_GRACE_MS",
+      DEFAULT_WORKER_TERMINATION_GRACE_MS
     )
   });
 }
@@ -835,6 +845,18 @@ function workerProcessSummaryPath(manifest: SdlcWorkerHandoffManifest): string {
 
 function workerProcessSummaryRef(manifest: SdlcWorkerHandoffManifest): string {
   return pathToFileURL(workerProcessSummaryPath(manifest)).href;
+}
+
+function runtimeLivenessProjectionPath(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  return join(manifest.archiveRoot, "runtime_liveness_observer_projection.json");
+}
+
+function runtimeLivenessProjectionRef(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  return pathToFileURL(runtimeLivenessProjectionPath(manifest)).href;
 }
 
 function workerProcessStartedContextPath(
@@ -900,6 +922,48 @@ function writeWorkerProcessStartedContext(input: {
   return context;
 }
 
+function workerRuntimeWatchdogPolicy(input: {
+  readonly policy: ReturnType<typeof workerInactivityPolicy>;
+  readonly elapsedMs: number | null;
+}) {
+  return constructRuntimeWatchdogPolicy({
+    policyRef: "policy://odd-sdlc/installed-worker-runtime/abg-3.7.1",
+    startupSilenceLeaseMs: input.policy.inactivityTimeoutMs,
+    inactivityLeaseMs: input.policy.inactivityTimeoutMs,
+    terminationGraceMs: input.policy.terminationGraceMs,
+    hardSafetyCapMs: input.policy.timeoutMs,
+    nowElapsedMs: input.elapsedMs,
+    retryBudgetRemaining: null
+  });
+}
+
+function writeRuntimeLivenessObserverProjection(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly basis: ExecutionBasis;
+  readonly processResult: SupervisedProcessActorResult;
+  readonly policy: ReturnType<typeof workerInactivityPolicy>;
+}): RuntimeLivenessObserverProjection {
+  const projection = deriveRuntimeLivenessObserverProjection({
+    basis: input.basis,
+    runtimeProjection: deriveRuntimeAggregateProjection(
+      input.basis,
+      input.processResult.events
+    ),
+    events: input.processResult.events,
+    probeContracts: input.processResult.probeContracts,
+    policy: workerRuntimeWatchdogPolicy({
+      policy: input.policy,
+      elapsedMs: input.processResult.elapsedMs
+    })
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "runtime_liveness_observer_projection.json",
+    payload: projection
+  });
+  return projection;
+}
+
 function writeWorkerProcessSummary(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly manifestPath: string;
@@ -907,6 +971,7 @@ function writeWorkerProcessSummary(input: {
   readonly workerRun: SdlcWorkerRunResult;
   readonly processResult: SupervisedProcessActorResult;
   readonly policy: ReturnType<typeof workerInactivityPolicy>;
+  readonly livenessProjection: RuntimeLivenessObserverProjection;
 }): SdlcWorkerProcessSummary {
   const latestHeartbeat = latestProcessHeartbeat(input.processResult.events);
   const summary: SdlcWorkerProcessSummary = Object.freeze({
@@ -965,6 +1030,15 @@ function writeWorkerProcessSummary(input: {
     timeoutMs: input.policy.timeoutMs,
     inactivityTimeoutMs: input.policy.inactivityTimeoutMs,
     heartbeatMs: input.policy.heartbeatMs,
+    runtimeLivenessAuthority:
+      "abiogenesis_runtime_liveness_observer_projection",
+    runtimeLivenessProjectionRef: runtimeLivenessProjectionRef(input.manifest),
+    runtimeLivenessPolicyRef: input.livenessProjection.policyRef,
+    runtimeLivenessLeaseState: input.livenessProjection.leaseState,
+    runtimeLivenessDispositionAction:
+      input.livenessProjection.disposition.action,
+    runtimeLivenessDispositionReason:
+      input.livenessProjection.disposition.reason,
     lastHeartbeatIndex: latestHeartbeat?.heartbeatIndex ?? null,
     lastHeartbeatElapsedMs: latestHeartbeat?.elapsedMs ?? null,
     signalSequence: processSignalSequence(input.processResult.events),
@@ -1248,6 +1322,24 @@ function admitWorkerProcessSummary(
     const timeoutMs = numberValue(record["timeoutMs"]);
     const inactivityTimeoutMs = numberValue(record["inactivityTimeoutMs"]);
     const heartbeatMs = numberValue(record["heartbeatMs"]);
+    const runtimeLivenessAuthority = stringValue(
+      record["runtimeLivenessAuthority"]
+    );
+    const runtimeLivenessProjectionRef = stringValue(
+      record["runtimeLivenessProjectionRef"]
+    );
+    const runtimeLivenessPolicyRef = stringValue(
+      record["runtimeLivenessPolicyRef"]
+    );
+    const runtimeLivenessLeaseState = stringValue(
+      record["runtimeLivenessLeaseState"]
+    );
+    const runtimeLivenessDispositionAction = stringValue(
+      record["runtimeLivenessDispositionAction"]
+    );
+    const runtimeLivenessDispositionReason = stringValue(
+      record["runtimeLivenessDispositionReason"]
+    );
     const lastHeartbeatIndex = nullableNumberValue(
       record["lastHeartbeatIndex"]
     );
@@ -1306,6 +1398,13 @@ function admitWorkerProcessSummary(
       timeoutMs === null ||
       inactivityTimeoutMs === null ||
       heartbeatMs === null ||
+      runtimeLivenessAuthority !==
+        "abiogenesis_runtime_liveness_observer_projection" ||
+      runtimeLivenessProjectionRef === null ||
+      runtimeLivenessPolicyRef === null ||
+      runtimeLivenessLeaseState === null ||
+      runtimeLivenessDispositionAction === null ||
+      runtimeLivenessDispositionReason === null ||
       lastHeartbeatIndex === undefined ||
       lastHeartbeatElapsedMs === undefined ||
       signalSequence === null ||
@@ -1340,6 +1439,12 @@ function admitWorkerProcessSummary(
         timeoutMs,
         inactivityTimeoutMs,
         heartbeatMs,
+        runtimeLivenessAuthority,
+        runtimeLivenessProjectionRef,
+        runtimeLivenessPolicyRef,
+        runtimeLivenessLeaseState,
+        runtimeLivenessDispositionAction,
+        runtimeLivenessDispositionReason,
         lastHeartbeatIndex,
         lastHeartbeatElapsedMs,
         signalSequence,
@@ -1377,6 +1482,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   readonly manifestPath: string;
   readonly promptPath: string;
   readonly pluginInput: EnginePluginInput;
+  readonly basis: ExecutionBasis;
   readonly eventSink: (event: RuntimeEvent) => void;
 }): Promise<SdlcWorkerRunResult> {
   const stdoutPath = join(input.manifest.archiveRoot, "worker_stdout.log");
@@ -1436,10 +1542,8 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       processEventsPath,
       parser: parserForWorkerTransport(input.transport),
       executorProfile,
-      timeoutMs: Math.min(
-        inactivityPolicy.timeoutMs,
-        inactivityPolicy.inactivityTimeoutMs
-      ),
+      timeoutMs: inactivityPolicy.timeoutMs,
+      terminationGraceMs: inactivityPolicy.terminationGraceMs,
       heartbeatMs: inactivityPolicy.heartbeatMs,
       eventSink: (event) => {
         if (event.kind === "actor_process_started" && !startedContextWritten) {
@@ -1501,13 +1605,20 @@ async function invokeWorkerThroughAbgProcessActor(input: {
     relativePath: "worker_run.json",
     payload: workerRun
   });
+  const livenessProjection = writeRuntimeLivenessObserverProjection({
+    manifest: input.manifest,
+    basis: input.basis,
+    processResult,
+    policy: inactivityPolicy
+  });
   writeWorkerProcessSummary({
     manifest: input.manifest,
     manifestPath: input.manifestPath,
     promptPath: input.promptPath,
     workerRun,
     processResult,
-    policy: inactivityPolicy
+    policy: inactivityPolicy,
+    livenessProjection
   });
   return workerRun;
 }
@@ -1630,6 +1741,7 @@ function workerProcessEvidenceRefs(input: {
     pathToFileURL(join(input.manifest.archiveRoot, "worker_run.json")).href,
     workerProcessStartedContextRef(input.manifest),
     workerProcessSummaryRef(input.manifest),
+    runtimeLivenessProjectionRef(input.manifest),
     pathToFileURL(input.workerRun.stdoutPath).href,
     pathToFileURL(input.workerRun.stderrPath).href,
     ...(input.workerRun.finalOutputRef === undefined ||
@@ -1758,6 +1870,16 @@ export function constructWorkerProcessFailurePostflight(input: {
       : processSummary.signalSequence
           .map((entry) => `${entry.signal}@${String(entry.elapsedMs)}ms`)
           .join(",");
+  const livenessDetail =
+    processSummary === null
+      ? Object.freeze([] as const)
+      : Object.freeze([
+          `runtimeLivenessAuthority=${processSummary.runtimeLivenessAuthority}`,
+          `runtimeLivenessProjectionRef=${processSummary.runtimeLivenessProjectionRef}`,
+          `runtimeLivenessLeaseState=${processSummary.runtimeLivenessLeaseState}`,
+          `runtimeLivenessDispositionAction=${processSummary.runtimeLivenessDispositionAction}`,
+          `runtimeLivenessDispositionReason=${processSummary.runtimeLivenessDispositionReason}`
+        ]);
   const carrier = makeSdlcBlockingReason({
     code: workerFailureCode({
       workerRun: input.workerRun,
@@ -1784,6 +1906,7 @@ export function constructWorkerProcessFailurePostflight(input: {
           `heartbeatMs=${processSummary?.heartbeatMs ?? "unknown"}`,
           `lastHeartbeatElapsedMs=${processSummary?.lastHeartbeatElapsedMs ?? "none"}`,
           `signalSequence=${signalSequence}`,
+          ...livenessDetail,
           `priorSilentAttempts=${String(priorSilentInactivityCount(input.manifest))}`,
           `sharpenedRetryAvailable=${String(silentRetryAvailable)}`,
           `executionShards=${String(input.manifest.productMaterialization.executionShards.length)}`,
@@ -2006,10 +2129,8 @@ export async function executeInstalledOperatorStart(input: {
     }
     const archiveRoot = join(
       input.workspaceRoot,
-      ".ai-workspace",
-      "runtime",
-      "odd_sdlc",
-      "operator-runs",
+      deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+        .operatorRunRoot,
       operatorRunId()
     );
     const managedTraversalManifest =
@@ -2200,6 +2321,7 @@ export async function executeInstalledOperatorStart(input: {
         manifestPath: handoffFiles.manifestPath,
         promptPath: handoffFiles.promptPath,
         pluginInput,
+        basis,
         eventSink: (event) => {
           emitted.push(event);
         }

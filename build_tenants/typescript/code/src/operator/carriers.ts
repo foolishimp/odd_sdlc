@@ -176,6 +176,12 @@ export interface SdlcWorkerProcessSummary {
   readonly timeoutMs: number;
   readonly inactivityTimeoutMs: number;
   readonly heartbeatMs: number;
+  readonly runtimeLivenessAuthority: "abiogenesis_runtime_liveness_observer_projection";
+  readonly runtimeLivenessProjectionRef: string;
+  readonly runtimeLivenessPolicyRef: string;
+  readonly runtimeLivenessLeaseState: string;
+  readonly runtimeLivenessDispositionAction: string;
+  readonly runtimeLivenessDispositionReason: string;
   readonly lastHeartbeatIndex: number | null;
   readonly lastHeartbeatElapsedMs: number | null;
   readonly signalSequence: readonly {

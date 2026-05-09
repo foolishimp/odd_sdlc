@@ -155,6 +155,37 @@ test("B-070 process://codex?model=... lowers to codex exec --model", () => {
   );
 });
 
+test("B-070 process://codex?model=...&effort=... lowers Codex reasoning effort config", () => {
+  const fx = makeFixture("CODEX-GPT55-PROMPT\n");
+  const transport = admitWorkerTransport(
+    "process://codex?model=gpt-5.5&effort=medium"
+  );
+  assert.equal(transport.agentKey, "codex");
+  assert.equal(transport.model, "gpt-5.5");
+  assert.equal(transport.effort, "medium");
+
+  const args = argsForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath
+  });
+
+  assert.equal(args[0], "exec");
+  assert.ok(args.includes("--model"));
+  const modelIndex = args.indexOf("--model");
+  assert.equal(args[modelIndex + 1], "gpt-5.5");
+  assert.ok(args.includes("-c"));
+  const configIndex = args.indexOf("-c");
+  assert.equal(args[configIndex + 1], 'model_reasoning_effort="medium"');
+  assert.equal(
+    args[args.length - 1],
+    "CODEX-GPT55-PROMPT\n",
+    "codex final positional arg remains prompt content"
+  );
+});
+
 test("T-125 process://claude?model=... lowers to claude --model", () => {
   const fx = makeFixture("CLAUDE-MODEL-PROMPT\n");
   const transport = admitWorkerTransport(

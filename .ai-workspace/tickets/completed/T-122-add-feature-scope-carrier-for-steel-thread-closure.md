@@ -2,8 +2,8 @@
 id: T-122
 title: Add feature scope carrier for steel-thread closure
 type: feature
-status: active
-review_status: reopened_closure_evidence_invalid_scope_derivation_risks
+status: completed
+review_status: completed_live_feature_scope_carrier_proof
 ticket_category: sdlc_runtime_scope
 goal: odd-sdlc-rc-data-mapper-production-depth
 change_intent: Realize a typed feature-scope carrier for steel-thread and targeted-repair traversal pressure without silently inventing scope or suppressing in-scope assurance failures.
@@ -11,7 +11,8 @@ change_class: design_reframe
 re_entry_point: design
 triaged_at: 2026-05-05
 created_at: 2026-05-05
-updated_at: 2026-05-07
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 owner: odd_sdlc
 affected_boundary:
   - build_tenants/typescript/code/src/operator/carriers.ts
@@ -66,6 +67,34 @@ non_closure_conditions:
   - feature-scope or F_D assurance fails only because a closed axis status is qualified by the selected scope
   - targeted_repair mode exists in code but is absent from the ticket contract
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for the feature-scope carrier and steel-thread/targeted-scope
+closure slice.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- Live handoff manifests carry both `featureScope` and
+  `traversalStrategyDecision`.
+- Early induction surfaces such as `derive_intent_surface`,
+  `derive_product_surface`, `derive_goal_surface`, and
+  `derive_requirement_surface` carried non-narrowing `full_breadth` scope.
+- Post-induction construction surfaces such as `derive_uat_testcases_surface`,
+  `derive_implementation_design_surface`,
+  `derive_aggregate_domain_model_surface`, and
+  `derive_aggregate_sunny_day_sequence_surface` carried `steel_thread` scope
+  over `cdme-compiler`.
+- Later full-breadth component/test surfaces remained explicit and visible
+  rather than silently invented.
+
+Closure boundary:
+
+- This closes the carrier/projection/proof requirement for T-122.
+- Full-breadth widening beyond the selected scope remains separate backlog
+  scope, not a reopened defect here.
 
 ## Reopen Finding - 2026-05-07
 

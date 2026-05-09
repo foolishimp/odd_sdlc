@@ -375,9 +375,12 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
   });
   assert.equal(install.kind, "installed");
   const workerScript = writeSilentWorkerScript(workspace);
-  const previousTimeout = process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
+  const previousTimeout = process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
+  const previousInactivityTimeout =
+    process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
   const previousHeartbeat = process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
-  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "120";
+  process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = "120";
+  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "10000";
   process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
   try {
     const start = await invokeOddSdlcSpecMethodCommand([
@@ -421,7 +424,11 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     );
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
-      /inactivityTimeoutMs=120/u
+      /hardTimeoutMs=120/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /inactivityTimeoutMs=10000/u
     );
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
@@ -434,6 +441,22 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
       /signalSequence=SIGTERM@\d+ms/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessAuthority=abiogenesis_runtime_liveness_observer_projection/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessProjectionRef=file:.*runtime_liveness_observer_projection\.json/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessLeaseState=externally_interrupted/u
+    );
+    assert.match(
+      start.payload.postflight.blockingReasonCarriers[0].detail,
+      /runtimeLivenessDispositionAction=block/u
     );
     assert.match(
       start.payload.postflight.blockingReasonCarriers[0].detail,
@@ -475,8 +498,18 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
       )
     );
     assert.equal(processSummary.kind, "sdlc_worker_process_summary");
-    assert.equal(processSummary.inactivityTimeoutMs, 120);
+    assert.equal(processSummary.timeoutMs, 120);
+    assert.equal(processSummary.inactivityTimeoutMs, 10000);
     assert.equal(processSummary.heartbeatMs, 20);
+    assert.equal(
+      processSummary.runtimeLivenessAuthority,
+      "abiogenesis_runtime_liveness_observer_projection"
+    );
+    assert.equal(
+      processSummary.runtimeLivenessLeaseState,
+      "externally_interrupted"
+    );
+    assert.equal(processSummary.runtimeLivenessDispositionAction, "block");
     assert.equal(processSummary.pid > 0, true);
     assert.equal(processSummary.lastHeartbeatElapsedMs >= 0, true);
     assert.deepStrictEqual(
@@ -487,11 +520,32 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     assert.match(processSummary.promptRef, /worker_prompt\.md$/u);
     assert.match(processSummary.reportRef, /worker_result_report\.json$/u);
     assert.match(processSummary.outputRef, /intent_surface\.md$/u);
+    const livenessProjection = JSON.parse(
+      readFileSync(
+        path.join(start.payload.archiveRoot, "runtime_liveness_observer_projection.json"),
+        "utf8"
+      )
+    );
+    assert.equal(livenessProjection.kind, "runtime_liveness_observer_projection");
+    assert.equal(livenessProjection.leaseState, "externally_interrupted");
+    assert.equal(livenessProjection.disposition.action, "block");
+    assert.equal(
+      livenessProjection.interruptionRows.some(
+        (row) => row.source === "harness_safety_cap"
+      ),
+      true
+    );
   } finally {
     if (previousTimeout === undefined) {
+      delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
+    } else {
+      process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = previousTimeout;
+    }
+    if (previousInactivityTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
     } else {
-      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = previousTimeout;
+      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] =
+        previousInactivityTimeout;
     }
     if (previousHeartbeat === undefined) {
       delete process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];

@@ -112,12 +112,18 @@ function codexArgs(input: {
   readonly promptPath: string;
   readonly outputLastMessagePath: string;
   readonly model: string | null;
+  readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
 }): readonly string[] {
   const modelArgs =
     input.model === null ? Object.freeze([]) : Object.freeze(["--model", input.model]);
+  const effortArgs =
+    input.effort === null
+      ? Object.freeze([])
+      : Object.freeze(["-c", `model_reasoning_effort="${input.effort}"`]);
   return Object.freeze([
     "exec",
     ...modelArgs,
+    ...effortArgs,
     "--skip-git-repo-check",
     "--ephemeral",
     "--sandbox",
@@ -163,7 +169,8 @@ export function argsForWorker(input: {
         workspaceRoot: input.manifest.workspaceRoot,
         promptPath: input.promptPath,
         outputLastMessagePath: input.outputLastMessagePath,
-        model: input.transport.model
+        model: input.transport.model,
+        effort: input.transport.effort
       });
     }
     if (input.transport.agentKey === "claude") {

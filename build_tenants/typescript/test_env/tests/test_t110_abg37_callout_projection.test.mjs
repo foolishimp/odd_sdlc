@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -182,4 +182,82 @@ test("T-110 timed worker projects ABG hard timeout instead of generic worker fai
     true
   );
   assert.notEqual(start.payload.summary.blockingReason, "worker_process_failed");
+});
+
+test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lease and archives ABG liveness projection", async () => {
+  const workspace = makeWorkspace();
+  await installWorkspace(workspace);
+  const workerPath = path.join(workspace, "t129_active_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { createHash } from 'node:crypto';",
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import { dirname } from 'node:path';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));",
+      "process.stdout.write('activity-0\\n');",
+      "await sleep(90);",
+      "process.stdout.write('activity-1\\n');",
+      "await sleep(90);",
+      "process.stdout.write('activity-2\\n');",
+      "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'ABG liveness activity reset fixture.'].join('\\n');",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
+      "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
+      "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [] }));",
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated ABG liveness reset fixture', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const start = await withEnv(
+    {
+      ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
+      ABG_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
+      ODD_SDLC_WORKER_TIMEOUT_MS: "2000",
+      ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: "100",
+      ODD_SDLC_WORKER_HEARTBEAT_MS: "25"
+    },
+    () => runStart(workspace, `process://node?script=${encodeURIComponent(workerPath)}`)
+  );
+
+  assert.equal(start.status, "ok");
+  assert.equal(start.payload.workerRun.status, 0);
+  assert.equal(start.payload.workerRun.timedOut, false);
+  assert.notEqual(start.payload.workerRun.outcome.kind, "hard_timeout");
+  const eventsText = readFileSync(
+    path.join(start.payload.archiveRoot, "worker_process_events.jsonl"),
+    "utf8"
+  );
+  assert.match(eventsText, /runtime_activity_probe_observed/u);
+  const liveness = JSON.parse(
+    readFileSync(
+      path.join(start.payload.archiveRoot, "runtime_liveness_observer_projection.json"),
+      "utf8"
+    )
+  );
+  assert.equal(liveness.kind, "runtime_liveness_observer_projection");
+  assert.equal(liveness.leaseState, "active");
+  assert.equal(liveness.disposition.action, "continue_waiting");
+  assert.equal(
+    liveness.probeCoverageRefs.some((ref) =>
+      ref.includes("local_spawn_stdout")
+    ),
+    true
+  );
+  const summary = JSON.parse(
+    readFileSync(
+      path.join(start.payload.archiveRoot, "worker_process_summary.json"),
+      "utf8"
+    )
+  );
+  assert.equal(
+    summary.runtimeLivenessAuthority,
+    "abiogenesis_runtime_liveness_observer_projection"
+  );
+  assert.equal(summary.runtimeLivenessLeaseState, "active");
+  assert.equal(summary.runtimeLivenessDispositionAction, "continue_waiting");
+  assert.equal(summary.timeoutMs, 2000);
+  assert.equal(summary.inactivityTimeoutMs, 100);
 });

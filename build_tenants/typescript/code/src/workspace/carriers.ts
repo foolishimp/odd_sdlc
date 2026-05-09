@@ -51,8 +51,17 @@ export interface SdlcProjectConstraints {
   readonly projectSlug: string;
   readonly activeTenant: string;
   readonly selectedOutputRoot: string;
+  readonly runtimeLayout: SdlcRuntimeLayout;
   readonly ambiguityRiskAppetite: "low" | "medium" | "high";
   readonly capabilityContracts: readonly string[];
+}
+
+export interface SdlcRuntimeLayout {
+  readonly kind: "sdlc_runtime_layout";
+  readonly runtimeRoot: string;
+  readonly transformAssetRoot: string;
+  readonly operatorRunRoot: string;
+  readonly productMaterializationRootPolicy: "selected_output_root";
 }
 
 export const SDLC_REALIZATION_MODE_VALUES = Object.freeze([
@@ -85,6 +94,7 @@ export interface SdlcConformProjectProfile {
   readonly activeTenant: string;
   readonly selectedOutputRoot: string;
   readonly declaredOutputRoot: string;
+  readonly runtimeLayout: SdlcRuntimeLayout;
   readonly buildExecutionContract: string;
   readonly testExecutionContract: string;
   readonly deploymentContract: string;

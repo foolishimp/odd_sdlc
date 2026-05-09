@@ -25,6 +25,10 @@ import {
   constructModule,
   constructNode,
   constructGraphCallOpenedEvent,
+  constructRuntimeActivityProbeObservedEvent,
+  constructRuntimeExternalInterruptionObservedEvent,
+  constructRuntimeSystemProbeContract,
+  constructRuntimeWatchdogPolicy,
   constructScheduledContinuation,
   constructScheduledContinuationReopenedEvent,
   constructTimerIntent,
@@ -32,6 +36,7 @@ import {
   constructTimerOutcome,
   constructTimerOutcomeAdmittedEvent,
   deriveRuntimeAggregateProjection,
+  deriveRuntimeLivenessObserverProjection,
   deriveTemporalConstraintFromGtl,
   deriveTemporalHomeostaticProjection,
   deriveTemporalProjection,
@@ -213,6 +218,67 @@ function buildOddSdlcAbg37Basis(input) {
 
 function graphOpenedEvents(basis) {
   return [constructGraphCallOpenedEvent(basis), constructFrameOpenedEvent(basis)];
+}
+
+function firstEdgeName(basis) {
+  const vector = basis.graph.vectors[0];
+  assert.notEqual(vector, undefined);
+  return vector.name;
+}
+
+function livenessPolicy(overrides = {}) {
+  return constructRuntimeWatchdogPolicy({
+    policyRef:
+      overrides.policyRef ?? "policy://odd-sdlc/t129/runtime-liveness-test",
+    startupSilenceLeaseMs: overrides.startupSilenceLeaseMs ?? 100,
+    inactivityLeaseMs: overrides.inactivityLeaseMs ?? 3_000,
+    terminationGraceMs: overrides.terminationGraceMs ?? 500,
+    hardSafetyCapMs: overrides.hardSafetyCapMs ?? null,
+    nowElapsedMs: overrides.nowElapsedMs ?? null,
+    retryBudgetRemaining: overrides.retryBudgetRemaining ?? 1
+  });
+}
+
+function runtimeProbeEvent(input) {
+  return constructRuntimeActivityProbeObservedEvent({
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    runId: input.basis.runId,
+    workKey: input.basis.workKey,
+    graphCallId: null,
+    frameId: null,
+    vectorIndex: 0,
+    edge: firstEdgeName(input.basis),
+    actorInvocationId: null,
+    workerId: input.basis.runtimeIdentity.workerId,
+    backendId: input.basis.runtimeIdentity.backendId,
+    systemRef: "runtime-system://odd-sdlc/t129/liveness",
+    probeRef: `runtime-probe://odd-sdlc/t129/${input.source}/${input.suffix}`,
+    probeSource: input.source,
+    activityRef: `${input.activityBaseRef}/${input.suffix}`,
+    elapsedMs: input.elapsedMs,
+    observedAtMs: input.elapsedMs,
+    evidenceRefs: [`${input.activityBaseRef}/${input.suffix}`],
+    detail: input.detail ?? null,
+    causationEventRefs: [],
+    correlationId: "correlation://odd-sdlc/t129/liveness"
+  });
+}
+
+function probeContractFor(event) {
+  return constructRuntimeSystemProbeContract({
+    probeRef: event.probeRef,
+    systemRef: event.systemRef,
+    source: event.probeSource,
+    basisId: event.basisId,
+    graphFunctionId: event.graphFunctionId,
+    graphCallId: event.graphCallId,
+    frameId: event.frameId,
+    vectorIndex: event.vectorIndex,
+    edge: event.edge,
+    actorInvocationId: event.actorInvocationId,
+    evidenceRefs: event.evidenceRefs
+  });
 }
 
 function publicGapNode(id, name, assetType) {
@@ -1040,4 +1106,99 @@ test("T-129 substrate boundary fails closed without ABG temporal identity fields
     () => assertRuntimeEvent(Object.freeze(deadlineWithoutAction)),
     /DeadlineBreachAdmittedEvent\.deadlineBreachAction/
   );
+});
+
+test("T-129 consumes ABG liveness projection for activity reset without odd_sdlc liveness wrapper", () => {
+  const { basis } = buildOddSdlcAbg37Basis({
+    name: "liveness_reset",
+    declarations: attrs()
+  });
+  const staleProbe = runtimeProbeEvent({
+    basis,
+    source: "runtime_ledger_write",
+    suffix: "stale",
+    activityBaseRef: "ledger://odd-sdlc/t129/liveness-reset",
+    elapsedMs: 1_000
+  });
+  const resetProbe = runtimeProbeEvent({
+    basis,
+    source: "runtime_ledger_write",
+    suffix: "reset",
+    activityBaseRef: "ledger://odd-sdlc/t129/liveness-reset",
+    elapsedMs: 5_200
+  });
+  assertRuntimeEvent(staleProbe);
+  assertRuntimeEvent(resetProbe);
+
+  const expired = deriveRuntimeLivenessObserverProjection({
+    basis,
+    events: [staleProbe],
+    probeContracts: [probeContractFor(staleProbe)],
+    policy: livenessPolicy({ nowElapsedMs: 5_500 })
+  });
+  const reset = deriveRuntimeLivenessObserverProjection({
+    basis,
+    events: [staleProbe, resetProbe],
+    probeContracts: [probeContractFor(staleProbe), probeContractFor(resetProbe)],
+    policy: livenessPolicy({ nowElapsedMs: 5_500 })
+  });
+
+  assert.equal(expired.kind, "runtime_liveness_observer_projection");
+  assert.equal(expired.leaseState, "inactivity_exceeded");
+  assert.equal(expired.disposition.action, "retry");
+  assert.equal(reset.leaseState, "active");
+  assert.equal(reset.disposition.action, "continue_waiting");
+  assert.equal(
+    reset.lastActivity.activityRef,
+    "ledger://odd-sdlc/t129/liveness-reset/reset"
+  );
+  assert.equal(reset.probeCoverageRefs.includes(resetProbe.probeRef), true);
+});
+
+test("T-129 consumes ABG liveness projection for typed external interruption", () => {
+  const { basis } = buildOddSdlcAbg37Basis({
+    name: "liveness_interruption",
+    declarations: attrs()
+  });
+  const interruption = constructRuntimeExternalInterruptionObservedEvent({
+    basisId: basis.id,
+    graphFunctionId: basis.graphFunction.id,
+    runId: basis.runId,
+    workKey: basis.workKey,
+    graphCallId: null,
+    frameId: null,
+    vectorIndex: 0,
+    edge: firstEdgeName(basis),
+    actorInvocationId: null,
+    workerId: basis.runtimeIdentity.workerId,
+    backendId: basis.runtimeIdentity.backendId,
+    systemRef: "runtime-system://odd-sdlc/t129/liveness",
+    interruptionRef: "interruption://odd-sdlc/t129/harness-safety-cap",
+    interruptionSource: "harness_safety_cap",
+    signal: "SIGTERM",
+    elapsedMs: 6_000,
+    observedAtMs: 6_000,
+    evidenceRefs: ["process://odd-sdlc/t129/harness-safety-cap"],
+    detail: "harness safety cap recorded as ABG interruption truth",
+    causationEventRefs: [],
+    correlationId: "correlation://odd-sdlc/t129/liveness"
+  });
+  assertRuntimeEvent(interruption);
+
+  const projection = deriveRuntimeLivenessObserverProjection({
+    basis,
+    events: [interruption],
+    probeContracts: [],
+    policy: livenessPolicy({ nowElapsedMs: 6_000 })
+  });
+
+  assert.equal(projection.leaseState, "externally_interrupted");
+  assert.equal(projection.disposition.action, "block");
+  assert.equal(
+    projection.disposition.reason,
+    "external_interruption_observed"
+  );
+  assert.deepEqual(projection.interruptedSystemRefs, [
+    "runtime-system://odd-sdlc/t129/liveness"
+  ]);
 });

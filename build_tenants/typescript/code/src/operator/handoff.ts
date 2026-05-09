@@ -943,10 +943,8 @@ function priorWorkerResultReportRefsForSourceAsset(input: {
 }): readonly string[] {
   const operatorRunsRoot = join(
     input.workspaceRoot,
-    ".ai-workspace",
-    "runtime",
-    "odd_sdlc",
-    "operator-runs"
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+      .operatorRunRoot
   );
   if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
     return Object.freeze([]);
@@ -1255,25 +1253,19 @@ export function deriveWorkerHandoffManifest(input: {
   readonly runId?: string;
 }): SdlcWorkerHandoffManifest {
   const runId = input.runId ?? operatorRunId();
+  const conformedProject =
+    input.conformedProject ??
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot);
   const archiveRoot = join(
     input.workspaceRoot,
-    ".ai-workspace",
-    "runtime",
-    "odd_sdlc",
-    "operator-runs",
+    conformedProject.runtimeLayout.operatorRunRoot,
     runId
   );
   const outputRoot = join(
     input.workspaceRoot,
-    ".ai-workspace",
-    "runtime",
-    "odd_sdlc",
-    "assets",
+    conformedProject.runtimeLayout.transformAssetRoot,
     runId
   );
-  const conformedProject =
-    input.conformedProject ??
-    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot);
   const baseMaterialization = productMaterializationContract({
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
@@ -1480,7 +1472,8 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
     return [
       "This edge realizes declared components as product code.",
       "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows.",
-      "Each componentRealizationRows entry MUST cite componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
+      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_code_surface`.",
+      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
       "Read implementation_component_topology_surface and component_realization_schedule_surface before writing code.",
       "Materialized source must preserve declared component boundaries unless a blocker is explicitly carried.",
       "The output artifact must report realized, blocked, and deferred components by componentId."
@@ -1490,6 +1483,8 @@ function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
     return [
       "This edge qualifies component realization.",
       "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows for the realized or blocked components.",
+      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_realization_qualification_surface`.",
+      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
       "Compare implementation_component_topology_surface to component_code_surface and the observed product materialization ledger.",
       "The output MUST include realizedComponentIds, missingComponentIds, collapsedComponentIds, and requirement ids affected by each gap.",
       "A missing or collapsed component is a typed non-closure reason, not a prompt suggestion."
@@ -1866,10 +1861,10 @@ function componentDepthFieldSetForTarget(
     targetAssetType === "component_realization_qualification_surface"
   ) {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
-      "componentRealizationRows[].kind",
+      "kind=sdlc_component_depth_register",
+      "registerVersion=ts-component-depth-v1",
+      `targetAssetType=${targetAssetType}`,
+      "componentRealizationRows[].kind=sdlc_component_realization_row",
       "componentRealizationRows[].componentId",
       "componentRealizationRows[].moduleName",
       "componentRealizationRows[].relativePath",
@@ -2160,10 +2155,8 @@ function recentRuntimeAssetPaths(input: {
 }): readonly string[] {
   const assetsRoot = join(
     input.workspaceRoot,
-    ".ai-workspace",
-    "runtime",
-    "odd_sdlc",
-    "assets"
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+      .transformAssetRoot
   );
   if (!existsSync(assetsRoot) || !statSync(assetsRoot).isDirectory()) {
     return Object.freeze([]);

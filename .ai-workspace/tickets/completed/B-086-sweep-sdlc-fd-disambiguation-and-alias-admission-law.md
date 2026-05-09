@@ -3,8 +3,8 @@ id: B-086
 title: Sweep SDLC F_D disambiguation, alias admission, and F_P escalation law
 type: bug
 ticket_category: rc_blocker
-status: active
-review_status: deterministic_review_findings_applied_pending_live_review
+status: completed
+review_status: completed_live_fd_disambiguation_sweep_proof
 goal: typescript-bounded-data-mapper-build-rc
 change_intent: Sweep SDLC F_D admission and assurance checks so they evaluate carriers at the level of disambiguation supplied by hard source authority, ticket, handoff, feature scope, and carrier context; remove strict canonical spelling checks inferred from local parser preferences, admit deterministic aliases when equivalence is provable, and route unresolved semantic disambiguation to F_P instead of forcing F_D failure.
 change_class: design_reframe
@@ -18,7 +18,8 @@ affected_boundary:
 priority: critical
 triaged_at: 2026-05-07
 created_at: 2026-05-07
-updated_at: 2026-05-08
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 build_tenant: typescript
 owner: odd_sdlc
 governance_scope: STDO Method
@@ -109,6 +110,27 @@ non_closure_conditions:
 ---
 
 # B-086: Sweep SDLC F_D Disambiguation, Alias Admission, And F_P Escalation Law
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for the SDLC F_D disambiguation and alias-admission sweep.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- The run advanced past the previous false-failure classes: non-canonical
+  operation identity, scope-qualified design-completeness status, standard
+  cardinality notation, and design-depth parser drift.
+- Remaining stop point was an outer test harness timeout during
+  `derive_component_test_surface`, not an F_D disambiguation rejection.
+- Retry-bearing live packages carried typed repair instructions instead of
+  requiring local parser-preference spellings as source authority.
+
+Closure boundary:
+
+- This closes the F_D exactness/alias/escalation sweep.
+- It does not close RC or the component-test/release-depth blocker.
 
 ## STDO Triage
 

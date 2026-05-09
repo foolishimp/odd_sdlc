@@ -17,7 +17,7 @@ The TypeScript tenant separates the ingress surface into these seams:
 | carrier vocabulary | `workspace/carriers.ts` | source input, project constraints, imported requirement authority, bootstrap lineage, and ingress report types |
 | source input derivation | `workspace/source_input.ts` | digest, role detection, authority-marker extraction, ambiguity classification, source-input admission |
 | project constraints | `workspace/project_constraints.ts` | closed project-profile admission and project slug parsing |
-| conform project profile | `workspace/project_profile.ts` | `{documents, project_constraints} -> ConformProjectProfile` canonicalization for tenant, output root, modules, capabilities, execution contracts, and realization mode |
+| conform project profile | `workspace/project_profile.ts` | `{documents, project_constraints} -> ConformProjectProfile` canonicalization for tenant, output root, runtime layout, modules, capabilities, execution contracts, and realization mode |
 | bootstrap lineage | `workspace/bootstrap_lineage.ts` | imported requirement seed authority and `InputSet -> Project` lineage projection |
 | compatibility barrel | `workspace/ingress.ts` | export continuity only |
 
@@ -30,6 +30,11 @@ runtime facts, or infer semantic authority from path names alone.
 Project constraints are input only. Downstream installed-operator handoff,
 product materialization, capability gates, and execution-contract prompts
 consume `ConformProjectProfile`, not direct YAML scalar scans.
+
+The standard conformed runtime layout is part of that same profile. Transform
+assets are archived under `.ai-workspace/runtime/odd_sdlc/assets`, operator run
+archives under `.ai-workspace/runtime/odd_sdlc/operator-runs`, and product
+files materialize through `selected_output_root` under `build_tenants/<tenant>`.
 
 The lawful bootstrap handoff is:
 

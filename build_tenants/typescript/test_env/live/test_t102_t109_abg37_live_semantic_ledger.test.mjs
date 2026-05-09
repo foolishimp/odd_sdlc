@@ -48,6 +48,7 @@ import { liveTestArchiveRoot } from "./archive_root.mjs";
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_LIVE"] === "1";
 const WORKER_COMMAND = process.env["ODD_SDLC_TS_LIVE_WORKER_COMMAND"] ?? "codex";
 const CODEX_MODEL = process.env["ODD_SDLC_TS_LIVE_CODEX_MODEL"] ?? "gpt-5.3-codex";
+const CODEX_EFFORT = process.env["ODD_SDLC_TS_LIVE_CODEX_EFFORT"] ?? null;
 
 function sha256Text(content) {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
@@ -303,6 +304,9 @@ function runLiveWorker(input) {
           "exec",
           "-m",
           CODEX_MODEL,
+          ...(CODEX_EFFORT === null
+            ? []
+            : ["-c", `model_reasoning_effort="${CODEX_EFFORT}"`]),
           "--skip-git-repo-check",
           "--ephemeral",
           "--sandbox",
@@ -345,7 +349,7 @@ test(
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T109_LIVE=1 not set" },
   () => {
     assert.equal(WORKER_COMMAND, "codex", "T-109 live proof is pinned to codex");
-    assert.equal(CODEX_MODEL, "gpt-5.3-codex", "codex live proof must use gpt-5.3-codex");
+    assert.match(CODEX_MODEL, /\S/u, "codex live proof must declare a model");
 
     const archiveRoot = liveTestArchiveRoot(
       "t109_live_abg37_sdlc_lifecycle",

@@ -3,8 +3,8 @@ id: T-118
 title: Slim worker invocation packages and archive full manifests by reference
 type: performance
 ticket_category: worker_context_packaging
-status: active
-review_status: reopened_codex_rc_completeness_review
+status: completed
+review_status: completed_live_compact_package_proof
 goal: typescript-rc-live-lane-performance-and-worker-readability
 build_tenant: typescript
 owner: unassigned
@@ -15,7 +15,8 @@ affected_boundary: worker_prompt.md, handoff_manifest.json, traversal_intent_pac
 priority: high
 triaged_at: 2026-05-04
 created_at: 2026-05-04
-updated_at: 2026-05-07
+updated_at: 2026-05-09
+completed_at: 2026-05-09
 governance_scope: STDO Method
 depends_on:
   - T-107 split operator handoff into prime domain modules
@@ -42,6 +43,28 @@ non_closure_conditions:
   - prompt still instructs worker to read the full manifest as the default first step
   - closure authority moves into the compact package narrative
 ---
+
+## Closure Note - 2026-05-09
+
+Closed under STDO for compact worker invocation packaging.
+
+Current live evidence:
+
+- Fresh data_mapper live archive:
+  `build_tenants/typescript/test_env/test_runs/t109_live_installed_data_mapper_pty/20260508T122226315Z_pid79621`.
+- Worker outputs cite `worker_invocation_package.json` and
+  `traversal_intent_package.json` as the worker-facing authority.
+- The archive contains no failed full-manifest read or 256 KB read-ceiling
+  failure before worker output.
+- Live `worker_invocation_package.json` sizes remained below the ticket budget;
+  observed packages were below 96 KB, including retry-bearing packages.
+- `handoff_manifest.json` remains archived as forensic truth; closure authority
+  stays in typed postflight/assurance outputs, not worker narrative.
+
+Closure boundary:
+
+- This closes the packaging/readability ticket.
+- It does not claim RC build completion or release-depth parity.
 
 ## Closure Note - 2026-05-06
 
