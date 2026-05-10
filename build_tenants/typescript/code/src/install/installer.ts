@@ -1,6 +1,7 @@
 // Implements: REQ-F-ODDSDLC-040
 
 import { installAbiogenesisTypescript } from "@abiogenesis/typescript-tenant/app/m04/install-bootstrap";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { admitOddSdlcTypescriptInstallRequest } from "./admission.js";
@@ -20,6 +21,35 @@ import {
   legacyBlockingReasonCode,
   makeSdlcBlockingReason
 } from "../shared/blocking_reason.js";
+import { appendOddSdlcRuntimeEvents } from "../operator/event_store.js";
+
+export const ODD_SDLC_TYPESCRIPT_INSTALLER_ECOSYSTEM = "odd_sdlc_typescript" as const;
+
+async function emitOddSdlcWorkspaceInstallationAdmitted(input: {
+  readonly targetRoot: string;
+  readonly packageName: string;
+  readonly packageVersion: string;
+  readonly resolvedRuntimeRef: string;
+  readonly installManifestPath: string;
+}): Promise<void> {
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot: input.targetRoot,
+    events: Object.freeze([
+      Object.freeze({
+        kind: "workspace_installation_admitted" as const,
+        installResult: "installed" as const,
+        targetRoot: input.targetRoot,
+        packageName: input.packageName,
+        packageVersion: input.packageVersion,
+        resolvedRuntimeRef: input.resolvedRuntimeRef,
+        installManifestPath: input.installManifestPath,
+        installerEcosystem: ODD_SDLC_TYPESCRIPT_INSTALLER_ECOSYSTEM,
+        causationEventRefs: Object.freeze([]),
+        correlationId: `odd-sdlc-install://${randomUUID()}`
+      })
+    ])
+  });
+}
 
 export const ODD_SDLC_TYPESCRIPT_PRODUCT_INSTALL_ROOT_RELATIVE = Object.freeze([
   ".abiogenesis",
@@ -211,6 +241,13 @@ async function installAdmittedOddSdlcTypescript(
         abgInstallManifestPath: abgOutcome.installManifestPath
       })
     );
+    await emitOddSdlcWorkspaceInstallationAdmitted({
+      targetRoot: request.targetRoot,
+      packageName: installedPackage.packageName,
+      packageVersion: installedPackage.packageVersion,
+      resolvedRuntimeRef: runtimeIdentity.resolvedRuntimeRef,
+      installManifestPath
+    });
     return Object.freeze({
       kind: "installed",
       request,
