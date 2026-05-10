@@ -706,10 +706,17 @@ function nextActionProjectionFromArchive(
   });
 }
 
-function selectedNextGraphFunctionNameFromArchive(input: {
+interface SelectedNextGraphFunctionFromArchive {
+  readonly graphFunctionName: string;
+  readonly nextActionProjectionRef: string;
+  readonly selectedActionRef: string;
+  readonly closureDecisionRef: string;
+}
+
+function selectedNextGraphFunctionFromArchive(input: {
   readonly context: SpecMethodWorkspaceContext;
   readonly module: ReturnType<typeof constructSdlcGtlModule>;
-}): string | null {
+}): SelectedNextGraphFunctionFromArchive | null {
   const graphFunctionNameByRef = new Map(
     input.module.graphFunctions.flatMap((graphFunction) => [
       [graphFunction.id, graphFunction.name],
@@ -725,31 +732,52 @@ function selectedNextGraphFunctionNameFromArchive(input: {
       path.join(archiveRoot, "sdlc_next_action_projection.json")
     );
     if (
-      record?.["kind"] !== "sdlc_next_action_projection" ||
+      record?.["kind"] !== "sdlc_next_action_projection"
+    ) {
+      return null;
+    }
+    if (
       record["choosesNextTraversal"] !== true ||
       stringField(record, "selectedActionRef") === null
     ) {
-      continue;
+      return null;
     }
     if (
       !stringArrayField(record, "predecessorRefs").includes(decision.decisionRef)
     ) {
-      continue;
+      return null;
     }
     const nextGraphFunctionRef = stringField(record, "nextGraphFunctionRef");
-    if (nextGraphFunctionRef === null) {
-      continue;
+    const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
+    const selectedActionRef = stringField(record, "selectedActionRef");
+    if (
+      nextGraphFunctionRef === null ||
+      nextActionProjectionRef === null ||
+      selectedActionRef === null
+    ) {
+      return null;
     }
     const direct = graphFunctionNameByRef.get(nextGraphFunctionRef);
     if (direct !== undefined) {
-      return direct;
+      return Object.freeze({
+        graphFunctionName: direct,
+        nextActionProjectionRef,
+        selectedActionRef,
+        closureDecisionRef: decision.decisionRef
+      });
     }
     const suffixMatch = input.module.graphFunctions.find((graphFunction) =>
       nextGraphFunctionRef.endsWith(`:${graphFunction.name}`)
     );
     if (suffixMatch !== undefined) {
-      return suffixMatch.name;
+      return Object.freeze({
+        graphFunctionName: suffixMatch.name,
+        nextActionProjectionRef,
+        selectedActionRef,
+        closureDecisionRef: decision.decisionRef
+      });
     }
+    return null;
   }
   return null;
 }
@@ -977,7 +1005,14 @@ function defaultRegimeFor(input: {
   return "F_P";
 }
 
-function startOutcomeFor(request: OddSdlcSpecMethodTraversalRequest): ReturnType<typeof publicStartOnce> {
+function startOutcomeFor(
+  request: OddSdlcSpecMethodTraversalRequest,
+  replayNextAction?: {
+    readonly nextActionProjectionRef: string;
+    readonly selectedActionRef: string;
+    readonly closureDecisionRef: string;
+  }
+): ReturnType<typeof publicStartOnce> {
   const context = workspaceContext({
     workspaceRoot: request.workspaceRoot,
     outputWorkspaceRoot: request.outputWorkspaceRoot
@@ -993,7 +1028,15 @@ function startOutcomeFor(request: OddSdlcSpecMethodTraversalRequest): ReturnType
           : context.outputWorkspaceRoot,
       target: request.target,
       until: request.until,
-      defaultRegime: defaultRegimeFor({ request, queryDomain })
+      defaultRegime: defaultRegimeFor({ request, queryDomain }),
+      ...(replayNextAction === undefined
+        ? {}
+        : {
+            replayNextActionProjectionRef:
+              replayNextAction.nextActionProjectionRef,
+            replaySelectedActionRef: replayNextAction.selectedActionRef,
+            replayClosureDecisionRef: replayNextAction.closureDecisionRef
+          })
     },
     module: constructSdlcGtlModule(),
     queryDomain,
@@ -1025,27 +1068,28 @@ function startOutcomeForObservedReplay(input: {
     outputWorkspaceRoot: input.request.outputWorkspaceRoot
   });
   const module = constructSdlcGtlModule();
-  const selectedNextGraphFunctionName = selectedNextGraphFunctionNameFromArchive({
+  const selectedNextGraphFunction = selectedNextGraphFunctionFromArchive({
     context,
     module
   });
   if (
-    selectedNextGraphFunctionName !== null &&
+    selectedNextGraphFunction !== null &&
     (input.request.target.kind === "next" ||
       (input.request.target.kind === "graph_function" &&
-        input.request.target.handle !== selectedNextGraphFunctionName))
+        input.request.target.handle !== selectedNextGraphFunction.graphFunctionName))
   ) {
     const selected = startOutcomeFor({
       ...input.request,
       target: {
         kind: "graph_function",
-        handle: selectedNextGraphFunctionName
+        handle: selectedNextGraphFunction.graphFunctionName
       }
+    }, {
+      nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
+      selectedActionRef: selectedNextGraphFunction.selectedActionRef,
+      closureDecisionRef: selectedNextGraphFunction.closureDecisionRef
     });
-    if (
-      selected.executionContract !== null &&
-      hasReplayForBasis(selected.executionContract.basis, input.events)
-    ) {
+    if (selected.executionContract !== null) {
       return selected;
     }
   }

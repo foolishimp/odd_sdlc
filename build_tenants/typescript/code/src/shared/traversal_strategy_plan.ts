@@ -24,6 +24,7 @@ const ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES: Readonly<
     derive_aggregate_sunny_day_sequence_surface: "steel_thread",
     derive_implementation_component_topology_surface: "steel_thread",
     derive_code_surface: "steel_thread",
+    Fg_materialize_declared_product_asset: "steel_thread",
     derive_test_execution_result_surface: "full_breadth",
     derive_test_run_archive_surface: "full_breadth",
     qualify_testcase_authority: "full_breadth",

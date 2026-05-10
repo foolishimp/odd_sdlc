@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   constructSdlcHookContractCatalog,
   deriveSdlcTraversalStrategyDecision,
   deriveWorkerHandoffManifest,
@@ -108,11 +109,91 @@ function retryContext() {
   };
 }
 
-function manifestFor(edgeName, traversalAttemptEnvelope = null, retry = null) {
+function consequenceRetryContextFor(sourceProjectionRef) {
+  return {
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: [
+      {
+        vectorIndex: 0,
+        retryRunId: `retry-run://t123/${encodeURIComponent(sourceProjectionRef)}`,
+        retryCallId: `retry-call://t123/${encodeURIComponent(sourceProjectionRef)}`,
+        manifestId: "file:///tmp/t123/handoff_manifest.json",
+        priorAuthorityRef: "closure-decision://t123/prior-close",
+        attemptIndex: 1,
+        sourceProjectionRef
+      }
+    ],
+    priorGapDossiers: []
+  };
+}
+
+function retryContextForAccountingPlaceholderWithCompilerEvidence() {
+  return {
+    kind: "sdlc_worker_retry_context",
+    retryAttemptRefs: [
+      {
+        vectorIndex: 0,
+        retryRunId: "retry-run://t123/cdme-accounting",
+        retryCallId: "retry-call://t123/cdme-accounting",
+        manifestId: "file:///tmp/t123/accounting/handoff_manifest.json",
+        priorAuthorityRef: "file:///tmp/t123/accounting/gap_dossier.json",
+        attemptIndex: 1,
+        sourceProjectionRef:
+          "construction-priority-projection://odd-sdlc/post-action/module/cdme-accounting/Fg_materialize_declared_product_asset"
+      }
+    ],
+    priorGapDossiers: [
+      {
+        kind: "sdlc_postflight_gap_dossier",
+        dossierVersion: "ts-gap-dossier-v1",
+        graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+        edgeName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+        vectorIndex: 0,
+        targetAssetType: "component_code_surface",
+        status: "open",
+        reasons: [
+          {
+            kind: "sdlc_postflight_gap_reason",
+            reason:
+              "placeholder_surface:file:///tmp/t123/build_tenants/scala_spark/cdme-accounting/src/main/scala/cdme/accounting/AccountingLedger.scala",
+            reasonClass: "assurance",
+            blockingReason: {
+              kind: "sdlc_blocking_reason",
+              code: "accounting_ledger_reason",
+              reasonClass: "assurance",
+              lawfulReentryPoint: "same_edge_retry",
+              message: "Accounting file contains placeholder implementation text.",
+              detail:
+                "placeholder_surface:file:///tmp/t123/build_tenants/scala_spark/cdme-accounting/src/main/scala/cdme/accounting/AccountingLedger.scala",
+              evidenceRefs: [
+                "file:///tmp/t123/build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/TopologicalCompiler.scala"
+              ]
+            }
+          }
+        ],
+        evidenceRefs: [
+          "file:///tmp/t123/build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/TopologicalCompiler.scala",
+          "file:///tmp/t123/build_tenants/scala_spark/cdme-accounting/src/main/scala/cdme/accounting/AccountingLedger.scala"
+        ],
+        priorManifestId: "file:///tmp/t123/accounting/handoff_manifest.json",
+        currentGapDossierRef: "file:///tmp/t123/accounting/gap_dossier.json",
+        retryEligible: true,
+        nextLawfulActions: ["retry_same_edge"]
+      }
+    ]
+  };
+}
+
+function manifestFor(
+  edgeName,
+  traversalAttemptEnvelope = null,
+  retry = null,
+  graphFunctionName = "graph_function:bootstrap_release_self_test"
+) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
     workspaceRoot: makeWorkspace(),
-    graphFunctionName: "graph_function:bootstrap_release_self_test",
+    graphFunctionName,
     edgeName,
     vectorIndex: 0,
     contract,
@@ -193,6 +274,33 @@ test("T-123 post-induction construction edges derive T-122 feature scope", () =>
   assert.equal(
     manifest.traversalIntentPackage.traversalStrategyDecision.selectedStrategy,
     "steel_thread"
+  );
+});
+
+test("T-123 declared product materialization uses steel-thread scope", () => {
+  const manifest = manifestFor(
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    null,
+    null,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+
+  assert.equal(
+    manifest.traversalStrategyDecision.selectedStrategy,
+    "steel_thread"
+  );
+  assert.equal(manifest.traversalStrategyDecision.featureScopeRequired, true);
+  assert.equal(manifest.traversalStrategyDecision.featureScopeDerived, true);
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
+    "cdme-compiler"
+  ]);
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-accounting"
+  ]);
+  assert.match(
+    promptForHandoff(manifest),
+    /Steel thread \/ targeted repair: close only included scope/u
   );
 });
 
@@ -292,6 +400,151 @@ test("T-123 ABG-selected strategy overrides the fallback plan", () => {
     "steel_thread"
   );
   assert.equal(manifest.featureScope.mode, "steel_thread");
+});
+
+test("T-123 consequence reentry scope advances steel thread beyond static first slice", () => {
+  const manifest = manifestFor(
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    {
+      kind: "traversal_attempt_envelope",
+      envelopeRef: "abg://envelope/t123-materialize",
+      profileRef: "abg://profile/t123-materialize",
+      basisId: "basis:t123-materialize",
+      graphFunctionId: "graph:t123-materialize",
+      graphCallId: "call:t123-materialize",
+      frameId: "frame:t123-materialize",
+      vectorIndex: 0,
+      edge: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      strategyDirectiveRef:
+        "strategy://abg/selected/single_vertical_slice",
+      backendProfileRef: "backend:t123-materialize",
+      actorInvocationId: "actor:t123-materialize",
+      selectedScheduleItemRefs: [
+        `schedule://odd_sdlc/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}/cdme-compiler`
+      ],
+      orderingConstraintRefs: [],
+      phaseGateRefs: [],
+      requiredProgressArtifactRefs: [],
+      gapPressureRefs: [],
+      affectRefs: [],
+      retryBudgetRemaining: 1,
+      mustExitAfterBoundedAttempt: true
+    },
+    consequenceRetryContextFor(
+      `construction-priority-projection://odd-sdlc/post-action/module/cdme-accounting/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    ),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+
+  assert.equal(manifest.traversalStrategyDecision.decisionSource, "abg_selected");
+  assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "steel_thread");
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
+    "cdme-accounting"
+  ]);
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-compiler"
+  ]);
+  assert(
+    manifest.traversalStrategyDecision.basisRefs.some((ref) =>
+      ref.includes("cdme-accounting")
+    )
+  );
+});
+
+test("T-123 unscoped post-action lineage does not broaden first materialization slice", () => {
+  const manifest = manifestFor(
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    {
+      kind: "traversal_attempt_envelope",
+      envelopeRef: "abg://envelope/t123-materialize-general",
+      profileRef: "abg://profile/t123-materialize-general",
+      basisId: "basis:t123-materialize-general",
+      graphFunctionId: "graph:t123-materialize-general",
+      graphCallId: "call:t123-materialize-general",
+      frameId: "frame:t123-materialize-general",
+      vectorIndex: 0,
+      edge: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      strategyDirectiveRef:
+        "strategy://abg/selected/single_vertical_slice",
+      backendProfileRef: "backend:t123-materialize-general",
+      actorInvocationId: "actor:t123-materialize-general",
+      selectedScheduleItemRefs: [
+        `schedule://odd_sdlc/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}/cdme-compiler`
+      ],
+      orderingConstraintRefs: [],
+      phaseGateRefs: [],
+      requiredProgressArtifactRefs: [],
+      gapPressureRefs: [],
+      affectRefs: [],
+      retryBudgetRemaining: 1,
+      mustExitAfterBoundedAttempt: true
+    },
+    consequenceRetryContextFor(
+      `construction-priority-projection://odd-sdlc/post-action/general/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    ),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+
+  assert.equal(manifest.traversalStrategyDecision.decisionSource, "abg_selected");
+  assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "steel_thread");
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
+    "cdme-compiler"
+  ]);
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-accounting"
+  ]);
+});
+
+test("T-123 same-edge retry scope does not widen from evidence refs", () => {
+  const manifest = manifestFor(
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    {
+      kind: "traversal_attempt_envelope",
+      envelopeRef: "abg://envelope/t123-materialize-retry-accounting",
+      profileRef: "abg://profile/t123-materialize-retry-accounting",
+      basisId: "basis:t123-materialize-retry-accounting",
+      graphFunctionId: "graph:t123-materialize-retry-accounting",
+      graphCallId: "call:t123-materialize-retry-accounting",
+      frameId: "frame:t123-materialize-retry-accounting",
+      vectorIndex: 0,
+      edge: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      strategyDirectiveRef: "strategy://odd_sdlc/Fg_materialize_declared_product_asset/steel_thread",
+      backendProfileRef: "backend:t123-materialize-retry-accounting",
+      actorInvocationId: "actor:t123-materialize-retry-accounting",
+      selectedScheduleItemRefs: [
+        `schedule://odd_sdlc/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}/cdme-accounting`
+      ],
+      orderingConstraintRefs: [],
+      phaseGateRefs: [],
+      requiredProgressArtifactRefs: [],
+      gapPressureRefs: [],
+      affectRefs: [],
+      retryBudgetRemaining: 1,
+      mustExitAfterBoundedAttempt: true
+    },
+    retryContextForAccountingPlaceholderWithCompilerEvidence(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+
+  assert.equal(manifest.traversalStrategyDecision.selectedStrategy, "steel_thread");
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
+    "cdme-accounting"
+  ]);
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-compiler"
+  ]);
+  assert(
+    manifest.retryContext.priorGapDossiers[0].evidenceRefs.some((ref) =>
+      ref.includes("cdme-compiler")
+    )
+  );
+  const prompt = promptForHandoff(manifest);
+  assert.match(prompt, /This is a retry\/re-entry attempt/u);
+  assert.match(prompt, /Prior defect: same_edge_retry/u);
+  assert.match(prompt, /Accounting file contains placeholder implementation text/u);
 });
 
 test("T-123 ABG-selected full breadth cannot be overridden by retry context", () => {

@@ -21,7 +21,9 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
 const DEFAULT_TEST_RUN_ROOT = resolve(PACKAGE_ROOT, "test_env/test_runs");
-const LANE_NAME = "full_external_data_mapper_sandbox";
+const LANE_NAME =
+  process.env["ODD_SDLC_TS_DATA_MAPPER_LANE_NAME"] ??
+  "full_external_data_mapper_sandbox";
 const DATA_MAPPER_TEMPLATE_ROOT =
   process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
   "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
@@ -33,7 +35,7 @@ const MAX_STEPS = Number.parseInt(
   10
 );
 const COMMAND_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS"] ?? `${1000 * 60 * 20}`,
+  process.env["ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS"] ?? `${1000 * 60 * 45}`,
   10
 );
 
@@ -290,18 +292,16 @@ function main() {
       }),
       startLabel
     );
+    const startSummary = edgeSummary(start);
     summary.steps.push({
       step,
       phase: "start",
       requestedEdge,
-      ...edgeSummary(start)
+      ...startSummary
     });
     summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
     writeJson(path.join(archiveRoot, "run_summary.json"), summary);
-    if (
-      start.status === "converged" ||
-      (startSummary.status === "converged" && startSummary.currentEdge === null)
-    ) {
+    if (startSummary.status === "converged" && startSummary.currentEdge === null) {
       summary.terminalReason = "odd_sdlc_reported_converged";
       writeJson(path.join(archiveRoot, "run_summary.json"), summary);
       break;

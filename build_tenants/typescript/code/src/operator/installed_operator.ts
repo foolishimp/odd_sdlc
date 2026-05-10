@@ -543,6 +543,67 @@ function retryContextFromRetryAttemptRefs(
   });
 }
 
+function decodedRefForScope(input: string): string {
+  try {
+    return decodeURIComponent(input);
+  } catch {
+    return input;
+  }
+}
+
+function postActionProjectionHasExplicitFeatureScope(input: {
+  readonly nextActionProjectionRef: string;
+  readonly selectedActionRef: string;
+}): boolean {
+  const refs = [
+    input.nextActionProjectionRef,
+    input.selectedActionRef
+  ].map(decodedRefForScope);
+  return refs.some((ref) =>
+    /(?:\/module\/|\/scope\/|post_deferred_scope_product_materialization\/)[A-Za-z0-9._-]+/u.test(
+      ref
+    )
+  );
+}
+
+function resumeContextFromPostActionProjection(input: {
+  readonly nextActionProjection: NonNullable<
+    SdlcPublicStartOutcome["executionContract"]
+  >["nextActionProjection"];
+  readonly vectorIndex: number;
+}): SdlcWorkerRetryContext | undefined {
+  if (
+    input.nextActionProjection.nextActionBasisKind === "initial_selection" ||
+    input.nextActionProjection.choosesNextTraversal !== true ||
+    input.nextActionProjection.selectedActionRef === null
+  ) {
+    return undefined;
+  }
+  if (
+    !postActionProjectionHasExplicitFeatureScope({
+      nextActionProjectionRef: input.nextActionProjection.nextActionProjectionRef,
+      selectedActionRef: input.nextActionProjection.selectedActionRef
+    })
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_retry_context" as const,
+    retryAttemptRefs: Object.freeze([
+      Object.freeze({
+        vectorIndex: input.vectorIndex,
+        retryRunId: "post-action-reentry",
+        retryCallId: input.nextActionProjection.nextActionProjectionRef,
+        manifestId: input.nextActionProjection.nextActionProjectionRef,
+        priorAuthorityRef: input.nextActionProjection.selectedActionRef,
+        attemptIndex: 0,
+        sourceProjectionRef: input.nextActionProjection.nextActionProjectionRef
+      })
+    ]),
+    priorGapDossiers: Object.freeze([])
+  });
+}
+
 function mergedRetryContext(input: {
   readonly projected: SdlcWorkerRetryContext;
   readonly override: SdlcWorkerRetryContext | undefined;
@@ -2202,6 +2263,8 @@ function postProductMaterializationCandidateFor(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
+  readonly scopeModuleName?: string | null | undefined;
+  readonly scopeScheduleRef?: string | null | undefined;
 }): OddSdlcEvaluateNextActionInput | null {
   const materializationAction = deriveSdlcPublishedProductMaterializationAction({
     module: input.module,
@@ -2218,17 +2281,27 @@ function postProductMaterializationCandidateFor(input: {
   if (targetAssetType === undefined) {
     return null;
   }
+  const scopeModuleName = input.scopeModuleName ?? null;
+  const scopeScheduleRef = input.scopeScheduleRef ?? null;
+  const scopePath =
+    scopeModuleName === null
+      ? Object.freeze([] as string[])
+      : Object.freeze(["scope", encodeURIComponent(scopeModuleName)]);
   const targetOutcomeRef = [
     "target-outcome://odd-sdlc/post-action",
     materializationAction.graphFunctionRef,
     targetAssetType,
+    ...scopePath,
     encodeURIComponent(manifestRefSegment(input.state.manifest))
   ].join("/");
   return Object.freeze({
     actionRef: [
       "construction-action://odd-sdlc/post-action",
       FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-      "post_downstream_product_materialization",
+      scopeModuleName === null
+        ? "post_downstream_product_materialization"
+        : "post_deferred_scope_product_materialization",
+      ...(scopeModuleName === null ? [] : [encodeURIComponent(scopeModuleName)]),
       targetOutcomeRef
     ].join("/"),
     actionKind: "invoke_graph_function" as const,
@@ -2246,11 +2319,52 @@ function postProductMaterializationCandidateFor(input: {
     requiredAuthorityRefs: Object.freeze([materializationAction.publishedActionRef]),
     eligibleReasonRefs: uniqueSorted([
       "evaluate_next_downstream_requirement_transformation_set",
+      ...(scopeModuleName === null
+        ? []
+        : [`feature_scope_deferred_module:${scopeModuleName}`]),
+      ...(scopeScheduleRef === null
+        ? []
+        : [`selected_schedule_ref:${scopeScheduleRef}`]),
       ...materializationAction.reasonRefs,
       ...input.downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
       ...input.downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
     ])
   });
+}
+
+function deferredProductMaterializationModuleFor(
+  state: SdlcAbgOwnedFpDispatchState
+): string | null {
+  if (
+    state.manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
+    state.manifest.featureScope.mode !== "steel_thread"
+  ) {
+    return null;
+  }
+  return state.manifest.featureScope.deferredModuleNames[0] ?? null;
+}
+
+function materializationScheduleRefForModule(moduleName: string): string {
+  return [
+    "schedule://odd_sdlc",
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    moduleName
+  ].join("/");
+}
+
+function candidateProjectionScopeSegment(
+  candidates: readonly OddSdlcEvaluateNextActionInput[]
+): string {
+  if (candidates.length !== 1) {
+    return "mixed";
+  }
+  const candidate = candidates[0];
+  const scopedModule = candidate?.eligibleReasonRefs
+    ?.find((ref) => ref.startsWith("feature_scope_deferred_module:"))
+    ?.slice("feature_scope_deferred_module:".length);
+  return scopedModule === undefined || scopedModule.length === 0
+    ? "general"
+    : `module/${encodeURIComponent(scopedModule)}`;
 }
 
 function postActionCandidates(input: {
@@ -2262,6 +2376,34 @@ function postActionCandidates(input: {
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
 }) {
+  const nextDeferredModule =
+    input.closureDecisionDisposition === "close"
+      ? deferredProductMaterializationModuleFor(input.state)
+      : null;
+  if (nextDeferredModule !== null) {
+    const scopeScheduleRef =
+      materializationScheduleRefForModule(nextDeferredModule);
+    const productMaterializationCandidate =
+      postProductMaterializationCandidateFor({
+        module: input.module,
+        state: input.state,
+        downstreamPressureRefs: uniqueSorted([
+          input.state.manifest.featureScope.scopeRef,
+          scopeScheduleRef,
+          ...input.state.manifest.featureScope.basisRefs.map(
+            (ref) => `prior_scope_basis:${ref}`
+          )
+        ]),
+        downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+        scopeModuleName: nextDeferredModule,
+        scopeScheduleRef
+      });
+    return Object.freeze(
+      productMaterializationCandidate === null
+        ? []
+        : [productMaterializationCandidate]
+    );
+  }
   if (
     input.closureDecisionDisposition === "close" &&
     input.downstreamPressureRefs.length > 0
@@ -2452,14 +2594,16 @@ function deriveInstalledTraversalConsequence(input: {
           ])
         })
       : (() => {
+          const projectionScopeSegment = candidateProjectionScopeSegment(candidates);
           const evaluator = deriveOddSdlcEvaluateNextReport({
             basis: input.basis,
             events: Object.freeze([...input.replayEvents, ...input.emittedEvents]),
             intentEventRefs: constructionIntent.intentEventRefs,
             productAssetModelRef: constructionIntent.productAssetModelRef,
-            episodeId: `construction-episode://odd-sdlc/post-action/${runRef}`,
+            episodeId:
+              `construction-episode://odd-sdlc/post-action/${runRef}/${projectionScopeSegment}`,
             observationId:
-              `construction-observation://odd-sdlc/post-action/${runRef}`,
+              `construction-observation://odd-sdlc/post-action/${runRef}/${projectionScopeSegment}`,
             pressures: Object.freeze([
               {
                 pressureRef,
@@ -3081,6 +3225,18 @@ export async function executeInstalledOperatorStart(input: {
     contract: fpDispatchPluginContract(),
     dispatch: async (pluginInput: EnginePluginInput) => {
       const contract = hookContractByEdgeName(pluginInput.edge);
+      const projectedRetryContext = mergedRetryContext({
+        projected: retryContextFromRetryAttemptRefs(
+          pluginInput.retryAttemptRefs.filter(
+            (ref) => ref.vectorIndex === pluginInput.vectorIndex
+          )
+        ),
+        override: resumeContextFromPostActionProjection({
+          nextActionProjection: executionContract.nextActionProjection,
+          vectorIndex: pluginInput.vectorIndex
+        }),
+        vectorIndex: pluginInput.vectorIndex
+      });
       const manifest = deriveWorkerHandoffManifest({
         workspaceRoot: input.workspaceRoot,
         graphFunctionName: executionContract.targetGraphFunction,
@@ -3091,11 +3247,7 @@ export async function executeInstalledOperatorStart(input: {
         traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
         conformedProject: executionContract.conformedProject,
         retryContext: mergedRetryContext({
-          projected: retryContextFromRetryAttemptRefs(
-            pluginInput.retryAttemptRefs.filter(
-              (ref) => ref.vectorIndex === pluginInput.vectorIndex
-            )
-          ),
+          projected: projectedRetryContext,
           override: input.retryContextOverride,
           vectorIndex: pluginInput.vectorIndex
         })

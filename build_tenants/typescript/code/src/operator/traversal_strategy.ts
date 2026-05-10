@@ -135,6 +135,10 @@ export function deriveSdlcTraversalStrategyDecision(input: {
     ...(directiveRef === null ? [] : [directiveRef]),
     ...(input.selectedScheduleItemRefs ?? Object.freeze([])),
     ...(input.requiredProgressArtifactRefs ?? Object.freeze([])),
+    ...(input.retryContext?.retryAttemptRefs.flatMap((attempt) => [
+      attempt.sourceProjectionRef,
+      attempt.priorAuthorityRef
+    ]) ?? Object.freeze([])),
     ...(input.retryContext?.priorGapDossiers.map(
       (dossier) => dossier.currentGapDossierRef
     ) ?? Object.freeze([]))

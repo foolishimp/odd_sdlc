@@ -558,6 +558,130 @@ function targetsFromProductAuthoritySection(input: {
   );
 }
 
+function firstCodeSpan(input: string): string | null {
+  const match = /`([^`]+)`/u.exec(input);
+  return match?.[1]?.trim() ?? null;
+}
+
+function markdownTableCells(input: string): readonly string[] | null {
+  const trimmed = input.trim();
+  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) {
+    return null;
+  }
+  const cells = trimmed
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
+  if (
+    cells.length === 0 ||
+    cells.every((cell) => /^:?-{3,}:?$/u.test(cell))
+  ) {
+    return null;
+  }
+  return Object.freeze(cells);
+}
+
+function productBuildToolFromMarkdown(product: string): string | null {
+  for (const line of product.split(/\r?\n/u)) {
+    const cells = markdownTableCells(line);
+    if (cells === null || cells.length < 2) {
+      const fieldMatch =
+        /^\s*(?:[-*]\s*)?(?:\*\*)?Build Tool(?:\*\*)?\s*:\s*(.+?)\s*$/iu.exec(line);
+      if (fieldMatch === null) {
+        continue;
+      }
+      const value = firstCodeSpan(fieldMatch[1] ?? "") ?? fieldMatch[1] ?? "";
+      const normalized = value.replace(/[*_`]/gu, "").trim();
+      return normalized.length === 0 ? null : normalized;
+    }
+    {
+      const field = cells[0]?.replace(/[*_`]/gu, "").trim().toLowerCase();
+      if (field !== "build tool") {
+        continue;
+      }
+      const value = firstCodeSpan(cells[1] ?? "") ?? cells[1] ?? "";
+      const normalized = value.replace(/[*_`]/gu, "").trim();
+      return normalized.length === 0 ? null : normalized;
+    }
+  }
+  return null;
+}
+
+function moduleNameFromMarkdownLine(input: string): string | null {
+  const codeSpan = firstCodeSpan(input);
+  const candidate = codeSpan ??
+    input
+      .replace(/^[-*]\s+/u, "")
+      .replace(/[*_`]/gu, "")
+      .trim();
+  if (
+    candidate.length === 0 ||
+    candidate.includes("/") ||
+    /^module$/iu.test(candidate) ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(candidate)
+  ) {
+    return null;
+  }
+  return candidate;
+}
+
+function targetsFromDeclaredModuleTargets(input: {
+  readonly body: string;
+  readonly selectedOutputRoot: string;
+  readonly buildTool: string | null;
+}): readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[] {
+  const targets = new Map<
+    string,
+    Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">
+  >();
+  const addDirectory = (pathValue: string): void => {
+    const normalized = normalizeDeclaredProductFileTarget({
+      value: `${pathValue.replace(/\/+$/u, "")}/`,
+      selectedOutputRoot: input.selectedOutputRoot
+    });
+    if (
+      normalized !== null &&
+      normalized.path !== input.selectedOutputRoot
+    ) {
+      targets.set(normalized.path, normalized);
+    }
+  };
+
+  const normalizedBuildTool = input.buildTool?.toLowerCase() ?? "";
+  if (/\bsbt\b/u.test(normalizedBuildTool)) {
+    const buildFile = normalizeDeclaredProductFileTarget({
+      value: `${input.selectedOutputRoot}/build.sbt`,
+      selectedOutputRoot: input.selectedOutputRoot
+    });
+    if (buildFile !== null) {
+      targets.set(buildFile.path, buildFile);
+    }
+    addDirectory(`${input.selectedOutputRoot}/project`);
+  }
+
+  for (const line of input.body.split(/\r?\n/u)) {
+    const cells = markdownTableCells(line);
+    if (cells !== null && cells.length >= 2) {
+      const moduleName = moduleNameFromMarkdownLine(cells[0] ?? "");
+      if (moduleName !== null) {
+        addDirectory(`${input.selectedOutputRoot}/${moduleName}/src`);
+      }
+      continue;
+    }
+    if (!/^\s*[-*]\s+/u.test(line)) {
+      continue;
+    }
+    const moduleName = moduleNameFromMarkdownLine(line);
+    if (moduleName !== null) {
+      addDirectory(`${input.selectedOutputRoot}/${moduleName}/src`);
+    }
+  }
+
+  return Object.freeze(
+    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+  );
+}
+
 function productAuthorityTargetsFor(
   manifest: SdlcWorkerHandoffManifest
 ): {
@@ -576,16 +700,30 @@ function productAuthorityTargetsFor(
     markdown: product,
     titlePattern: /^(?:declared|expected)\s+product\s+files$/iu
   });
+  const declaredModuleSections = markdownSectionBodies({
+    markdown: product,
+    titlePattern: /^(?:declared\s+module\s+targets|module\s+structure)$/iu
+  });
   const sourceRef = pathToFileURL(productPath).href;
+  const buildTool = productBuildToolFromMarkdown(product);
   const targets = targetContractsFromSeeds({
     source: "product_authority",
     sourceRef,
-    seeds: sections.flatMap((body) =>
-      targetsFromProductAuthoritySection({
-        body,
-        selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
-      })
-    )
+    seeds: [
+      ...sections.flatMap((body) =>
+        targetsFromProductAuthoritySection({
+          body,
+          selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+        })
+      ),
+      ...declaredModuleSections.flatMap((body) =>
+        targetsFromDeclaredModuleTargets({
+          body,
+          selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot,
+          buildTool
+        })
+      )
+    ]
   });
   return Object.freeze({
     targets,
@@ -704,6 +842,86 @@ function mergedTargetContracts(
   );
 }
 
+function normalizedSelectedOutputRoot(input: string): string {
+  return input.replace(/\\/gu, "/").replace(/\/+$/u, "");
+}
+
+function targetRelativeToSelectedOutputRoot(input: {
+  readonly targetPath: string;
+  readonly selectedOutputRoot: string;
+}): string {
+  const outputRoot = normalizedSelectedOutputRoot(input.selectedOutputRoot);
+  const targetPath = input.targetPath.replace(/\\/gu, "/").replace(/\/+$/u, "");
+  if (targetPath === outputRoot) {
+    return "";
+  }
+  if (targetPath.startsWith(`${outputRoot}/`)) {
+    return targetPath.slice(outputRoot.length + 1);
+  }
+  return targetPath;
+}
+
+function productAuthorityTargetIsSharedForFeatureScope(input: {
+  readonly target: SdlcProductMaterializationAuthorityTarget;
+  readonly selectedOutputRoot: string;
+}): boolean {
+  const relativeTarget = targetRelativeToSelectedOutputRoot({
+    targetPath: input.target.path,
+    selectedOutputRoot: input.selectedOutputRoot
+  });
+  return (
+    relativeTarget === "" ||
+    relativeTarget === "build.sbt" ||
+    relativeTarget === "project" ||
+    relativeTarget.startsWith("project/")
+  );
+}
+
+function productAuthorityTargetMatchesIncludedModule(input: {
+  readonly target: SdlcProductMaterializationAuthorityTarget;
+  readonly selectedOutputRoot: string;
+  readonly includedModuleNames: readonly string[];
+}): boolean {
+  const relativeTarget = targetRelativeToSelectedOutputRoot({
+    targetPath: input.target.path,
+    selectedOutputRoot: input.selectedOutputRoot
+  });
+  const parts = relativeTarget.split("/").filter((part) => part.length > 0);
+  return input.includedModuleNames.some((moduleName) =>
+    parts.includes(moduleName)
+  );
+}
+
+function scopeProductMaterializationAuthorityTargets(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+}): readonly SdlcProductMaterializationAuthorityTarget[] {
+  if (
+    (input.manifest.featureScope.mode !== "steel_thread" &&
+      input.manifest.featureScope.mode !== "targeted_repair") ||
+    input.manifest.featureScope.includedModuleNames.length === 0 ||
+    !input.manifest.productMaterialization.required
+  ) {
+    return input.targets;
+  }
+  return Object.freeze(
+    input.targets.filter(
+      (target) =>
+        productAuthorityTargetIsSharedForFeatureScope({
+          target,
+          selectedOutputRoot:
+            input.manifest.productMaterialization.selectedOutputRoot
+        }) ||
+        productAuthorityTargetMatchesIncludedModule({
+          target,
+          selectedOutputRoot:
+            input.manifest.productMaterialization.selectedOutputRoot,
+          includedModuleNames: input.manifest.featureScope.includedModuleNames
+        })
+    )
+  );
+}
+
 function sameTargetSet(
   left: readonly string[],
   right: readonly string[]
@@ -719,17 +937,33 @@ export function reconcileSdlcProductMaterializationAuthority(
 ): SdlcProductMaterializationAuthorityReconciliation {
   const context = contextExpectedFileTargetsFor(manifest);
   const product = productAuthorityTargetsFor(manifest);
-  const contextTargetPaths = uniqueSorted(context.targets.map((target) => target.path));
-  const productTargetPaths = uniqueSorted(product.targets.map((target) => target.path));
+  const contextTargets = scopeProductMaterializationAuthorityTargets({
+    manifest,
+    targets: context.targets
+  });
+  const productTargets = scopeProductMaterializationAuthorityTargets({
+    manifest,
+    targets: product.targets
+  });
+  const contextTargetPaths = uniqueSorted(contextTargets.map((target) => target.path));
+  const productTargetPaths = uniqueSorted(productTargets.map((target) => target.path));
   const declaredProductTargetContracts = mergedTargetContracts(
-    context.targets,
-    product.targets
+    contextTargets,
+    productTargets
   );
   const declaredProductFileTargets = uniqueSorted([
     ...contextTargetPaths,
     ...productTargetPaths
   ]);
   const reasonRefs = new Set<string>(context.reasonRefs);
+  if (
+    contextTargets.length !== context.targets.length ||
+    productTargets.length !== product.targets.length
+  ) {
+    reasonRefs.add(
+      `product_targets_scoped_by_feature_scope:${manifest.featureScope.includedModuleNames.join(",")}`
+    );
+  }
   if (
     contextTargetPaths.length > 0 &&
     productTargetPaths.length > 0 &&
@@ -756,8 +990,8 @@ export function reconcileSdlcProductMaterializationAuthority(
     contextExpectedFileTargets: contextTargetPaths,
     productAuthorityTargets: productTargetPaths,
     declaredProductFileTargets,
-    contextExpectedTargetContracts: context.targets,
-    productAuthorityTargetContracts: product.targets,
+    contextExpectedTargetContracts: contextTargets,
+    productAuthorityTargetContracts: productTargets,
     declaredProductTargetContracts,
     sourceRefs: uniqueSorted([...context.sourceRefs, ...product.sourceRefs]),
     reasonRefs: Object.freeze([...reasonRefs].sort())
@@ -769,6 +1003,71 @@ export function declaredProductFileTargets(
 ): readonly string[] {
   return reconcileSdlcProductMaterializationAuthority(manifest)
     .declaredProductFileTargets;
+}
+
+function featureScopeNarrowsMaterialization(
+  manifest: Pick<
+    SdlcWorkerHandoffManifest,
+    "featureScope" | "productMaterialization"
+  >
+): boolean {
+  return (
+    manifest.productMaterialization.required &&
+    (manifest.featureScope.mode === "steel_thread" ||
+      manifest.featureScope.mode === "targeted_repair") &&
+    manifest.featureScope.includedModuleNames.length > 0
+  );
+}
+
+function scopedMaterializationWriteRoots(
+  manifest: SdlcWorkerHandoffManifest,
+  fallbackRoots: readonly string[]
+): readonly string[] {
+  if (!featureScopeNarrowsMaterialization(manifest)) {
+    return fallbackRoots;
+  }
+  const authority = reconcileSdlcProductMaterializationAuthority(manifest);
+  const roots = new Set<string>([
+    manifest.archiveRoot,
+    dirname(manifest.outputFile),
+    join(manifest.productMaterialization.tenantRoot, "build.sbt"),
+    join(manifest.productMaterialization.tenantRoot, "project")
+  ]);
+  for (const target of authority.declaredProductTargetContracts) {
+    const absoluteTarget = resolve(manifest.workspaceRoot, target.path);
+    roots.add(target.targetKind === "directory" ? absoluteTarget : absoluteTarget);
+  }
+  return Object.freeze([...roots].sort());
+}
+
+function materializationFileTargetRoots(
+  manifest: SdlcWorkerHandoffManifest
+): ReadonlySet<string> {
+  if (!manifest.productMaterialization.required) {
+    return new Set<string>();
+  }
+  const roots = new Set(
+    reconcileSdlcProductMaterializationAuthority(manifest)
+      .declaredProductTargetContracts
+      .filter((target) => target.targetKind === "file")
+      .map((target) => resolve(manifest.workspaceRoot, target.path))
+  );
+  roots.add(resolve(join(manifest.productMaterialization.tenantRoot, "build.sbt")));
+  return roots;
+}
+
+function directoryToPrepareForWriteRoot(
+  writeRoot: string,
+  fileTargetRoots: ReadonlySet<string>
+): string {
+  const resolved = resolve(writeRoot);
+  if (fileTargetRoots.has(resolved)) {
+    return dirname(writeRoot);
+  }
+  if (existsSync(resolved) && statSync(resolved).isFile()) {
+    return dirname(writeRoot);
+  }
+  return writeRoot;
 }
 
 const DEFAULT_EXECUTION_SHARD_TIMEOUT_MS = 1000 * 60 * 30;
@@ -1379,17 +1678,72 @@ function retryContextScopeRefs(
   retryContext: SdlcWorkerRetryContext
 ): readonly string[] {
   return uniqueSorted(
-    retryContext.priorGapDossiers.flatMap((dossier) => [
-      dossier.currentGapDossierRef,
-      dossier.edgeName,
-      dossier.targetAssetType,
-      ...dossier.evidenceRefs,
-      ...dossier.reasons.flatMap((reason) => [
-        reason.reason,
-        reason.blockingReason.detail ?? "",
-        ...reason.blockingReason.evidenceRefs
+    [
+      ...retryContext.retryAttemptRefs.flatMap((attempt) => [
+        attempt.sourceProjectionRef,
+        attempt.priorAuthorityRef
+      ]),
+      ...retryContext.priorGapDossiers.flatMap((dossier) => [
+        dossier.currentGapDossierRef,
+        dossier.edgeName,
+        dossier.targetAssetType,
+        ...dossier.reasons.flatMap((reason) => [
+          reason.reason,
+          reason.blockingReason.detail ?? ""
+        ])
       ])
-    ])
+    ]
+  );
+}
+
+function decodedScopeRef(input: string): string {
+  try {
+    return decodeURIComponent(input);
+  } catch {
+    return input;
+  }
+}
+
+function refContainsDeclaredModule(input: {
+  readonly ref: string;
+  readonly moduleName: string;
+}): boolean {
+  const decoded = decodedScopeRef(input.ref);
+  const moduleName = input.moduleName.trim();
+  return (
+    decoded === moduleName ||
+    decoded.includes(`/${moduleName}`) ||
+    decoded.includes(`${moduleName}/`) ||
+    decoded.includes(`:${moduleName}`) ||
+    decoded.includes(`${moduleName}:`) ||
+    decoded.includes(`=${moduleName}`) ||
+    decoded.includes(`${moduleName}?`) ||
+    decoded.includes(`${moduleName}#`)
+  );
+}
+
+function retryContextScopedScheduleRefs(input: {
+  readonly retryContext: SdlcWorkerRetryContext;
+  readonly declaredModuleNames: readonly string[];
+}): readonly string[] {
+  const scopeRefs = retryContextScopeRefs(input.retryContext);
+  if (input.declaredModuleNames.length === 0) {
+    return scopeRefs;
+  }
+  return uniqueSorted(
+    scopeRefs.filter((ref) =>
+      input.declaredModuleNames.some((moduleName) =>
+        refContainsDeclaredModule({ ref, moduleName })
+      )
+    )
+  );
+}
+
+function traversalEnvelopeForcesFullBreadth(
+  envelope: SdlcWorkerHandoffManifest["traversalAttemptEnvelope"] | null
+): boolean {
+  return /(?:full[-_]?breadth|broad[-_]?induction|complete[-_]?breadth)/iu.test(
+    envelope?.strategyDirectiveRef ?? ""
   );
 }
 
@@ -1742,12 +2096,16 @@ export function deriveWorkerHandoffManifest(input: {
   const fpTransformResultFile = join(archiveRoot, "fp_transform_result.json");
   const fpEvaluateResultFile = join(archiveRoot, "fp_evaluate_result.json");
   const traversalAttemptEnvelope = input.traversalAttemptEnvelope ?? null;
-  const retrySelectedScheduleItemRefs = retryContextScopeRefs(retryContext);
+  const retrySelectedScheduleItemRefs = retryContextScopedScheduleRefs({
+    retryContext,
+    declaredModuleNames: baseMaterialization.declaredModuleNames
+  });
   const selectedScheduleItemRefs =
-    traversalAttemptEnvelope?.selectedScheduleItemRefs ??
-    (retrySelectedScheduleItemRefs.length > 0
+    retrySelectedScheduleItemRefs.length > 0 &&
+    !traversalEnvelopeForcesFullBreadth(traversalAttemptEnvelope)
       ? retrySelectedScheduleItemRefs
-      : defaultSdlcTraversalScopeRefsForName(input.edgeName));
+      : traversalAttemptEnvelope?.selectedScheduleItemRefs ??
+        defaultSdlcTraversalScopeRefsForName(input.edgeName);
   const traversalStrategyDecision = deriveSdlcTraversalStrategyDecision({
     edgeName: input.edgeName,
     targetAssetType: input.contract.targetAssetType,
@@ -1781,7 +2139,7 @@ export function deriveWorkerHandoffManifest(input: {
     resolve(outputFile),
     resolve(materialization.tenantRoot)
   );
-  const allowedWriteRoots = materialization.required || outputFileIsTenantLocal
+  const baseAllowedWriteRoots = materialization.required || outputFileIsTenantLocal
     ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
     : input.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
       ? Object.freeze([
@@ -1813,7 +2171,7 @@ export function deriveWorkerHandoffManifest(input: {
     obligationContext: traversalObligationContext,
     retryContext
   });
-  return Object.freeze({
+  const manifest = Object.freeze({
     kind: "sdlc_worker_handoff_manifest",
     contractVersion: "ts-operator-v1",
     workspaceRoot: input.workspaceRoot,
@@ -1829,7 +2187,7 @@ export function deriveWorkerHandoffManifest(input: {
     fpTransformRequestFile,
     fpTransformResultFile,
     fpEvaluateResultFile,
-    allowedWriteRoots,
+    allowedWriteRoots: baseAllowedWriteRoots,
     conformedProject,
     productMaterialization: materialization,
     traversalStrategyDecision,
@@ -1840,6 +2198,13 @@ export function deriveWorkerHandoffManifest(input: {
     retryContext,
     methodRefs,
     resultReportSchema
+  });
+  return Object.freeze({
+    ...manifest,
+    allowedWriteRoots: scopedMaterializationWriteRoots(
+      manifest,
+      baseAllowedWriteRoots
+    )
   });
 }
 
@@ -2685,6 +3050,27 @@ function compactScheduleDirective(
   return "Emit schedule truth with dependency graph, tranches, shard register where relevant, obligation ledger, gap ledger, and next tranche selector.";
 }
 
+function retryDefectDirectivesForWorker(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const reasons = manifest.retryContext.priorGapDossiers.flatMap((dossier) =>
+    dossier.reasons.map((reason) => {
+      const detail = reason.blockingReason.detail ?? reason.reason;
+      return `${reason.blockingReason.lawfulReentryPoint}: ${reason.blockingReason.message} (${detail})`;
+    })
+  );
+  if (reasons.length === 0) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([
+    "This is a retry/re-entry attempt. Repair the prior deterministic defect before adding new surface area.",
+    ...reasons.slice(0, 6).map((reason) => `Prior defect: ${reason}`),
+    ...(reasons.length > 6
+      ? [`Prior defect count omitted: ${reasons.length - 6}`]
+      : [])
+  ]);
+}
+
 function outcomeDirectivesForWorker(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
@@ -2693,6 +3079,7 @@ function outcomeDirectivesForWorker(
     `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
     `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`
   ];
+  directives.push(...retryDefectDirectivesForWorker(manifest));
   if (manifest.featureScope.mode === "full_breadth") {
     directives.push(
       "Full breadth: do not narrow induction, product, goal, or requirement pressure to a feature slice."
@@ -2745,18 +3132,27 @@ function outcomeDirectivesForWorker(
       );
     }
   } else {
+    const scopedMaterialization =
+      featureScopeNarrowsMaterialization(manifest);
     directives.push(
       "Product materialization is REQUIRED for this edge.",
       `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}.`,
       `Selected output root: ${manifest.productMaterialization.selectedOutputRoot}.`,
       `materializedFiles.relativePath basis: ${manifest.productMaterialization.relativePathBasis}.`,
-      `Declared modules: ${listForPrompt(manifest.productMaterialization.declaredModuleNames)}.`,
+      scopedMaterialization
+        ? `Included modules for this edge: ${listForPrompt(manifest.featureScope.includedModuleNames)}.`
+        : `Declared modules: ${listForPrompt(manifest.productMaterialization.declaredModuleNames)}.`,
+      scopedMaterialization
+        ? `Deferred modules are lineage only for this edge; do not create or modify their files: ${listForPrompt(manifest.featureScope.deferredModuleNames)}.`
+        : "Deferred modules: none.",
       `Required roles: ${listForPrompt(manifest.productMaterialization.requiredRoles)}.`,
       `Build/test contracts: ${manifest.productMaterialization.buildExecutionContract} / ${manifest.productMaterialization.testExecutionContract}.`,
       productFileTargets.length === 0
         ? "Declared product file targets: none."
         : `Declared product file targets: ${productFileTargets.join(", ")}.`,
       `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
+      `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`,
+      "Do not create or modify product files outside the declared product file targets and allowed shared build roots for this edge.",
       "Apply requirementTraceObligationIds as the requirement transformation set for product files."
     );
     if (
@@ -2775,7 +3171,7 @@ function outcomeDirectivesForWorker(
     if (manifest.targetAssetType === "component_code_surface") {
       directives.push(
         manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-          ? "For declared product materialization, materialize the declared product file targets; use minimal structure only when no topology authority is present."
+          ? "For declared product materialization, materialize product files under the declared product file targets. The output artifact is the traversal summary carrier, not a substitute for source/build files. Use minimal source structure only when no topology authority is present."
           : "For component_code_surface, materialize implementation files for each declared component and record Component Realization Register evidence."
       );
     }
@@ -3191,8 +3587,11 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
 } {
   assertTraversalIntentPackagePressure(manifest);
   mkdirSync(manifest.archiveRoot, { recursive: true });
+  const fileTargetRoots = materializationFileTargetRoots(manifest);
   for (const writeRoot of manifest.allowedWriteRoots) {
-    mkdirSync(writeRoot, { recursive: true });
+    mkdirSync(directoryToPrepareForWriteRoot(writeRoot, fileTargetRoots), {
+      recursive: true
+    });
   }
   const manifestPath = join(manifest.archiveRoot, "handoff_manifest.json");
   const invocationPackagePath = join(
@@ -3833,7 +4232,10 @@ function materializedRoleForObservedFile(input: {
   if (lower.startsWith("design/") || lower === "design") {
     return "design";
   }
-  return input.manifest.productMaterialization.requiredRoles[0] ?? "other";
+  if (isLikelySourceMaterialization(input.relativePath)) {
+    return "source";
+  }
+  return "other";
 }
 
 function normalizedRelativePath(relativePath: string): string {

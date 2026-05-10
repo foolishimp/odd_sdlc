@@ -68,6 +68,9 @@ export interface SdlcPublicStartRequest {
   };
   readonly until: SdlcPublicStartUntil;
   readonly defaultRegime: RuntimeRegime;
+  readonly replayNextActionProjectionRef?: string | null;
+  readonly replaySelectedActionRef?: string | null;
+  readonly replayClosureDecisionRef?: string | null;
 }
 
 export interface SdlcWorkerAttachment {
@@ -118,7 +121,10 @@ export function admitSdlcPublicStartRequest(
     "outputWorkspaceRoot",
     "target",
     "until",
-    "defaultRegime"
+    "defaultRegime",
+    "replayNextActionProjectionRef",
+    "replaySelectedActionRef",
+    "replayClosureDecisionRef"
   ]);
   const target = parseClosedRecord(record["target"], `${label}.target`, [
     "kind",
@@ -147,7 +153,31 @@ export function admitSdlcPublicStartRequest(
       record["defaultRegime"],
       `${label}.defaultRegime`,
       ["F_D", "F_P", "F_H"]
-    )
+    ),
+    replayNextActionProjectionRef:
+      record["replayNextActionProjectionRef"] === undefined ||
+      record["replayNextActionProjectionRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayNextActionProjectionRef"],
+            `${label}.replayNextActionProjectionRef`
+          ),
+    replaySelectedActionRef:
+      record["replaySelectedActionRef"] === undefined ||
+      record["replaySelectedActionRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replaySelectedActionRef"],
+            `${label}.replaySelectedActionRef`
+          ),
+    replayClosureDecisionRef:
+      record["replayClosureDecisionRef"] === undefined ||
+      record["replayClosureDecisionRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayClosureDecisionRef"],
+            `${label}.replayClosureDecisionRef`
+          )
   });
 }
 
@@ -438,10 +468,31 @@ function evaluateInitialPublicStartAction(input: {
       constructionIntent: null
     });
   }
-  const selectedActionRef = selected.actionRef;
+  const selectedActionRef =
+    input.request.replaySelectedActionRef ?? selected.actionRef;
+  const replayClosureDecision =
+    input.request.replayClosureDecisionRef === undefined ||
+    input.request.replayClosureDecisionRef === null
+      ? null
+      : Object.freeze({
+          kind: "sdlc_edge_closure_decision" as const,
+          decisionRef: input.request.replayClosureDecisionRef,
+          ledgerRef: `ledger://odd-sdlc/public-start/replay/${encodeURIComponent(input.request.replayClosureDecisionRef)}`,
+          ledgerVersionRef:
+            `ledger-version://odd-sdlc/public-start/replay/${encodeURIComponent(input.request.replayClosureDecisionRef)}`,
+          disposition: "close" as const,
+          basisRefs: Object.freeze([input.request.replayClosureDecisionRef]),
+          reasonRefs: Object.freeze([]),
+          yieldResumeBasis: null,
+          predecessorRefs: Object.freeze([input.request.replayClosureDecisionRef])
+        });
   const nextActionProjection = constructSdlcNextActionProjection({
-    nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
-    nextActionBasisKind: "initial_selection",
+    nextActionProjectionRef:
+      input.request.replayNextActionProjectionRef ??
+      evaluator.priorityProjection.projectionRef,
+    ...(replayClosureDecision === null
+      ? { nextActionBasisKind: "initial_selection" as const }
+      : { closureDecision: replayClosureDecision }),
     intentEventRefs: evaluator.intentEventRefs,
     productAssetModelRef: evaluator.productAssetModelRef,
     gapPressureRefs: evaluator.gapPressureRefs,
@@ -536,7 +587,7 @@ function constructExecutionContract(input: {
     runId: "run://odd-sdlc/public-start",
     workKey: "wk://odd-sdlc/public-start",
     frameId: null,
-    frameLineageId: null
+    frameLineageId: input.nextActionProjection.nextActionProjectionRef
   });
   return Object.freeze({
     kind: "sdlc_execution_contract",

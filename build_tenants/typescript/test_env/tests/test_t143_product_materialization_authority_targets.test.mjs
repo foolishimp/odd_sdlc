@@ -2,7 +2,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -16,8 +23,11 @@ import {
   hookContractByEdgeName,
   installedReentryAttemptLimit,
   installedReentryDispositionForOutcome,
+  observeProductMaterializationDelta,
   promptForHandoff,
   reconcileSdlcProductMaterializationAuthority,
+  snapshotProductMaterializationRoot,
+  writeHandoffFiles,
 } from "../../build/semantic/code/src/index.js";
 
 const installedOperatorSource = () =>
@@ -83,7 +93,7 @@ function workspaceWithProductAuthority() {
 function workspaceWithoutProductTargets() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-empty-"));
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
-  mkdirSync(path.join(root, "specification"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
   writeFileSync(
     path.join(root, ".ai-workspace/context/project_constraints.yml"),
     [
@@ -103,6 +113,73 @@ function workspaceWithoutProductTargets() {
     "# Product\n\nNo product file topology has been conformed yet.\n",
     "utf8"
   );
+  writeFileSync(
+    path.join(root, "specification/requirements/00-imported-sources.md"),
+    "# Imported Sources\n\nREQ-BT-003: Preserve missing target authority as F_P-visible pressure.\n",
+    "utf8"
+  );
+  return root;
+}
+
+function workspaceWithModuleTargetProductAuthority() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-modules-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: data_mapper_t143_modules",
+      "active_tenant: scala_spark",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark",
+      "    language: scala",
+      "    build_tool: sbt",
+      "    module_structure:",
+      "      - cdme-compiler",
+      "      - cdme-assurance",
+      "      - cdme-executor",
+      "    build_command: sbt compile",
+      "    test_command: sbt test"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Active Tenant",
+      "",
+      "- **Tenant**: scala_spark",
+      "- **Language**: Scala",
+      "- **Runtime**: Apache Spark",
+      "- **Build Tool**: sbt",
+      "- **Output Root**: `build_tenants/scala_spark`",
+      "",
+      "## Module Structure",
+      "",
+      "The scala_spark tenant realizes the following modules under `build_tenants/scala_spark/`:",
+      "",
+      "| Module | Responsibility |",
+      "|--------|---------------|",
+      "| cdme-compiler | Topological validation, path compilation, adjoint validation |",
+      "| cdme-assurance | AI hallucination prevention, triangulation of assurance |",
+      "| cdme-executor | Morphism execution, dry-run/live mode |",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/00-imported-sources.md"),
+    [
+      "# Imported Sources",
+      "",
+      "REQ-BT-002: Compile the cdme-compiler module as the first steel-thread product slice."
+    ].join("\n"),
+    "utf8"
+  );
   return root;
 }
 
@@ -114,8 +191,11 @@ function writeJsonExpectedFiles(workspaceRoot, expectedFiles) {
   );
 }
 
-function materializationManifest(workspaceRoot) {
-  const contract = hookContractByEdgeName("derive_component_code_surface");
+function materializationManifest(
+  workspaceRoot,
+  edgeName = "derive_component_code_surface"
+) {
+  const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
     workspaceRoot,
     graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
@@ -226,6 +306,145 @@ test("T-143 worker package carries materialization authority reconciliation", ()
     prompt,
     /Declared product file targets: build_tenants\/scala_spark\/build\.sbt/u
   );
+});
+
+test("T-143 derives product targets from conformed module structure", () => {
+  const manifest = materializationManifest(
+    workspaceWithModuleTargetProductAuthority()
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/scala_spark/build.sbt",
+    "build_tenants/scala_spark/cdme-assurance/src",
+    "build_tenants/scala_spark/cdme-compiler/src",
+    "build_tenants/scala_spark/cdme-executor/src",
+    "build_tenants/scala_spark/project"
+  ]);
+  assert.equal(
+    reconciliation.productAuthorityTargetContracts.find(
+      (target) => target.path === "build_tenants/scala_spark/cdme-compiler/src"
+    )?.targetKind,
+    "directory"
+  );
+});
+
+test("T-143 steel-thread materialization scopes product targets to included module", () => {
+  const workspace = workspaceWithModuleTargetProductAuthority();
+  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  const prompt = promptForHandoff(manifest);
+  const allowedWriteRoots = manifest.allowedWriteRoots
+    .map((root) => path.relative(workspace, root).split(path.sep).join("/"))
+    .sort();
+
+  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.deepEqual(manifest.featureScope.includedModuleNames, [
+    "cdme-compiler"
+  ]);
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/scala_spark/build.sbt",
+    "build_tenants/scala_spark/cdme-compiler/src",
+    "build_tenants/scala_spark/project"
+  ]);
+  assert.equal(
+    reconciliation.reasonRefs.includes(
+      "product_targets_scoped_by_feature_scope:cdme-compiler"
+    ),
+    true
+  );
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    reconciliation.declaredProductFileTargets
+  );
+  assert.equal(allowedWriteRoots.includes("build_tenants/scala_spark"), false);
+  assert.equal(
+    allowedWriteRoots.includes("build_tenants/scala_spark/build.sbt"),
+    true
+  );
+  assert.equal(
+    allowedWriteRoots.includes("build_tenants/scala_spark/cdme-compiler/src"),
+    true
+  );
+  assert.equal(
+    allowedWriteRoots.includes("build_tenants/scala_spark/project"),
+    true
+  );
+  assert.equal(
+    allowedWriteRoots.some((root) => root.includes("cdme-assurance")),
+    false
+  );
+  assert.match(prompt, /cdme-compiler\/src/u);
+  assert.match(prompt, /Included modules for this edge: cdme-compiler/u);
+  assert.match(prompt, /Deferred modules are lineage only for this edge/u);
+  assert.match(prompt, /Allowed write roots:/u);
+  assert.match(prompt, /materialize product files under the declared product file targets/u);
+  assert.doesNotMatch(prompt, /cdme-assurance\/src/u);
+  assert.doesNotMatch(prompt, /cdme-executor\/src/u);
+});
+
+test("T-143 handoff preparation does not create file targets as directories", () => {
+  const workspace = workspaceWithModuleTargetProductAuthority();
+  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+
+  writeHandoffFiles(manifest);
+
+  const buildFile = path.join(workspace, "build_tenants/scala_spark/build.sbt");
+  const projectDir = path.join(workspace, "build_tenants/scala_spark/project");
+  const compilerSrcDir = path.join(
+    workspace,
+    "build_tenants/scala_spark/cdme-compiler/src"
+  );
+
+  assert.equal(
+    manifest.allowedWriteRoots.includes(buildFile),
+    true,
+    "the exact build.sbt file target remains an allowed write root"
+  );
+  assert.equal(
+    existsSync(buildFile),
+    false,
+    "handoff preparation must not turn a file target into a directory"
+  );
+  assert.equal(statSync(projectDir).isDirectory(), true);
+  assert.equal(statSync(compilerSrcDir).isDirectory(), true);
+});
+
+test("T-143 handoff preparation tolerates existing shared build file", () => {
+  const workspace = workspaceWithoutProductTargets();
+  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const buildFile = path.join(workspace, "build_tenants/scala_spark/build.sbt");
+  mkdirSync(path.dirname(buildFile), { recursive: true });
+  writeFileSync(buildFile, "ThisBuild / scalaVersion := \"2.13.12\"\n", "utf8");
+
+  writeHandoffFiles(manifest);
+
+  assert.equal(statSync(buildFile).isFile(), true);
+});
+
+test("T-143 build-only files do not satisfy component source materialization", () => {
+  const workspace = workspaceWithoutProductTargets();
+  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  const buildFile = path.join(workspace, "build_tenants/scala_spark/build.sbt");
+  const buildProperties = path.join(
+    workspace,
+    "build_tenants/scala_spark/project/build.properties"
+  );
+  mkdirSync(path.dirname(buildProperties), { recursive: true });
+  writeFileSync(buildFile, "ThisBuild / scalaVersion := \"2.13.12\"\n", "utf8");
+  writeFileSync(buildProperties, "sbt.version=1.10.7\n", "utf8");
+
+  const materialized = observeProductMaterializationDelta({ manifest, before });
+
+  assert.deepEqual(
+    materialized.map((file) => `${file.role}:${file.relativePath}`).sort(),
+    ["build_config:build.sbt", "other:project/build.properties"]
+  );
+  assert.equal(materialized.some((file) => file.role === "source"), false);
 });
 
 test("T-143 context and PRODUCT target conflicts become typed ambiguity", () => {

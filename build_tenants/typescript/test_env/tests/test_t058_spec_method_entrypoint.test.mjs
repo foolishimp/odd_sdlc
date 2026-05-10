@@ -19,6 +19,7 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   invokeOddSdlcSpecMethodCommandSync,
   serializeOddSdlcSpecMethodResult
 } from "../../build/semantic/code/src/index.js";
@@ -101,6 +102,54 @@ function writeRuntimeEvents(workspace, events) {
   );
 }
 
+function writePostCloseNextActionArchive(workspace, input = {}) {
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs",
+    input.name ?? "20260510T000000000Z_pid1"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const decisionRef =
+    input.decisionRef ??
+    `closure-decision://t058/${input.name ?? "post-close"}`;
+  writeFileSync(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_edge_closure_decision",
+        decisionRef,
+        disposition: "close"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "sdlc_next_action_projection.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_next_action_projection",
+        choosesNextTraversal: input.choosesNextTraversal ?? true,
+        selectedActionRef:
+          input.selectedActionRef === undefined
+            ? "construction-action://t058/materialize"
+            : input.selectedActionRef,
+        nextActionProjectionRef:
+          input.nextActionProjectionRef ??
+          "construction-priority-projection://t058/post-close/materialize",
+        nextGraphFunctionRef:
+          input.nextGraphFunctionRef ??
+          `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`,
+        predecessorRefs: input.predecessorRefs ?? [decisionRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 test("T-058 Spec Method catalog command reads graph catalog without workspace mutation", () => {
   const result = invokeOddSdlcSpecMethodCommandSync(["catalog"]);
 
@@ -116,6 +165,52 @@ test("T-058 Spec Method catalog command reads graph catalog without workspace mu
     result.payload.executives.some(
       (entry) => entry.backingGraphFunction === "bootstrap_release_self_test"
     )
+  );
+});
+
+test("T-058 replay-backed post-close next action becomes the next start target", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace);
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  assert.equal(
+    result.payload.projection.currentEdge,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+});
+
+test("T-058 newer terminal post-close projection prevents stale next-action replay", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    name: "20260510T000000000Z_pid1"
+  });
+  writePostCloseNextActionArchive(workspace, {
+    name: "20260510T000100000Z_pid2",
+    choosesNextTraversal: false,
+    selectedActionRef: null,
+    nextGraphFunctionRef: null
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.notEqual(
+    result.payload.start.executionContract.targetGraphFunction,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
 });
 
