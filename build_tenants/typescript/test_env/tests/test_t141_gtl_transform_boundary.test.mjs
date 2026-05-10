@@ -3,12 +3,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   admitModule,
@@ -19,13 +22,16 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
+  FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcProjectConstraints,
+  admitSdlcPublicStartRequest,
   buildPostTransformWorkerResultReport,
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
   constructSdlcNextActionProjection,
   deriveOddSdlcEvaluateNextReport,
+  deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcPublishedProductMaterializationAction,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
@@ -33,9 +39,12 @@ import {
   deriveSdlcTargetObligationBinding,
   deriveSdlcWorkspaceIngressReport,
   deriveWorkerHandoffManifest,
+  executeInstalledOperatorStart,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain,
+  projectSdlcWorkerAttachment,
+  publicStartOnce,
   snapshotProductMaterializationRoot
 } from "../../build/semantic/code/src/index.js";
 
@@ -129,6 +138,58 @@ function writeRequirementWorkspace() {
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
   return root;
+}
+
+function writeAuthorityConformanceWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t141_authority_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { createHash } from 'node:crypto';",
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import { dirname, join } from 'node:path';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "const requirementId = 'REQ-T141-001';",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "mkdirSync(join(manifest.workspaceRoot, 'specification/requirements'), { recursive: true });",
+      "writeFileSync(join(manifest.workspaceRoot, 'specification/INTENT.md'), '# Intent\\n\\nBuild a Rust hello-world tenant.\\n', 'utf8');",
+      "writeFileSync(join(manifest.workspaceRoot, 'specification/PRODUCT.md'), '# Product\\n\\nhello_world_rust under build_tenants/hello_world_rust.\\n', 'utf8');",
+      "writeFileSync(join(manifest.workspaceRoot, 'specification/GOALS.md'), '# Goals\\n\\n- Produce the declared product tenant.\\n', 'utf8');",
+      "writeFileSync(join(manifest.workspaceRoot, 'specification/requirements/01-rust-hello-world.md'), `${requirementId}: Generate a Rust Cargo tenant that prints Hello, world!.\\n`, 'utf8');",
+      "const content = ['# Project Authority Conformance', '', `graph_function: ${manifest.graphFunctionName}`, `target_asset: ${manifest.targetAssetType}`, '', `${requirementId}: Generate a Rust Cargo tenant that prints Hello, world!.`].join('\\n');",
+      "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
+      "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
+      "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => {",
+      "  if (obligation.obligationId.startsWith('requirement:')) {",
+      "    return { kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'partial', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [`requirement_recorded_for_future_closure:${obligation.obligationId.slice('requirement:'.length)}`] };",
+      "  }",
+      "  return { kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [] };",
+      "});",
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'conformed authority and carried requirements to product materialization', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
+function t141QueryContext(workspaceRoot) {
+  const module = constructSdlcGtlModule();
+  const constraints = admitSdlcProjectConstraints({
+    projectSlug: "t141_requirement_carry",
+    activeTenant: "hello_world_rust",
+    selectedOutputRoot: "build_tenants/hello_world_rust",
+    ambiguityRiskAppetite: "low",
+    capabilityContracts: ["transport_contract"]
+  });
+  const queryDomain = projectSdlcQueryDomain({
+    module,
+    ingressReport: deriveSdlcWorkspaceIngressReport({
+      workspaceRootUri: pathToFileURL(workspaceRoot).href,
+      projectConstraints: constraints,
+      sourceInputs: []
+    })
+  });
+  return { module, queryDomain };
 }
 
 function requirementSurfaceManifest(workspaceRoot) {
@@ -499,4 +560,79 @@ test("T-141 target binding reuses the existing target-obligation surface for pro
     ),
     true
   );
+});
+
+test("T-141 installed runner closes authority induction and selects product materialization", async () => {
+  const workspaceRoot = writeRequirementWorkspace();
+  const workerScript = writeAuthorityConformanceWorkerScript(workspaceRoot);
+  const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
+  const { module, queryDomain } = t141QueryContext(workspaceRoot);
+  const start = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "graph_function",
+        handle: FG_CONFORM_PROJECT_AUTHORITY
+      },
+      until: "first_traversal",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject: deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot),
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: workerTransport
+    })
+  });
+  assert.equal(start.kind, "sdlc_public_start_projected");
+
+  const outcome = await executeInstalledOperatorStart({
+    workspaceRoot,
+    start,
+    workerTransport,
+    replayEvents: []
+  });
+  assert.equal(outcome.status, "worker_invoked");
+  assert(outcome.traversalConsequence);
+  assert.equal(
+    outcome.traversalConsequence.edgeClosureDecision.disposition,
+    "close"
+  );
+  assert.ok(
+    outcome.traversalConsequence.edgeFulfillmentLedger.downstreamPressureRefs.length > 0
+  );
+  assert.ok(
+    outcome.traversalConsequence.edgeFulfillmentLedger.downstreamTargetBindingRefs.includes(
+      "target-binding://odd-sdlc/component_code_surface"
+    )
+  );
+  assert.equal(
+    outcome.traversalConsequence.nextActionProjection.choosesNextTraversal,
+    true
+  );
+  assert.equal(
+    outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
+    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+  );
+  assert.match(
+    outcome.traversalConsequence.nextActionProjection.selectedActionRef ?? "",
+    new RegExp(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET, "u")
+  );
+  assert.equal(
+    existsSync(path.join(outcome.archiveRoot, "sdlc_edge_fulfillment_ledger.json")),
+    true
+  );
+  assert.equal(
+    existsSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json")),
+    true
+  );
+  assert.equal(
+    existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
+    true
+  );
+  const handoffPrompt = readFileSync(
+    path.join(outcome.archiveRoot, "worker_prompt.md"),
+    "utf8"
+  );
+  assert.match(handoffPrompt, /Product materialization is not required for this edge/u);
 });

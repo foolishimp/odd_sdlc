@@ -153,15 +153,22 @@ function assessmentByObligationId(
 
 function carriesDownstreamRequirementTransformationSet(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
+  readonly postflight: SdlcPostflightResult;
   readonly assessment: SdlcWorkerObligationAssessment;
 }): boolean {
-  return (
-    input.manifest.targetAssetType === "requirement_surface" &&
-    !input.manifest.productMaterialization.required &&
-    input.assessment.obligationId.startsWith("requirement:") &&
+  const requirementRecordedForFutureClosure =
     input.assessment.blockingReasons.some((reason) =>
       reason.startsWith("requirement_recorded_for_future_closure:")
-    )
+    );
+  const authorityConformanceInducedRequirement =
+    input.postflight.status === "passed" &&
+    input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY;
+  return (
+    !input.manifest.productMaterialization.required &&
+    input.assessment.obligationId.startsWith("requirement:") &&
+    ((input.manifest.targetAssetType === "requirement_surface" &&
+      requirementRecordedForFutureClosure) ||
+      authorityConformanceInducedRequirement)
   );
 }
 
@@ -217,6 +224,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
         assessment.fulfillmentStatus === "unassessed") &&
       !carriesDownstreamRequirementTransformationSet({
         manifest: input.manifest,
+        postflight: input.postflight,
         assessment
       })
   );
@@ -225,6 +233,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
       obligationIds.has(assessment.obligationId) &&
       carriesDownstreamRequirementTransformationSet({
         manifest: input.manifest,
+        postflight: input.postflight,
         assessment
       })
   );
@@ -326,6 +335,7 @@ function requirementIdFromObligation(obligation: SdlcTraversalObligation): strin
 function requirementClosureRegisterFromObligations(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
+  readonly postflight: SdlcPostflightResult;
 }): SdlcRequirementClosureRegister | null {
   const requirementObligations = input.manifest.traversalObligationContext.obligations
     .map((obligation) => ({
@@ -347,6 +357,7 @@ function requirementClosureRegisterFromObligations(input: {
         ? false
         : carriesDownstreamRequirementTransformationSet({
             manifest: input.manifest,
+            postflight: input.postflight,
             assessment
           });
     const fulfilled = assessment?.fulfillmentStatus === "fulfilled";
@@ -619,7 +630,8 @@ export function deriveSdlcOperatorAssuranceGate(input: {
 
   const requirementClosureRegister = requirementClosureRegisterFromObligations({
     manifest: input.manifest,
-    report: input.report
+    report: input.report,
+    postflight: input.postflight
   });
   if (requirementClosureRegister !== null) {
     ledgers.push(

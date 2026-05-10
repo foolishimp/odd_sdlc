@@ -550,12 +550,13 @@ Implemented:
   `requirement_recorded_for_future_closure:*` are admitted as downstream
   transformation-set pressure, not same-edge requirement failure.
 - The assurance gate no longer converts downstream-carried requirement rows
-  into retry pressure for `derive_requirement_surface`.
+  into retry pressure for `derive_requirement_surface` or
+  `Fg_conform_project_authority`.
 - `Fg_materialize_declared_product_asset` is published in the graph catalog and
   hook catalog as the narrow product-materialization graph function.
-- The installed runner routes closed requirement pressure through evaluate-next
-  and selects `Fg_materialize_declared_product_asset` instead of retrying the
-  requirement edge or falling back to the broad executive graph.
+- The installed runner routes closed authority/requirement pressure through
+  evaluate-next and selects `Fg_materialize_declared_product_asset` instead of
+  retrying the induction edge or falling back to the broad executive graph.
 - The runner derives product-materialization eligibility from the current
   published GTL module graph functions and output target-binding refs. It no
   longer manufactures the materialization candidate from local constants.
@@ -571,7 +572,7 @@ Focused verification:
 
 ```bash
 npm run test:t141
-# 6/6 passed
+# 7/7 passed
 
 npm run test:t030
 # 9/9 passed
@@ -605,7 +606,7 @@ npm run build:semantic
 # passed
 
 npm run test:t141
-# 6/6 passed
+# 7/7 passed
 
 npm run test:t135
 # 7/7 passed
@@ -619,6 +620,20 @@ npm run test:t133
 git diff --check
 # passed
 ```
+
+Runner-level functional proof added:
+
+- `test_t141_gtl_transform_boundary.test.mjs` now invokes the installed
+  operator against `Fg_conform_project_authority` with a deterministic process
+  worker.
+- The proof asserts the induction edge closes, downstream requirement pressure
+  remains in the traversal consequence, `SdlcNextActionProjection` selects
+  `Fg_materialize_declared_product_asset`, and the archive contains
+  `sdlc_edge_fulfillment_ledger.json`, `sdlc_edge_closure_decision.json`, and
+  `sdlc_next_action_projection.json`.
+- The proof also caught the prior assurance-gate gap where carried requirements
+  still forced same-edge retry on `Fg_conform_project_authority`; that gate now
+  uses the same downstream transformation-set rule as `derive_requirement_surface`.
 
 Live Rust hello-world proof:
 
