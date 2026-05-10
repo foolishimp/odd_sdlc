@@ -121,6 +121,50 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
       "gap_retirement_surface"
     ],
     realizationStatus: "active_first_slice"
+  }),
+  admitSdlcAssetFamily({
+    name: "builder_scenario_contracts",
+    description: "Bootstrap, lifecycle graph, graph-function selection, and lawful action contracts that drive guided installed live-build lanes.",
+    lifecycleRole: "entry",
+    representativeAssetTypes: [
+      "bootstrap_start_document_surface",
+      "scenario_contract_surface",
+      "lifecycle_graph_surface",
+      "graph_function_selection_surface",
+      "lawful_action_menu_surface",
+      "operator_workspace_dialogue_surface",
+      "deployed_domain_surface"
+    ],
+    realizationStatus: "active_t131_t133_contract"
+  }),
+  admitSdlcAssetFamily({
+    name: "installed_traversal_run",
+    description: "Installed-workspace runtime and operator-run archives that make a live traversal diagnosable from the sandbox that executed it.",
+    lifecycleRole: "build",
+    representativeAssetTypes: [
+      "installed_runtime_surface",
+      "operator_run_archive_surface",
+      "worker_invocation_surface",
+      "worker_process_trace_surface",
+      "runtime_liveness_projection_surface"
+    ],
+    realizationStatus: "active_t133_proof_structure"
+  }),
+  admitSdlcAssetFamily({
+    name: "consequence_chain",
+    description: "Replay-visible construction consequence surfaces from observed worksite through intent, fulfillment, closure, next-action projection, product materialization, and execution proof.",
+    lifecycleRole: "build",
+    representativeAssetTypes: [
+      "worksite_evidence_surface",
+      "construction_intent_surface",
+      "edge_fulfillment_ledger_surface",
+      "edge_closure_decision_surface",
+      "next_action_projection_surface",
+      "product_materialization_manifest_surface",
+      "materialized_product_file_surface",
+      "execution_proof_surface"
+    ],
+    realizationStatus: "active_t002_t133_contract"
   })
 ]);
 
@@ -265,7 +309,27 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "gap_route_surface",
     "repricing_proposal_surface",
     "ticket_work_item_route_surface",
-    "gap_retirement_surface"
+    "gap_retirement_surface",
+    "bootstrap_start_document_surface",
+    "scenario_contract_surface",
+    "lifecycle_graph_surface",
+    "graph_function_selection_surface",
+    "lawful_action_menu_surface",
+    "operator_workspace_dialogue_surface",
+    "deployed_domain_surface",
+    "installed_runtime_surface",
+    "operator_run_archive_surface",
+    "worker_invocation_surface",
+    "worker_process_trace_surface",
+    "runtime_liveness_projection_surface",
+    "worksite_evidence_surface",
+    "construction_intent_surface",
+    "edge_fulfillment_ledger_surface",
+    "edge_closure_decision_surface",
+    "next_action_projection_surface",
+    "product_materialization_manifest_surface",
+    "materialized_product_file_surface",
+    "execution_proof_surface"
   ].map((name) =>
     admitSdlcAssetType({
       name,

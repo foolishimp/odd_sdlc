@@ -7,7 +7,13 @@ import { assuranceLedger, assuranceReason, uniqueSorted } from "./shared.js";
 
 export interface SdlcRealizationTextSurface {
   readonly kind: "sdlc_realization_text_surface";
-  readonly role: "source" | "test" | "build_config" | "documentation" | "other";
+  readonly role:
+    | "source"
+    | "test"
+    | "build_config"
+    | "design"
+    | "documentation"
+    | "other";
   readonly ref: string;
   readonly content: string;
 }

@@ -17,11 +17,7 @@ software-domain surface. Nothing in this file remains current operative law by
 inertia.
 
 Historical references here to `build_tenants/odd_sdlc/` describe the original
-<<<<<<< Updated upstream
 `odd_sdlc` source-repository proving slice only. They do not define
-=======
-`odd_method` source-repository proving slice only. They do not define
->>>>>>> Stashed changes
 downstream installed-workspace topology, which is governed by
 `REQ-F-ODDSDLC-032`.
 

@@ -18,9 +18,14 @@ import {
   admitSdlcAsset,
   admitSdlcAssetBinding,
   admitSdlcCapability,
+  admitSdlcConstructionEvidenceCycle,
+  admitSdlcInstalledRunArchive,
+  admitSdlcLawfulActionMenuEntry,
   admitSdlcOperationalResult,
   admitSdlcOperationalTransitionCommand,
   admitSdlcWorkAct,
+  admitSdlcWorksiteAssetRef,
+  admitSdlcWorksiteObservation,
   admitSdlcWorksite,
   projectSdlcOperationalState
 } from "../../build/semantic/code/src/index.js";
@@ -68,7 +73,12 @@ test("T-029 admits closed SDLC asset, binding, worksite, and capability carriers
     worksiteId: "worksite://example",
     rootUri: "file:///tmp/example",
     lifecycleState: "designing",
-    activeAssetIds: [asset.assetId]
+    activeAssetIds: [asset.assetId],
+    systemAssetRefs: ["system://odd-sdlc/installed-runtime"],
+    workspaceAssetRefs: [asset.assetId],
+    runtimeEvidenceRefs: ["file://.ai-workspace/runtime/odd_sdlc/operator-runs/run"],
+    selectedGraphFunctionRef: "graph-function:odd_sdlc:Fg_materialize_declared_product_asset",
+    selectedActionRef: "construction-action://odd-sdlc/example"
   });
   const capability = admitSdlcCapability({
     capabilityId: "capability://ts/core-fd",
@@ -95,11 +105,88 @@ test("T-029 admits closed SDLC asset, binding, worksite, and capability carriers
   assert.equal(asset.provenance.model, "imported");
   assert.equal(binding.nodeName, "RequirementSurface");
   assert.equal(worksite.lifecycleState, "designing");
+  assert.equal(
+    worksite.selectedGraphFunctionRef,
+    "graph-function:odd_sdlc:Fg_materialize_declared_product_asset"
+  );
+  assert.deepStrictEqual(worksite.runtimeEvidenceRefs, [
+    "file://.ai-workspace/runtime/odd_sdlc/operator-runs/run"
+  ]);
   assert.equal(workAct.kind, "sdlc_work_act");
   assert.equal(workAct.descriptorName, "import");
   assert.equal(capability.family, "core_fd");
   assert(Object.isFrozen(asset));
   assert(Object.isFrozen(worksite));
+});
+
+test("T-029 admits current installed run consequence-chain carriers", () => {
+  const systemRef = admitSdlcWorksiteAssetRef({
+    ref: "file://workspace/.abiogenesis/odd_sdlc/typescript/install-manifest.json",
+    role: "system_asset",
+    description: "installed odd_sdlc product payload"
+  });
+  const workspaceRef = admitSdlcWorksiteAssetRef({
+    ref: "file://workspace/build_tenants/hello_world_rust/src/main.rs",
+    role: "product_materialization",
+    description: "materialized Rust source file"
+  });
+  const observation = admitSdlcWorksiteObservation({
+    observationRef: "observation://odd-sdlc/post-action/run",
+    worksiteId: "worksite://t133",
+    systemAssetRefs: [systemRef.ref],
+    workspaceAssetRefs: [workspaceRef.ref],
+    runtimeEvidenceRefs: [
+      "file://workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/run/sdlc_worksite_evidence.json"
+    ],
+    selectedGraphFunctionRef: "graph-function:odd_sdlc:Fg_materialize_declared_product_asset",
+    selectedActionRef: "construction-action://odd-sdlc/public-start/Fg_materialize_declared_product_asset",
+    targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"],
+    predecessorRefs: ["construction-intent://odd-sdlc/public-start/Fg_materialize_declared_product_asset"]
+  });
+  const action = admitSdlcLawfulActionMenuEntry({
+    actionId: "action:build_rust_product",
+    graphFunctionRef: "graph-function:odd_sdlc:Fg_materialize_declared_product_asset",
+    sourceAssetRefs: ["asset:start_document", "asset:installed_odd_sdlc"],
+    targetAssetRef: "asset:rust_product_files",
+    expectedCarrierRef: "schema://odd_sdlc/component_code_surface",
+    humanDecision: "continue",
+    retryActionRef: "action:repair_rust_product_files",
+    donePredicate: "Cargo.toml and src/main.rs exist under build_tenants/hello_world_rust"
+  });
+  const archive = admitSdlcInstalledRunArchive({
+    archiveRoot: "file://test_runs/t133/run",
+    workspaceRoot: "file://test_runs/t133/run/workspace",
+    runtimeRoot: "file://test_runs/t133/run/workspace/.ai-workspace/runtime/odd_sdlc",
+    operatorRunRefs: [
+      "file://test_runs/t133/run/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/run"
+    ],
+    processTraceRefs: [
+      "file://test_runs/t133/run/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/run/worker_process_events.jsonl.trace"
+    ],
+    productEvidenceRefs: [
+      "file://test_runs/t133/run/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/run/product_materialization_manifest.json"
+    ],
+    executionProofRefs: ["file://test_runs/t133/run/rust_hello_world_execution_proof.json"]
+  });
+  const cycle = admitSdlcConstructionEvidenceCycle({
+    cycleRef: "cycle://odd-sdlc/t133/product-materialization",
+    worksiteObservationRef: observation.observationRef,
+    constructionIntentRef: "construction-intent://odd-sdlc/public-start/Fg_materialize_declared_product_asset",
+    workerProcessRef: "file://runtime/operator-runs/run/worker_process_summary.json",
+    edgeFulfillmentLedgerRef: "ledger://odd-sdlc/runtime/operator-runs/run/edge-fulfillment",
+    closureDecisionRef: "closure-decision://odd-sdlc/runtime/operator-runs/run/edge-fulfillment/1",
+    nextActionProjectionRef: "next-action://odd-sdlc/runtime/operator-runs/run/close/no-action",
+    materializationManifestRef: "file://runtime/operator-runs/run/product_materialization_manifest.json",
+    executionProofRefs: archive.executionProofRefs,
+    predecessorRefs: [observation.observationRef, action.actionId]
+  });
+
+  assert.equal(systemRef.role, "system_asset");
+  assert.equal(action.humanDecision, "continue");
+  assert.equal(observation.targetBindingRefs[0], "target-binding://odd-sdlc/component_code_surface");
+  assert.equal(archive.runtimeRoot.endsWith(".ai-workspace/runtime/odd_sdlc"), true);
+  assert.equal(cycle.nextActionProjectionRef, "next-action://odd-sdlc/runtime/operator-runs/run/close/no-action");
+  assert(Object.isFrozen(cycle));
 });
 
 test("T-029 admission rejects open payloads and malformed lifecycle values", () => {
@@ -132,6 +219,15 @@ test("T-029 admission rejects open payloads and malformed lifecycle values", () 
       }),
     /unexpected field/
   );
+  assert.throws(
+    () =>
+      admitSdlcWorksiteAssetRef({
+        ref: "file://bad",
+        role: "hidden_controller",
+        description: "bad role"
+      }),
+    /role/
+  );
 });
 
 test("T-029 TypeScript catalog preserves Python software-domain family and work-act names", () => {
@@ -140,7 +236,10 @@ test("T-029 TypeScript catalog preserves Python software-domain family and work-
     SOFTWARE_DOMAIN_ASSET_FAMILIES.map((entry) => entry.name),
     [
       ...namesFromConstructor(source, "AssetFamilyDescriptor"),
-      "governance_loop"
+      "governance_loop",
+      "builder_scenario_contracts",
+      "installed_traversal_run",
+      "consequence_chain"
     ]
   );
   assert.deepStrictEqual(
@@ -149,6 +248,21 @@ test("T-029 TypeScript catalog preserves Python software-domain family and work-
   );
 
   const assetTypeNames = new Set(SOFTWARE_DOMAIN_ASSET_TYPES.map((entry) => entry.name));
+  for (const required of [
+    "bootstrap_start_document_surface",
+    "scenario_contract_surface",
+    "lawful_action_menu_surface",
+    "operator_run_archive_surface",
+    "worksite_evidence_surface",
+    "construction_intent_surface",
+    "edge_fulfillment_ledger_surface",
+    "edge_closure_decision_surface",
+    "next_action_projection_surface",
+    "product_materialization_manifest_surface",
+    "execution_proof_surface"
+  ]) {
+    assert(assetTypeNames.has(required), required);
+  }
   for (const family of SOFTWARE_DOMAIN_ASSET_FAMILIES) {
     for (const assetTypeName of family.representativeAssetTypes) {
       assert(assetTypeNames.has(assetTypeName), assetTypeName);

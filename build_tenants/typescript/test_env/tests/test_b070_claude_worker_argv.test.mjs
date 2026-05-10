@@ -34,7 +34,7 @@ function fakeManifest(workspaceRoot) {
   return Object.freeze({ workspaceRoot });
 }
 
-test("B-070 process://claude lowers to ABG-owned stream-json print argv", () => {
+test("B-070 process://claude lowers to stream-json print argv with prompt on stdin", () => {
   const fx = makeFixture("CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n");
   const transport = admitWorkerTransport("process://claude");
   assert.equal(transport.agentKey, "claude");
@@ -60,8 +60,8 @@ test("B-070 process://claude lowers to ABG-owned stream-json print argv", () => 
       transport,
       promptPath: fx.promptPath
     }),
-    null,
-    "Claude stdin is no longer odd_sdlc-owned transport law"
+    "CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n",
+    "Claude reads prompt content from stdin instead of argv"
   );
   assert.ok(
     args.includes("--output-format"),
@@ -93,10 +93,55 @@ test("B-070 process://claude lowers to ABG-owned stream-json print argv", () => 
     "argv must not be the bare manifest path fallthrough"
   );
   assert.equal(
-    args[args.length - 1],
-    "CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n",
-    "prompt placement follows the ABG shared Claude callout contract"
+    args.includes("CLAUDE-PROMPT-CONTENT-MARKER\nbody.\n"),
+    false,
+    "argv must not record the worker prompt payload"
   );
+});
+
+test("T-002 process://claude PTY launch redirects prompt file to stdin without prompt argv", () => {
+  const fx = makeFixture("CLAUDE-PTY-PROMPT\n");
+  const transport = admitWorkerTransport("process://claude");
+
+  const launch = processLaunchForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath,
+    executorProfile: "pty-terminal"
+  });
+
+  assert.equal(launch.command, "/bin/sh");
+  assert.equal(launch.stdin, null);
+  assert.deepEqual(launch.args.slice(0, 4), [
+    "-lc",
+    'prompt_file=$1; shift; exec "$@" < "$prompt_file"',
+    "odd-sdlc-worker-stdin",
+    fx.promptPath
+  ]);
+  assert.equal(launch.args[4], "claude");
+  assert(launch.args.includes("-p"));
+  assert.equal(launch.args.includes("CLAUDE-PTY-PROMPT\n"), false);
+});
+
+test("T-002 process://claude local-spawn launch uses stdin pipe", () => {
+  const fx = makeFixture("CLAUDE-LOCAL-PROMPT\n");
+  const transport = admitWorkerTransport("process://claude");
+
+  const launch = processLaunchForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath,
+    executorProfile: "local-spawn"
+  });
+
+  assert.equal(launch.command, "claude");
+  assert.equal(launch.args[0], "-p");
+  assert.equal(launch.args.includes("CLAUDE-LOCAL-PROMPT\n"), false);
+  assert.equal(launch.stdin, "CLAUDE-LOCAL-PROMPT\n");
 });
 
 test("B-070 process://codex argv shape is preserved (regression guard)", () => {
@@ -277,7 +322,14 @@ test("T-125 process://claude?model=... lowers to claude --model", () => {
   assert.equal(args[modelIndex + 1], "claude-test-model");
   assert.ok(args.includes("--output-format"));
   assert.equal(args[args.indexOf("--output-format") + 1], "stream-json");
-  assert.equal(args[args.length - 1], "CLAUDE-MODEL-PROMPT\n");
+  assert.equal(args.includes("CLAUDE-MODEL-PROMPT\n"), false);
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CLAUDE-MODEL-PROMPT\n"
+  );
 });
 
 test("T-126 process://claude?model=...&effort=max lowers both Claude controls", () => {
@@ -301,7 +353,14 @@ test("T-126 process://claude?model=...&effort=max lowers both Claude controls", 
   assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-4-7");
   assert.equal(args[args.indexOf("--effort") + 1], "max");
   assert.equal(args[args.indexOf("--output-format") + 1], "stream-json");
-  assert.equal(args[args.length - 1], "CLAUDE-MAX-EFFORT-PROMPT\n");
+  assert.equal(args.includes("CLAUDE-MAX-EFFORT-PROMPT\n"), false);
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CLAUDE-MAX-EFFORT-PROMPT\n"
+  );
 });
 
 test("T-126 invalid Claude effort is rejected at transport admission", () => {
@@ -333,7 +392,14 @@ test("T-127 bare Claude worker alias admits as process transport", () => {
 
   assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-4-7");
   assert.equal(args[args.indexOf("--effort") + 1], "max");
-  assert.equal(args[args.length - 1], "CLAUDE-ALIAS-PROMPT\n");
+  assert.equal(args.includes("CLAUDE-ALIAS-PROMPT\n"), false);
+  assert.equal(
+    stdinForWorker({
+      transport,
+      promptPath: fx.promptPath
+    }),
+    "CLAUDE-ALIAS-PROMPT\n"
+  );
 });
 
 test("T-127 bare non-Claude worker aliases admit as process transports", () => {

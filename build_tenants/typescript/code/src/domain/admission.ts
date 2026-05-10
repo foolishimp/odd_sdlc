@@ -14,6 +14,7 @@ import {
   SDLC_CAPABILITY_FAMILY_VALUES,
   SDLC_OPERATIONAL_LANE_VALUES,
   SDLC_OPERATIONAL_RESULT_STATUS_VALUES,
+  SDLC_WORKSITE_ASSET_REF_ROLE_VALUES,
   SDLC_WORKSITE_STATE_VALUES,
   type SdlcAsset,
   type SdlcAssetBinding,
@@ -22,11 +23,16 @@ import {
   type SdlcAssetProvenance,
   type SdlcAssetType,
   type SdlcCapability,
+  type SdlcConstructionEvidenceCycle,
+  type SdlcInstalledRunArchive,
+  type SdlcLawfulActionMenuEntry,
   type SdlcOperationalResult,
   type SdlcOperationalTransitionCommand,
   type SdlcWorkAct,
   type SdlcWorkActDescriptor,
-  type SdlcWorksite
+  type SdlcWorksite,
+  type SdlcWorksiteAssetRef,
+  type SdlcWorksiteObservation
 } from "./carriers.js";
 
 function parseNullableNumber(input: unknown, label: string): number | null {
@@ -37,6 +43,24 @@ function parseNullableNumber(input: unknown, label: string): number | null {
     throw new TypeError(`${label}: expected non-negative integer or null`);
   }
   return input;
+}
+
+function parseOptionalStringList(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+  label: string
+): readonly string[] {
+  const input = parseOptionalField(record, key);
+  return input === undefined ? Object.freeze([]) : parseStringList(input, label);
+}
+
+function parseOptionalNullableNonEmptyString(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+  label: string
+): string | null {
+  const input = parseOptionalField(record, key);
+  return input === undefined ? null : parseNullableNonEmptyString(input, label);
 }
 
 export function admitSdlcAssetType(
@@ -192,7 +216,12 @@ export function admitSdlcWorksite(
     "worksiteId",
     "rootUri",
     "lifecycleState",
-    "activeAssetIds"
+    "activeAssetIds",
+    "systemAssetRefs",
+    "workspaceAssetRefs",
+    "runtimeEvidenceRefs",
+    "selectedGraphFunctionRef",
+    "selectedActionRef"
   ]);
   return Object.freeze({
     kind: "sdlc_worksite",
@@ -203,7 +232,239 @@ export function admitSdlcWorksite(
       `${label}.lifecycleState`,
       SDLC_WORKSITE_STATE_VALUES
     ),
-    activeAssetIds: parseStringList(record["activeAssetIds"], `${label}.activeAssetIds`)
+    activeAssetIds: parseStringList(record["activeAssetIds"], `${label}.activeAssetIds`),
+    systemAssetRefs: parseOptionalStringList(
+      record,
+      "systemAssetRefs",
+      `${label}.systemAssetRefs`
+    ),
+    workspaceAssetRefs: parseOptionalStringList(
+      record,
+      "workspaceAssetRefs",
+      `${label}.workspaceAssetRefs`
+    ),
+    runtimeEvidenceRefs: parseOptionalStringList(
+      record,
+      "runtimeEvidenceRefs",
+      `${label}.runtimeEvidenceRefs`
+    ),
+    selectedGraphFunctionRef: parseOptionalNullableNonEmptyString(
+      record,
+      "selectedGraphFunctionRef",
+      `${label}.selectedGraphFunctionRef`
+    ),
+    selectedActionRef: parseOptionalNullableNonEmptyString(
+      record,
+      "selectedActionRef",
+      `${label}.selectedActionRef`
+    )
+  });
+}
+
+export function admitSdlcWorksiteAssetRef(
+  input: unknown,
+  label = "SdlcWorksiteAssetRef"
+): SdlcWorksiteAssetRef {
+  const record = parseClosedRecord(input, label, ["ref", "role", "description"]);
+  return Object.freeze({
+    kind: "sdlc_worksite_asset_ref",
+    ref: parseNonEmptyString(record["ref"], `${label}.ref`),
+    role: parseEnumValue(
+      record["role"],
+      `${label}.role`,
+      SDLC_WORKSITE_ASSET_REF_ROLE_VALUES
+    ),
+    description: parseNonEmptyString(record["description"], `${label}.description`)
+  });
+}
+
+export function admitSdlcWorksiteObservation(
+  input: unknown,
+  label = "SdlcWorksiteObservation"
+): SdlcWorksiteObservation {
+  const record = parseClosedRecord(input, label, [
+    "observationRef",
+    "worksiteId",
+    "systemAssetRefs",
+    "workspaceAssetRefs",
+    "runtimeEvidenceRefs",
+    "selectedGraphFunctionRef",
+    "selectedActionRef",
+    "targetBindingRefs",
+    "predecessorRefs"
+  ]);
+  return Object.freeze({
+    kind: "sdlc_worksite_observation",
+    observationRef: parseNonEmptyString(
+      record["observationRef"],
+      `${label}.observationRef`
+    ),
+    worksiteId: parseNonEmptyString(record["worksiteId"], `${label}.worksiteId`),
+    systemAssetRefs: parseStringList(
+      record["systemAssetRefs"],
+      `${label}.systemAssetRefs`
+    ),
+    workspaceAssetRefs: parseStringList(
+      record["workspaceAssetRefs"],
+      `${label}.workspaceAssetRefs`
+    ),
+    runtimeEvidenceRefs: parseStringList(
+      record["runtimeEvidenceRefs"],
+      `${label}.runtimeEvidenceRefs`
+    ),
+    selectedGraphFunctionRef: parseNullableNonEmptyString(
+      record["selectedGraphFunctionRef"],
+      `${label}.selectedGraphFunctionRef`
+    ),
+    selectedActionRef: parseNullableNonEmptyString(
+      record["selectedActionRef"],
+      `${label}.selectedActionRef`
+    ),
+    targetBindingRefs: parseStringList(
+      record["targetBindingRefs"],
+      `${label}.targetBindingRefs`
+    ),
+    predecessorRefs: parseStringList(
+      record["predecessorRefs"],
+      `${label}.predecessorRefs`
+    )
+  });
+}
+
+export function admitSdlcLawfulActionMenuEntry(
+  input: unknown,
+  label = "SdlcLawfulActionMenuEntry"
+): SdlcLawfulActionMenuEntry {
+  const record = parseClosedRecord(input, label, [
+    "actionId",
+    "graphFunctionRef",
+    "sourceAssetRefs",
+    "targetAssetRef",
+    "expectedCarrierRef",
+    "humanDecision",
+    "retryActionRef",
+    "donePredicate"
+  ]);
+  return Object.freeze({
+    kind: "sdlc_lawful_action_menu_entry",
+    actionId: parseNonEmptyString(record["actionId"], `${label}.actionId`),
+    graphFunctionRef: parseNonEmptyString(
+      record["graphFunctionRef"],
+      `${label}.graphFunctionRef`
+    ),
+    sourceAssetRefs: parseStringList(
+      record["sourceAssetRefs"],
+      `${label}.sourceAssetRefs`
+    ),
+    targetAssetRef: parseNonEmptyString(
+      record["targetAssetRef"],
+      `${label}.targetAssetRef`
+    ),
+    expectedCarrierRef: parseNonEmptyString(
+      record["expectedCarrierRef"],
+      `${label}.expectedCarrierRef`
+    ),
+    humanDecision: parseNonEmptyString(record["humanDecision"], `${label}.humanDecision`),
+    retryActionRef: parseNullableNonEmptyString(
+      record["retryActionRef"],
+      `${label}.retryActionRef`
+    ),
+    donePredicate: parseNonEmptyString(record["donePredicate"], `${label}.donePredicate`)
+  });
+}
+
+export function admitSdlcInstalledRunArchive(
+  input: unknown,
+  label = "SdlcInstalledRunArchive"
+): SdlcInstalledRunArchive {
+  const record = parseClosedRecord(input, label, [
+    "archiveRoot",
+    "workspaceRoot",
+    "runtimeRoot",
+    "operatorRunRefs",
+    "processTraceRefs",
+    "productEvidenceRefs",
+    "executionProofRefs"
+  ]);
+  return Object.freeze({
+    kind: "sdlc_installed_run_archive",
+    archiveRoot: parseNonEmptyString(record["archiveRoot"], `${label}.archiveRoot`),
+    workspaceRoot: parseNonEmptyString(record["workspaceRoot"], `${label}.workspaceRoot`),
+    runtimeRoot: parseNonEmptyString(record["runtimeRoot"], `${label}.runtimeRoot`),
+    operatorRunRefs: parseStringList(
+      record["operatorRunRefs"],
+      `${label}.operatorRunRefs`
+    ),
+    processTraceRefs: parseStringList(
+      record["processTraceRefs"],
+      `${label}.processTraceRefs`
+    ),
+    productEvidenceRefs: parseStringList(
+      record["productEvidenceRefs"],
+      `${label}.productEvidenceRefs`
+    ),
+    executionProofRefs: parseStringList(
+      record["executionProofRefs"],
+      `${label}.executionProofRefs`
+    )
+  });
+}
+
+export function admitSdlcConstructionEvidenceCycle(
+  input: unknown,
+  label = "SdlcConstructionEvidenceCycle"
+): SdlcConstructionEvidenceCycle {
+  const record = parseClosedRecord(input, label, [
+    "cycleRef",
+    "worksiteObservationRef",
+    "constructionIntentRef",
+    "workerProcessRef",
+    "edgeFulfillmentLedgerRef",
+    "closureDecisionRef",
+    "nextActionProjectionRef",
+    "materializationManifestRef",
+    "executionProofRefs",
+    "predecessorRefs"
+  ]);
+  return Object.freeze({
+    kind: "sdlc_construction_evidence_cycle",
+    cycleRef: parseNonEmptyString(record["cycleRef"], `${label}.cycleRef`),
+    worksiteObservationRef: parseNonEmptyString(
+      record["worksiteObservationRef"],
+      `${label}.worksiteObservationRef`
+    ),
+    constructionIntentRef: parseNonEmptyString(
+      record["constructionIntentRef"],
+      `${label}.constructionIntentRef`
+    ),
+    workerProcessRef: parseNonEmptyString(
+      record["workerProcessRef"],
+      `${label}.workerProcessRef`
+    ),
+    edgeFulfillmentLedgerRef: parseNonEmptyString(
+      record["edgeFulfillmentLedgerRef"],
+      `${label}.edgeFulfillmentLedgerRef`
+    ),
+    closureDecisionRef: parseNonEmptyString(
+      record["closureDecisionRef"],
+      `${label}.closureDecisionRef`
+    ),
+    nextActionProjectionRef: parseNonEmptyString(
+      record["nextActionProjectionRef"],
+      `${label}.nextActionProjectionRef`
+    ),
+    materializationManifestRef: parseNullableNonEmptyString(
+      record["materializationManifestRef"],
+      `${label}.materializationManifestRef`
+    ),
+    executionProofRefs: parseStringList(
+      record["executionProofRefs"],
+      `${label}.executionProofRefs`
+    ),
+    predecessorRefs: parseStringList(
+      record["predecessorRefs"],
+      `${label}.predecessorRefs`
+    )
   });
 }
 

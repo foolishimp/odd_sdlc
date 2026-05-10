@@ -6,20 +6,8 @@
 **Carries Forward From**: None
 **Authoring Design**: None
 
-<<<<<<< Updated upstream
 This family defines the standard realization topology for the `odd_sdlc`
 source repository.
-=======
-This family defines the standard realization topology for the `odd_method`
-source repository.
-
-Downstream installed workspaces are governed separately by
-`REQ-F-ODDSDLC-032`.
-
-Nothing in this family authorizes downstream installed workspaces to place
-project realization under `build_tenants/common/` or to treat released
-`odd_sdlc` runtime as a project tenant.
->>>>>>> Stashed changes
 
 Downstream installed workspaces are governed separately by
 `REQ-F-ODDSDLC-032`.
@@ -63,11 +51,7 @@ In short:
 
 ### REQ-F-REALIZATION-003 — Shared and tenant-local realization law are explicit
 
-<<<<<<< Updated upstream
 `odd_sdlc` keeps shared realization law and tenant-local realization law in
-=======
-`odd_method` keeps shared realization law and tenant-local realization law in
->>>>>>> Stashed changes
 explicit separate surfaces inside the source repository.
 
 **Acceptance Criteria**:

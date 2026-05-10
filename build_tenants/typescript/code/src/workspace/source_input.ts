@@ -61,12 +61,17 @@ function detectRole(relativePath: string): SdlcSourceInputRole {
 
 function detectAuthorityMarkers(content: string): readonly string[] {
   const markerExpression = /\b(?:INT-\d{3}|RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
+  const transformRefExpression =
+    /\b(?:transform-obligation|requirement-transform|requirement-lineage):\/\/[^\s\])}>,]+/g;
   const projectExpression = /^\*\*Project\*\*:\s*(.+?)\s*$/gm;
   const markers = [...content.matchAll(markerExpression)].map((match) => match[0]);
+  const transformRefs = [...content.matchAll(transformRefExpression)].map(
+    (match) => match[0]
+  );
   const projectMarkers = [...content.matchAll(projectExpression)].map(
     (match) => `Project:${match[1] ?? ""}`
   );
-  return uniqueSorted([...markers, ...projectMarkers]);
+  return uniqueSorted([...markers, ...transformRefs, ...projectMarkers]);
 }
 
 function ambiguityFor(input: {

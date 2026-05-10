@@ -31,6 +31,7 @@ import {
   projectSdlcQueryDomain,
   projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
   withSdlcRequirementFulfillmentArchiveRehydration,
+  type SdlcRequirementClosureRegister,
   type SdlcRequirementFulfillmentClosureSource,
   type SdlcRequirementFulfillmentEdgeLedgerSource,
   type SdlcRequirementFulfillmentAssessmentPublicInput,
@@ -51,6 +52,14 @@ import {
   type SdlcPublicStartTargetKind,
   type SdlcPublicStartUntil
 } from "../start/index.js";
+import {
+  bindSdlcRoute,
+  classifySdlcGapObservation,
+  observeSdlcGapPressure,
+  type SdlcGapObservation,
+  type SdlcRouteBinding,
+  type SdlcTriageClassification
+} from "../triage/index.js";
 import {
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveSdlcConformProjectProfileFromWorkspace,
@@ -151,6 +160,14 @@ interface SpecMethodWorkspaceContext {
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly conformanceReport: SdlcConformProjectReport;
+}
+
+interface SdlcHomeostaticGapTriageSurface {
+  readonly kind: "sdlc_homeostatic_gap_triage_surface";
+  readonly observation: SdlcGapObservation;
+  readonly classification: SdlcTriageClassification;
+  readonly routeBinding: SdlcRouteBinding;
+  readonly emittedRuntimeEventKinds: readonly [];
 }
 
 const DEFAULT_SOURCE_PATHS = Object.freeze([
@@ -863,6 +880,87 @@ function requirementFulfillmentForGaps(input: {
   });
 }
 
+function closureRegisterForHomeostaticTriage(
+  projection: SdlcRequirementFulfillmentPublicProjection
+): SdlcRequirementClosureRegister {
+  const entries = Object.freeze(
+    projection.rows
+      .filter((row) => row.fulfillmentStatus !== "extra")
+      .map((row) => {
+        const fulfillmentStatus =
+          row.fulfillmentStatus === "fulfilled" ||
+          row.fulfillmentStatus === "partial" ||
+          row.fulfillmentStatus === "planned" ||
+          row.fulfillmentStatus === "missing"
+            ? row.fulfillmentStatus
+            : "missing";
+        return Object.freeze({
+          kind: "sdlc_requirement_closure_entry" as const,
+          requirementId: row.requirementId,
+          sourceInputUris: row.sourceInputUris,
+          assetIds: Object.freeze([]),
+          producedByGraphFunctions: Object.freeze([]),
+          proofKinds: Object.freeze([]),
+          authorityVerbs: Object.freeze([]),
+          evidenceRefs: row.evidenceRefs,
+          traceabilityStatus: "absent" as const,
+          fulfillmentStatus,
+          carryStatus: row.carryStatus,
+          openReasons: row.openReasons
+        });
+      })
+  );
+  return Object.freeze({
+    kind: "sdlc_requirement_closure_register" as const,
+    entries,
+    fulfilledRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementId)
+    ),
+    carriedForwardRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementId)
+    ),
+    unresolvedRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementId)
+    ),
+    emittedRuntimeEventKinds: Object.freeze([] as const)
+  });
+}
+
+function homeostaticGapTriageForGaps(input: {
+  readonly dossier: ReturnType<typeof deriveSdlcGapDossier>;
+  readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
+  readonly ingressReport: SdlcWorkspaceIngressReport;
+}): SdlcHomeostaticGapTriageSurface {
+  const observation = observeSdlcGapPressure({
+    gapDossier: input.dossier,
+    closureRegister: closureRegisterForHomeostaticTriage(
+      input.requirementFulfillment
+    ),
+    requirementTransformAuthorities:
+      input.ingressReport.requirementTransformAuthorities,
+    analysisRef: [
+      "analysis://odd-sdlc/spec-method/gaps",
+      encodeURIComponent(input.dossier.triageInput),
+      encodeURIComponent(input.requirementFulfillment.sourceRegisterRef)
+    ].join("/")
+  });
+  const classification = classifySdlcGapObservation({ observation });
+  const routeBinding = bindSdlcRoute({ observation, classification });
+  return Object.freeze({
+    kind: "sdlc_homeostatic_gap_triage_surface" as const,
+    observation,
+    classification,
+    routeBinding,
+    emittedRuntimeEventKinds: Object.freeze([] as const)
+  });
+}
+
 function defaultRegimeFor(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly queryDomain: ReturnType<typeof projectSdlcQueryDomain>;
@@ -1154,11 +1252,17 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     requirementFulfillment,
     ...(priorityScheme === undefined ? {} : { priorityScheme })
   });
+  const homeostaticTriage = homeostaticGapTriageForGaps({
+    dossier,
+    requirementFulfillment,
+    ingressReport: context.ingressReport
+  });
   return Object.freeze({
     start,
     projection,
     dossier,
-    requirementFulfillment
+    requirementFulfillment,
+    homeostaticTriage
   });
 }
 
@@ -1305,10 +1409,35 @@ function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
     requirementFulfillment === null
       ? null
       : childRecord(requirementFulfillment, "counts");
+  const homeostaticTriage = childRecord(result.payload, "homeostaticTriage");
+  const triageClassification =
+    homeostaticTriage === null
+      ? null
+      : childRecord(homeostaticTriage, "classification");
+  const routeBinding =
+    homeostaticTriage === null
+      ? null
+      : childRecord(homeostaticTriage, "routeBinding");
   const totalRequirements =
     requirementCounts === null ? null : numberField(requirementCounts, "total");
   const unresolvedRequirements =
     requirementCounts === null ? null : numberField(requirementCounts, "unresolved");
+  const triageLayer =
+    triageClassification === null
+      ? "inspect_json"
+      : stringField(triageClassification, "frameworkLayer") ?? "inspect_json";
+  const triageCondition =
+    triageClassification === null
+      ? "inspect_json"
+      : stringField(triageClassification, "frameworkCondition") ?? "inspect_json";
+  const reEntryLayer =
+    routeBinding === null
+      ? "inspect_json"
+      : stringField(routeBinding, "reEntryLayer") ?? "inspect_json";
+  const targetGraphFunction =
+    routeBinding === null
+      ? "inspect_json"
+      : stringField(routeBinding, "targetGraphFunction") ?? "none";
   return [
     "odd-sdlc-ts gaps",
     `status: ${stringField(projection, "status") ?? result.status}`,
@@ -1318,6 +1447,7 @@ function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
     totalRequirements === null
       ? "requirements: inspect_json"
       : `requirements: ${unresolvedRequirements ?? 0}/${totalRequirements} unresolved`,
+    `triage: ${triageLayer}/${triageCondition} -> ${reEntryLayer}:${targetGraphFunction}`,
     "read_only: true",
     "chooses_next_traversal: false",
     `next_action: ${actions[0] ?? "inspect_json"}`,

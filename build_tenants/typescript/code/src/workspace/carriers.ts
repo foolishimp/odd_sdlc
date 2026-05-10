@@ -170,6 +170,24 @@ export interface SdlcImportedRequirementAuthority {
   readonly sourceDigest: string;
 }
 
+export type SdlcRequirementTransformAuthorityStatus =
+  | "current"
+  | "stale"
+  | "ambiguous"
+  | "contradictory";
+
+export interface SdlcRequirementTransformAuthority {
+  readonly kind: "sdlc_requirement_transform_authority";
+  readonly requirementId: string;
+  readonly transformRef: string;
+  readonly predecessorTransformRefs: readonly string[];
+  readonly transformInputAuthorityRef: string;
+  readonly transformOutputAuthorityRef: string;
+  readonly sourceInputUris: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly status: SdlcRequirementTransformAuthorityStatus;
+}
+
 export interface SdlcBootstrapLineageRecord {
   readonly kind: "sdlc_bootstrap_lineage_record";
   readonly elementId: string;
@@ -186,6 +204,7 @@ export interface SdlcWorkspaceIngressReport {
   readonly projectIngressContract: ProjectIngressContract;
   readonly sourceInputs: readonly SdlcSourceInput[];
   readonly importedRequirementAuthorities: readonly SdlcImportedRequirementAuthority[];
+  readonly requirementTransformAuthorities: readonly SdlcRequirementTransformAuthority[];
   readonly lineage: readonly SdlcBootstrapLineageRecord[];
   readonly ambiguityRegister: readonly string[];
   readonly bootstrapGapSet: readonly string[];

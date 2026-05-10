@@ -79,6 +79,34 @@ function manifestForLargeSurface() {
   });
 }
 
+function manifestWithDeclaredProductFileTargets() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  writeFileSync(
+    path.join(workspaceRoot, ".ai-workspace/context/t118_expected_files.json"),
+    JSON.stringify(
+      {
+        expectedFiles: [
+          "build_tenants/scala_spark/build.sbt",
+          "build_tenants/scala_spark/src/main/scala/generated/App.scala",
+          "README.md"
+        ]
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    runId: "t118-declared-product-file-targets"
+  });
+}
+
 test("T-118 writes a compact worker invocation package while preserving the full manifest by reference", () => {
   const manifest = manifestForLargeSurface();
   const files = writeHandoffFiles(manifest);
@@ -109,6 +137,10 @@ test("T-118 writes a compact worker invocation package while preserving the full
   );
   assert.equal(path.isAbsolute(invocationPackage.manifestPath), false);
   assert.equal(invocationPackage.traversalIntentPackagePath.endsWith("traversal_intent_package.json"), true);
+  assert(invocationPackage.transformAxioms.length >= 5);
+  assert(invocationPackage.transformAxioms.some((axiom) => axiom.includes("F_P.transform only")));
+  assert(invocationPackage.outcomeDirectives.length > 0);
+  assert(invocationPackage.outcomeDirectives.some((directive) => directive.includes("Outcome:")));
   assert.equal(
     invocationPackage.manifestDigest,
     sha256Text(readFileSync(files.manifestPath, "utf8"))
@@ -122,6 +154,7 @@ test("T-118 writes a compact worker invocation package while preserving the full
     invocationPackage.outputContract.reportFile,
     relativeToWorkspace(manifest.reportFile)
   );
+  assert.deepEqual(invocationPackage.outputContract.declaredProductFileTargets, []);
   assert.deepStrictEqual(
     invocationPackage.allowedWriteRoots,
     manifest.allowedWriteRoots.map(relativeToWorkspace)
@@ -160,16 +193,46 @@ test("T-118 prompt points workers to the compact package before the forensic man
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
 
-  assert(Buffer.byteLength(prompt, "utf8") < 8 * 1024);
+  assert(Buffer.byteLength(prompt, "utf8") < 3 * 1024);
   assert.doesNotMatch(prompt, new RegExp(manifest.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
-  assert.match(prompt, /Read the worker brief first:/u);
+  assert.match(prompt, /Read in order:/u);
   assert.match(prompt, /worker_invocation_package\.json/u);
   assert.match(prompt, /worker_brief\.json/u);
-  assert.match(prompt, /full forensic handoff manifest remains archived by reference/u);
+  assert.match(prompt, /forensic manifest only when a package ref requires it/u);
+  assert.match(prompt, /Terse axioms:/u);
+  assert.match(
+    prompt,
+    /Apply workerInvocationPackage\.transformAxioms as the single axiom authority/u
+  );
+  assert.doesNotMatch(prompt, /This invocation is F_P\.transform only/u);
+  assert.match(prompt, /outcomeDirectives/u);
   assert.doesNotMatch(prompt, /Read the full handoff manifest before writing output/u);
   assert.match(prompt, /Use workerInvocationPackage\.requirementTraceObligationIds/u);
   assert.doesNotMatch(prompt, /Compact worker invocation package:/u);
   assert.doesNotMatch(prompt, /Legacy compact prompt pressure projection:/u);
   assert.doesNotMatch(prompt, /"kind": "sdlc_worker_invocation_package"/u);
   assert.doesNotMatch(prompt, /sdlc_worker_prompt_pressure_projection/u);
+  assert.doesNotMatch(prompt, /workerInvocationPackage\.retryRepairInstructions is non-empty/u);
+});
+
+test("T-002 worker package and prompt carry declared product file targets", () => {
+  const manifest = manifestWithDeclaredProductFileTargets();
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    [
+      "build_tenants/scala_spark/build.sbt",
+      "build_tenants/scala_spark/src/main/scala/generated/App.scala"
+    ]
+  );
+  assert.match(
+    prompt,
+    /Declared product file targets: build_tenants\/scala_spark\/build\.sbt, build_tenants\/scala_spark\/src\/main\/scala\/generated\/App\.scala\./u
+  );
+  assert.doesNotMatch(prompt, /README\.md/u);
 });

@@ -1,1307 +1,454 @@
 # T-004 Restore Homeostatic Gap Triage And Intent Renewal
 
 - id: T-004
-- title: Restore homeostatic gap triage, lawful re-entry, and intent renewal on top of the stabilized runtime boundary
+- title: Restore the spec-method homeostatic loop so gap analysis triages expected-vs-realized mismatch and generates lawful next vectors including new goals or intent when needed
 - type: feature
 - status: completed
 - goal: ambiguity-governance-and-traceability
 - priority: critical
-- created_at: 2026-04-13
-- updated_at: 2026-04-16
+- created_at: 2026-04-12
+- updated_at: 2026-05-10
 - dependencies: B-001, T-002, B-002, T-003
 
 ## Triage
 
-- intake: feature / operator direction / live proving feedback / architectural review
-- lawful_change_class: behavioral_completion
-- affected_boundary: odd_sdlc gap analysis, lawful route selection, constitutional repricing gates, and traversal-scoped recovery products
-- lawful_re_entry: odd_sdlc runtime analysis, gap triage, routing policy, and proof fixtures
-- downstream_proof_span: named test28.02 survivor fixtures, deterministic route-selection proofs, repricing-gate proofs, and live downstream proving after checkpoint
+- intake: feature / methodology recovery / operator finding
+- lawful_change_class: requirement_reprice
+- affected_boundary: odd_sdlc gap analysis, ambiguity governance, requirement-closure interpretation, traversal triage, and spec-method repricing path from concrete gap back into goals and intent
+- lawful_re_entry: odd_method specification, design, and realization surfaces for gap analysis, triage outputs, query surfaces, and runtime continuation selection
+- downstream_proof_span: focused gap-triage fixtures, reset/replay lanes, and real downstream proving on the `data_mapper` corpus
 
 ## Why This Ticket Exists
 
-`odd_sdlc` now has a materially better substrate than it had before:
-
-- explicit analysis publication under `.ai-workspace/runtime/`
-- explicit workspace readiness and stale-analysis invalidation
-- stricter source-repo versus governed-workspace boundary behavior
-- stronger traceability and testcase-authority ingestion
-- stateful iterator and realization-deepening builder law from `T-002`
-
-But `gaps()` is still mostly structural. It can tell us that an edge did not
-close. It cannot yet lawfully answer the next question:
-
-- what kind of mismatch is this
-- which layer owns the mismatch
-- where does lawful re-entry happen in the reverse path described by
-  `SPEC_METHOD.md`
-- is the next action fixed repair, deeper realization, reopened requirements,
-  goal repricing, or a dynamic family such as discovery or PoC
-
-That missing layer is what caused the current live evidence to feel one edge
-late. Deterministic gates stopped bad work, which is good, but the system still
-lacks a first-class triage product that turns failure evidence into lawful next
-intent.
-
-This ticket restores that homeostatic reverse path:
-
-`current surface -> observed mismatch -> semantic triage -> lawful re-entry -> renewed forward derivation`
-
-## Baseline Before T-004 Implementation
-
-This ticket is not starting from zero. The following substrate is already the
-baseline in whole or in part and must not be silently weakened:
-
-- workspace state is published at
-  `.ai-workspace/runtime/odd_sdlc-workspace-state.json`
-- runtime start is gated on explicit published analysis readiness
-- published analysis becomes stale when declared input surfaces change
-- source-domain helper trees do not override the declared selected root unless
-  the workspace is explicitly the real source-domain repo
-- deterministic F_D gates remain authoritative and continue to stop malformed
-  work before false convergence accumulates
-
-Where these behaviors are already implemented, T-004 must preserve them. Where
-they are only partially crystallized, Slice 1 must finish and prove them
-without re-coupling runtime mutation, analysis refresh, topology recovery, and
-route selection back into one ambient path.
-
-## Design Position
-
-T-004 adopts a closed-law / open-extension shape.
-
-Closed law:
-
-- workspace mode vocabulary
-- analysis freshness law
-- triage artifact law
-- deterministic evidence minimums
-- constitutional repricing gate
-- retry and fallback law
-- deterministic route binding
-
-Open extension:
-
-- `extensions {}` in triage artifacts
-- additional shallow-pattern classifiers
-- new dynamic candidate families declared through existing GTL/ABG machinery
-- operator priority overrides in constraints
-
-The builder is free to extend declared surfaces. It is not free to cross the
-runtime contract boundary.
-
-## Total-Function Boundary
-
-T-004 applies a total-function lens to the process state machine, not to the
-asset-under-construction itself.
-
-The outer framework must be total:
+`SPEC_METHOD` already defines the homeostatic reverse path:
 
 ```text
-process_step(
-  workspace_mode,
-  process_state,
-  observation_bundle,
-  analysis_manifest,
-  domain_registry,
-  graphfunction_registry,
-  policy_bundle,
-) -> process_outcome
+Current spec -> real-world use case -> gap analysis -> new goals / intent
 ```
 
-`process_outcome.kind` is a closed set:
+and makes this rule explicit:
 
-- `converged`
-- `advance_fixed_vector`
-- `advance_dynamic_family`
-- `propose_constitutional_reprice`
-- `await_fh_resolution`
-- `suppressed_by_mode`
-- `blocked_stale_analysis`
-- `blocked_missing_capability`
-- `dependency_gap`
-- `unclassified_gap`
-- `no_lawful_route`
+- gap analysis identifies where real use cases hit the current model and reveal
+  insufficiency
+- when the insufficiency is constitutional, repricing generates new goals
+  and/or intent
 
-Unknown is not silence. Unknown is a named outcome.
+`odd_sdlc` already has important raw surfaces:
 
-Inside that closed shell, the framework remains open through:
+- an ambiguity register
+- a requirement closure register
+- event history
+- projection and delta
+- builder-side analytical capability through `F_P`
 
-- domain gap taxonomy and evidence refinements
-- domain fixed-vector mappings
-- future graphfunction families declared through the registry
-- operator policy overrides
+But the current operational `gaps()` path does not complete the homeostatic
+loop.
 
-Extension boundaries are separate:
+Today:
 
-- `domain_registry` extends:
-  - gap kinds
-  - evidence collectors
-  - `(framework_layer, framework_condition)` refinements
-  - fixed-vector mappings
-- `graphfunction_registry` extends:
-  - dynamic-family resolution only
-  - future graphfunctions
-  - priorities, applicability filters, and capability requirements
+- `odd_sdlc.app.gaps()` delegates directly to ABG `gen_gaps()`
+- ABG `gen_gaps()` is intentionally `bind_fd` only
+- the result is structural gap reporting and edge delta summary
+- the result is not a true semantic triage product over the mismatch between
+  expected truth and realized truth
 
-Dynamic routing is itself a second total function:
+That means the system currently under-delivers on one of the core purposes of
+the method:
+
+- gap analysis should act like spec-method bug triage
+- it should classify the mismatch
+- it should say whether the missing work belongs in implementation, design,
+  requirements, goals, or intent
+- it should inject the lawful next vector at the correct level
+
+Without that, the homeostatic reverse path is present in the constitution but
+only partially present in the runtime.
+
+The empirical failure case is visible in `test28.02`:
+
+- pass 2 iterated over the same realized workspace after reset/replay
+- 8 of 14 module groups were unchanged and byte-identical across passes
+- 4 groups received lateral additions only
+- 2 groups were entirely new capability groups
+- no existing Scala file was deepened
+
+The concrete shallow survivors included:
+
+- `JobSubmitter.submit()` still `???`
+- `SparkMorphismExecutor` still `val output = input`
+- `Reconciler` still hard-codes `isConsistent = true`
+
+So the current system can observe coverage and traceability, but it does not
+yet triage the gap as "shallow existing realization" and route correction
+accordingly.
+
+## Existing Surfaces To Reuse
+
+This ticket is not a greenfield invention. The main ingredients already exist:
+
+- ambiguity register published in `.ai-workspace/context/ambiguity_register.json`
+- requirement closure register published in
+  `.ai-workspace/context/requirement_closure_register.json`
+- event stream and projection surfaces
+- deterministic evaluator outcomes
+- builder-side stateful control frame work under `T-002`
+
+The problem is not absence of evidence. The problem is that the evidence is not
+yet interpreted into a first-class homeostatic triage product.
+
+There is also prior art for corrective-vector thinking in the historical
+feedback loop model at:
+
+- `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.test10/.ai-workspace/graph/edges/feedback_loop.yml`
+
+That surface already classified signal sources such as:
+
+- `runtime_deviation`
+- `ecosystem_change`
+- `gap_analysis`
+- `test_failure`
+- `refactoring_needed`
+- `source_finding_escalation`
+- `process_gap_escalation`
+
+and paired them with structured intent templates. This ticket should recover
+that homeostatic direction in the current governed `odd_sdlc` model rather than
+reinventing it loosely.
+
+## Intended Direction
+
+Gap analysis at a single traversal should become a local semantic diff between
+what is expected and what is real.
+
+It should answer:
+
+- what upstream authority or expectation is in force here
+- what is currently realized
+- what mismatch remains
+- what kind of gap this is
+- what the lawful next vector is
+
+The gap product should behave like spec-method triage, not just evaluator
+reporting.
+
+This has two sequential layers:
+
+1. per-edge triage
+   - at the active traversal boundary, compare expected truth against realized
+     truth and classify the local mismatch
+2. cross-edge routing
+   - interpret the set of local triage results and attach the lawful next
+     vector at the correct level in the constitutional chain
+
+The second depends on the first. `odd_sdlc` needs explicit per-edge triage
+results before it can route correction into implementation, design,
+requirements, goals, or intent.
+
+Requirement truth is also a transformation lineage, not a flat current list.
+If a requirement transform produces `req.t1` from `Req`, the live requirement
+authority is the nested chain:
 
 ```text
-resolve_dynamic_route(
-  dynamic_family,
-  normalized_gap,
-  workspace_mode,
-  capabilities,
-  graphfunction_registry,
-  policy_bundle,
-) -> route_outcome
+Req.tn = transform_n(transform_n-1(...transform_1(Req)))
 ```
 
-`route_outcome.kind` is a closed set:
-
-- `selected_graphfunction`
-- `no_lawful_route`
-- `suppressed_by_mode`
-- `blocked_missing_capability`
-
-This is the formal "else condition" for the process. No branch may fall
-through into implicit repair, silent retry, or undefined state.
-
-## Homeostatic Event Chain
-
-T-004 adopts an explicitly homeostatic event chain. The runtime must not
-collapse sensing, appraisal, and action selection into one opaque step.
-
-The lawful sequence is:
-
-`observation -> triage -> route -> repricing`
-
-### 1. Observation Event
-
-An observation event is the disturbance signal.
-
-This is produced when the system detects a meaningful departure from expected
-closure or expected readiness, for example:
-
-- deterministic evaluator failure
-- malformed generated-asset contract
-- unresolved ambiguity
-- stale analysis
-- missing capability
-- shallow existing realization
-
-The observation event is the closest runtime analogue to homeostatic sensing or
-interoceptive disturbance.
-
-Observation is also the primary future telemetry hook.
-
-That means:
-
-- observation must be emitted even when triage does not yet run
-- observation must survive retries, gating, and unresolved routing states
-- observation must be queryable independently of triage success
-- future telemetry and operator-facing analytics should key off observation
-  streams rather than reconstructing salience only from later route or closure
-  artifacts
-
-At minimum an observation event must be durable enough to answer:
-
-- what changed
-- where it was detected
-- which edge or boundary was affected
-- which published-analysis fingerprint was current at the time
-- whether the disturbance later converged, rerouted, gated, or escalated
-
-### 2. Triage Event
-
-A triage event is structured appraisal.
-
-It transforms the observation into:
-
-- `framework_layer`
-- `framework_condition`
-- `gap_kind`
-- `reentry_layer`
-- evidence and policy context
-
-This is the salience-forming step. It is not yet route binding and not yet
-constitutional repricing.
-
-### 3. Route Event
-
-A route event is lawful action selection.
-
-It binds the triage result into one of:
-
-- fixed-vector advance
-- dynamic-family advance
-- gated or suppressed state
-- explicit unresolved route state
-
-This is where action selection happens. It must remain distinct from triage so
-the system can explain not only what is wrong, but why a particular next move
-was selected or blocked.
-
-### 4. Constitutional Event
-
-A constitutional event exists only when the lawful re-entry point is above the
-current design or realization layer.
-
-This is not ordinary repair. It is allostatic repricing:
-
-- proposed goal change
-- proposed intent change
-- F_H approval or rejection
-
-This layer must remain explicitly gated.
-
-### 5. Correlation Law
-
-These events must be durable and correlated. The runtime must be able to query
-the chain for a given traversal edge.
-
-At minimum, the chain must remain joinable by:
-
-- `run_id`
-- `edge_id`
-- `observation_id`
-- `triage_id`
-- `route_id`
-
-There must be no silent jump from observation straight to code repair and no
-silent jump from triage straight to constitutional write.
-
-## Observation Telemetry Contract
-
-Because observation is the primary telemetry hook, the runtime must preserve an
-observation stream that remains useful even before higher-order triage is fully
-implemented.
-
-Minimum observation payload:
-
-- `observation_id`
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `detected_at`
-- `detected_by`
-- `observed_boundary`
-- `observed_signal`
-- `evidence[]`
-- `extensions {}`
-
-The observation contract is intentionally generic. Domain-specific triage may
-later refine the meaning, but the telemetry stream must remain stable enough to
-support:
-
-- live operator inspection
-- replay and historical comparison
-- future alerting and anomaly detection
-- future dashboards over failure pressure, stale-analysis pressure, and
-  unresolved-route pressure
-
-This telemetry stream must not depend on successful F_P triage.
-
-## Existing Runtime Hook
-
-The substrate hook already exists in ABG and must be reused rather than
-shadowed:
-
-- append-only correlated events through `emit()` and `EventStream`
-- continuation lifecycle
-- policy bundle resolution
-- candidate-family selection
-- graphfunction routing and child-lineage opening
-- explicit routed-selection provenance through `workflow_selected`
-- explicit approval and revocation events for F_H decisions
-
-The important boundary is:
-
-- ABG owns the event substrate, causation/correlation fields, continuation
-  truth, deterministic selection application, and approval plumbing
-- `odd_sdlc` owns the semantic domain model layered on top of that substrate:
-  `observation`, `triage`, `route`, and constitutional repricing semantics
-
-So T-004 must add domain events and domain projections on top of ABG event
-truth. It must not introduce:
-
-- a second event store
-- a second continuation store
-- a second route-selection mechanism
-- an approval path outside ABG `approved` / `revoked` event truth
-
-T-004 is therefore domain wiring, not a new orchestration stack. `odd_sdlc`
-must emit lawful triage products and lawful next vectors that bind into the
-existing continuation and candidate-family machinery.
-
-The minimum preserved hook set is:
-
-- `emit()` / `EventStream` as the only lawful event write path
-- ABG event causation and correlation fields as the join key substrate
-- `continuation_opened` / `continuation_resolved` / related continuation truth
-- `workflow_selected` as the lawful routed-selection provenance event
-- `approved` / `revoked` as the lawful approval boundary for gated human review
-
-ABG event truth in this design is the real coordination substrate for an
-event-driven, saga-shaped runtime, and also the forensic/divergence substrate.
-
-That means:
-
-- events drive continuation, routing, approvals, and future distributed
-  coordination
-- events remain the durable causation and correlation record
-- events support replay, audit, divergence analysis, and historical comparison
-- triage artifacts may still be the operational domain read model for current
-  queries
-- the ticket does not require classical deterministic replay equivalence of F_P
-  semantic outputs
-
-So the law is:
-
-- no second event substrate
-- no second continuation substrate
-- no second approval substrate
-- but domain triage artifacts are allowed as live operational read models so
-  long as they remain correlated to ABG event truth and do not silently diverge
-  from it
-
-## Event-Driven Stance
-
-`odd_sdlc` remains event-driven.
-
-Events are not only history. They are the real process drivers in the
-event-calculus / saga-pattern sense:
-
-- continuation state advances through events
-- route selection and route application are recorded through events
-- approval and rejection are event-driven state changes
-- future distributed coordination should compose through the same event truth
-
-In an F_P-bearing system, however, event sourcing is not a claim of classical
-deterministic replay equivalence for semantic judgments.
-
-That means:
-
-- the live triage artifact is authoritative for current queries
-- the event stream is authoritative for:
-  - what drove the process
-  - what was decided
-  - by whom
-  - with what evidence
-  - when reruns disagreed
-- F_P non-determinism is expected
-- divergence is first-class information, not automatically a bug
-
-So T-004 does not require:
-
-- deterministic reconstruction of current F_P semantic state only by replay
-- rollback of prior triage as a primitive
-- consensus or confidence thresholds as a mandatory v1 route gate
-
-Instead it requires:
-
-- event-driven process coordination through the ABG substrate
-- durable current triage state for operational queries
-- durable event history for forensic analysis and divergence tracking
-- explicit divergence reporting when repeated triage at the same authority basis
-  materially disagrees
-
-## Runtime Law For Triage
-
-### 1. Authority Separation
-
-Three authorities must remain separate:
-
-1. `workspace_state`
-   - authoritative for workspace mode, selected root, declared root,
-     readiness, and published-analysis identity
-2. `analysis_manifest`
-   - authoritative for published analysis artifact paths and the
-     analysis-fingerprint they were built from
-3. per-edge triage artifacts
-   - authoritative for traversal-scoped semantic triage results only
-
-`workspace_state` must not become the authority for per-edge triage payloads or
-their schema evolution. Triage is traversal-scoped, not readiness-scoped.
-
-### 2. Artifact Law
-
-The runtime must publish and consume three distinct artifact classes:
-
-- workspace state:
-  - `.ai-workspace/runtime/odd_sdlc-workspace-state.json`
-- analysis manifest:
-  - `.ai-workspace/runtime/odd_sdlc-analysis-manifest.json`
-- per-edge triage artifact:
-  - `.ai-workspace/runtime/triage/<edge_id>.json`
-
-`workspace_state` may point to the active analysis manifest. It must not inline
-triage results. The analysis manifest may enumerate current published analysis
-artifacts. The triage artifact is the current live read model for that edge and
-must carry its own `run_id`, `analysis_fingerprint`, `triage_id`, and
-`triage_hash`.
-
-Current-state law:
-
-- there is at most one current live triage projection per `edge_id` in the
-  workspace
-- overlapping or repeated runs may compete to update that current projection
-- the current artifact must therefore carry the winning `run_id`,
-  `analysis_fingerprint`, `triage_id`, and `triage_hash`
-- historical per-run distinction remains in the event stream, not in multiple
-  current artifact files
-
-Artifact law for this ticket is:
-
-- event truth is the durable event-driven coordination substrate and forensic
-  substrate
-- triage artifacts are the latest operational read models
-- query surfaces may read the live artifact directly for current domain state
-- historical supersession and divergence remain queryable through event
-  correlation rather than requiring historical artifact filenames
-
-### 2a. Divergence Law
-
-When a new triage is produced for the same `(edge_id, analysis_fingerprint)`
-tuple:
-
-- if the normalized triage payload hash matches the current artifact hash, the
-  runtime may treat it as equivalent and avoid meaningless route churn
-- if the normalized triage payload hash differs, the runtime emits a
-  `triage_divergence` event referencing both the previous and current hashes
-- the newer triage becomes authoritative for current routing and query surfaces
-
-Divergence is informational. It is not automatically failure.
-
-### 2b. Analysis Manifest Schema
-
-The analysis manifest must carry at least:
-
-- `manifest_kind`
-- `schema_version`
-- `workspace_mode`
-- `selected_root`
-- `declared_root`
-- `analysis_fingerprint`
-- `published_artifacts[]`
-- `source_inputs[]`
-
-`published_artifacts[]` entries must carry:
-
-- `artifact_kind`
-- `path`
-- `fingerprint`
-- `last_written`
-
-`source_inputs[]` entries must carry:
-
-- `input_kind`
-- `path`
-- `fingerprint`
-
-This is the minimal schema needed to explain what published analysis exists,
-which declared inputs it was built from, and which selected root it is
-describing.
-
-### 3. Freshness Law
-
-Published analysis is fresh only when its fingerprint matches all declared
-inputs that can change ambiguity or closure truth.
-
-At minimum the `analysis_fingerprint` must include:
-
-- `.ai-workspace/context/project_constraints.yml`
-- `.odd_sdlc/release/genesis.yml` when present
-- `specification/INTENT.md`
-- `specification/PRODUCT.md`
-- `specification/GOALS.md`
-- all requirement surfaces under `specification/requirements/**/*.md`
-- testcase-authority and scenario surfaces under
-  `specification/scenarios/**/*.md`
-- implementation-planning and planned-test surfaces under the active tenant
-  design and test roots
-- realized code and test files under the active selected root that carry
-  requirement or testcase trace tags
-
-No published ambiguity register, closure register, prompt context, or triage
-artifact may be served as current truth against a mismatched
-`analysis_fingerprint`.
-
-Operational implication:
-
-- authority-surface edits and trace-tagged code/test edits will stale published
-  analysis frequently
-- explicit `refresh-analysis` discipline is therefore part of normal operation
-- auto-refresh-on-edit hooks are out of scope for this ticket
-
-### 4. Mode Law
-
-The canonical traversable workspace modes are:
-
-- `source_domain_repo`
-- `installed_target`
-- `governed_workspace`
-
-`unclassified_workspace` is not a lawful traversal mode. It is a readiness
-failure.
-
-`test_sandbox` is not a fourth workspace mode. Sandbox behavior is a governed
-workspace policy profile or fixture class, not a different ontology.
-
-Identity law:
-
-- `installed_target`
-  - marked by `.odd_sdlc/release/genesis.yml`
-- `source_domain_repo`
-  - marked by the real `odd_sdlc` source-repo structure
-- `governed_workspace`
-  - marked by the presence of `.ai-workspace/context/project_constraints.yml`
-    while not satisfying `installed_target` or `source_domain_repo`
-
-### 5. Deterministic Truth Boundary
-
-T-004 does not replace or weaken deterministic F_D and asset-contract gates.
-
-Instead:
-
-- deterministic truth closes first wherever possible
-- triage consumes deterministic evidence and failed-evaluator output
-- triage may classify, route, or reprice
-- triage may not overrule a deterministic failure into success
-
-### 5a. Framework-First Classification Law
-
-The framework classifies generic process conditions first, domain meaning
-second.
-
-Closed framework layer set:
-
-- `intent`
-- `goals`
-- `product`
-- `requirements`
-- `design`
-- `code`
-- `test`
-- `execution`
-- `ambiguity`
-- `capability`
-- `routing`
-- `analysis`
-
-Closed framework condition set:
-
-- `complete`
-- `missing`
-- `shallow`
-- `contradictory`
-- `unproven`
-- `blocked`
-- `stale`
-- `unroutable`
-- `insufficient`
-
-The framework totalizes over `(framework_layer, framework_condition)` first.
-The domain then refines that result with richer `gap_kind`, evidence, and
-vector semantics.
-
-Only declared meaningful pairs must produce specific domain triage. Any
-undeclared, semantically void, or unsupported `(framework_layer,
-framework_condition)` pair defaults to `unclassified_gap`.
+The active obligation is still local to the immediate transform edge:
+
+```text
+An -> Bn
+```
+
+The lineage is the causal authority context for `An`, not a demand that the
+current edge re-satisfy every prior transform. Gap triage must preserve both
+facts:
+
+- closure evaluates whether the current edge fulfilled `An -> Bn`
+- lineage records how `An` came to be the lawful input authority
+- upstream re-entry is selected only when lineage proves `An` itself is stale,
+  ambiguous, contradictory, or insufficient
+
+If the public triage surface only sees the latest rows, it can route the same
+mismatch to code repair, requirement reprice, or downstream materialization
+depending on which read model happened to flatten the lineage. That is rival
+traversal truth.
 
 Examples:
 
-- `(code, shallow)` -> `advance_fixed_vector`
-- `(requirements, insufficient)` -> `propose_constitutional_reprice` or
-  `advance_fixed_vector` depending on policy
-- `(analysis, stale)` -> `blocked_stale_analysis`
-- `(routing, unroutable)` -> `no_lawful_route`
-- `(capability, blocked)` -> `blocked_missing_capability`
-- F_P triage exhaustion -> `dependency_gap`
-
-### 5b. Scope Law
-
-Triage does not run on every edge by default.
-
-Default scope:
-
-- edges with unresolved deterministic evaluators
-- edges explicitly surfaced by `gaps()`
-- edges reopened by continuation, repricing, or explicit operator request
-
-Default non-scope:
-
-- edges that passed deterministically and are already converged
-- edges outside the active frontier unless explicitly queried
-
-This keeps the framework generic-first and bounded. Domain-specific expansions
-may widen scope deliberately through policy or explicit query surfaces.
-
-### 6. Constitutional Repricing Gate
-
-Constitutional repricing means proposed writes to `GOALS.md` or `INTENT.md`.
-
-That path requires two gates:
-
-1. workspace-mode policy gate
-2. explicit F_H approval
-
-The governed-workspace branch must be explicit through:
-
-- `policy_bundle.constitutional_repricing.mode`
-
-Closed values:
-
-- `fh_gate`
-- `suppress`
-
-Mode law:
-
-- `source_domain_repo` defaults to `fh_gate`
-- `installed_target` defaults to `fh_gate`
-- `governed_workspace` resolves through
-  `policy_bundle.constitutional_repricing.mode`
-- sandbox-style governed fixtures are not a separate workspace mode; they are
-  governed workspaces with `constitutional_repricing.mode = suppress`
-- missing `constitutional_repricing.mode` defaults to `fh_gate`
-- malformed or unknown `constitutional_repricing.mode` is a readiness failure
-
-Law:
-
-- no code path may write `specification/GOALS.md` or `specification/INTENT.md`
-  without a recorded approved constitutional-change event
-- when `constitutional_repricing.mode = suppress`, triage may record the
-  recommendation but write application remains suppressed
-- in `source_domain_repo` and `installed_target`, traversal must stop in a
-  gated state until the operator approves or rejects the proposal
-
-Triage may propose constitutional repricing. It may not apply it silently.
-
-Approval outcome law:
-
-- `approve`
-  - apply the proposed constitutional change
-- `approve_with_edits`
-  - apply the operator-edited constitutional change while preserving the
-    original proposal in history
-- `reject`
-  - keep the current constitution and record the rejection rationale
-- `defer`
-  - keep the proposal pending across traversals
-  - apply no constitutional write
-  - keep the affected constitutional path blocked or explicitly deferred until
-    approved, rejected, or superseded
-
-### 7. Retry And Fallback Law
-
-F_P triage is fallible, but "no result" is not lawful runtime state.
-
-Law:
-
-- every triage attempt must terminate as exactly one of:
-  - `triage_produced`
-  - `triage_failed_fallback_dependency_gap`
-  - `triage_gated`
-- default retry budget: three attempts with deterministic backoff policy
-- failure classes must be recorded (`timeout`, `schema_invalid`,
-  `transport_error`, `empty_response`, `policy_rejected`)
-- after retry exhaustion, the system emits a first-class `dependency_gap`
-  triage result rather than hanging or silently resuming breadth-first work
-
-### 7a. Stability And Supersession Law
-
-Triage is F_P reasoning and is therefore probabilistic.
-
-This ticket does not require perfect reproducibility. It requires bounded,
-addressable, and supersedable decisions.
-
-Law:
-
-- the actionable current triage result is carried by the live per-edge artifact
-  and identified by `triage_id`, `analysis_fingerprint`, and `triage_hash`
-- retries are schema-validated and bounded
-- later triage for the same `(edge_id, analysis_fingerprint)` may supersede an
-  earlier result without erasing its forensic event trail
-- unchanged normalized triage should not create meaningless new route work
-- materially changed normalized triage at the same authority basis must emit a
-  divergence signal
-
-Future confidence, consensus, or multi-agent agreement signals are lawful
-extension fields under `extensions {}`. They are not required as a hard gate for
-the first implementation cut.
-
-There is no rollback primitive for triage. Later traversal may produce a new
-triage and let the newer result win for current routing.
-
-### 7b. Resumption Law
-
-Blocked or gated states must declare their re-entry trigger explicitly.
-
-- `blocked_stale_analysis`
-  - re-enter on `analysis_published` for a newer valid `analysis_fingerprint`
-- `blocked_missing_capability`
-  - re-enter on capability declaration or runtime-capability change
-- `await_fh_resolution`
-  - re-enter on `approved` or `revoked`
-- deferred constitutional proposals
-  - remain pending until approved, rejected, or superseded
-
-### 8. Routing Law
-
-Triage output and route binding are separate.
-
-For route-bearing outcomes, the domain emits a lawful route proposal:
-
-- fixed vectors:
-  - `deepen_realization`
-  - `repair_output_contract`
-  - `realize_missing_tests`
-  - `reopen_design`
-  - `reopen_product`
-  - `reopen_requirements`
-  - `goal_reprice`
-  - `intent_reprice`
-- dynamic vector:
-  - `dynamic_family`
-
-Only `dynamic_family` is bound through candidate-family selection.
-
-Deterministic selection algorithm:
-
-1. filter by declared applicable `gap_kind`
-2. filter by `reentry_layer`
-3. filter by `workspace_mode` / policy profile
-4. filter by capability contract
-5. rank by declared priority
-6. apply stable lexicographic tie-break
-
-If zero lawful dynamic candidates remain, the route state is
-`no_lawful_route`. It must not silently demote to code repair.
-
-Edge-scoped route law:
-
-- route selection remains edge-scoped by default
-- when one edge triage carries multiple `asset_findings[]`, the route proposal
-  may carry `target_assets[]`
-- the route executes once for the edge unless a future graphfunction contract
-  explicitly declares per-finding execution
-
-### 8a. Deepen-Versus-Expand Enforcement Law
-
-The distinction between deepening existing shallow realization and widening the
-surface laterally is domain law, not ABG substrate law.
-
-It must be carried on three surfaces:
-
-- triage:
-  - classifies shallow existing realization and may emit
-    `deepening_preferred_over_expansion`
-- routing:
-  - prefers `deepen_realization` when shallow existing assets remain unresolved
-- graphfunction applicability:
-  - dynamic graphfunctions may declare that they are lawful only when no
-    higher-priority deepening obligation is active
-
-It is not enough to record the preference in triage and then allow lateral
-expansion to satisfy the same gap silently.
-
-### 9. Evidence Law
-
-For shallow-realization and similar content-level findings, evidence must carry:
-
-- `path`
-- `excerpt`
-- `evidence_role`
-- `line_start` when available
-- `line_end` when available
-
-Exact line numbers alone are too brittle. Free-form prose alone is too weak.
-
-The triage artifact must not claim completion against evidence such as:
-
-- literal `???`
-- trivial pass-through assignment
-- hard-coded success
+- real use case reveals the constitution cannot express the needed concern ->
+  generate a new `intent_vector` or `goal_vector`
+- requirement family is missing or insufficient -> generate a requirement
+  repricing vector
+- design no longer harmonizes with the requirement truth -> generate a design
+  gap vector
+- code is present but shallow -> generate a code repair vector
+- test is missing as an independent implementation of the requirement ->
+  generate a test realization vector
+- execution result contradicts the intended guarantee -> generate an execution
+  triage vector and, if constitutional, repricing upward
 
 ## Gap Triage Model
 
-The closed core taxonomy is:
+At minimum, gap triage should classify mismatches into a domain-local taxonomy
+such as:
 
+- `intent_gap`
+- `goal_gap`
+- `product_gap`
+- `requirement_gap`
+- `design_gap`
+- `module_gap`
 - `code_gap`
 - `test_gap`
-- `design_gap`
-- `requirement_gap`
-- `ambiguity_gap`
+- `execution_gap`
 - `topology_gap`
-- `dependency_gap`
+- `capability_gap`
+- `ambiguity_gap`
 
-The closed core taxonomy intentionally does not include `product_gap`,
-`goal_gap`, `intent_gap`, `execution_gap`, or `capability_gap` as first-class
-gap kinds.
-Those are modeled through:
+Each triage result should identify:
 
-- `framework_layer`
-- `framework_condition`
-- `reentry_layer`
-- `process_outcome_kind`
-
-If a future domain cut needs them as first-class gap kinds, they must be added
-deliberately through the extension surface rather than inferred implicitly.
-
-Granularity law:
-
-- the primary triage unit is the edge
-- per-edge triage may carry nested `asset_findings[]` when the motivating
-  evidence is asset-local
-- route selection still occurs at the lawful edge/re-entry boundary, not by
-  pretending every asset is its own graph edge
-
-This preserves generic-first process structure while retaining enough resolution
-to act on shallow module-level findings.
-
-The core routing signal is `reentry_layer`, not a boolean constitutional flag.
-
-Canonical `reentry_layer` values:
-
-- `code`
-- `test`
-- `design`
-- `requirements`
-- `product`
-- `goals`
-- `intent`
-
-Ambiguity or constitutional findings must still choose one lawful re-entry
-layer. For example:
-
-- unresolved downstream ambiguity in design evidence may re-enter at `design`
-- constitutional insufficiency that cannot be solved beneath current goals may
-  re-enter at `goals` or `intent`
-
-Boolean `constitutional_insufficiency` may exist only as supporting detail or
-extension data. It is not the main routing carrier.
-
-## Triage Result Schema
-
-Each per-edge triage artifact must carry at least:
-
-- `observation_id`
-- `triage_id`
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `triage_hash`
-- `framework_layer`
-- `framework_condition`
 - `gap_kind`
-- `reentry_layer`
-- `process_outcome_kind`
+- `affected_assets`
 - `authority_basis`
 - `realized_basis`
-- `asset_findings[]`
-- `route_proposal`
-- `constitutional_proposal`
-- `evidence[]`
-- `policy_gate`
-- `route_binding`
-- `extensions {}`
+- `evidence`
+- `recommended_lawful_vector`
+- `constitutional_insufficiency: true|false`
 
-Expected semantics:
+When `constitutional_insufficiency` is true, the result should support lawful
+repricing into `GOALS.md` and/or `INTENT.md`.
 
-- `policy_gate`
-  - `none`
-  - `fh_approval_required`
-  - `sandbox_suppressed`
-  - `capability_blocked`
-- `process_outcome_kind`
-  - one of the closed `process_outcome.kind` values
-- `authority_basis`
-  - structured extract of the governing basis used for comparison
-  - may draw from requirement, design, scenario, testcase-authority, or other
-    declared authority surfaces
-- `realized_basis`
-  - structured extract of the realized basis used for comparison
-  - may draw from code, tests, generated assets, manifests, or execution
-    evidence
-- `asset_findings[]`
-  - optional per-asset nested findings for module-local or file-local evidence
-  - each finding carries its own `path`, `excerpt`, `evidence_role`, and
-    optional line data
-- `route_proposal`
-  - null for non-routing outcomes
-  - present only when `process_outcome_kind` is
-    `advance_fixed_vector` or `advance_dynamic_family`
-  - carries:
-    - `vector_kind`
-      - `fixed`
-      - `dynamic_family`
-    - `fixed_vector`
-      - present only when `vector_kind == fixed`
-    - `dynamic_family`
-      - present only when `vector_kind == dynamic_family`
-    - `target_assets[]`
-      - optional list of asset identifiers or paths when one edge route targets
-        multiple specific findings
-- `constitutional_proposal`
-  - null unless `process_outcome_kind` is
-    `propose_constitutional_reprice` or `await_fh_resolution`
-  - carries proposed constitutional target, rationale, and evidence
-- `route_binding`
-  - null until route binding runs
-  - then records:
-    - `route_id`
-    - `state`
-    - `selected_graphfunction` or `no_lawful_route_reason`
-    - `priority_source`
-- `observation_id`
-  - links the triage result back to the originating disturbance event
+## Analytical Capability Boundary
 
-`extensions {}` is the lawful forward-extension surface for builder-specific
-annotations, extra evidence classifiers, richer rationales, and future domain
-gap kinds.
+This ticket does not assume a missing reasoning capability.
 
-`authority_basis` and `realized_basis` are not raw unconstrained prose dumps.
-They must be built from structured extracts of the relevant authority and
-realized surfaces so different builders remain query-compatible even when the
-semantic diff itself is F_P-mediated.
+`F_P` can already perform deep semantic review when asked. The missing pieces
+are:
 
-Ambiguity law:
+- a prompt contract that explicitly asks for gap triage rather than only
+  builder continuation
+- a durable artifact surface that captures the result as typed triage output
+- lawful routing from the triage result into the next vector
 
-- `ambiguity_gap` is primarily a pass-through envelope over existing ambiguity
-  register truth
-- triage may normalize that ambiguity into the common triage shape for uniform
-  downstream routing
-- triage must not silently invent a second independent ambiguity classification
-  regime
+So this is primarily a wiring and contract problem, not a claim that the system
+cannot already reason about the mismatch.
 
-Observation chain law:
+## Task List
 
-- each disturbance detection produces a new `observation_id`
-- repeated detection for the same edge at a later checkpoint may carry
-  `prior_observation_id`
-- later triage and route artifacts correlate to the current `observation_id`
-  while preserving prior detections for divergence analysis
+- [x] Define the domain-local gap-triage contract for `odd_sdlc` as a
+  first-class runtime surface rather than leaving gap meaning implicit in edge
+  deltas.
+- [x] Separate the implementation into per-edge gap triage and cross-edge
+  repricing/routing so the local mismatch product is explicit before the
+  reverse-path vector is chosen.
+- [x] Reuse the ambiguity register, requirement closure register, event stream,
+  and deterministic findings as triage evidence inputs.
+- [x] Make `odd_sdlc` able to distinguish implementation gaps from design,
+  requirement, goal, and intent insufficiency.
+- [x] Preserve requirement-transform lineage through homeostatic triage so the
+  active requirement set is understood as `transform_n(...transform_1(Req))`,
+  not as a flat replacement register.
+- [x] Keep transform obligations edge-local: evaluate fulfillment of the
+  immediate `An -> Bn` edge while carrying lineage as causal authority context
+  for lawful upstream re-entry.
+- [x] Define the lawful next-vector taxonomy for gap results, including upward
+  repricing vectors such as new goals or intent when the gap is constitutional.
+- [x] Publish a gap-triage artifact that is durable and queryable rather than
+  only ephemeral prompt text.
+- [x] Reprice `gaps` output so operators can see semantic triage, not only
+  failing evaluators and total delta.
+- [x] Preserve ABG as the generic runtime substrate; keep gap interpretation
+  and next-vector semantics in the domain.
+- [x] Preserve tenant-local SDLC surface placement: design and realization
+  transform artifacts are authored under `build_tenants/<label>/design` or
+  `build_tenants/<label>/design/adrs`, while runtime archives remain under
+  `.ai-workspace/runtime/odd_sdlc`.
+- [x] Prove the reverse-path behavior on concrete cases where a real use case
+  reveals:
+  - missing implementation only
+  - missing test only
+  - missing requirement
+  - missing or insufficient design
+  - true constitutional insufficiency requiring new goals or intent
 
-## Event Schemas
+## Implementation Slice - 2026-05-10
 
-These are domain event payloads carried on the ABG event substrate.
+This slice wires the existing T-036 homeostatic triage carriers into the public
+Spec Method `gaps` path.
 
-### Observation Event
+Implemented:
 
-Minimum payload:
+- `gaps` now returns `homeostaticTriage` with distinct:
+  - `SdlcGapObservation`
+  - `SdlcTriageClassification`
+  - `SdlcRouteBinding`
+- compact `gaps` output now renders the semantic triage route in addition to
+  the read-only evaluator/action summary.
+- `SdlcGapObservation` now carries requirement open reason codes/refs so
+  triage can distinguish:
+  - missing generated code/product evidence -> `code` re-entry through
+    `derive_code_surface`
+  - trace-only or missing behavioral proof -> `test` re-entry through
+    `derive_test_run_archive_surface`
+  - unresolved requirement pressure without a more precise open reason ->
+    `requirements` re-entry through `derive_requirement_surface`
+- `SdlcGapObservation` now carries `SdlcRequirementTransformLineage` rows for
+  unresolved requirement pressure. Each row records the immediate transform
+  obligation (`An -> Bn`) separately from lineage basis refs that explain how
+  `An` became the lawful input authority.
+- requirement-lineage authority failure now wins over code repair. If `An` is
+  missing, stale, ambiguous, or contradictory as requirement input authority,
+  triage routes upstream to requirements re-entry before evaluating the current
+  edge as a code/product repair.
+- `SdlcRequirementTransformLineage` is now fed by typed
+  `SdlcRequirementTransformAuthority` rows from workspace ingress when present.
+  The row carries `lineageSource`, `lineageAuthorityRefs`,
+  `predecessorTransformRefs`, and `lineageDepth`, while keeping immediate edge
+  closure local to `An -> Bn`.
+- route selection now distinguishes:
+  - design pressure -> `design` re-entry through `derive_design_surface`
+  - code pressure -> `code` re-entry through `derive_code_surface`
+  - test pressure -> `test` re-entry through
+    `derive_test_run_archive_surface`
+  - requirement-lineage authority failure -> `requirements` re-entry through
+    `derive_requirement_surface`
+  - intent/goals/product authority failure -> gated constitutional repricing
+    through `propose_constitutional_repricing`
+- The implementation remains read-only at `gaps`; it emits no runtime events
+  and does not choose traversal. It exposes route truth for the operator and
+  downstream start/evaluator surfaces to consume lawfully.
+- Tenant-local SDLC surface placement is now explicit in the TypeScript handoff.
+  Runtime reports, packages, and ledgers stay in
+  `.ai-workspace/runtime/odd_sdlc`, while target surface artifacts such as
+  `component_code_surface.md` and `implementation_design_surface.md` are written
+  beneath the selected tenant root under `design/` or `design/adrs/`.
 
-- `observation_id`
-- `prior_observation_id` or null
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `detected_at`
-- `detected_by`
-- `observed_boundary`
-- `observed_signal`
-- `evidence[]`
-- `extensions {}`
+Verification:
 
-### Triage Event
+```bash
+npm run test:t036
+# 14/14 passed
 
-Minimum payload:
+node --test test_env/tests/test_t031_workspace_ingress.test.mjs
+# 3/3 passed
 
-- `triage_id`
-- `observation_id`
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `triage_hash`
-- `process_outcome_kind`
-- `gap_kind`
-- `reentry_layer`
-- `policy_gate`
-- `route_proposal`
-- `constitutional_proposal`
-- `evidence[]`
-- `extensions {}`
+npm run test:t058
+# 8/8 passed
 
-### Route Event
+npm run build:semantic
+# passed
 
-Minimum payload:
+npm run test:t066
+# 29/29 passed
 
-- `route_id`
-- `triage_id`
-- `observation_id`
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `route_state`
-- `selected_graphfunction` or `no_lawful_route_reason`
-- `priority_source`
-- `target_assets[]`
-- `extensions {}`
+npm run test:t068
+# 5/5 passed
 
-### Constitutional Event
+npm run test:t038
+# 4/4 passed
 
-Minimum payload:
+npm run test:t139
+# 7/7 passed
 
-- `proposal_id`
-- `triage_id`
-- `run_id`
-- `edge_id`
-- `analysis_fingerprint`
-- `constitutional_target`
-- `approval_outcome`
-- `proposed_diff`
-- `operator_diff` or null
-- `rationale`
-- `extensions {}`
+npm run test:t032
+# 4/4 passed
 
-## Task Slices
+git diff --check
+# passed
+```
 
-### Slice 1. Substrate And Freshness
+## Authoritative Requirement Transform Lineage
 
-- [x] Add `odd_sdlc-analysis-manifest.json` as a separate published artifact.
-- [x] Move published-analysis artifact pointers out of `workspace_state` and
-  into the analysis manifest, leaving `workspace_state` focused on readiness,
-  mode, selected root, and published-analysis identity.
-- [x] Publish one live per-edge triage artifact under
-  `.ai-workspace/runtime/triage/<edge_id>.json`.
-- [x] Reuse ABG event truth rather than adding a second event or continuation
-  store for observation, triage, route, or repricing state.
-- [x] Codify the freshness law against declared input surfaces and require
-  `analysis_fingerprint` match before any published analysis or triage result is
-  treated as current truth.
-- [x] Prove that source-domain helper trees cannot override the declared
-  selected root unless `workspace_mode == source_domain_repo`.
+T-004 closes with requirement-transform lineage represented as typed ingress
+authority and public triage context, not only as ad hoc source URI strings.
 
-### Slice 2. Per-Edge Triage
+The target truth is:
 
-- [x] Define the closed `process_outcome.kind` and `route_outcome.kind` sets.
-- [x] Define the generic `framework_layer` and `framework_condition` model.
-- [x] Define the closed core gap taxonomy and `reentry_layer` model.
-- [x] Define `unclassified_gap` as the default outcome for undeclared or
-  semantically void `(framework_layer, framework_condition)` pairs.
-- [x] Emit durable observation events before triage and keep them correlated to
-  triage artifacts by `observation_id`.
-- [x] Publish observation events in a stable telemetry shape that remains
-  queryable even when triage fails, is gated, or is not yet implemented for a
-  given disturbance class.
-- [x] Implement triage result publication for failed or incomplete edges using
-  deterministic evaluator output plus semantic evidence.
-- [x] Emit `triage_divergence` when repeated triage for the same
-  `(edge_id, analysis_fingerprint)` materially disagrees with the current
-  artifact.
-- [x] Ensure triage consumes deterministic truth rather than replacing it.
-- [x] Define `authority_basis`, `realized_basis`, and `asset_findings[]` as
-  structured comparison surfaces rather than unconstrained prose fields.
-- [x] Add evidence extraction for shallow-realization patterns with durable
-  `path`, `excerpt`, and line data when available.
-- [x] Emit `dependency_gap` when F_P triage exhausts its retry budget.
-- [x] Make ambiguity-gap handling an explicit pass-through envelope over the
-  existing ambiguity register.
-- [x] Define observation, triage, route, and constitutional event schemas as
-  first-class domain payloads on the ABG event substrate.
+```text
+Req.tn = transform_n(transform_n-1(...transform_1(Req)))
+```
 
-### Slice 3. Routing And Repricing
+For every current requirement authority `An`, `odd_sdlc` must be able to
+reconstruct how `An` became lawful input authority before evaluating the
+immediate transform obligation:
 
-- [x] Separate fixed vectors from dynamic-family route binding.
-- [x] Emit route events as first-class correlated artifacts rather than
-  implicit side effects of triage.
-- [x] Bind `dynamic_family` through existing candidate-family machinery rather
-  than new shadow routing code.
-- [x] Reuse ABG `workflow_selected` provenance and ABG continuation truth
-  rather than inventing a parallel routing or child-lineage model.
-- [x] Make route selection deterministic and queryable.
-- [x] Add constitutional repricing proposals with mode gate and F_H approval
-  requirements.
-- [x] Materialize governed-workspace constitutional policy through
-  `policy_bundle.constitutional_repricing.mode` rather than fixture-name
-  inference.
-- [x] Define fail-closed/default behavior for missing or malformed
-  `constitutional_repricing.mode`.
-- [x] Reuse ABG `approved` / `revoked` events for constitutional approval state
-  rather than introducing a second approval channel.
-- [x] Define constitutional approval outcomes:
-  - `approve`
-  - `approve_with_edits`
-  - `reject`
-  - `defer`
-- [x] Keep zero-candidate dynamic routing as `no_lawful_route`, not silent
-  fallback to repair.
-- [x] Define traversal budget rules for triage scope, caching, and overrun
-  fallback.
-- [x] Define blocked-state resumption triggers and deferred constitutional
-  proposal semantics explicitly.
+```text
+An -> Bn
+```
 
-### Slice 4a. Convergence And Budget Guarantees
+Implemented closure:
 
-- [x] Bound triage attempts per edge per traversal.
-- [x] Bound active constitutional repricing proposals per constitutional target
-  per run.
-- [x] Suppress no-op supersession when normalized triage has not materially
-  changed.
-- [x] Define cache reuse for the current triage artifact at the same
-  `analysis_fingerprint`.
+- `deriveSdlcWorkspaceIngressReport` publishes
+  `requirementTransformAuthorities`.
+- each authority has a transform ref, predecessor transform refs, input/output
+  authority refs, source inputs, evidence refs, and status.
+- `observeSdlcGapPressure` consumes those authorities when available and marks
+  lineage as `requirement_transform_authority`; older direct callers remain
+  totalized with `closure_register_fallback`.
+- valid predecessor chains keep the current edge routed by immediate missing
+  work.
+- stale, ambiguous, or contradictory typed lineage routes upstream to
+  requirements before code/design repair.
+- `gaps` passes ingress-derived transform authorities into the public
+  homeostatic triage surface.
 
-### Slice 4. Proof Fixtures
-
-- [x] Add named shallow-realization fixtures from the `test28.02` survivor set.
-- [x] Place the survivor fixture at
-  `build_tenants/python/test_env/fixtures/test28_pass2_replay/`.
-- [x] Add deterministic route-selection proofs over multiple matching dynamic
-  candidates.
-- [x] Add repricing-gate proofs for governed fixture and live installed/source
-  modes.
-- [x] Add stale-analysis and selected-root boundary proofs as explicit
-  regression fixtures.
-- [x] Re-run live downstream proving after checkpoint on the stabilized
-  substrate.
+Downstream `data_mapper` proof remains the next product proving lane, not an
+open T-004 implementation item.
 
 ## Proof Required
 
-The proof bar for this ticket is the named behavior, not just generic categories.
-
-Required acceptance tests:
-
-1. `JobSubmitter.submit()` still `???`
-   - triage kind: `code_gap`
-   - re-entry: `code`
-   - vector: `deepen_realization`
-   - evidence includes file path, literal excerpt, and line data
-2. `SparkMorphismExecutor` still `val output = input`
-   - triage kind: `code_gap`
-   - re-entry: `code`
-   - vector: `deepen_realization`
-   - evidence classifies trivial pass-through
-3. `Reconciler.isConsistent` hard-codes `true`
-   - triage kind: `code_gap`
-   - re-entry: `code`
-   - vector: `deepen_realization`
-   - evidence classifies hard-coded success
-4. Lateral-only second-pass expansion regression
-   - triage kind: `topology_gap`
-   - re-entry: `code` or `design` as lawful
-   - vector prefers deepening existing shallow realization over lateral
-     expansion
-5. Unresolved major ambiguity
-   - triage kind: `ambiguity_gap`
-   - re-entry is explicit
-   - policy escalation remains visible
-6. Requirement missing from current requirement surface
-   - triage kind: `requirement_gap`
-   - re-entry: `requirements`
-   - vector: `reopen_requirements`
-7. Constitutional insufficiency under governed workspace with
-   `constitutional_repricing.mode = suppress`
-   - proposal recorded
-   - no constitutional file write occurs
-   - route remains gated or suppressed lawfully
-8. Constitutional insufficiency under `installed_target`
-   - traversal blocks pending F_H approval
-   - no silent write occurs
-9. F_P triage failure
-   - three failed attempts are recorded
-   - final triage result is `dependency_gap`
-10. Deterministic selection across two matching dynamic candidates
-    - same inputs always yield the same selected graphfunction
-11. Zero-candidate dynamic route
-    - process outcome is `no_lawful_route`
-    - there is no silent demotion to repair
-12. Unknown or unmapped process condition
-    - process outcome is `unclassified_gap`
-    - there is no silent pass-through
-13. Published analysis becomes stale when any declared input surface changes
-    - stale analysis is not served as current truth
-14. Source-domain helper trees never override the selected root unless
-    `workspace_mode == source_domain_repo`
-15. Homeostatic chain correlation
-    - a given failed edge yields a durable `observation -> triage -> route`
-      chain
-    - constitutional repricing, when present, is a separate gated continuation
-      rather than an inlined route side effect
-16. Observation telemetry survivability
-    - observation remains queryable even when triage fails, routing is blocked,
-      or repricing is gated
-    - later stages enrich or correlate the observation rather than replacing it
-17. ABG hook preservation
-    - observation, triage, route, and repricing state are carried on ABG event
-      truth
-    - there is no second event store, second continuation store, or second
-      approval channel
-    - dynamic route binding still resolves through ABG candidate-family and
-      selection machinery
-18. Edge-local triage with asset-local findings
-    - one edge triage may carry multiple `asset_findings[]`
-    - shallow module findings remain individually evidenced without pretending
-      each module is its own graph edge
-19. Ambiguity pass-through
-    - `ambiguity_gap` wraps existing ambiguity-register truth rather than
-      inventing a second ambiguity classifier
-20. Triage scope and cache reuse
-    - triage does not run on already-converged deterministic edges by default
-    - current triage may be reused at the same `analysis_fingerprint`
-21. Divergence reporting
-    - repeated triage at the same `(edge_id, analysis_fingerprint)` with a
-      changed normalized payload emits `triage_divergence`
-    - the new triage becomes authoritative for current routing
-    - prior triage remains visible through the forensic event trail
+- focused fixture proof:
+  - a requirement-vs-code mismatch produces `code_gap`
+  - a requirement-vs-test mismatch produces `test_gap`
+  - a requirement not expressible by current product/requirements produces
+    `requirement_gap` or higher repricing
+- ambiguity proof:
+  - unresolved major ambiguity produces `ambiguity_gap`
+  - policy/risk appetite continues to govern whether that gap blocks or
+    escalates
+- constitutional repricing proof:
+  - a concrete real-world use case can produce a triage result that lawfully
+    recommends new goals and/or intent
+- query-surface proof:
+  - the triage artifact is available through domain query surfaces rather than
+    only hidden inside logs or prompts
+- downstream proof:
+  - on a real downstream proving lane such as `data_mapper`, the system can
+    classify at least one concrete mismatch above the implementation layer and
+    route it to the correct lawful vector
+- iteration-depth proof:
+  - on a reset/replay or second-pass run over an existing realized workspace,
+    the triage surface makes shallow existing implementations visible as active
+    gaps to deepen rather than treating mere file presence as completion
+- non-regression proof:
+  - existing `gaps`, `iterate`, and `start` flows still work, but with richer
+    domain-local gap interpretation layered on top
 
 ## Acceptance
 
-- `odd_sdlc` produces a durable, queryable semantic triage artifact rather than
-  only structural gap output
-- the runtime preserves the homeostatic chain of `observation -> triage ->
-  route -> repricing` rather than collapsing them into one opaque step
-- observation is preserved as a first-class telemetry stream, not merely an
-  internal precursor to triage
-- ABG remains the sole event, continuation, selection, and approval substrate;
-  T-004 adds domain semantics on top rather than parallel orchestration beneath
-- the runtime remains event-driven in the saga/event-calculus sense while
-  explicitly rejecting classical deterministic replay equivalence for F_P
-  semantics
-- lawful re-entry is explicit and anchored to the reverse path in
-  `SPEC_METHOD.md`
-- the framework is total at the process-outcome boundary while remaining open
-  in domain gap taxonomy and graphfunction registry
-- analysis publication, semantic triage, and route binding are separate
-  authorities
-- deterministic truth gates remain authoritative
-- fixed vectors and dynamic route binding are not conflated
-- constitutional repricing cannot happen silently
-- no-candidate dynamic routing remains explicit unresolved state
-- shallow-realization findings are backed by durable evidence, not prose alone
-- source-domain behavior and governed target behavior do not collapse
-
-## Deferred Scope
-
-This ticket does not silently absorb the broader odd_service remote-client and
-consensus product-line debt. That work remains explicitly tracked in `B-004`.
-
-## Completion Notes
-
-- `triage.py` now publishes a durable per-edge homeostatic chain over
-  observation, semantic triage, route binding, and constitutional proposal
-  state without introducing a second event or continuation substrate.
-- semantic triage is now bounded, cache-aware, analysis-freshness aware, and
-  divergence-aware; repeated materially changed triage emits
-  `triage_divergence`.
-- shallow-realization evidence is structured and durable, including path,
-  excerpt, and line data from the survivor fixtures.
-- the route layer now distinguishes fixed-vector repair from declared
-  dynamic-family selection and records zero-candidate dynamic routing as an
-  explicit `no_lawful_route` state.
-- constitutional repricing remains explicit and gated through policy plus ABG
-  approval/revocation truth rather than ambient file edits.
-- focused proof is green:
-  - `python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_first_slice.py -q`
+- the homeostatic reverse path from real use case to gap analysis to lawful
+  repricing is explicit in `odd_sdlc`, not only in `SPEC_METHOD`
+- `gaps` is no longer just structural evaluator reporting; it exposes semantic
+  gap triage
+- ambiguity and requirement-closure registers are used as live evidence inputs
+  into gap interpretation
+- the domain can distinguish implementation repair from requirement/design/goal
+  or intent repricing
+- the domain can distinguish uncovered-family expansion from shallow-existing
+  realization that must be deepened in place
+- constitutional insufficiency can lawfully generate new goals and/or intent
+  vectors
+- the resulting next vector is attached at the correct point in the method
+  chain rather than forcing every mismatch into code repair
 
 ## Links
 
-- parent: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md`
-- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
-- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
-- sibling: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/completed/T-003-enforce-spec-method-structured-build-topology-for-project-tenants.md`
-- deferred_scope: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/tickets/active/B-004-track-odd-service-remote-client-and-consensus-scope-debt.md`
-- strategy: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/codex/20260413T023750Z_STRATEGY_preserve-builder-direction-separate-runtime-boundaries.md`
-- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T150000_REVIEW_odd-sdlc-in-progress-refactor.md`
-- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T160000_REVIEW_T-004-axiomatic-boundaries-for-agentic-builder.md`
-- review: `/Users/jim/src/apps/odd_sdlc/.ai-workspace/comments/claude/20260413T170000_REVIEW_post-checkpoint-runtime-boundary-fixes.md`
+- parent: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/B-001-refactor-odd-method-to-released-abg-boundary.md`
+- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
+- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
+- sibling: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/T-003-enforce-spec-method-structured-build-topology-for-project-tenants.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`
+- scenario: `/Users/jim/src/apps/odd_method/specification/scenarios/11-ambiguity-register-disambiguation-pipeline.md`
+- prior_art: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.test10/.ai-workspace/graph/edges/feedback_loop.yml`
+- evidence: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/CODE_QUALITY_DEEP_DIVE_TEST28_PASS2.md`
+- evidence: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/CODE_QUALITY_DEEP_DIVE_11_25_26_27_28.md`

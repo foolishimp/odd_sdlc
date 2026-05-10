@@ -7,29 +7,31 @@
 **Blocker Map**: `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_PYTHON_PARITY_RC_BLOCKER_MAP.md`
 **Archive Comparison**: `build_tenants/typescript/qualification/ODD_SDLC_TYPESCRIPT_LIVE_PYTHON_ARCHIVE_COMPARISON.md`
 
-## Current RC Blocker - 2026-05-06
+## Retired RC Blocker Context - 2026-05-10
 
-The earlier bounded package-surface claim remains historical proof, but the
-current full operational RC lane is blocked by B-085.
+The earlier bounded package-surface claim remains historical proof. The older
+T-041/B-085 full operational RC blocker path is now retired/superseded; current
+feature-gap closure is governed by the test35 uplift sequence in
+`specification/GOALS.md`, T-004, and T-002.
 
-Live `data_mapper` replay is stopped at
+The historical live `data_mapper` replay stopped at
 `derive_release_depth_parity_surface` with vectors `0-30` closed. The current
-blocker is not PTY, ABG traversal, or parser/runtime truth; it is missing
+finding was not PTY, ABG traversal, or parser/runtime truth; it was missing
 admitted pass evidence after a generated Scala test compile failure in
 `DiagnosticsFinalizeSpec.scala`.
 
-Current closure requires consuming the typed component repair schedule, repairing
-only the implicated generated test source, rerunning the `cdme-compiler` shard,
-admitting pass evidence, and rederiving release-depth parity.
+That evidence remains useful historical context, but it no longer controls the
+current ticket wave.
 
-Active control tickets:
+Retired control tickets:
 
-- `.ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
-- `.ai-workspace/tickets/active/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md`
+- `.ai-workspace/tickets/completed/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
+- `.ai-workspace/tickets/completed/B-085-consume-component-repair-schedule-for-generated-scala-test-compile-failure.md`
 
 ## Verdict
 
-The TypeScript tenant is blocked for the current full operational RC lane.
+The TypeScript tenant's older full operational RC lane is retired as a current
+control surface.
 
 The TypeScript tenant was previously qualified for a bounded ODD-native package
 claim.
@@ -180,17 +182,14 @@ Release:
 - Status: closed for package release-cut evidence; live deployment remains out
   of scope for this RC report.
 
-## Remaining Gap Ticket
+## Retired Gap Ticket
 
-The future full Python-replacement RC claim is tracked by:
+The future full Python-replacement RC claim was tracked by:
 
-- `.ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
+- `.ai-workspace/tickets/completed/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md`
 
-That ticket owns the side-effecting install/normalize adapter, public CLI
-surface, release-cut packaging, and side-by-side Python archive comparison
-needed before TypeScript can replace Python as the operational tenant. T-058,
-T-059, and T-060 close the CLI/install/release/comparison preconditions;
-T-041 remains the final full operational envelope.
+That ticket is no longer the active wave driver. The current operational driver
+is the test35 uplift sequence recorded in `specification/GOALS.md`.
 
 The installed-workspace sandbox precondition is closed by:
 

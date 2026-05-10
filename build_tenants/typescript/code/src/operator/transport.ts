@@ -4,7 +4,6 @@
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  claudeStreamJsonArgs,
   type TracedProcessExecutorProfile,
   type TracedProcessParser
 } from "@abiogenesis/typescript-tenant";
@@ -137,23 +136,23 @@ function codexArgs(input: {
 }
 
 function claudeArgs(input: {
-  readonly promptPath: string;
   readonly model: string | null;
   readonly effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
 }): readonly string[] {
-  const args = claudeStreamJsonArgs(readFileSync(input.promptPath, "utf8"));
-  if (input.model === null && input.effort === null) {
-    return args;
-  }
-  const [head, ...tail] = args;
-  if (head === undefined) {
-    throw new TypeError("Claude worker argv contract returned no executable arguments");
-  }
   const modelArgs =
     input.model === null ? Object.freeze([]) : Object.freeze(["--model", input.model]);
   const effortArgs =
     input.effort === null ? Object.freeze([]) : Object.freeze(["--effort", input.effort]);
-  return Object.freeze([head, ...modelArgs, ...effortArgs, ...tail]);
+  return Object.freeze([
+    "-p",
+    ...modelArgs,
+    ...effortArgs,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "bypassPermissions"
+  ]);
 }
 
 export function argsForWorker(input: {
@@ -175,7 +174,6 @@ export function argsForWorker(input: {
     }
     if (input.transport.agentKey === "claude") {
       return claudeArgs({
-        promptPath: input.promptPath,
         model: input.transport.model,
         effort: input.transport.effort
       });
@@ -188,7 +186,10 @@ export function stdinForWorker(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly promptPath: string;
 }): string | null {
-  if (input.transport.args.length === 0 && input.transport.agentKey === "codex") {
+  if (
+    input.transport.args.length === 0 &&
+    (input.transport.agentKey === "codex" || input.transport.agentKey === "claude")
+  ) {
     return readFileSync(input.promptPath, "utf8");
   }
   return null;

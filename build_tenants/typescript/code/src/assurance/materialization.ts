@@ -11,9 +11,14 @@ import type { SdlcAssuranceLedger } from "./carriers.js";
 import { assuranceLedger, assuranceReason, verdictFromReasons } from "./shared.js";
 
 const MATERIALIZATION_CONTRACT_VIOLATIONS = Object.freeze([
+  "adr_output_filename_invalid",
+  "adr_output_required_field_missing",
+  "adr_output_status_invalid",
   "materialized_product_relative_path_mismatch",
   "materialized_product_relative_path_absolute",
+  "materialized_product_file_is_output_artifact",
   "materialized_product_file_outside_tenant_root",
+  "materialized_design_file_outside_design_root",
   "materialized_product_digest_mismatch",
   "materialized_product_byte_count_mismatch",
   "materialized_product_path_not_file",

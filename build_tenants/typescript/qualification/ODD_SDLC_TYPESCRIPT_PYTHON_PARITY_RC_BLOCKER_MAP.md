@@ -1,6 +1,6 @@
 # odd_sdlc TypeScript Python Parity RC Blocker Map
 
-**Status**: Active
+**Status**: Retired / historical
 **Date**: 2026-04-26
 **Owner Ticket**: `.ai-workspace/tickets/completed/T-054-publish-python-to-typescript-operational-rc-blocker-map.md`
 **Scope**: TypeScript package RC versus full operational Python-replacement RC.
@@ -27,7 +27,14 @@ live external `F_P` proof.
 - Full operational RC blockers must stay visible under `T-041` until each row
   in this map has an owning closure record and proof surface.
 
-## Summary
+## Current Reading
+
+This blocker map is retained as historical evidence for the older T-041
+full-operational RC framing. T-041 and B-085 have since moved to completed as
+retired/superseded surfaces. The current feature-gap wave is governed by the
+test35 uplift sequence in `specification/GOALS.md`, T-004, and T-002.
+
+## Historical Summary
 
 Bounded TypeScript package RC:
 
@@ -37,8 +44,8 @@ Bounded TypeScript package RC:
 
 Full operational Python-replacement RC:
 
-- Status: blocked.
-- Primary open blocker: `T-041`.
+- Status: retired as current control surface.
+- Primary historical blocker: `T-041`.
 - Closed preconditions: `T-052` ABG-populated installed sandbox proof,
   `T-053` live external `F_P` data_mapper proof, `T-059` install/release
   adapter proof, and `T-063` installer feature-contract governance.
@@ -292,6 +299,5 @@ Full operational Python-replacement RC:
 4. `T-059` is complete; install/normalize and release-cut packaging are no
    longer blockers.
 5. `T-060` is complete; Python archive comparison is now explicit.
-6. Use `T-041` as the final full operational RC envelope. The open decision is
-   whether full RC requires multi-edge data_mapper qualification depth beyond
-   the current T-053 live single-edge proof.
+6. T-041 is no longer the active control envelope. Current work continues under
+   the test35 uplift sequence in `GOALS.md`.

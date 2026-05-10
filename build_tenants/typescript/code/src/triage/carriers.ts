@@ -73,6 +73,33 @@ export const SDLC_ROUTE_KIND_VALUES = Object.freeze([
 
 export type SdlcRouteKind = (typeof SDLC_ROUTE_KIND_VALUES)[number];
 
+export type SdlcRequirementTransformLineageStatus =
+  | "lineage_observed"
+  | "lineage_absent"
+  | "lineage_authority_failure";
+
+export type SdlcRequirementTransformLineageSource =
+  | "requirement_transform_authority"
+  | "closure_register_fallback";
+
+export interface SdlcRequirementTransformLineage {
+  readonly kind: "sdlc_requirement_transform_lineage";
+  readonly requirementId: string;
+  readonly currentEdge: string | null;
+  readonly transformLineageRef: string;
+  readonly immediateTransformObligationRef: string;
+  readonly transformInputAuthorityRef: string;
+  readonly transformOutputExpectationRef: string;
+  readonly predecessorTransformRefs: readonly string[];
+  readonly lineageDepth: number;
+  readonly sourceInputUris: readonly string[];
+  readonly lineageSource: SdlcRequirementTransformLineageSource;
+  readonly lineageAuthorityRefs: readonly string[];
+  readonly lineageBasisRefs: readonly string[];
+  readonly lineageStatus: SdlcRequirementTransformLineageStatus;
+  readonly emittedRuntimeEventKinds: readonly [];
+}
+
 export interface SdlcGapObservation {
   readonly kind: "sdlc_gap_observation";
   readonly observationId: string;
@@ -80,6 +107,9 @@ export interface SdlcGapObservation {
   readonly gapStatus: SdlcGapStatus;
   readonly currentEdge: string | null;
   readonly requirementPressureIds: readonly string[];
+  readonly requirementOpenReasonCodes: readonly string[];
+  readonly requirementOpenReasonRefs: readonly string[];
+  readonly requirementTransformLineage: readonly SdlcRequirementTransformLineage[];
   readonly evidenceRefs: readonly string[];
   readonly freshnessToken: string;
   readonly emittedRuntimeEventKinds: readonly [];
@@ -145,4 +175,3 @@ export interface SdlcGapRetirement {
   readonly evidenceRefs: readonly string[];
   readonly emittedRuntimeEventKinds: readonly [];
 }
-

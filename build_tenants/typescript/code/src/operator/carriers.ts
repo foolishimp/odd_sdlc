@@ -215,6 +215,7 @@ export type SdlcMaterializedProductFileRole =
   | "source"
   | "test"
   | "build_config"
+  | "design"
   | "documentation"
   | "other";
 
@@ -970,6 +971,7 @@ export interface SdlcWorkerInvocationOutputContract {
   readonly materializationRequired: boolean;
   readonly tenantRoot: string;
   readonly selectedOutputRoot: string;
+  readonly declaredProductFileTargets: readonly string[];
   readonly requiredRoles: readonly SdlcMaterializedProductFileRole[];
   readonly buildExecutionContract: string;
   readonly testExecutionContract: string;
@@ -989,6 +991,8 @@ export interface SdlcWorkerInvocationPackage {
   readonly traversalIntentPackagePath: string;
   readonly traversalIntentPackageRef: string;
   readonly traversalIntentPackageDigest: string;
+  readonly transformAxioms: readonly string[];
+  readonly outcomeDirectives: readonly string[];
   readonly outputContract: SdlcWorkerInvocationOutputContract;
   readonly allowedWriteRoots: readonly string[];
   readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;

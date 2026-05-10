@@ -12,8 +12,12 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "output_path_not_file",
   "output_file_empty",
   "output_digest_mismatch",
+  "adr_output_filename_invalid",
+  "adr_output_required_field_missing",
+  "adr_output_status_invalid",
   "worker_report_unresolved_reasons_present",
   "unexpected_product_materialization_for_surface_edge",
+  "materialized_product_file_is_output_artifact",
   "materialized_product_files_missing",
   "materialized_product_role_missing",
   "materialized_product_file_outside_tenant_root",
@@ -21,6 +25,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_relative_path_mismatch",
   "materialized_product_file_missing",
   "materialized_product_path_not_file",
+  "materialized_design_file_outside_design_root",
   "materialized_product_file_empty",
   "materialized_product_byte_count_mismatch",
   "materialized_product_digest_mismatch",
@@ -114,6 +119,9 @@ export type SdlcBlockingReasonLawfulReentryPoint =
 
 const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "materialized_product_role_missing",
+  "adr_output_filename_invalid",
+  "adr_output_required_field_missing",
+  "adr_output_status_invalid",
   "worker_report_admission_failed",
   "test_execution_lane_mismatch",
   "test_execution_command_mismatch",
@@ -168,6 +176,9 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     code.includes("digest") ||
     code.includes("byte_count") ||
     code.includes("path_not_file") ||
+    code.startsWith("adr_output_") ||
+    code === "materialized_product_file_is_output_artifact" ||
+    code === "materialized_design_file_outside_design_root" ||
     code === "unexpected_product_materialization_for_surface_edge"
   ) {
     return Object.freeze({

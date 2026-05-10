@@ -19,7 +19,8 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
-  invokeOddSdlcSpecMethodCommandSync
+  invokeOddSdlcSpecMethodCommandSync,
+  serializeOddSdlcSpecMethodResult
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -144,6 +145,56 @@ test("T-058 Spec Method gaps command emits read-only dossier without choosing tr
   assert.equal(result.payload.projection.kind, "sdlc_gap_projection");
   assert.equal(result.payload.dossier.kind, "sdlc_gap_dossier");
   assert.equal(result.payload.dossier.choosesNextTraversal, false);
+  assert.equal(
+    result.payload.homeostaticTriage.kind,
+    "sdlc_homeostatic_gap_triage_surface"
+  );
+  assert.equal(result.payload.homeostaticTriage.observation.kind, "sdlc_gap_observation");
+  assert.equal(
+    result.payload.homeostaticTriage.observation.requirementTransformLineage[0].kind,
+    "sdlc_requirement_transform_lineage"
+  );
+  assert.match(
+    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+      .immediateTransformObligationRef,
+    /^transform-obligation:\/\/odd-sdlc\/[^/]+\/REQ-/u
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+      .lineageStatus,
+    "lineage_observed"
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+      .lineageSource,
+    "requirement_transform_authority"
+  );
+  assert(
+    result.payload.homeostaticTriage.observation.requirementTransformLineage[0]
+      .lineageAuthorityRefs.some((ref) =>
+        ref.startsWith("requirement-transform://odd-sdlc/ingress/")
+      )
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.classification.frameworkLayer,
+    "code"
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.classification.frameworkCondition,
+    "open_gap"
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.routeBinding.targetGraphFunction,
+    "derive_code_surface"
+  );
+  assert.equal(
+    result.payload.homeostaticTriage.routeBinding.mayApplyConstitutionalChange,
+    false
+  );
+  assert.match(
+    serializeOddSdlcSpecMethodResult(result),
+    /triage: code\/open_gap -> code:derive_code_surface/u
+  );
 });
 
 test("T-058 Spec Method gaps command admits one evaluator priority surface", () => {

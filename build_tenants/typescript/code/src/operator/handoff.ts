@@ -132,9 +132,52 @@ const MATERIALIZED_PRODUCT_FILE_ROLES = Object.freeze([
   "source",
   "test",
   "build_config",
+  "design",
   "documentation",
   "other"
 ] as const);
+
+const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
+  feature_decomp_surface: "design/feature_decomp_surface.md",
+  design_surface: "design/adrs/ADR-001-design-surface.md",
+  scenario_surface: "design/scenario_surface.md",
+  implementation_design_surface:
+    "design/adrs/ADR-002-implementation-design-surface.md",
+  implementation_stack_profile: "design/implementation_stack_profile.md",
+  implementation_module_surface: "design/implementation_module_surface.md",
+  aggregate_domain_model_surface: "design/aggregate_domain_model_surface.md",
+  implementation_component_topology_surface:
+    "design/implementation_component_topology_surface.md",
+  aggregate_sunny_day_sequence_surface:
+    "design/aggregate_sunny_day_sequence_surface.md",
+  component_realization_schedule_surface:
+    "design/component_realization_schedule_surface.md",
+  component_code_surface: "design/component_code_surface.md",
+  component_realization_qualification_surface:
+    "design/component_realization_qualification_surface.md",
+  realization_schedule_surface: "design/realization_schedule_surface.md",
+  code_surface: "design/code_surface.md",
+  uat_testcases_surface: "design/uat_testcases_surface.md",
+  test_design_surface: "design/adrs/ADR-003-test-design-surface.md",
+  test_stack_profile: "design/test_stack_profile.md",
+  test_module_surface: "design/test_module_surface.md",
+  test_component_topology_surface: "design/test_component_topology_surface.md",
+  component_test_surface: "design/component_test_surface.md",
+  component_test_qualification_surface:
+    "design/component_test_qualification_surface.md",
+  component_repair_schedule_surface: "design/component_repair_schedule_surface.md",
+  testcase_authority_surface: "design/testcase_authority_surface.md",
+  release_depth_parity_surface: "design/release_depth_parity_surface.md",
+  release_surface: "design/release_surface.md",
+  retrofit_design_surface: "design/adrs/ADR-004-retrofit-design-surface.md",
+  retrofit_plan_surface: "design/retrofit_plan_surface.md",
+  gap_observation_surface: "design/gap_observation_surface.md",
+  gap_triage_surface: "design/gap_triage_surface.md",
+  gap_route_surface: "design/gap_route_surface.md",
+  repricing_proposal_surface: "design/repricing_proposal_surface.md",
+  ticket_work_item_route_surface: "design/ticket_work_item_route_surface.md",
+  gap_retirement_surface: "design/gap_retirement_surface.md"
+} as const satisfies Record<string, string>);
 
 const POSTFLIGHT_GAP_REASON_CLASSES = Object.freeze([
   "contract_violation",
@@ -204,6 +247,44 @@ export function operatorRunId(): string {
     .replace(".", "")}_pid${process.pid}`;
 }
 
+function tenantLocalSdlcSurfaceRelativePath(targetAssetType: string): string | null {
+  return (
+    TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS[
+      targetAssetType as keyof typeof TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
+    ] ?? null
+  );
+}
+
+function deriveOutputFileForTarget(input: {
+  readonly defaultOutputRoot: string;
+  readonly targetAssetType: string;
+  readonly materialization: SdlcProductMaterializationContract;
+}): string {
+  const tenantRelativePath = tenantLocalSdlcSurfaceRelativePath(
+    input.targetAssetType
+  );
+  if (tenantRelativePath === null) {
+    return join(input.defaultOutputRoot, `${input.targetAssetType}.md`);
+  }
+  return join(input.materialization.tenantRoot, tenantRelativePath);
+}
+
+function tenantRelativeOutputArtifactPath(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  const tenantRoot = resolve(manifest.productMaterialization.tenantRoot);
+  const outputFile = resolve(manifest.outputFile);
+  if (!pathIsInside(outputFile, tenantRoot)) {
+    return null;
+  }
+  return relative(tenantRoot, outputFile).split(path.sep).join("/");
+}
+
+function tenantOutputArtifactIsAdr(manifest: SdlcWorkerHandoffManifest): boolean {
+  const tenantRelativePath = tenantRelativeOutputArtifactPath(manifest);
+  return tenantRelativePath !== null && tenantRelativePath.startsWith("design/adrs/");
+}
+
 function materializationRolesForTarget(
   targetAssetType: string
 ): readonly SdlcMaterializedProductFileRole[] {
@@ -222,6 +303,7 @@ function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
 
 function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
   return (
+    targetAssetType === "component_code_surface" ||
     targetAssetType === "component_test_surface" ||
     targetAdmitsTestExecutionEvidence(targetAssetType)
   );
@@ -1328,7 +1410,6 @@ export function deriveWorkerHandoffManifest(input: {
     "workspace://.abiogenesis/docs/standards/ODD_METHOD.md"
   ]);
   const resultReportSchema = REPORT_FIELDS;
-  const outputFile = join(outputRoot, `${input.contract.targetAssetType}.md`);
   const reportFile = join(archiveRoot, "worker_result_report.json");
   const fpTransformRequestFile = join(archiveRoot, "fp_transform_request.json");
   const fpTransformResultFile = join(archiveRoot, "fp_transform_result.json");
@@ -1364,7 +1445,16 @@ export function deriveWorkerHandoffManifest(input: {
     materialization: baseMaterialization,
     featureScope
   });
-  const allowedWriteRoots = materialization.required
+  const outputFile = deriveOutputFileForTarget({
+    defaultOutputRoot: outputRoot,
+    targetAssetType: input.contract.targetAssetType,
+    materialization
+  });
+  const outputFileIsTenantLocal = pathIsInside(
+    resolve(outputFile),
+    resolve(materialization.tenantRoot)
+  );
+  const allowedWriteRoots = materialization.required || outputFileIsTenantLocal
     ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
     : input.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
       ? Object.freeze([
@@ -1441,351 +1531,8 @@ function normalizeConformedProjectRuntimeLayout(
   });
 }
 
-function productMaterializationPrompt(manifest: SdlcWorkerHandoffManifest): string {
-  if (!manifest.productMaterialization.required) {
-    const lines = [
-      "Product materialization is not required for this edge.",
-      "Do not write product source/test files for this edge."
-    ];
-    if (manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
-      lines.push(
-        "This edge conforms project authority from bootstrap documents.",
-        "Treat JSON, YAML, markdown, and prose blocks as source fragments; do not require one privileged input shape.",
-        "Read the current worksite and bootstrap/source documents, then materialize conformed project authority surfaces.",
-        "Expected authority outputs are .ai-workspace/context/project_bootstrap.md, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md, specification/requirements/README.md, and specification/requirements/*.md when product requirements are present.",
-        "Every authority surface created or updated for this edge must cite `Fg_conform_project_authority` as its `Derived From` graph function.",
-        "When the source declares product files, exact expected output, or an execution command, preserve those as explicit requirement obligations rather than only general prose.",
-        "Write the transform artifact with the requirement ids you induced, the authority files you wrote, and the evidence refs you used.",
-        "Do not write implementation source, tests, Cargo manifests, package manifests, or tenant product files on this edge."
-      );
-    }
-    if (manifest.targetAssetType === "code_surface") {
-      lines.push(
-        "For code_surface, produce a compatibility rollup over admitted component_code_surface and component_realization_qualification_surface evidence.",
-        "Do not independently generate broad source files from code_surface; component_code_surface owns product source materialization."
-      );
-    }
-    if (manifest.targetAssetType === "test_module_surface") {
-      lines.push(
-        "For test_module_surface, produce a compatibility rollup over test_component_topology_surface and component_test_surface evidence.",
-        "Do not independently generate broad test files from test_module_surface; component_test_surface owns product test materialization."
-      );
-    }
-    return lines.join("\n");
-  }
-  const requirementObligationIds = manifest.traversalObligationContext.obligations
-    .filter((obligation) => obligation.obligationKind === "requirement")
-    .map((obligation) => obligation.obligationId);
-  const productFileTargets = declaredProductFileTargets(manifest);
-  const lines = [
-    "Product materialization is REQUIRED for this edge.",
-    `Selected graph action: ${manifest.graphFunctionName}`,
-    `Selected edge: ${manifest.edgeName}`,
-    `Worksite root: ${workerFacingPath(manifest, manifest.workspaceRoot)}`,
-    `Target asset type: ${manifest.targetAssetType}`,
-    `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}`,
-    `Selected output root: ${manifest.productMaterialization.selectedOutputRoot}`,
-    "materializedFiles.relativePath MUST be relative to the tenant root, not the workspace root.",
-    `relativePath basis: ${manifest.productMaterialization.relativePathBasis}`,
-    `Declared modules: ${
-      manifest.productMaterialization.declaredModuleNames.length > 0
-        ? manifest.productMaterialization.declaredModuleNames.join(", ")
-        : "none declared"
-    }`,
-    `Build execution contract: ${manifest.productMaterialization.buildExecutionContract}`,
-    `Test execution contract: ${manifest.productMaterialization.testExecutionContract}`,
-    `Required file roles: ${manifest.productMaterialization.requiredRoles.join(", ")}`,
-    `Execution shard count: ${manifest.productMaterialization.executionShards.length}`,
-    productFileTargets.length === 0
-      ? "Declared product file targets: none"
-      : `Declared product file targets: ${productFileTargets.join(", ")}`,
-    productFileTargets.length === 0
-      ? "No declared product file target overrides are present."
-      : "When declared product file targets are present, materialize those exact workspace-relative paths; do not substitute generic filenames.",
-    `Requirement transformation set count: ${requirementObligationIds.length}`,
-    requirementObligationIds.length === 0
-      ? "Requirement transformation set: none"
-      : `Requirement transformation set: ${requirementObligationIds
-          .slice(0, 30)
-          .join(", ")}${requirementObligationIds.length > 30 ? ", ..." : ""}`,
-    "Write non-empty downstream product files under the tenant root.",
-    "The framework observes changed product files after F_P.transform exits and builds the materialized file ledger.",
-    "Use role source for implementation source and role test for developer tests.",
-    "Prefer source paths for implementation files and test paths for developer tests."
-  ];
-  if (manifest.targetAssetType === "test_module_surface") {
-    lines.push(
-      "For test_module_surface, generated tests MUST be discoverable by the declared test execution contract.",
-      "If the selected build configuration lacks a test framework binding, materialize or update build config and list that file with role build_config.",
-      "For sbt test, do not emit only standalone object/main tests; use a test framework discoverable by sbt test."
-    );
-  }
-  if (manifest.targetAssetType === "component_code_surface") {
-    if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
-      lines.push(
-        "For declared product materialization, apply the requirement transformation set to the current worksite and materialize the declared product file targets.",
-        "If component topology or schedule refs are present in the compact packages, preserve them; otherwise derive the minimal product file structure from the requirements, project profile, and declared product targets.",
-        "Do not search PTY transcripts, runtime logs, or worker archives as product authority unless a compact package explicitly references them.",
-        "The transform artifact should record the requirement ids applied to each product file, but component-depth topology is not required for this declared-product action."
-      );
-    } else {
-      lines.push(
-        "For component_code_surface, materialize implementation source files for every component declared by implementation_component_topology_surface.",
-        "If an admitted component_repair_schedule_surface exists, repair only the cited source rows unless deterministic evidence widens the scope.",
-        "Do not collapse multiple declared components into one generic source file when the topology declares distinct componentIds or relativePaths.",
-        "The transform artifact MUST include a Component Realization Register naming componentId, moduleName, relativePath, exported boundary, requirement ids, and materialized file role for each source file."
-      );
-    }
-  }
-  if (manifest.targetAssetType === "component_test_surface") {
-    lines.push(
-      "For component_test_surface, materialize developer test files for every test class or test file declared by test_component_topology_surface.",
-      "If an admitted component_repair_schedule_surface exists, repair only the cited test rows unless deterministic evidence widens the scope.",
-      "Do not collapse allocated testcase ids into one broad smoke test unless the test topology explicitly declares one class/file.",
-      "The transform artifact MUST include a Component Test Register naming testClassId, testcase ids, covered componentIds, requirement ids, and materialized test file path."
-    );
-    if (isSbtTestContract(manifest.productMaterialization.testExecutionContract)) {
-      lines.push(
-        "For ScalaTest Matchers, avoid local identifiers that collide with matcher words such as a, an, be, empty, or contain.",
-        "For numeric or primitive assertions, prefer shouldEqual or parenthesized shouldBe RHS so matcher overload inference cannot require a matcher word."
-      );
-    }
-  }
-  return lines.join("\n");
-}
-
-function componentDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
-  if (manifest.targetAssetType === "implementation_component_topology_surface") {
-    return [
-      "This edge produces implementation component topology.",
-      "The output MUST include a fenced JSON block named component_depth_register.",
-      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, targetAssetType, and componentTopologyRows.",
-      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
-      "Each componentTopologyRows entry MUST cite kind `sdlc_component_topology_row`, componentId, moduleName, relativePath, publicBoundary, concernRole, sourceAssetRefs, and requirementIds.",
-      "Use concernRole for the typed concern value; prose sidecars may mention domainCarrier or adapter, but the JSON carrier must use concernRole.",
-      "The topology must be production-shaped: separate parsing, validation, mapping, error/reporting, and IO/adapter concerns when those concerns are present in requirements or design.",
-      "Do not use line count or file count as the authority. The authority is explicit concern separation and requirement allocation."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_realization_schedule_surface") {
-    return [
-      "This edge produces a component realization schedule.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows for scheduled components.",
-      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_realization_schedule_surface`.",
-      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
-      "The output MUST order work by declared componentId and dependency reason.",
-      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary or firstProductFileToChange, upstreamComponentIds, requirementIds, and sourceAssetRefs.",
-      "The schedule must make component-by-component progress observable; do not emit only a module-level checklist."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_code_surface") {
-    if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
-      return [
-        "No component-depth schema is required for this declared-product materialization edge.",
-        "Closure is based on observed product file materialization, requirement trace evidence, and the traversal consequence ledger.",
-        "Do not invent component topology to satisfy this edge unless topology authority is present in the compact packages."
-      ].join("\n");
-    }
-    return [
-      "This edge realizes declared components as product code.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows.",
-      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_code_surface`.",
-      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
-      "Read implementation_component_topology_surface and component_realization_schedule_surface before writing code.",
-      "Materialized source must preserve declared component boundaries unless a blocker is explicitly carried.",
-      "The output artifact must report realized, blocked, and deferred components by componentId."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_realization_qualification_surface") {
-    return [
-      "This edge qualifies component realization.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentRealizationRows for the realized or blocked components.",
-      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_realization_qualification_surface`.",
-      "Each componentRealizationRows entry MUST cite kind `sdlc_component_realization_row`, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs.",
-      "Compare implementation_component_topology_surface to component_code_surface and the observed product materialization ledger.",
-      "The output MUST include realizedComponentIds, missingComponentIds, collapsedComponentIds, and requirement ids affected by each gap.",
-      "A missing or collapsed component is a typed non-closure reason, not a prompt suggestion."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "test_component_topology_surface") {
-    return [
-      "This edge produces test component topology.",
-      "The output MUST include a fenced JSON block named component_depth_register.",
-      "That JSON block MUST contain testComponentTopologyRows.",
-      "Markdown prose is allowed, but postflight reads only the typed JSON carrier for component-depth closure.",
-      "Each row MUST name testClassId, relativePath, testcase ids, covered componentIds, requirement ids, test kind, and expected execution shard.",
-      "Preserve testcase allocation from uat_testcases_surface and scenario/test design authority; do not collapse all TC ids into one generic integration test."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_test_surface") {
-    return [
-      "This edge realizes declared component tests as product test code.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentTestRows.",
-      "Each componentTestRows entry MUST cite testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId.",
-      "Read test_component_topology_surface before writing tests.",
-      "Materialized tests must preserve declared testClassId and testcase allocation unless a blocker is explicitly carried.",
-      "The output artifact must report realized, blocked, and deferred test classes by testClassId."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_test_qualification_surface") {
-    return [
-      "This edge qualifies component test execution.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentTestQualificationRows.",
-      "That JSON block MUST contain kind `sdlc_component_depth_register`, registerVersion `ts-component-depth-v1`, and targetAssetType `component_test_qualification_surface`.",
-      "Each componentTestQualificationRows entry MUST cite testClassId, testcaseIds, componentIds, requirementIds, status, and evidenceRefs.",
-      "componentTestQualificationRows.status MUST be one of passed, failed, blocked, pending, or unproven. Use blocked for classes that could not execute because another typed failure stopped the shard.",
-      "When any componentTestQualificationRows entry has status failed, the same JSON block MUST also include componentExecutionFailureRegister with kind component_execution_failure_register.",
-      "componentExecutionFailureRegister.registerVersion MUST be ts-component-depth-v1.",
-      "Every failureRows entry MUST bind failureId, shardId, moduleName, testClassId, testcaseIds, componentIds, requirementIds, failureKind, repairTarget, lawfulReentryPoint, attributionConfidence, sourceRefs, testRefs, and evidenceRefs.",
-      "If deterministic evidence cannot bind testcaseId + componentId + requirementId, emit a low-confidence triage_gap row rather than mutating source or tests.",
-      "Map admitted test_execution_result_surface evidence to test_component_topology_surface rows and component_test_surface materialization.",
-      "The output MUST include executedTestClassIds, unexecutedTestClassIds, covered testcase ids, uncovered testcase ids, covered componentIds, and uncovered componentIds.",
-      "A passing command without testClassId/testcase/component mapping is insufficient release evidence."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "component_repair_schedule_surface") {
-    return [
-      "This edge derives component repair schedule truth from admitted execution failure rows.",
-      "The output MUST include a fenced JSON block named component_depth_register with componentRepairSchedule.",
-      "That JSON block MUST contain only the component-depth carrier fields accepted for this target: kind, registerVersion, targetAssetType, and componentRepairSchedule.",
-      "The component_depth_register JSON block kind MUST be sdlc_component_depth_register and registerVersion MUST be ts-component-depth-v1.",
-      "Keep module_dependency_graph, tranche ledgers, and explanatory schedule prose outside the component_depth_register JSON block.",
-      "If you emit schedule metadata as a fenced block, its info string MUST NOT start with json; use schedule_surface so the component-depth parser does not treat it as carrier authority.",
-      "componentRepairSchedule.kind MUST be sdlc_component_repair_schedule and registerVersion MUST be ts-component-depth-v1.",
-      "componentRepairSchedule.scheduleStatus MUST be one of repair_required, no_repair_required, or triage_gap.",
-      "If no repairable failure rows are open, use scheduleStatus no_repair_required with repairRows [].",
-      "If repair is required, use scheduleStatus repair_required and emit one repair row per admitted high-confidence failure row.",
-      "Do not convert prior postflight gaps, schema rejections, or module-build notes into repair rows; repair rows only derive from admitted componentExecutionFailureRegister.failureRows.",
-      "Each repair row kind MUST be sdlc_component_repair_schedule_row.",
-      "Each repair row MUST bind scheduleId, failureId, repairTarget, lawfulReentryPoint, attributionConfidence, testcaseIds, componentIds, requirementIds, sourceRefs, testRefs, and evidenceRefs.",
-      "repairTarget MUST be one of component_code, component_test, test_schedule, test_execution_surface, implementation_design, testcase_authority, requirement_reprice, worker_archive, or transport_retry.",
-      "Rows that do not bind testcaseId + componentId + requirementId are not repair authority; do not emit them in repairRows. If deterministic evidence cannot bind them, set scheduleStatus triage_gap with repairRows [].",
-      "Do not mutate product source or tests in this edge; this edge only schedules bounded repair for later component code/test traversal."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "release_depth_parity_surface") {
-    return [
-      "This edge derives release depth parity evidence.",
-      "The output MUST include a fenced JSON block named component_depth_register with releaseDepthParity.",
-      "The component_depth_register JSON block kind MUST be sdlc_component_depth_register and registerVersion MUST be ts-component-depth-v1.",
-      "releaseDepthParity.kind MUST be sdlc_release_depth_parity_assessment.",
-      "releaseDepthParity.status MUST be one of: met, blocked, repriced.",
-      "Compare component topology, component realization qualification, component test qualification, component repair schedule, and test run archive truth.",
-      "If componentRepairSchedule has scheduleStatus repair_required, releaseDepthParity.status MUST NOT be met.",
-      "The output MUST state whether production-depth parity is met, blocked, or repriced.",
-      "Depth parity is based on explicit component concern separation, file/test materialization, testcase allocation, and execution evidence, not on output size alone."
-    ].join("\n");
-  }
-  return "No component-depth schema is required for this edge.";
-}
-
-function designDepthPrompt(manifest: SdlcWorkerHandoffManifest): string {
-  const scopeLines = designFeatureScopePromptLines(manifest);
-  if (manifest.targetAssetType === "implementation_module_surface") {
-    return [
-      "This edge produces implementation module structure and design-depth fragments.",
-      ...scopeLines,
-      "The output MUST include a fenced JSON block named design_depth_register.",
-      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `implementation_module_surface`, moduleSchemaFragments, and moduleStateDiagramFragments.",
-      "Each moduleSchemaFragments entry MUST declare moduleName, typed entities, typed attributes, operations, requirementIds, and sourceAssetRefs.",
-      "Each moduleStateDiagramFragments entry MUST declare entityId, stateless, states, transitions, requirementIds, and sourceAssetRefs.",
-      "Stateless entities MUST be explicitly marked stateless; stateful entities MUST declare lawful transitions."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "aggregate_domain_model_surface") {
-    return [
-      "This edge produces the aggregate domain model.",
-      ...scopeLines,
-      "The output MUST include a fenced JSON block named design_depth_register.",
-      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `aggregate_domain_model_surface`, aggregateDomainModel, and designCompletenessVerdict.",
-      "aggregateDomainModel MUST compose module schema fragments into one typed entity/operation model with ownerModuleName and crossModuleReferences.",
-      "designCompletenessVerdict MUST include entity, attribute, and flow axis verdicts. Entity and attribute completeness must be satisfied before downstream scheduling can rely on this surface."
-    ].join("\n");
-  }
-  if (manifest.targetAssetType === "aggregate_sunny_day_sequence_surface") {
-    return [
-      "This edge produces the aggregate sunny-day sequence.",
-      ...scopeLines,
-      "The output MUST include a fenced JSON block named design_depth_register.",
-      "That JSON block MUST contain kind `sdlc_design_depth_register`, registerVersion `ts-design-depth-v1`, targetAssetType `aggregate_sunny_day_sequence_surface`, aggregateDomainModel, aggregateSunnyDaySequence, and designCompletenessVerdict.",
-      "aggregateSunnyDaySequence.steps MUST name stepId, moduleName, operationId, inputEntityIds, outputEntityIds, and stateTransitionIds.",
-      "Every sequence operation MUST be published in aggregateDomainModel.operations and every exchanged entity MUST be present in aggregateDomainModel.entities.",
-      "designCompletenessVerdict MUST classify entity, attribute, and flow completeness separately."
-    ].join("\n");
-  }
-  return "No design-depth schema is required for this edge.";
-}
-
 function listForPrompt(values: readonly string[]): string {
   return values.length === 0 ? "(none declared)" : values.join(", ");
-}
-
-function designFeatureScopePromptLines(
-  manifest: SdlcWorkerHandoffManifest
-): readonly string[] {
-  const scope = manifest.featureScope;
-  if (scope.mode === "full_breadth") {
-    return Object.freeze([
-      "Feature scope mode: full_breadth.",
-      `Included modules: ${listForPrompt(scope.includedModuleNames)}.`,
-      "Evaluate and materialize the complete declared breadth for this edge."
-    ]);
-  }
-  return Object.freeze([
-    `Feature scope mode: ${scope.mode}.`,
-    `Included modules for this traversal: ${listForPrompt(
-      scope.includedModuleNames
-    )}.`,
-    `Included entities for this traversal: ${listForPrompt(
-      scope.includedEntityIds
-    )}.`,
-    `Included operations for this traversal: ${listForPrompt(
-      scope.includedOperationIds
-    )}.`,
-    `Deferred modules: ${listForPrompt(scope.deferredModuleNames)}.`,
-    "Close only the included feature scope for this edge.",
-    "Preserve deferred modules by reference; do not treat deferred-module omissions as current closure defects or as completed breadth."
-  ]);
-}
-
-function executionEvidenceTransformPrompt(
-  manifest: SdlcWorkerHandoffManifest
-): string {
-  if (manifest.targetAssetType === "test_run_archive_surface") {
-    return [
-      "For test_run_archive_surface, do not run test commands and do not emit fresh sdlc_worker_execution_evidence.",
-      "Archive the admitted test_execution_result_surface from the input assets and cite its refs.",
-      "Archive component_test_qualification_surface and component_repair_schedule_surface truth; do not close the archive over open repair rows.",
-      "If admitted execution-result truth is absent or insufficient, carry a typed blocker instead of synthesizing release evidence."
-    ].join("\n");
-  }
-  if (!targetAdmitsTestExecutionEvidence(manifest.targetAssetType)) {
-    return "No execution-evidence transform section is required for this edge.";
-  }
-  return [
-    `For ${manifest.targetAssetType}, the transform artifact should contain bounded test execution evidence for framework admission.`,
-    "Do not write worker_result_report.json; the framework admits execution evidence from the transform output.",
-    `Consume manifest.productMaterialization.executionShards; do not collapse shard truth into one unscoped run when shards are present.`,
-    "When executionShards is non-empty, executionEvidence.shardEvidence MUST contain one sdlc_worker_execution_shard_evidence row for each shardId.",
-    "Each shardEvidence row MUST copy shardId and moduleName from the shard register and report counts/status for that shard.",
-    "The transform artifact MUST include a Requirement Trace Register for every requirement obligation in manifest.traversalObligationContext.obligations.",
-    "For every obligationId that starts with `requirement:`, copy both the full obligationId and the exact requirement id verbatim into the artifact; do not abbreviate, wildcard, or collapse families such as REQ-ACC-*.",
-    "The Requirement Trace Register MUST cite the relevant executionEvidence or shardEvidence row for each requirement id so framework postflight can observe the exact marker.",
-    "If a requirement is not covered, still include its exact requirement id and obligationId with pending/blocked evidence status instead of omitting the row.",
-    "executionEvidence.status MUST be one of: succeeded, failed, pending.",
-    "Use pending only when execution did not run or external evidence is still unavailable.",
-    "If a declared test command was executed and exits non-zero during compile, discovery, or test phases, record failed, not pending, even when testsObserved is 0.",
-    "Do not use status values such as not_run, skipped, unknown, or none.",
-    "executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null; never arrays or strings.",
-    "executionEvidence.lane MUST be exactly \"test\".",
-    `If the test execution contract is declared as ${JSON.stringify(
-      manifest.productMaterialization.testExecutionContract
-    )}, run that command from the tenant root when execution is available.`,
-    "When the command runs, record succeeded or failed and report observed test counts.",
-    "When the command cannot run at all, record pending, keep counts at 0, and carry a blocker instead of claiming closure.",
-    "Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence.",
-    "Execution evidence MUST be emitted as a fenced JSON block with kind sdlc_worker_execution_evidence. Do not emit YAML for the execution evidence carrier."
-  ].join("\n");
 }
 
 function isSbtTestContract(testExecutionContract: string): boolean {
@@ -1809,24 +1556,6 @@ function looksLikeSbtDiscoverableTest(content: string): boolean {
   return /(?:org\.scalatest|munit\.|utest\.|org\.specs2|extends\s+[A-Za-z0-9_.$]*(?:Suite|Spec|FunSuite|AnyFunSuite|AnyFlatSpec|AnyWordSpec|AnyFreeSpec|FunSpec|TestSuite|Specification))/u.test(
     content
   );
-}
-
-function scheduleSurfacePrompt(manifest: SdlcWorkerHandoffManifest): string {
-  if (!manifest.targetAssetType.endsWith("_schedule_surface")) {
-    return "No schedule-surface schema is required for this edge.";
-  }
-  return [
-    "This edge produces a graph-owned schedule surface.",
-    "The schedule surface MUST include:",
-    "- module_dependency_graph with nodes, edges, and dependency reasons",
-    "- realization_tranches or test_tranches ordered by dependency constraints",
-    "- execution_shard_register copied from manifest.productMaterialization.executionShards for test scheduling/execution surfaces",
-    "- tranche_obligation_ledger mapping tranche ids to requirement/design/module obligation ids",
-    "- tranche_gap_ledger with open, done, blocked, and carry-forward states",
-    "- next_tranche_selector describing the lawful next tranche and re-entry condition",
-    "If this schedule surface also carries a typed admission JSON block, do not fence schedule metadata as json; use prose, tables, or a non-json fence such as schedule_surface.",
-    "Do not collapse the schedule into a flat checklist when dependency tranches can be derived."
-  ].join("\n");
 }
 
 function compactObligation(
@@ -1883,7 +1612,7 @@ function compactRetrievalHints(
   hints: readonly SdlcRetrievalHint[]
 ): readonly SdlcRetrievalHint[] {
   return Object.freeze(
-    hints.slice(0, 4).map((hint) =>
+    hints.slice(0, 12).map((hint) =>
       Object.freeze({
         kind: "sdlc_retrieval_hint" as const,
         key: hint.key,
@@ -2552,6 +2281,185 @@ function retryRepairInstructionsForContext(
   return Object.freeze(instructions);
 }
 
+function transformAxiomsForWorker(): readonly string[] {
+  return Object.freeze([
+    "F_P.transform only: produce bounded candidate transform evidence.",
+    "Do not write ledgers, runtime events, closure decisions, evaluator projections, or framework result carriers.",
+    "Use worker_brief, worker_invocation_package, traversal_intent_package, and explicitly referenced manifest fields as authority.",
+    "Do not use PTY transcripts, runtime logs, or worker archives as product authority unless a package ref names them.",
+    "Start the output artifact with ## Execution Plan naming read authority, bounded steps, and first materialization target.",
+    "When requirementTraceObligationIds is non-empty, include ## Requirement Trace Register with each exact id."
+  ]);
+}
+
+function compactComponentDepthDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  switch (manifest.targetAssetType) {
+    case "implementation_component_topology_surface":
+      return "Emit component_depth_register.componentTopologyRows with componentId, moduleName, relativePath, publicBoundary, concernRole, sourceAssetRefs, and requirementIds.";
+    case "component_realization_schedule_surface":
+      return "Emit component_depth_register.componentRealizationRows ordered by dependency reason; keep progress component-addressable.";
+    case "component_code_surface":
+      if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
+        return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
+      }
+      return "Emit component_depth_register.componentRealizationRows and preserve declared component boundaries from topology/schedule authority.";
+    case "component_realization_qualification_surface":
+      return "Emit component_depth_register realization qualification with realized, missing, collapsed, and affected requirement ids.";
+    case "test_component_topology_surface":
+      return "Emit component_depth_register.testComponentTopologyRows with testClassId, relativePath, testcaseIds, componentIds, requirementIds, test kind, and shard.";
+    case "component_test_surface":
+      return "Emit component_depth_register with componentTestRows and preserve testClassId/testcase allocation from topology authority.";
+    case "component_test_qualification_surface":
+      return "Emit component_depth_register.componentTestQualificationRows; failed rows must carry componentExecutionFailureRegister evidence.";
+    case "component_repair_schedule_surface":
+      return "Emit component_depth_register.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.";
+    case "release_depth_parity_surface":
+      return "Emit component_depth_register.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.";
+    default:
+      return null;
+  }
+}
+
+function compactDesignDepthDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  switch (manifest.targetAssetType) {
+    case "implementation_module_surface":
+      return "Emit design_depth_register module schema and state fragments; mark stateless/stateful entities explicitly.";
+    case "aggregate_domain_model_surface":
+      return "Emit design_depth_register aggregateDomainModel plus entity, attribute, and flow completeness verdicts.";
+    case "aggregate_sunny_day_sequence_surface":
+      return "Emit design_depth_register aggregateSunnyDaySequence backed by published operations/entities and completeness verdicts.";
+    default:
+      return null;
+  }
+}
+
+function compactExecutionEvidenceDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  if (manifest.targetAssetType === "test_run_archive_surface") {
+    return "Archive the admitted test_execution_result_surface truth; do not run test commands, do not emit fresh sdlc_worker_execution_evidence, and do not synthesize release evidence.";
+  }
+  if (!targetAdmitsTestExecutionEvidence(manifest.targetAssetType)) {
+    return null;
+  }
+  return "Emit sdlc_worker_execution_evidence JSON; executionEvidence.status MUST be one of: succeeded, failed, pending. Do not use status values such as not_run. executionEvidence.lane MUST be exactly \"test\". executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null. If execution exits non-zero during compile, discovery, or test phases, record failed, not pending. Use pending only when execution did not run or external evidence is still unavailable. Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence.";
+}
+
+function compactScheduleDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  if (!manifest.targetAssetType.endsWith("_schedule_surface")) {
+    return null;
+  }
+  return "Emit schedule truth with dependency graph, tranches, shard register where relevant, obligation ledger, gap ledger, and next tranche selector.";
+}
+
+function outcomeDirectivesForWorker(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const directives: string[] = [
+    `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
+    `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
+    `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`
+  ];
+  if (manifest.featureScope.mode === "full_breadth") {
+    directives.push(
+      "Full breadth: do not narrow induction, product, goal, or requirement pressure to a feature slice."
+    );
+  } else {
+    directives.push(
+      "Steel thread / targeted repair: close only included scope and preserve deferred scope by ref."
+    );
+  }
+  const tenantOutputArtifact = tenantRelativeOutputArtifactPath(manifest);
+  const productFileTargets = declaredProductFileTargets(manifest);
+  if (!manifest.productMaterialization.required) {
+    directives.push(
+      "Product materialization is not required for this edge.",
+      "Do not write product source/test files for this edge."
+    );
+    if (tenantOutputArtifact !== null) {
+      directives.push(
+        `tenant-local SDLC surface artifact path: ${tenantOutputArtifact}; do not list it in materializedFiles.`
+      );
+      if (tenantOutputArtifact.startsWith("design/adrs/")) {
+        directives.push(
+          "ADR/design output must carry Status:, Implements:, Derives from:, Supersedes:, Superseded by:, and retained-special-case fields."
+        );
+      }
+    }
+    if (manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
+      directives.push(
+        "This edge conforms project authority from bootstrap documents.",
+        "Conform project authority from bootstrap/source fragments into context, intent, product, goals, and requirements surfaces.",
+        "MUST create/update authority files, not only the transform artifact: .ai-workspace/context/project_bootstrap.md, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md, specification/requirements/README.md, specification/requirements/*.md.",
+        "Read root bootstrap/source files and .ai-workspace/context JSON/YAML/Markdown fragments before writing authority surfaces.",
+        "Preserve product identity, tenant/language/runtime, expected files, exact output, and execution command in INTENT, PRODUCT, and requirements.",
+        "INTENT must preserve source role and builder anchors: bootstrap document, odd_sdlc, language/runtime, and process execution proof.",
+        "Preserve declared product files, expected output, and execution command as explicit requirement obligations.",
+        "Cite Fg_conform_project_authority as Derived From for created/updated authority surfaces."
+      );
+    }
+    if (manifest.targetAssetType === "code_surface") {
+      directives.push(
+        "For code_surface, produce a compatibility rollup over admitted component_code_surface and component_realization_qualification_surface evidence."
+      );
+    }
+    if (manifest.targetAssetType === "test_module_surface") {
+      directives.push(
+        "For test_module_surface, produce a compatibility rollup over test topology/component test evidence."
+      );
+    }
+  } else {
+    directives.push(
+      "Product materialization is REQUIRED for this edge.",
+      `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}.`,
+      `Selected output root: ${manifest.productMaterialization.selectedOutputRoot}.`,
+      `materializedFiles.relativePath basis: ${manifest.productMaterialization.relativePathBasis}.`,
+      `Declared modules: ${listForPrompt(manifest.productMaterialization.declaredModuleNames)}.`,
+      `Required roles: ${listForPrompt(manifest.productMaterialization.requiredRoles)}.`,
+      `Build/test contracts: ${manifest.productMaterialization.buildExecutionContract} / ${manifest.productMaterialization.testExecutionContract}.`,
+      productFileTargets.length === 0
+        ? "Declared product file targets: none."
+        : `Declared product file targets: ${productFileTargets.join(", ")}.`,
+      "Apply requirementTraceObligationIds as the requirement transformation set for product files."
+    );
+    if (manifest.targetAssetType === "test_module_surface") {
+      directives.push(
+        "Generated tests must be discoverable by the declared test execution contract."
+      );
+    }
+    if (manifest.targetAssetType === "component_code_surface") {
+      directives.push(
+        manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+          ? "For declared product materialization, materialize the declared product file targets; use minimal structure only when no topology authority is present."
+          : "For component_code_surface, materialize implementation files for each declared component and record Component Realization Register evidence."
+      );
+    }
+    if (manifest.targetAssetType === "component_test_surface") {
+      directives.push(
+        "For component_test_surface, materialize developer test files for each declared test class/file and record Component Test Register evidence.",
+        "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS."
+      );
+    }
+  }
+  for (const directive of [
+    compactDesignDepthDirective(manifest),
+    compactComponentDepthDirective(manifest),
+    compactExecutionEvidenceDirective(manifest),
+    compactScheduleDirective(manifest)
+  ]) {
+    if (directive !== null) {
+      directives.push(directive);
+    }
+  }
+  return Object.freeze(directives);
+}
+
 export function constructWorkerInvocationPackage(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly manifestPath?: string | undefined;
@@ -2568,6 +2476,7 @@ export function constructWorkerInvocationPackage(input: {
   const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
   const repairReentryPlans = repairReentryPlansForContext(input.manifest);
   const retryRepairInstructions = retryRepairInstructionsForContext(input.manifest);
+  const productFileTargets = declaredProductFileTargets(input.manifest);
   const base = Object.freeze({
     kind: "sdlc_worker_invocation_package" as const,
     packageVersion: "ts-invocation-v1" as const,
@@ -2586,6 +2495,8 @@ export function constructWorkerInvocationPackage(input: {
     ),
     traversalIntentPackageDigest:
       input.manifest.traversalIntentPackage.packageDigest,
+    transformAxioms: transformAxiomsForWorker(),
+    outcomeDirectives: outcomeDirectivesForWorker(input.manifest),
     outputContract: Object.freeze({
       kind: "sdlc_worker_invocation_output_contract" as const,
       outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
@@ -2608,6 +2519,7 @@ export function constructWorkerInvocationPackage(input: {
         input.manifest.productMaterialization.tenantRoot
       ),
       selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+      declaredProductFileTargets: productFileTargets,
       requiredRoles: input.manifest.productMaterialization.requiredRoles,
       buildExecutionContract:
         input.manifest.productMaterialization.buildExecutionContract,
@@ -2873,59 +2785,45 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     manifest.archiveRoot,
     "traversal_intent_package.json"
   );
+  const outcomeSummary = [
+    `edge=${manifest.edgeName}`,
+    `target=${manifest.targetAssetType}`,
+    `materialization=${manifest.productMaterialization.required ? "required" : "not_required"}`,
+    `output=${workerFacingPath(manifest, manifest.outputFile)}`
+  ].join("; ");
+  const outcomeDirectives = outcomeDirectivesForWorker(manifest).map(
+    (directive) => `- ${directive}`
+  );
   return [
-    "You are the F_P worker for an installed odd_sdlc TypeScript operator run.",
-    `Read the worker brief first: ${workerFacingPath(manifest, workerBriefPath)}`,
-    `Then read the compact worker invocation package: ${workerFacingPath(manifest, invocationPackagePath)}`,
-    `Read the traversal intent package before writing output: ${workerFacingPath(manifest, traversalIntentPath)}`,
-    "Use those files as worker-facing authority. This prompt is only the launch contract.",
-    `The full forensic handoff manifest remains archived by reference: ${workerFacingPath(manifest, manifestPath)}`,
-    "Read the full manifest only when the compact package points you to a specific field or when you need forensic detail that is not in the compact package.",
-    "The traversal intent package is the typed cumulative intent package for this edge.",
-    "The compact package traversalStrategyDecision is the selected per-edge traversal strategy.",
-    "When selectedStrategy is full_breadth, do not narrow induction, product, goal, or requirement pressure to a feature slice.",
-    "When selectedStrategy is steel_thread or targeted_repair, feature scope may narrow current closure pressure while preserving deferred breadth by reference.",
-    "The compact package featureScope is framework-derived scope authority. Do not replace it with worker-authored scope.",
-    "When featureScope.mode is steel_thread, consume only obligations and authority refs carried by the compact package and traversal intent package; deferred modules remain visible in featureScope but are not current closure pressure.",
-    "Prior retry gaps are linked through priorGapFrontier dossier refs; read those files selectively instead of copying historical gap rows.",
-    "When workerInvocationPackage.retryRepairInstructions is non-empty, treat it as retry-local repair law.",
-    "When workerInvocationPackage.repairReentryPlans is non-empty, use those typed plans as the repair-edge target, repair-row, diagnostic, and no-broad-regeneration authority.",
-    "For schema_local repair instructions, repair the rejected artifact against acceptedCarrierSchemaRef and acceptedCarrierFieldSet; do not broadly regenerate unrelated surfaces.",
-    "When any retry repair instruction has acceptedCarrierSchemaRef and acceptedCarrierFieldSet, use that carrier shape even if repairScope is semantic_local.",
-    "When any retry repair instruction carries repairReentryPlanId, resolve it against repairReentryPlans, repair only its targetEdgeName/targetAssetType row, and read diagnosticEvidenceRefs before editing product files.",
-    "Copy the exact retry reason and blockingReasonDetail into your execution plan before changing the artifact.",
-    "Do not use any instruction as authority unless it is represented in the compact invocation package, traversal intent package, or referenced manifest field.",
-    "This invocation is F_P.transform only.",
-    "Perform the bounded constructive transformation and return control to the framework.",
-    "Do not evaluate closure, assess obligations, list materialized files, write ledgers, or decide whether the edge closes.",
-    "The ABG/odd_sdlc post-transform stages observe files, emit events, project ledgers, evaluate obligations, and fold closure after this process exits.",
-    "The transform artifact MUST include a `## Requirement Trace Register` section when the manifest contains requirement obligations.",
-    "The Requirement Trace Register is observational evidence only, not a closure decision or obligation assessment.",
-    "Use workerInvocationPackage.requirementTraceObligationIds as the complete checklist for requirement trace markers, including ids omitted from compact inlineObligations.",
-    "For every requirementTraceObligationIds entry whose obligationId starts with `requirement:`, copy the full obligationId and exact requirement id verbatim; do not abbreviate, wildcard, or collapse requirement families.",
-    `ABG F_P transform request carrier: ${workerFacingPath(manifest, manifest.fpTransformRequestFile)}`,
-    `ABG F_P transform result carrier written by framework: ${workerFacingPath(manifest, manifest.fpTransformResultFile)}`,
-    `odd_sdlc F_P.evaluate result carrier written by framework: ${workerFacingPath(manifest, manifest.fpEvaluateResultFile)}`,
-    "If manifest.traversalAttemptEnvelope is present, treat its selected schedule refs, phase gates, required progress artifacts, retry budget, and bounded-exit flag as ABG replay authority for this attempt.",
-    "Write only the requested transform artifact and product files unless the manifest says otherwise.",
-    `Output artifact: ${workerFacingPath(manifest, manifest.outputFile)}`,
-    "Before executing the transform or editing product files, write an explicit execution plan into the output artifact.",
-    "The output artifact must start with a `## Execution Plan` section that names the bounded steps, authority files read, and first materialization target.",
-    "Do not keep this plan private. If you cannot form that plan, write the blocker into the output artifact and exit.",
-    "After the plan section is written, continue the requested transform in the same artifact.",
-    `Framework-generated result report path: ${workerFacingPath(manifest, manifest.reportFile)}`,
-    "Do not write the result report. The framework writes it after observing this transform.",
-    "If you cannot complete the requested transformation in this turn, write the best bounded transform artifact you can, leave remaining work in that artifact, and exit.",
-    "Use conformedProject as the generic project profile. Do not infer product identity from this prompt's examples.",
+    "odd_sdlc F_P.transform launch contract.",
+    `Outcome: ${outcomeSummary}`,
     "",
-    productMaterializationPrompt(manifest),
+    "Read in order:",
+    `1. worker brief: ${workerFacingPath(manifest, workerBriefPath)}`,
+    `2. invocation package: ${workerFacingPath(manifest, invocationPackagePath)}`,
+    `3. traversal intent package: ${workerFacingPath(manifest, traversalIntentPath)}`,
+    `4. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
     "",
-    designDepthPrompt(manifest),
-    componentDepthPrompt(manifest),
+    "Terse axioms:",
+    "- Apply workerInvocationPackage.transformAxioms as the single axiom authority.",
+    "- Do not add local axiom variants from this launch frame.",
     "",
-    executionEvidenceTransformPrompt(manifest),
+    "Outcome directives:",
+    ...outcomeDirectives,
     "",
-    scheduleSurfacePrompt(manifest)
+    "Worker package fields to apply:",
+    "- transformAxioms",
+    "- outcomeDirectives",
+    "- outputContract",
+    "- Use workerInvocationPackage.requirementTraceObligationIds exactly when present.",
+    "- traversalStrategyDecision",
+    "- featureScope",
+    "- retryRepairInstructions and repairReentryPlans when present.",
+    "",
+    manifest.productMaterialization.required
+      ? "Product materialization is REQUIRED for this edge."
+      : "Product materialization is not required for this edge.",
+    "The framework writes reports, evidence carriers, ledgers, and closure after this process exits."
   ].join("\n");
 }
 
@@ -3538,8 +3436,6 @@ function isExecutionByproductPath(relativePath: string): boolean {
     normalized === "target" ||
     normalized.startsWith("target/") ||
     normalized.includes("/target/") ||
-    normalized === "project" ||
-    normalized.startsWith("project/") ||
     normalized.includes("/project/target/") ||
     normalized === ".bsp" ||
     normalized.startsWith(".bsp/") ||
@@ -3553,6 +3449,9 @@ function materializedRoleForObservedFile(input: {
 }): SdlcMaterializedProductFileRole {
   const normalized = input.relativePath.split(path.sep).join("/");
   const lower = normalized.toLowerCase();
+  if (lower === "cargo.toml" || lower.endsWith("/cargo.toml")) {
+    return "build_config";
+  }
   if (
     lower === "build.sbt" ||
     lower.endsWith("/build.sbt") ||
@@ -3571,6 +3470,12 @@ function materializedRoleForObservedFile(input: {
     targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)
   ) {
     return "test";
+  }
+  if (normalized === tenantRelativeOutputArtifactPath(input.manifest)) {
+    return "design";
+  }
+  if (lower.startsWith("design/") || lower === "design") {
+    return "design";
   }
   return input.manifest.productMaterialization.requiredRoles[0] ?? "other";
 }
@@ -3620,7 +3525,25 @@ function isLikelySourceMaterialization(relativePath: string): boolean {
     return false;
   }
   return /(?:^|\/)src\/(?:main\/)?/u.test(normalized) &&
-    /\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt|sql)$/u.test(normalized);
+    /\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt|rs|sql)$/u.test(normalized);
+}
+
+function isLikelyDesignMaterialization(input: {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+}): boolean {
+  const normalized = normalizedRelativePath(input.relativePath).toLowerCase();
+  if (
+    normalized === "design" ||
+    (!normalized.startsWith("design/") && !normalized.startsWith("design\\"))
+  ) {
+    return false;
+  }
+  if (!/\.(?:md|markdown|json|ya?ml)$/u.test(normalized)) {
+    return false;
+  }
+  const content = textIfFile(input.absolutePath);
+  return content !== null && content.trim().length > 0;
 }
 
 function observedFileSatisfiesRequiredRole(input: {
@@ -3639,6 +3562,9 @@ function observedFileSatisfiesRequiredRole(input: {
   }
   if (role === "source") {
     return isLikelySourceMaterialization(input.file.relativePath);
+  }
+  if (role === "design") {
+    return isLikelyDesignMaterialization(input.file);
   }
   return role === "build_config";
 }
@@ -3670,6 +3596,9 @@ export function observeProductMaterializationDelta(input: {
   const beforeByPath = snapshotByRelativePath(input.before);
   const observedByPath = new Map<string, SdlcMaterializedProductFile>();
   for (const file of after.files) {
+    if (resolve(file.absolutePath) === resolve(input.manifest.outputFile)) {
+      continue;
+    }
     if (
       targetIgnoresExecutionByproducts(input.manifest.targetAssetType) &&
       isExecutionByproductPath(file.relativePath)
@@ -4285,7 +4214,21 @@ function evaluateMaterializedProductFiles(input: {
   readonly blockingReasonCarriers: SdlcBlockingReason[];
 }): void {
   const contract = input.manifest.productMaterialization;
-  if (!contract.required && input.report.materializedFiles.length > 0) {
+  const reportedProductFiles = input.report.materializedFiles.filter(
+    (file) => resolve(file.absolutePath) !== resolve(input.manifest.outputFile)
+  );
+  for (const file of input.report.materializedFiles) {
+    const absolutePath = resolve(file.absolutePath);
+    if (absolutePath === resolve(input.manifest.outputFile)) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_file_is_output_artifact",
+          evidenceRefs: [pathToFileURL(absolutePath).href]
+        })
+      );
+    }
+  }
+  if (!contract.required && reportedProductFiles.length > 0) {
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "unexpected_product_materialization_for_surface_edge",
@@ -4296,7 +4239,7 @@ function evaluateMaterializedProductFiles(input: {
   if (!contract.required) {
     return;
   }
-  if (input.report.materializedFiles.length === 0) {
+  if (reportedProductFiles.length === 0) {
     input.blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "materialized_product_files_missing",
@@ -4305,7 +4248,7 @@ function evaluateMaterializedProductFiles(input: {
     );
   }
   for (const requiredRole of contract.requiredRoles) {
-    if (!input.report.materializedFiles.some((file) => file.role === requiredRole)) {
+    if (!reportedProductFiles.some((file) => file.role === requiredRole)) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "materialized_product_role_missing",
@@ -4319,6 +4262,9 @@ function evaluateMaterializedProductFiles(input: {
   for (const file of input.report.materializedFiles) {
     const absolutePath = resolve(file.absolutePath);
     const fileEvidenceRef = pathToFileURL(absolutePath).href;
+    if (absolutePath === resolve(input.manifest.outputFile)) {
+      continue;
+    }
     if (!pathIsInside(absolutePath, tenantRoot)) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
@@ -4363,6 +4309,14 @@ function evaluateMaterializedProductFiles(input: {
         })
       );
       continue;
+    }
+    if (file.role === "design" && !isLikelyDesignMaterialization(file)) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_design_file_outside_design_root",
+          evidenceRefs: [fileEvidenceRef]
+        })
+      );
     }
     const content = readFileSync(absolutePath, "utf8");
     if (content.trim().length === 0) {
@@ -4514,6 +4468,73 @@ function evaluateExecutionEvidence(input: {
       makeSdlcBlockingReason({
         code: "test_execution_report_refs_missing",
         evidenceRefs: input.evidenceRefs
+      })
+    );
+  }
+}
+
+function hasAdrField(content: string, field: string): boolean {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`(?:^|[|\\n\\r])\\s*\`?${escaped}:\`?\\s*(?:[|:]|$)`, "imu").test(
+    content
+  );
+}
+
+function adrStatusValue(content: string): string | null {
+  const match = /(?:^|\|)\s*`?Status:`?\s*\|\s*`?([a-z_ -]+)`?/imu.exec(content);
+  if (match?.[1] !== undefined) {
+    return match[1].trim().toLowerCase();
+  }
+  const lineMatch = /^Status:\s*([a-z_ -]+)\s*$/imu.exec(content);
+  return lineMatch?.[1]?.trim().toLowerCase() ?? null;
+}
+
+function evaluateAdrOutputArtifact(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly outputFile: string;
+  readonly content: string;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+}): void {
+  if (!tenantOutputArtifactIsAdr(input.manifest)) {
+    return;
+  }
+  const evidenceRefs = [pathToFileURL(input.outputFile).href];
+  const filename = path.basename(input.outputFile);
+  if (!/^ADR-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\.md$/u.test(filename)) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "adr_output_filename_invalid",
+        detail: filename,
+        evidenceRefs
+      })
+    );
+  }
+  const requiredFields = Object.freeze([
+    "Status",
+    "Implements",
+    "Derives from",
+    "Supersedes",
+    "Superseded by",
+    "Retained special case"
+  ]);
+  for (const field of requiredFields) {
+    if (!hasAdrField(input.content, field)) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "adr_output_required_field_missing",
+          detail: field,
+          evidenceRefs
+        })
+      );
+    }
+  }
+  const status = adrStatusValue(input.content);
+  if (status !== "active" && status !== "superseded" && status !== "retired") {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "adr_output_status_invalid",
+        detail: status ?? "missing",
+        evidenceRefs
       })
     );
   }
@@ -4946,6 +4967,12 @@ export function evaluateWorkerResultPostflight(input: {
         })
       );
     }
+    evaluateAdrOutputArtifact({
+      manifest: input.manifest,
+      outputFile,
+      content,
+      blockingReasonCarriers
+    });
     if (sha256Text(content) !== input.report.digest) {
       blockingReasonCarriers.push(
         makeSdlcBlockingReason({

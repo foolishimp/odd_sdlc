@@ -157,6 +157,17 @@ test("T-031 portable fixture derives imported requirement authority and lineage"
       (authority) => authority.requirementId === "REQ-ENG-007"
     )
   );
+  assert(
+    report.requirementTransformAuthorities.some(
+      (authority) =>
+        authority.requirementId === "REQ-LDM-001" &&
+        authority.kind === "sdlc_requirement_transform_authority" &&
+        authority.status === "current" &&
+        authority.transformRef.startsWith(
+          "requirement-transform://odd-sdlc/ingress/REQ-LDM-001/"
+        )
+    )
+  );
 
   const projectLineage = report.lineage.find(
     (entry) => entry.elementId === "project:data_mapper"

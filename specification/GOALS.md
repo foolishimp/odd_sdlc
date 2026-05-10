@@ -127,10 +127,16 @@ This wave reads current invariant truth from:
 - `specification/PRODUCT.md`
 - `specification/requirements/01-upstream-adoption.md`
 - `specification/requirements/03-runtime-governance.md`
-- `specification/requirements/08-odd-sdlc-first-slice.md`
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
 - `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
 - `specification/requirements/12-declarative-operational-state-transitions.md`
+- `specification/requirements/13-odd-sdlc-typescript-tenant.md`
+- `specification/requirements/14-odd-sdlc-installed-product-contract.md`
+- `specification/requirements/15-odd-sdlc-scheduling-phase.md`
+
+`specification/requirements/08-odd-sdlc-first-slice.md` remains superseded
+provenance only. It is not current operative law for this wave unless an active
+requirement explicitly carries a retained obligation forward.
 
 This wave also reads current operational sequencing and review evidence from:
 

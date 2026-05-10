@@ -45,6 +45,17 @@ export const SDLC_WORKSITE_STATE_VALUES = Object.freeze([
 export type SdlcWorksiteState =
   (typeof SDLC_WORKSITE_STATE_VALUES)[number];
 
+export const SDLC_WORKSITE_ASSET_REF_ROLE_VALUES = Object.freeze([
+  "system_asset",
+  "workspace_asset",
+  "runtime_evidence",
+  "product_materialization",
+  "operator_run_evidence"
+] as const);
+
+export type SdlcWorksiteAssetRefRole =
+  (typeof SDLC_WORKSITE_ASSET_REF_ROLE_VALUES)[number];
+
 export const SDLC_CAPABILITY_FAMILY_VALUES = Object.freeze([
   "core_fd",
   "capability_fd",
@@ -144,6 +155,68 @@ export interface SdlcWorksite {
   readonly rootUri: string;
   readonly lifecycleState: SdlcWorksiteState;
   readonly activeAssetIds: readonly string[];
+  readonly systemAssetRefs: readonly string[];
+  readonly workspaceAssetRefs: readonly string[];
+  readonly runtimeEvidenceRefs: readonly string[];
+  readonly selectedGraphFunctionRef: string | null;
+  readonly selectedActionRef: string | null;
+}
+
+export interface SdlcWorksiteAssetRef {
+  readonly kind: "sdlc_worksite_asset_ref";
+  readonly ref: string;
+  readonly role: SdlcWorksiteAssetRefRole;
+  readonly description: string;
+}
+
+export interface SdlcWorksiteObservation {
+  readonly kind: "sdlc_worksite_observation";
+  readonly observationRef: string;
+  readonly worksiteId: string;
+  readonly systemAssetRefs: readonly string[];
+  readonly workspaceAssetRefs: readonly string[];
+  readonly runtimeEvidenceRefs: readonly string[];
+  readonly selectedGraphFunctionRef: string | null;
+  readonly selectedActionRef: string | null;
+  readonly targetBindingRefs: readonly string[];
+  readonly predecessorRefs: readonly string[];
+}
+
+export interface SdlcLawfulActionMenuEntry {
+  readonly kind: "sdlc_lawful_action_menu_entry";
+  readonly actionId: string;
+  readonly graphFunctionRef: string;
+  readonly sourceAssetRefs: readonly string[];
+  readonly targetAssetRef: string;
+  readonly expectedCarrierRef: string;
+  readonly humanDecision: string;
+  readonly retryActionRef: string | null;
+  readonly donePredicate: string;
+}
+
+export interface SdlcInstalledRunArchive {
+  readonly kind: "sdlc_installed_run_archive";
+  readonly archiveRoot: string;
+  readonly workspaceRoot: string;
+  readonly runtimeRoot: string;
+  readonly operatorRunRefs: readonly string[];
+  readonly processTraceRefs: readonly string[];
+  readonly productEvidenceRefs: readonly string[];
+  readonly executionProofRefs: readonly string[];
+}
+
+export interface SdlcConstructionEvidenceCycle {
+  readonly kind: "sdlc_construction_evidence_cycle";
+  readonly cycleRef: string;
+  readonly worksiteObservationRef: string;
+  readonly constructionIntentRef: string;
+  readonly workerProcessRef: string;
+  readonly edgeFulfillmentLedgerRef: string;
+  readonly closureDecisionRef: string;
+  readonly nextActionProjectionRef: string;
+  readonly materializationManifestRef: string | null;
+  readonly executionProofRefs: readonly string[];
+  readonly predecessorRefs: readonly string[];
 }
 
 export interface SdlcWorkActDescriptor {

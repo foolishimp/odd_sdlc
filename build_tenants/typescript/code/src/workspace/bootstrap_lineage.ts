@@ -13,6 +13,8 @@ import {
   type SdlcBootstrapLineageRecord,
   type SdlcImportedRequirementAuthority,
   type SdlcProjectConstraints,
+  type SdlcRequirementTransformAuthority,
+  type SdlcRequirementTransformAuthorityStatus,
   type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
 } from "./carriers.js";
@@ -49,6 +51,76 @@ function importedRequirementAuthorities(
     }
   }
   return Object.freeze(authorities);
+}
+
+function sourceInputForAuthority(input: {
+  readonly sourceInputs: readonly SdlcSourceInput[];
+  readonly authority: SdlcImportedRequirementAuthority;
+}): SdlcSourceInput | null {
+  return (
+    input.sourceInputs.find((sourceInput) => sourceInput.uri === input.authority.sourceUri) ??
+    null
+  );
+}
+
+function requirementTransformRefsFromSource(
+  sourceInput: SdlcSourceInput | null
+): readonly string[] {
+  if (sourceInput === null) {
+    return Object.freeze([]);
+  }
+  return uniqueSorted(
+    sourceInput.authorityMarkers.filter(
+      (marker) =>
+        marker.startsWith("transform-obligation://") ||
+        marker.startsWith("requirement-transform://") ||
+        marker.startsWith("requirement-lineage://")
+    )
+  );
+}
+
+function transformAuthorityStatus(
+  sourceInput: SdlcSourceInput | null
+): SdlcRequirementTransformAuthorityStatus {
+  if (sourceInput === null || sourceInput.ambiguity.kind === "ambiguous") {
+    return "ambiguous";
+  }
+  return "current";
+}
+
+function requirementTransformAuthorities(input: {
+  readonly sourceInputs: readonly SdlcSourceInput[];
+  readonly authorities: readonly SdlcImportedRequirementAuthority[];
+}): readonly SdlcRequirementTransformAuthority[] {
+  return Object.freeze(
+    input.authorities.map((authority) => {
+      const encodedRequirementId = encodeURIComponent(authority.requirementId);
+      const sourceInput = sourceInputForAuthority({
+        sourceInputs: input.sourceInputs,
+        authority
+      });
+      const sourceInputUris = Object.freeze([authority.sourceUri]);
+      const transformRef =
+        `requirement-transform://odd-sdlc/ingress/${encodedRequirementId}/${encodeURIComponent(authority.sourceDigest)}`;
+      return Object.freeze({
+        kind: "sdlc_requirement_transform_authority" as const,
+        requirementId: authority.requirementId,
+        transformRef,
+        predecessorTransformRefs: requirementTransformRefsFromSource(sourceInput),
+        transformInputAuthorityRef:
+          `source-authority://odd-sdlc/${encodedRequirementId}/${encodeURIComponent(authority.sourceDigest)}`,
+        transformOutputAuthorityRef:
+          `requirement-authority://odd-sdlc/${encodedRequirementId}/An`,
+        sourceInputUris,
+        evidenceRefs: Object.freeze([
+          authority.sourceUri,
+          `source-digest://odd-sdlc/${encodeURIComponent(authority.sourceDigest)}`,
+          transformRef
+        ]),
+        status: transformAuthorityStatus(sourceInput)
+      });
+    })
+  );
 }
 
 function lineageFor(input: {
@@ -179,6 +251,10 @@ export function deriveSdlcWorkspaceIngressReport(input: {
     sourceInputs: input.sourceInputs
   });
   const ambiguity = ambiguityRegister(input.sourceInputs);
+  const transformAuthorities = requirementTransformAuthorities({
+    sourceInputs: input.sourceInputs,
+    authorities
+  });
   return Object.freeze({
     kind: "sdlc_workspace_ingress_report",
     governingGraphFunction: FG_INGRESS_PROJECT,
@@ -188,6 +264,7 @@ export function deriveSdlcWorkspaceIngressReport(input: {
     projectIngressContract: deriveProjectIngressContract(input.projectConstraints),
     sourceInputs: Object.freeze([...input.sourceInputs]),
     importedRequirementAuthorities: authorities,
+    requirementTransformAuthorities: transformAuthorities,
     lineage: lineageFor({
       projectConstraints: input.projectConstraints,
       sourceInputs: input.sourceInputs,

@@ -123,7 +123,7 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
   const report = describeOddSdlcTypescriptRcQualification();
 
   assert.equal(report.kind, "odd_sdlc_typescript_rc_qualification_report");
-  assert.equal(report.verdict, "blocked_pending_b085_component_test_repair");
+  assert.equal(report.verdict, "retired_superseded_by_test35_uplift_wave");
   assert(!report.nonClaimedScope.includes("live probabilistic data_mapper generation with an external F_P worker"));
   assert(!report.nonClaimedScope.includes("side-effecting installed-workspace CLI replacement for the Python tenant"));
   assert(report.gates.some((gate) => gate.name === "T-038 composed harnessed sandbox" && gate.status === "passed"));
@@ -133,7 +133,7 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
   assert(report.gates.some((gate) => gate.name === "T-140 no local forced-iteration authority" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-059 install and release-cut adapter" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "live F_P worker traversal" && gate.status === "passed"));
-  assert(report.gates.some((gate) => gate.name === "B-085 current live data_mapper release-depth parity" && gate.status === "blocked"));
+  assert(report.gates.some((gate) => gate.name === "B-085 current live data_mapper release-depth parity" && gate.status === "completed_retired"));
   assert(report.gates.some((gate) => gate.name === "T-060 TypeScript/Python archive comparison" && gate.status === "passed"));
 
   for (const gap of remainingOddSdlcTypescriptRcGaps()) {
@@ -166,7 +166,7 @@ test("T-054 Python parity blocker map is the full operational RC control surface
   );
   const t041Path = resolve(
     REPO_ROOT,
-    ".ai-workspace/tickets/active/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
+    ".ai-workspace/tickets/completed/T-041-realize-typescript-full-operational-python-replacement-rc-lane.md"
   );
   const comparisonPath = resolve(
     REPO_ROOT,
@@ -308,8 +308,8 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
     lawfulReEntryPoint: "requirement_reprice"
   });
 
-  assert.equal(classification.frameworkLayer, "requirements");
-  assert.equal(route.lawfulStartTarget.handle, "derive_requirement_surface");
+  assert.equal(classification.frameworkLayer, "code");
+  assert.equal(route.lawfulStartTarget.handle, "derive_code_surface");
   assert.equal(ticketRoute.ticketAuthority, "TICKET_METHOD");
   assert.equal(ticketRoute.writesTicket, false);
 

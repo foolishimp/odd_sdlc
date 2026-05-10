@@ -276,8 +276,12 @@ build_tenants:
   );
   assert.equal(
     manifest.outputFile.endsWith(
-      ".ai-workspace/runtime/odd_sdlc/assets/t068-conform-project-handoff/component_code_surface.md"
+      "build_tenants/node_cli/design/component_code_surface.md"
     ),
+    true
+  );
+  assert.equal(
+    manifest.allowedWriteRoots.includes(manifest.productMaterialization.tenantRoot),
     true
   );
   assert.equal(manifest.productMaterialization.selectedOutputRoot, "build_tenants/node_cli");
