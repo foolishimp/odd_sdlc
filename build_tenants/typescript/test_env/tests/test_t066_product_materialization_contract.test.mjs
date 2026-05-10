@@ -29,6 +29,7 @@ import {
   constructorResultFromWorkerOutput,
   deriveComponentDepthAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
+  deriveSdlcOperatorAssuranceGate,
   deriveSdlcWorkspaceIngressReport,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
@@ -730,6 +731,77 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
   assert.deepStrictEqual(constructorResult.generatedAssetContract.diagnostics, [
     "materialized_product_file_count:1"
   ]);
+});
+
+test("T-144 assurance gate routes missing obligation assessments to same-edge retry", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t144-assurance-missing-obligation"
+  });
+  const output = writeOutputSurface(manifest, "component_code_surface");
+  const sourceContent = [
+    "package generated",
+    "",
+    "final case class MissingAssessmentProbe(value: String)"
+  ].join("\n");
+  const productFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/MissingAssessmentProbe.scala"
+  );
+  mkdirSync(dirname(productFile), { recursive: true });
+  writeFileSync(productFile, `${sourceContent}\n`, "utf8");
+  const materializedFiles = [
+    {
+      kind: "sdlc_materialized_product_file",
+      role: "source",
+      relativePath: path.relative(manifest.productMaterialization.tenantRoot, productFile),
+      absolutePath: productFile,
+      digest: sha256Text(`${sourceContent}\n`),
+      byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
+    }
+  ];
+  const report = {
+    kind: "odd_sdlc.worker_result_report",
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile,
+    digest: output.digest,
+    summary: "generated product source while omitting obligation assessment",
+    unresolvedReasons: [],
+    materializedFiles,
+    executionEvidence: null,
+    obligationAssessments: []
+  };
+  const gate = deriveSdlcOperatorAssuranceGate({
+    manifest,
+    report,
+    postflight: {
+      kind: "sdlc_operator_postflight_result",
+      status: "passed",
+      blockingReasons: [],
+      blockingReasonCarriers: [],
+      evidenceRefs: [`file://${productFile}`]
+    }
+  });
+
+  assert.equal(gate.satisfaction.status, "retry_same_edge");
+  assert(gate.blockingPostflight);
+  const missingAssessmentReason =
+    gate.blockingPostflight.blockingReasonCarriers.find((reason) =>
+      reason.detail.startsWith("obligation_assessment_missing:")
+    );
+  assert(missingAssessmentReason);
+  assert.equal(missingAssessmentReason.lawfulReentryPoint, "same_edge_retry");
+  assert.notEqual(missingAssessmentReason.lawfulReentryPoint, "operator_blocked");
 });
 
 test("T-004 tenant-local surface output is not counted as product source materialization", () => {

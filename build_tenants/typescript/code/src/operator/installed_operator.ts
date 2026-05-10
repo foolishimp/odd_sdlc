@@ -136,7 +136,11 @@ import {
   type SdlcBlockingReasonLawfulReentryPoint
 } from "../shared/blocking_reason.js";
 
-const MAX_INSTALLED_REENTRY_ATTEMPTS = 4;
+export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
+export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
+const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 5;
+
+export type SdlcInstalledReentryDisposition = "retry" | "yield" | "other";
 
 function summary(input: {
   readonly workspaceRoot: string;
@@ -232,6 +236,8 @@ function installedStartLoopAttemptFor(input: {
     attemptIndex: input.attemptIndex,
     status: input.outcome.status,
     currentEdge: input.outcome.summary.currentEdge,
+    closureDisposition: installedReentryDispositionForOutcome(input.outcome),
+    reentryBasisRef: installedReentryBasisRef(input.outcome),
     blockingReason: input.outcome.summary.blockingReason,
     nextLawfulAction: input.outcome.summary.nextLawfulAction,
     archiveRoot: input.outcome.archiveRoot,
@@ -244,6 +250,56 @@ function installedStartHasEvaluateNextTraversalTruth(
   outcome: SdlcInstalledOperatorStartOutcome
 ): boolean {
   return outcome.traversalConsequence?.nextActionProjection.choosesNextTraversal === true;
+}
+
+export function installedReentryDispositionForOutcome(
+  outcome: Pick<SdlcInstalledOperatorStartOutcome, "traversalConsequence">
+): SdlcInstalledReentryDisposition | null {
+  const disposition =
+    outcome.traversalConsequence?.edgeClosureDecision.disposition ?? null;
+  if (disposition === null) {
+    return null;
+  }
+  if (disposition === "retry" || disposition === "yield") {
+    return disposition;
+  }
+  return "other";
+}
+
+export function installedReentryAttemptLimit(
+  disposition: SdlcInstalledReentryDisposition
+): number {
+  if (disposition === "yield") {
+    return MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
+  }
+  if (disposition === "retry") {
+    return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
+  }
+  return MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS;
+}
+
+function installedReentryBasisRef(
+  outcome: SdlcInstalledOperatorStartOutcome
+): string | null {
+  const consequence = outcome.traversalConsequence;
+  if (consequence === null) {
+    return null;
+  }
+  const materialization = outcome.manifest?.productMaterialization;
+  return [
+    consequence.edgeFulfillmentLedger.edgeRef,
+    `disposition:${consequence.edgeClosureDecision.disposition}`,
+    `selected:${consequence.nextActionProjection.selectedActionRef ?? "none"}`,
+    `nextGraph:${consequence.nextActionProjection.nextGraphFunctionRef ?? "none"}`,
+    `edge:${outcome.summary.currentEdge ?? "none"}`,
+    `target:${outcome.manifest?.targetAssetType ?? "none"}`,
+    `output:${outcome.manifest?.outputFile ?? "none"}`,
+    `materializationRequired:${String(materialization?.required ?? null)}`,
+    `selectedOutputRoot:${materialization?.selectedOutputRoot ?? "none"}`,
+    `roles:${materialization?.requiredRoles.join(",") ?? "none"}`,
+    `executionShards:${String(materialization?.executionShards.length ?? 0)}`,
+    `blocking:${outcome.summary.blockingReason ?? "none"}`
+  ].join("|");
 }
 
 export type SdlcWorkerRetryContextDerivationStatus =
@@ -326,8 +382,15 @@ function terminalReasonForInstalledStartLoop(input: {
   readonly requestedUntil: string;
   readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly retryGuardExhausted: boolean;
+  readonly exhaustedDisposition: SdlcInstalledReentryDisposition | null;
 }): SdlcInstalledOperatorStartLoop["terminalReason"] {
   if (input.retryGuardExhausted) {
+    if (input.exhaustedDisposition === "yield") {
+      return "yield_guard_exhausted";
+    }
+    if (input.exhaustedDisposition === "other") {
+      return "reentry_guard_exhausted";
+    }
     return "retry_guard_exhausted";
   }
   if (input.outcome.status === "converged") {
@@ -350,20 +413,27 @@ function installedStartWithLoop(input: {
   readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
   readonly retryGuardExhausted: boolean;
+  readonly exhaustedDisposition: SdlcInstalledReentryDisposition | null;
 }): SdlcInstalledOperatorStartOutcome {
   if (input.attempts.length <= 1) {
     return input.outcome;
   }
+  const disposition =
+    input.exhaustedDisposition ??
+    installedReentryDispositionForOutcome(input.outcome) ??
+    "other";
   const loop: SdlcInstalledOperatorStartLoop = Object.freeze({
     kind: "sdlc_installed_operator_start_loop",
     requestedUntil: input.requestedUntil,
-    maxAttempts: MAX_INSTALLED_REENTRY_ATTEMPTS,
+    maxAttempts: installedReentryAttemptLimit(disposition),
     attemptCount: input.attempts.length,
     terminalReason: terminalReasonForInstalledStartLoop({
       requestedUntil: input.requestedUntil,
       outcome: input.outcome,
-      retryGuardExhausted: input.retryGuardExhausted
+      retryGuardExhausted: input.retryGuardExhausted,
+      exhaustedDisposition: input.exhaustedDisposition
     }),
+    exhaustedDisposition: input.exhaustedDisposition,
     attempts: Object.freeze([...input.attempts])
   });
   return Object.freeze({
@@ -3598,10 +3668,16 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   let start = input.start;
   let replayEvents = input.replayEvents;
   let retryGuardExhausted = false;
+  let exhaustedDisposition: SdlcInstalledReentryDisposition | null = null;
   let retryContextOverride: SdlcWorkerRetryContext | undefined;
+  const reentryDispositionCounts: Record<SdlcInstalledReentryDisposition, number> = {
+    retry: 0,
+    yield: 0,
+    other: 0
+  };
   for (
     let attemptIndex = 0;
-    attemptIndex < MAX_INSTALLED_REENTRY_ATTEMPTS;
+    attemptIndex < MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
     attemptIndex += 1
   ) {
     latest = await executeInstalledOperatorStart({
@@ -3632,8 +3708,15 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     if (!installedStartHasEvaluateNextTraversalTruth(latest)) {
       break;
     }
-    if (attemptIndex === MAX_INSTALLED_REENTRY_ATTEMPTS - 1) {
+    const reentryDisposition =
+      installedReentryDispositionForOutcome(latest) ?? "other";
+    reentryDispositionCounts[reentryDisposition] += 1;
+    if (
+      reentryDispositionCounts[reentryDisposition] >=
+      installedReentryAttemptLimit(reentryDisposition)
+    ) {
       retryGuardExhausted = true;
+      exhaustedDisposition = reentryDisposition;
       break;
     }
     retryContextOverride = deriveSdlcWorkerRetryContextFromTraversalConsequence({
@@ -3662,6 +3745,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     requestedUntil: input.requestedUntil,
     outcome: latest,
     attempts,
-    retryGuardExhausted
+    retryGuardExhausted,
+    exhaustedDisposition
   });
 }

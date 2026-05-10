@@ -464,7 +464,7 @@ test(
   { skip: LIVE_ENABLED ? false : "ODD_SDLC_TS_T109_DATA_MAPPER_LIVE=1 not set" },
   async () => {
     const archiveRoot = liveTestArchiveRoot(
-      "t109_live_installed_data_mapper_pty",
+      "full_external_data_mapper_sandbox",
       archiveTimestamp(),
       process.pid
     );

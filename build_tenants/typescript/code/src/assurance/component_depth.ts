@@ -558,26 +558,33 @@ function componentRepairScheduleReasons(input: {
 function latestAdmittedComponentRepairSchedule(input: {
   readonly workspaceRoot: string;
 }): { readonly schedule: SdlcComponentRepairSchedule; readonly evidenceRefs: readonly string[] } | null {
+  const profile = deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot);
   const assetsRoot = join(
     input.workspaceRoot,
-    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
-      .transformAssetRoot
+    profile.runtimeLayout.transformAssetRoot
   );
-  if (!existsSync(assetsRoot) || !statSync(assetsRoot).isDirectory()) {
-    return null;
-  }
   const candidates: { readonly filePath: string; readonly mtimeMs: number }[] = [];
-  for (const runId of readdirSync(assetsRoot)) {
-    const filePath = join(
-      assetsRoot,
-      runId,
-      "component_repair_schedule_surface.md"
-    );
+  const pushCandidate = (filePath: string): void => {
     if (existsSync(filePath) && statSync(filePath).isFile()) {
-      candidates.push(Object.freeze({
-        filePath,
-        mtimeMs: statSync(filePath).mtimeMs
-      }));
+      candidates.push(
+        Object.freeze({
+          filePath,
+          mtimeMs: statSync(filePath).mtimeMs
+        })
+      );
+    }
+  };
+  pushCandidate(
+    join(
+      input.workspaceRoot,
+      profile.selectedOutputRoot,
+      "design",
+      "component_repair_schedule_surface.md"
+    )
+  );
+  if (existsSync(assetsRoot) && statSync(assetsRoot).isDirectory()) {
+    for (const runId of readdirSync(assetsRoot)) {
+      pushCandidate(join(assetsRoot, runId, "component_repair_schedule_surface.md"));
     }
   }
   for (const candidate of candidates.sort((left, right) => right.mtimeMs - left.mtimeMs)) {

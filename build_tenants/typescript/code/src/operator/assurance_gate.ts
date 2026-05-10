@@ -243,7 +243,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
       assessment.fulfillmentStatus === "fulfilled" &&
       assessment.evidenceRefs.length === 0
   );
-  const blockedReasonCodes = [
+  const openGapReasonCodes = [
     ...missing.map(
       (obligation) => `obligation_assessment_missing:${obligation.obligationId}`
     ),
@@ -252,9 +252,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
     ),
     ...blocked.map(
       (assessment) => `obligation_assessment_blocked:${assessment.obligationId}`
-    )
-  ];
-  const openGapReasonCodes = [
+    ),
     ...open.map(
       (assessment) => `obligation_assessment_open:${assessment.obligationId}`
     ),
@@ -265,7 +263,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
   return assuranceLedger({
     dimension: "semantic_convergence",
     verdict: verdictFromReasons({
-      blockedReasonCodes,
+      blockedReasonCodes: Object.freeze([]),
       openGapReasonCodes
     }),
     reasons: [
@@ -274,7 +272,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
           code: `obligation_assessment_missing:${obligation.obligationId}`,
           message: `Traversal obligation ${obligation.obligationId} was not assessed by the worker.`,
           evidenceRefs: obligation.evidenceRefs,
-          lawfulReentryPoint: "operator_blocked"
+          lawfulReentryPoint: "same_edge_retry"
         })
       ),
       ...extra.map((assessment) =>
@@ -282,7 +280,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
           code: `obligation_assessment_extra:${assessment.obligationId}`,
           message: `Worker assessed undeclared obligation ${assessment.obligationId}.`,
           evidenceRefs: assessment.evidenceRefs,
-          lawfulReentryPoint: "operator_blocked"
+          lawfulReentryPoint: "repair_worker_output"
         })
       ),
       ...blocked.map((assessment) =>
@@ -290,7 +288,7 @@ function deriveDeclaredObligationAssuranceLedger(input: {
           code: `obligation_assessment_blocked:${assessment.obligationId}`,
           message: `Traversal obligation ${assessment.obligationId} is blocked.`,
           evidenceRefs: assessment.evidenceRefs,
-          lawfulReentryPoint: "operator_blocked"
+          lawfulReentryPoint: "repair_worker_output"
         })
       ),
       ...open.map((assessment) =>

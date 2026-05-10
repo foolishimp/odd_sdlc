@@ -57,6 +57,8 @@ export interface SdlcInstalledOperatorStartLoopAttempt {
   readonly attemptIndex: number;
   readonly status: SdlcInstalledOperatorStatus;
   readonly currentEdge: string | null;
+  readonly closureDisposition: string | null;
+  readonly reentryBasisRef: string | null;
   readonly blockingReason: string | null;
   readonly nextLawfulAction: string;
   readonly archiveRoot: string | null;
@@ -74,7 +76,10 @@ export interface SdlcInstalledOperatorStartLoop {
     | "converged"
     | "blocked"
     | "retry_not_planned"
-    | "retry_guard_exhausted";
+    | "retry_guard_exhausted"
+    | "yield_guard_exhausted"
+    | "reentry_guard_exhausted";
+  readonly exhaustedDisposition: "retry" | "yield" | "other" | null;
   readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
 }
 
@@ -977,6 +982,28 @@ export interface SdlcWorkerInvocationOutputContract {
   readonly testExecutionContract: string;
 }
 
+export interface SdlcProductMaterializationAuthorityTarget {
+  readonly kind: "sdlc_product_materialization_authority_target";
+  readonly path: string;
+  readonly targetKind: "file" | "directory";
+  readonly source: "context_expected_files" | "product_authority";
+  readonly sourceRef: string;
+}
+
+export interface SdlcProductMaterializationAuthorityReconciliation {
+  readonly kind: "sdlc_product_materialization_authority_reconciliation";
+  readonly status: "not_required" | "passed" | "missing" | "ambiguous";
+  readonly selectedOutputRoot: string;
+  readonly contextExpectedFileTargets: readonly string[];
+  readonly productAuthorityTargets: readonly string[];
+  readonly declaredProductFileTargets: readonly string[];
+  readonly contextExpectedTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly productAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly declaredProductTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly sourceRefs: readonly string[];
+  readonly reasonRefs: readonly string[];
+}
+
 export interface SdlcWorkerInvocationPackage {
   readonly kind: "sdlc_worker_invocation_package";
   readonly packageVersion: "ts-invocation-v1";
@@ -994,6 +1021,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly transformAxioms: readonly string[];
   readonly outcomeDirectives: readonly string[];
   readonly outputContract: SdlcWorkerInvocationOutputContract;
+  readonly productMaterializationAuthority: SdlcProductMaterializationAuthorityReconciliation;
   readonly allowedWriteRoots: readonly string[];
   readonly traversalStrategyDecision: SdlcTraversalStrategyDecision;
   readonly featureScope: SdlcFeatureScope;

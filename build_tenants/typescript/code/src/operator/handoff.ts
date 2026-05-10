@@ -83,6 +83,8 @@ import type {
   SdlcTraversalObligationContext,
   SdlcTraversalStrategyDecision,
   SdlcRetrievalHint,
+  SdlcProductMaterializationAuthorityReconciliation,
+  SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerBrief,
   SdlcWorkerInvocationObligation,
   SdlcWorkerInvocationPackage,
@@ -248,11 +250,14 @@ export function operatorRunId(): string {
 }
 
 function tenantLocalSdlcSurfaceRelativePath(targetAssetType: string): string | null {
-  return (
-    TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS[
-      targetAssetType as keyof typeof TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
-    ] ?? null
-  );
+  for (const [assetType, relativePath] of Object.entries(
+    TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
+  )) {
+    if (assetType === targetAssetType) {
+      return relativePath;
+    }
+  }
+  return null;
 }
 
 function deriveOutputFileForTarget(input: {
@@ -403,12 +408,209 @@ function productMaterializationForFeatureScope(input: {
   });
 }
 
-function declaredProductFileTargets(manifest: SdlcWorkerHandoffManifest): readonly string[] {
+function normalizeDeclaredProductFileTarget(input: {
+  readonly value: string;
+  readonly selectedOutputRoot: string;
+}): Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind"> | null {
+  const withoutComment = input.value.replace(/\s+#.*$/u, "");
+  const trimmed = withoutComment
+    .trim()
+    .replace(/^[-*]\s+/u, "")
+    .replace(/^["'`]+|["'`]+$/gu, "")
+    .replace(/\\/gu, "/")
+    .replace(/^workspace:\/\//u, "")
+    .replace(/^\.\//u, "");
+  const targetKind =
+    trimmed.endsWith("/") || /\/(?:src|project)$/u.test(trimmed)
+      ? "directory"
+      : "file";
+  const cleaned = withoutComment
+    .trim()
+    .replace(/^[-*]\s+/u, "")
+    .replace(/^["'`]+|["'`]+$/gu, "")
+    .replace(/\\/gu, "/")
+    .replace(/^workspace:\/\//u, "")
+    .replace(/^\.\//u, "")
+    .replace(/\/+$/u, "");
+  if (cleaned.length === 0) {
+    return null;
+  }
+  const normalized = path.posix.normalize(cleaned).replace(/^\.\//u, "");
+  if (
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    isAbsolute(normalized)
+  ) {
+    return null;
+  }
+  if (
+    normalized === input.selectedOutputRoot ||
+    normalized.startsWith(`${input.selectedOutputRoot}/`)
+  ) {
+    return Object.freeze({
+      path: normalized,
+      targetKind
+    });
+  }
+  return null;
+}
+
+function markdownSectionBodies(input: {
+  readonly markdown: string;
+  readonly titlePattern: RegExp;
+}): readonly string[] {
+  const lines = input.markdown.split(/\r?\n/u);
+  const bodies: string[] = [];
+  let activeDepth: number | null = null;
+  let activeLines: string[] = [];
+  for (const line of lines) {
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/u.exec(line);
+    if (heading !== null) {
+      const marker = heading[1] ?? "";
+      const headingTitle = heading[2] ?? "";
+      const depth = marker.length;
+      const title = headingTitle.trim();
+      if (activeDepth !== null && depth <= activeDepth) {
+        bodies.push(activeLines.join("\n"));
+        activeDepth = null;
+        activeLines = [];
+      }
+      if (activeDepth === null && input.titlePattern.test(title)) {
+        activeDepth = depth;
+        activeLines = [];
+      }
+      continue;
+    }
+    if (activeDepth !== null) {
+      activeLines.push(line);
+    }
+  }
+  if (activeDepth !== null) {
+    bodies.push(activeLines.join("\n"));
+  }
+  return Object.freeze(bodies);
+}
+
+function targetsFromProductAuthoritySection(input: {
+  readonly body: string;
+  readonly selectedOutputRoot: string;
+}): readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[] {
+  const targets = new Map<
+    string,
+    Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">
+  >();
+  let fenced = false;
+  let sectionTreeRoot: string | null = null;
+  const addTarget = (candidate: string): void => {
+    const directTarget = normalizeDeclaredProductFileTarget({
+      value: candidate,
+      selectedOutputRoot: input.selectedOutputRoot
+    });
+    if (directTarget?.path === input.selectedOutputRoot) {
+      sectionTreeRoot = input.selectedOutputRoot;
+      return;
+    }
+    if (directTarget !== null) {
+      targets.set(directTarget.path, directTarget);
+      return;
+    }
+    if (sectionTreeRoot === null) {
+      return;
+    }
+    const relativeTarget = normalizeDeclaredProductFileTarget({
+      value: `${sectionTreeRoot}/${candidate.trim()}`,
+      selectedOutputRoot: input.selectedOutputRoot
+    });
+    if (
+      relativeTarget !== null &&
+      relativeTarget.path !== input.selectedOutputRoot
+    ) {
+      targets.set(relativeTarget.path, relativeTarget);
+    }
+  };
+
+  for (const line of input.body.split(/\r?\n/u)) {
+    if (/^\s*```/u.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    for (const match of line.matchAll(/`([^`]+)`/gu)) {
+      const codeSpan = match[1];
+      if (codeSpan !== undefined) {
+        addTarget(codeSpan);
+      }
+    }
+    if (!fenced) {
+      const bullet = /^\s*[-*]\s+(.+)$/u.exec(line);
+      if (bullet !== null) {
+        const bulletTarget = bullet[1];
+        if (bulletTarget !== undefined) {
+          addTarget(bulletTarget);
+        }
+      }
+      continue;
+    }
+    addTarget(line);
+  }
+  return Object.freeze(
+    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+  );
+}
+
+function productAuthorityTargetsFor(
+  manifest: SdlcWorkerHandoffManifest
+): {
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly sourceRefs: readonly string[];
+} {
+  const productPath = join(manifest.workspaceRoot, "specification/PRODUCT.md");
+  if (!existsSync(productPath)) {
+    return Object.freeze({
+      targets: Object.freeze([]),
+      sourceRefs: Object.freeze([])
+    });
+  }
+  const product = readFileSync(productPath, "utf8");
+  const sections = markdownSectionBodies({
+    markdown: product,
+    titlePattern: /^(?:declared|expected)\s+product\s+files$/iu
+  });
+  const sourceRef = pathToFileURL(productPath).href;
+  const targets = targetContractsFromSeeds({
+    source: "product_authority",
+    sourceRef,
+    seeds: sections.flatMap((body) =>
+      targetsFromProductAuthoritySection({
+        body,
+        selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+      })
+    )
+  });
+  return Object.freeze({
+    targets,
+    sourceRefs: Object.freeze([sourceRef])
+  });
+}
+
+function contextExpectedFileTargetsFor(
+  manifest: SdlcWorkerHandoffManifest
+): {
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly sourceRefs: readonly string[];
+  readonly reasonRefs: readonly string[];
+} {
   const contextRoot = join(manifest.workspaceRoot, ".ai-workspace/context");
   if (!existsSync(contextRoot)) {
-    return Object.freeze([]);
+    return Object.freeze({
+      targets: Object.freeze([]),
+      sourceRefs: Object.freeze([]),
+      reasonRefs: Object.freeze([])
+    });
   }
-  const targets = new Set<string>();
+  const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
+  const sourceRefs = new Set<string>();
+  const reasonRefs = new Set<string>();
   for (const entry of readdirSync(contextRoot, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) {
       continue;
@@ -418,6 +620,7 @@ function declaredProductFileTargets(manifest: SdlcWorkerHandoffManifest): readon
     try {
       parsed = JSON.parse(readFileSync(filePath, "utf8"));
     } catch {
+      reasonRefs.add(`context_expected_files_parse_failed:${entry.name}`);
       continue;
     }
     if (
@@ -428,20 +631,144 @@ function declaredProductFileTargets(manifest: SdlcWorkerHandoffManifest): readon
     ) {
       continue;
     }
+    const sourceRef = pathToFileURL(filePath).href;
+    sourceRefs.add(sourceRef);
     for (const value of parsed.expectedFiles) {
       if (typeof value !== "string" || value.trim().length === 0) {
         continue;
       }
-      const normalized = value.trim().replace(/\\/gu, "/");
+      const normalized = normalizeDeclaredProductFileTarget({
+        value,
+        selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+      });
       if (
-        normalized === manifest.productMaterialization.selectedOutputRoot ||
-        normalized.startsWith(`${manifest.productMaterialization.selectedOutputRoot}/`)
+        normalized !== null &&
+        normalized.path !== manifest.productMaterialization.selectedOutputRoot
       ) {
-        targets.add(normalized);
+        targets.set(
+          normalized.path,
+          Object.freeze({
+            kind: "sdlc_product_materialization_authority_target" as const,
+            ...normalized,
+            source: "context_expected_files" as const,
+            sourceRef
+          })
+        );
       }
     }
   }
-  return Object.freeze([...targets].sort());
+  return Object.freeze({
+    targets: Object.freeze(
+      [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+    ),
+    sourceRefs: Object.freeze([...sourceRefs].sort()),
+    reasonRefs: Object.freeze([...reasonRefs].sort())
+  });
+}
+
+function targetContractsFromSeeds(input: {
+  readonly source: SdlcProductMaterializationAuthorityTarget["source"];
+  readonly sourceRef: string;
+  readonly seeds: readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[];
+}): readonly SdlcProductMaterializationAuthorityTarget[] {
+  const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
+  for (const seed of input.seeds) {
+    targets.set(
+      seed.path,
+      Object.freeze({
+        kind: "sdlc_product_materialization_authority_target" as const,
+        ...seed,
+        source: input.source,
+        sourceRef: input.sourceRef
+      })
+    );
+  }
+  return Object.freeze(
+    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+  );
+}
+
+function mergedTargetContracts(
+  contextTargets: readonly SdlcProductMaterializationAuthorityTarget[],
+  productTargets: readonly SdlcProductMaterializationAuthorityTarget[]
+): readonly SdlcProductMaterializationAuthorityTarget[] {
+  const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
+  for (const target of contextTargets) {
+    targets.set(target.path, target);
+  }
+  for (const target of productTargets) {
+    targets.set(target.path, target);
+  }
+  return Object.freeze(
+    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+  );
+}
+
+function sameTargetSet(
+  left: readonly string[],
+  right: readonly string[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+export function reconcileSdlcProductMaterializationAuthority(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcProductMaterializationAuthorityReconciliation {
+  const context = contextExpectedFileTargetsFor(manifest);
+  const product = productAuthorityTargetsFor(manifest);
+  const contextTargetPaths = uniqueSorted(context.targets.map((target) => target.path));
+  const productTargetPaths = uniqueSorted(product.targets.map((target) => target.path));
+  const declaredProductTargetContracts = mergedTargetContracts(
+    context.targets,
+    product.targets
+  );
+  const declaredProductFileTargets = uniqueSorted([
+    ...contextTargetPaths,
+    ...productTargetPaths
+  ]);
+  const reasonRefs = new Set<string>(context.reasonRefs);
+  if (
+    contextTargetPaths.length > 0 &&
+    productTargetPaths.length > 0 &&
+    !sameTargetSet(contextTargetPaths, productTargetPaths)
+  ) {
+    reasonRefs.add("product_context_target_mismatch");
+  }
+  if (
+    manifest.productMaterialization.required &&
+    declaredProductFileTargets.length === 0
+  ) {
+    reasonRefs.add("declared_product_file_targets_missing");
+  }
+  return Object.freeze({
+    kind: "sdlc_product_materialization_authority_reconciliation",
+    status: !manifest.productMaterialization.required
+      ? "not_required"
+      : reasonRefs.has("product_context_target_mismatch")
+        ? "ambiguous"
+      : declaredProductFileTargets.length > 0
+        ? "passed"
+        : "missing",
+    selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot,
+    contextExpectedFileTargets: contextTargetPaths,
+    productAuthorityTargets: productTargetPaths,
+    declaredProductFileTargets,
+    contextExpectedTargetContracts: context.targets,
+    productAuthorityTargetContracts: product.targets,
+    declaredProductTargetContracts,
+    sourceRefs: uniqueSorted([...context.sourceRefs, ...product.sourceRefs]),
+    reasonRefs: Object.freeze([...reasonRefs].sort())
+  });
+}
+
+export function declaredProductFileTargets(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return reconcileSdlcProductMaterializationAuthority(manifest)
+    .declaredProductFileTargets;
 }
 
 const DEFAULT_EXECUTION_SHARD_TIMEOUT_MS = 1000 * 60 * 30;
@@ -2376,7 +2703,10 @@ function outcomeDirectivesForWorker(
     );
   }
   const tenantOutputArtifact = tenantRelativeOutputArtifactPath(manifest);
-  const productFileTargets = declaredProductFileTargets(manifest);
+  const productMaterializationAuthority =
+    reconcileSdlcProductMaterializationAuthority(manifest);
+  const productFileTargets =
+    productMaterializationAuthority.declaredProductFileTargets;
   if (!manifest.productMaterialization.required) {
     directives.push(
       "Product materialization is not required for this edge.",
@@ -2426,8 +2756,17 @@ function outcomeDirectivesForWorker(
       productFileTargets.length === 0
         ? "Declared product file targets: none."
         : `Declared product file targets: ${productFileTargets.join(", ")}.`,
+      `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
       "Apply requirementTraceObligationIds as the requirement transformation set for product files."
     );
+    if (
+      productMaterializationAuthority.status === "missing" ||
+      productMaterializationAuthority.status === "ambiguous"
+    ) {
+      directives.push(
+        "If product target inventory is missing or ambiguous, inspect PRODUCT.md, requirements, and context refs in workerInvocationPackage.productMaterializationAuthority; derive the product topology and report the rationale in the worker result."
+      );
+    }
     if (manifest.targetAssetType === "test_module_surface") {
       directives.push(
         "Generated tests must be discoverable by the declared test execution contract."
@@ -2476,7 +2815,10 @@ export function constructWorkerInvocationPackage(input: {
   const priorGapReasons = priorGapReasonCodes(input.manifest.retryContext);
   const repairReentryPlans = repairReentryPlansForContext(input.manifest);
   const retryRepairInstructions = retryRepairInstructionsForContext(input.manifest);
-  const productFileTargets = declaredProductFileTargets(input.manifest);
+  const productMaterializationAuthority =
+    reconcileSdlcProductMaterializationAuthority(input.manifest);
+  const productFileTargets =
+    productMaterializationAuthority.declaredProductFileTargets;
   const base = Object.freeze({
     kind: "sdlc_worker_invocation_package" as const,
     packageVersion: "ts-invocation-v1" as const,
@@ -2526,6 +2868,10 @@ export function constructWorkerInvocationPackage(input: {
       testExecutionContract:
         input.manifest.productMaterialization.testExecutionContract
     }),
+    productMaterializationAuthority: workerFacingProductMaterializationAuthority(
+      input.manifest,
+      productMaterializationAuthority
+    ),
     allowedWriteRoots: input.manifest.allowedWriteRoots.map((root) =>
       workerFacingPath(input.manifest, root)
     ),
@@ -2710,6 +3056,16 @@ function workerFacingRefs(
   refs: readonly string[]
 ): readonly string[] {
   return Object.freeze(refs.map((ref) => workerFacingRef(manifest, ref)));
+}
+
+function workerFacingProductMaterializationAuthority(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  reconciliation: SdlcProductMaterializationAuthorityReconciliation
+): SdlcProductMaterializationAuthorityReconciliation {
+  return Object.freeze({
+    ...reconciliation,
+    sourceRefs: workerFacingRefs(manifest, reconciliation.sourceRefs)
+  });
 }
 
 function workerFacingTraversalStrategyDecision(
