@@ -160,12 +160,13 @@ function findProductMaterializationPackages(workspace) {
         stack.push(child);
       } else if (entry.isFile() && entry.name === "worker_invocation_package.json") {
         const pkg = readJsonFile(child);
-        if (pkg.productMaterialization?.required === true) {
+        if (pkg.outputContract?.materializationRequired === true) {
           packages.push({
             path: child,
             edgeName: pkg.edgeName,
             targetAssetType: pkg.targetAssetType,
-            declaredProductFileTargets: pkg.declaredProductFileTargets ?? [],
+            declaredProductFileTargets:
+              pkg.outputContract?.declaredProductFileTargets ?? [],
             productMaterializationAuthority: pkg.productMaterializationAuthority ?? null
           });
         }
@@ -297,6 +298,14 @@ function main() {
     });
     summary.productMaterializationPackages = findProductMaterializationPackages(workspace);
     writeJson(path.join(archiveRoot, "run_summary.json"), summary);
+    if (
+      start.status === "converged" ||
+      (startSummary.status === "converged" && startSummary.currentEdge === null)
+    ) {
+      summary.terminalReason = "odd_sdlc_reported_converged";
+      writeJson(path.join(archiveRoot, "run_summary.json"), summary);
+      break;
+    }
   }
   writeJson(path.join(archiveRoot, "run_summary.json"), summary);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);

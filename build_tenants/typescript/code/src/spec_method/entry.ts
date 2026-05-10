@@ -1042,7 +1042,10 @@ function startOutcomeForObservedReplay(input: {
         handle: selectedNextGraphFunctionName
       }
     });
-    if (selected.executionContract !== null) {
+    if (
+      selected.executionContract !== null &&
+      hasReplayForBasis(selected.executionContract.basis, input.events)
+    ) {
       return selected;
     }
   }
