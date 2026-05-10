@@ -25,6 +25,7 @@ from .domain_model import (
     AssetProvenance,
     relative_file_uri,
 )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/workspace_assets.py
 from .execution_contract import EXECUTION_CONTRACT_KIND, EXECUTION_CONTRACT_REGISTER_PATH
 from .install_topology import LEGACY_INSTALLED_PRODUCT_ROOT_RELATIVE
 from .project_profile import (
@@ -34,12 +35,22 @@ from .project_profile import (
     RealizationCandidate,
     load_project_profile,
     operational_capability_projection_for_profile,
+=======
+from .project_profile import (
+    DEFAULT_PROVING_CODE_RELATIVE_PATH,
+    ProjectProfile,
+    load_project_profile,
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py
     profile_design_relative_path,
     profile_test_env_relative_path,
     profile_test_env_tests_relative_path,
     realization_candidates_for_selected_root,
 )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/workspace_assets.py
 from .requirement_closure import (
+=======
+from .traceability import (
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py
     REQUIREMENT_CLOSURE_REGISTER_KIND,
     REQUIREMENT_CLOSURE_REGISTER_PATH,
 )
@@ -824,7 +835,10 @@ def summarize_test_evidence(workspace_root: Path) -> TestEvidenceSummary:
             "report_paths": [],
             "ungoverned_report_file_count": len(ungoverned_report_paths),
             "ungoverned_report_paths": ungoverned_report_paths,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/workspace_assets.py
             "governing_capability": governing_capability,
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py
         }
     return {
         "report_file_count": len(report_files),
@@ -839,7 +853,10 @@ def summarize_test_evidence(workspace_root: Path) -> TestEvidenceSummary:
             path.relative_to(workspace_root).as_posix()
             for path in sorted(foreign_report_files)
         ],
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/workspace_assets.py
         "governing_capability": governing_capability,
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py
     }
 
 
@@ -863,7 +880,11 @@ def _selected_build_tenant_root(workspace_root: Path) -> Path | None:
     return None
 
 
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/workspace_assets.py
 def foreign_realization_candidates(workspace_root: Path) -> list[RealizationCandidate]:
+=======
+def foreign_realization_candidates(workspace_root: Path) -> list[dict[str, object]]:
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/workspace_assets.py
     return realization_candidates_for_selected_root(workspace_root)
 
 

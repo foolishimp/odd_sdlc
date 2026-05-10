@@ -28,10 +28,11 @@ import {
   deriveSdlcInstalledQualificationInitialState,
   deriveSdlcWorkspaceIngressReport,
   executeInstalledOperatorStart,
+  FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
-  projectSdlcGapsFromReplay,
+  evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicStartOnce,
@@ -366,7 +367,7 @@ test("T-076 component-code materialization closes under current path admission",
   assert.equal(completed.postflight.status, "passed");
   assert.equal(completed.gapDossier, null);
   const completionEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterCompletion = projectSdlcGapsFromReplay({
+  const afterCompletion = evalSdlcGapFromReplay({
     basis,
     events: Object.freeze([...preclosedEvents, ...completionEvents])
   });
@@ -406,6 +407,31 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
       );
       assert.equal(induction.status, "converged");
       assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
+      continue;
+    }
+    if (gaps.projection.currentEdge === FG_CONFORM_PROJECT_AUTHORITY) {
+      const authority = runInstalledOddSdlc(
+        commandPath,
+        [
+          "start",
+          "--workspace",
+          workspace,
+          "--target",
+          target,
+          "--until",
+          "first_traversal",
+          "--worker",
+          workerTransport
+        ],
+        workspace
+      );
+      assert(
+        authority.status === "converged" || authority.status === "worker_invoked",
+        `${gaps.projection.currentEdge}: ${authority.status}`
+      );
+      if (authority.status === "worker_invoked") {
+        assert.equal(authority.postflight.status, "passed");
+      }
       continue;
     }
     const start = runInstalledOddSdlc(

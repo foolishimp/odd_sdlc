@@ -8,6 +8,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcConstructorResult,
   admitSdlcWorkReport,
   constructSdlcHookContractCatalog,
@@ -18,7 +20,8 @@ import {
   minimalSdlcHookInvocationForContract,
   runSdlcHookTurn,
   SDLC_FUNCTION_CATALOG,
-  SDLC_HOOK_TARGET_POLICY
+  SDLC_HOOK_TARGET_POLICY,
+  SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG
 } from "../../build/semantic/code/src/index.js";
 
 function successfulConstructorResult(contract, targetAssetId) {
@@ -90,7 +93,13 @@ test("T-051 hook target class and operation policy is declared data", () => {
     SDLC_HOOK_TARGET_POLICY.map((entry) => [entry.targetAssetType, entry])
   );
   const catalogTargets = [
-    ...new Set(SDLC_FUNCTION_CATALOG.flatMap((entry) => entry.outputs))
+    ...new Set([
+      ...SDLC_FUNCTION_CATALOG.flatMap((entry) => entry.outputs),
+      ...SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.filter((entry) =>
+        entry.name === FG_CONFORM_PROJECT_AUTHORITY ||
+        entry.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+      ).flatMap((entry) => [entry.outputs[0]].filter(Boolean))
+    ])
   ].sort();
 
   assert.deepStrictEqual([...policyByTarget.keys()].sort(), catalogTargets);

@@ -393,6 +393,7 @@ to verify the req -> design -> module -> code or test traceability chain.
   satisfy the current traceability contract
 - AC-4: deterministic checks identify orphan generated source or test files
   that carry no governing trace authority
+<<<<<<< Updated upstream
 - AC-5: gap analysis over the active requirement set does not collapse
   traceability integrity into delivery completeness; requirements that remain
   behaviorally shallow stay open even when their trace tags are present
@@ -409,17 +410,24 @@ to verify the req -> design -> module -> code or test traceability chain.
   artifacts are evaluated as one cumulative obligation chain; no current
   artifact may close a realization edge by hiding or dropping obligations from
   earlier graph traversals
+=======
+>>>>>>> Stashed changes
 
 ### REQ-F-ODDSDLC-032 — odd_sdlc projects imported or unstructured workspaces into conformant downstream spec-method topology
 
 `odd_sdlc` treats downstream installed workspaces as target projects governed by
+<<<<<<< Updated upstream
 the method package, not as extensions of the `odd_sdlc` source repository.
+=======
+the method package, not as extensions of the `odd_method` source repository.
+>>>>>>> Stashed changes
 
 Imported or understructured bootstrap input may be broad, but the first lawful
 installed shape must be conformant:
 
 - project-owned constitutional `WHAT` remains under `specification/`
 - project-owned realization `HOW` lands under `build_tenants/<tenant>/`
+<<<<<<< Updated upstream
 - immutable installed substrate and installed odd-product payloads remain under
   `.abiogenesis/`
 - released `odd_sdlc` install payload remains under
@@ -427,6 +435,10 @@ installed shape must be conformant:
   topology
 - mutable named instances, when used, live beneath
   `build_tenants/<tenant>/workspaces/<name>/`
+=======
+- immutable released `odd_sdlc` runtime/software remains under `.odd_sdlc/`
+  rather than inside the project tenant topology
+>>>>>>> Stashed changes
 
 **Acceptance Criteria**:
 - AC-1: downstream install and normalization project broad bootstrap input into
@@ -435,6 +447,7 @@ installed shape must be conformant:
 - AC-2: downstream generated design, implementation, test, and traceability
   surfaces bind to the active project tenant root rather than to
   `build_tenants/common/` or `build_tenants/odd_sdlc/` by default
+<<<<<<< Updated upstream
 - AC-3: released `odd_sdlc` install payload is carried under
   `.abiogenesis/odd_sdlc/<build_tenant>/` and does not masquerade as a project
   realization tenant in downstream workspaces
@@ -482,3 +495,9 @@ released product, installed payload, and mutable worksite identity.
   installed payload
 - AC-4: self-induction proving preserves the same source/install/product/worksite
   split that odd_sdlc requires for downstream governed projects
+=======
+- AC-3: released `odd_sdlc` install payload is carried under `.odd_sdlc/` and
+  does not masquerade as a project realization tenant in downstream workspaces
+- AC-4: reset/replay and subsequent bounded traversals continue to operate
+  against the tenant-rooted downstream workspace shape
+>>>>>>> Stashed changes

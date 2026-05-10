@@ -11,16 +11,24 @@ from test_odd_sdlc_installation import (
     _append_runtime_contract_overrides,
     _append_tenant_capability_contracts,
     _seed_data_mapper_template_workspace,
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_capability_gating_usecase.py
     _seed_imported_workspace,
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_capability_gating_usecase.py
     _write_fake_transport_contract,
 )
 
 
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_capability_gating_usecase.py
 def _install_workspace_with_fake_transport(workspace, *, template: bool):
     if template:
         _seed_data_mapper_template_workspace(workspace)
     else:
         _seed_imported_workspace(workspace)
+=======
+def _install_data_mapper_with_fake_transport(workspace):
+    _seed_data_mapper_template_workspace(workspace)
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_capability_gating_usecase.py
     payload = install_release(
         workspace,
         project_slug="data_mapper",

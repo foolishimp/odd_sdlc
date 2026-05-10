@@ -2,7 +2,12 @@
 // Implements: REQ-F-ODDSDLC-014
 // Implements: REQ-F-ODDSDLC-015
 
-import { SDLC_FUNCTION_CATALOG } from "../graph/index.js";
+import {
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  SDLC_FUNCTION_CATALOG,
+  SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG
+} from "../graph/index.js";
 import type { SdlcHookContract, SdlcHookEdgeClass } from "./carriers.js";
 import { hookTargetPolicyForTarget } from "./policy.js";
 
@@ -75,8 +80,13 @@ function constructHookContract(input: {
 }
 
 export function constructSdlcHookContractCatalog(): readonly SdlcHookContract[] {
+  const reusableDispatchFunctions = SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.filter(
+    (entry) =>
+      entry.name === FG_CONFORM_PROJECT_AUTHORITY ||
+      entry.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
   return Object.freeze(
-    SDLC_FUNCTION_CATALOG.map((entry) =>
+    [...SDLC_FUNCTION_CATALOG, ...reusableDispatchFunctions].map((entry) =>
       constructHookContract({
         edgeName: entry.name,
         inputs: entry.inputs,

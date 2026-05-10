@@ -22,14 +22,22 @@ from odd_sdlc.install_topology import (
 )
 from odd_sdlc.normalization import PROJECT_BOOTSTRAP_PATH, normalize_workspace
 from odd_sdlc.project_profile import canonical_tenant_name
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
 from odd_sdlc.runtime_contract import runtime_contract_lines
 from odd_sdlc.requirement_closure import REQUIREMENT_CLOSURE_REGISTER_PATH
+=======
+from odd_sdlc.traceability import REQUIREMENT_CLOSURE_REGISTER_PATH
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
 
 
 SOURCE_PACKAGE = Path(__file__).resolve().parents[1]
 SOURCE_PYTHON_ROOT = Path(__file__).resolve().parents[3]
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[5]
 APPS_ROOT = Path(__file__).resolve().parents[6]
+=======
+APPS_ROOT = Path(__file__).resolve().parents[7]
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
 ABI_INSTALLER = APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "gen-install.py"
 _ODD_SDLC_BOOTLOADER_START = "<!-- ODD_SDLC_BOOTLOADER_START -->"
 _ODD_SDLC_BOOTLOADER_END = "<!-- ODD_SDLC_BOOTLOADER_END -->"
@@ -43,7 +51,11 @@ def _json_object_payload(raw: str, *, context: str) -> dict[str, object]:
 
 
 def _copy_package(target_root: Path) -> Path:
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
     package_root = target_root / INSTALLED_PRODUCT_CODE_ROOT_RELATIVE
+=======
+    package_root = target_root / ".odd_sdlc" / "python" / "code"
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
     package_root.mkdir(parents=True, exist_ok=True)
     destination = package_root / "odd_sdlc"
     # Source-workspace self-install must not try to copy the package onto itself.
@@ -60,7 +72,11 @@ def _copy_package(target_root: Path) -> Path:
 
 def _copy_domain_design_assets(target_root: Path) -> Path:
     source = SOURCE_PYTHON_ROOT / "design" / "fp"
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
     destination = target_root / INSTALLED_PRODUCT_DESIGN_ROOT_RELATIVE / "fp"
+=======
+    destination = target_root / ".odd_sdlc" / "python" / "design" / "fp"
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
     if destination.resolve() == source.resolve():
         return destination
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -73,6 +89,7 @@ def _copy_domain_design_assets(target_root: Path) -> Path:
     return destination
 
 
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
 def _ensure_installed_genesis_runtime(target_root: Path) -> Path:
     destination_root = target_root / ".genesis"
     if not (destination_root / "genesis").exists() or not (destination_root / "gtl").exists():
@@ -83,6 +100,9 @@ def _ensure_installed_genesis_runtime(target_root: Path) -> Path:
 
 
 def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, object]:
+=======
+def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: str) -> dict[str, Any]:
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
     if not ABI_INSTALLER.exists():
         raise FileNotFoundError(f"abiogenesis installer not found at {ABI_INSTALLER}")
     result = subprocess.run(
@@ -101,7 +121,39 @@ def _run_abiogenesis_install(target_root: Path, *, project_slug: str, platform: 
         timeout=180,
         check=True,
     )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
     return _json_object_payload(result.stdout, context="_run_abiogenesis_install")
+=======
+    return json.loads(result.stdout)
+
+
+def _runtime_contract_lines() -> tuple[str, ...]:
+    asset_binding_contract = json.dumps(
+        {
+            "command": ["python", "-m", "odd_sdlc", "query-domain", "--workspace", "."],
+            "assets_key": "assets",
+            "asset_id_key": "asset_id",
+            "uri_key": "uri",
+            "relative_path_key": "metadata.relative_path",
+            "path_kind_key": "checkpoint.path_kind",
+            "exists_key": "checkpoint.exists",
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return (
+        "# odd_sdlc runtime contract",
+        "module: odd_sdlc.gtl_module:MODULE",
+        "package: odd_sdlc.gtl_module:MODULE",
+        "domain_package: odd_sdlc",
+        "runtime_backend: claude",
+        f"asset_binding_contract: {asset_binding_contract}",
+        "pythonpath:",
+        "  - .genesis",
+        "  - .odd_sdlc/python/code",
+        "",
+    )
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
 
 
 def _write_runtime_contract(target_root: Path) -> Path:
@@ -265,7 +317,10 @@ def install(
     abiogenesis_result = _run_abiogenesis_install(root, project_slug=slug, platform=canonical_platform)
     package_path = _copy_package(root)
     _copy_domain_design_assets(root)
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/release/install.py
     genesis_root = _ensure_installed_genesis_runtime(root)
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/release/install.py
     normalization = normalize_workspace(root, project_slug=slug, platform=canonical_platform)
     contract_path = _write_runtime_contract(root)
     _wire_kernel_contract(root)

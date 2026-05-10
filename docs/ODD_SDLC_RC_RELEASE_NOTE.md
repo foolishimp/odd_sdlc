@@ -76,15 +76,39 @@ This RC was qualified on the exact source cut published as `v1.0.0-rc.2`.
 - `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_installation.py -q -k 'install_exposes_public_odd_sdlc_start_contract or install_exposes_public_odd_sdlc_graph_function_and_asset_targets or install_start_routes_ticket_asset_without_manual_upstream_edit or default_claude_manifest_declares_domain_dispatch_timeout or install_explicit_asset_start_also_stops_at_published_constitutional_fh_gate or install_public_next_varies_only_with_published_carrier_truth_between_pristine_and_progressed_workspaces'`
 - result: `6 passed, 29 deselected in 43.96s`
 
+<<<<<<< Updated upstream
 - `PYTHONPATH=/Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/python/code:build_tenants/python/code python -m pytest build_tenants/python/test_env/tests/test_odd_sdlc_sandbox_usecase.py -q -k 'sandbox_forensic_public_start_stops_before_constructive_events_at_published_fh_gate'`
 - result: `1 passed, 12 deselected in 4.67s`
+=======
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests -q`
+- result: green at the RC boundary cut; subsequent follow-on topology,
+  traceability, and iterator regressions were added afterward and are tracked
+  through their own targeted lanes
+
+Current targeted follow-on regressions:
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_fd_evidence.py -q`
+- result: green
+
+- `python -m pytest build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_test28_regression.py -q`
+- result: green
+>>>>>>> Stashed changes
 
 ## RC Scope
 
 This RC certifies the current source and installed-workspace governance line for
 odd_sdlc.
 
+<<<<<<< Updated upstream
 It does not claim that every future orchestration, service, or external live
 agent lane is part of this source-cut qualification. Accepted RC-scoped
 behavior and caveats are recorded in
 [ODD_SDLC_RC_NOTES.md](/Users/jim/src/apps/odd_sdlc/docs/ODD_SDLC_RC_NOTES.md).
+=======
+## Known RC Limitation
+
+The full homeostatic gap-triage loop remains post-RC work.
+
+This is documented in [ODD_SDLC_RC_NOTES.md](/Users/jim/src/apps/odd_method/docs/ODD_SDLC_RC_NOTES.md)
+and remains outside this RC cut.
+>>>>>>> Stashed changes

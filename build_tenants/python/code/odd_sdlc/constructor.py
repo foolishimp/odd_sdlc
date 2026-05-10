@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from .asset_types import ASSET_TYPES
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
 from .domain_model import AssetCheckpoint, relative_file_uri
 from .project_profile import execution_contract_is_declared, load_project_profile, strip_scalar_quotes
 from .requirement_closure import build_requirement_closure_register
@@ -18,6 +19,10 @@ from .runtime_effects import publish_workspace_runtime_event
 from .runtime_event_contract import admit_runtime_event_payload
 from .test_lane_evidence import build_test_lane_evidence
 from .traceability_index import build_requirement_traceability_index
+=======
+from .project_profile import SOURCE_EXTENSIONS, load_project_profile
+from .traceability import current_requirement_refs, implementation_claim_refs, planned_test_claim_refs
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
 from .workspace_assets import (
     assess_generated_asset_contract,
     asset_declared_type,
@@ -366,6 +371,7 @@ def _selected_test_stack_defaults(workspace_root: Path) -> dict[str, str]:
 
 
 def _planned_test_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
     index = build_requirement_traceability_index(workspace_root)
     implementation_ids = tuple(sorted(index.implementation_refs))
     if implementation_ids:
@@ -374,6 +380,15 @@ def _planned_test_requirement_ids(workspace_root: Path) -> tuple[str, ...]:
     if current_ids:
         return current_ids
     return tuple(sorted(index.planned_validation_refs))
+=======
+    implementation_ids = tuple(sorted(implementation_claim_refs(workspace_root)))
+    if implementation_ids:
+        return implementation_ids
+    current_ids = tuple(sorted(current_requirement_refs(workspace_root)))
+    if current_ids:
+        return current_ids
+    return tuple(sorted(planned_test_claim_refs(workspace_root)))
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
 
 
 def _distributed_requirement_ids(requirement_ids: tuple[str, ...], modules: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
@@ -1734,10 +1749,16 @@ def _construct_implementation_module_surface(workspace_root: Path) -> str:
     implementation_stack = _asset_text(workspace_root, "implementation_stack_profile")
     code_summary = summarize_code_surface(workspace_root)
     proving_subset_requirement_ids = (
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
         _proving_subset_requirement_ids(workspace_root)
         if load_project_profile(workspace_root).realization_mode == "generated_proving_subset"
         else ()
     )
+=======
+        "REQ-F-ODDSDLC-003",
+        "REQ-F-ODDSDLC-004",
+    ) if load_project_profile(workspace_root).realization_mode == "generated_proving_subset" else ()
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
     claimed_requirement_lines = (
         (f"- claimed requirement ids: {', '.join(proving_subset_requirement_ids)}",)
         if proving_subset_requirement_ids
@@ -2708,7 +2729,14 @@ def _construct_test_module_surface(workspace_root: Path) -> str:
         )
     test_design = _asset_text(workspace_root, "test_design_surface")
     test_stack = _asset_text(workspace_root, "test_stack_profile")
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
     planned_requirement_ids = _proving_subset_requirement_ids(workspace_root)
+=======
+    planned_requirement_ids = (
+        "REQ-F-ODDSDLC-003",
+        "REQ-F-ODDSDLC-004",
+    )
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
     return "\n".join(
         (
             "# Generated Test Modules",
@@ -3021,6 +3049,7 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
         correlation_id=manifest.get("call_id"),
     )
 
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
     fulfillment_obligations = [
         obligation
         for obligation in manifest.get("fulfillment_obligations", ())
@@ -3031,10 +3060,21 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
     if not fulfillment_obligations:
         raise ValueError("manifest must include fulfillment_obligations with stable ids")
     primary_evaluator = str(fulfillment_obligations[0]["id"])
+=======
+    assessment_evaluators = [
+        evaluator["name"]
+        for evaluator in failing_evaluators
+        if isinstance(evaluator, dict) and isinstance(evaluator.get("name"), str) and evaluator["name"]
+    ]
+    if not assessment_evaluators:
+        raise ValueError("manifest failing_evaluators must include evaluator names")
+    primary_evaluator = assessment_evaluators[0]
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
     evidence = (
         f"{_operation_verb(operation)} {target_path.relative_to(workspace)} under governed odd_sdlc work-report "
         "and satisfied the generated-asset contract"
     )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
     operational_fulfillment = _operational_result_fulfillment(workspace, target_asset)
     fulfillment_status = (
         str(operational_fulfillment["fulfillment_status"])
@@ -3073,12 +3113,25 @@ def construct_manifest(manifest_path: str | Path, *, workspace_root: str | Path 
             }
             for obligation in fulfillment_obligations
         ]
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
     payload = {
         "edge": manifest["edge"],
         "actor": "odd_sdlc_constructor",
         "attestation": attestation,
         "work_report": work_report,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/constructor.py
         "fulfillment_assessments": fulfillment_assessments,
+=======
+        "assessments": [
+            {
+                "evaluator": evaluator_name,
+                "result": "pass",
+                "evidence": evidence,
+            }
+            for evaluator_name in assessment_evaluators
+        ],
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/constructor.py
     }
     result_file = Path(result_path)
     result_file.parent.mkdir(parents=True, exist_ok=True)

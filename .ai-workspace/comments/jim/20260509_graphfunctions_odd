@@ -1,0 +1,273 @@
+
+we have a graph
+
+a->b->c->d->e->f->g
+
+i have an a->b edge traversal, a defines {unkown} -> b defines { folder structure, intent surface, product surface, goal surface, requirement surface}
+i have a graph function conform_project_authority( a ):b internally it creates intermediate assets zoom in a1,a2,a3 as part of the transformation,
+
+on the first traversal from a -> a1, evaluators process eval.action decides it needs to trigger a graph_function(x):y which will x<-inherits-a1 and y<-inherits-a2
+
+this means a graph function is a best fit operator to fulfill a->g
+that the evaluator is a configured call out
+
+
+--- claude ---
+
+Reading this as a constitutional refinement of ODD_METHOD §5 (Graph Functions) and §11.5D (the eval_gap / evaluate_next / evaluate_action loop). Four claims, each load-bearing.
+
+## 1. Graph function is a best-fit operator over an outer vector
+
+Current §5 line 202: "graph functions are named constructive programs that realize vectors." Your framing reads stronger: a graph function is **a selected operator** picked because its (input):output signature best fits the current state. The outer vector (a→g) is the constitutional contract; the graph function is one operator among published candidates, ranked by `evaluate_next` over the action catalog.
+
+This is consistent with §5's existing `RefinementBoundary` and `CandidateFamily` concepts but makes them load-bearing rather than optional. A graph function is no longer a fixed realization of a vector — it is a selection event. The selection itself IS `evaluate_next`. This means there is no "the implementation of vector X"; there is "the operator currently selected to fulfill vector X under current gap and policy".
+
+Implication: A3 (Published Action Law) ranks operators, not implementations. The published action catalog is a catalog of *operators*. Implementation discipline (DMM) governs how each operator is realized; the constitutional surface governs which one is selected.
+
+## 2. Recursive zoom: the three-evaluation split applies at every published zoom level
+
+When `conform_project_authority(a):b` zooms into a1, a2, a3, and at zoom point a→a1 the evaluator triggers a sub-graph-function `g(x):y`, the three evaluation functions fire again at the inner level. `eval_gap` on the intermediate asset; `evaluate_next` picks the sub-operator; `evaluate_action` folds its evidence into a sub-ledger and sub-decision; the outer `evaluate_action` then folds those sub-results into the outer ledger.
+
+This resolves the open question on whether DMM-governed inner realization is opaque or transparent: **transparent when inner sub-vectors are published, opaque only when they are not**. Published refinement extends the constitutional surface downward; unpublished imperative realization remains DMM-governed and stays at one level.
+
+A4a (Evaluation Function Separation) applies at every recursion depth. A0 (One Surface) generalizes to "one surface per zoom frame" — each frame has its own ledger/decision/projection chain, parented to its caller's evidence row.
+
+## 3. Inheritance / subtype relation among nodes
+
+`x <-inherits- a1, y <-inherits- a2` introduces a constitutional element ODD_METHOD does not yet formalize: a subtype relation among nodes. §5 currently names nodes as "bounded states of truth" but does not formalize specialization among them.
+
+The proposal: intermediate assets carry an `is-a-refinement-of` relation to outer assets. Sub-graph-functions then operate on type-narrowed signatures. `g(x):y` where `x is-a a1` means the sub-operator is selectable only when the current asset is at least an a1, and produces an output that is at least an a2.
+
+This converts `evaluate_next`'s "best fit" from string match (asset-type name equality) to **type-directed dispatch**. The ranking signal becomes: among published candidates, the operator whose input type most specifically matches (or correctly specializes from) the current asset wins. That is a stronger and more lawful ranking signal than the current admissibility-and-priority pair.
+
+This is also what gives the loop closure under recursion: when sub-frame outputs are inherited subtypes of the outer frame's expected output, the outer `evaluate_action` can fold them into outer evidence without an ad-hoc translation.
+
+## 4. Evaluator is a configured call-out
+
+Sharpest reformulation of A14 in the post. The evaluator is not an autonomous decider; it is a call-out site. ABG runtime reaches the site as part of the constitutional loop; the evaluator consults its configuration (gap definitions, action catalog, priority policy, the type hierarchy from claim 3) and returns a decision; runtime continues.
+
+ABG owns the call-out mechanism. The product owns the configuration. The configuration is replay-visible per A13 (decisions reproducible from policy refs + catalog + observation). This phrasing is more precise than the current "ABG evaluator kernel plus product policy" wording in §11.5D.
+
+Implication: the evaluator is not a thing implementations build — it is a contract implementations supply configuration to. This is what lets one evaluator kernel serve multiple ODD products without product-specific code in the kernel.
+
+## Constitutional implications
+
+- §5 needs the **operator-as-best-fit-selector** framing, not only "constructive program that realizes."
+- §5 needs an explicit **subtype/inheritance relation** among nodes.
+- §11.5D needs an explicit **recursion clause**: the four functions (synthesize_model, eval_gap, evaluate_next, evaluate_action) apply at every published zoom level.
+- A4a's separation rule extends recursively. A0 generalizes to per-frame surfaces parented to their caller's evidence.
+- A14's "evaluator is a configured call-out" phrasing replaces the current "ABG kernel plus product policy" wording.
+
+These are additions that compose with the existing surface rather than reframing it. The brevity of the original note is doing real work — each line introduces one structural element and they fit together as a single design move.
+
+
+--- codex ---
+
+I agree with the direction, with one correction to keep it from becoming too
+broad: the graph function is not "best fit for a->g" in the abstract. It is best
+fit for the current target obligation binding at the current frame.
+
+The lawful selection input is:
+
+```text
+current frame
++ product asset model
++ observed gap pressure
++ target obligation binding
++ published action catalog
++ visible policy
+```
+
+That matters because `a->g` is too coarse by itself. If the system selects
+against the whole outer path, it can recreate broad fallback. If it selects
+against the exact binding, then `conform_project_authority(a):b` is selected
+because `b` is the current missing authority asset, not because it is generally
+useful.
+
+## 1. Frame stack, not hidden nested control
+
+The right mental model is a frame stack:
+
+```text
+OuterFrame: a -> g
+  selected action: conform_project_authority(a):b
+  ChildFrame: a1 -> a2
+    selected action: graph_function(x):y
+```
+
+Each published child frame gets the full loop:
+
+```text
+synthesize_model
+-> eval_gap
+-> bind target obligation
+-> evaluate_next
+-> admit ConstructionIntent
+-> invoke
+-> admit evidence
+-> evaluate_action
+-> close/yield/retry/repair/re-enter/reprice/block
+```
+
+The parent frame does not inspect the child's private implementation. It consumes
+the child's admitted closure/evidence as evidence for the parent target. That is
+the line between lawful recursion and hidden orchestration.
+
+If the inner work is unpublished implementation detail, it can use local control
+flow as ordinary realization code. It cannot dispatch graph work, retry graph
+work, repair graph work, or close graph work as a hidden controller. The moment
+it is a published vector or candidate action, it is back under the loop.
+
+## 2. Typed inheritance needs three compatibility checks
+
+The `x <-inherits- a1` and `y <-inherits- a2` idea is right, but I would avoid a
+single "subtype match" rule. A candidate graph action should be admissible only
+when three checks pass:
+
+```text
+input compatibility: current asset can lawfully satisfy candidate input
+output compatibility: candidate output can lawfully satisfy target obligation
+evidence compatibility: candidate proof/evidence can fold into parent closure
+```
+
+This is what prevents a type match from becoming another broad action selector.
+The output side is as important as the input side. `graph_function(x):y` is not
+lawful merely because `x` refines `a1`; it is lawful because `y` refines or
+fulfills the exact target asset expected at that frame.
+
+For ranking, specificity is a policy signal, not the whole law:
+
+```text
+admissible first
+then exact target binding
+then most specific type fit
+then policy priority
+then deterministic tie-break
+```
+
+## 3. CandidateFamily is the right publication shape
+
+This thought experiment makes `CandidateFamily` more important than a plain
+function list.
+
+The catalog should be able to say:
+
+```text
+for target obligation T at frame F:
+  candidates = [
+    conform_project_authority,
+    repair_project_authority,
+    materialize_authority_shell,
+    clarify_project_authority
+  ]
+```
+
+`evaluate_next` ranks those candidates. The runner invokes only the admitted
+ConstructionIntent that cites the selected row. A graph function can still be a
+named public carrier, but selection happens over an action row inside a published
+family.
+
+That keeps the operator model clean:
+
+- graph function: constructive carrier
+- candidate family: lawful choice set
+- evaluate_next: deterministic selector over the choice set
+- ConstructionIntent: admitted invocation record
+
+## 4. Evaluator callout returns findings, not authority
+
+The evaluator-as-configured-callout framing is good, but the callout should not
+be the authority surface by itself.
+
+The safe shape is:
+
+```text
+configured evaluator callout -> findings / ranking proposal
+ABG/F_D admission -> PriorityProjection / NextActionProjection
+NextActionProjection -> ConstructionIntent admission
+```
+
+That preserves product configurability without letting the configured evaluator
+invent graph actions or bypass ABG admission. Product policy can rank and prefer;
+published GTL/ABG action authority still decides what can be invoked.
+
+## 5. Evidence lifting is the closure rule
+
+The parent frame needs a named way to consume child results:
+
+```text
+Child EdgeClosureDecision(close)
++ child output asset refs
++ child evidence refs
++ child lineage refs
+-> parent AdmittedEvidence row
+```
+
+Without that lifting rule, recursion will leak. Parent `evaluate_action` will
+either inspect child internals directly or trust a summary string. Both break the
+one-surface rule.
+
+So the recursive version needs one additional carrier concept, even if the name
+changes later:
+
+```text
+FrameClosureEvidence
+```
+
+It says: this child frame closed, these target assets were produced or refined,
+these refs prove it, and this is the parent frame obligation it satisfies.
+
+## 6. What this implies for the current main loop
+
+The loop becomes:
+
+```text
+observe current workspace state
+-> synthesize product asset model
+-> eval_gap
+-> bind exact target obligation
+-> evaluate_next over published candidate family
+-> admit construction intent
+-> invoke selected graph function
+-> if selected graph function publishes refinement, open child frame
+-> child frame runs the same loop
+-> child closure lifts into parent evidence
+-> parent evaluate_action closes/yields/repairs/re-enters
+-> evaluate_next selects next action
+```
+
+This preserves the premise:
+
+```text
+observe reality
+-> compare to model
+-> discover gap
+-> synthesize current construction intent from gap
+-> select lawful graph action
+-> close the gap
+```
+
+It also keeps the key separation: intent does not create actions. Intent seeds
+the model. Gap binds model to reality. `evaluate_next` selects among already
+published lawful actions. ConstructionIntent admits the selected action for one
+bounded invocation.
+
+## 7. Tests this design would eventually need
+
+- A published child vector must run through the same loop, not a private runner.
+- An opaque implementation may use local control flow but cannot dispatch a
+  hidden graph action.
+- A candidate with matching input type but incompatible output target is
+  rejected.
+- Two admissible candidates with different type specificity rank
+  deterministically.
+- Child closure cannot close the parent unless lifted evidence cites the parent
+  target obligation.
+- Parent retry/resume context is derived from frame/closure/projection refs, not
+  from child prose or gap-dossier strings.
+
+Net: the thread is pointing at a strong abstraction. I would phrase it as
+"recursive typed action selection over published frame obligations" rather than
+"graph function is best fit for a->g." The first version preserves exact target
+binding; the second version is true only when `a->g` has already been narrowed to
+the current frame obligation.

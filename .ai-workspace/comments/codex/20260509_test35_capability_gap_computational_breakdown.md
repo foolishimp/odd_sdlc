@@ -4,6 +4,327 @@ Date: 2026-05-09
 Author: Codex
 Status: commentary / code review / design breakdown
 
+## 2026-05-10 Live Confirmation Update
+
+This section updates the original 2026-05-09 analysis using the clean TypeScript
+live runs from 2026-05-10. It should be read as the current implementation
+review surface. Older sections below remain useful as design history, but any
+line saying TypeScript has no edge ledger, no closure decision, or only local
+gap-dossier action strings is stale after T-135/T139/T140/T141.
+
+The current question is narrower and more useful:
+
+```text
+Has TypeScript restored the test35 computational loop, or only a controlled
+single-target proof that resembles one slice of it?
+```
+
+Answer: TypeScript now works for controlled single-tenant live lanes. It has
+real edge evidence, ledgers, closure decisions, next-action projections,
+liveness observation, and product execution proof. It does not yet fully restore
+the `data_mapper.test35` emergent loop because the live harness still supplies
+the product target after bootstrap. The evaluator does not yet autonomously turn
+closed bootstrap authority into the next declared product materialization
+action.
+
+### Live Proofs Run
+
+Commands:
+
+```text
+npm run test:t132:hello-world-live
+npm run test:t133:rust-live
+```
+
+Both passed.
+
+Archives:
+
+```text
+build_tenants/typescript/test_env/test_runs/t132_hello_world_single_tenant_bootstrap_sandbox/20260510T031225509Z_pid13389
+build_tenants/typescript/test_env/test_runs/t133_rust_hello_world_bootstrap_sandbox/20260510T031739737Z_pid81100
+```
+
+Summary:
+
+| Lane | Result | Run summary elapsed | Product worker elapsed | Product proof |
+| --- | --- | ---: | ---: | --- |
+| T132 single-tenant JavaScript | passed | 150,745 ms | 150,075 ms | `Hello, world!` from `build_tenants/hello_world_javascript/src/hello.js` |
+| T133 single-tenant Rust | passed | 142,104 ms | 141,412 ms | `Hello, world!` from `build_tenants/hello_world_rust/src/main.rs` |
+
+Both product edges used:
+
+```text
+process://codex?model=gpt-5.5&effort=medium
+```
+
+Both product edge archives contain the expected consequence artifacts:
+
+```text
+sdlc_worksite_evidence.json
+sdlc_edge_fulfillment_ledger.json
+sdlc_edge_closure_decision.json
+sdlc_next_action_projection.json
+sdlc_construction_intent.json
+product_materialization_manifest.json
+runtime_liveness_observer_projection.json
+worker_process_summary.json
+```
+
+Both product edge ledgers closed with:
+
+```text
+counts.expected = 15
+counts.fulfilled = 15
+counts.partial = 0
+counts.blocked = 0
+counts.unfulfilled = 0
+counts.missing = 0
+counts.extra = 0
+admitted = true
+targetCertificationPassed = true
+fdRecheckPassed = true
+edgeConverged = true
+closure disposition = close
+```
+
+### Edge-By-Edge Walkthrough
+
+Both clean lanes now have the same four-step shape.
+
+| Step | Phase | T132 | T133 | Interpretation |
+| ---: | --- | --- | --- | --- |
+| -2 | `conform_project` | `Fg_conform_project`, converged | `Fg_conform_project`, converged | Deterministic project conformance/bootstrap of installed workspace state. |
+| -1 | `bootstrap_authority` | `Fg_conform_project_authority`, worker invoked, postflight passed, assurance close allowed | same | The authority-conformance edge materializes the project bootstrap surface. |
+| 0 | `gaps` | `currentEdge: null` | `currentEdge: null` | Public read model reports no current graph edge after bootstrap. This is the main remaining architecture gap. |
+| 0 | `start asset:component_code_surface` | `derive_component_code_surface`, worker invoked, close allowed | same | The harness explicitly requests the product target. The runner invokes F_P, observes product files, folds evidence into the ledger, and closes. |
+
+T132 materialized:
+
+```text
+build_tenants/hello_world_javascript/src/hello.js
+```
+
+T133 materialized:
+
+```text
+build_tenants/hello_world_rust/Cargo.toml
+build_tenants/hello_world_rust/src/main.rs
+```
+
+The T132 pass is the more important behavioral confirmation. The prior failure
+mode was generic-file drift: the worker could create a plausible JavaScript file
+such as `index.js` while missing the declared product file. The current pass
+depends on the handoff surfacing declared product file targets and instructing
+the worker to materialize those exact workspace-relative paths.
+
+Current implementation surface:
+
+```text
+build_tenants/typescript/code/src/operator/handoff.ts
+  declaredProductFileTargets(...)
+  worker prompt lines for declared product file targets
+```
+
+This is a useful generic fix for the live calibration lane, but it is not yet
+the final carrier shape. The final shape should be a typed
+ProductMaterializationContract / target-obligation carrier consumed by the
+evaluator and rendered into the prompt. Context-file scanning is a bridge, not
+the constitutional source.
+
+### What The Clean Runs Prove
+
+They prove the following current TypeScript claims:
+
+1. The installed product can create a clean sandbox, install `odd_sdlc`, run
+   project conformance, run authority conformance, invoke an F_P worker, and
+   create executable product files.
+2. F_P does not close the edge directly. The framework observes files after F_P
+   returns and builds a post-transform report from observed artifacts.
+3. Product materialization becomes replay-visible evidence through
+   `product_materialization_manifest.json`, `sdlc_worksite_evidence.json`, and
+   `sdlc_edge_fulfillment_ledger.json`.
+4. The closure decision is now derived from a ledger-backed consequence surface,
+   not from the old gap-dossier action strings.
+5. The ABG 3.7.1 liveness observer is active in the worker process path:
+   `runtimeLivenessLeaseState = active`,
+   `runtimeLivenessDispositionAction = continue_waiting`,
+   `runtimeLivenessDispositionReason = activity_recent`,
+   `timedOut = false`.
+
+This is real progress relative to the original diagnosis.
+
+### What The Clean Runs Do Not Prove
+
+They do not prove full `test35` parity.
+
+The live harness still performs this control step after bootstrap:
+
+```text
+start --target asset:component_code_surface
+```
+
+That means the test proves product-target execution once explicitly requested.
+It does not yet prove the installed runner can derive that request from:
+
+```text
+closed project authority
++ target obligation binding
++ requirement transformation set
++ current worksite observation
++ odd_sdlc policy
+```
+
+The decisive observation is:
+
+```text
+after Fg_conform_project_authority:
+  gaps.currentEdge = null
+```
+
+If the TypeScript loop had fully restored the Python machine behavior, the next
+read-only view would expose declared product materialization pressure and the
+runner would select the product action from evaluator truth. Instead, the live
+test currently supplies the product target as an external harness instruction.
+
+### Comparison To data_mapper.test35
+
+The installed Python `data_mapper.test35` workspace remains the reference model.
+The relevant confirmation surfaces are:
+
+```text
+data_mapper.test35/.genesis/genesis/run.py
+data_mapper.test35/.genesis/genesis/interpret.py
+data_mapper.test35/.genesis/genesis/result_ingest.py
+data_mapper.test35/.genesis/genesis/dispatch_runtime.py
+data_mapper.test35/.genesis/genesis/fulfillment_ledger.py
+data_mapper.test35/.genesis/odd_sdlc/python/code/odd_sdlc/traceability.py
+```
+
+The Python line has these properties:
+
+| Property | test35 Python behavior | Current TypeScript state |
+| --- | --- | --- |
+| Run state | Event-derived run state includes `yielded` as active, not terminal. | Liveness/yield machinery exists, but the clean hello-world lanes only exercise close. |
+| F_P closure | `result_ingest.py` builds a published fulfillment ledger and computes `edge_converged = carry_converged and fulfillment_converged and admitted`. | Product edge now has `sdlc_edge_fulfillment_ledger.json` with counts, admission, certification flags, and `edgeConverged: true`. |
+| Failure continuation | Python emits `proof_failed`, `graph_call_failed`, and `continuation_opened` with causation refs. | Not exercised by the clean lanes. Needs a non-close live regression. |
+| Requirement pressure | Python traceability builds requirement/declared-edge obligation ledgers and distinguishes carry convergence from fulfillment convergence. | Product edge requirements are counted as fulfilled; downstream carried transformation-set pressure is not yet fully proven. |
+| Bootstrap-to-product transition | Python can project next graph state from event/ledger truth. | TypeScript still needs the harness to request `asset:component_code_surface` after bootstrap. |
+| Target specificity | Python manifests/obligation ledgers bind target evidence. | TypeScript now guides exact target files, but through context scan and prompt rendering rather than final typed product target carrier. |
+
+### Current Architecture Verdict
+
+The current TypeScript implementation is working as a controlled single-tenant
+calibration lane. It is not just producing logs; it is producing useful
+deterministic observability:
+
+```text
+F_P transform
+-> observed worksite evidence
+-> product materialization manifest
+-> edge fulfillment ledger
+-> closure decision
+-> next-action projection
+-> execution proof
+```
+
+The architecture is not yet complete because the loop is still externally
+steered at the point that matters most:
+
+```text
+bootstrap authority closed
+-> harness asks for product asset
+-> product edge closes
+```
+
+The target architecture is:
+
+```text
+bootstrap authority closed
+-> evaluate_next sees declared product pressure
+-> admitted construction intent selects materialization action
+-> product edge closes
+```
+
+That distinction is the remaining functional gap.
+
+### Immediate Gap Analysis
+
+**Gap 1: post-bootstrap product pressure is not visible enough to drive the next action.**
+
+After `Fg_conform_project_authority`, public `gaps` reports `currentEdge: null`.
+The evaluator should be able to expose the declared product materialization
+pressure as read-only truth and the runner should be able to consume it as
+executable intent when running `start`.
+
+**Gap 2: declared file targets are prompt-rendered, not carrier-owned.**
+
+The current handoff scans `.ai-workspace/context/*.json` for `expectedFiles`
+under the selected output root. That is generic enough to fix the immediate
+hello-world miss, but the durable method shape should be:
+
+```text
+SdlcTargetObligationBinding / ProductMaterializationContract
+-> exact expected files and evidence roles
+-> prompt rendering
+-> post-worker observation
+-> ledger closure
+```
+
+**Gap 3: requirement rows are not yet a first-class downstream transformation set.**
+
+The model we want is:
+
+```text
+A -> B(requirements, design, topology, schedules)
+B.workspace -> traverse.F_P -> C(product files)
+```
+
+Some B assets, especially requirements, are not merely documents to close for
+their own edge. They are the transformation set for C. TypeScript has started
+to carry requirement obligation ids into the product prompt, but the clean live
+runs do not yet prove the full typed carry-forward rule:
+
+```text
+edge-local fulfillment can close
+while downstream product pressure remains visible and actionable
+```
+
+**Gap 4: non-close behavior is not proven in the live lane.**
+
+The clean runs only prove `close`. They do not prove `yield`, `retry`, `repair`,
+`re-enter`, `reprice`, or `block` from live worker evidence. Python `test35`
+made continuation and yield part of the machine model; TypeScript needs live or
+live-equivalent regressions for those dispositions.
+
+**Gap 5: multi-tenant fanout is a separate capability and should stay out of this closure path.**
+
+The five-hello-world lane exposed fanout/control problems. That should remain a
+backlog feature. Single-tenant product materialization is the correct
+calibration lane for restoring the core loop.
+
+### Next Decision
+
+There are two lawful next moves:
+
+1. Further fix `odd_sdlc` so bootstrap closure autonomously exposes and selects
+   the declared product materialization action.
+2. Run internal data-mapper live tests only after that loop is tighter, because
+   data-mapper will otherwise test a broad product surface while the simpler
+   bootstrap-to-product transition still depends on harness steering.
+
+The recommended next implementation target is:
+
+```text
+after Fg_conform_project_authority closes,
+gaps must render declared product pressure,
+start must select the product materialization action from evaluator truth
+without the harness passing --target asset:component_code_surface.
+```
+
+That is the cleanest proof that the TypeScript line has restored the functional
+spine from `test35`, rather than only proving a manually steered product edge.
+
 ## Claim
 
 The current TypeScript gap analysis, assurance ledgers, product materialization
@@ -2107,6 +2428,45 @@ asset meaning, graph-function catalog meaning, gap interpretation, and priority
 policy. DMM governs realization modules inside that split; it must not fragment
 the evaluator into module-local decision authorities.
 
+**A16. Constitutional Override**
+
+For any ticket that touches traversal, gap evaluation, action selection,
+construction intent, worker invocation, evidence admission, fulfillment,
+liveness, closure, re-entry, public gaps, or live proof, this axiom set and the
+Constitutional Equation are the controlling acceptance target.
+
+Ticket-local closure wording, test names, source-grep checks, compact CLI
+summaries, or implementation notes cannot weaken the constitutional loop. If a
+ticket appears complete by its local checklist but leaves a rival traversal
+consequence path, the ticket is not constitutionally complete. The lawful result
+is to reprice the ticket, add a follow-up with an explicit constitutional
+deferral, or mark the gap as a remaining closure blocker.
+
+The following artifacts may provide evidence, diagnostics, or read-model
+context only. They must not independently close an edge, select a next action,
+or route retry/repair/re-entry:
+
+```text
+gap dossier
+postflight report
+assurance report
+materialization manifest
+runtime liveness projection
+run summary
+worker prose
+screen/PTY transcript
+prompt package
+harness target argument
+source-grep test
+CLI branch or compact output
+```
+
+If any of those artifacts conflict with the admitted
+`SdlcEdgeFulfillmentLedger`, `SdlcEdgeClosureDecision`, or
+`EvaluatorProjection`, the ledger/decision/evaluator chain wins. If that chain
+is absent, the edge has not constitutionally closed and the next action has not
+been constitutionally selected.
+
 ### Constitutional Equation
 
 The target loop is:
@@ -2136,3 +2496,28 @@ other path can decide what work happens next.
 The second `observe(...)` is intentional. Next-action evaluation must use
 post-evidence runtime/worksite truth, not the stale observation that produced
 the just-executed intent.
+
+## Final Uplift Table: test35 Python To TS Line
+
+This table is the constitutional parity map. The axioms are not a new process;
+they name the computation the successful `test35` Python line already achieved
+and translate it into the TS/ABG carrier vocabulary.
+
+| Computational step | Axiom target | `test35.py` implementation | Current TS/TL implementation | Existing TS ledgers/counters disposition | Constitutional gap | Work to uplift TS/TL |
+| --- | --- | --- | --- | --- | --- | --- |
+| Observe current worksite | A0, A1, A13. Worksite facts are observed, not trusted. | `.genesis/genesis/run.py` projects run state from events; `RUN_STATES` includes `yielded` as active. `.genesis/genesis/result_ingest.py` reads manifest/result/workspace facts before ledger fold. | ABG observation exists through `deriveOddSdlcEvaluateNextReport` and `ConstructionObservationSnapshot`; public start and post-action paths build observations before `SdlcNextActionProjection`. | Keep observation/read-model counters only as inputs. Requirement closure registers, liveness projections, run summaries, and gap dossiers are not retired if they remain evidence sources, but they must be demoted wherever they imply closure or next-action authority. | Observation is present, but the live proof can still be helped by harness targets. We have not fully proven bootstrap -> observe -> product pressure without an explicit product target argument. | Make the no-target post-bootstrap observation a required proof: after authority conformance, TS must observe declared product pressure from workspace/requirements truth and produce the next action from that observation. |
+| Bind missing or required work to edge obligations | A2, A3. Every constructive action must bind gap pressure to exact target assets and obligations. | `result_ingest.py` folds the manifest fulfillment obligation set, computes missing/extra, and applies target materialization checks before edge convergence. | `SdlcTargetObligationBinding` in `query_domain.ts` binds target asset type to published graph functions; `SdlcEdgeFulfillmentLedger` carries `targetBindingRefs`; T-141 added `downstream_transformation_set` for requirements carried to product materialization. | Repurpose existing requirement/gap registers as source rows for `SdlcTargetObligationBinding` and fulfillment assessments. Retire any parallel "current gap means next action" interpretation from gap dossier rows. | Binding exists, but product pressure still needs to be generated from GTL/configured transform-set truth rather than harness intent. Requirements must be treated as the transformation set for the product, not as the product itself. | Publish an explicit transform-set binding: `requirement_surface -> component_code_surface` obligations partition into `edge_local` and `downstream_transformation_set`, with no broad fallback and no harness target needed. |
+| Rank lawful actions | A3, A4, A15. Only published catalog actions can be ranked; default graph following is evaluator law. | Python dispatch did not fall back from a declared target to a broad unrelated graph. Continuation/yield was represented as event/replay state, not hidden loop control. | `public_start.ts` and `installed_operator.ts` call `deriveOddSdlcEvaluateNextReport`; `SdlcNextActionProjection` records selected action refs and `choosesNextTraversal`. | Keep ABG priority/evaluator projections and `SdlcNextActionProjection`. Retire local action lists, string-fold retry paths, and compact CLI next-action summaries as authority. They may remain only as rendered views over the projection. | Candidate generation still has domain-specific construction inside `installed_operator.ts`, including post-action product-materialization candidates. That is acceptable as an interim domain adapter, but not yet a fully published GTL/catalog policy surface. | Move candidate declaration for product materialization into the graph/catalog/policy surface, and keep `installed_operator.ts` as consumer of evaluator output, not author of special continuation law. |
+| Admit construction intent | A0, A3, A14. Selected evaluator action becomes admitted intent with predecessor refs. | Python run/dispatch events carry run/call/manifest identity; fail-closed paths chain causation refs from graph call failure into continuation events. | `constructSdlcConstructionIntent` records selected priority row, next-action projection, selected action, basis refs, and predecessor refs; public start threads it into execution contract. | Keep `SdlcConstructionIntent` as the intent lineage carrier. Retire any "intent ledger" idea as a separate prime ledger; intent belongs in event/admission truth with lineage projections over refs. | Initial intent admission works when a target is requested. The missing proof is autonomous intent admission from post-bootstrap product pressure. | Add live/function proof where `conform_project_authority` closes, `evaluate_next` selects product materialization from carried requirements, and that selected row becomes the construction intent. |
+| Invoke bounded worker/action | A5. F_P may transform, but must not publish closure truth. | Python dispatched bounded worker work through manifest/result channels; the worker result became input to `result_ingest`, not direct closure authority. | `installed_operator.ts`, `handoff.ts`, and `transport.ts` invoke the worker and archive worker outputs, process traces, prompt/package files, postflight, and materialization reports. | Keep worker/process archives, PTY logs, prompt packages, and materialization manifests as evidence/debug ledgers. Retire duplicated prompt-embedded package state and any worker self-closure fields. | The authority boundary is now mostly right, but the prompt/package path still carries too much duplicated context. That is token waste and can obscure the exact obligation being transformed. It is not itself closure authority unless a downstream consumer treats it as such. | Slim worker input to exact target binding, obligation set, worksite refs, and product proof contract. Logs can remain verbose on disk; prompts should be deterministic work orders, not replayed system state. |
+| Admit worker/process/product evidence | A1, A5, A6, A14. Raw output becomes typed evidence before closure. | `result_ingest.py` records assessment rows, evidence refs, target materialization result, and admission fields before computing convergence. | `constructSdlcWorksiteEvidence` records process refs, product evidence refs, admitted progress refs, liveness refs, and predecessor refs; installed operator feeds those into the ledger. | Repurpose postflight, assurance, materialization, and liveness counters as evidence rows or evidence refs consumed by `SdlcWorksiteEvidence`. They are not retired, but their status fields must not independently close an edge. | Evidence admission exists, but postflight, assurance, materialization, and liveness artifacts still need to stay subordinated under the ledger in every consumer. | Add conflict tests: if postflight passes but ledger does not converge, the edge must not close; if files exist but evidence is not admitted, the edge must not close. |
+| Publish fulfillment ledger | A6, A7, A16. Ledger is the closure evidence surface, not a side artifact. | `result_ingest.py` publishes the fulfillment ledger fields: expected, fulfilled, partial, blocked, unfulfilled, missing, extra, carry, fulfillment, admitted, and edge convergence. | `SdlcEdgeFulfillmentLedger` now carries counts, `assessmentCount`, `carryConverged`, `fulfillmentConverged`, `admitted`, `targetCertificationPassed`, `fdRecheckPassed`, and `edgeConverged`; installed operator archives it. | Keep and promote `SdlcEdgeFulfillmentLedger` as the canonical edge fulfillment ledger. Retire older `SdlcManagedTraversalLedger` or ingress/source ledger uses wherever they claim closure; keep them only as source lineage/registers feeding assessments. | The carrier exists, but sovereignty is still the key acceptance issue. A ticket can still appear green if it only proves helper construction or source-grep shape, not that this ledger is the only closure path. | Make every traversal ticket cite A16 and include one negative proof that no alternate artifact can close or route when the ledger/decision/evaluator chain disagrees. |
+| Compute `edge_converged = carry && fulfillment && admitted` | A6, A7. Closure is a fold over admitted evidence and declared carry. | `result_ingest.py` computes `carry_converged = missing_count == 0 and extra_count == 0`, `fulfillment_converged = fulfilled_count == len(obligation_rows) ...`, and `edge_converged = carry_converged and fulfillment_converged and admitted`. | `traversal_consequence.ts` computes carry from `missing === 0 && extra === 0`, fulfillment from fulfilled/partial/blocked/unfulfilled counts, then gates `edgeConverged` by admitted, target certification, and F_D recheck. | Keep these counters only on `SdlcEdgeFulfillmentLedger` or as direct projections from it. Retire duplicated closure counters in run summaries, gap dossiers, or assurance reports unless they explicitly cite the ledger version ref. | Formula parity is now close. The delicate part is T-141: downstream transformation-set obligations must not falsely block the requirement edge, but must create downstream product pressure. | Preserve the partition: `edge_local` obligations gate this edge; `downstream_transformation_set` obligations carry pressure into product materialization. Add regression where requirement edge closes only when local obligations converge and downstream pressure is emitted. |
+| Decide close/yield/retry/repair/re-enter/reprice/block | A8, A9, A10, A11. Closure disposition is a replay-visible sum type. | Python represents `run_yielded` as active state and `MachineAdvanceResult(progressed=..., yielded=True)` as separate from failure/timeout. | `SdlcEdgeClosureDecision` has the seven-disposition sum type; yield requires current edge lawful and admitted progress beyond liveness-only refs; closure policy is explicit. | Keep `SdlcEdgeClosureDecision` as the sole closure disposition ledger/projection. Retire local retry/repair/re-entry counters or branch names as authority; preserve them only as reason refs under the decision. | Closure vocabulary is materially aligned. Remaining risk is policy/candidate drift: retries and continuation must never be selected by string branches or gap dossier rows. | Keep retry/repair/re-entry as graph/evaluator actions. Add functional non-close continuation tests that execute the loop and assert next action derives from `SdlcEdgeClosureDecision -> SdlcNextActionProjection`. |
+| Continue from replay-visible state | A12, A13, A14, A16. Next action is selected from closure decision plus fresh observation. | Python replay derives run state from event stream; continuation/failure chains carry causation refs, so the next machine advance can be reconstructed. | `replaySdlcTraversalConsequence` reconstructs `ConstructionIntent -> WorksiteEvidence -> Ledger -> ClosureDecision -> NextActionProjection`; public gaps rehydrates consequence archives for read-only view. | Keep replay archives and public gaps as read models over the consequence chain. Retire any public gaps, run summary, or compact output path that can route work without a `SdlcNextActionProjection` ref. | Replay machinery exists, but the live lanes have not yet proven full autonomous continuation from bootstrap through product materialization without an explicit target. Multi-tenant lanes still exposed loop/circuit-breaker weaknesses. | Add the controlling live proof: run from a source/specification-only workspace, conform authority, derive requirements as transformation set, emit product pressure, select materialization, close product ledger, and prove replay reconstructs every decision. |
+
+The current TS/TL line is therefore not missing the names of the carriers. It is
+missing full constitutional proof that those carriers are the only route from
+transform output to next action. The next uplift should avoid adding another
+artifact. It should make this chain sovereign in the live runner and make the
+negative cases fail closed.

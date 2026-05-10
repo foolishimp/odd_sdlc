@@ -38,7 +38,11 @@ import {
   type TracedProcessOutcome,
   type TracedProcessStreamModel
 } from "@abiogenesis/typescript-tenant";
-import { FG_CONFORM_PROJECT } from "../graph/index.js";
+import {
+  FG_CONFORM_PROJECT,
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+} from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
   defaultOperationForTarget,
@@ -53,6 +57,7 @@ import type {
   SdlcInstalledOperatorStartLoopAttempt,
   SdlcInstalledOperatorStartOutcome,
   SdlcInstalledOperatorStatus,
+  SdlcInstalledOperatorTraversalConsequence,
   SdlcOperatorSummary,
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
@@ -106,13 +111,27 @@ import {
   materializeSdlcProjectConformance
 } from "../workspace/index.js";
 import {
+  deriveOddSdlcEvaluateNextReport,
+  type OddSdlcEvaluateNextActionInput
+} from "../runtime/index.js";
+import {
+  constructSdlcEdgeFulfillmentLedger,
+  constructSdlcNextActionProjection,
+  constructSdlcWorksiteEvidence,
+  deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeFulfillmentCountsFromAssessments,
+  type SdlcEdgeFulfillmentAssessmentStatus,
+  type SdlcEdgeFulfillmentCountProjection
+} from "./traversal_consequence.js";
+import {
   canonicalSdlcPriorGapReasonCode,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
   sdlcBlockingReasonFromLegacy,
   summarizeBlockingReasons,
   type SdlcBlockingReason,
-  type SdlcBlockingReasonCode
+  type SdlcBlockingReasonCode,
+  type SdlcBlockingReasonLawfulReentryPoint
 } from "../shared/blocking_reason.js";
 
 const MAX_INSTALLED_REENTRY_ATTEMPTS = 4;
@@ -167,6 +186,7 @@ function terminalOutcome(input: {
   readonly blockingReasonCarriers?: readonly SdlcBlockingReason[] | undefined;
   readonly nextLawfulAction: string;
   readonly currentEdge?: string | null;
+  readonly traversalConsequence?: SdlcInstalledOperatorTraversalConsequence | null;
 }): SdlcInstalledOperatorStartOutcome {
   const graphFunctionName =
     input.start.executionContract?.targetGraphFunction ?? null;
@@ -196,7 +216,8 @@ function terminalOutcome(input: {
     replayEventCountAfter: input.replayEventCountAfter,
     emittedRuntimeEventKinds: input.emittedRuntimeEventKinds,
     eventLogPath: oddSdlcRuntimeEventsPath(input.workspaceRoot),
-    archiveRoot: input.archiveRoot
+    archiveRoot: input.archiveRoot,
+    traversalConsequence: input.traversalConsequence ?? null
   });
 }
 
@@ -217,65 +238,85 @@ function installedStartLoopAttemptFor(input: {
   });
 }
 
-function installedStartHasSameEdgeRetryTruth(
+function installedStartHasEvaluateNextTraversalTruth(
   outcome: SdlcInstalledOperatorStartOutcome
 ): boolean {
-  if (outcome.gapDossier?.retryEligible !== true) {
-    return false;
-  }
-  return (
-    outcome.summary.nextLawfulAction === "retry_same_edge_with_gap_dossier" ||
-    outcome.gapDossier.nextLawfulActions.includes("retry_same_edge")
-  );
+  return outcome.traversalConsequence?.nextActionProjection.choosesNextTraversal === true;
 }
 
-function installedStartHasRepairReentryTruth(
-  outcome: SdlcInstalledOperatorStartOutcome
-): boolean {
-  return (
-    outcome.gapDossier?.retryEligible === true &&
-    outcome.gapDossier.nextLawfulActions.includes("repair_worker_output")
-  );
+export type SdlcWorkerRetryContextDerivationStatus =
+  | "ready"
+  | "no_consequence"
+  | "no_manifest"
+  | "no_executable_intent";
+
+export interface SdlcWorkerRetryContextDerivation {
+  readonly kind: "sdlc_worker_retry_context_derivation";
+  readonly status: SdlcWorkerRetryContextDerivationStatus;
+  readonly retryContext: SdlcWorkerRetryContext | null;
+  readonly reasonRef: string;
+  readonly sourceProjectionRef: string | null;
 }
 
-function installedStartHasFpEscalationTruth(
-  outcome: SdlcInstalledOperatorStartOutcome
-): boolean {
-  return (
-    outcome.gapDossier?.retryEligible === true &&
-    outcome.gapDossier.nextLawfulActions.includes("escalate_to_fp")
-  );
-}
-
-function installedStartHasReentryTruth(
-  outcome: SdlcInstalledOperatorStartOutcome
-): boolean {
-  return (
-    installedStartHasSameEdgeRetryTruth(outcome) ||
-    installedStartHasFpEscalationTruth(outcome) ||
-    installedStartHasRepairReentryTruth(outcome)
-  );
-}
-
-function retryContextFromGapDossier(input: {
-  readonly gapDossier: SdlcPostflightGapDossier;
+export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly attemptIndex: number;
-}): SdlcWorkerRetryContext {
-  const sourceProjectionRef = `projection://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`;
-  return Object.freeze({
+}): SdlcWorkerRetryContextDerivation {
+  const consequence = input.outcome.traversalConsequence;
+  if (consequence === null) {
+    return Object.freeze({
+      kind: "sdlc_worker_retry_context_derivation" as const,
+      status: "no_consequence" as const,
+      retryContext: null,
+      reasonRef: "retry-context-unavailable://odd-sdlc/no-consequence",
+      sourceProjectionRef: null
+    });
+  }
+  const sourceProjectionRef =
+    consequence.nextActionProjection.nextActionProjectionRef;
+  if (input.outcome.manifest === null) {
+    return Object.freeze({
+      kind: "sdlc_worker_retry_context_derivation" as const,
+      status: "no_manifest" as const,
+      retryContext: null,
+      reasonRef: "retry-context-unavailable://odd-sdlc/no-manifest",
+      sourceProjectionRef
+    });
+  }
+  if (consequence.nextActionProjection.choosesNextTraversal !== true) {
+    return Object.freeze({
+      kind: "sdlc_worker_retry_context_derivation" as const,
+      status: "no_executable_intent" as const,
+      retryContext: null,
+      reasonRef: "retry-context-unavailable://odd-sdlc/no-executable-intent",
+      sourceProjectionRef
+    });
+  }
+  const manifestRef = pathToFileURL(
+    join(input.outcome.manifest.archiveRoot, "handoff_manifest.json")
+  ).href;
+  const refSegment = encodeURIComponent(sourceProjectionRef);
+  const retryContext = Object.freeze({
     kind: "sdlc_worker_retry_context",
     retryAttemptRefs: Object.freeze([
       Object.freeze({
-        vectorIndex: input.gapDossier.vectorIndex,
-        retryRunId: `retry-run://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`,
-        retryCallId: `retry-call://odd-sdlc-ts/installed-reentry/${input.gapDossier.vectorIndex}/${input.attemptIndex}`,
-        manifestId: input.gapDossier.priorManifestId,
-        priorManifestId: input.gapDossier.currentGapDossierRef,
+        vectorIndex: input.outcome.manifest.vectorIndex,
+        retryRunId: `retry-run://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
+        retryCallId: `retry-call://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
+        manifestId: manifestRef,
+        priorAuthorityRef: consequence.edgeClosureDecision.decisionRef,
         attemptIndex: input.attemptIndex,
         sourceProjectionRef
       })
     ]),
-    priorGapDossiers: Object.freeze([input.gapDossier])
+    priorGapDossiers: Object.freeze([])
+  });
+  return Object.freeze({
+    kind: "sdlc_worker_retry_context_derivation" as const,
+    status: "ready" as const,
+    retryContext,
+    reasonRef: "retry-context://odd-sdlc/ready",
+    sourceProjectionRef
   });
 }
 
@@ -325,6 +366,7 @@ function installedStartWithLoop(input: {
   });
   return Object.freeze({
     ...input.outcome,
+    traversalConsequence: input.outcome.traversalConsequence,
     loop
   });
 }
@@ -412,7 +454,7 @@ function retryContextFromRetryAttemptRefs(
         retryRunId: ref.retryRunId,
         retryCallId: ref.retryCallId,
         manifestId: ref.manifestId,
-        priorManifestId: ref.priorManifestId,
+        priorAuthorityRef: ref.priorManifestId,
         attemptIndex: ref.attemptIndex,
         sourceProjectionRef: ref.sourceProjectionRef
       })
@@ -423,7 +465,7 @@ function retryContextFromRetryAttemptRefs(
     retryAttemptRefs,
     priorGapDossiers: compactPriorGapDossiers(
       retryAttemptRefs
-        .map((ref) => readPostflightGapDossierRef(ref.priorManifestId))
+        .map((ref) => readPostflightGapDossierRef(ref.priorAuthorityRef))
         .filter((dossier): dossier is SdlcPostflightGapDossier => dossier !== null)
     )
   });
@@ -443,7 +485,10 @@ function mergedRetryContext(input: {
   const overrideDossiers = input.override.priorGapDossiers.filter(
     (dossier) =>
       dossier.vectorIndex === input.vectorIndex ||
-      dossier.nextLawfulActions.includes("repair_worker_output")
+      dossier.reasons.some(
+        (reason) =>
+          reason.blockingReason.lawfulReentryPoint === "repair_worker_output"
+      )
   );
   if (overrideAttemptRefs.length === 0 && overrideDossiers.length === 0) {
     return input.projected;
@@ -457,7 +502,7 @@ function mergedRetryContext(input: {
     ...overrideAttemptRefs
   ]) {
     attemptRefByKey.set(
-      `${ref.vectorIndex}:${ref.priorManifestId}:${ref.attemptIndex}`,
+      `${ref.vectorIndex}:${ref.priorAuthorityRef}:${ref.attemptIndex}`,
       ref
     );
   }
@@ -546,8 +591,10 @@ function repairReentryGraphSpanRuntimeEvents(input: {
   const dossier = input.outcome.gapDossier;
   if (
     dossier === null ||
-    dossier.retryEligible !== true ||
-    !dossier.nextLawfulActions.includes("repair_worker_output")
+    blockingReasonRefsForReentry({
+      state: input.outcome,
+      lawfulReentryPoint: "repair_worker_output"
+    }).length === 0
   ) {
     return Object.freeze([]);
   }
@@ -1758,6 +1805,541 @@ function workerProcessEvidenceRefs(input: {
   ]);
 }
 
+function graphVectorRef(input: {
+  readonly basis: ExecutionBasis;
+  readonly vectorIndex: number;
+}): string {
+  const vector = input.basis.graph.vectors[input.vectorIndex];
+  if (vector === undefined) {
+    throw new TypeError(`missing graph vector ${input.vectorIndex}`);
+  }
+  return vector.id;
+}
+
+function targetOutcomeRef(input: {
+  readonly basis: ExecutionBasis;
+  readonly vectorIndex: number;
+}): string {
+  const vector = input.basis.graph.vectors[input.vectorIndex];
+  if (vector === undefined) {
+    throw new TypeError(`missing graph vector ${input.vectorIndex}`);
+  }
+  return `outcome://odd-sdlc/${input.basis.graphFunction.id}/${vector.target.id}`;
+}
+
+function traversalConsequenceEvidenceRefs(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+}): readonly string[] {
+  return uniqueSorted([
+    ...workerProcessEvidenceRefs({
+      manifest: input.state.manifest,
+      workerRun: input.state.workerRun
+    }),
+    ...(input.state.workerReport === null
+      ? []
+      : [pathToFileURL(input.state.workerReport.outputFile).href]),
+    ...(input.state.postflight?.evidenceRefs ?? []),
+    ...(input.state.gapDossier === null
+      ? []
+      : [
+          input.state.gapDossier.currentGapDossierRef,
+          ...input.state.gapDossier.evidenceRefs
+        ])
+  ]);
+}
+
+function manifestRefSegment(manifest: SdlcWorkerHandoffManifest): string {
+  return encodeURIComponent(pathToFileURL(manifest.archiveRoot).href);
+}
+
+function materializedFileRef(file: {
+  readonly absolutePath: string;
+}): string {
+  return pathToFileURL(file.absolutePath).href;
+}
+
+function fallbackFulfillmentStatusForState(
+  state: SdlcAbgOwnedFpDispatchState
+): SdlcEdgeFulfillmentAssessmentStatus {
+  if (state.status === "worker_invoked") {
+    return "fulfilled";
+  }
+  if (
+    state.status === "postflight_failed" ||
+    state.status === "fp_escalation"
+  ) {
+    return "partial";
+  }
+  return "blocked";
+}
+
+function edgeFulfillmentProjectionFor(
+  state: SdlcAbgOwnedFpDispatchState
+): SdlcEdgeFulfillmentCountProjection {
+  const assessments = Object.freeze(
+    (state.workerReport?.obligationAssessments ?? Object.freeze([])).map(
+      (assessment) => {
+        const authorityRequirementInduction =
+          state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+          !state.manifest.productMaterialization.required &&
+          assessment.obligationId.startsWith("requirement:");
+        const carriesRequirementTransformationSet =
+          assessment.obligationId.startsWith("requirement:") &&
+          !state.manifest.productMaterialization.required &&
+          (authorityRequirementInduction ||
+            (state.manifest.targetAssetType === "requirement_surface" &&
+              assessment.blockingReasons.some((reason) =>
+                reason.startsWith("requirement_recorded_for_future_closure:")
+              )));
+        return Object.freeze({
+          obligationId: assessment.obligationId,
+          fulfillmentStatus: assessment.fulfillmentStatus,
+          evidenceRefs: assessment.evidenceRefs,
+          ...(carriesRequirementTransformationSet
+            ? {
+                carryDirection: "downstream_transformation_set" as const,
+                downstreamGraphFunctionRefs: Object.freeze([
+                  `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+                ]),
+                targetBindingRefs: Object.freeze([
+                  "target-binding://odd-sdlc/component_code_surface"
+                ])
+              }
+            : {})
+        });
+      }
+    )
+  );
+  return deriveSdlcEdgeFulfillmentCountsFromAssessments({
+    declaredObligationIds: uniqueSorted([
+      ...state.manifest.traversalObligationContext.obligations.map(
+        (obligation) => obligation.obligationId
+      ),
+      ...(state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
+        ? assessments
+            .map((assessment) => assessment.obligationId)
+            .filter((obligationId) => obligationId.startsWith("requirement:"))
+        : [])
+    ]),
+    assessments,
+    fallbackStatus: fallbackFulfillmentStatusForState(state)
+  });
+}
+
+function blockingReasonRefsForReentry(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly lawfulReentryPoint: SdlcBlockingReasonLawfulReentryPoint;
+}): readonly string[] {
+  const runRef = manifestRefSegment(input.state.manifest);
+  return uniqueSorted(
+    input.state.blockingReasonCarriers.flatMap((reason, index) =>
+      reason.lawfulReentryPoint === input.lawfulReentryPoint
+        ? [
+            `blocking-reason://odd-sdlc/${runRef}/${String(index)}/${reason.code}`,
+            ...reason.evidenceRefs
+          ]
+        : []
+    )
+  );
+}
+
+function blockReasonRefsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  if (
+    state.status === "worker_invoked" ||
+    blockingReasonRefsForReentry({
+      state,
+      lawfulReentryPoint: "same_edge_retry"
+    }).length > 0 ||
+    blockingReasonRefsForReentry({
+      state,
+      lawfulReentryPoint: "repair_worker_output"
+    }).length > 0 ||
+    blockingReasonRefsForReentry({
+      state,
+      lawfulReentryPoint: "reprice_requirement_or_design"
+    }).length > 0
+  ) {
+    return Object.freeze([]);
+  }
+  return uniqueSorted([
+    ...(state.gapDossier === null ? [] : [state.gapDossier.currentGapDossierRef]),
+    ...state.blockingReasonCarriers.flatMap((reason) => reason.evidenceRefs)
+  ]);
+}
+
+function postActionCandidateFor(input: {
+  readonly basis: ExecutionBasis;
+  readonly vectorIndex: number;
+  readonly basisKind: string;
+  readonly actionKind: OddSdlcEvaluateNextActionInput["actionKind"];
+}) {
+  const vectorRef = graphVectorRef({
+    basis: input.basis,
+    vectorIndex: input.vectorIndex
+  });
+  const outcomeRef = targetOutcomeRef({
+    basis: input.basis,
+    vectorIndex: input.vectorIndex
+  });
+  const actionRef = [
+    "construction-action://odd-sdlc/post-action",
+    input.basis.graphFunction.id,
+    input.basisKind,
+    vectorRef
+  ].join("/");
+  return Object.freeze({
+    actionRef,
+    actionKind: input.actionKind,
+    graphFunctionRef: input.basis.graphFunction.id,
+    graphVectorRef: vectorRef,
+    publishedTraversalTargetRef:
+      `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${vectorRef}`,
+    targetOutcomeRef: outcomeRef,
+    inputAssetRefs: Object.freeze([]),
+    expectedOutputAssetRefs: Object.freeze([outcomeRef]),
+    requiredAuthorityRefs: Object.freeze([
+      `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${vectorRef}`
+    ]),
+    eligibleReasonRefs: Object.freeze([
+      "evaluate_next_post_action_selected_published_graph_action"
+    ])
+  });
+}
+
+function postProductMaterializationCandidateFor(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+}): OddSdlcEvaluateNextActionInput | null {
+  const graphFunctionRef =
+    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`;
+  const targetOutcomeRef = [
+    "target-outcome://odd-sdlc/post-action",
+    graphFunctionRef,
+    "component_code_surface",
+    encodeURIComponent(manifestRefSegment(input.state.manifest))
+  ].join("/");
+  const publishedActionRef =
+    `published-action://odd-sdlc/graph-function/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`;
+  return Object.freeze({
+    actionRef: [
+      "construction-action://odd-sdlc/post-action",
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      "post_downstream_product_materialization",
+      targetOutcomeRef
+    ].join("/"),
+    actionKind: "invoke_graph_function" as const,
+    graphFunctionRef,
+    graphVectorRef: null,
+    publishedTraversalTargetRef: publishedActionRef,
+    targetOutcomeRef,
+    inputAssetRefs: Object.freeze([]),
+    expectedOutputAssetRefs: Object.freeze([
+      "asset-type://odd-sdlc/component_code_surface",
+      targetOutcomeRef
+    ]),
+    requiredAuthorityRefs: Object.freeze([publishedActionRef]),
+    eligibleReasonRefs: Object.freeze([
+      "evaluate_next_downstream_requirement_transformation_set",
+      "evaluate_next_declared_product_materialization_action_published",
+      ...input.downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
+      ...input.downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
+    ])
+  });
+}
+
+function postActionCandidates(input: {
+  readonly basis: ExecutionBasis;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly closureDecisionDisposition: string;
+  readonly nextVectorIndex: number | null;
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+}) {
+  if (
+    input.closureDecisionDisposition === "close" &&
+    input.downstreamPressureRefs.length > 0
+  ) {
+    const productMaterializationCandidate =
+      postProductMaterializationCandidateFor({
+        state: input.state,
+        downstreamPressureRefs: input.downstreamPressureRefs,
+        downstreamTargetBindingRefs: input.downstreamTargetBindingRefs
+      });
+    return Object.freeze(
+      productMaterializationCandidate === null
+        ? []
+        : [productMaterializationCandidate]
+    );
+  }
+  if (
+    input.closureDecisionDisposition === "close" &&
+    input.nextVectorIndex !== null
+  ) {
+    return Object.freeze([
+      postActionCandidateFor({
+        basis: input.basis,
+        vectorIndex: input.nextVectorIndex,
+        basisKind: "post_close_graph_continuation",
+        actionKind: "continue_graph_call"
+      })
+    ]);
+  }
+  if (input.closureDecisionDisposition === "retry") {
+    return Object.freeze([
+      postActionCandidateFor({
+        basis: input.basis,
+        vectorIndex: input.state.manifest.vectorIndex,
+        basisKind: "post_retry",
+        actionKind: "continue_graph_call"
+      })
+    ]);
+  }
+  if (input.closureDecisionDisposition === "repair") {
+    return Object.freeze([
+      postActionCandidateFor({
+        basis: input.basis,
+        vectorIndex: input.state.manifest.vectorIndex,
+        basisKind: "post_repair",
+        actionKind: "repair_same_edge"
+      })
+    ]);
+  }
+  if (input.closureDecisionDisposition === "re-enter") {
+    return Object.freeze([
+      postActionCandidateFor({
+        basis: input.basis,
+        vectorIndex: input.state.manifest.vectorIndex,
+        basisKind: "post_reenter",
+        actionKind: "reenter_graph_span"
+      })
+    ]);
+  }
+  return Object.freeze([]);
+}
+
+function deriveInstalledTraversalConsequence(input: {
+  readonly basis: ExecutionBasis;
+  readonly start: SdlcPublicStartOutcome;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly emittedEvents: readonly RuntimeEvent[];
+  readonly nextVectorIndex: number | null;
+}): SdlcInstalledOperatorTraversalConsequence {
+  if (input.start.executionContract === null) {
+    throw new TypeError("installed traversal consequence requires execution contract");
+  }
+  const constructionIntent = input.start.executionContract.constructionIntent;
+  const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
+  const runRef = manifestRefSegment(input.state.manifest);
+  const worksiteEvidence = constructSdlcWorksiteEvidence({
+    evidenceBundleRef: `evidence://odd-sdlc/${runRef}/worksite`,
+    intentRef: constructionIntent.intentRef,
+    invocationRef: processStartedRef(input.state.manifest),
+    processEventRefs: workerProcessEvidenceRefs({
+      manifest: input.state.manifest,
+      workerRun: input.state.workerRun
+    }),
+    productEvidenceRefs: Object.freeze([
+      ...(input.state.workerReport?.materializedFiles.map(materializedFileRef) ??
+        [])
+    ]),
+    admittedProgressRefs: evidenceRefs,
+    livenessProjectionRefs: Object.freeze([
+      runtimeLivenessProjectionRef(input.state.manifest)
+    ]),
+    predecessorRefs: Object.freeze([
+      constructionIntent.intentRef,
+      constructionIntent.nextActionProjectionRef
+    ])
+  });
+  const fulfillmentProjection = edgeFulfillmentProjectionFor(input.state);
+  const retryReasonRefs = blockingReasonRefsForReentry({
+    state: input.state,
+    lawfulReentryPoint: "same_edge_retry"
+  });
+  const repairReasonRefs = blockingReasonRefsForReentry({
+    state: input.state,
+    lawfulReentryPoint: "repair_worker_output"
+  });
+  const repriceReasonRefs = blockingReasonRefsForReentry({
+    state: input.state,
+    lawfulReentryPoint: "reprice_requirement_or_design"
+  });
+  const ledger = constructSdlcEdgeFulfillmentLedger({
+    ledgerRef: `ledger://odd-sdlc/${runRef}/edge-fulfillment`,
+    ledgerVersionRef: `ledger-version://odd-sdlc/${runRef}/edge-fulfillment/1`,
+    edgeRef:
+      `edge://odd-sdlc/${input.basis.graphFunction.id}/${input.state.manifest.vectorIndex}`,
+    attemptRef: `attempt://odd-sdlc/${runRef}/${input.state.manifest.vectorIndex}`,
+    targetBindingRefs: input.start.executionContract.nextActionProjection.targetBindingRefs,
+    evidenceBundleRefs: Object.freeze([worksiteEvidence.evidenceBundleRef]),
+    materializationRefs: Object.freeze([
+      ...(input.state.workerReport?.materializedFiles.map(materializedFileRef) ??
+        [])
+    ]),
+    livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs,
+    admissionRefs: evidenceRefs,
+    downstreamTransformationSetRefs:
+      fulfillmentProjection.downstreamTransformationSetRefs,
+    downstreamPressureRefs: fulfillmentProjection.downstreamPressureRefs,
+    downstreamTargetBindingRefs:
+      fulfillmentProjection.downstreamTargetBindingRefs,
+    counts: fulfillmentProjection.counts,
+    assessmentCount: fulfillmentProjection.assessmentCount,
+    admitted: true,
+    targetCertificationPassed: input.state.postflight?.status === "passed",
+    fdRecheckPassed: input.state.status !== "worker_report_rejected",
+    predecessorRefs: Object.freeze([
+      constructionIntent.intentRef,
+      worksiteEvidence.evidenceBundleRef,
+      ...input.start.executionContract.nextActionProjection.targetBindingRefs
+    ])
+  });
+  const closureDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef:
+      `closure-decision://odd-sdlc/${runRef}/edge-fulfillment/1`,
+    ledger,
+    currentEdgeLawful:
+      input.state.status !== "worker_report_rejected" &&
+      repriceReasonRefs.length === 0,
+    retryReasonRefs,
+    repairReasonRefs,
+    repriceReasonRefs,
+    blockReasonRefs: uniqueSorted([
+      ...blockReasonRefsForState(input.state),
+      ...fulfillmentProjection.nonConvergedReasonRefs
+    ])
+  });
+  const candidates = postActionCandidates({
+    basis: input.basis,
+    state: input.state,
+    closureDecisionDisposition: closureDecision.disposition,
+    nextVectorIndex: input.nextVectorIndex,
+    downstreamPressureRefs: ledger.downstreamPressureRefs,
+    downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs
+  });
+  const pressureRef =
+    `pressure://odd-sdlc/post-action/${runRef}/${closureDecision.disposition}`;
+  const nextActionProjection =
+    candidates.length === 0
+      ? constructSdlcNextActionProjection({
+          nextActionProjectionRef:
+            `next-action://odd-sdlc/${runRef}/${closureDecision.disposition}/no-action`,
+          intentEventRefs: constructionIntent.intentEventRefs,
+          productAssetModelRef: constructionIntent.productAssetModelRef,
+          gapPressureRefs: Object.freeze([pressureRef]),
+          targetBindingRefs: ledger.targetBindingRefs,
+          closureDecision,
+          observationRef: `observation://odd-sdlc/post-action/${runRef}`,
+          policyRefs: Object.freeze([
+            "policy://odd-sdlc/evaluate-next/post-action/no-action"
+          ]),
+          actionCatalogRefs: Object.freeze([
+            `catalog://odd-sdlc/post-action/${runRef}/empty`
+          ])
+        })
+      : (() => {
+          const evaluator = deriveOddSdlcEvaluateNextReport({
+            basis: input.basis,
+            events: Object.freeze([...input.replayEvents, ...input.emittedEvents]),
+            intentEventRefs: constructionIntent.intentEventRefs,
+            productAssetModelRef: constructionIntent.productAssetModelRef,
+            episodeId: `construction-episode://odd-sdlc/post-action/${runRef}`,
+            observationId:
+              `construction-observation://odd-sdlc/post-action/${runRef}`,
+            pressures: Object.freeze([
+              {
+                pressureRef,
+                pressureKind: "gap_row",
+                sourceRef: closureDecision.decisionRef,
+                affectedAssetRefs: Object.freeze(
+                  candidates.flatMap(
+                    (candidate) => candidate.expectedOutputAssetRefs ?? []
+                  )
+                ),
+                targetOutcomeRefs: Object.freeze(
+                  candidates.map((candidate) => candidate.targetOutcomeRef)
+                ),
+                evidenceRefs,
+                severity: 1
+              }
+            ]),
+            actions: candidates
+          });
+          return constructSdlcNextActionProjection({
+            nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
+            intentEventRefs: evaluator.intentEventRefs,
+            productAssetModelRef: evaluator.productAssetModelRef,
+            gapPressureRefs: evaluator.gapPressureRefs,
+            targetBindingRefs:
+              evaluator.targetBindingRefs.length === 0
+                ? ledger.targetBindingRefs
+                : evaluator.targetBindingRefs,
+            closureDecision,
+            observationRef: evaluator.observation.observationId,
+            policyRefs: Object.freeze([
+              evaluator.policyCarrierRef,
+              evaluator.priorityProjection.prioritySchemeRef
+            ]),
+            actionCatalogRefs: evaluator.actionCatalogRefs,
+            selectedActionRef: evaluator.selectedPriorityRow?.actionRef ?? null,
+            nextGraphFunctionRef: evaluator.bestGraphFunctionRef,
+            nextGraphVectorRef: evaluator.bestGraphVectorRef
+          });
+        })();
+  return Object.freeze({
+    kind: "sdlc_installed_operator_traversal_consequence" as const,
+    constructionIntent,
+    worksiteEvidence,
+    edgeFulfillmentLedger: ledger,
+    edgeClosureDecision: closureDecision,
+    nextActionProjection
+  });
+}
+
+function writeTraversalConsequenceArchive(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly consequence: SdlcInstalledOperatorTraversalConsequence;
+}): void {
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_construction_intent.json",
+    payload: input.consequence.constructionIntent
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_worksite_evidence.json",
+    payload: input.consequence.worksiteEvidence
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_edge_fulfillment_ledger.json",
+    payload: input.consequence.edgeFulfillmentLedger
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_edge_closure_decision.json",
+    payload: input.consequence.edgeClosureDecision
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_next_action_projection.json",
+    payload: input.consequence.nextActionProjection
+  });
+}
+
+function nextLawfulActionFromConsequence(
+  consequence: SdlcInstalledOperatorTraversalConsequence
+): string {
+  return (
+    consequence.nextActionProjection.selectedActionRef ??
+    `disposition://${consequence.edgeClosureDecision.disposition}`
+  );
+}
+
 function readOptionalWorkerTextRef(ref: string | null | undefined): string {
   if (ref === null || ref === undefined || !ref.startsWith("file:")) {
     return "";
@@ -2764,20 +3346,22 @@ export async function executeInstalledOperatorStart(input: {
     workspaceRoot: input.workspaceRoot,
     events: emitted
   });
-  const retryPlanned = emitted.some((event) => event.kind === "retry_repair_planned");
-  const retryVisibleGap =
-    completedDispatchState.gapDossier?.retryEligible === true &&
-    completedDispatchState.gapDossier.nextLawfulActions.includes("retry_same_edge");
-  const repairVisibleGap =
-    completedDispatchState.gapDossier?.retryEligible === true &&
-    completedDispatchState.gapDossier.nextLawfulActions.includes("repair_worker_output");
-  const fpEscalationVisibleGap =
-    completedDispatchState.gapDossier?.retryEligible === true &&
-    completedDispatchState.gapDossier.nextLawfulActions.includes("escalate_to_fp");
   const nextVector =
     engineResult.projection.nextVectorIndex === null
       ? null
       : basis.graph.vectors[engineResult.projection.nextVectorIndex]?.name ?? null;
+  const traversalConsequence = deriveInstalledTraversalConsequence({
+    basis,
+    start: input.start,
+    state: completedDispatchState,
+    replayEvents: input.replayEvents,
+    emittedEvents: emitted,
+    nextVectorIndex: engineResult.projection.nextVectorIndex
+  });
+  writeTraversalConsequenceArchive({
+    manifest: completedDispatchState.manifest,
+    consequence: traversalConsequence
+  });
   const terminal =
     engineResult.transition.kind === "terminal" ? engineResult.transition : null;
   const status =
@@ -2792,23 +3376,7 @@ export async function executeInstalledOperatorStart(input: {
     status === "blocked" && terminal?.reason !== null && terminal?.reason !== undefined
       ? terminal.reason
       : completedDispatchState.blockingReason;
-  const nextLawfulAction =
-    status === "converged"
-      ? "close_or_reprice"
-      : status === "blocked" && engineResult.assuranceGate.kind === "assurance_blocked"
-        ? "review_dossier"
-        : completedDispatchState.nextLawfulAction ??
-          (completedDispatchState.status === "worker_invoked"
-            ? engineResult.projection.nextVectorIndex === null
-              ? "close_or_reprice"
-              : "rerun_gaps_or_start_next_edge"
-            : retryPlanned || retryVisibleGap
-              ? "retry_same_edge_with_gap_dossier"
-              : fpEscalationVisibleGap
-                ? "escalate_to_fp_with_gap_dossier"
-              : repairVisibleGap
-                ? "plan_repair_reentry_with_gap_dossier"
-              : "inspect_worker_archive");
+  const nextLawfulAction = nextLawfulActionFromConsequence(traversalConsequence);
   const outcome = terminalOutcome({
     workspaceRoot: input.workspaceRoot,
     status,
@@ -2828,6 +3396,7 @@ export async function executeInstalledOperatorStart(input: {
     blockingReason,
     blockingReasonCarriers: completedDispatchState.blockingReasonCarriers,
     nextLawfulAction,
+    traversalConsequence,
     currentEdge:
       status === "converged"
         ? null
@@ -2914,20 +3483,23 @@ export async function executeInstalledOperatorStartWithReentry(input: {
         attemptIndex
       })
     );
-    if (!installedStartHasReentryTruth(latest)) {
+    if (
+      input.requestedUntil === "first_traversal" &&
+      latest.status === "worker_invoked"
+    ) {
+      break;
+    }
+    if (!installedStartHasEvaluateNextTraversalTruth(latest)) {
       break;
     }
     if (attemptIndex === MAX_INSTALLED_REENTRY_ATTEMPTS - 1) {
       retryGuardExhausted = true;
       break;
     }
-    retryContextOverride =
-      latest.gapDossier === null
-        ? undefined
-        : retryContextFromGapDossier({
-            gapDossier: latest.gapDossier,
-            attemptIndex: attemptIndex + 1
-          });
+    retryContextOverride = deriveSdlcWorkerRetryContextFromTraversalConsequence({
+      outcome: latest,
+      attemptIndex: attemptIndex + 1
+    }).retryContext ?? undefined;
     const refreshed = await input.refreshReplayState();
     start = refreshed.start;
     replayEvents = refreshed.replayEvents;

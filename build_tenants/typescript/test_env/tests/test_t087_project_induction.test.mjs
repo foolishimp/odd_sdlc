@@ -9,6 +9,7 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
   invokeOddSdlcSpecMethodCommand
@@ -152,7 +153,7 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   assert.equal(secondGaps.status, "ok", JSON.stringify(secondGaps.payload));
   assert.equal(
     secondGaps.payload.start.executionContract.targetGraphFunction,
-    "bootstrap_release_self_test"
+    FG_CONFORM_PROJECT_AUTHORITY
   );
-  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(secondGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT_AUTHORITY);
 });

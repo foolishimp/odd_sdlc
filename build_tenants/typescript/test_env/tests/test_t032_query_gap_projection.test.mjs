@@ -21,7 +21,7 @@ import {
   constructSdlcGtlModule,
   deriveSdlcGapDossier,
   deriveSdlcWorkspaceIngressReport,
-  projectSdlcGapsFromReplay,
+  evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
   projectSdlcSpanAnalysis
 } from "../../build/semantic/code/src/index.js";
@@ -88,14 +88,22 @@ test("T-032 query-domain is a read-only projection over catalogs and module publ
   assert.equal(projection.readOnly, true);
   assert.deepStrictEqual(projection.emittedRuntimeEventKinds, []);
   assert(projection.graphFunctions.some((entry) => entry.name === "bootstrap_release_self_test"));
+  assert(projection.graphFunctions.some((entry) => entry.name === "Fg_conform_project_authority"));
   assert(projection.functions.some((entry) => entry.name === "derive_code_surface"));
   assert(projection.programs.some((entry) => entry.name === "release_operational_cycle"));
-  assert(projection.startTargets.some((entry) => entry.name === "bootstrap_release_self_test"));
+  assert(projection.startTargets.some((entry) => entry.name === "Fg_conform_project_authority"));
   assert(
     projection.assetOwnership.some(
       (entry) =>
         entry.assetType === "release_surface" &&
         entry.producerGraphFunctions.includes("prepare_release_surface")
+    )
+  );
+  assert(
+    projection.targetBindings.some(
+      (entry) =>
+        entry.declaredTargetAssetType === "project_bootstrap_surface" &&
+        entry.admissibleGraphFunctionNames.includes("Fg_conform_project_authority")
     )
   );
 });
@@ -121,14 +129,14 @@ test("T-032 query-domain fails closed when admitted module drifts from catalog t
 
 test("T-032 gaps and dossiers read ABI replay truth without emitting events", () => {
   const basis = moduleBasis();
-  const open = projectSdlcGapsFromReplay({ basis, events: [] });
+  const open = evalSdlcGapFromReplay({ basis, events: [] });
   const events = [
     constructGraphCallOpenedEvent(basis),
     constructFrameOpenedEvent(basis),
     constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 }),
     constructVectorClosedEvent({ basis, vectorIndex: 0, closureKind: "advanced" })
   ];
-  const partial = projectSdlcGapsFromReplay({ basis, events });
+  const partial = evalSdlcGapFromReplay({ basis, events });
   const dossier = deriveSdlcGapDossier({
     basis,
     events,
@@ -137,18 +145,36 @@ test("T-032 gaps and dossiers read ABI replay truth without emitting events", ()
   });
 
   assert.equal(open.status, "open");
+  assert.equal(open.evaluationFunction, "eval_gap");
+  assert.match(open.productAssetModelRef, /^product-asset-model:\/\/odd-sdlc\//);
+  assert.equal(open.choosesNextTraversal, false);
+  assert.equal(open.evaluatesActionClosure, false);
   assert.equal(open.currentEdge, "derive_intent_surface");
   assert.deepStrictEqual(open.emittedRuntimeEventKinds, []);
   assert.equal(partial.status, "partial");
   assert.equal(partial.currentEdge, "derive_product_surface");
   assert.equal(dossier.edge, "derive_product_surface");
+  assert.equal(dossier.gapEvaluationFunction, "eval_gap");
+  assert.equal(dossier.nextActionEvaluationFunction, "evaluate_next");
+  assert.equal(dossier.actionClosureEvaluationFunction, null);
+  assert.equal(dossier.nextActionBasisKind, "initial_selection");
+  assert.deepStrictEqual(dossier.intentEventRefs, [
+    "event://odd-sdlc/intent/operator-review"
+  ]);
+  assert.equal(dossier.productAssetModelRef, partial.productAssetModelRef);
+  assert(dossier.gapPressureRefs.length > 0);
+  assert(dossier.targetBindingRefs.length > 0);
+  assert(dossier.actionCatalogRefs.length > 0);
   assert.equal(dossier.choosesNextTraversal, false);
   assert.equal(
     dossier.rankingAuthority,
     "abiogenesis_construction_priority_projection"
   );
   assert.equal(dossier.localRankingAuthority, false);
-  assert.match(dossier.evaluatorProjectionRef, /^construction-priority-projection:/);
+  assert.match(
+    dossier.nextActionProjectionRef,
+    /^construction-priority-projection:/
+  );
   assert.equal(dossier.bestGraphFunctionRef, basis.graphFunction.id);
   assert.equal(
     dossier.bestGraphVectorRef,

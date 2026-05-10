@@ -12,6 +12,11 @@ export const FG_INGRESS_PROJECT = "Fg_ingress_project" as const;
 
 export const FG_CONFORM_PROJECT = "Fg_conform_project" as const;
 
+export const FG_CONFORM_PROJECT_AUTHORITY = "Fg_conform_project_authority" as const;
+
+export const FG_MATERIALIZE_DECLARED_PRODUCT_ASSET =
+  "Fg_materialize_declared_product_asset" as const;
+
 export const FG_MATERIALIZATION_ASSURANCE_LEDGER =
   "Fg_materialization_assurance_ledger" as const;
 
@@ -40,6 +45,8 @@ export type SdlcReusableGraphFunctionName =
   | typeof FG_SINGLE_TYPED_TRAVERSAL
   | typeof FG_INGRESS_PROJECT
   | typeof FG_CONFORM_PROJECT
+  | typeof FG_CONFORM_PROJECT_AUTHORITY
+  | typeof FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   | typeof FG_MATERIALIZATION_ASSURANCE_LEDGER
   | typeof FG_SEMANTIC_CONVERGENCE_ASSURANCE_LEDGER
   | typeof FG_OBLIGATION_CARRY_ASSURANCE_LEDGER
@@ -192,6 +199,36 @@ export const CONFORM_PROJECT_OUTPUTS = Object.freeze([
   "capability_contract_surface",
   "execution_contract_surface",
   "conformance_gap_set"
+] as const);
+
+export const PROJECT_AUTHORITY_CONFORMANCE_INPUTS = Object.freeze([
+  "conform_project_profile",
+  "selected_tenant_surface",
+  "module_inventory_surface",
+  "capability_contract_surface",
+  "execution_contract_surface",
+  "conformance_gap_set"
+] as const);
+
+export const PROJECT_AUTHORITY_CONFORMANCE_OUTPUTS = Object.freeze([
+  "project_bootstrap_surface",
+  "intent_surface",
+  "product_surface",
+  "goal_surface",
+  "project_authority_conformance_projection",
+  "project_authority_next_action_projection"
+] as const);
+
+export const DECLARED_PRODUCT_MATERIALIZATION_INPUTS = Object.freeze([
+  "project_authority_conformance_projection",
+  "requirement_surface",
+  "sdlc_target_obligation_binding",
+  "product_materialization_contract",
+  "worksite_surface"
+] as const);
+
+export const DECLARED_PRODUCT_MATERIALIZATION_OUTPUTS = Object.freeze([
+  "component_code_surface"
 ] as const);
 
 export const MATERIALIZATION_ASSURANCE_INPUTS = Object.freeze([
@@ -354,6 +391,69 @@ export const REUSABLE_GRAPH_FUNCTION_CATALOG: readonly SdlcReusableGraphFunction
         "capability_contracts",
         "execution_contracts",
         "realization_mode"
+      ])
+    }),
+    Object.freeze({
+      kind: "sdlc_reusable_graph_function_catalog_entry",
+      name: FG_CONFORM_PROJECT_AUTHORITY,
+      intent:
+        "Conform an already defined workspace into initial SDLC authority surfaces and next-action projection without running release construction.",
+      graphFunctionRole: "reusable_library",
+      inputs: PROJECT_AUTHORITY_CONFORMANCE_INPUTS,
+      outputs: PROJECT_AUTHORITY_CONFORMANCE_OUTPUTS,
+      stableOuterContract:
+        "ConformProjectProfile + Tenant + ModuleInventory + CapabilityContracts + ExecutionContracts + ConformanceGaps -> ProjectAuthorityConformance + Intent? + Product? + Goals? + NextActionProjection",
+      computeOrder: Object.freeze([
+        "observe:F_D",
+        "induct:F_P",
+        "project_next_action:F_P",
+        "postflight:F_D"
+      ]),
+      abgOwnedRuntimeTruth: Object.freeze([
+        "graph_call",
+        "frame",
+        "continuation",
+        "event",
+        "projection"
+      ]),
+      sdlcOwnedDomainTruth: Object.freeze([
+        "project_authority_meaning",
+        "supportable_authority_surfaces",
+        "authority_conformance_interpretation",
+        "next_action_interpretation"
+      ])
+    }),
+    Object.freeze({
+      kind: "sdlc_reusable_graph_function_catalog_entry",
+      name: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      intent:
+        "Materialize the declared product asset from conformed project authority, requirement transformation-set rows, target binding, and the current worksite.",
+      graphFunctionRole: "reusable_library",
+      inputs: DECLARED_PRODUCT_MATERIALIZATION_INPUTS,
+      outputs: DECLARED_PRODUCT_MATERIALIZATION_OUTPUTS,
+      stableOuterContract:
+        "ProjectAuthorityConformance + RequirementSurface + SdlcTargetObligationBinding + ProductMaterializationContract + WorksiteSurface -> ComponentCodeSurface",
+      computeOrder: Object.freeze([
+        "observe:F_D",
+        "construct:F_P",
+        "admit_evidence:F_D",
+        "evaluate_action:F_P",
+        "postflight:F_D"
+      ]),
+      abgOwnedRuntimeTruth: Object.freeze([
+        "graph_call",
+        "frame",
+        "intent",
+        "event",
+        "projection",
+        "runtime_liveness"
+      ]),
+      sdlcOwnedDomainTruth: Object.freeze([
+        "declared_product_target",
+        "requirement_transformation_set",
+        "target_obligation_binding",
+        "product_materialization_contract",
+        "worksite_interpretation"
       ])
     }),
     Object.freeze({

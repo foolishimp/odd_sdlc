@@ -31,6 +31,7 @@ from .execution_contract import (
 )
 from .fd_contracts import fd_binding, fd_contract
 from .function_catalog import FUNCTION_CATALOG
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
 from .project_profile import (
     PROJECT_CONSTRAINTS_PATH,
     load_project_profile,
@@ -118,6 +119,14 @@ def _fp_retry_policy_declaration(
             "deepening_eligible": deepening_eligible,
         }
     )
+=======
+from .ambiguity import refresh_ambiguity_register
+from .project_profile import PROJECT_CONSTRAINTS_PATH, load_project_profile
+from .traceability import (
+    REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
+    refresh_requirement_closure_register,
+)
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
 
 
 def _asset_node(
@@ -418,6 +427,20 @@ _builder = Operator(
 )
 
 _PENDING_CONTEXT_DIGEST = "sha256:" + ("0" * 64)
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
+=======
+_STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-stateful-builder-control-frame.md"
+)
+_REALIZED_TEST_SOURCE_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-realized-test-source-obligation.md"
+)
+_REALIZATION_DEEPENING_CONTEXT_PATH = Path(
+    ".ai-workspace/runtime/odd_sdlc-realization-deepening-control-frame.md"
+)
+
+
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
 def _workspace_context(name: str, relative_path: Path) -> Context:
     return Context(
         name=name,
@@ -430,14 +453,18 @@ _stateful_builder_control_context = _workspace_context(
     "odd_sdlc_stateful_builder_control_frame",
     _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
 )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
 _execution_contract_context = _workspace_context(
     "odd_sdlc_execution_contract_context",
     EXECUTION_CONTRACT_CONTEXT_PATH,
 )
+=======
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
 _requirement_closure_context = _workspace_context(
     "odd_sdlc_requirement_closure_builder_context",
     REQUIREMENT_CLOSURE_PROMPT_CONTEXT_PATH,
 )
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
 _repair_frontier_context = _workspace_context(
     "odd_sdlc_repair_frontier",
     REPAIR_FRONTIER_CONTEXT_PATH,
@@ -463,6 +490,15 @@ _test_lane_builder_contexts = (
     _requirement_closure_context,
     _repair_frontier_context,
     _test_lane_completeness_context,
+=======
+_realized_test_source_context = _workspace_context(
+    "odd_sdlc_realized_test_source_obligation",
+    _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+)
+_realization_deepening_context = _workspace_context(
+    "odd_sdlc_realization_deepening_control_frame",
+    _REALIZATION_DEEPENING_CONTEXT_PATH,
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
 )
 
 def _fd_evaluator(name: str) -> Evaluator:
@@ -745,6 +781,7 @@ def _graph_function(
     obligation_ledger: Attrs | dict[str, object] | None = None,
     fp_retry_policy: Attrs | dict[str, object] | None = None,
 ) -> GraphFunction:
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     published_contexts = (
         _stateful_builder_control_context,
         _execution_contract_context,
@@ -785,6 +822,9 @@ def _graph_function(
                 "fp_retry_policy": Attrs.coerce(fp_retry_policy),
             }
         )
+=======
+    published_contexts = (_stateful_builder_control_context, *contexts)
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     vector = GraphVector(
         name=name,
         source=source,
@@ -792,7 +832,26 @@ def _graph_function(
         operators=(_builder,),
         evaluators=(fd_evaluator, *extra_fd_evaluators, fp_evaluator),
         contexts=published_contexts,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
         declarations=declarations,
+=======
+        declarations=Attrs(
+            entries=(
+                (
+                    "dispatch",
+                    Attrs(
+                        entries=(
+                            ("ref", "genesis.dispatch_runtime:dispatch_bound_manifest_via_transport"),
+                            ("config", Attrs(entries=(("timeout", _FP_DISPATCH_TIMEOUT_SECONDS),))),
+                        )
+                    ),
+                ),
+                ("proof", Attrs(entries=(("ref", "genesis.policy_defaults:proof_recheck_after_fp"),))),
+                ("closure", Attrs(entries=(("ref", "genesis.policy_defaults:closure_require_resolution_or_fh"),))),
+                ("implements", tuple(req_refs)),
+            )
+        ),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     )
     source_nodes = source if isinstance(source, tuple) else (source,)
     graph = Graph(
@@ -1065,6 +1124,7 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
     target=_implementation_module_surface,
     fd_evaluator=_implementation_module_fd,
     fp_evaluator=_implementation_module_fp,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     extra_fd_evaluators=(_implementation_module_obligation_fd,),
     contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
@@ -1077,6 +1137,9 @@ GF_DERIVE_IMPLEMENTATION_MODULE = _graph_function(
         evaluator_id=_implementation_module_fp.name,
         deepening_eligible=True,
     ),
+=======
+    contexts=(_realization_deepening_context,),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_CODE = _graph_function(
@@ -1085,6 +1148,7 @@ GF_DERIVE_CODE = _graph_function(
     target=_code_surface,
     fd_evaluator=_code_fd,
     fp_evaluator=_code_fp,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     extra_fd_evaluators=(_code_traceability_fd, _code_obligation_fd),
     contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
@@ -1097,6 +1161,10 @@ GF_DERIVE_CODE = _graph_function(
         evaluator_id=_code_fp.name,
         deepening_eligible=True,
     ),
+=======
+    extra_fd_evaluators=(_code_traceability_fd,),
+    contexts=(_realization_deepening_context,),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_DESIGN = _graph_function(
@@ -1133,6 +1201,7 @@ GF_DERIVE_TEST_MODULE = _graph_function(
     target=_test_module_surface,
     fd_evaluator=_test_module_fd,
     fp_evaluator=_test_module_fp,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     extra_fd_evaluators=(_planned_test_traceability_fd, _test_module_obligation_fd),
     contexts=_realization_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
@@ -1145,6 +1214,10 @@ GF_DERIVE_TEST_MODULE = _graph_function(
         evaluator_id=_test_module_fp.name,
         deepening_eligible=True,
     ),
+=======
+    extra_fd_evaluators=(_planned_test_traceability_fd,),
+    contexts=(_realization_deepening_context,),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
@@ -1153,6 +1226,7 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
     target=_test_run_archive_surface,
     fd_evaluator=_test_run_archive_fd,
     fp_evaluator=_test_run_archive_fp,
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     extra_fd_evaluators=(_test_run_archive_obligation_fd,),
     contexts=_test_lane_builder_contexts,
     obligation_ledger=_requirement_edge_obligation_ledger(
@@ -1161,6 +1235,10 @@ GF_DERIVE_TEST_RUN_ARCHIVE = _graph_function(
         fulfillment_rule="realized_test_source",
         evidence_policy="realized_test_source_evidence",
     ),
+=======
+    extra_fd_evaluators=(_realized_test_traceability_fd,),
+    contexts=(_realized_test_source_context,),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     req_refs=("REQ-F-ASSET-004", "REQ-F-ODDSDLC-002"),
 )
 GF_PREPARE_RELEASE = _graph_function(
@@ -1795,6 +1873,33 @@ def _active_workspace_root(start: Path | None = None) -> Path:
 
 def _module_workspace_root() -> Path:
     return _active_workspace_root(Path(__file__).resolve().parent)
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
+=======
+
+
+def _write_runtime_builder_contexts(workspace_root: Path) -> None:
+    package_python_root = Path(__file__).resolve().parents[2]
+    published_contexts = (
+        (
+            package_python_root / "design" / "fp" / "STATEFUL_ITERATOR_CONTROL_FRAME.md",
+            workspace_root / _STATEFUL_ITERATOR_CONTROL_CONTEXT_PATH,
+        ),
+        (
+            package_python_root / "design" / "fp" / "REALIZED_TEST_SOURCE_OBLIGATION.md",
+            workspace_root / _REALIZED_TEST_SOURCE_CONTEXT_PATH,
+        ),
+        (
+            package_python_root / "design" / "fp" / "REALIZATION_DEEPENING_CONTROL_FRAME.md",
+            workspace_root / _REALIZATION_DEEPENING_CONTEXT_PATH,
+        ),
+    )
+    for source_path, target_path in published_contexts:
+        content = source_path.read_text(encoding="utf-8")
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = target_path.read_text(encoding="utf-8") if target_path.exists() else None
+        if existing != content:
+            target_path.write_text(content, encoding="utf-8")
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
 
 
 def _workspace_declares_project_constraints(workspace_root: Path) -> bool:
@@ -2018,6 +2123,7 @@ def _ambiguity_policy_candidate_families(
 
 
 def _build_module(workspace_root: Path) -> Module:
+<<<<<<< Updated upstream:build_tenants/python/code/odd_sdlc/gtl_module.py
     (
         active_leaf_functions,
         dynamic_fh_evaluators,
@@ -2032,6 +2138,11 @@ def _build_module(workspace_root: Path) -> Module:
     ambiguity_policy_candidate_families = _ambiguity_policy_candidate_families(
         ambiguity_policy_start_functions,
     )
+=======
+    _write_runtime_builder_contexts(workspace_root)
+    refresh_requirement_closure_register(workspace_root, stage="module_build")
+    active_leaf_functions, dynamic_fh_evaluators, fh_required_by_edge, ambiguity_register = _configured_leaf_graph_functions(workspace_root)
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/code/odd_sdlc/gtl_module.py
     active_operational_functions = _active_operational_leaf_graph_functions(workspace_root)
     operational_capabilities = operational_capability_projection_for_profile(
         load_project_profile(workspace_root),

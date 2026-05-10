@@ -153,7 +153,7 @@ test("T-098 requirements-to-design closes through existing assurance ledgers", a
   }
 
   assert.deepStrictEqual(visitedEdges, [
-    "derive_intent_surface",
+    "Fg_conform_project_authority",
     "derive_product_surface",
     "derive_goal_surface",
     "derive_requirement_surface",

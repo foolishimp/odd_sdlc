@@ -29,6 +29,10 @@ function policyEntry(input: {
 
 export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
   policyEntry({
+    targetAssetType: "project_bootstrap_surface",
+    edgeClass: "bootstrap_specification"
+  }),
+  policyEntry({
     targetAssetType: "intent_surface",
     edgeClass: "bootstrap_specification"
   }),

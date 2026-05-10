@@ -550,13 +550,18 @@ Requirements then decompose that product realization into constitutional truth.
 
 The intended end-state product shape is:
 
+<<<<<<< Updated upstream
 This section describes the `odd_sdlc` source repository as the product under
+=======
+This section describes the `odd_method` source repository as the product under
+>>>>>>> Stashed changes
 development.
 
 The source-repository realization rules below do not redefine downstream
 installed-workspace topology. Downstream project topology is governed
 separately by `REQ-F-ODDSDLC-032`.
 
+<<<<<<< Updated upstream
 The source repository does not carry repo-root `.abiogenesis/` as source truth.
 Source commands bind explicitly to the sibling ABG source/release substrate and
 the active `odd_sdlc` source realization.
@@ -587,6 +592,21 @@ mutable odd_sdlc source line:
    `build_tenants/common/design/` or a tenant-local
    `build_tenants/<tenant>/design/` root rather than under `specification/`
 5. within the `odd_sdlc` source repository, keep shared bootstrap
+=======
+Downstream installed workspaces are governed separately by
+`REQ-F-ODDSDLC-032`: their constitutional `WHAT` remains under
+`specification/`, their project-owned realization `HOW` lands under
+`build_tenants/<tenant>/`, and released `odd_sdlc` runtime/software remains
+under `.odd_sdlc/`.
+
+1. install `odd_method` clean as a GTL/ABG-native product
+2. author project-owned intent, product, and requirements surfaces
+3. maintain project-owned realization structure beneath `build_tenants/`
+4. within the `odd_method` source repository, keep design under
+   `build_tenants/common/design/` or a tenant-local
+   `build_tenants/<tenant>/design/` root rather than under `specification/`
+5. within the `odd_method` source repository, keep shared bootstrap
+>>>>>>> Stashed changes
    realization law in `build_tenants/common/` until real tenant-local
    divergence appears
 6. publish graph functions and lawful higher-order compositions directly over

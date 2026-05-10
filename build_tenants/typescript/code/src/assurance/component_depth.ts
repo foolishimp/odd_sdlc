@@ -6,6 +6,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { admitComponentDepthRegisterFromArtifact } from "../operator/component_depth_register.js";
+import { FG_MATERIALIZE_DECLARED_PRODUCT_ASSET } from "../graph/index.js";
 import type {
   SdlcComponentDepthRegister,
   SdlcComponentDepthRegisterAdmission,
@@ -712,6 +713,9 @@ export function deriveComponentDepthAssuranceLedger(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
 }): SdlcAssuranceLedger | null {
+  if (input.manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
+    return null;
+  }
   const contract = componentDepthContractForTarget(input.manifest.targetAssetType);
   if (contract === null) {
     return null;

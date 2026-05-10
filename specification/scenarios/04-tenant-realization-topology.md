@@ -10,6 +10,9 @@ authority.
 This scenario validates the `odd_sdlc` source repository. Downstream
 installed workspace topology is governed separately by `REQ-F-ODDSDLC-032`.
 
+This scenario validates the `odd_method` source repository. Downstream
+installed workspace topology is governed separately by `REQ-F-ODDSDLC-032`.
+
 ## Scenario
 
 Inspect the live `odd_sdlc` project tree and the active specification and

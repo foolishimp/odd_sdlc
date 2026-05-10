@@ -204,7 +204,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
     workspace
   ]);
   assert.equal(firstGaps.status, "ok");
-  assert.equal(firstGaps.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(firstGaps.payload.projection.currentEdge, "Fg_conform_project_authority");
 
   const start = await invokeOddSdlcSpecMethodCommand([
     "start",

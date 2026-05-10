@@ -137,10 +137,14 @@ def test_low_risk_appetite_escalates_major_ambiguity_to_fh(run_archive) -> None:
     assert entries["multiple-realization-roots"]["policy_action"] == "escalate_fh"
     assert entries["multiple-realization-roots"]["status"] == "fh_required"
     assert entries["multiple-realization-roots"]["blocking"] is True
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
     assert (
         entries["multiple-realization-roots"]["expected_resolving_edge"]
         == "select_implementation_stack_profile"
     )
+=======
+    assert "declared-root-vs-realized-root-mismatch" not in entries
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
 
     events = read_events(workspace)
     run_archive.capture_json("low_risk.events.json", events)
@@ -159,6 +163,7 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     _set_ambiguity_risk_appetite(workspace, "high")
     normalize_workspace(workspace, project_slug="data_mapper", platform="spark_scala")
 
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
     start_result = run_installed_odd_sdlc(
         workspace,
         "start",
@@ -172,16 +177,34 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
         label="high risk appetite start",
         timeout=180,
         check=False,
+=======
+    start_payload = json.loads(
+        run_installed_genesis(
+            workspace,
+            "start",
+            "--auto",
+            archive=run_archive,
+            label="high risk appetite start",
+            timeout=180,
+            check=False,
+        ).stdout
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
     )
     run_archive.capture_text("high_risk.start.stdout.txt", start_result.stdout)
     run_archive.capture_text("high_risk.start.stderr.txt", start_result.stderr)
     start_payload = json.loads(start_result.stdout)
     run_archive.capture_json("high_risk.start.json", start_payload)
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
     assert start_result.returncode == 0
     assert start_payload["status"] in {"pending", "error"}
     assert start_payload["stopped_by"] != "fh_gate"
     assert start_payload["edge"] == "select_implementation_stack_profile"
     assert start_payload["blocking_reason"] == "fp_dispatch"
+=======
+    assert start_payload["status"] in {"pending", "error"}
+    assert start_payload["stopped_by"] != "fh_gate"
+    assert start_payload["edge"] != "select_implementation_stack_profile"
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
     if start_payload["status"] == "error":
         assert start_payload["failure_class"] == "transport_failure"
         assert start_payload["stopped_by"] == "fp_runtime_failure"
@@ -193,6 +216,10 @@ def test_high_risk_appetite_allows_fp_to_carry_major_ambiguity(run_archive) -> N
     assert entries["multiple-realization-roots"]["decision_status"] == "pending_fp"
     assert entries["multiple-realization-roots"]["status"] == "open"
     assert entries["multiple-realization-roots"]["blocking"] is False
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
+=======
+    assert "declared-root-vs-realized-root-mismatch" not in entries
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_risk_appetite_usecase.py
 
     events = read_events(workspace)
     run_archive.capture_json("high_risk.events.json", events)

@@ -4,6 +4,7 @@ export * from "./event_store.js";
 export * from "./handoff.js";
 export * from "./feature_scope.js";
 export * from "./traversal_strategy.js";
+export * from "./traversal_consequence.js";
 export * from "./component_depth_register.js";
 export * from "./design_depth_register.js";
 export * from "./installed_operator.js";

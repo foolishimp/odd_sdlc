@@ -50,7 +50,7 @@ import {
 import {
   constructOddSdlcAbiogenesisExecutionBasis,
   deriveSdlcGapDossier,
-  deriveOddSdlcConstructionEvaluatorReport
+  deriveOddSdlcEvaluateNextReport
 } from "../../build/semantic/code/src/index.js";
 
 function attrs(entries = []) {
@@ -590,7 +590,7 @@ test("T-129 substrate boundary consumes ABG 3.7 construction evaluator priority 
       })
     ])
   });
-  const report = deriveOddSdlcConstructionEvaluatorReport({
+  const report = deriveOddSdlcEvaluateNextReport({
     basis,
     events: graphOpenedEvents(basis),
     episodeId: "construction-episode://odd-sdlc/t129/evaluator",
@@ -643,7 +643,7 @@ test("T-129 substrate boundary consumes ABG 3.7 construction evaluator priority 
   assert.equal(report.localRankingAuthority, false);
   assert.equal(
     report.policyCarrierRef,
-    "policy-carrier://odd-sdlc/construction-evaluator/source-default/abg-3.7"
+    "policy-carrier://odd-sdlc/evaluate-next/source-default/abg-3.7"
   );
   assert.equal(
     report.policyVisibility,
@@ -733,13 +733,27 @@ test("T-129 public gap dossier ranks competing graph actions through the ABG eva
 
   assert.equal(dossier.readOnly, true);
   assert.equal(dossier.choosesNextTraversal, false);
+  assert.equal(dossier.nextActionBasisKind, "initial_selection");
+  assert.deepEqual(dossier.intentEventRefs, [
+    "event://odd-sdlc/intent/t129-public-gap-multi-candidate"
+  ]);
+  assert.match(
+    dossier.productAssetModelRef,
+    /^product-asset-model:\/\/odd-sdlc\//
+  );
+  assert(dossier.gapPressureRefs.length > 0);
+  assert(dossier.targetBindingRefs.length > 0);
+  assert(dossier.actionCatalogRefs.length > 0);
   assert.equal(dossier.edge, "derive_alpha_surface");
   assert.equal(
     dossier.rankingAuthority,
     "abiogenesis_construction_priority_projection"
   );
   assert.equal(dossier.localRankingAuthority, false);
-  assert.match(dossier.evaluatorProjectionRef, /^construction-priority-projection:/);
+  assert.match(
+    dossier.nextActionProjectionRef,
+    /^construction-priority-projection:/
+  );
   assert.equal(
     dossier.bestGraphVectorRef,
     "vector:t129/public-gaps/release-depth"

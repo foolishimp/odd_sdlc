@@ -25,9 +25,17 @@ import {
 } from "../graph/index.js";
 import { installOddSdlcTypescript } from "../install/index.js";
 import {
+  constructSdlcRequirementFulfillmentArchiveRehydration,
   deriveSdlcGapDossier,
-  projectSdlcGapsFromReplay,
-  projectSdlcQueryDomain
+  evalSdlcGapFromReplay,
+  projectSdlcQueryDomain,
+  projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
+  withSdlcRequirementFulfillmentArchiveRehydration,
+  type SdlcRequirementFulfillmentClosureSource,
+  type SdlcRequirementFulfillmentEdgeLedgerSource,
+  type SdlcRequirementFulfillmentAssessmentPublicInput,
+  type SdlcRequirementFulfillmentNextActionSource,
+  type SdlcRequirementFulfillmentPublicProjection
 } from "../projection/index.js";
 import { describeOddSdlcTypescriptRcQualification } from "../qualification/index.js";
 import { deriveOddSdlcTypescriptReleaseCut } from "../release/index.js";
@@ -538,6 +546,318 @@ function queryDomainFor(context: SpecMethodWorkspaceContext): ReturnType<typeof 
   });
 }
 
+function jsonRecordFromFile(filePath: string): Readonly<Record<string, unknown>> | null {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function operatorRunArchiveRootsNewestFirst(
+  context: SpecMethodWorkspaceContext
+): readonly string[] {
+  const operatorRunRoot = path.join(
+    context.outputWorkspaceRoot,
+    context.conformedProject.runtimeLayout.operatorRunRoot
+  );
+  if (!existsSync(operatorRunRoot) || !statSync(operatorRunRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    readdirSync(operatorRunRoot)
+      .map((entry) => path.join(operatorRunRoot, entry))
+      .filter((entryPath) => statSync(entryPath).isDirectory())
+      .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+  );
+}
+
+function edgeFulfillmentCountsFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentEdgeLedgerSource["counts"] | null {
+  const counts = childRecord(record, "counts");
+  if (counts === null) {
+    return null;
+  }
+  const expected = numberField(counts, "expected");
+  const fulfilled = numberField(counts, "fulfilled");
+  const partial = numberField(counts, "partial");
+  const blocked = numberField(counts, "blocked");
+  const unfulfilled = numberField(counts, "unfulfilled");
+  const missing = numberField(counts, "missing");
+  const extra = numberField(counts, "extra");
+  if (
+    expected === null ||
+    fulfilled === null ||
+    partial === null ||
+    blocked === null ||
+    unfulfilled === null ||
+    missing === null ||
+    extra === null
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    expected,
+    fulfilled,
+    partial,
+    blocked,
+    unfulfilled,
+    missing,
+    extra
+  });
+}
+
+function edgeFulfillmentLedgerFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentEdgeLedgerSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
+  );
+  if (record?.["kind"] !== "sdlc_edge_fulfillment_ledger") {
+    return null;
+  }
+  const ledgerRef = stringField(record, "ledgerRef");
+  const ledgerVersionRef = stringField(record, "ledgerVersionRef");
+  const counts = edgeFulfillmentCountsFromRecord(record);
+  if (ledgerRef === null || ledgerVersionRef === null || counts === null) {
+    return null;
+  }
+  return Object.freeze({
+    ledgerRef,
+    ledgerVersionRef,
+    counts
+  });
+}
+
+function edgeClosureDispositionFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentClosureSource["disposition"] | null {
+  const disposition = stringField(record, "disposition");
+  return disposition === "close" ||
+    disposition === "yield" ||
+    disposition === "retry" ||
+    disposition === "repair" ||
+    disposition === "re-enter" ||
+    disposition === "reprice" ||
+    disposition === "block"
+    ? disposition
+    : null;
+}
+
+function edgeClosureDecisionFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentClosureSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+  );
+  if (record?.["kind"] !== "sdlc_edge_closure_decision") {
+    return null;
+  }
+  const decisionRef = stringField(record, "decisionRef");
+  const disposition = edgeClosureDispositionFromRecord(record);
+  if (decisionRef === null || disposition === null) {
+    return null;
+  }
+  return Object.freeze({
+    decisionRef,
+    disposition
+  });
+}
+
+function nextActionProjectionFromArchive(
+  archiveRoot: string
+): SdlcRequirementFulfillmentNextActionSource | null {
+  const record = jsonRecordFromFile(
+    path.join(archiveRoot, "sdlc_next_action_projection.json")
+  );
+  if (record?.["kind"] !== "sdlc_next_action_projection") {
+    return null;
+  }
+  const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
+  const selectedActionRef = stringField(record, "selectedActionRef");
+  if (nextActionProjectionRef === null) {
+    return null;
+  }
+  return Object.freeze({
+    nextActionProjectionRef,
+    selectedActionRef
+  });
+}
+
+function selectedNextGraphFunctionNameFromArchive(input: {
+  readonly context: SpecMethodWorkspaceContext;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}): string | null {
+  const graphFunctionNameByRef = new Map(
+    input.module.graphFunctions.flatMap((graphFunction) => [
+      [graphFunction.id, graphFunction.name],
+      [graphFunction.name, graphFunction.name]
+    ])
+  );
+  for (const archiveRoot of operatorRunArchiveRootsNewestFirst(input.context)) {
+    const decision = edgeClosureDecisionFromArchive(archiveRoot);
+    if (decision?.disposition !== "close") {
+      continue;
+    }
+    const record = jsonRecordFromFile(
+      path.join(archiveRoot, "sdlc_next_action_projection.json")
+    );
+    if (
+      record?.["kind"] !== "sdlc_next_action_projection" ||
+      record["choosesNextTraversal"] !== true ||
+      stringField(record, "selectedActionRef") === null
+    ) {
+      continue;
+    }
+    const nextGraphFunctionRef = stringField(record, "nextGraphFunctionRef");
+    if (nextGraphFunctionRef === null) {
+      continue;
+    }
+    const direct = graphFunctionNameByRef.get(nextGraphFunctionRef);
+    if (direct !== undefined) {
+      return direct;
+    }
+    const suffixMatch = input.module.graphFunctions.find((graphFunction) =>
+      nextGraphFunctionRef.endsWith(`:${graphFunction.name}`)
+    );
+    if (suffixMatch !== undefined) {
+      return suffixMatch.name;
+    }
+  }
+  return null;
+}
+
+function assessmentStatusFromRecord(
+  record: Readonly<Record<string, unknown>>
+): SdlcRequirementFulfillmentAssessmentPublicInput["fulfillmentStatus"] | null {
+  const status = stringField(record, "fulfillmentStatus");
+  return status === "fulfilled" ||
+    status === "partial" ||
+    status === "blocked" ||
+    status === "unassessed"
+    ? status
+    : null;
+}
+
+function requirementAssessmentsFromArchive(
+  archiveRoot: string
+): readonly SdlcRequirementFulfillmentAssessmentPublicInput[] {
+  const report = jsonRecordFromFile(path.join(archiveRoot, "worker_result_report.json"));
+  const assessments = report?.["obligationAssessments"];
+  if (!Array.isArray(assessments)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    assessments.flatMap((assessment): SdlcRequirementFulfillmentAssessmentPublicInput[] => {
+      if (!isRecord(assessment)) {
+        return [];
+      }
+      const obligationId = stringField(assessment, "obligationId");
+      const fulfillmentStatus = assessmentStatusFromRecord(assessment);
+      if (obligationId === null || fulfillmentStatus === null) {
+        return [];
+      }
+      return [
+        Object.freeze({
+          obligationId,
+          fulfillmentStatus,
+          evidenceRefs: stringArrayField(assessment, "evidenceRefs"),
+          blockingReasons: stringArrayField(assessment, "blockingReasons")
+        })
+      ];
+    })
+  );
+}
+
+function archiveRefForRoot(archiveRoot: string): string {
+  return pathToFileURL(archiveRoot).href;
+}
+
+function missingTraversalConsequenceArtifactRefs(input: {
+  readonly archiveRoot: string;
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource | null;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource | null;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource | null;
+}): readonly string[] {
+  const missing: string[] = [];
+  if (input.edgeFulfillmentLedger === null) {
+    missing.push("sdlc_edge_fulfillment_ledger.json");
+  }
+  if (input.edgeClosureDecision === null) {
+    missing.push("sdlc_edge_closure_decision.json");
+  }
+  if (input.nextActionProjection === null) {
+    missing.push("sdlc_next_action_projection.json");
+  }
+  return Object.freeze(
+    missing.map((fileName) => pathToFileURL(path.join(input.archiveRoot, fileName)).href)
+  );
+}
+
+function requirementFulfillmentForGaps(input: {
+  readonly context: SpecMethodWorkspaceContext;
+  readonly sourceProjection: SdlcRequirementFulfillmentPublicProjection;
+}): SdlcRequirementFulfillmentPublicProjection {
+  const archiveRoots = operatorRunArchiveRootsNewestFirst(input.context);
+  if (archiveRoots.length === 0) {
+    return withSdlcRequirementFulfillmentArchiveRehydration({
+      projection: input.sourceProjection,
+      archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+        status: "no_operator_runs"
+      })
+    });
+  }
+  const scannedArchiveRefs = Object.freeze(archiveRoots.map(archiveRefForRoot));
+  const missingArtifactRefs: string[] = [];
+  for (const archiveRoot of archiveRoots) {
+    const edgeFulfillmentLedger = edgeFulfillmentLedgerFromArchive(archiveRoot);
+    const edgeClosureDecision = edgeClosureDecisionFromArchive(archiveRoot);
+    const nextActionProjection = nextActionProjectionFromArchive(archiveRoot);
+    if (
+      edgeFulfillmentLedger === null ||
+      edgeClosureDecision === null ||
+      nextActionProjection === null
+    ) {
+      missingArtifactRefs.push(
+        ...missingTraversalConsequenceArtifactRefs({
+          archiveRoot,
+          edgeFulfillmentLedger,
+          edgeClosureDecision,
+          nextActionProjection
+        })
+      );
+      continue;
+    }
+    return projectSdlcRequirementFulfillmentPublicViewFromPriorProjection({
+      sourceProjection: input.sourceProjection,
+      assessments: requirementAssessmentsFromArchive(archiveRoot),
+      edgeFulfillmentLedger,
+      edgeClosureDecision,
+      nextActionProjection,
+      sourceRegisterRef: `requirement-fulfillment-public://odd-sdlc/${encodeURIComponent(archiveRoot)}`,
+      archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+        status: "rehydrated",
+        archiveRef: archiveRefForRoot(archiveRoot),
+        scannedArchiveRefs,
+        missingArtifactRefs
+      })
+    });
+  }
+  return withSdlcRequirementFulfillmentArchiveRehydration({
+    projection: input.sourceProjection,
+    archiveRehydration: constructSdlcRequirementFulfillmentArchiveRehydration({
+      status: "no_archive_with_consequence_triple",
+      scannedArchiveRefs,
+      missingArtifactRefs
+    })
+  });
+}
+
 function defaultRegimeFor(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly queryDomain: ReturnType<typeof projectSdlcQueryDomain>;
@@ -597,6 +917,32 @@ function startOutcomeForObservedReplay(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly events: readonly RuntimeEvent[];
 }): ReturnType<typeof publicStartOnce> {
+  const context = workspaceContext({
+    workspaceRoot: input.request.workspaceRoot,
+    outputWorkspaceRoot: input.request.outputWorkspaceRoot
+  });
+  const module = constructSdlcGtlModule();
+  const selectedNextGraphFunctionName = selectedNextGraphFunctionNameFromArchive({
+    context,
+    module
+  });
+  if (
+    selectedNextGraphFunctionName !== null &&
+    (input.request.target.kind === "next" ||
+      (input.request.target.kind === "graph_function" &&
+        input.request.target.handle !== selectedNextGraphFunctionName))
+  ) {
+    const selected = startOutcomeFor({
+      ...input.request,
+      target: {
+        kind: "graph_function",
+        handle: selectedNextGraphFunctionName
+      }
+    });
+    if (selected.executionContract !== null) {
+      return selected;
+    }
+  }
   const requested = startOutcomeFor(input.request);
   if (
     requested.executionContract === null ||
@@ -614,6 +960,27 @@ function startOutcomeForObservedReplay(input: {
       hasReplayForBasis(candidate.executionContract.basis, input.events)
     ) {
       return candidate;
+    }
+  }
+  if (input.request.target.kind === "next") {
+    const queryDomain = queryDomainFor(context);
+    for (const target of queryDomain.startTargets) {
+      for (const until of SDLC_PUBLIC_START_UNTIL_VALUES) {
+        const candidate = startOutcomeFor({
+          ...input.request,
+          target: {
+            kind: "graph_function",
+            handle: target.name
+          },
+          until
+        });
+        if (
+          candidate.executionContract !== null &&
+          hasReplayForBasis(candidate.executionContract.basis, input.events)
+        ) {
+          return candidate;
+        }
+      }
     }
   }
   return requested;
@@ -741,6 +1108,11 @@ async function installedStartPayloadFor(
 
 function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   const outputWorkspaceRoot = outputWorkspaceRootFor(request);
+  const context = workspaceContext({
+    workspaceRoot: request.workspaceRoot,
+    outputWorkspaceRoot: request.outputWorkspaceRoot
+  });
+  const queryDomain = queryDomainFor(context);
   const allEvents = readOddSdlcRuntimeEventsSync(outputWorkspaceRoot);
   const start = startOutcomeForObservedReplay({
     request,
@@ -756,7 +1128,7 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     start.executionContract.basis,
     allEvents
   );
-  const projection = projectSdlcGapsFromReplay({
+  const projection = evalSdlcGapFromReplay({
     basis: start.executionContract.basis,
     events
   });
@@ -765,17 +1137,23 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     basis: start.executionContract.basis,
     closedVectorIndexes: projection.closedVectorIndexes
   });
+  const requirementFulfillment = requirementFulfillmentForGaps({
+    context,
+    sourceProjection: queryDomain.requirementFulfillment
+  });
   const dossier = deriveSdlcGapDossier({
     basis: start.executionContract.basis,
     events,
     triageInput: "spec_method:gaps",
     evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"],
+    requirementFulfillment,
     ...(priorityScheme === undefined ? {} : { priorityScheme })
   });
   return Object.freeze({
     start,
     projection,
-    dossier
+    dossier,
+    requirementFulfillment
   });
 }
 
@@ -877,6 +1255,14 @@ function numberArrayField(
   );
 }
 
+function numberField(
+  record: Readonly<Record<string, unknown>>,
+  key: string
+): number | null {
+  const value = record[key];
+  return typeof value === "number" ? value : null;
+}
+
 function stringArrayField(
   record: Readonly<Record<string, unknown>>,
   key: string
@@ -908,12 +1294,27 @@ function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
     return null;
   }
   const actions = dossier === null ? Object.freeze([]) : stringArrayField(dossier, "nextLawfulActions");
+  const requirementFulfillment =
+    dossier === null ? null : childRecord(dossier, "requirementFulfillment");
+  const requirementCounts =
+    requirementFulfillment === null
+      ? null
+      : childRecord(requirementFulfillment, "counts");
+  const totalRequirements =
+    requirementCounts === null ? null : numberField(requirementCounts, "total");
+  const unresolvedRequirements =
+    requirementCounts === null ? null : numberField(requirementCounts, "unresolved");
   return [
     "odd-sdlc-ts gaps",
     `status: ${stringField(projection, "status") ?? result.status}`,
     `graph_function: ${stringField(projection, "graphFunctionName") ?? "n/a"}`,
     `current_edge: ${stringField(projection, "currentEdge") ?? "n/a"}`,
     `closed_vectors: ${numberArrayField(projection, "closedVectorIndexes").join(",") || "none"}`,
+    totalRequirements === null
+      ? "requirements: inspect_json"
+      : `requirements: ${unresolvedRequirements ?? 0}/${totalRequirements} unresolved`,
+    "read_only: true",
+    "chooses_next_traversal: false",
     `next_action: ${actions[0] ?? "inspect_json"}`,
     "json: rerun with ODD_SDLC_TS_OUTPUT=json"
   ].join("\n");

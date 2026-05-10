@@ -18,7 +18,11 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  FG_CONFORM_PROJECT
+  FG_CONFORM_PROJECT,
+  FG_CONFORM_PROJECT_AUTHORITY,
+  ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH,
+  ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH,
+  ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 
@@ -33,6 +37,7 @@ const FIXTURE_ROOT = resolve(TEST_DIR, "../fixtures/t131_guided_odd_chat");
 const BOOTSTRAP_PATH = path.join(FIXTURE_ROOT, "bootstrap.md");
 const SOURCE_ODD_SDLC_CLI = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_LIVE"] === "1";
+const CONFORMANCE_ONLY = process.env["ODD_SDLC_TS_LIVE_CONFORMANCE_ONLY"] === "1";
 const LIVE_WORKER =
   process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_WORKER"] ??
   "process://codex?model=gpt-5.5&effort=medium";
@@ -92,6 +97,11 @@ function assertScenarioContract(contract) {
   assert.equal(contract.defaultDomain.kind, "odd_gtl_abg_domain");
   assert.equal(contract.builderHarness.builder, "odd_sdlc");
   assert.equal(contract.builderHarness.notRuntimeDependency, true);
+  assert.deepEqual(contract.authorityInput, {
+    kind: "source_file",
+    path: "bootstrap.md",
+    graphFunction: FG_CONFORM_PROJECT_AUTHORITY
+  });
   assert.equal(contract.workspaceDialogue.purpose.includes("workspace"), true);
   assert.equal(contract.graphFunctionSelection.defaultGraphFunction, "document_to_requirements");
   assert.equal(contract.sandbox.installOddSdlc, true);
@@ -275,6 +285,27 @@ function assertScenarioContract(contract) {
     "testOddChat commands must prove workspace creation"
   );
   assert.equal(
+    contract.commands.conformProjectAuthority.some((command) =>
+      command.includes(`graph_function:${FG_CONFORM_PROJECT_AUTHORITY}`)
+    ),
+    true,
+    "conformProjectAuthority commands must use Fg_conform_project_authority"
+  );
+  assert.equal(
+    contract.commands.materializeProduct.some((command) =>
+      command.includes("asset:component_code_surface")
+    ),
+    true,
+    "materializeProduct commands must target component_code_surface"
+  );
+  assert.equal(
+    contract.commands.materializeProduct.some((command) =>
+      command.includes("bootstrap_release_self_test")
+    ),
+    false,
+    "materializeProduct commands must not use bootstrap_release_self_test"
+  );
+  assert.equal(
     contract.commands.testOddChat.some((command) => command.includes("graph-functions")),
     true,
     "testOddChat commands must prove graph-function listing"
@@ -299,6 +330,33 @@ function assertScenarioContract(contract) {
   );
 }
 
+function projectConstraintsText(contract) {
+  return [
+    "project:",
+    `  name: ${contract.sandbox.workspaceSlug}`,
+    `active_tenant: ${contract.buildTenant.name}`,
+    `selected_output_root: ${contract.buildTenant.sourceRoot}`,
+    "ambiguity_risk_appetite: low",
+    "runtime:",
+    `  root: ${ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH}`,
+    `  transform_asset_root: ${ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH}`,
+    `  operator_run_root: ${ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH}`,
+    "  product_materialization_root_policy: selected_output_root",
+    "build_tenants:",
+    `  ${contract.buildTenant.name}:`,
+    `    output_dir: ${contract.buildTenant.sourceRoot}/`,
+    `    language: ${contract.buildTenant.language}`,
+    `    build_tool: ${contract.buildTenant.packageManager}`,
+    `    test_runner: ${contract.buildTenant.packageManager}`,
+    "    module_structure:",
+    `      - ${contract.buildTenant.name}`
+  ].join("\n");
+}
+
+function expectedRequirementIds(contract) {
+  return contract.requirements.map((row) => row.id);
+}
+
 function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
   rmSync(workspace, { recursive: true, force: true });
   mkdirSync(path.join(workspace, "specification/requirements"), { recursive: true });
@@ -310,53 +368,10 @@ function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
   mkdirSync(path.join(workspace, "build_tenants"), { recursive: true });
   writeFileSync(path.join(workspace, "README.md"), `# ${contract.product.name}\n\n${contract.product.definition}\n`, "utf8");
   writeFileSync(path.join(workspace, "bootstrap.md"), bootstrapMarkdown, "utf8");
-  writeFileSync(path.join(workspace, "specification/INTENT.md"), `# Intent\n\n${contract.product.intent}\n`, "utf8");
-  writeFileSync(path.join(workspace, "specification/PRODUCT.md"), `# Product\n\n${contract.product.definition}\n`, "utf8");
-  writeFileSync(
-    path.join(workspace, "specification/GOALS.md"),
-    [
-      "# Goals",
-      "",
-      "- build odd_chat through a guided graph-function lifecycle",
-      "- install the odd_chat CLI locally",
-      "- prove odd_chat can load the document_to_requirements domain",
-      "- admit test evidence before release-readiness projection"
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "specification/requirements/00-start-document.md"),
-    bootstrapMarkdown,
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "specification/requirements/01-odd-chat-guided-workbench.md"),
-    [
-      "# odd_chat Guided Workbench Requirements",
-      "",
-      ...contract.requirements.map((row) => `${row.id}: ${row.title}\n\n${row.text}\n`)
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
-    bootstrapMarkdown,
-    "utf8"
-  );
+  const constraintsText = projectConstraintsText(contract);
   writeFileSync(
     path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      `  name: ${contract.sandbox.workspaceSlug}`,
-      "active_tenant: typescript",
-      `selected_output_root: ${contract.buildTenant.sourceRoot}`,
-      "ambiguity_risk_appetite: low"
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "build_tenants/TENANT_REGISTRY.md"),
-    ["# Tenant Registry", "", `- tenant: ${contract.buildTenant.name}`].join("\n"),
+    constraintsText,
     "utf8"
   );
   writeJson(path.join(workspace, "gtl/graph.json"), {
@@ -402,6 +417,59 @@ function assertNoPrebuiltOddChatImplementation(workspace, contract) {
     [],
     `bootstrap sandbox must not start with generated odd_chat implementation files: ${generatedTargetsPresent.join(", ")}`
   );
+}
+
+function assertBootstrapSourceWorkspace(workspace, contract) {
+  assert.equal(existsSync(path.join(workspace, "bootstrap.md")), true);
+  assert.equal(
+    existsSync(path.join(workspace, ".ai-workspace/context/project_constraints.yml")),
+    true
+  );
+  for (const relativePath of [
+    ".ai-workspace/context/project_bootstrap.md",
+    "specification/INTENT.md",
+    "specification/PRODUCT.md",
+    "specification/GOALS.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      false,
+      `sandbox must not pre-materialize ${relativePath}`
+    );
+  }
+  const requirementFiles = readdirSync(path.join(workspace, "specification/requirements"))
+    .filter((entry) => entry.endsWith(".md"));
+  assert.deepEqual(requirementFiles, []);
+  assertNoPrebuiltOddChatImplementation(workspace, contract);
+}
+
+function assertConformedProjectWorkspace(workspace, contract) {
+  for (const relativePath of [
+    ".ai-workspace/context/project_bootstrap.md",
+    "specification/INTENT.md",
+    "specification/PRODUCT.md",
+    "specification/GOALS.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      true,
+      `F_P authority conformance must materialize ${relativePath}`
+    );
+  }
+  const requirementDir = path.join(workspace, "specification/requirements");
+  const requirementFiles = readdirSync(requirementDir)
+    .filter((entry) => entry.endsWith(".md"))
+    .sort();
+  assert.ok(
+    requirementFiles.length > 0,
+    "F_P authority conformance must induce at least one requirement surface"
+  );
+  const requirementText = requirementFiles
+    .map((file) => readFileSync(path.join(requirementDir, file), "utf8"))
+    .join("\n");
+  for (const requirementId of expectedRequirementIds(contract)) {
+    assert.match(requirementText, new RegExp(`\\b${requirementId}\\b`, "u"));
+  }
 }
 
 function installedOddSdlcCommand(install) {
@@ -619,7 +687,7 @@ test("T-131 bootstrap-only sandbox has no prebuilt odd_chat implementation", () 
   );
   const workspace = path.join(archiveRoot, "workspace");
   writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract);
-  assertNoPrebuiltOddChatImplementation(workspace, contract);
+  assertBootstrapSourceWorkspace(workspace, contract);
   writeJson(path.join(archiveRoot, "bootstrap_sandbox_snapshot.json"), {
     workspace,
     bootstrapDigest: sha256Text(bootstrapMarkdown),
@@ -645,7 +713,7 @@ test(
     );
     const workspace = path.join(archiveRoot, "workspace");
     writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract);
-    assertNoPrebuiltOddChatImplementation(workspace, contract);
+    assertBootstrapSourceWorkspace(workspace, contract);
     writeJson(path.join(archiveRoot, "scenario_contract_snapshot.json"), {
       bootstrapPath: BOOTSTRAP_PATH,
       bootstrapDigest: sha256Text(bootstrapMarkdown),
@@ -658,10 +726,69 @@ test(
     assert.equal(existsSync(path.join(workspace, "node_modules/.bin/odd-sdlc-ts")), true);
 
     const steps = [];
-    const target = "graph_function:bootstrap_release_self_test";
+    const target = "asset:component_code_surface";
     let terminalState = generatedProductState(workspace, contract);
     writeJson(path.join(archiveRoot, "initial_generated_product_state.json"), terminalState);
     assert.equal(terminalState.expectedFilesPresent, false);
+
+    const conformance = runInstalled(
+      commandPath,
+      ["start", "--workspace", workspace, "--until", "blocked"],
+      workspace,
+      archiveRoot,
+      "bootstrap-conform-project-start"
+    );
+    const conformanceSummary = edgeSummary(conformance);
+    steps.push({ step: -2, phase: "conform_project", ...conformanceSummary });
+    writeJson(path.join(archiveRoot, "bootstrap_conform_project_summary.json"), conformanceSummary);
+    assert.notEqual(
+      conformanceSummary.blockingReason,
+      "target_unavailable",
+      "Fg_conform_project must be available before project authority conformance"
+    );
+
+    const bootstrap = runInstalled(
+      commandPath,
+      [
+        "start",
+        "--workspace",
+        workspace,
+        "--target",
+        `graph_function:${FG_CONFORM_PROJECT_AUTHORITY}`,
+        "--until",
+        "first_traversal",
+        "--worker",
+        LIVE_WORKER
+      ],
+      workspace,
+      archiveRoot,
+      "bootstrap-authority-start"
+    );
+    const bootstrapSummary = edgeSummary(bootstrap);
+    steps.push({ step: -1, phase: "bootstrap_authority", ...bootstrapSummary });
+    writeJson(path.join(archiveRoot, "bootstrap_authority_summary.json"), bootstrapSummary);
+    assert.notEqual(
+      bootstrapSummary.blockingReason,
+      "target_unavailable",
+      "Fg_conform_project_authority must be a published bootstrap target"
+    );
+    assertConformedProjectWorkspace(workspace, contract);
+    if (CONFORMANCE_ONLY) {
+      writeJson(path.join(archiveRoot, "steps.json"), steps);
+      writeJson(path.join(archiveRoot, "run_summary.json"), {
+        verdict: "conformance_passed",
+        workspace,
+        worker: LIVE_WORKER,
+        completionController: "authority_conformance_only",
+        maxSteps: MAX_STEPS,
+        installCommandTimeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
+        installedCommandTimeoutMs:
+          INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
+        steps,
+        generatedProductState: terminalState
+      });
+      return;
+    }
 
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const gaps = runInstalled(

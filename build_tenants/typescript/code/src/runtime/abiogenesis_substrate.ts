@@ -102,7 +102,7 @@ export interface OddSdlcAbiogenesisSubstrateReport {
   readonly transitionEventKinds: readonly RuntimeEvent["kind"][];
 }
 
-export interface OddSdlcConstructionEvaluatorPressureInput {
+export interface OddSdlcEvaluateNextPressureInput {
   readonly pressureRef: string;
   readonly pressureKind: ConstructionPressureKind;
   readonly sourceRef: string;
@@ -112,7 +112,7 @@ export interface OddSdlcConstructionEvaluatorPressureInput {
   readonly severity?: number;
 }
 
-export interface OddSdlcConstructionEvaluatorActionInput {
+export interface OddSdlcEvaluateNextActionInput {
   readonly actionRef?: string;
   readonly actionKind: ConstructionActionKind;
   readonly graphFunctionRef?: string | null;
@@ -126,8 +126,18 @@ export interface OddSdlcConstructionEvaluatorActionInput {
   readonly ineligibleReasonRefs?: readonly string[];
 }
 
-export interface OddSdlcConstructionEvaluatorPolicyCarrier {
-  readonly kind: "odd_sdlc_construction_evaluator_policy_carrier";
+export type OddSdlcNextActionBasisKind =
+  | "initial_selection"
+  | "post_yield_resume"
+  | "post_close_graph_continuation"
+  | "post_retry"
+  | "post_repair"
+  | "post_reenter"
+  | "post_reprice"
+  | "post_block";
+
+export interface OddSdlcEvaluateNextPolicyCarrier {
+  readonly kind: "odd_sdlc_evaluate_next_policy_carrier";
   readonly carrierRef: string;
   readonly sourceKind: "source_default";
   readonly visibility: "visible_source_default_when_no_runtime_policy";
@@ -137,23 +147,35 @@ export interface OddSdlcConstructionEvaluatorPolicyCarrier {
   readonly priorityScheme: ConstructionPriorityScheme;
 }
 
-export interface OddSdlcConstructionEvaluatorInput {
+export interface OddSdlcEvaluateNextInput {
   readonly basis: ExecutionBasis;
   readonly events: readonly RuntimeEvent[];
+  readonly nextActionBasisKind?: OddSdlcNextActionBasisKind;
+  readonly intentEventRefs?: readonly string[];
+  readonly productAssetModelRef?: string;
   readonly episodeId?: string;
   readonly observationId?: string;
   readonly actionCatalogRef?: string;
   readonly hookResolutionRef?: string;
   readonly fallbackConfigDigest?: string;
   readonly authorityDigest?: string;
-  readonly policyCarrier?: OddSdlcConstructionEvaluatorPolicyCarrier;
+  readonly policyCarrier?: OddSdlcEvaluateNextPolicyCarrier;
   readonly priorityScheme?: ConstructionPriorityScheme;
-  readonly pressures: readonly OddSdlcConstructionEvaluatorPressureInput[];
-  readonly actions: readonly OddSdlcConstructionEvaluatorActionInput[];
+  readonly pressures: readonly OddSdlcEvaluateNextPressureInput[];
+  readonly actions: readonly OddSdlcEvaluateNextActionInput[];
 }
 
-export interface OddSdlcConstructionEvaluatorReport {
-  readonly kind: "odd_sdlc_construction_evaluator_report";
+export interface OddSdlcEvaluateNextReport {
+  readonly kind: "odd_sdlc_evaluate_next_report";
+  readonly evaluationFunction: "evaluate_next";
+  readonly nextActionBasisKind: OddSdlcNextActionBasisKind;
+  readonly intentEventRefs: readonly string[];
+  readonly productAssetModelRef: string;
+  readonly gapPressureRefs: readonly string[];
+  readonly targetBindingRefs: readonly string[];
+  readonly actionCatalogRefs: readonly string[];
+  readonly gapEvaluationAuthority: false;
+  readonly actionClosureEvaluationAuthority: false;
   readonly rankingAuthority: "abiogenesis_construction_priority_projection";
   readonly localRankingAuthority: false;
   readonly observation: ConstructionObservationSnapshot;
@@ -161,25 +183,25 @@ export interface OddSdlcConstructionEvaluatorReport {
   readonly bindingProjection: ObservationToActionBindingProjection;
   readonly priorityProjection: ConstructionPriorityProjection;
   readonly policyCarrierRef: string;
-  readonly policyVisibility: OddSdlcConstructionEvaluatorPolicyCarrier["visibility"];
+  readonly policyVisibility: OddSdlcEvaluateNextPolicyCarrier["visibility"];
   readonly selectedPriorityRow: ConstructionPriorityRow | null;
   readonly nextLawfulActionRefs: readonly string[];
   readonly bestGraphFunctionRef: string | null;
   readonly bestGraphVectorRef: string | null;
 }
 
-export const ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY =
+export const ODD_SDLC_SOURCE_DEFAULT_EVALUATE_NEXT_POLICY =
   Object.freeze({
-    kind: "odd_sdlc_construction_evaluator_policy_carrier",
-    carrierRef: "policy-carrier://odd-sdlc/construction-evaluator/source-default/abg-3.7",
+    kind: "odd_sdlc_evaluate_next_policy_carrier",
+    carrierRef: "policy-carrier://odd-sdlc/evaluate-next/source-default/abg-3.7",
     sourceKind: "source_default",
     visibility: "visible_source_default_when_no_runtime_policy",
     hookResolutionRef: "hook-resolution://odd-sdlc/source-default/abg-3.7",
-    sourceDefaultConfigDigest: "sha256:odd-sdlc-source-default-construction-evaluator-abg-3.7",
+    sourceDefaultConfigDigest: "sha256:odd-sdlc-source-default-evaluate-next-abg-3.7",
     authorityDigest: "sha256:odd-sdlc-abg-3.7-evaluator-adapter",
     priorityScheme: constructConstructionPriorityScheme({
     schemeRef: "priority-scheme://odd-sdlc/default/abg-3.7",
-    sourcePolicyRef: "policy://odd-sdlc/default-construction-evaluator",
+    sourcePolicyRef: "policy://odd-sdlc/default-evaluate-next",
     rules: Object.freeze([
       constructConstructionPriorityRule({
         priorityRuleRef: "priority-rule://odd-sdlc/default/gap-repair",
@@ -187,15 +209,15 @@ export const ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY =
         weight: 1,
         appliesToActionKinds: Object.freeze([]),
         appliesToOutcomeRefs: Object.freeze([]),
-        sourcePolicyRef: "policy://odd-sdlc/default-construction-evaluator",
-        strategyLabel: "odd_sdlc_default_gap_repair"
+        sourcePolicyRef: "policy://odd-sdlc/default-evaluate-next",
+        strategyLabel: "odd_sdlc_evaluate_next_default_gap_repair"
       })
     ])
   })
-  }) satisfies OddSdlcConstructionEvaluatorPolicyCarrier;
+  }) satisfies OddSdlcEvaluateNextPolicyCarrier;
 
-export const ODD_SDLC_DEFAULT_CONSTRUCTION_PRIORITY_SCHEME =
-  ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY.priorityScheme;
+export const ODD_SDLC_DEFAULT_EVALUATE_NEXT_PRIORITY_SCHEME =
+  ODD_SDLC_SOURCE_DEFAULT_EVALUATE_NEXT_POLICY.priorityScheme;
 
 function typedSdlcNode(id: string, name: string, typeName: string) {
   return admitNode({
@@ -341,7 +363,7 @@ function defaultConstructionObservationId(input: {
   ].join("/");
 }
 
-function actionRefFor(input: OddSdlcConstructionEvaluatorActionInput): string {
+function actionRefFor(input: OddSdlcEvaluateNextActionInput): string {
   if (input.actionRef !== undefined) {
     return input.actionRef;
   }
@@ -384,12 +406,12 @@ export function deriveOddSdlcAbiogenesisSubstrateReport(input: {
   });
 }
 
-export function deriveOddSdlcConstructionEvaluatorReport(
-  input: OddSdlcConstructionEvaluatorInput
-): OddSdlcConstructionEvaluatorReport {
+export function deriveOddSdlcEvaluateNextReport(
+  input: OddSdlcEvaluateNextInput
+): OddSdlcEvaluateNextReport {
   const projection = deriveRuntimeAggregateProjection(input.basis, input.events);
   const policyCarrier =
-    input.policyCarrier ?? ODD_SDLC_SOURCE_DEFAULT_CONSTRUCTION_EVALUATOR_POLICY;
+    input.policyCarrier ?? ODD_SDLC_SOURCE_DEFAULT_EVALUATE_NEXT_POLICY;
   const assetRefs = deriveConstructionObservationAssetRefsFromRuntimeTruth({
     basis: input.basis,
     projection
@@ -481,7 +503,26 @@ export function deriveOddSdlcConstructionEvaluatorReport(
         ) ?? null;
 
   return Object.freeze({
-    kind: "odd_sdlc_construction_evaluator_report",
+    kind: "odd_sdlc_evaluate_next_report",
+    evaluationFunction: "evaluate_next",
+    nextActionBasisKind: input.nextActionBasisKind ?? "initial_selection",
+    intentEventRefs: Object.freeze([
+      ...(input.intentEventRefs ?? [
+        `event://odd-sdlc/intent/${input.basis.graphFunction.id}`
+      ])
+    ]),
+    productAssetModelRef:
+      input.productAssetModelRef ??
+      `product-asset-model://odd-sdlc/${input.basis.graphFunction.id}`,
+    gapPressureRefs: Object.freeze(
+      pressureRows.map((pressure) => pressure.pressureRef)
+    ),
+    targetBindingRefs: Object.freeze(
+      bindingProjection.rows.map((binding) => binding.bindingRef)
+    ),
+    actionCatalogRefs: Object.freeze([actionCatalog.catalogRef]),
+    gapEvaluationAuthority: false,
+    actionClosureEvaluationAuthority: false,
     rankingAuthority: "abiogenesis_construction_priority_projection",
     localRankingAuthority: false,
     observation,

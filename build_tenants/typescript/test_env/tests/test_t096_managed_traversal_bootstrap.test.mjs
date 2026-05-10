@@ -156,7 +156,7 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
   assert.equal(secondGaps.status, "ok");
   assert.equal(
     secondGaps.payload.start.executionContract.targetGraphFunction,
-    "bootstrap_release_self_test"
+    "Fg_conform_project_authority"
   );
-  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(secondGaps.payload.projection.currentEdge, "Fg_conform_project_authority");
 });

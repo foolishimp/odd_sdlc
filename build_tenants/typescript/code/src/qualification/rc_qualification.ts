@@ -47,6 +47,22 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
         ".ai-workspace/tickets/completed/T-058-realize-typescript-public-cli-adapter-over-graph-query-start-surfaces.md"
     }),
     Object.freeze({
+      name: "T-139 public requirements-fulfillment gaps view",
+      category: "spec_method",
+      command: "npm run test:t139",
+      status: "passed",
+      evidenceRef:
+        "build_tenants/typescript/test_env/tests/test_t139_public_gaps_read_only_evaluator_view.test.mjs"
+    }),
+    Object.freeze({
+      name: "T-140 no local forced-iteration authority",
+      category: "runner_spine",
+      command: "npm run test:t140",
+      status: "passed",
+      evidenceRef:
+        "build_tenants/typescript/test_env/tests/test_t140_no_local_forced_iteration_authority.test.mjs"
+    }),
+    Object.freeze({
       name: "T-059 install and release-cut adapter",
       category: "install_release",
       command: "npm run test:t059",
@@ -109,7 +125,7 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
       area: "gaps and query",
       pythonEvidence: "query.py, gap_dossier.py, and span_analysis.py publish domain read models.",
       typescriptEvidence:
-        "projection/query_domain.ts publishes read-only query, gap, dossier, span, start-target, and ownership surfaces over admitted module truth.",
+        "projection/query_domain.ts publishes read-only query, gap, dossier, span, start-target, ownership, and requirements-fulfillment measurement surfaces over admitted module and T-135 consequence truth.",
       status: "bounded_parity",
       gapTicket: null
     }),

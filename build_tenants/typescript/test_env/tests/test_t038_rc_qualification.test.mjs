@@ -129,6 +129,8 @@ test("T-038 qualification report scopes RC claim and tickets remaining gaps", ()
   assert(report.gates.some((gate) => gate.name === "T-038 composed harnessed sandbox" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-052 ABG-populated installed sandbox contract" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-058/T-120 Spec Method entrypoint" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-139 public requirements-fulfillment gaps view" && gate.status === "passed"));
+  assert(report.gates.some((gate) => gate.name === "T-140 no local forced-iteration authority" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "T-059 install and release-cut adapter" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "live F_P worker traversal" && gate.status === "passed"));
   assert(report.gates.some((gate) => gate.name === "B-085 current live data_mapper release-depth parity" && gate.status === "blocked"));
@@ -241,7 +243,7 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
 
   assert.equal(start.kind, "sdlc_public_start_projected");
   assert.equal(start.status, "dispatch_required");
-  assert.equal(start.executionContract.targetGraphFunction, "bootstrap_release_self_test");
+  assert.equal(start.executionContract.targetGraphFunction, "prepare_release_surface");
 
   const gapDossier = deriveSdlcGapDossier({
     basis: start.executionContract.basis,

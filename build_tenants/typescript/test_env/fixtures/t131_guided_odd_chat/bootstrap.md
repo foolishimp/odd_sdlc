@@ -93,6 +93,11 @@ or decide release closure.
     "purpose": "Build odd_chat from this bootstrap document as the T-131 live proof.",
     "notRuntimeDependency": true
   },
+  "authorityInput": {
+    "kind": "source_file",
+    "path": "bootstrap.md",
+    "graphFunction": "Fg_conform_project_authority"
+  },
   "workspaceDialogue": {
     "purpose": "Create or open an odd_chat operator workspace before operating over a domain.",
     "commands": [
@@ -583,6 +588,12 @@ or decide release closure.
     "installOddSdlc": [
       "npm install",
       "node_modules/.bin/odd-sdlc-ts gaps --workspace ."
+    ],
+    "conformProjectAuthority": [
+      "node_modules/.bin/odd-sdlc-ts start --workspace . --target graph_function:Fg_conform_project_authority --until first_traversal"
+    ],
+    "materializeProduct": [
+      "node_modules/.bin/odd-sdlc-ts start --workspace . --target asset:component_code_surface --until first_traversal"
     ],
     "buildOddChat": [
       "cd build_tenants/typescript && npm install",

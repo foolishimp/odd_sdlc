@@ -30,7 +30,7 @@ program.
     "intent": "Create the smallest useful Rust product that proves odd_sdlc can build and test an executable artifact from a bootstrap document.",
     "definition": "hello_world_rust_minimal contains one build tenant, hello_world_rust. The tenant owns a Cargo manifest and Rust source file. Running the generated Rust program must write exactly `Hello, world!` to standard output. The proof is process execution evidence, not worker prose.",
     "nonGoals": [
-      "five-language suite",
+      "multi-tenant suite",
       "multi-tenant scheduling",
       "release-depth parity",
       "ADR closure",
@@ -44,6 +44,11 @@ program.
     "builder": "odd_sdlc",
     "purpose": "Measure minimum installed odd_sdlc overhead for one Rust build tenant.",
     "notRuntimeDependency": true
+  },
+  "authorityInput": {
+    "kind": "source_file",
+    "path": "bootstrap.md",
+    "graphFunction": "Fg_conform_project_authority"
   },
   "tenant": {
     "id": "rust",
@@ -63,6 +68,13 @@ program.
   "expectedFiles": [
     "build_tenants/hello_world_rust/Cargo.toml",
     "build_tenants/hello_world_rust/src/main.rs"
+  ],
+  "expectedRequirementIds": [
+    "REQ-T133-001-product-scope",
+    "REQ-T133-002-rust-tenant",
+    "REQ-T133-003-expected-files",
+    "REQ-T133-004-exact-output",
+    "REQ-T133-005-execution-command"
   ],
   "sandbox": {
     "workspaceSlug": "t133_rust_hello_world_minimal_workspace",
@@ -174,9 +186,12 @@ program.
     "installOddSdlc": [
       "odd-sdlc-ts install --target <workspace> --package-source <odd_sdlc_source>"
     ],
+    "conformProjectAuthority": [
+      "odd-sdlc-ts start --workspace <workspace> --target graph_function:Fg_conform_project_authority --until first_traversal --worker <worker>"
+    ],
     "buildProduct": [
       "odd-sdlc-ts gaps --workspace <workspace>",
-      "odd-sdlc-ts start --workspace <workspace> --target graph_function:bootstrap_release_self_test --until first_traversal --worker <worker>"
+      "odd-sdlc-ts start --workspace <workspace> --target next --until first_traversal --worker <worker>"
     ],
     "testProduct": [
       "cd build_tenants/hello_world_rust && cargo run --quiet"

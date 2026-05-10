@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   FG_CONFORM_PROJECT,
+  FG_CONFORM_PROJECT_AUTHORITY,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH,
   ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH,
   ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
@@ -34,6 +36,7 @@ const FIXTURE_ROOT = path.join(PACKAGE_ROOT, "test_env/fixtures/t133_rust_hello_
 const BOOTSTRAP_PATH = path.join(FIXTURE_ROOT, "bootstrap.md");
 const SOURCE_ODD_SDLC_CLI = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T133_RUST_HELLO_WORLD_LIVE"] === "1";
+const CONFORMANCE_ONLY = process.env["ODD_SDLC_TS_LIVE_CONFORMANCE_ONLY"] === "1";
 const LIVE_WORKER =
   process.env["ODD_SDLC_TS_T133_RUST_HELLO_WORLD_WORKER"] ??
   "process://codex?model=gpt-5.5&effort=medium";
@@ -78,12 +81,33 @@ function assertUnique(values, label) {
   }
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function assertTextContains(text, value, label) {
+  assert.match(text, new RegExp(escapeRegExp(value), "u"), `${label} must contain ${value}`);
+}
+
+function assertTextContainsOneOf(text, values, label) {
+  assert.equal(
+    values.some((value) => new RegExp(escapeRegExp(value), "u").test(text)),
+    true,
+    `${label} must contain one of ${values.join(", ")}`
+  );
+}
+
 function assertScenarioContract(contract) {
   assert.equal(contract.schemaVersion, "t133.rust_hello_world_minimal.v1");
   assert.equal(contract.scenarioId, "t133_rust_hello_world_minimal");
   assert.equal(contract.product.name, "hello_world_rust_minimal");
   assert.equal(contract.builderHarness.builder, "odd_sdlc");
   assert.equal(contract.builderHarness.notRuntimeDependency, true);
+  assert.deepEqual(contract.authorityInput, {
+    kind: "source_file",
+    path: "bootstrap.md",
+    graphFunction: FG_CONFORM_PROJECT_AUTHORITY
+  });
   assert.equal(contract.expectedOutput, "Hello, world!");
   assert.equal(contract.sandbox.expectedRuntimeRoot, ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH);
   assert.equal(
@@ -106,6 +130,14 @@ function assertScenarioContract(contract) {
   assert.equal(Array.isArray(contract.expectedFiles), true);
   assert.deepEqual(contract.expectedFiles, [tenant.manifestFile, tenant.sourceFile]);
   assertUnique(contract.expectedFiles, "expectedFiles");
+  assert.deepEqual(contract.expectedRequirementIds, [
+    "REQ-T133-001-product-scope",
+    "REQ-T133-002-rust-tenant",
+    "REQ-T133-003-expected-files",
+    "REQ-T133-004-exact-output",
+    "REQ-T133-005-execution-command"
+  ]);
+  assertUnique(contract.expectedRequirementIds, "expectedRequirementIds");
   for (const expectedFile of contract.expectedFiles) {
     assert.equal(
       expectedFile.startsWith(`${tenant.selectedOutputRoot}/`),
@@ -134,13 +166,57 @@ function assertScenarioContract(contract) {
     assertNonEmptyString(action.retryAction, `${action.id}.retryAction`);
   }
   assert.equal(
+    contract.commands.conformProjectAuthority.some((command) =>
+      command.includes(`graph_function:${FG_CONFORM_PROJECT_AUTHORITY}`)
+    ),
+    true,
+    "commands.conformProjectAuthority must include Fg_conform_project_authority"
+  );
+  assert.equal(
     contract.commands.buildProduct.some((command) => command.includes("odd-sdlc-ts start")),
     true,
     "commands.buildProduct must include odd-sdlc-ts start"
   );
+  assert.equal(
+    contract.commands.buildProduct.some((command) =>
+      command.includes("bootstrap_release_self_test")
+    ),
+    false,
+    "commands.buildProduct must not use bootstrap_release_self_test as bootstrap"
+  );
+  assert.equal(
+    contract.commands.buildProduct.some((command) =>
+      command.includes("asset:component_code_surface")
+    ),
+    false,
+    "commands.buildProduct must not inject the product target"
+  );
   assert.deepEqual(contract.commands.testProduct, [
     "cd build_tenants/hello_world_rust && cargo run --quiet"
   ]);
+}
+
+function projectConstraintsText(contract) {
+  return [
+    "project:",
+    `  name: ${contract.sandbox.workspaceSlug}`,
+    `active_tenant: ${contract.tenant.tenantName}`,
+    `selected_output_root: ${contract.tenant.selectedOutputRoot}`,
+    "ambiguity_risk_appetite: low",
+    "runtime:",
+    `  root: ${ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH}`,
+    `  transform_asset_root: ${ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH}`,
+    `  operator_run_root: ${ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH}`,
+    "  product_materialization_root_policy: selected_output_root",
+    "build_tenants:",
+    `  ${contract.tenant.tenantName}:`,
+    `    output_dir: ${contract.tenant.selectedOutputRoot}/`,
+    "    language: Rust",
+    "    build_tool: cargo",
+    "    test_runner: cargo",
+    "    module_structure:",
+    `      - ${contract.tenant.tenantName}`
+  ].join("\n");
 }
 
 function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
@@ -151,72 +227,10 @@ function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
   mkdirSync(path.join(workspace, "build_tenants"), { recursive: true });
   writeFileSync(path.join(workspace, "README.md"), `# ${contract.product.name}\n`, "utf8");
   writeFileSync(path.join(workspace, "bootstrap.md"), bootstrapMarkdown, "utf8");
-  writeFileSync(path.join(workspace, "specification/INTENT.md"), `# Intent\n\n${contract.product.intent}\n`, "utf8");
-  writeFileSync(
-    path.join(workspace, "specification/PRODUCT.md"),
-    `# Product\n\n${contract.product.definition}\n`,
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "specification/GOALS.md"),
-    [
-      "# Goals",
-      "",
-      "- generate one Rust build tenant",
-      "- run the generated Rust program",
-      "- admit exact stdout evidence as the minimum-overhead proof"
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "specification/requirements/00-start-document.md"),
-    bootstrapMarkdown,
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "specification/requirements/01-rust-hello-world.md"),
-    [
-      "# Rust Hello-World Requirements",
-      "",
-      "REQ-T133-001: Generate one Rust build tenant named hello_world_rust.",
-      "REQ-T133-002: The generated Cargo project must emit Hello, world!.",
-      "REQ-T133-003: The proof must be process execution evidence from cargo run --quiet.",
-      "REQ-T133-004: Runtime transform assets remain under .ai-workspace/runtime/odd_sdlc/assets; product files are materialized under build_tenants/hello_world_rust."
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
-    bootstrapMarkdown,
-    "utf8"
-  );
+  const constraintsText = projectConstraintsText(contract);
   writeFileSync(
     path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      `  name: ${contract.sandbox.workspaceSlug}`,
-      `active_tenant: ${contract.tenant.tenantName}`,
-      `selected_output_root: ${contract.tenant.selectedOutputRoot}`,
-      "ambiguity_risk_appetite: low",
-      "runtime:",
-      `  root: ${ODD_SDLC_RUNTIME_ROOT_RELATIVE_PATH}`,
-      `  transform_asset_root: ${ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH}`,
-      `  operator_run_root: ${ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH}`,
-      "  product_materialization_root_policy: selected_output_root",
-      "build_tenants:",
-      `  ${contract.tenant.tenantName}:`,
-      `    output_dir: ${contract.tenant.selectedOutputRoot}/`,
-      "    language: Rust",
-      "    build_tool: cargo",
-      "    test_runner: cargo",
-      "    module_structure:",
-      `      - ${contract.tenant.tenantName}`
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, "build_tenants/TENANT_REGISTRY.md"),
-    `# Tenant Registry\n\n- tenant: ${contract.tenant.tenantName} (Rust)\n`,
+    constraintsText,
     "utf8"
   );
   writeJson(path.join(workspace, "gtl/graph.json"), {
@@ -236,6 +250,86 @@ function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
     expectedOutput: contract.expectedOutput,
     expectedFiles: contract.expectedFiles
   });
+}
+
+function assertBootstrapSourceWorkspace(workspace, contract) {
+  assert.equal(existsSync(path.join(workspace, "bootstrap.md")), true);
+  assert.equal(
+    existsSync(path.join(workspace, ".ai-workspace/context/project_constraints.yml")),
+    true
+  );
+  assert.equal(
+    existsSync(path.join(workspace, ".ai-workspace/context/project_bootstrap.md")),
+    false,
+    "sandbox must not pre-materialize conformed project bootstrap"
+  );
+  for (const relativePath of [
+    "specification/INTENT.md",
+    "specification/PRODUCT.md",
+    "specification/GOALS.md",
+    "specification/requirements/01-rust-hello-world.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      false,
+      `sandbox must not pre-materialize ${relativePath}`
+    );
+  }
+  assertNoPrebuiltRustImplementation(workspace, contract);
+}
+
+function assertConformedProjectWorkspace(workspace, contract) {
+  for (const relativePath of [
+    ".ai-workspace/context/project_bootstrap.md",
+    "specification/INTENT.md",
+    "specification/PRODUCT.md",
+    "specification/GOALS.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      true,
+      `F_P authority conformance must materialize ${relativePath}`
+    );
+  }
+  const requirementDir = path.join(workspace, "specification/requirements");
+  const requirementFiles = readdirSync(requirementDir)
+    .filter((entry) => entry.endsWith(".md"))
+    .sort();
+  assert.ok(
+    requirementFiles.length > 0,
+    "F_P authority conformance must induce at least one requirement surface"
+  );
+  const requirementText = requirementFiles
+    .map((file) => readFileSync(path.join(requirementDir, file), "utf8"))
+    .join("\n");
+  const intentText = readFileSync(path.join(workspace, "specification/INTENT.md"), "utf8");
+  const productText = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
+  const authorityText = [intentText, productText, requirementText].join("\n");
+
+  for (const anchor of ["Rust", "bootstrap document", "odd_sdlc"]) {
+    assertTextContains(intentText, anchor, "INTENT.md");
+  }
+  assertTextContainsOneOf(intentText, ["process execution", "execution proof"], "INTENT.md");
+  assertTextContains(productText, contract.product.name, "PRODUCT.md");
+  assertTextContains(productText, contract.tenant.tenantName, "PRODUCT.md");
+  assertTextContains(productText, contract.tenant.manifestFile, "PRODUCT.md");
+  assertTextContains(productText, contract.tenant.sourceFile, "PRODUCT.md");
+  assertTextContains(productText, contract.expectedOutput, "PRODUCT.md");
+
+  for (const obligationId of contract.expectedRequirementIds) {
+    assert.match(requirementText, new RegExp(`\\b${escapeRegExp(obligationId)}\\b`, "u"));
+  }
+  for (const anchor of [
+    contract.tenant.tenantName,
+    contract.tenant.manifestFile,
+    contract.tenant.sourceFile,
+    contract.expectedOutput,
+    contract.tenant.run.args.join(" "),
+    contract.tenant.run.cwd
+  ]) {
+    assertTextContains(requirementText, anchor, "generated requirements");
+  }
+  assertTextContains(authorityText, FG_CONFORM_PROJECT_AUTHORITY, "conformed authority surfaces");
 }
 
 function assertNoPrebuiltRustImplementation(workspace, contract) {
@@ -436,11 +530,90 @@ function edgeSummary(payload) {
     status: payload.status,
     currentEdge: payload.projection?.currentEdge ?? payload.summary?.currentEdge ?? null,
     graphFunction: payload.summary?.graphFunctionName ?? null,
+    nextLawfulAction: payload.summary?.nextLawfulAction ?? null,
     postflight: payload.postflight?.status ?? null,
     assurance: payload.assuranceSatisfaction?.status ?? null,
     blockingReason: payload.summary?.blockingReason ?? payload.blockingReason ?? null,
     archiveRoot: payload.archiveRoot ?? payload.summary?.archiveRoot ?? null
   };
+}
+
+function readJsonIfExists(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function productMaterializationConsequenceRows(workspace) {
+  const runRoot = path.join(workspace, ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH);
+  if (!existsSync(runRoot)) {
+    return [];
+  }
+  return readdirSync(runRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const archiveRoot = path.join(runRoot, entry.name);
+      const ledger = readJsonIfExists(path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"));
+      const closureDecision = readJsonIfExists(
+        path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+      );
+      const nextActionProjection = readJsonIfExists(
+        path.join(archiveRoot, "sdlc_next_action_projection.json")
+      );
+      return {
+        archiveRoot,
+        ledger,
+        closureDecision,
+        nextActionProjection
+      };
+    })
+    .filter((row) =>
+      row.ledger !== null &&
+      row.closureDecision !== null &&
+      row.nextActionProjection !== null &&
+      row.closureDecision.disposition === "close" &&
+      row.ledger.downstreamPressureRefs?.length > 0 &&
+      row.nextActionProjection.choosesNextTraversal === true &&
+      row.nextActionProjection.nextGraphFunctionRef ===
+        `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    );
+}
+
+function productMaterializationRequiredRows(workspace) {
+  const runRoot = path.join(workspace, ODD_SDLC_OPERATOR_RUN_ROOT_RELATIVE_PATH);
+  if (!existsSync(runRoot)) {
+    return [];
+  }
+  return readdirSync(runRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const archiveRoot = path.join(runRoot, entry.name);
+      const handoffManifest = readJsonIfExists(path.join(archiveRoot, "handoff_manifest.json"));
+      const workerPackage = readJsonIfExists(
+        path.join(archiveRoot, "worker_invocation_package.json")
+      );
+      return {
+        archiveRoot,
+        graphFunctionName:
+          handoffManifest?.graphFunctionName ?? workerPackage?.graphFunctionName ?? null,
+        targetAssetType:
+          handoffManifest?.targetAssetType ?? workerPackage?.targetAssetType ?? null,
+        required:
+          handoffManifest?.productMaterialization?.required ??
+          workerPackage?.workerBrief?.materializationRequired ??
+          workerPackage?.materializationRequired ??
+          null,
+        requiredRoles:
+          handoffManifest?.productMaterialization?.requiredRoles ??
+          workerPackage?.workerBrief?.requiredRoles ??
+          Object.freeze([])
+      };
+    })
+    .filter((row) =>
+      row.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
+      row.targetAssetType === "component_code_surface"
+    );
 }
 
 test("T-133 bootstrap document is a complete one-tenant Rust hello-world contract", () => {
@@ -468,7 +641,7 @@ test("T-133 bootstrap-only sandbox has no prebuilt Rust implementation", () => {
   );
   const workspace = path.join(archiveRoot, "workspace");
   writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract);
-  assertNoPrebuiltRustImplementation(workspace, contract);
+  assertBootstrapSourceWorkspace(workspace, contract);
   writeJson(path.join(archiveRoot, "bootstrap_sandbox_snapshot.json"), {
     workspace,
     bootstrapDigest: sha256Text(bootstrapMarkdown),
@@ -491,7 +664,7 @@ test(
     );
     const workspace = path.join(archiveRoot, "workspace");
     writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract);
-    assertNoPrebuiltRustImplementation(workspace, contract);
+    assertBootstrapSourceWorkspace(workspace, contract);
     writeJson(path.join(archiveRoot, "scenario_contract_snapshot.json"), {
       bootstrapPath: BOOTSTRAP_PATH,
       bootstrapDigest: sha256Text(bootstrapMarkdown),
@@ -503,13 +676,76 @@ test(
     assert.equal(existsSync(path.join(workspace, "node_modules/.bin/odd-sdlc-ts")), true);
 
     const steps = [];
-    const target = "graph_function:bootstrap_release_self_test";
     let terminalState = generatedProductState(workspace, contract);
     writeJson(path.join(archiveRoot, "initial_generated_product_state.json"), terminalState);
     assert.equal(terminalState.expectedFilesPresent, false);
 
+    const conformance = runInstalled(
+      commandPath,
+      ["start", "--workspace", workspace, "--until", "blocked"],
+      workspace,
+      archiveRoot,
+      "bootstrap-conform-project-start"
+    );
+    const conformanceSummary = edgeSummary(conformance);
+    steps.push({ step: -2, phase: "conform_project", ...conformanceSummary });
+    writeJson(path.join(archiveRoot, "bootstrap_conform_project_summary.json"), conformanceSummary);
+    assert.notEqual(
+      conformanceSummary.blockingReason,
+      "target_unavailable",
+      "Fg_conform_project must be available before project authority conformance"
+    );
+
+    const bootstrap = runInstalled(
+      commandPath,
+      [
+        "start",
+        "--workspace",
+        workspace,
+        "--target",
+        `graph_function:${FG_CONFORM_PROJECT_AUTHORITY}`,
+        "--until",
+        "first_traversal",
+        "--worker",
+        LIVE_WORKER
+      ],
+      workspace,
+      archiveRoot,
+      "bootstrap-authority-start"
+    );
+    const bootstrapSummary = edgeSummary(bootstrap);
+    steps.push({ step: -1, phase: "bootstrap_authority", ...bootstrapSummary });
+    writeJson(path.join(archiveRoot, "bootstrap_authority_summary.json"), bootstrapSummary);
+    assert.notEqual(
+      bootstrapSummary.blockingReason,
+      "target_unavailable",
+      "Fg_conform_project_authority must be a published bootstrap target"
+    );
+    assertConformedProjectWorkspace(workspace, contract);
+    assertTextContains(
+      bootstrapSummary.nextLawfulAction ?? "",
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      "completed authority conformance next action"
+    );
+    if (CONFORMANCE_ONLY) {
+      writeJson(path.join(archiveRoot, "steps.json"), steps);
+      writeJson(path.join(archiveRoot, "run_summary.json"), {
+        verdict: "conformance_passed",
+        workspace,
+        worker: LIVE_WORKER,
+        completionController: "authority_conformance_only",
+        installCommandTimeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
+        installedCommandTimeoutMs:
+          INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
+        steps,
+        generatedProductState: terminalState
+      });
+      return;
+    }
+
     let step = 0;
     let terminalReason = "not_terminal";
+    let autonomousNextStartAttempted = false;
     const startedAtMs = Date.now();
     while (true) {
       const gaps = runInstalled(
@@ -523,32 +759,43 @@ test(
       steps.push({ step, phase: "gaps", ...edgeSummary(gaps) });
       writeJson(path.join(archiveRoot, "steps.json"), steps);
       if (currentEdge === null) {
-        terminalReason = "odd_sdlc_reported_no_current_edge";
-        break;
+        terminalState = generatedProductState(workspace, contract);
+        if (terminalState.expectedFilesPresent) {
+          terminalReason = "scenario_expected_files_present";
+          break;
+        }
+        if (autonomousNextStartAttempted) {
+          terminalReason = "odd_sdlc_reported_no_current_edge_after_autonomous_next";
+          break;
+        }
       }
       const startArgs =
         currentEdge === FG_CONFORM_PROJECT
           ? ["start", "--workspace", workspace, "--until", "blocked"]
           : [
-              "start",
-              "--workspace",
-              workspace,
-              "--target",
-              target,
-              "--until",
-              "first_traversal",
-              "--worker",
-              LIVE_WORKER
-            ];
+            "start",
+            "--workspace",
+            workspace,
+            "--target",
+            "next",
+            "--until",
+            "first_traversal",
+            "--worker",
+            LIVE_WORKER
+          ];
+      const requestedEdge = currentEdge ?? "target:next";
+      if (currentEdge === null) {
+        autonomousNextStartAttempted = true;
+      }
       const start = runInstalled(
         commandPath,
         startArgs,
         workspace,
         archiveRoot,
-        `step-${String(step).padStart(2, "0")}-start-${currentEdge}`
+        `step-${String(step).padStart(2, "0")}-start-${requestedEdge.replace(/[^a-z0-9_-]/giu, "_")}`
       );
       const startSummary = edgeSummary(start);
-      steps.push({ step, phase: "start", requestedEdge: currentEdge, ...startSummary });
+      steps.push({ step, phase: "start", requestedEdge, ...startSummary });
       terminalState = generatedProductState(workspace, contract);
       writeJson(
         path.join(archiveRoot, `step-${String(step).padStart(2, "0")}-generated-product-state.json`),
@@ -576,7 +823,7 @@ test(
         elapsedMs,
         workspace,
         worker: LIVE_WORKER,
-        completionController: "odd_sdlc_current_edge_or_minimal_product_files",
+        completionController: "odd_sdlc_autonomous_consequence_chain_or_minimal_product_files",
         installCommandTimeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
         installedCommandTimeoutMs:
           INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
@@ -584,6 +831,29 @@ test(
         generatedProductState: terminalState
       });
     }
+    assert.equal(
+      steps.some((row) => row.requestedEdge === "asset:component_code_surface"),
+      false,
+      "live harness must not inject the product target; evaluate_next must select it"
+    );
+    const productMaterializationConsequences = productMaterializationConsequenceRows(workspace);
+    writeJson(
+      path.join(archiveRoot, "autonomous_product_materialization_consequence_rows.json"),
+      productMaterializationConsequences
+    );
+    assert.ok(
+      productMaterializationConsequences.length > 0,
+      "conformance/requirement evidence must publish a close decision whose next action selects product materialization"
+    );
+    const productMaterializationRequired = productMaterializationRequiredRows(workspace);
+    writeJson(
+      path.join(archiveRoot, "product_materialization_required_rows.json"),
+      productMaterializationRequired
+    );
+    assert.ok(
+      productMaterializationRequired.some((row) => row.required === true),
+      "materialization handoff must mark productMaterialization.required true before Rust product files can close"
+    );
     assert.equal(
       terminalState.expectedFilesPresent,
       true,
@@ -601,10 +871,12 @@ test(
       elapsedMs,
       workspace,
       worker: LIVE_WORKER,
-      completionController: "odd_sdlc_current_edge_or_minimal_product_files",
+      completionController: "odd_sdlc_autonomous_consequence_chain_or_minimal_product_files",
       installCommandTimeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
       installedCommandTimeoutMs: INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
       steps,
+      autonomousProductMaterializationConsequenceCount:
+        productMaterializationConsequences.length,
       generatedProductState: terminalState,
       tenantProof
     });

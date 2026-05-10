@@ -81,9 +81,9 @@ test("T-057 public start target resolution policy is declared data", () => {
       entry.resolver
     ]),
     [
-      ["next", "first_start_target"],
+      ["next", "published_start_targets"],
       ["graph_function", "named_graph_function"],
-      ["asset", "asset_producer_executive"]
+      ["asset", "asset_published_action"]
     ]
   );
 });
@@ -131,7 +131,7 @@ test("T-033 attached public start projects one ABI handoff without iterating int
 
   assert.equal(outcome.kind, "sdlc_public_start_projected");
   assert.equal(outcome.status, "dispatch_required");
-  assert.equal(outcome.executionContract.targetGraphFunction, "bootstrap_release_self_test");
+  assert.equal(outcome.executionContract.targetGraphFunction, "prepare_release_surface");
   assert.equal(outcome.transition.kind, "fp_dispatch");
   assert.equal(outcome.transition.vectorIndex, 0);
   assert.deepStrictEqual(outcome.emittedRuntimeEventKinds, []);

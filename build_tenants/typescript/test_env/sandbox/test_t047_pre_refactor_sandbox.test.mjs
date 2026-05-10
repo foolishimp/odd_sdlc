@@ -610,7 +610,7 @@ test("T-047 sandbox archives expected and actual composed traversal evidence", a
   assert.equal(runJson.elapsedMs > 0, true);
   assert.equal(runJson.diagnostics.length, 0);
   assert(runJson.carriersAdmitted.every((carrier) => typeof carrier === "string"));
-  assert(runJson.graphFunctionsExercised.includes("bootstrap_release_self_test"));
+  assert(runJson.graphFunctionsExercised.includes("prepare_release_surface"));
   assert(runJson.graphFunctionsExercised.includes("derive_code_surface"));
   assert(runJson.graphFunctionsExercised.includes("derive_requirement_surface"));
   assert.equal(

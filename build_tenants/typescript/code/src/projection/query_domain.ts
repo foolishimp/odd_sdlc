@@ -20,15 +20,28 @@ import {
   SOFTWARE_DOMAIN_WORK_ACT_TYPES
 } from "../domain/index.js";
 import {
+  FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
   type SdlcGraphFunctionCatalog
 } from "../graph/index.js";
 import {
-  deriveOddSdlcConstructionEvaluatorReport,
-  type OddSdlcConstructionEvaluatorReport
+  deriveOddSdlcEvaluateNextReport,
+  type OddSdlcEvaluateNextReport
 } from "../runtime/index.js";
+import {
+  projectSdlcRequirementClosureRegister,
+  type SdlcLineageLedger,
+  type SdlcRequirementCarryStatus,
+  type SdlcRequirementClosureRegister,
+  type SdlcRequirementFulfillmentStatus
+} from "./requirement_closure.js";
+import type {
+  SdlcEdgeClosureDisposition,
+  SdlcEdgeFulfillmentAssessmentStatus,
+  SdlcEdgeFulfillmentCounts
+} from "../operator/traversal_consequence.js";
 import type {
   SdlcConformProjectReport,
   SdlcWorkspaceIngressReport
@@ -53,6 +66,124 @@ export interface SdlcAssetOwnershipSurface {
   readonly producerGraphFunctions: readonly string[];
 }
 
+export type SdlcTargetObligationBindingStatus =
+  | "eligible"
+  | "no_published_action"
+  | "stale_action_publication";
+
+export interface SdlcTargetObligationBinding {
+  readonly kind: "sdlc_target_obligation_binding";
+  readonly readOnly: true;
+  readonly choosesNextTraversal: false;
+  readonly bindingRef: string;
+  readonly declaredTargetAssetType: string;
+  readonly targetAssetRefs: readonly string[];
+  readonly requiredRole: "construct_target_asset";
+  readonly evidenceRefs: readonly string[];
+  readonly admissibleGraphFunctionNames: readonly string[];
+  readonly publishedActionRefs: readonly string[];
+  readonly status: SdlcTargetObligationBindingStatus;
+  readonly disposition:
+    | "published_action_eligible"
+    | "no_action"
+    | "stale_query_domain";
+  readonly reasonRefs: readonly string[];
+}
+
+export interface SdlcRequirementFulfillmentPublicCounts
+  extends Pick<
+    SdlcEdgeFulfillmentCounts,
+    "fulfilled" | "partial" | "blocked" | "unfulfilled" | "missing" | "extra"
+  > {
+  readonly total: number;
+  readonly planned: number;
+  readonly carriedForward: number;
+  readonly unresolved: number;
+}
+
+export type SdlcRequirementFulfillmentArchiveRehydrationStatus =
+  | "not_attempted"
+  | "no_operator_runs"
+  | "no_archive_with_consequence_triple"
+  | "rehydrated";
+
+export interface SdlcRequirementFulfillmentArchiveRehydration {
+  readonly kind: "sdlc_requirement_fulfillment_archive_rehydration";
+  readonly status: SdlcRequirementFulfillmentArchiveRehydrationStatus;
+  readonly archiveRef: string | null;
+  readonly scannedArchiveRefs: readonly string[];
+  readonly missingArtifactRefs: readonly string[];
+}
+
+export type SdlcRequirementFulfillmentPublicStatus =
+  | SdlcRequirementFulfillmentStatus
+  // Rendered from evaluate_action obligation assessments.
+  | "blocked"
+  // Public label for an unassessed action obligation.
+  | "unfulfilled"
+  // Public label for a requirement-shaped obligation not present in source closure truth.
+  | "extra";
+
+export interface SdlcRequirementFulfillmentAssessmentPublicInput {
+  readonly obligationId: string;
+  readonly fulfillmentStatus: SdlcEdgeFulfillmentAssessmentStatus;
+  readonly evidenceRefs?: readonly string[];
+  readonly blockingReasons?: readonly string[];
+}
+
+export interface SdlcRequirementFulfillmentPublicRow {
+  readonly kind: "sdlc_requirement_fulfillment_public_row";
+  readonly readOnly: true;
+  readonly choosesNextTraversal: false;
+  readonly requirementId: string;
+  readonly obligationRef: string;
+  readonly sourceInputUris: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly fulfillmentStatus: SdlcRequirementFulfillmentPublicStatus;
+  readonly carryStatus: SdlcRequirementCarryStatus;
+  readonly openReasonRefs: readonly string[];
+  readonly openReasons: readonly string[];
+  readonly ledgerRefs: readonly string[];
+  readonly closureDecisionRefs: readonly string[];
+  readonly evaluatorSourceRefs: readonly string[];
+  readonly sourceRegisterRef: string;
+}
+
+export interface SdlcRequirementFulfillmentPublicProjection {
+  readonly kind: "sdlc_requirement_fulfillment_public_projection";
+  readonly readOnly: true;
+  readonly gapEvaluationFunction: null;
+  readonly nextActionEvaluationFunction: "evaluate_next" | null;
+  readonly actionClosureEvaluationFunction: "evaluate_action";
+  readonly choosesNextTraversal: false;
+  readonly sourceRegisterRef: string;
+  readonly rows: readonly SdlcRequirementFulfillmentPublicRow[];
+  readonly counts: SdlcRequirementFulfillmentPublicCounts;
+  readonly edgeFulfillmentCounts: SdlcEdgeFulfillmentCounts | null;
+  readonly edgeClosureDisposition: SdlcEdgeClosureDisposition | null;
+  readonly archiveRehydration: SdlcRequirementFulfillmentArchiveRehydration;
+  readonly fulfilledRequirementIds: readonly string[];
+  readonly carriedForwardRequirementIds: readonly string[];
+  readonly unresolvedRequirementIds: readonly string[];
+  readonly emittedRuntimeEventKinds: readonly [];
+}
+
+export interface SdlcRequirementFulfillmentEdgeLedgerSource {
+  readonly ledgerRef: string;
+  readonly ledgerVersionRef: string;
+  readonly counts: SdlcEdgeFulfillmentCounts;
+}
+
+export interface SdlcRequirementFulfillmentClosureSource {
+  readonly decisionRef: string;
+  readonly disposition: SdlcEdgeClosureDisposition;
+}
+
+export interface SdlcRequirementFulfillmentNextActionSource {
+  readonly nextActionProjectionRef: string;
+  readonly selectedActionRef: string | null;
+}
+
 export interface SdlcQueryDomainProjection {
   readonly kind: "sdlc_query_domain_projection";
   readonly contractName: "odd_sdlc.query-domain";
@@ -71,6 +202,8 @@ export interface SdlcQueryDomainProjection {
   readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
   readonly startTargets: readonly SdlcStartTargetSurface[];
   readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
+  readonly targetBindings: readonly SdlcTargetObligationBinding[];
+  readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
   readonly currentDossierRefs: readonly string[];
   readonly projectConformance: SdlcConformProjectReport | null;
 }
@@ -80,6 +213,10 @@ export type SdlcGapStatus = "open" | "partial" | "converged";
 export interface SdlcGapProjection {
   readonly kind: "sdlc_gap_projection";
   readonly readOnly: true;
+  readonly evaluationFunction: "eval_gap";
+  readonly productAssetModelRef: string;
+  readonly choosesNextTraversal: false;
+  readonly evaluatesActionClosure: false;
   readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
   readonly graphFunctionName: string;
   readonly status: SdlcGapStatus;
@@ -91,6 +228,9 @@ export interface SdlcGapProjection {
 export interface SdlcGapDossier {
   readonly kind: "sdlc_gap_dossier";
   readonly readOnly: true;
+  readonly gapEvaluationFunction: "eval_gap";
+  readonly nextActionEvaluationFunction: "evaluate_next";
+  readonly actionClosureEvaluationFunction: null;
   readonly choosesNextTraversal: false;
   readonly rankingAuthority: "abiogenesis_construction_priority_projection";
   readonly localRankingAuthority: false;
@@ -98,12 +238,19 @@ export interface SdlcGapDossier {
   readonly status: SdlcGapStatus;
   readonly evidenceRefs: readonly string[];
   readonly triageInput: string;
-  readonly evaluatorProjectionRef: string | null;
+  readonly nextActionBasisKind: "initial_selection";
+  readonly intentEventRefs: readonly string[];
+  readonly productAssetModelRef: string;
+  readonly gapPressureRefs: readonly string[];
+  readonly targetBindingRefs: readonly string[];
+  readonly actionCatalogRefs: readonly string[];
+  readonly nextActionProjectionRef: string | null;
   readonly prioritySchemeRef: string | null;
   readonly bestActionRef: string | null;
   readonly bestGraphFunctionRef: string | null;
   readonly bestGraphVectorRef: string | null;
   readonly rankingReasonRefs: readonly string[];
+  readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
   readonly nextLawfulActions: readonly string[];
 }
 
@@ -136,6 +283,12 @@ function startTargets(input: {
   readonly module: Module;
   readonly projectConformance?: SdlcConformProjectReport | null;
 }): readonly SdlcStartTargetSurface[] {
+  const publicTargetNames = new Set([
+    FG_CONFORM_PROJECT,
+    FG_CONFORM_PROJECT_AUTHORITY,
+    "bootstrap_release_self_test",
+    "release_operational_cycle"
+  ]);
   const byId = new Map(
     input.module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction])
   );
@@ -144,6 +297,9 @@ function startTargets(input: {
     for (const contract of job.contracts) {
       const graphFunction = byId.get(contract.targetId);
       if (graphFunction !== undefined) {
+        if (!publicTargetNames.has(graphFunction.name)) {
+          continue;
+        }
         targets.push(
           Object.freeze({
             name: graphFunction.name,
@@ -166,6 +322,13 @@ function assetOwnership(
   catalog: SdlcGraphFunctionCatalog
 ): readonly SdlcAssetOwnershipSurface[] {
   const producers = new Map<string, string[]>();
+  for (const entry of catalog.libraryFunctions) {
+    for (const output of entry.outputs) {
+      const existing = producers.get(output) ?? [];
+      existing.push(entry.name);
+      producers.set(output, existing);
+    }
+  }
   for (const entry of catalog.functions) {
     for (const output of entry.outputs) {
       const existing = producers.get(output) ?? [];
@@ -183,6 +346,81 @@ function assetOwnership(
   );
 }
 
+function targetBindingForOwnership(input: {
+  readonly ownership: SdlcAssetOwnershipSurface;
+  readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
+  readonly targetAssetRefs?: readonly string[];
+  readonly evidenceRefs?: readonly string[];
+}): SdlcTargetObligationBinding {
+  const publishedNames = new Set(
+    input.graphFunctions.map((graphFunction) => graphFunction.name)
+  );
+  const admissibleGraphFunctionNames = Object.freeze(
+    input.ownership.producerGraphFunctions.filter((name) => publishedNames.has(name))
+  );
+  const status: SdlcTargetObligationBindingStatus =
+    admissibleGraphFunctionNames.length > 0
+      ? "eligible"
+      : input.ownership.producerGraphFunctions.length > 0
+        ? "stale_action_publication"
+        : "no_published_action";
+  const disposition =
+    status === "eligible"
+      ? "published_action_eligible"
+      : status === "stale_action_publication"
+        ? "stale_query_domain"
+        : "no_action";
+  return Object.freeze({
+    kind: "sdlc_target_obligation_binding",
+    readOnly: true,
+    choosesNextTraversal: false,
+    bindingRef: `target-binding://odd-sdlc/${input.ownership.assetType}`,
+    declaredTargetAssetType: input.ownership.assetType,
+    targetAssetRefs: Object.freeze([
+      ...(input.targetAssetRefs ?? [`asset-type://odd-sdlc/${input.ownership.assetType}`])
+    ]),
+    requiredRole: "construct_target_asset",
+    evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
+    admissibleGraphFunctionNames,
+    publishedActionRefs: Object.freeze(
+      admissibleGraphFunctionNames.map(
+        (name) => `published-action://odd-sdlc/graph-function/${name}`
+      )
+    ),
+    status,
+    disposition,
+    reasonRefs: Object.freeze(
+      status === "eligible"
+        ? ["target_asset_bound_to_published_graph_action"]
+        : status === "stale_action_publication"
+          ? ["asset_owner_names_unpublished_graph_function"]
+          : ["target_asset_has_no_published_graph_action"]
+    )
+  });
+}
+
+export function deriveSdlcTargetObligationBinding(input: {
+  readonly queryDomain: SdlcQueryDomainProjection;
+  readonly targetAssetType: string;
+  readonly targetAssetRefs?: readonly string[];
+  readonly evidenceRefs?: readonly string[];
+}): SdlcTargetObligationBinding {
+  const ownership = input.queryDomain.assetOwnership.find(
+    (entry) => entry.assetType === input.targetAssetType
+  ) ?? Object.freeze({
+    assetType: input.targetAssetType,
+    producerGraphFunctions: Object.freeze([])
+  });
+  return targetBindingForOwnership({
+    ownership,
+    graphFunctions: input.queryDomain.graphFunctions,
+    ...(input.targetAssetRefs === undefined
+      ? {}
+      : { targetAssetRefs: input.targetAssetRefs }),
+    ...(input.evidenceRefs === undefined ? {} : { evidenceRefs: input.evidenceRefs })
+  });
+}
+
 interface GraphFunctionStructuralSignature {
   readonly id: string;
   readonly inputNames: readonly string[];
@@ -195,6 +433,421 @@ interface GraphFunctionStructuralSignature {
 
 function sortedStrings(values: readonly string[]): readonly string[] {
   return Object.freeze([...values].sort());
+}
+
+function requirementOpenReasonRef(input: {
+  readonly requirementId: string;
+  readonly reason: string;
+}): string {
+  return [
+    "requirement-open://odd-sdlc",
+    encodeURIComponent(input.requirementId),
+    encodeURIComponent(input.reason)
+  ].join("/");
+}
+
+const EMPTY_LINEAGE_LEDGER: SdlcLineageLedger = Object.freeze({
+  kind: "sdlc_lineage_ledger" as const,
+  entries: Object.freeze([]),
+  emittedRuntimeEventKinds: Object.freeze([] as const)
+});
+
+function requirementFulfillmentCounts(
+  rows: readonly SdlcRequirementFulfillmentPublicRow[]
+): SdlcRequirementFulfillmentPublicCounts {
+  return Object.freeze({
+    total: rows.length,
+    fulfilled: rows.filter((row) => row.fulfillmentStatus === "fulfilled").length,
+    partial: rows.filter((row) => row.fulfillmentStatus === "partial").length,
+    planned: rows.filter((row) => row.fulfillmentStatus === "planned").length,
+    blocked: rows.filter((row) => row.fulfillmentStatus === "blocked").length,
+    unfulfilled: rows.filter((row) => row.fulfillmentStatus === "unfulfilled").length,
+    missing: rows.filter((row) => row.fulfillmentStatus === "missing").length,
+    extra: rows.filter((row) => row.fulfillmentStatus === "extra").length,
+    carriedForward: rows.filter((row) => row.carryStatus === "carried_forward").length,
+    unresolved: rows.filter((row) => row.fulfillmentStatus !== "fulfilled").length
+  });
+}
+
+export function constructSdlcRequirementFulfillmentArchiveRehydration(input: {
+  readonly status: SdlcRequirementFulfillmentArchiveRehydrationStatus;
+  readonly archiveRef?: string | null;
+  readonly scannedArchiveRefs?: readonly string[];
+  readonly missingArtifactRefs?: readonly string[];
+}): SdlcRequirementFulfillmentArchiveRehydration {
+  return Object.freeze({
+    kind: "sdlc_requirement_fulfillment_archive_rehydration" as const,
+    status: input.status,
+    archiveRef: input.archiveRef ?? null,
+    scannedArchiveRefs: Object.freeze([...(input.scannedArchiveRefs ?? [])]),
+    missingArtifactRefs: Object.freeze([...(input.missingArtifactRefs ?? [])])
+  });
+}
+
+export function withSdlcRequirementFulfillmentArchiveRehydration(input: {
+  readonly projection: SdlcRequirementFulfillmentPublicProjection;
+  readonly archiveRehydration: SdlcRequirementFulfillmentArchiveRehydration;
+}): SdlcRequirementFulfillmentPublicProjection {
+  return Object.freeze({
+    ...input.projection,
+    archiveRehydration: input.archiveRehydration
+  });
+}
+
+interface RequirementFulfillmentPublicRowBasis {
+  readonly requirementId: string;
+  readonly sourceInputUris: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly fulfillmentStatus: SdlcRequirementFulfillmentPublicStatus;
+  readonly carryStatus: SdlcRequirementCarryStatus;
+  readonly openReasons: readonly string[];
+}
+
+function constructSdlcRequirementFulfillmentPublicProjection(input: {
+  readonly sourceRegisterRef: string;
+  readonly rows: readonly RequirementFulfillmentPublicRowBasis[];
+  readonly ledgerRefs: readonly string[];
+  readonly closureDecisionRefs: readonly string[];
+  readonly evaluatorSourceRefs: readonly string[];
+  readonly edgeFulfillmentCounts?: SdlcEdgeFulfillmentCounts | null;
+  readonly edgeClosureDisposition?: SdlcEdgeClosureDisposition | null;
+  readonly archiveRehydration?: SdlcRequirementFulfillmentArchiveRehydration;
+}): SdlcRequirementFulfillmentPublicProjection {
+  const rows = Object.freeze(
+    input.rows.map((row) =>
+      Object.freeze({
+        kind: "sdlc_requirement_fulfillment_public_row" as const,
+        readOnly: true as const,
+        choosesNextTraversal: false as const,
+        requirementId: row.requirementId,
+        obligationRef: `requirement:${row.requirementId}`,
+        sourceInputUris: row.sourceInputUris,
+        evidenceRefs: row.evidenceRefs,
+        fulfillmentStatus: row.fulfillmentStatus,
+        carryStatus: row.carryStatus,
+        openReasonRefs: Object.freeze(
+          row.openReasons.map((reason) =>
+            requirementOpenReasonRef({
+              requirementId: row.requirementId,
+              reason
+            })
+          )
+        ),
+        openReasons: row.openReasons,
+        ledgerRefs: input.ledgerRefs,
+        closureDecisionRefs: input.closureDecisionRefs,
+        evaluatorSourceRefs: input.evaluatorSourceRefs,
+        sourceRegisterRef: input.sourceRegisterRef
+      })
+    )
+  );
+  return Object.freeze({
+    kind: "sdlc_requirement_fulfillment_public_projection" as const,
+    readOnly: true as const,
+    gapEvaluationFunction: null,
+    nextActionEvaluationFunction:
+      input.evaluatorSourceRefs.length === 0 ? null : "evaluate_next",
+    actionClosureEvaluationFunction: "evaluate_action" as const,
+    choosesNextTraversal: false as const,
+    sourceRegisterRef: input.sourceRegisterRef,
+    rows,
+    counts: requirementFulfillmentCounts(rows),
+    edgeFulfillmentCounts: input.edgeFulfillmentCounts ?? null,
+    edgeClosureDisposition: input.edgeClosureDisposition ?? null,
+    archiveRehydration:
+      input.archiveRehydration ??
+      constructSdlcRequirementFulfillmentArchiveRehydration({
+        status: "not_attempted"
+      }),
+    fulfilledRequirementIds: Object.freeze(
+      rows
+        .filter((row) => row.fulfillmentStatus === "fulfilled")
+        .map((row) => row.requirementId)
+    ),
+    carriedForwardRequirementIds: Object.freeze(
+      rows
+        .filter((row) => row.carryStatus === "carried_forward")
+        .map((row) => row.requirementId)
+    ),
+    unresolvedRequirementIds: Object.freeze(
+      rows
+        .filter((row) => row.fulfillmentStatus !== "fulfilled")
+        .map((row) => row.requirementId)
+    ),
+    emittedRuntimeEventKinds: Object.freeze([] as const)
+  });
+}
+
+export function projectSdlcRequirementFulfillmentPublicView(input: {
+  readonly closureRegister: SdlcRequirementClosureRegister;
+  readonly sourceRegisterRef?: string;
+  readonly ledgerRefs?: readonly string[];
+  readonly closureDecisionRefs?: readonly string[];
+  readonly evaluatorSourceRefs?: readonly string[];
+  readonly archiveRehydration?: SdlcRequirementFulfillmentArchiveRehydration;
+}): SdlcRequirementFulfillmentPublicProjection {
+  const sourceRegisterRef =
+    input.sourceRegisterRef ?? "requirement-closure-register://odd-sdlc/query-domain";
+  const ledgerRefs = Object.freeze([...(input.ledgerRefs ?? [sourceRegisterRef])]);
+  const closureDecisionRefs = Object.freeze([...(input.closureDecisionRefs ?? [])]);
+  const evaluatorSourceRefs = Object.freeze([...(input.evaluatorSourceRefs ?? [])]);
+  return constructSdlcRequirementFulfillmentPublicProjection({
+    sourceRegisterRef,
+    ledgerRefs,
+    closureDecisionRefs,
+    evaluatorSourceRefs,
+    edgeFulfillmentCounts: null,
+    edgeClosureDisposition: null,
+    ...(input.archiveRehydration === undefined
+      ? {}
+      : { archiveRehydration: input.archiveRehydration }),
+    rows: input.closureRegister.entries.map((entry) =>
+      Object.freeze({
+        requirementId: entry.requirementId,
+        sourceInputUris: entry.sourceInputUris,
+        evidenceRefs: entry.evidenceRefs,
+        fulfillmentStatus: entry.fulfillmentStatus,
+        carryStatus: entry.carryStatus,
+        openReasons: entry.openReasons
+      })
+    )
+  });
+}
+
+function requirementIdFromObligationId(obligationId: string): string | null {
+  const prefix = "requirement:";
+  return obligationId.startsWith(prefix) && obligationId.length > prefix.length
+    ? obligationId.slice(prefix.length)
+    : null;
+}
+
+function publicStatusFromAssessment(
+  status: SdlcEdgeFulfillmentAssessmentStatus
+): SdlcRequirementFulfillmentPublicStatus {
+  if (status === "unassessed") {
+    return "unfulfilled";
+  }
+  return status;
+}
+
+export function publicRequirementStatusToClosureRegisterStatus(
+  status: SdlcRequirementFulfillmentPublicStatus
+): SdlcRequirementFulfillmentStatus {
+  if (
+    status === "blocked" ||
+    status === "unfulfilled" ||
+    status === "extra"
+  ) {
+    return "missing";
+  }
+  return status;
+}
+
+export function assessmentStatusToClosureRegisterStatus(
+  status: SdlcEdgeFulfillmentAssessmentStatus
+): SdlcRequirementFulfillmentStatus {
+  return publicRequirementStatusToClosureRegisterStatus(
+    publicStatusFromAssessment(status)
+  );
+}
+
+export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input: {
+  readonly closureRegister: SdlcRequirementClosureRegister;
+  readonly assessments: readonly SdlcRequirementFulfillmentAssessmentPublicInput[];
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource;
+  readonly sourceRegisterRef?: string;
+  readonly archiveRehydration?: SdlcRequirementFulfillmentArchiveRehydration;
+}): SdlcRequirementFulfillmentPublicProjection {
+  const sourceRegisterRef =
+    input.sourceRegisterRef ??
+    `requirement-closure-register://odd-sdlc/${encodeURIComponent(input.edgeFulfillmentLedger.ledgerRef)}`;
+  const assessmentByRequirementId = new Map(
+    input.assessments
+      .map((assessment) =>
+        Object.freeze({
+          assessment,
+          requirementId: requirementIdFromObligationId(assessment.obligationId)
+        })
+      )
+      .filter(
+        (entry): entry is {
+          readonly assessment: SdlcRequirementFulfillmentAssessmentPublicInput;
+          readonly requirementId: string;
+        } => entry.requirementId !== null
+      )
+      .map((entry) => [entry.requirementId, entry.assessment])
+  );
+  const entryByRequirementId = new Map(
+    input.closureRegister.entries.map((entry) => [entry.requirementId, entry])
+  );
+  const requirementIds = Object.freeze(
+    [
+      ...new Set([
+        ...input.closureRegister.entries.map((entry) => entry.requirementId),
+        ...assessmentByRequirementId.keys()
+      ])
+    ].sort()
+  );
+  const ledgerRefs = Object.freeze([
+    input.edgeFulfillmentLedger.ledgerRef,
+    input.edgeFulfillmentLedger.ledgerVersionRef
+  ]);
+  const closureDecisionRefs = Object.freeze([input.edgeClosureDecision.decisionRef]);
+  const evaluatorSourceRefs = Object.freeze([
+    input.nextActionProjection.nextActionProjectionRef,
+    ...(input.nextActionProjection.selectedActionRef === null
+      ? []
+      : [input.nextActionProjection.selectedActionRef])
+  ]);
+  return constructSdlcRequirementFulfillmentPublicProjection({
+    sourceRegisterRef,
+    ledgerRefs,
+    closureDecisionRefs,
+    evaluatorSourceRefs,
+    edgeFulfillmentCounts: input.edgeFulfillmentLedger.counts,
+    edgeClosureDisposition: input.edgeClosureDecision.disposition,
+    ...(input.archiveRehydration === undefined
+      ? {}
+      : { archiveRehydration: input.archiveRehydration }),
+    rows: requirementIds.map((requirementId) => {
+      const entry = entryByRequirementId.get(requirementId);
+      const assessment = assessmentByRequirementId.get(requirementId);
+      const fulfillmentStatus =
+        assessment === undefined
+          ? entry?.fulfillmentStatus ?? "missing"
+          : entry === undefined
+            ? "extra"
+          : publicStatusFromAssessment(assessment.fulfillmentStatus);
+      const openReasons =
+        fulfillmentStatus === "fulfilled"
+          ? Object.freeze([])
+          : Object.freeze(
+              assessment === undefined
+                ? entry?.openReasons ?? ["obligation_assessment_missing"]
+                : [
+                    ...(entry === undefined
+                      ? [`obligation_extra:${assessment.obligationId}`]
+                      : []),
+                    `obligation_${assessment.fulfillmentStatus}`,
+                    ...(assessment.blockingReasons ?? [])
+                  ]
+            );
+      return Object.freeze({
+        requirementId,
+        sourceInputUris: entry?.sourceInputUris ?? Object.freeze([]),
+        evidenceRefs: Object.freeze(
+          assessment === undefined
+            ? entry?.evidenceRefs ?? []
+            : assessment.evidenceRefs ?? []
+        ),
+        fulfillmentStatus,
+        carryStatus:
+          fulfillmentStatus === "fulfilled"
+            ? "fulfilled" as const
+            : "carried_forward" as const,
+        openReasons
+      });
+    })
+  });
+}
+
+function closureRegisterFromRequirementFulfillmentPublicProjection(
+  projection: SdlcRequirementFulfillmentPublicProjection
+): SdlcRequirementClosureRegister {
+  const entries = Object.freeze(
+    projection.rows.map((row) =>
+      Object.freeze({
+        kind: "sdlc_requirement_closure_entry" as const,
+        requirementId: row.requirementId,
+        sourceInputUris: row.sourceInputUris,
+        assetIds: Object.freeze([]),
+        producedByGraphFunctions: Object.freeze([]),
+        proofKinds: Object.freeze([]),
+        authorityVerbs: Object.freeze([]),
+        evidenceRefs: row.evidenceRefs,
+        traceabilityStatus: "absent" as const,
+        fulfillmentStatus: publicRequirementStatusToClosureRegisterStatus(
+          row.fulfillmentStatus
+        ),
+        carryStatus: row.carryStatus,
+        openReasons: row.openReasons
+      })
+    )
+  );
+  return Object.freeze({
+    kind: "sdlc_requirement_closure_register" as const,
+    entries,
+    fulfilledRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementId)
+    ),
+    carriedForwardRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementId)
+    ),
+    unresolvedRequirementIds: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementId)
+    ),
+    emittedRuntimeEventKinds: Object.freeze([] as const)
+  });
+}
+
+export function projectSdlcRequirementFulfillmentPublicViewFromPriorProjection(input: {
+  readonly sourceProjection: SdlcRequirementFulfillmentPublicProjection;
+  readonly assessments: readonly SdlcRequirementFulfillmentAssessmentPublicInput[];
+  readonly edgeFulfillmentLedger: SdlcRequirementFulfillmentEdgeLedgerSource;
+  readonly edgeClosureDecision: SdlcRequirementFulfillmentClosureSource;
+  readonly nextActionProjection: SdlcRequirementFulfillmentNextActionSource;
+  readonly sourceRegisterRef?: string;
+  readonly archiveRehydration?: SdlcRequirementFulfillmentArchiveRehydration;
+}): SdlcRequirementFulfillmentPublicProjection {
+  return projectSdlcRequirementFulfillmentPublicViewFromAssessments({
+    closureRegister: closureRegisterFromRequirementFulfillmentPublicProjection(
+      input.sourceProjection
+    ),
+    assessments: input.assessments,
+    edgeFulfillmentLedger: input.edgeFulfillmentLedger,
+    edgeClosureDecision: input.edgeClosureDecision,
+    nextActionProjection: input.nextActionProjection,
+    ...(input.archiveRehydration === undefined
+      ? {}
+      : { archiveRehydration: input.archiveRehydration }),
+    ...(input.sourceRegisterRef === undefined
+      ? {}
+      : { sourceRegisterRef: input.sourceRegisterRef })
+  });
+}
+
+function projectSdlcRequirementFulfillmentForIngress(
+  ingressReport: SdlcWorkspaceIngressReport
+): SdlcRequirementFulfillmentPublicProjection {
+  return projectSdlcRequirementFulfillmentPublicView({
+    closureRegister: projectSdlcRequirementClosureRegister({
+      ingressReport,
+      lineageLedger: EMPTY_LINEAGE_LEDGER
+    }),
+    sourceRegisterRef: "requirement-closure-register://odd-sdlc/query-domain"
+  });
+}
+
+function emptyRequirementFulfillmentPublicView(): SdlcRequirementFulfillmentPublicProjection {
+  return projectSdlcRequirementFulfillmentPublicView({
+    closureRegister: Object.freeze({
+      kind: "sdlc_requirement_closure_register" as const,
+      entries: Object.freeze([]),
+      fulfilledRequirementIds: Object.freeze([]),
+      carriedForwardRequirementIds: Object.freeze([]),
+      unresolvedRequirementIds: Object.freeze([]),
+      emittedRuntimeEventKinds: Object.freeze([] as const)
+    }),
+    sourceRegisterRef: "requirement-closure-register://odd-sdlc/absent"
+  });
 }
 
 function serializedAttrsSignature(attrs: SerializedAttrs): string {
@@ -379,6 +1032,11 @@ export function projectSdlcQueryDomain(input: {
 }): SdlcQueryDomainProjection {
   const catalog = constructSdlcGraphFunctionCatalog();
   assertModuleMatchesCatalog({ module: input.module, catalog });
+  const graphFunctionSurfaces = graphFunctionSurface(input.module);
+  const assetOwnershipRows = assetOwnership(catalog);
+  const requirementFulfillment = projectSdlcRequirementFulfillmentForIngress(
+    input.ingressReport
+  );
   return Object.freeze({
     kind: "sdlc_query_domain_projection",
     contractName: "odd_sdlc.query-domain",
@@ -394,12 +1052,21 @@ export function projectSdlcQueryDomain(input: {
     libraryFunctions: catalog.libraryFunctions,
     functions: catalog.functions,
     programs: catalog.executives,
-    graphFunctions: graphFunctionSurface(input.module),
+    graphFunctions: graphFunctionSurfaces,
     startTargets: startTargets({
       module: input.module,
       projectConformance: input.projectConformance ?? null
     }),
-    assetOwnership: assetOwnership(catalog),
+    assetOwnership: assetOwnershipRows,
+    targetBindings: Object.freeze(
+      assetOwnershipRows.map((ownership) =>
+        targetBindingForOwnership({
+          ownership,
+          graphFunctions: graphFunctionSurfaces
+        })
+      )
+    ),
+    requirementFulfillment,
     currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])]),
     projectConformance: input.projectConformance ?? null
   });
@@ -419,7 +1086,7 @@ function gapStatus(input: {
   return "open";
 }
 
-export function projectSdlcGapsFromReplay(input: {
+export function evalSdlcGapFromReplay(input: {
   readonly basis: ExecutionBasis;
   readonly events: readonly RuntimeEvent[];
 }): SdlcGapProjection {
@@ -431,6 +1098,11 @@ export function projectSdlcGapsFromReplay(input: {
   return Object.freeze({
     kind: "sdlc_gap_projection",
     readOnly: true,
+    evaluationFunction: "eval_gap",
+    productAssetModelRef:
+      `product-asset-model://odd-sdlc/${input.basis.graphFunction.id}`,
+    choosesNextTraversal: false,
+    evaluatesActionClosure: false,
     emittedRuntimeEventKinds: Object.freeze([]),
     graphFunctionName: input.basis.graphFunction.name,
     status: gapStatus({
@@ -450,28 +1122,37 @@ export function deriveSdlcGapDossier(input: {
   readonly triageInput: string;
   readonly evidenceRefs: readonly string[];
   readonly priorityScheme?: ConstructionPriorityScheme;
+  readonly requirementFulfillment?: SdlcRequirementFulfillmentPublicProjection;
 }): SdlcGapDossier {
-  const gaps = projectSdlcGapsFromReplay({
+  const gaps = evalSdlcGapFromReplay({
     basis: input.basis,
     events: input.events
   });
+  const intentEventRefs = Object.freeze([
+    `event://odd-sdlc/intent/${input.triageInput}`
+  ]);
   const evaluator =
     gaps.nextVectorIndex === null
       ? null
-      : deriveSdlcGapEvaluator(
+      : evaluateSdlcNextAction(
           {
             basis: input.basis,
             events: input.events,
             vectorIndex: gaps.nextVectorIndex,
             closedVectorIndexes: gaps.closedVectorIndexes,
             triageInput: input.triageInput,
-            evidenceRefs: input.evidenceRefs
+            evidenceRefs: input.evidenceRefs,
+            intentEventRefs,
+            productAssetModelRef: gaps.productAssetModelRef
           },
           input.priorityScheme
         );
   return Object.freeze({
     kind: "sdlc_gap_dossier",
     readOnly: true,
+    gapEvaluationFunction: "eval_gap",
+    nextActionEvaluationFunction: "evaluate_next",
+    actionClosureEvaluationFunction: null,
     choosesNextTraversal: false,
     rankingAuthority: "abiogenesis_construction_priority_projection",
     localRankingAuthority: false,
@@ -479,7 +1160,13 @@ export function deriveSdlcGapDossier(input: {
     status: gaps.status,
     evidenceRefs: Object.freeze([...input.evidenceRefs]),
     triageInput: input.triageInput,
-    evaluatorProjectionRef: evaluator?.priorityProjection.projectionRef ?? null,
+    nextActionBasisKind: "initial_selection",
+    intentEventRefs,
+    productAssetModelRef: gaps.productAssetModelRef,
+    gapPressureRefs: Object.freeze(evaluator?.gapPressureRefs ?? []),
+    targetBindingRefs: Object.freeze(evaluator?.targetBindingRefs ?? []),
+    actionCatalogRefs: Object.freeze(evaluator?.actionCatalogRefs ?? []),
+    nextActionProjectionRef: evaluator?.priorityProjection.projectionRef ?? null,
     prioritySchemeRef: evaluator?.priorityProjection.prioritySchemeRef ?? null,
     bestActionRef: evaluator?.selectedPriorityRow?.actionRef ?? null,
     bestGraphFunctionRef: evaluator?.bestGraphFunctionRef ?? null,
@@ -487,13 +1174,15 @@ export function deriveSdlcGapDossier(input: {
     rankingReasonRefs: Object.freeze(
       evaluator?.selectedPriorityRow?.rankReasonRefs ?? []
     ),
+    requirementFulfillment:
+      input.requirementFulfillment ?? emptyRequirementFulfillmentPublicView(),
     nextLawfulActions: Object.freeze(
       evaluator === null ? ["close_or_reprice"] : evaluator.nextLawfulActionRefs
     )
   });
 }
 
-function deriveSdlcGapEvaluator(
+function evaluateSdlcNextAction(
   input: {
     readonly basis: ExecutionBasis;
     readonly events: readonly RuntimeEvent[];
@@ -501,9 +1190,11 @@ function deriveSdlcGapEvaluator(
     readonly closedVectorIndexes: readonly number[];
     readonly triageInput: string;
     readonly evidenceRefs: readonly string[];
+    readonly intentEventRefs: readonly string[];
+    readonly productAssetModelRef: string;
   },
   priorityScheme?: ConstructionPriorityScheme
-): OddSdlcConstructionEvaluatorReport {
+): OddSdlcEvaluateNextReport {
   const vector = input.basis.graph.vectors[input.vectorIndex];
   if (vector === undefined) {
     throw new TypeError("SdlcGapDossier evaluator requires a published graph vector");
@@ -539,9 +1230,12 @@ function deriveSdlcGapEvaluator(
         })
       ])
     });
-  return deriveOddSdlcConstructionEvaluatorReport({
+  return deriveOddSdlcEvaluateNextReport({
     basis: input.basis,
     events: input.events,
+    nextActionBasisKind: "initial_selection",
+    intentEventRefs: input.intentEventRefs,
+    productAssetModelRef: input.productAssetModelRef,
     episodeId: `construction-episode://odd-sdlc/gaps/${input.basis.graphFunction.id}`,
     observationId: `construction-observation://odd-sdlc/gaps/${input.basis.graphFunction.id}/${input.vectorIndex}/${input.events.length}`,
     priorityScheme: effectivePriorityScheme,

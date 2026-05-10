@@ -105,11 +105,19 @@ fresh downstream proving lane confirms the post-cut runtime behavior.
 - [x] Commit the `odd_method` RC wave.
 - [x] Establish a fresh downstream proving baseline from the literal `data_mapper.template` corpus.
 - [x] Complete `T-003` so downstream workspaces conform to spec-method structured-build topology.
+<<<<<<< Updated upstream:.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md
 - [x] Complete `T-002` so builder control is stateful and reference-first rather than pure-function-shaped.
 - [x] Complete `B-002` so deterministic failures emit repair-usable evidence.
 - [x] Complete `B-003` so builder product source tenants no longer participate in project-tenant resolution.
 - [x] Re-run fresh downstream proving on the post-cut workspace shape.
 - [x] Compare the post-cut proving run against `test28` and earlier baselines and record which remaining gaps are domain-truth gaps rather than substrate/runtime drift.
+=======
+- [ ] Complete `T-002` so builder control is stateful and reference-first rather than pure-function-shaped.
+- [x] Complete `B-002` so deterministic failures emit repair-usable evidence.
+- [x] Complete `B-003` so builder product source tenants no longer participate in project-tenant resolution.
+- [ ] Re-run fresh downstream proving on the post-cut workspace shape.
+- [ ] Compare the post-cut proving run against `test28` and earlier baselines and record which remaining gaps are domain-truth gaps rather than substrate/runtime drift.
+>>>>>>> Stashed changes:.ai-workspace/tickets/active/B-001-refactor-odd-method-to-released-abg-boundary.md
 
 ## Acceptance
 
@@ -120,6 +128,7 @@ fresh downstream proving lane confirms the post-cut runtime behavior.
 - fresh downstream proof from the literal `data_mapper.template` corpus proves
   the downstream wave from installed runtime truth after the active child
   tickets land
+<<<<<<< Updated upstream:.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md
 
 ## Closure Rationale
 
@@ -129,15 +138,23 @@ Fresh downstream proving on `data_mapper.test29` and `data_mapper.test30`
 confirms that the remaining live failures are no longer ABG boundary drift.
 They are now domain-local SDLC behavior and gap-routing concerns inside
 `odd_sdlc`, which are owned by `T-004`.
+=======
+>>>>>>> Stashed changes:.ai-workspace/tickets/active/B-001-refactor-odd-method-to-released-abg-boundary.md
 
 ## Links
 
 - parent: `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/B-001-reprice-abg-provenance-runtime-boundary-wave.md`
 - child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/T-003-enforce-spec-method-structured-build-topology-for-project-tenants.md`
+<<<<<<< Updated upstream:.ai-workspace/tickets/completed/B-001-refactor-odd-method-to-released-abg-boundary.md
 - child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
 - child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
 - child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-003-keep-builder-product-source-tenants-out-of-project-tenant-resolution.md`
 - child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
+=======
+- child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/active/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
+- child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-002-emit-repair-usable-fd-evidence-from-odd-sdlc-evaluators.md`
+- child: `/Users/jim/src/apps/odd_method/.ai-workspace/tickets/completed/B-003-keep-builder-product-source-tenants-out-of-project-tenant-resolution.md`
+>>>>>>> Stashed changes:.ai-workspace/tickets/active/B-001-refactor-odd-method-to-released-abg-boundary.md
 - goal: `/Users/jim/src/apps/odd_method/specification/GOALS.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
 - standard: `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`

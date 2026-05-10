@@ -31,9 +31,11 @@ import {
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
   FG_AMBIGUITY_ASSURANCE_LEDGER,
+  FG_CONFORM_PROJECT_AUTHORITY,
   FG_CAPABILITY_ASSURANCE_LEDGER,
   FG_CONFORM_PROJECT,
   FG_INGRESS_PROJECT,
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   FG_MATERIALIZATION_ASSURANCE_LEDGER,
   FG_OBLIGATION_CARRY_ASSURANCE_LEDGER,
   FG_REQUIREMENT_FULFILLMENT_ASSURANCE_LEDGER,
@@ -104,6 +106,8 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
       FG_SINGLE_TYPED_TRAVERSAL,
       FG_INGRESS_PROJECT,
       FG_CONFORM_PROJECT,
+      FG_CONFORM_PROJECT_AUTHORITY,
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
       FG_MATERIALIZATION_ASSURANCE_LEDGER,
       FG_SEMANTIC_CONVERGENCE_ASSURANCE_LEDGER,
       FG_OBLIGATION_CARRY_ASSURANCE_LEDGER,
@@ -162,13 +166,16 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   assert(graphFunctionNames.includes(FG_SINGLE_TYPED_TRAVERSAL));
   assert(graphFunctionNames.includes(FG_INGRESS_PROJECT));
   assert(graphFunctionNames.includes(FG_CONFORM_PROJECT));
+  assert(graphFunctionNames.includes(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET));
   for (const graphFunctionName of ASSURANCE_GRAPH_FUNCTION_NAMES) {
     assert(graphFunctionNames.includes(graphFunctionName), graphFunctionName);
   }
+  assert(graphFunctionNames.includes(FG_CONFORM_PROJECT_AUTHORITY));
   assert(graphFunctionNames.includes("bootstrap_release_self_test"));
   assert(graphFunctionNames.includes("release_operational_cycle"));
-  assert.equal(module.jobs.length, 3);
+  assert.equal(module.jobs.length, module.graphFunctions.length);
   assert(module.jobs.some((job) => job.name === `${FG_CONFORM_PROJECT}_job`));
+  assert(module.jobs.some((job) => job.name === `${FG_CONFORM_PROJECT_AUTHORITY}_job`));
   assertSdlcModuleJobsTargetPublishedGraphFunctions(module);
   assert.deepStrictEqual(
     BOOTSTRAP_RELEASE_FUNCTION_CATALOG
@@ -200,15 +207,20 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   );
 
   const bootstrapBasis = basisFor(module, "bootstrap_release_self_test");
+  const authorityConformanceBasis = basisFor(module, FG_CONFORM_PROJECT_AUTHORITY);
   const operationalBasis = basisFor(module, "release_operational_cycle");
   const bootstrapProbe = deriveTraversalStructureProbe(bootstrapBasis);
+  const authorityConformanceProbe = deriveTraversalStructureProbe(authorityConformanceBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
   assert.equal(bootstrapBasis.graph.vectors.length, 33);
+  assert.equal(authorityConformanceBasis.graph.vectors.length, 1);
   assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");
+  assert.equal(authorityConformanceProbe.edge, FG_CONFORM_PROJECT_AUTHORITY);
   assert.equal(operationalProbe.edge, "prepare_build_execution_surface");
   assert.equal(bootstrapProbe.transitionKind, "fp_dispatch");
+  assert.equal(authorityConformanceProbe.transitionKind, "fp_dispatch");
   assert.equal(operationalProbe.transitionKind, "fp_dispatch");
 });
 

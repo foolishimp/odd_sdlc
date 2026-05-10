@@ -7,8 +7,11 @@ import {
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
   admitStartIntent,
+  constructConstructionPriorityRule,
+  constructConstructionPriorityScheme,
   deriveAdvancementTransition,
   type AdvancementTransition,
+  type GraphFunction,
   type ExecutionBasis,
   type Module,
   type RuntimeEvent,
@@ -19,8 +22,21 @@ import {
   parseEnumValue,
   parseNonEmptyString
 } from "../shared/validation.js";
-import type { SdlcQueryDomainProjection } from "../projection/index.js";
+import {
+  deriveSdlcTargetObligationBinding,
+  type SdlcQueryDomainProjection
+} from "../projection/index.js";
 import { FG_CONFORM_PROJECT } from "../graph/index.js";
+import {
+  deriveOddSdlcEvaluateNextReport,
+  type OddSdlcEvaluateNextActionInput
+} from "../runtime/index.js";
+import {
+  constructSdlcConstructionIntent,
+  constructSdlcNextActionProjection,
+  type SdlcConstructionIntent,
+  type SdlcNextActionProjection
+} from "../operator/traversal_consequence.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import { publicStartTargetPolicyFor } from "./policy.js";
 
@@ -68,6 +84,8 @@ export interface SdlcExecutionContract {
   readonly conformedProject: SdlcConformProjectProfile;
   readonly basis: ExecutionBasis;
   readonly workerAttachment: SdlcWorkerAttachment;
+  readonly nextActionProjection: SdlcNextActionProjection;
+  readonly constructionIntent: SdlcConstructionIntent;
 }
 
 export type SdlcPublicStartOutcome =
@@ -152,31 +170,309 @@ export function projectSdlcWorkerAttachment(input: {
   });
 }
 
-function resolveGraphFunctionTarget(input: {
-  readonly request: SdlcPublicStartRequest;
-  readonly queryDomain: SdlcQueryDomainProjection;
-}): string | null {
-  const targetPolicy = publicStartTargetPolicyFor(input.request.target.kind);
-  if (targetPolicy.resolver === "first_start_target") {
-    return input.queryDomain.startTargets[0]?.name ?? null;
-  }
-  if (targetPolicy.resolver === "named_graph_function") {
-    const matched = input.queryDomain.graphFunctions.find(
-      (graphFunction) => graphFunction.name === input.request.target.handle
-    );
-    return matched?.name ?? null;
-  }
-  const producer = input.queryDomain.assetOwnership.find(
-    (entry) => entry.assetType === input.request.target.handle
+interface PublicStartActionCandidate {
+  readonly graphFunctionName: string;
+  readonly graphFunctionId: string;
+  readonly actionRef: string;
+  readonly targetOutcomeRef: string;
+}
+
+interface PublicStartEvaluation {
+  readonly targetGraphFunction: string | null;
+  readonly blockingReason: "target_unavailable" | "stale_query_domain" | null;
+  readonly nextActionProjection: SdlcNextActionProjection | null;
+  readonly constructionIntent: SdlcConstructionIntent | null;
+}
+
+function graphFunctionByName(
+  module: Module,
+  graphFunctionName: string
+): GraphFunction | null {
+  return module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === graphFunctionName
+  ) ?? null;
+}
+
+function candidateForGraphFunction(input: {
+  readonly module: Module;
+  readonly graphFunctionName: string;
+  readonly sourceRef: string;
+}): PublicStartActionCandidate | null {
+  const graphFunction = graphFunctionByName(
+    input.module,
+    input.graphFunctionName
   );
-  const producerName = producer?.producerGraphFunctions[0] ?? null;
-  if (producerName === null) {
+  if (graphFunction === null) {
     return null;
   }
-  const executive = input.queryDomain.programs.find((program) =>
-    program.steps.includes(producerName)
+  const safeName = input.graphFunctionName.replaceAll("/", "_");
+  return Object.freeze({
+    graphFunctionName: input.graphFunctionName,
+    graphFunctionId: graphFunction.id,
+    actionRef:
+      `construction-action://odd-sdlc/public-start/${safeName}`,
+    targetOutcomeRef:
+      `outcome://odd-sdlc/public-start/${input.sourceRef}/${safeName}`
+  });
+}
+
+function publicStartIntentRef(request: SdlcPublicStartRequest): string {
+  return [
+    "event://odd-sdlc/public-start-intent",
+    request.target.kind,
+    request.target.handle
+  ].join("/");
+}
+
+function publicStartProductModelRef(request: SdlcPublicStartRequest): string {
+  return [
+    "product-asset-model://odd-sdlc/public-start",
+    request.target.kind,
+    request.target.handle
+  ].join("/");
+}
+
+function evaluateInitialPublicStartAction(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly module: Module;
+  readonly queryDomain: SdlcQueryDomainProjection;
+}): PublicStartEvaluation {
+  const targetPolicy = publicStartTargetPolicyFor(input.request.target.kind);
+  let candidates: readonly PublicStartActionCandidate[];
+  let blockingReason: "target_unavailable" | "stale_query_domain" | null = null;
+  let preferredTargetOutcomeRef: string | null = null;
+  const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
+  if (targetPolicy.resolver === "published_start_targets") {
+    candidates = Object.freeze(
+      input.queryDomain.startTargets
+        .map((target) =>
+          candidateForGraphFunction({
+            module: input.module,
+            graphFunctionName: target.name,
+            sourceRef
+          })
+        )
+        .filter(
+          (
+            candidate
+          ): candidate is PublicStartActionCandidate => candidate !== null
+        )
+    );
+    blockingReason =
+      input.queryDomain.startTargets.length === 0 ? "target_unavailable" : null;
+    preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
+  } else if (targetPolicy.resolver === "named_graph_function") {
+    const published = input.queryDomain.graphFunctions.some(
+      (graphFunction) => graphFunction.name === input.request.target.handle
+    );
+    const candidate = candidateForGraphFunction({
+      module: input.module,
+      graphFunctionName: input.request.target.handle,
+      sourceRef
+    });
+    if (published && candidate === null) {
+      return Object.freeze({
+        targetGraphFunction: input.request.target.handle,
+        blockingReason: "stale_query_domain",
+        nextActionProjection: null,
+        constructionIntent: null
+      });
+    }
+    candidates = Object.freeze(candidate === null ? [] : [candidate]);
+    blockingReason = candidate === null ? "target_unavailable" : null;
+  } else {
+    const binding = deriveSdlcTargetObligationBinding({
+      queryDomain: input.queryDomain,
+      targetAssetType: input.request.target.handle,
+      evidenceRefs: ["public-start://odd-sdlc/target-request"]
+    });
+    candidates = Object.freeze(
+      binding.admissibleGraphFunctionNames
+        .map((name) =>
+          candidateForGraphFunction({
+            module: input.module,
+            graphFunctionName: name,
+            sourceRef
+          })
+        )
+        .filter(
+          (
+            candidate
+          ): candidate is PublicStartActionCandidate => candidate !== null
+        )
+    );
+    blockingReason =
+      binding.status === "stale_action_publication"
+        ? "stale_query_domain"
+        : binding.status === "no_published_action"
+          ? "target_unavailable"
+          : candidates.length === 0
+            ? "stale_query_domain"
+            : null;
+  }
+  if (candidates.length === 0) {
+    return Object.freeze({
+      targetGraphFunction: null,
+      blockingReason: blockingReason ?? "target_unavailable",
+      nextActionProjection: null,
+      constructionIntent: null
+    });
+  }
+  const targetOutcomeRefs = Object.freeze(
+    candidates.map((candidate) => candidate.targetOutcomeRef)
   );
-  return executive?.backingGraphFunction ?? null;
+  const actions: readonly OddSdlcEvaluateNextActionInput[] = Object.freeze(
+    candidates.map((candidate) =>
+      Object.freeze({
+        actionRef: candidate.actionRef,
+        actionKind: "invoke_graph_function" as const,
+        graphFunctionRef: candidate.graphFunctionId,
+        graphVectorRef: null,
+        publishedTraversalTargetRef:
+          `published-action://odd-sdlc/graph-function/${candidate.graphFunctionName}`,
+        targetOutcomeRef: candidate.targetOutcomeRef,
+        inputAssetRefs: Object.freeze([]),
+        expectedOutputAssetRefs: Object.freeze([candidate.targetOutcomeRef]),
+        requiredAuthorityRefs: Object.freeze([
+          `published-action://odd-sdlc/graph-function/${candidate.graphFunctionName}`
+        ]),
+        eligibleReasonRefs: Object.freeze([
+          "public_start_evaluate_next_initial_selection"
+        ])
+      })
+    )
+  );
+  const evaluator = deriveOddSdlcEvaluateNextReport({
+    basis: admitExecutionBasis({
+      startIntent: admitStartIntent({
+        scope: {
+          kind: "workspace",
+          workspaceRoot: input.request.workspaceRoot,
+          moduleName: input.module.name
+        },
+        target: {
+          kind: "graph_function",
+          handle: candidates[0]?.graphFunctionName ?? ""
+        },
+        until: input.request.until
+      }),
+      module: input.module,
+      runtimeIdentity: admitResolvedRuntimeIdentity({
+        workerId: "worker://odd-sdlc/typescript",
+        backendId: "backend://node",
+        buildId: "build://odd-sdlc/typescript",
+        resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+      }),
+      resolvedPolicy: admitResolvedPolicyIdentity({
+        resolvedPolicyBundleRef: `policy://odd-sdlc/public-start/evaluate-next/${input.request.defaultRegime}`,
+        defaultRegime: input.request.defaultRegime,
+        dispatchRef:
+          input.request.defaultRegime === "F_P"
+            ? "dispatch://odd-sdlc/public-start/evaluate-next"
+            : null,
+        approvalSubjectRef:
+          input.request.defaultRegime === "F_H"
+            ? "approval://odd-sdlc/public-start/evaluate-next"
+            : null
+      }),
+      runId: "run://odd-sdlc/public-start/evaluate-next",
+      workKey: "wk://odd-sdlc/public-start/evaluate-next",
+      frameId: null,
+      frameLineageId: null
+    }),
+    events: Object.freeze([]),
+    nextActionBasisKind: "initial_selection",
+    intentEventRefs: Object.freeze([publicStartIntentRef(input.request)]),
+    productAssetModelRef: publicStartProductModelRef(input.request),
+    episodeId:
+      `construction-episode://odd-sdlc/public-start/${sourceRef}`,
+    observationId:
+      `construction-observation://odd-sdlc/public-start/${sourceRef}`,
+    pressures: Object.freeze([
+      {
+        pressureRef:
+          `pressure://odd-sdlc/public-start/${sourceRef}`,
+        pressureKind: "gap_row",
+        sourceRef: publicStartIntentRef(input.request),
+        affectedAssetRefs: targetOutcomeRefs,
+        targetOutcomeRefs,
+        evidenceRefs: Object.freeze(["public-start://odd-sdlc/target-request"]),
+        severity: 1
+      }
+    ]),
+    actions,
+    ...(preferredTargetOutcomeRef === null
+      ? {}
+      : {
+          priorityScheme: constructConstructionPriorityScheme({
+            schemeRef:
+              `priority-scheme://odd-sdlc/public-start/${sourceRef}`,
+            sourcePolicyRef: "policy://odd-sdlc/public-start/published-order",
+            rules: Object.freeze([
+              constructConstructionPriorityRule({
+                priorityRuleRef:
+                  `priority-rule://odd-sdlc/public-start/${sourceRef}/preferred`,
+                axis: "gap_repair",
+                weight: 1000,
+                appliesToActionKinds: Object.freeze(["invoke_graph_function"]),
+                appliesToOutcomeRefs: Object.freeze([preferredTargetOutcomeRef]),
+                sourcePolicyRef:
+                  "policy://odd-sdlc/public-start/published-order",
+                strategyLabel: "public_start_published_target_order"
+              })
+            ])
+          })
+        })
+  });
+  const selected = evaluator.selectedPriorityRow;
+  const selectedCandidate =
+    selected === null
+      ? null
+      : candidates.find((candidate) => candidate.actionRef === selected.actionRef) ??
+        null;
+  if (selected === null || selectedCandidate === null) {
+    return Object.freeze({
+      targetGraphFunction: null,
+      blockingReason: blockingReason ?? "target_unavailable",
+      nextActionProjection: null,
+      constructionIntent: null
+    });
+  }
+  const selectedActionRef = selected.actionRef;
+  const nextActionProjection = constructSdlcNextActionProjection({
+    nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
+    nextActionBasisKind: "initial_selection",
+    intentEventRefs: evaluator.intentEventRefs,
+    productAssetModelRef: evaluator.productAssetModelRef,
+    gapPressureRefs: evaluator.gapPressureRefs,
+    targetBindingRefs: evaluator.targetBindingRefs,
+    observationRef: evaluator.observation.observationId,
+    policyRefs: Object.freeze([
+      evaluator.policyCarrierRef,
+      evaluator.priorityProjection.prioritySchemeRef
+    ]),
+    actionCatalogRefs: evaluator.actionCatalogRefs,
+    selectedActionRef,
+    nextGraphFunctionRef: selectedCandidate.graphFunctionId,
+    nextGraphVectorRef: null
+  });
+  const constructionIntent = constructSdlcConstructionIntent({
+    intentRef:
+      `construction-intent://odd-sdlc/public-start/${selectedCandidate.graphFunctionName}`,
+    intentEventRefs: nextActionProjection.intentEventRefs,
+    productAssetModelRef: nextActionProjection.productAssetModelRef,
+    selectedPriorityRowRef: selected.rankInputRef,
+    nextActionProjectionRef: nextActionProjection.nextActionProjectionRef,
+    selectedActionRef,
+    basisRefs: nextActionProjection.predecessorRefs,
+    predecessorRefs: Object.freeze([nextActionProjection.nextActionProjectionRef])
+  });
+  return Object.freeze({
+    targetGraphFunction: selectedCandidate.graphFunctionName,
+    blockingReason,
+    nextActionProjection,
+    constructionIntent
+  });
 }
 
 function constructExecutionContract(input: {
@@ -185,6 +481,8 @@ function constructExecutionContract(input: {
   readonly targetGraphFunction: string;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
+  readonly nextActionProjection: SdlcNextActionProjection;
+  readonly constructionIntent: SdlcConstructionIntent;
 }): SdlcExecutionContract {
   const requestedOutputs =
     input.request.outputWorkspaceRoot === undefined ||
@@ -246,7 +544,9 @@ function constructExecutionContract(input: {
     requestedUntil: input.request.until,
     conformedProject: input.conformedProject,
     basis,
-    workerAttachment: input.workerAttachment
+    workerAttachment: input.workerAttachment,
+    nextActionProjection: input.nextActionProjection,
+    constructionIntent: input.constructionIntent
   });
 }
 
@@ -275,15 +575,20 @@ export function publicStartOnce(input: {
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
 }): SdlcPublicStartOutcome {
-  const targetGraphFunction = resolveGraphFunctionTarget({
+  const targetResolution = evaluateInitialPublicStartAction({
     request: input.request,
+    module: input.module,
     queryDomain: input.queryDomain
   });
-  if (targetGraphFunction === null) {
+  if (
+    targetResolution.targetGraphFunction === null ||
+    targetResolution.nextActionProjection === null ||
+    targetResolution.constructionIntent === null
+  ) {
     return Object.freeze({
       kind: "sdlc_public_start_blocked",
       status: "blocked",
-      blockingReason: "target_unavailable",
+      blockingReason: targetResolution.blockingReason ?? "target_unavailable",
       stopPredicate: "gap_stop",
       executionContract: null,
       emittedRuntimeEventKinds: Object.freeze([])
@@ -291,7 +596,7 @@ export function publicStartOnce(input: {
   }
   if (
     input.queryDomain.projectConformance?.status === "blocked" &&
-    targetGraphFunction !== FG_CONFORM_PROJECT
+    targetResolution.targetGraphFunction !== FG_CONFORM_PROJECT
   ) {
     return Object.freeze({
       kind: "sdlc_public_start_blocked",
@@ -302,7 +607,7 @@ export function publicStartOnce(input: {
       emittedRuntimeEventKinds: Object.freeze([])
     });
   }
-  if (!moduleHasGraphFunction(input.module, targetGraphFunction)) {
+  if (!moduleHasGraphFunction(input.module, targetResolution.targetGraphFunction)) {
     return Object.freeze({
       kind: "sdlc_public_start_blocked",
       status: "blocked",
@@ -315,9 +620,11 @@ export function publicStartOnce(input: {
   const executionContract = constructExecutionContract({
     request: input.request,
     module: input.module,
-    targetGraphFunction,
+    targetGraphFunction: targetResolution.targetGraphFunction,
     conformedProject: input.conformedProject,
-    workerAttachment: input.workerAttachment
+    workerAttachment: input.workerAttachment,
+    nextActionProjection: targetResolution.nextActionProjection,
+    constructionIntent: targetResolution.constructionIntent
   });
   if (
     input.request.defaultRegime === "F_P" &&

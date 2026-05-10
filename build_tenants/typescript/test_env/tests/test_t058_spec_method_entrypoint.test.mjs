@@ -153,11 +153,11 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
     "--workspace",
     workspace,
     "--evaluator-priority-edge",
-    "derive_release_depth_parity_surface"
+    "Fg_conform_project_authority"
   ]);
 
   assert.equal(result.status, "ok");
-  assert.equal(result.payload.projection.currentEdge, "derive_intent_surface");
+  assert.equal(result.payload.projection.currentEdge, "Fg_conform_project_authority");
   assert.equal(result.payload.dossier.choosesNextTraversal, false);
   assert.equal(
     result.payload.dossier.rankingAuthority,
@@ -170,14 +170,14 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
   );
   assert.equal(
     result.payload.dossier.bestGraphVectorRef,
-    "vector:odd_sdlc:derive_release_depth_parity_surface"
+    "vector:odd_sdlc:Fg_conform_project_authority"
   );
   assert.deepEqual(result.payload.dossier.nextLawfulActions, [
-    "construction-action:graph-function:odd_sdlc:bootstrap_release_self_test:vector:odd_sdlc:derive_release_depth_parity_surface"
+    "construction-action:graph-function:odd_sdlc:Fg_conform_project_authority:vector:odd_sdlc:Fg_conform_project_authority"
   ]);
   assert(
     result.payload.dossier.rankingReasonRefs.includes(
-      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/derive_release_depth_parity_surface"
+      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/Fg_conform_project_authority"
     )
   );
 
@@ -186,7 +186,7 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
     "--workspace",
     workspace,
     "--evaluator-priority-edge",
-    "derive_release_depth_parity_surface"
+    "Fg_conform_project_authority"
   ]);
   assert.equal(rejected.status, "error");
   assert.match(rejected.payload.error, /only valid for gaps/);
@@ -238,7 +238,7 @@ test("T-058 Spec Method gaps priority fails closed on invalid edge selectors", (
     "--workspace",
     closedWorkspace,
     "--evaluator-priority-edge",
-    "derive_intent_surface"
+    "Fg_conform_project_authority"
   ]);
   assert.equal(closed.status, "error");
   assert.match(closed.payload.error, /already closed graph edge/);
@@ -275,7 +275,7 @@ test("T-058 Spec Method start command is an ABG entrypoint over worker attachmen
   assert.equal(attached.payload.status, "dispatch_required");
   assert.equal(
     attached.payload.executionContract.targetGraphFunction,
-    "bootstrap_release_self_test"
+    "derive_code_surface"
   );
 });
 

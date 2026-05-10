@@ -17,6 +17,7 @@ temporary focus into accidental constitutional law.
 
 ## Current Goals
 
+<<<<<<< Updated upstream
 - open the `odd_sdlc.TS` build line as an ODD-native tenant that uses graph
   functions as programs, ABG as runtime truth, Python as discovery evidence,
   and ABIogenesis TypeScript as substrate proof rather than as a finished SDLC
@@ -58,14 +59,25 @@ temporary focus into accidental constitutional law.
 - ratify declarative operational state transitions as explicit command,
   admitted-result, and projected-state law rather than as ambient release
   appendages
+=======
+- keep the current `odd_sdlc` wave focused on ambiguity governance, lawful
+  bounded closure, and inherited-workspace traceability
+- keep inherited-project qualification centered on `data_mapper` as the
+  standing regression corpus for the active software-domain package
+- keep GTL and ABG substrate ownership explicit and small while `odd_sdlc`
+  carries software-domain semantics on the live `odd_method` line
+>>>>>>> Stashed changes
 - keep `odd_service` incubation subordinate to current ABG runtime truth and
   `odd_sdlc` domain law
 - keep current-wave changes traceable back to the live intent, product, and
   requirement surfaces before they are treated as closed
+<<<<<<< Updated upstream
 - keep one-truth migration discipline explicit in this wave:
   - no bridge authority
   - no compatibility facades as closure evidence
   - no shadow tracker beside the admitted domain ledger / closure family
+=======
+>>>>>>> Stashed changes
 
 ## Current Trace Boundary
 
@@ -77,8 +89,11 @@ This wave reads current invariant truth from:
 - `specification/requirements/03-runtime-governance.md`
 - `specification/requirements/08-odd-sdlc-first-slice.md`
 - `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+<<<<<<< Updated upstream
 - `specification/requirements/11-odd-sdlc-homeostatic-gap-triage-and-intent-renewal.md`
 - `specification/requirements/12-declarative-operational-state-transitions.md`
+=======
+>>>>>>> Stashed changes
 
 ## Boundary
 

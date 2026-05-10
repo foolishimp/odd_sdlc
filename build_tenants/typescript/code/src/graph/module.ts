@@ -27,10 +27,7 @@ import {
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
-import {
-  FG_CONFORM_PROJECT,
-  type SdlcReusableGraphFunctionCatalogEntry
-} from "./library.js";
+import type { SdlcReusableGraphFunctionCatalogEntry } from "./library.js";
 import {
   defaultSdlcTraversalScopeRefsForName,
   defaultSdlcTraversalStrategyForName,
@@ -458,19 +455,8 @@ function jobFor(graphFunction: GraphFunction) {
       })
     ]),
     roles: [],
-    tags: ["odd_sdlc", "executive_job"]
+    tags: ["odd_sdlc", "semantic_job"]
   });
-}
-
-function requiredGraphFunction(
-  graphFunctions: readonly GraphFunction[],
-  name: string
-): GraphFunction {
-  const graphFunction = graphFunctions.find((candidate) => candidate.name === name);
-  if (graphFunction === undefined) {
-    throw new TypeError(`Expected published graph function ${name}`);
-  }
-  return graphFunction;
 }
 
 export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
@@ -516,10 +502,6 @@ export function constructSdlcGtlModule(): Module {
     functions: operationalFunctions,
     outputs: ["retrofit_plan_surface"]
   });
-  const conformProjectFunction = requiredGraphFunction(
-    libraryFunctions,
-    FG_CONFORM_PROJECT
-  );
   const graphFunctions = Object.freeze([
     ...libraryFunctions,
     bootstrapExecutive,
@@ -534,11 +516,7 @@ export function constructSdlcGtlModule(): Module {
     graphFunctions,
     refinementBoundaries: [],
     candidateFamilies: [],
-    jobs: [
-      jobFor(conformProjectFunction),
-      jobFor(bootstrapExecutive),
-      jobFor(operationalExecutive)
-    ],
+    jobs: graphFunctions.map(jobFor),
     roles: [],
     operators: [BUILDER_OPERATOR],
     evaluators: [],

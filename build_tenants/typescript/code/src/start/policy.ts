@@ -4,9 +4,9 @@
 import type { SdlcPublicStartTargetKind } from "./public_start.js";
 
 export type SdlcPublicStartTargetResolver =
-  | "first_start_target"
+  | "published_start_targets"
   | "named_graph_function"
-  | "asset_producer_executive";
+  | "asset_published_action";
 
 export interface SdlcPublicStartTargetPolicyEntry {
   readonly kind: "sdlc_public_start_target_policy_entry";
@@ -18,7 +18,7 @@ export const SDLC_PUBLIC_START_TARGET_POLICY = Object.freeze([
   Object.freeze({
     kind: "sdlc_public_start_target_policy_entry",
     targetKind: "next",
-    resolver: "first_start_target"
+    resolver: "published_start_targets"
   }),
   Object.freeze({
     kind: "sdlc_public_start_target_policy_entry",
@@ -28,7 +28,7 @@ export const SDLC_PUBLIC_START_TARGET_POLICY = Object.freeze([
   Object.freeze({
     kind: "sdlc_public_start_target_policy_entry",
     targetKind: "asset",
-    resolver: "asset_producer_executive"
+    resolver: "asset_published_action"
   })
 ] as const satisfies readonly SdlcPublicStartTargetPolicyEntry[]);
 

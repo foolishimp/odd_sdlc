@@ -23,6 +23,13 @@ import type {
 import type { SdlcPublicStartOutcome } from "../start/index.js";
 import type { SdlcBlockingReason } from "../shared/blocking_reason.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
+import type {
+  SdlcConstructionIntent,
+  SdlcEdgeClosureDecision,
+  SdlcEdgeFulfillmentLedger,
+  SdlcNextActionProjection,
+  SdlcWorksiteEvidence
+} from "./traversal_consequence.js";
 
 export type SdlcInstalledOperatorStatus =
   | "blocked"
@@ -69,6 +76,15 @@ export interface SdlcInstalledOperatorStartLoop {
     | "retry_not_planned"
     | "retry_guard_exhausted";
   readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
+}
+
+export interface SdlcInstalledOperatorTraversalConsequence {
+  readonly kind: "sdlc_installed_operator_traversal_consequence";
+  readonly constructionIntent: SdlcConstructionIntent;
+  readonly worksiteEvidence: SdlcWorksiteEvidence;
+  readonly edgeFulfillmentLedger: SdlcEdgeFulfillmentLedger;
+  readonly edgeClosureDecision: SdlcEdgeClosureDecision;
+  readonly nextActionProjection: SdlcNextActionProjection;
 }
 
 export interface SdlcWorkerTransportContract {
@@ -845,7 +861,7 @@ export interface SdlcWorkerRetryContext {
     readonly retryRunId: string;
     readonly retryCallId: string;
     readonly manifestId: string;
-    readonly priorManifestId: string;
+    readonly priorAuthorityRef: string;
     readonly attemptIndex: number;
     readonly sourceProjectionRef: string;
   }[];
@@ -1118,5 +1134,6 @@ export interface SdlcInstalledOperatorStartOutcome {
   readonly emittedRuntimeEventKinds: readonly RuntimeEvent["kind"][];
   readonly eventLogPath: string;
   readonly archiveRoot: string | null;
+  readonly traversalConsequence: SdlcInstalledOperatorTraversalConsequence | null;
   readonly loop?: SdlcInstalledOperatorStartLoop | undefined;
 }

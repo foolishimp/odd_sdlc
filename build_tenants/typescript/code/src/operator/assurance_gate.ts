@@ -32,6 +32,7 @@ import {
   legacyBlockingReasonCode,
   makeSdlcBlockingReason
 } from "../shared/blocking_reason.js";
+import { FG_CONFORM_PROJECT_AUTHORITY } from "../graph/index.js";
 import type { SdlcRequirementClosureRegister } from "../projection/index.js";
 import type {
   SdlcPostflightResult,
@@ -150,9 +151,37 @@ function assessmentByObligationId(
   );
 }
 
+function carriesDownstreamRequirementTransformationSet(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcWorkerObligationAssessment;
+}): boolean {
+  return (
+    input.manifest.targetAssetType === "requirement_surface" &&
+    !input.manifest.productMaterialization.required &&
+    input.assessment.obligationId.startsWith("requirement:") &&
+    input.assessment.blockingReasons.some((reason) =>
+      reason.startsWith("requirement_recorded_for_future_closure:")
+    )
+  );
+}
+
+function admitsAuthorityConformanceInducedRequirement(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly postflight: SdlcPostflightResult;
+  readonly assessment: SdlcWorkerObligationAssessment;
+}): boolean {
+  return (
+    input.postflight.status === "passed" &&
+    input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+    !input.manifest.productMaterialization.required &&
+    input.assessment.obligationId.startsWith("requirement:")
+  );
+}
+
 function deriveDeclaredObligationAssuranceLedger(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
+  readonly postflight: SdlcPostflightResult;
 }): SdlcAssuranceLedger {
   const obligations = input.manifest.traversalObligationContext.obligations;
   if (obligations.length === 0) {
@@ -168,7 +197,13 @@ function deriveDeclaredObligationAssuranceLedger(input: {
     (obligation) => !byId.has(obligation.obligationId)
   );
   const extra = input.report.obligationAssessments.filter(
-    (assessment) => !obligationIds.has(assessment.obligationId)
+    (assessment) =>
+      !obligationIds.has(assessment.obligationId) &&
+      !admitsAuthorityConformanceInducedRequirement({
+        manifest: input.manifest,
+        postflight: input.postflight,
+        assessment
+      })
   );
   const blocked = input.report.obligationAssessments.filter(
     (assessment) =>
@@ -179,7 +214,19 @@ function deriveDeclaredObligationAssuranceLedger(input: {
     (assessment) =>
       obligationIds.has(assessment.obligationId) &&
       (assessment.fulfillmentStatus === "partial" ||
-        assessment.fulfillmentStatus === "unassessed")
+        assessment.fulfillmentStatus === "unassessed") &&
+      !carriesDownstreamRequirementTransformationSet({
+        manifest: input.manifest,
+        assessment
+      })
+  );
+  const downstreamCarried = input.report.obligationAssessments.filter(
+    (assessment) =>
+      obligationIds.has(assessment.obligationId) &&
+      carriesDownstreamRequirementTransformationSet({
+        manifest: input.manifest,
+        assessment
+      })
   );
   const fulfilledWithoutEvidence = input.report.obligationAssessments.filter(
     (assessment) =>
@@ -257,7 +304,11 @@ function deriveDeclaredObligationAssuranceLedger(input: {
       input.report.obligationAssessments.flatMap((assessment) => assessment.evidenceRefs)
     ),
     carryForwardObligationRefs: uniqueSorted(
-      [...missing.map((obligation) => obligation.obligationId), ...open.map((assessment) => assessment.obligationId)]
+      [
+        ...missing.map((obligation) => obligation.obligationId),
+        ...open.map((assessment) => assessment.obligationId),
+        ...downstreamCarried.map((assessment) => assessment.obligationId)
+      ]
     )
   });
 }
@@ -291,11 +342,18 @@ function requirementClosureRegisterFromObligations(input: {
   const byId = assessmentByObligationId(input.report);
   const entries = requirementObligations.map(({ obligation, requirementId }) => {
     const assessment = byId.get(obligation.obligationId);
+    const carriedDownstream =
+      assessment === undefined
+        ? false
+        : carriesDownstreamRequirementTransformationSet({
+            manifest: input.manifest,
+            assessment
+          });
     const fulfilled = assessment?.fulfillmentStatus === "fulfilled";
     const openReasons =
       assessment === undefined
         ? Object.freeze(["obligation_assessment_missing"])
-        : fulfilled
+        : fulfilled || carriedDownstream
           ? Object.freeze([])
           : uniqueSorted([
               `obligation_${assessment.fulfillmentStatus}`,
@@ -314,13 +372,25 @@ function requirementClosureRegisterFromObligations(input: {
       ),
       producedByGraphFunctions: Object.freeze([input.manifest.graphFunctionName]),
       proofKinds: Object.freeze(
-        fulfilled ? (["runtime_result"] as const) : ([] as const)
+        fulfilled
+          ? (["runtime_result"] as const)
+          : carriedDownstream
+            ? (["design_carry"] as const)
+            : ([] as const)
       ),
       authorityVerbs: Object.freeze(
-        fulfilled ? (["implements"] as const) : ([] as const)
+        fulfilled
+          ? (["implements"] as const)
+          : carriedDownstream
+            ? (["carries"] as const)
+            : ([] as const)
       ),
       evidenceRefs,
-      traceabilityStatus: fulfilled ? "behavioral_evidence" as const : "absent" as const,
+      traceabilityStatus: fulfilled
+        ? "behavioral_evidence" as const
+        : carriedDownstream
+          ? "trace_only" as const
+          : "absent" as const,
       fulfillmentStatus: fulfilled ? "fulfilled" as const : "partial" as const,
       carryStatus: fulfilled ? "fulfilled" as const : "carried_forward" as const,
       openReasons
@@ -522,7 +592,8 @@ export function deriveSdlcOperatorAssuranceGate(input: {
     ledgers.push(
       deriveDeclaredObligationAssuranceLedger({
         manifest: input.manifest,
-        report: input.report
+        report: input.report,
+        postflight: input.postflight
       })
     );
     requiredDimensions.push("semantic_convergence");

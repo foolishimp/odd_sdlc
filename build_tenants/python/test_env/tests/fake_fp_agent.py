@@ -33,7 +33,11 @@ def main(argv: list[str] | None = None) -> int:
     env = os.environ.copy()
     pythonpath_entries = [
         str(workspace / ".genesis"),
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/fake_fp_agent.py
         str(workspace / ".genesis" / "odd_sdlc" / "python" / "code"),
+=======
+        str(workspace / ".odd_sdlc" / "python" / "code"),
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/fake_fp_agent.py
     ]
     existing_pythonpath = env.get("PYTHONPATH")
     if existing_pythonpath:

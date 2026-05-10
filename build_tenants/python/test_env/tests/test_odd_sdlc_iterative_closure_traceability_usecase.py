@@ -26,12 +26,16 @@ from odd_sdlc.fd_checks import (
     realized_test_traceability_present as fd_test_traceability_present,
 )
 from odd_sdlc.normalization import normalize_workspace
+<<<<<<< Updated upstream:build_tenants/python/test_env/tests/test_odd_sdlc_iterative_closure_traceability_usecase.py
 from odd_sdlc.project_profile import (
     tenant_design_relative_path,
     tenant_output_dir,
     tenant_test_env_relative_path,
     tenant_test_env_tests_relative_path,
 )
+=======
+from odd_sdlc.project_profile import tenant_design_relative_path, tenant_output_dir, tenant_test_env_tests_relative_path
+>>>>>>> Stashed changes:build_tenants/odd_sdlc/python/test_env/tests/test_odd_sdlc_iterative_closure_traceability_usecase.py
 from odd_sdlc.query import query_domain
 from odd_sdlc.requirement_closure import REQUIREMENT_CLOSURE_REGISTER_PATH
 from odd_sdlc.workspace_assets import asset_marker

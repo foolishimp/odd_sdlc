@@ -34,12 +34,13 @@ import {
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveWorkerHandoffManifest,
   executeInstalledOperatorStart,
+  FG_CONFORM_PROJECT_AUTHORITY,
   evaluateWorkerResultPostflight,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
-  projectSdlcGapsFromReplay,
+  evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicStartOnce,
@@ -2729,7 +2730,7 @@ test("T-066 installed operator rejects shallow source through assurance fold bef
   );
 
   const failureEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterFailure = projectSdlcGapsFromReplay({
+  const afterFailure = evalSdlcGapFromReplay({
     basis,
     events: Object.freeze([
       ...preclosedEventsBeforeEdge(basis, "derive_component_code_surface"),
@@ -2826,6 +2827,31 @@ test("T-066 installed data_mapper successor materializes source and behavioral t
       );
       assert.equal(induction.status, "converged", currentEdge);
       assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
+      continue;
+    }
+    if (currentEdge === FG_CONFORM_PROJECT_AUTHORITY) {
+      const authority = runInstalledOddSdlc(
+        commandPath,
+        [
+          "start",
+          "--workspace",
+          workspace,
+          "--target",
+          target,
+          "--until",
+          "first_traversal",
+          "--worker",
+          workerTransport
+        ],
+        workspace
+      );
+      assert(
+        authority.status === "converged" || authority.status === "worker_invoked",
+        `${currentEdge}: ${authority.status}`
+      );
+      if (authority.status === "worker_invoked") {
+        assert.equal(authority.postflight.status, "passed", currentEdge);
+      }
       continue;
     }
     const start = runInstalledOddSdlc(
