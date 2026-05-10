@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  admitModule,
   admitExecutionBasis,
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
@@ -25,6 +26,7 @@ import {
   constructSdlcGtlModule,
   constructSdlcNextActionProjection,
   deriveOddSdlcEvaluateNextReport,
+  deriveSdlcPublishedProductMaterializationAction,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcOperatorAssuranceGate,
@@ -37,8 +39,8 @@ import {
   snapshotProductMaterializationRoot
 } from "../../build/semantic/code/src/index.js";
 
-function moduleBasis() {
-  const module = constructSdlcGtlModule();
+function moduleBasis(moduleOverride = constructSdlcGtlModule()) {
+  const module = moduleOverride;
   const basis = admitExecutionBasis({
     startIntent: admitStartIntent({
       scope: {
@@ -71,6 +73,29 @@ function moduleBasis() {
     frameLineageId: null
   });
   return { basis, module };
+}
+
+function moduleWithoutMaterializer() {
+  const module = constructSdlcGtlModule();
+  const removedGraphFunctionIds = new Set(
+    module.graphFunctions
+      .filter(
+        (graphFunction) =>
+          graphFunction.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+      )
+      .map((graphFunction) => graphFunction.id)
+  );
+  return admitModule({
+    ...module,
+    graphFunctions: module.graphFunctions.filter(
+      (graphFunction) => !removedGraphFunctionIds.has(graphFunction.id)
+    ),
+    jobs: module.jobs.filter((job) =>
+      job.contracts.every(
+        (contract) => !removedGraphFunctionIds.has(contract.targetId)
+      )
+    )
+  });
 }
 
 function writeRequirementWorkspace() {
@@ -381,6 +406,61 @@ test("T-141 evaluate_next selects materialization action from carried requiremen
   assert.doesNotMatch(
     nextActionProjection.selectedActionRef ?? "",
     /broad-bootstrap-fallback/u
+  );
+});
+
+test("T-141 materialization candidate is derived from the published graph catalog", () => {
+  const { module } = moduleBasis();
+  const action = deriveSdlcPublishedProductMaterializationAction({
+    module,
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ]
+  });
+
+  assert.equal(action.status, "eligible");
+  assert.equal(
+    action.graphFunctionRef,
+    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+  );
+  assert.deepEqual(action.outputAssetTypes, ["component_code_surface"]);
+  assert.deepEqual(action.targetBindingRefs, [
+    "target-binding://odd-sdlc/component_code_surface"
+  ]);
+  assert.deepEqual(action.eligibleTargetBindingRefs, [
+    "target-binding://odd-sdlc/component_code_surface"
+  ]);
+});
+
+test("T-141 unpublished or mismatched materialization action fails closed before selection", () => {
+  const unpublished = deriveSdlcPublishedProductMaterializationAction({
+    module: moduleWithoutMaterializer(),
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ]
+  });
+  assert.equal(unpublished.status, "unpublished");
+  assert.equal(unpublished.graphFunctionRef, null);
+  assert.equal(
+    unpublished.reasonRefs.includes(
+      "product_materialization_graph_function_unpublished"
+    ),
+    true
+  );
+
+  const mismatch = deriveSdlcPublishedProductMaterializationAction({
+    module: moduleBasis().module,
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/tenant_release_surface"
+    ]
+  });
+  assert.equal(mismatch.status, "target_binding_mismatch");
+  assert.equal(mismatch.eligibleTargetBindingRefs.length, 0);
+  assert.equal(
+    mismatch.reasonRefs.includes(
+      "downstream_target_binding_not_admitted_for_published_materializer"
+    ),
+    true
   );
 });
 

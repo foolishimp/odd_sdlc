@@ -31,6 +31,7 @@ related_tickets:
   - T-133 exposed the miss through the minimal live product lane.
   - T-041 remains the full data_mapper parity lane.
 affected_boundary:
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REQUIREMENT_TRANSFORM_BOUNDARY.md
   - build_tenants/typescript/code/src/graph/library.ts
   - build_tenants/typescript/code/src/graph/module.ts
   - build_tenants/typescript/code/src/projection/query_domain.ts
@@ -226,6 +227,16 @@ ProductMaterializationGraphFunctionCatalogEntry
 ```
 
 Names may change during implementation, but the boundary must not.
+
+Design ratification surface:
+
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_REQUIREMENT_TRANSFORM_BOUNDARY.md`
+
+That design states the runner may derive product-materialization candidates only
+from the published GTL module graph function and matching target-binding refs.
+If the narrow materializer is unpublished or does not match the carried target
+binding, the lawful result is no action/typed defect rather than fallback to a
+broad executive graph.
 
 ### Type-Level Closure Partition
 
@@ -545,17 +556,22 @@ Implemented:
 - The installed runner routes closed requirement pressure through evaluate-next
   and selects `Fg_materialize_declared_product_asset` instead of retrying the
   requirement edge or falling back to the broad executive graph.
+- The runner derives product-materialization eligibility from the current
+  published GTL module graph functions and output target-binding refs. It no
+  longer manufactures the materialization candidate from local constants.
 - Product-materialization handoff includes the selected graph action, worksite
   root, target asset type, and requirement transformation set.
 - Spec Method start rehydrates the selected next action from archived
   `sdlc_next_action_projection.json` so a subsequent start invokes the selected
   product-materialization graph function.
+- Spec Method archive rehydration now follows an archived next-action projection
+  only when its predecessor refs include the archived closure decision ref.
 
 Focused verification:
 
 ```bash
 npm run test:t141
-# 4/4 passed
+# 6/6 passed
 
 npm run test:t030
 # 9/9 passed
@@ -567,6 +583,31 @@ npm run test:t135
 # 7/7 passed
 
 npm run test:t139
+# 7/7 passed
+
+npm run test:t140
+# 6/6 passed
+
+npm run test:t133
+# 2/2 non-live passed; live skipped without opt-in
+
+npm run test:t139
+# 7/7 passed
+
+git diff --check
+# passed
+```
+
+Review fix evidence:
+
+```bash
+npm run build:semantic
+# passed
+
+npm run test:t141
+# 6/6 passed
+
+npm run test:t135
 # 7/7 passed
 
 npm run test:t140

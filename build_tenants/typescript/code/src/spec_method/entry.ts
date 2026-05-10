@@ -714,6 +714,11 @@ function selectedNextGraphFunctionNameFromArchive(input: {
     ) {
       continue;
     }
+    if (
+      !stringArrayField(record, "predecessorRefs").includes(decision.decisionRef)
+    ) {
+      continue;
+    }
     const nextGraphFunctionRef = stringField(record, "nextGraphFunctionRef");
     if (nextGraphFunctionRef === null) {
       continue;

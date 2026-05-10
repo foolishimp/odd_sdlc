@@ -30,6 +30,7 @@ import {
   type ActorInvocation,
   type EnginePluginInput,
   type ExecutionBasis,
+  type Module,
   type RuntimeAggregateProjection,
   type RuntimeEvent,
   type RuntimeLivenessObserverProjection,
@@ -41,7 +42,8 @@ import {
 import {
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
-  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  constructSdlcGtlModule
 } from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
@@ -1858,6 +1860,120 @@ function materializedFileRef(file: {
   return pathToFileURL(file.absolutePath).href;
 }
 
+export type SdlcPublishedProductMaterializationActionStatus =
+  | "eligible"
+  | "unpublished"
+  | "no_output_asset"
+  | "target_binding_mismatch";
+
+export interface SdlcPublishedProductMaterializationAction {
+  readonly kind: "sdlc_published_product_materialization_action";
+  readonly status: SdlcPublishedProductMaterializationActionStatus;
+  readonly graphFunctionName: typeof FG_MATERIALIZE_DECLARED_PRODUCT_ASSET;
+  readonly graphFunctionRef: string | null;
+  readonly publishedActionRef: string | null;
+  readonly outputAssetTypes: readonly string[];
+  readonly targetBindingRefs: readonly string[];
+  readonly eligibleTargetBindingRefs: readonly string[];
+  readonly reasonRefs: readonly string[];
+}
+
+function targetBindingRefForAssetType(assetType: string): string {
+  return `target-binding://odd-sdlc/${assetType}`;
+}
+
+function assetTypeRefFor(assetType: string): string {
+  return `asset-type://odd-sdlc/${assetType}`;
+}
+
+export function deriveSdlcPublishedProductMaterializationAction(input: {
+  readonly module: Module;
+  readonly downstreamTargetBindingRefs?: readonly string[];
+}): SdlcPublishedProductMaterializationAction {
+  const graphFunction = input.module.graphFunctions.find(
+    (candidate) => candidate.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const requiredTargetBindingRefs = uniqueSorted(
+    input.downstreamTargetBindingRefs ?? []
+  );
+  if (graphFunction === undefined) {
+    return Object.freeze({
+      kind: "sdlc_published_product_materialization_action" as const,
+      status: "unpublished" as const,
+      graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      graphFunctionRef: null,
+      publishedActionRef: null,
+      outputAssetTypes: Object.freeze([]),
+      targetBindingRefs: Object.freeze([]),
+      eligibleTargetBindingRefs: Object.freeze([]),
+      reasonRefs: Object.freeze([
+        "product_materialization_graph_function_unpublished"
+      ])
+    });
+  }
+  const outputAssetTypes = uniqueSorted(
+    graphFunction.outputs.map((output) => output.name)
+  );
+  const targetBindingRefs = uniqueSorted(
+    outputAssetTypes.map(targetBindingRefForAssetType)
+  );
+  const eligibleTargetBindingRefs =
+    requiredTargetBindingRefs.length === 0
+      ? targetBindingRefs
+      : targetBindingRefs.filter((ref) => requiredTargetBindingRefs.includes(ref));
+  const publishedActionRef =
+    `published-action://odd-sdlc/graph-function/${graphFunction.name}`;
+  if (outputAssetTypes.length === 0) {
+    return Object.freeze({
+      kind: "sdlc_published_product_materialization_action" as const,
+      status: "no_output_asset" as const,
+      graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      graphFunctionRef: graphFunction.id,
+      publishedActionRef,
+      outputAssetTypes,
+      targetBindingRefs,
+      eligibleTargetBindingRefs: Object.freeze([]),
+      reasonRefs: Object.freeze([
+        "product_materialization_graph_function_has_no_output_asset"
+      ])
+    });
+  }
+  if (
+    requiredTargetBindingRefs.length > 0 &&
+    eligibleTargetBindingRefs.length === 0
+  ) {
+    return Object.freeze({
+      kind: "sdlc_published_product_materialization_action" as const,
+      status: "target_binding_mismatch" as const,
+      graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+      graphFunctionRef: graphFunction.id,
+      publishedActionRef,
+      outputAssetTypes,
+      targetBindingRefs,
+      eligibleTargetBindingRefs: Object.freeze([]),
+      reasonRefs: uniqueSorted([
+        "downstream_target_binding_not_admitted_for_published_materializer",
+        ...requiredTargetBindingRefs.map((ref) => `required_target_binding:${ref}`),
+        ...targetBindingRefs.map((ref) => `published_target_binding:${ref}`)
+      ])
+    });
+  }
+  return Object.freeze({
+    kind: "sdlc_published_product_materialization_action" as const,
+    status: "eligible" as const,
+    graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    graphFunctionRef: graphFunction.id,
+    publishedActionRef,
+    outputAssetTypes,
+    targetBindingRefs,
+    eligibleTargetBindingRefs,
+    reasonRefs: uniqueSorted([
+      "evaluate_next_declared_product_materialization_action_published",
+      ...eligibleTargetBindingRefs.map((ref) => `eligible_target_binding:${ref}`)
+    ])
+  });
+}
+
 function fallbackFulfillmentStatusForState(
   state: SdlcAbgOwnedFpDispatchState
 ): SdlcEdgeFulfillmentAssessmentStatus {
@@ -1873,21 +1989,25 @@ function fallbackFulfillmentStatusForState(
   return "blocked";
 }
 
-function edgeFulfillmentProjectionFor(
-  state: SdlcAbgOwnedFpDispatchState
-): SdlcEdgeFulfillmentCountProjection {
+function edgeFulfillmentProjectionFor(input: {
+  readonly module: Module;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+}): SdlcEdgeFulfillmentCountProjection {
+  const materializationAction = deriveSdlcPublishedProductMaterializationAction({
+    module: input.module
+  });
   const assessments = Object.freeze(
-    (state.workerReport?.obligationAssessments ?? Object.freeze([])).map(
+    (input.state.workerReport?.obligationAssessments ?? Object.freeze([])).map(
       (assessment) => {
         const authorityRequirementInduction =
-          state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
-          !state.manifest.productMaterialization.required &&
+          input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+          !input.state.manifest.productMaterialization.required &&
           assessment.obligationId.startsWith("requirement:");
         const carriesRequirementTransformationSet =
           assessment.obligationId.startsWith("requirement:") &&
-          !state.manifest.productMaterialization.required &&
+          !input.state.manifest.productMaterialization.required &&
           (authorityRequirementInduction ||
-            (state.manifest.targetAssetType === "requirement_surface" &&
+            (input.state.manifest.targetAssetType === "requirement_surface" &&
               assessment.blockingReasons.some((reason) =>
                 reason.startsWith("requirement_recorded_for_future_closure:")
               )));
@@ -1898,12 +2018,11 @@ function edgeFulfillmentProjectionFor(
           ...(carriesRequirementTransformationSet
             ? {
                 carryDirection: "downstream_transformation_set" as const,
-                downstreamGraphFunctionRefs: Object.freeze([
-                  `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
-                ]),
-                targetBindingRefs: Object.freeze([
-                  "target-binding://odd-sdlc/component_code_surface"
-                ])
+                downstreamGraphFunctionRefs:
+                  materializationAction.graphFunctionRef === null
+                    ? Object.freeze([])
+                    : Object.freeze([materializationAction.graphFunctionRef]),
+                targetBindingRefs: materializationAction.targetBindingRefs
               }
             : {})
         });
@@ -1912,17 +2031,17 @@ function edgeFulfillmentProjectionFor(
   );
   return deriveSdlcEdgeFulfillmentCountsFromAssessments({
     declaredObligationIds: uniqueSorted([
-      ...state.manifest.traversalObligationContext.obligations.map(
+      ...input.state.manifest.traversalObligationContext.obligations.map(
         (obligation) => obligation.obligationId
       ),
-      ...(state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
+      ...(input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
         ? assessments
             .map((assessment) => assessment.obligationId)
             .filter((obligationId) => obligationId.startsWith("requirement:"))
         : [])
     ]),
     assessments,
-    fallbackStatus: fallbackFulfillmentStatusForState(state)
+    fallbackStatus: fallbackFulfillmentStatusForState(input.state)
   });
 }
 
@@ -2009,20 +2128,32 @@ function postActionCandidateFor(input: {
 }
 
 function postProductMaterializationCandidateFor(input: {
+  readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
 }): OddSdlcEvaluateNextActionInput | null {
-  const graphFunctionRef =
-    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`;
+  const materializationAction = deriveSdlcPublishedProductMaterializationAction({
+    module: input.module,
+    downstreamTargetBindingRefs: input.downstreamTargetBindingRefs
+  });
+  if (
+    materializationAction.status !== "eligible" ||
+    materializationAction.graphFunctionRef === null ||
+    materializationAction.publishedActionRef === null
+  ) {
+    return null;
+  }
+  const targetAssetType = materializationAction.outputAssetTypes[0];
+  if (targetAssetType === undefined) {
+    return null;
+  }
   const targetOutcomeRef = [
     "target-outcome://odd-sdlc/post-action",
-    graphFunctionRef,
-    "component_code_surface",
+    materializationAction.graphFunctionRef,
+    targetAssetType,
     encodeURIComponent(manifestRefSegment(input.state.manifest))
   ].join("/");
-  const publishedActionRef =
-    `published-action://odd-sdlc/graph-function/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`;
   return Object.freeze({
     actionRef: [
       "construction-action://odd-sdlc/post-action",
@@ -2031,19 +2162,21 @@ function postProductMaterializationCandidateFor(input: {
       targetOutcomeRef
     ].join("/"),
     actionKind: "invoke_graph_function" as const,
-    graphFunctionRef,
+    graphFunctionRef: materializationAction.graphFunctionRef,
     graphVectorRef: null,
-    publishedTraversalTargetRef: publishedActionRef,
+    publishedTraversalTargetRef: materializationAction.publishedActionRef,
     targetOutcomeRef,
     inputAssetRefs: Object.freeze([]),
-    expectedOutputAssetRefs: Object.freeze([
-      "asset-type://odd-sdlc/component_code_surface",
-      targetOutcomeRef
-    ]),
-    requiredAuthorityRefs: Object.freeze([publishedActionRef]),
-    eligibleReasonRefs: Object.freeze([
+    expectedOutputAssetRefs: Object.freeze(
+      uniqueSorted([
+        ...materializationAction.outputAssetTypes.map(assetTypeRefFor),
+        targetOutcomeRef
+      ])
+    ),
+    requiredAuthorityRefs: Object.freeze([materializationAction.publishedActionRef]),
+    eligibleReasonRefs: uniqueSorted([
       "evaluate_next_downstream_requirement_transformation_set",
-      "evaluate_next_declared_product_materialization_action_published",
+      ...materializationAction.reasonRefs,
       ...input.downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
       ...input.downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
     ])
@@ -2052,6 +2185,7 @@ function postProductMaterializationCandidateFor(input: {
 
 function postActionCandidates(input: {
   readonly basis: ExecutionBasis;
+  readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly closureDecisionDisposition: string;
   readonly nextVectorIndex: number | null;
@@ -2064,6 +2198,7 @@ function postActionCandidates(input: {
   ) {
     const productMaterializationCandidate =
       postProductMaterializationCandidateFor({
+        module: input.module,
         state: input.state,
         downstreamPressureRefs: input.downstreamPressureRefs,
         downstreamTargetBindingRefs: input.downstreamTargetBindingRefs
@@ -2132,6 +2267,7 @@ function deriveInstalledTraversalConsequence(input: {
     throw new TypeError("installed traversal consequence requires execution contract");
   }
   const constructionIntent = input.start.executionContract.constructionIntent;
+  const module = constructSdlcGtlModule();
   const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
   const runRef = manifestRefSegment(input.state.manifest);
   const worksiteEvidence = constructSdlcWorksiteEvidence({
@@ -2155,7 +2291,10 @@ function deriveInstalledTraversalConsequence(input: {
       constructionIntent.nextActionProjectionRef
     ])
   });
-  const fulfillmentProjection = edgeFulfillmentProjectionFor(input.state);
+  const fulfillmentProjection = edgeFulfillmentProjectionFor({
+    module,
+    state: input.state
+  });
   const retryReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "same_edge_retry"
@@ -2215,6 +2354,7 @@ function deriveInstalledTraversalConsequence(input: {
   });
   const candidates = postActionCandidates({
     basis: input.basis,
+    module,
     state: input.state,
     closureDecisionDisposition: closureDecision.disposition,
     nextVectorIndex: input.nextVectorIndex,
