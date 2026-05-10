@@ -19,13 +19,14 @@ Has TypeScript restored the test35 computational loop, or only a controlled
 single-target proof that resembles one slice of it?
 ```
 
-Answer: TypeScript now works for controlled single-tenant live lanes. It has
-real edge evidence, ledgers, closure decisions, next-action projections,
-liveness observation, and product execution proof. It does not yet fully restore
-the `data_mapper.test35` emergent loop because the live harness still supplies
-the product target after bootstrap. The evaluator does not yet autonomously turn
-closed bootstrap authority into the next declared product materialization
-action.
+Answer: TypeScript now restores the core single-tenant consequence loop named
+by the Final Uplift Table. It has real edge evidence, ledgers, closure
+decisions, next-action projections, liveness observation, and product execution
+proof. After T-141/T-142, the evaluator can turn closed authority plus carried
+requirement transformation pressure into a declared product materialization
+action. This closes the feature-gap slice. It does not by itself prove full
+`data_mapper.test35` replacement, non-close continuation under live failure, or
+multi-tenant fanout.
 
 ### Live Proofs Run
 
@@ -43,14 +44,16 @@ Archives:
 ```text
 build_tenants/typescript/test_env/test_runs/t132_hello_world_single_tenant_bootstrap_sandbox/20260510T031225509Z_pid13389
 build_tenants/typescript/test_env/test_runs/t133_rust_hello_world_bootstrap_sandbox/20260510T031739737Z_pid81100
+build_tenants/typescript/test_env/test_runs/t132_hello_world_single_tenant_bootstrap_sandbox/20260510T084735429Z_pid82785
+build_tenants/typescript/test_env/test_runs/t133_rust_hello_world_bootstrap_sandbox/20260510T082113534Z_pid77797
 ```
 
 Summary:
 
-| Lane | Result | Run summary elapsed | Product worker elapsed | Product proof |
-| --- | --- | ---: | ---: | --- |
-| T132 single-tenant JavaScript | passed | 150,745 ms | 150,075 ms | `Hello, world!` from `build_tenants/hello_world_javascript/src/hello.js` |
-| T133 single-tenant Rust | passed | 142,104 ms | 141,412 ms | `Hello, world!` from `build_tenants/hello_world_rust/src/main.rs` |
+| Lane | Result | Latest run summary elapsed | Product proof |
+| --- | --- | ---: | --- |
+| T132 single-tenant JavaScript | passed | 136,270 ms | `Hello, world!` from `build_tenants/hello_world_javascript/src/hello.js` |
+| T133 single-tenant Rust | passed | 94,719 ms | `Hello, world!` from `build_tenants/hello_world_rust/src/main.rs` |
 
 Both product edges used:
 
@@ -90,14 +93,16 @@ closure disposition = close
 
 ### Edge-By-Edge Walkthrough
 
-Both clean lanes now have the same four-step shape.
+Both clean lanes now have the same broad four-step shape, with one important
+difference: T133 is the controlling autonomous materialization proof, while
+T132 remains a single-tenant asset-target calibration lane.
 
 | Step | Phase | T132 | T133 | Interpretation |
 | ---: | --- | --- | --- | --- |
 | -2 | `conform_project` | `Fg_conform_project`, converged | `Fg_conform_project`, converged | Deterministic project conformance/bootstrap of installed workspace state. |
-| -1 | `bootstrap_authority` | `Fg_conform_project_authority`, worker invoked, postflight passed, assurance close allowed | same | The authority-conformance edge materializes the project bootstrap surface. |
-| 0 | `gaps` | `currentEdge: null` | `currentEdge: null` | Public read model reports no current graph edge after bootstrap. This is the main remaining architecture gap. |
-| 0 | `start asset:component_code_surface` | `derive_component_code_surface`, worker invoked, close allowed | same | The harness explicitly requests the product target. The runner invokes F_P, observes product files, folds evidence into the ledger, and closes. |
+| -1 | `bootstrap_authority` | `Fg_conform_project_authority`, worker invoked, postflight passed, assurance close allowed | same, with next lawful action selecting `Fg_materialize_declared_product_asset` | The authority-conformance edge materializes project authority and carries requirement pressure downstream. |
+| 0 | `gaps` | `currentEdge: Fg_materialize_declared_product_asset` | `currentEdge: Fg_materialize_declared_product_asset` | Public read model exposes product materialization pressure after bootstrap. |
+| 0 | `start product` | asset-target calibration invokes `derive_component_code_surface` while observing `Fg_materialize_declared_product_asset` | direct start invokes `Fg_materialize_declared_product_asset` | The runner invokes F_P, observes product files, folds evidence into the ledger, and closes. |
 
 T132 materialized:
 
@@ -156,16 +161,11 @@ This is real progress relative to the original diagnosis.
 
 ### What The Clean Runs Do Not Prove
 
-They do not prove full `test35` parity.
+They prove the single-tenant autonomous materialization slice. They do not prove
+full `test35` parity.
 
-The live harness still performs this control step after bootstrap:
-
-```text
-start --target asset:component_code_surface
-```
-
-That means the test proves product-target execution once explicitly requested.
-It does not yet prove the installed runner can derive that request from:
+The T133/T142 path now proves the installed runner can derive product
+materialization from:
 
 ```text
 closed project authority
@@ -175,17 +175,16 @@ closed project authority
 + odd_sdlc policy
 ```
 
-The decisive observation is:
+The decisive observation after T-141/T-142 is:
 
 ```text
 after Fg_conform_project_authority:
-  gaps.currentEdge = null
+  gaps.currentEdge = Fg_materialize_declared_product_asset
 ```
 
-If the TypeScript loop had fully restored the Python machine behavior, the next
-read-only view would expose declared product materialization pressure and the
-runner would select the product action from evaluator truth. Instead, the live
-test currently supplies the product target as an external harness instruction.
+That is the feature-gap closure for this uplift slice. The remaining parity work
+is broader: data_mapper-scale traversal, non-close live continuation, and
+homeostatic gap triage.
 
 ### Comparison To data_mapper.test35
 
@@ -208,14 +207,14 @@ The Python line has these properties:
 | Run state | Event-derived run state includes `yielded` as active, not terminal. | Liveness/yield machinery exists, but the clean hello-world lanes only exercise close. |
 | F_P closure | `result_ingest.py` builds a published fulfillment ledger and computes `edge_converged = carry_converged and fulfillment_converged and admitted`. | Product edge now has `sdlc_edge_fulfillment_ledger.json` with counts, admission, certification flags, and `edgeConverged: true`. |
 | Failure continuation | Python emits `proof_failed`, `graph_call_failed`, and `continuation_opened` with causation refs. | Not exercised by the clean lanes. Needs a non-close live regression. |
-| Requirement pressure | Python traceability builds requirement/declared-edge obligation ledgers and distinguishes carry convergence from fulfillment convergence. | Product edge requirements are counted as fulfilled; downstream carried transformation-set pressure is not yet fully proven. |
-| Bootstrap-to-product transition | Python can project next graph state from event/ledger truth. | TypeScript still needs the harness to request `asset:component_code_surface` after bootstrap. |
-| Target specificity | Python manifests/obligation ledgers bind target evidence. | TypeScript now guides exact target files, but through context scan and prompt rendering rather than final typed product target carrier. |
+| Requirement pressure | Python traceability builds requirement/declared-edge obligation ledgers and distinguishes carry convergence from fulfillment convergence. | T-141/T-142 prove downstream transformation-set pressure for the single-tenant materialization slice. Data_mapper-scale pressure remains to be proven. |
+| Bootstrap-to-product transition | Python can project next graph state from event/ledger truth. | T133/T142 prove evaluator-selected product materialization after authority conformance; T132 remains an asset-target calibration lane. |
+| Target specificity | Python manifests/obligation ledgers bind target evidence. | TypeScript now binds the declared target and exact files well enough for hello-world materialization. Wider asset families still need data_mapper proof. |
 
 ### Current Architecture Verdict
 
-The current TypeScript implementation is working as a controlled single-tenant
-calibration lane. It is not just producing logs; it is producing useful
+The current TypeScript implementation is working as a single-tenant
+materialization lane. It is not just producing logs; it is producing useful
 deterministic observability:
 
 ```text
@@ -228,16 +227,7 @@ F_P transform
 -> execution proof
 ```
 
-The architecture is not yet complete because the loop is still externally
-steered at the point that matters most:
-
-```text
-bootstrap authority closed
--> harness asks for product asset
--> product edge closes
-```
-
-The target architecture is:
+The feature-gap slice is now complete because the controlling path is:
 
 ```text
 bootstrap authority closed
@@ -246,22 +236,30 @@ bootstrap authority closed
 -> product edge closes
 ```
 
-That distinction is the remaining functional gap.
+The remaining target is broader than this uplift slice:
 
-### Immediate Gap Analysis
+```text
+real data_mapper worksite
+-> homeostatic gap triage
+-> non-close continuation/yield/repair proof
+-> data_mapper-scale closure or typed exhaustion
+```
 
-**Gap 1: post-bootstrap product pressure is not visible enough to drive the next action.**
+That distinction is the next parity problem, not the T-141 feature gap.
 
-After `Fg_conform_project_authority`, public `gaps` reports `currentEdge: null`.
-The evaluator should be able to expose the declared product materialization
-pressure as read-only truth and the runner should be able to consume it as
-executable intent when running `start`.
+### Residual Gap Analysis After T-141/T-142
 
-**Gap 2: declared file targets are prompt-rendered, not carrier-owned.**
+**Closed gap: post-bootstrap product pressure drives the next action.**
+
+After `Fg_conform_project_authority`, the public read model can expose
+`Fg_materialize_declared_product_asset`, and the runner can consume that
+projection through evaluator-owned intent. T-141/T-142 close this uplift item.
+
+**Residual 1: declared file targets still need broader carrier audit.**
 
 The current handoff scans `.ai-workspace/context/*.json` for `expectedFiles`
-under the selected output root. That is generic enough to fix the immediate
-hello-world miss, but the durable method shape should be:
+under the selected output root in some lanes. That is generic enough for the
+hello-world proof, but the durable method shape remains:
 
 ```text
 SdlcTargetObligationBinding / ProductMaterializationContract
@@ -271,7 +269,8 @@ SdlcTargetObligationBinding / ProductMaterializationContract
 -> ledger closure
 ```
 
-**Gap 3: requirement rows are not yet a first-class downstream transformation set.**
+**Closed gap: requirement rows are a downstream transformation set for the
+single-tenant materialization slice.**
 
 The model we want is:
 
@@ -281,23 +280,25 @@ B.workspace -> traverse.F_P -> C(product files)
 ```
 
 Some B assets, especially requirements, are not merely documents to close for
-their own edge. They are the transformation set for C. TypeScript has started
-to carry requirement obligation ids into the product prompt, but the clean live
-runs do not yet prove the full typed carry-forward rule:
+their own edge. They are the transformation set for C. TypeScript now carries
+this rule at the carrier level for the single-tenant materialization slice:
 
 ```text
 edge-local fulfillment can close
 while downstream product pressure remains visible and actionable
 ```
 
-**Gap 4: non-close behavior is not proven in the live lane.**
+The remaining work is breadth, not the core rule: prove this behavior on
+data_mapper-scale requirement sets and other product asset families.
+
+**Residual 2: non-close behavior is not proven in the live lane.**
 
 The clean runs only prove `close`. They do not prove `yield`, `retry`, `repair`,
 `re-enter`, `reprice`, or `block` from live worker evidence. Python `test35`
 made continuation and yield part of the machine model; TypeScript needs live or
 live-equivalent regressions for those dispositions.
 
-**Gap 5: multi-tenant fanout is a separate capability and should stay out of this closure path.**
+**Residual 3: multi-tenant fanout is a separate capability and should stay out of this closure path.**
 
 The five-hello-world lane exposed fanout/control problems. That should remain a
 backlog feature. Single-tenant product materialization is the correct
@@ -305,25 +306,30 @@ calibration lane for restoring the core loop.
 
 ### Next Decision
 
-There are two lawful next moves:
+There are two lawful next moves after T-141 closure:
 
-1. Further fix `odd_sdlc` so bootstrap closure autonomously exposes and selects
-   the declared product materialization action.
-2. Run internal data-mapper live tests only after that loop is tighter, because
-   data-mapper will otherwise test a broad product surface while the simpler
-   bootstrap-to-product transition still depends on harness steering.
+1. Run or reprice the internal data_mapper parity lane against the completed
+   uplift chain.
+2. Re-enter T-004 for the remaining homeostatic gap-triage behavior if
+   data_mapper exposes semantic mismatch, repricing, or lawful renewal gaps.
 
-The recommended next implementation target is:
+The recommended next proof target is:
 
 ```text
-after Fg_conform_project_authority closes,
-gaps must render declared product pressure,
-start must select the product materialization action from evaluator truth
-without the harness passing --target asset:component_code_surface.
+real data_mapper worksite
+-> observe expected-vs-realized mismatch
+-> classify the lawful gap route
+-> continue/yield/retry/repair/reprice from replay-visible consequence truth
 ```
 
-That is the cleanest proof that the TypeScript line has restored the functional
-spine from `test35`, rather than only proving a manually steered product edge.
+That is the next proof that the TypeScript line can handle the real product
+pressure that made `test35` successful, not just the single-tenant materializer
+feature gap.
+
+The sections below are retained as design history and decomposition. Where they
+say TypeScript lacks a ledger, closure decision, evaluator-owned traversal, or
+requirement transformation-set partition, the 2026-05-10 update and Final Uplift
+Table supersede them.
 
 ## Claim
 
@@ -2496,8 +2502,8 @@ other path can decide what work happens next.
 The second `observe(...)` is intentional. Next-action evaluation must use
 post-evidence runtime/worksite truth, not the stale observation that produced
 the just-executed intent.
-
 ## Final Uplift Table: test35 Python To TS Line
+
 
 This table is the constitutional parity map. The axioms are not a new process;
 they name the computation the successful `test35` Python line already achieved

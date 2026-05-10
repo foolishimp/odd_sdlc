@@ -3,8 +3,8 @@ id: T-133
 title: Create minimum-overhead Rust hello-world live lane
 type: feature
 ticket_category: live_proof_lane
-status: active
-review_status: conformance_live_passed_pending_full_product_live
+status: completed
+review_status: closed_implemented
 goal: typescript-rc-bounded-live-proof
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,7 +19,7 @@ priority: high
 triaged_at: 2026-05-09
 created_at: 2026-05-09
 updated_at: 2026-05-10
-completed_at: null
+completed_at: 2026-05-10
 governance_scope: STDO Method
 dependencies:
   - T-142 records the deferred five-language/full-graph fan-out lane and motivates the smaller baseline.
@@ -151,7 +151,7 @@ design, implementation, tests, or release surfaces.
 - [x] Run generated Rust program with `cargo run --quiet`.
 - [x] Archive overhead metrics and execution proof.
 - [x] Run `npm run test:t133`.
-- [ ] Run `npm run test:t133:rust-live` for closure review after the stricter content and materialization guards.
+- [x] Run `npm run test:t133:rust-live` for closure review after the stricter content and materialization guards.
 
 ## Conformance Evidence - 2026-05-10
 
@@ -186,3 +186,39 @@ T-133 remains active until `npm run test:t133:rust-live` runs without
 `build_tenants/hello_world_rust/Cargo.toml` and
 `build_tenants/hello_world_rust/src/main.rs`, executes
 `cargo run --quiet`, and archives exact `Hello, world!` process evidence.
+
+## Closure Evidence - 2026-05-10
+
+Fresh full product live proof:
+
+```bash
+npm run test:t133:rust-live
+# 3/3 passed
+```
+
+Closure archive:
+
+`build_tenants/typescript/test_env/test_runs/t133_rust_hello_world_bootstrap_sandbox/20260510T082113534Z_pid77797`
+
+Observed result:
+
+- `Fg_conform_project` converged through the installed sandbox command path.
+- `Fg_conform_project_authority` closed with `postflight: passed` and
+  `assurance: close_allowed`.
+- The authority traversal produced downstream materialization pressure and
+  selected `Fg_materialize_declared_product_asset`.
+- Public gaps projected `Fg_materialize_declared_product_asset` as the current
+  materialization edge.
+- The product materialization traversal generated:
+  - `build_tenants/hello_world_rust/Cargo.toml`
+  - `build_tenants/hello_world_rust/src/main.rs`
+- `cargo run --quiet` produced exact stdout `Hello, world!` with exit status
+  `0`.
+- `run_summary.json` records `verdict: passed`, `elapsedMs: 94719`, two
+  expected product files present, runtime file counts, operator-run counts, and
+  the tenant execution proof.
+
+Closure boundary:
+
+- This closes the one-tenant Rust minimum-overhead live proof lane.
+- It does not close T-132, T-142, or T-041.

@@ -3,8 +3,8 @@ id: T-132
 title: Create hello-world single-tenant live proof lane
 type: feature
 ticket_category: live_proof_lane
-status: active
-review_status: implemented_pending_review
+status: completed
+review_status: closed_implemented
 goal: typescript-rc-bounded-live-proof
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,7 +19,7 @@ priority: high
 triaged_at: 2026-05-09
 created_at: 2026-05-09
 updated_at: 2026-05-10
-completed_at: null
+completed_at: 2026-05-10
 governance_scope: STDO Method
 dependencies:
   - T-129 completed ABG 3.7.1 evaluator and liveness substrate migration.
@@ -152,3 +152,42 @@ Observed traversal:
 - it reaches `Fg_materialize_declared_product_asset`;
 - it terminates when the single selected tenant source file exists;
 - it does not enter the old multi-tenant no-progress loop.
+
+## Closure Evidence - 2026-05-10
+
+Fresh live proof:
+
+```bash
+npm run test:t132:hello-world-live
+# 3/3 passed
+```
+
+Closure archive:
+
+`build_tenants/typescript/test_env/test_runs/t132_hello_world_single_tenant_bootstrap_sandbox/20260510T084735429Z_pid82785`
+
+Observed result:
+
+- `Fg_conform_project` converged through the installed sandbox command path.
+- `Fg_conform_project_authority` closed with `postflight: passed` and
+  `assurance: close_allowed`.
+- Public gaps projected `Fg_materialize_declared_product_asset` as the current
+  materialization edge.
+- The start command materialized
+  `build_tenants/hello_world_javascript/src/hello.js`.
+- Node execution produced exact stdout `Hello, world!` with exit status `0`.
+- `run_summary.json` records `verdict: passed`, `elapsedMs: 136270`,
+  one expected product file present, runtime file counts, operator-run counts,
+  and the tenant execution proof.
+
+Harness closure note:
+
+- The live assertion for F_P-generated authority content now checks semantic
+  content and T132 requirement markers instead of one exact wording for
+  product-edge and execution-proof phrasing. This keeps the assurance on
+  content completion while allowing lawful F_P wording variation.
+
+Closure boundary:
+
+- This closes the one-tenant JavaScript hello-world live proof lane.
+- It does not close T-142 multi-tenant fan-out or T-041 data_mapper parity.

@@ -6,8 +6,8 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_odd_sdlc_carriers_and_graph_catalog
 governing_library: odd_sdlc TypeScript graph/operator/projection carriers over ABG 3.7.1 evaluator substrate
-status: active
-review_status: implemented_pending_review
+status: completed
+review_status: closed_implemented
 goal: typescript-rc-bounded-live-proof
 build_tenant: typescript
 owner: odd_sdlc
@@ -18,7 +18,7 @@ priority: critical
 triaged_at: 2026-05-10
 created_at: 2026-05-10
 updated_at: 2026-05-10
-completed_at: null
+completed_at: 2026-05-10
 governance_scope: STDO Method
 dependencies:
   - T-109 ratifies the traversal consequence ledger/decision/evaluator split.
@@ -674,3 +674,38 @@ Live summary:
 
 Review boundary: implemented and live-proved, pending review. This ticket has
 not been moved to completed in this pass.
+
+## Closure Evidence - 2026-05-10
+
+Closure judgment: implemented and closed.
+
+The current implementation satisfies the closure law:
+
+- `derive_requirement_surface` and `Fg_conform_project_authority` can close
+  induction/authority work without treating missing product files as
+  same-edge failure.
+- Requirement rows can be carried as `downstream_transformation_set` pressure.
+- `evaluate_next` selects the published
+  `Fg_materialize_declared_product_asset` graph action from that carried
+  pressure.
+- The installed runner archives the consequence chain:
+  `sdlc_construction_intent.json`, `sdlc_worksite_evidence.json`,
+  `sdlc_edge_fulfillment_ledger.json`,
+  `sdlc_edge_closure_decision.json`, and
+  `sdlc_next_action_projection.json`.
+- Product materialization invokes the bounded worker over the target asset,
+  worksite binding, selected graph action, and requirement transformation set.
+
+Verification run at closure:
+
+```bash
+npm run test:t141
+# 7/7 passed
+
+npm run test:t142
+# 2/2 passed
+```
+
+The T-142 proof is accepted as the controlling autonomous-product proof over
+this implementation. The latest single-tenant live lanes remain supporting
+calibration evidence for JavaScript and Rust product materialization.
