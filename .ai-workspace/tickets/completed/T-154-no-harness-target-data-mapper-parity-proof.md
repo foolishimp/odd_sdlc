@@ -6,7 +6,7 @@ ticket_category: live_proof
 migration_strategy: inside_out_hard_break
 library_usage: prove_current_typescript_traversal_consequence_chain_against_data_mapper_scale_workspace
 governing_library: odd_sdlc TypeScript evaluator-owned runner, traversal consequence, target binding, and data_mapper parity lane
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -160,3 +160,35 @@ Run from `build_tenants/typescript`:
 - Replay cannot reconstruct the decision chain.
 - Product materialization is reached through local installed-operator special
   cases instead of the evaluator/ledger/decision/projection chain.
+
+## Completion Evidence
+
+Closed on 2026-05-11.
+
+Implemented `test_env/tests/test_t154_no_harness_target_data_mapper_parity.test.mjs`
+as a source/specification-only internal data_mapper parity proof. The test uses
+the controlled internal data_mapper fixture, derives 112 imported requirement
+authority observations and 72 unique requirement authority refs, carries those
+requirements as downstream transformation-set pressure, binds
+`component_code_surface` through the published target-obligation surface, and
+selects `Fg_materialize_declared_product_asset` through ABG `evaluate_next`.
+
+The proof constructs and replays both decisive consequence chains:
+
+- source/spec authority consequence:
+  `SdlcConstructionIntent -> SdlcWorksiteEvidence -> SdlcEdgeFulfillmentLedger -> SdlcEdgeClosureDecision -> SdlcNextActionProjection`
+- product materialization consequence:
+  `SdlcConstructionIntent -> SdlcWorksiteEvidence -> SdlcEdgeFulfillmentLedger -> SdlcEdgeClosureDecision -> SdlcNextActionProjection`
+
+The post-product materialization action helper now fails closed unless both
+downstream source/spec pressure and downstream target binding refs are present,
+so pressure-only, binding-only, and harness-target-only paths cannot manufacture
+product materialization selection.
+
+Verification:
+
+- `npm run test:t154`
+- `node --test test_env/tests/test_t141_gtl_transform_boundary.test.mjs`
+- `node --test test_env/tests/test_t142_autonomous_product_materialization.test.mjs`
+- `node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs`
+- `npm run test:semantic` (420 tests passed)

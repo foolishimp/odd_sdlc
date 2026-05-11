@@ -88,11 +88,11 @@ The completed base for this wave is:
 15. T-153 proves live-equivalent non-close dispositions from admitted evidence,
     evaluator-selected post-actions, and replay-visible closure/projection
     truth.
+16. T-154 proves source/specification-only data_mapper parity without an
+    explicit product-materialization harness target.
 
-With T-153 closed, the current executable order remains:
-
-1. T-154: prove source/specification-only data_mapper parity without an explicit
-   product-materialization harness target.
+With T-154 closed, this axiomatic and parity wave has no remaining executable
+tickets in `GOALS.md`.
 
 ## Current Computational Target
 
@@ -165,7 +165,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-151-one-closed-computational-loop-and-runner-evaluator-sovereignty.md`
 - `.ai-workspace/tickets/completed/T-152-data-mapper-scale-transformation-set-partition-proof.md`
 - `.ai-workspace/tickets/completed/T-153-live-non-close-disposition-parity-proof.md`
-- `.ai-workspace/tickets/backlog/T-154-no-harness-target-data-mapper-parity-proof.md`
+- `.ai-workspace/tickets/completed/T-154-no-harness-target-data-mapper-parity-proof.md`
 
 ## Boundary
 

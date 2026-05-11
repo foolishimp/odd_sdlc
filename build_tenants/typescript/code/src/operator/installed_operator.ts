@@ -2266,9 +2266,19 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
   readonly scopeModuleName?: string | null | undefined;
   readonly scopeScheduleRef?: string | null | undefined;
 }): OddSdlcEvaluateNextActionInput | null {
+  const downstreamPressureRefs = uniqueSorted(input.downstreamPressureRefs);
+  const downstreamTargetBindingRefs = uniqueSorted(
+    input.downstreamTargetBindingRefs
+  );
+  if (
+    downstreamPressureRefs.length === 0 ||
+    downstreamTargetBindingRefs.length === 0
+  ) {
+    return null;
+  }
   const materializationAction = deriveSdlcPublishedProductMaterializationAction({
     module: input.module,
-    downstreamTargetBindingRefs: input.downstreamTargetBindingRefs
+    downstreamTargetBindingRefs
   });
   if (
     materializationAction.status !== "eligible" ||
@@ -2326,8 +2336,8 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
         ? []
         : [`selected_schedule_ref:${scopeScheduleRef}`]),
       ...materializationAction.reasonRefs,
-      ...input.downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
-      ...input.downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
+      ...downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
+      ...downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
     ])
   });
 }
