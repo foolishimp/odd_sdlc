@@ -256,28 +256,27 @@ test("T-123 induction and requirement edges remain full-breadth", () => {
   }
 });
 
-test("T-123 post-induction construction edges derive T-122 feature scope", () => {
+test("T-123 unqualified post-induction construction edges default to full wave", () => {
   const manifest = manifestFor("derive_aggregate_domain_model_surface");
   assert.equal(
     manifest.traversalStrategyDecision.selectedStrategy,
-    "steel_thread"
+    "full_breadth"
   );
-  assert.equal(manifest.traversalStrategyDecision.featureScopeRequired, true);
-  assert.equal(manifest.traversalStrategyDecision.featureScopeDerived, true);
-  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.equal(manifest.traversalStrategyDecision.featureScopeRequired, false);
+  assert.equal(manifest.traversalStrategyDecision.featureScopeDerived, false);
+  assert.equal(manifest.featureScope.mode, "full_breadth");
   assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
-    "cdme-compiler"
-  ]);
-  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-compiler",
     "cdme-accounting"
   ]);
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, []);
   assert.equal(
     manifest.traversalIntentPackage.traversalStrategyDecision.selectedStrategy,
-    "steel_thread"
+    "full_breadth"
   );
 });
 
-test("T-123 declared product materialization uses steel-thread scope", () => {
+test("T-123 unqualified declared product materialization uses full-wave scope", () => {
   const manifest = manifestFor(
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
     null,
@@ -287,18 +286,17 @@ test("T-123 declared product materialization uses steel-thread scope", () => {
 
   assert.equal(
     manifest.traversalStrategyDecision.selectedStrategy,
-    "steel_thread"
+    "full_breadth"
   );
-  assert.equal(manifest.traversalStrategyDecision.featureScopeRequired, true);
-  assert.equal(manifest.traversalStrategyDecision.featureScopeDerived, true);
-  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.equal(manifest.traversalStrategyDecision.featureScopeRequired, false);
+  assert.equal(manifest.traversalStrategyDecision.featureScopeDerived, false);
+  assert.equal(manifest.featureScope.mode, "full_breadth");
   assert.deepStrictEqual(manifest.featureScope.includedModuleNames, [
-    "cdme-compiler"
-  ]);
-  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, [
+    "cdme-compiler",
     "cdme-accounting"
   ]);
-  assert.match(
+  assert.deepStrictEqual(manifest.featureScope.deferredModuleNames, []);
+  assert.doesNotMatch(
     promptForHandoff(manifest),
     /Steel thread \/ targeted repair: close only included scope/u
   );
@@ -308,12 +306,12 @@ test("T-123 targeted repair is distinct from steel-thread strategy", () => {
   const manifest = manifestFor("derive_code_surface");
   assert.equal(
     manifest.traversalStrategyDecision.selectedStrategy,
-    "steel_thread"
+    "full_breadth"
   );
-  assert.equal(manifest.featureScope.mode, "steel_thread");
+  assert.equal(manifest.featureScope.mode, "full_breadth");
   assert.equal(
     manifest.traversalIntentPackage.traversalStrategyDecision.selectedStrategy,
-    "steel_thread"
+    "full_breadth"
   );
 
   const executionManifest = manifestFor("derive_test_execution_result_surface");

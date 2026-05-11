@@ -193,7 +193,8 @@ function writeJsonExpectedFiles(workspaceRoot, expectedFiles) {
 
 function materializationManifest(
   workspaceRoot,
-  edgeName = "derive_component_code_surface"
+  edgeName = "derive_component_code_surface",
+  traversalAttemptEnvelope = null
 ) {
   const contract = hookContractByEdgeName(edgeName);
   return deriveWorkerHandoffManifest({
@@ -202,8 +203,36 @@ function materializationManifest(
     edgeName: contract.edgeName,
     vectorIndex: 0,
     contract,
+    traversalAttemptEnvelope,
     runId: "t143-product-authority-targets"
   });
+}
+
+function steelThreadEnvelope(edgeName = FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
+  return {
+    kind: "traversal_attempt_envelope",
+    envelopeRef: "abg://envelope/t143-steel-thread",
+    profileRef: "abg://profile/t143-steel-thread",
+    basisId: "basis:t143-steel-thread",
+    graphFunctionId: "graph:t143-steel-thread",
+    graphCallId: "call:t143-steel-thread",
+    frameId: "frame:t143-steel-thread",
+    vectorIndex: 0,
+    edge: edgeName,
+    strategyDirectiveRef: "strategy://abg/selected/single_vertical_slice",
+    backendProfileRef: "backend:t143-steel-thread",
+    actorInvocationId: "actor:t143-steel-thread",
+    selectedScheduleItemRefs: [
+      `schedule://odd_sdlc/${edgeName}/cdme-compiler`
+    ],
+    orderingConstraintRefs: [],
+    phaseGateRefs: [],
+    requiredProgressArtifactRefs: [],
+    gapPressureRefs: [],
+    affectRefs: [],
+    retryBudgetRemaining: 1,
+    mustExitAfterBoundedAttempt: true
+  };
 }
 
 test("T-143 installed loop circuit breakers distinguish retry and yield", () => {
@@ -332,7 +361,11 @@ test("T-143 derives product targets from conformed module structure", () => {
 
 test("T-143 steel-thread materialization scopes product targets to included module", () => {
   const workspace = workspaceWithModuleTargetProductAuthority();
-  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const manifest = materializationManifest(
+    workspace,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    steelThreadEnvelope()
+  );
   const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
   const invocationPackage = constructWorkerInvocationPackage({ manifest });
   const prompt = promptForHandoff(manifest);
@@ -388,7 +421,11 @@ test("T-143 steel-thread materialization scopes product targets to included modu
 
 test("T-143 handoff preparation does not create file targets as directories", () => {
   const workspace = workspaceWithModuleTargetProductAuthority();
-  const manifest = materializationManifest(workspace, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  const manifest = materializationManifest(
+    workspace,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    steelThreadEnvelope()
+  );
 
   writeHandoffFiles(manifest);
 

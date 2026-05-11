@@ -27,16 +27,20 @@ affected_boundary:
   - build_tenants/typescript/code/src/assurance/semantic_convergence.ts
   - build_tenants/typescript/code/src/operator/handoff.ts
   - build_tenants/typescript/code/src/materialization/materialization.ts
+  - build_tenants/typescript/code/src/operator/installed_operator.ts
+  - build_tenants/typescript/code/src/shared/traversal_strategy_plan.ts
+  - build_tenants/typescript/test_env/live/test_t132_hello_world_single_tenant_live_build.test.mjs
   - build_tenants/typescript/test_env/tests/
 intake_source: 2026-05-11 F_D-overreach review against PRODUCT.md Technology Capability Asset law and current T-143 product-authority correction.
-target_truth: Core SDLC supplies lineage, target binding, allowed roots, worker handoff context, postflight mechanics, and admitted evidence routing. F_P and declared tenant/capability validators own constructive repair and ecosystem-specific grammar. F_D blocks closure/admission when evidence does not satisfy declared obligations; it blocks dispatch only for hard-stop prerequisites.
+target_truth: Core SDLC supplies lineage, target binding, allowed roots, worker handoff context, postflight mechanics, and admitted evidence routing. F_D affirms framework/system validity from deterministic facts. F_P and declared tenant/capability validators own constructive repair and product-semantics judgment. F_D blocks invalid framework state and closure/admission when admitted evidence does not satisfy declared obligations; it must not provide blocking assurance over F_P semantic construction or suppress continuation because of naming, heading, template, or ecosystem-style conventions. F_D blocks dispatch only for hard-stop prerequisites.
 superseded_truth: Core assurance/postflight code classifies repairable missing obligation assessments, untyped repair evidence, ADR field shape, build-tool files, and test discovery patterns through hard-coded framework logic that can become an operator_blocked hard stop or hidden ecosystem grammar.
-closure_law: This ticket closes when repairable obligation/reporting gaps re-enter via retry/repair/reprice dispositions instead of operator_blocked, and stack-specific file/test/build grammar is supplied by declared tenant/capability policy or worker evidence rather than hard-coded core runtime lists, without weakening deterministic admission mechanics.
+closure_law: This ticket closes when repairable obligation/reporting gaps re-enter via retry/repair/reprice dispositions instead of operator_blocked, stack-specific file/test/build grammar is supplied by declared tenant/capability policy or worker evidence rather than hard-coded core runtime lists, and noncanonical but parseable F_P authority output preserves lineage/downstream pressure instead of becoming an F_D block or no-action continuation, without weakening deterministic admission mechanics.
 non_closure_conditions:
   - Missing or repairable worker obligation assessment defaults to operator_blocked when a same-edge retry or repair-worker-output basis exists.
   - Semantic contradiction advertises design_reframe but returns a block verdict.
   - Component-depth repair gaps are stored as open gaps while carrying operator_blocked re-entry points.
   - Core SDLC requires ADR field strings, build tool names, or test path/extension patterns as hidden ecosystem law instead of declared capability policy or worker evidence.
+  - Core SDLC requires canonical requirement ID prefixes, heading shapes, or ticket-local marker strings before preserving requirement lineage, downstream transformation pressure, or product-materialization continuation.
   - Existing T-066/T-115/T-143 product materialization and repair-flow regressions lose deterministic closure/admission checks.
 ---
 
@@ -60,6 +64,51 @@ Current examples:
   attribution, and repair-schedule triage gaps.
 - `operator/handoff.ts` hard-codes ecosystem grammar for build config files,
   likely source/test paths, SBT discoverability, and ADR field strings.
+- The 2026-05-11 T-132 Claude live run generated semantically usable
+  `specification/PRODUCT.md` and `specification/requirements/01-product-contract.md`
+  from `Fg_conform_project_authority`, but used local requirement headings
+  `R-01` ... `R-07` instead of `REQ-T132-*`. The test failed on the marker
+  convention, and the runtime failed to carry downstream product-materialization
+  pressure because requirement extraction only recognizes `RF-*` / `REQ-*`
+  markers. This converted naming style into traversal authority.
+
+## Boundary Rule
+
+F_D provides system validity, not blocking product semantics.
+
+F_D may affirm deterministic framework facts:
+
+- carrier shape is valid;
+- refs resolve;
+- paths stay inside allowed roots;
+- files exist or do not exist;
+- digests match;
+- event, ledger, and predecessor replay are complete;
+- declared deterministic validators returned pass/fail;
+- required evidence for closure is present.
+
+F_D may block only when the framework cannot lawfully proceed:
+
+- unsafe path or write-root escape;
+- malformed carrier;
+- missing required authority surface with no constructive recovery basis;
+- invalid or missing target binding;
+- broken replay chain;
+- unpublished action or no lawful F_P action;
+- runtime/process failure prevents evidence admission.
+
+F_D must not block traversal, suppress downstream pressure, or erase lineage
+because it cannot provide blocking assurance over F_P semantic construction.
+For F_P output, F_D may publish typed pressure such as `unfulfilled`,
+`partial`, `noncanonical`, `insufficient_evidence`, `needs_repair`,
+`needs_retry`, or `needs_reprice`. Those are traversal facts, not hard
+operator blocks.
+
+If F_P emits noncanonical but parseable authority, such as `R-01` requirement
+headings instead of `REQ-*` IDs, the framework must preserve lineage using a
+deterministic fallback ref derived from source path, heading, and/or content
+digest. Canonical ID hygiene can be a visible finding, but it must not sever the
+transform chain.
 
 ## Required Fix
 
@@ -85,6 +134,20 @@ Current examples:
    - path containment, existence, digest, byte count, output-root containment,
      and report schema admission stay core F_D checks.
 
+5. Preserve noncanonical F_P authority lineage:
+   - replace ticket/test-specific requirement marker gates with content and
+     authority-contract assertions;
+   - extend requirement extraction to preserve parseable requirement sections
+     even when IDs are local (`R-01`, numbered headings, or other project-local
+     forms);
+   - mint deterministic fallback requirement refs from source path + heading or
+     content digest when no canonical `REQ-*` marker exists;
+   - derive downstream product-materialization pressure from conformed authority
+     content (`PRODUCT.md` declared product files, requirements, lineage, and
+     target binding), not from canonical marker spelling alone;
+   - emit nonblocking hygiene findings for noncanonical requirement IDs instead
+     of no-action continuation.
+
 ## Evaluation Criteria
 
 - Focused tests prove missing obligation assessment re-enters via retry/repair
@@ -97,6 +160,14 @@ Current examples:
   become mixed open_gap/operator_blocked states.
 - Product materialization still rejects unsafe paths, missing files, digest
   mismatches, and unreported materialization.
+- T-132 live or live-equivalent proof accepts semantically complete requirements
+  with local IDs such as `R-01` and still carries downstream pressure into
+  `Fg_materialize_declared_product_asset`.
+- A negative test proves canonical marker absence alone does not yield
+  `choosesNextTraversal=false` when `PRODUCT.md` declares product files and
+  requirements describe the transformation.
+- A positive hygiene assertion records noncanonical requirement IDs as
+  nonblocking observability, not closure or dispatch failure.
 - Existing `npm run test:t066`, `npm run test:t115`, `npm run test:t143`, and
   relevant assurance ledger tests pass after repricing expected dispositions.
 
@@ -135,3 +206,32 @@ Remaining T-144 scope:
 - Move ADR field grammar and ecosystem build/test discovery patterns behind
   declared tenant/capability surfaces without removing deterministic path,
   digest, existence, and containment checks.
+- Repair the T-132/T-143 requirement-lineage extraction boundary so
+  noncanonical but parseable F_P authority output preserves downstream
+  transformation pressure instead of becoming a no-action projection.
+
+## Default Full-Wave Addendum - 2026-05-11
+
+The closest currently evidenced ODD_SDLC behavior is full-wave transformation.
+Steel-thread traversal is the intended control/volume mode, but live evidence
+has not yet proved it across conformance, downstream pressure preservation,
+product materialization, bounded retry/yield, and lineage replay.
+
+Until that proof exists, unqualified `odd_sdlc` operation must default to
+full-wave/full-breadth traversal. Steel-thread remains lawful only when selected
+by an explicit ABG strategy directive, explicit lane, or retry/repair context.
+It must not be the hidden fallback for ordinary graph-function edges.
+
+Implementation slice:
+
+- `shared/traversal_strategy_plan.ts` now maps post-induction construction,
+  design, code, and declared product materialization edges to `full_breadth`
+  in the default plan.
+- The plan ref is now `strategy-plan://odd_sdlc/typescript/default-full-wave`.
+- T-123 focused tests now assert unqualified construction/materialization edges
+  are full-wave, while explicit ABG `steel_thread` directives still select
+  steel-thread scope.
+
+Validation:
+
+- `npm run test:t123` passed 11/11.

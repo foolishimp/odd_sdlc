@@ -49,10 +49,11 @@ temporary focus into accidental constitutional law.
   construction so generic builder prompts preserve satisfied structure and
   repair only unmet requirement deltas unless deterministic truth lawfully
   widens scope
-- use steel-thread implementation as the default delivery strategy for new
-  graph mechanics: prove one typed vertical path through carrier, admission,
-  projection/evaluator, graph wiring, positive fixture, and negative fixture
-  before widening to full data-mapper live proof
+- use full-wave transformation as the default delivery strategy for unqualified
+  `odd_sdlc` operation until steel-thread traversal has live proof across
+  conformance, downstream pressure, product materialization, bounded retry/yield,
+  and lineage replay; steel-thread remains an explicit qualified lane, not the
+  default live-parity path
 - dogfood the current ticket execution discipline into prompt-bearing surfaces
   so constructive edge traversal and gap-analysis prompts consume published
   execution contracts and gap dossiers rather than ad hoc section assembly
