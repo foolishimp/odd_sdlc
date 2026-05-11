@@ -97,6 +97,7 @@
     "test:t142": "npm run build:semantic && node --test test_env/tests/test_t142_autonomous_product_materialization.test.mjs",
     "test:t143": "npm run build:semantic && node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs",
     "test:t145": "npm run build:semantic && node --test test_env/tests/test_t145_replay_visible_closure_authority.test.mjs",
+    "test:t151": "npm run build:semantic && node --test test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox npm run live:data-mapper-sandbox",
     "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",

@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: consolidate_existing_runner_action_paths_onto_traversal_consequence_chain
 governing_library: odd_sdlc TypeScript installed operator, ABG evaluator substrate, traversal consequence carriers
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 2
 execution_order_reason: Makes the installed runner consume the single consequence truth surface after rival closure authority is deleted.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old_and_replaces_local_action_authority
 authority_ruling:
@@ -212,3 +213,32 @@ Run from `build_tenants/typescript`:
 - A test can pass while `SdlcEdgeClosureDecision` is absent or contradicted.
 - Public gaps and runner action selection can disagree on the governing
   evaluator truth.
+
+## Closure Evidence
+
+Implementation:
+
+- Changed installed-runner `first_traversal` handling so it returns after the
+  first admitted traversal consequence, including non-close retry/repair
+  consequences, instead of continuing only when the first status is
+  `worker_invoked`.
+- Removed unused dispatch-state `nextLawfulAction` branch strings so installed
+  F_P outcomes derive the displayed next lawful action from
+  `SdlcNextActionProjection.selectedActionRef` or the closure disposition.
+- Added `test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs` and
+  `npm run test:t151`. The focused test executes a real F_P attempt through
+  postflight/evidence admission, observes the retry closure decision and
+  next-action projection, and proves `first_traversal` does not refresh into a
+  second runner attempt.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run test:t151` passed.
+- `npm run test:t135` passed.
+- `npm run test:t136` passed.
+- `npm run test:t138` passed.
+- `npm run test:t139` passed.
+- `npm run test:t140` passed.
+- `npm run test:t142` passed.
+- `npm run lint:semantic` passed.
+- `npm run test:semantic` passed: 392 tests.

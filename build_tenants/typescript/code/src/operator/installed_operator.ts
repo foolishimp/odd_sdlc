@@ -1847,7 +1847,6 @@ interface SdlcAbgOwnedFpDispatchState {
   readonly hookOutcome: SdlcHookTurnOutcome | null;
   readonly blockingReason: string | null;
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
-  readonly nextLawfulAction: string | null;
   readonly currentEdge: string | null;
 }
 
@@ -3300,7 +3299,6 @@ export async function executeInstalledOperatorStart(input: {
           hookOutcome: null,
           blockingReason: failurePostflight.blockingReasons.join(","),
           blockingReasonCarriers: failurePostflight.blockingReasonCarriers,
-          nextLawfulAction: null,
           currentEdge: pluginInput.edge
         };
         return constructFpDispatchOutcome({
@@ -3376,7 +3374,6 @@ export async function executeInstalledOperatorStart(input: {
             hookOutcome: null,
             blockingReason: rejectionPostflight.blockingReasons.join(","),
             blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
-            nextLawfulAction: null,
             currentEdge: pluginInput.edge
           };
           return constructFpDispatchOutcome({
@@ -3441,7 +3438,6 @@ export async function executeInstalledOperatorStart(input: {
           hookOutcome: null,
           blockingReason: postflight.blockingReasons.join(","),
           blockingReasonCarriers: postflight.blockingReasonCarriers,
-          nextLawfulAction: null,
           currentEdge: pluginInput.edge
         };
         return constructFpDispatchOutcome({
@@ -3503,12 +3499,6 @@ export async function executeInstalledOperatorStart(input: {
           blockingReason: assuranceGate.blockingPostflight.blockingReasons.join(","),
           blockingReasonCarriers:
             assuranceGate.blockingPostflight.blockingReasonCarriers,
-          nextLawfulAction:
-            assuranceGate.satisfaction.status === "reprice_required"
-              ? "reprice_requirement_or_design"
-              : assuranceGate.satisfaction.status === "fp_escalation"
-                ? "escalate_to_fp"
-              : null,
           currentEdge: pluginInput.edge
         };
         if (assuranceGate.satisfaction.status === "reprice_required") {
@@ -3606,7 +3596,6 @@ export async function executeInstalledOperatorStart(input: {
           hookOutcome,
           blockingReason: hookPostflight.blockingReasons.join(","),
           blockingReasonCarriers: hookPostflight.blockingReasonCarriers,
-          nextLawfulAction: null,
           currentEdge: pluginInput.edge
         };
         return constructFpDispatchOutcome({
@@ -3637,7 +3626,6 @@ export async function executeInstalledOperatorStart(input: {
         hookOutcome,
         blockingReason: null,
         blockingReasonCarriers: Object.freeze([]),
-        nextLawfulAction: null,
         currentEdge: null
       };
       return constructFpDispatchOutcome({
@@ -3854,7 +3842,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     );
     if (
       input.requestedUntil === "first_traversal" &&
-      latest.status === "worker_invoked"
+      latest.traversalConsequence !== null
     ) {
       break;
     }
