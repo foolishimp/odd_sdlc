@@ -6,7 +6,7 @@ ticket_category: live_proof
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_yield_retry_repair_reentry_reprice_block_tests_to_live_or_live_equivalent_lanes
 governing_library: odd_sdlc TypeScript closure decision, liveness observer, replay, and evaluator-owned runner surfaces
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -139,3 +139,31 @@ Run from `build_tenants/typescript`:
 - Timeout, process silence, or worker prose is enough to classify semantic
   failure.
 - A local loop keeps the edge alive without a replay-visible yield disposition.
+
+## Completion Evidence
+
+Closed on 2026-05-11.
+
+Implemented `test_env/tests/test_t153_non_close_disposition_parity.test.mjs`
+as a live-equivalent consequence-chain proof over admitted worksite evidence,
+`SdlcEdgeFulfillmentLedger`, `SdlcEdgeClosureDecision`,
+`SdlcNextActionProjection`, ABG `evaluate_next` priority output, and traversal
+consequence replay.
+
+The proof covers `yield`, `retry`, `repair`, `re-enter`, `reprice`, `block`,
+and liveness-only negative handling. Retry, repair, and re-entry select their
+next action from evaluator output; yield, reprice, and block do not dispatch a
+new action. Worker prose and liveness alone do not convert to repair or yield.
+
+The installed post-action projection now preserves the ledger target binding
+refs while still taking selected action truth from the evaluator projection, so
+post-action non-close consequences remain replayable against the original
+edge-fulfillment ledger.
+
+Verification:
+
+- `npm run test:t153`
+- `node --test test_env/tests/test_t136_yield_closure_disposition.test.mjs`
+- `node --test test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs`
+- `node --test test_env/tests/test_t138_traversal_consequence_replayability.test.mjs`
+- `npm run test:semantic` (418 tests passed)

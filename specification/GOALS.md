@@ -85,13 +85,13 @@ The completed base for this wave is:
     capability and component-depth evidence gaps.
 14. T-152 proves data_mapper-scale downstream transformation-set partition over
     multiple requirements and product evidence families.
+15. T-153 proves live-equivalent non-close dispositions from admitted evidence,
+    evaluator-selected post-actions, and replay-visible closure/projection
+    truth.
 
-With T-152 closed, the current executable order remains axiomatic first, proof
-second:
+With T-153 closed, the current executable order remains:
 
-1. T-153: prove live or live-equivalent non-close dispositions from admitted
-   evidence and replay-visible closure/evaluator truth.
-2. T-154: prove source/specification-only data_mapper parity without an explicit
+1. T-154: prove source/specification-only data_mapper parity without an explicit
    product-materialization harness target.
 
 ## Current Computational Target
@@ -164,7 +164,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-150-visible-defaults-and-published-catalog-lookup-discipline.md`
 - `.ai-workspace/tickets/completed/T-151-one-closed-computational-loop-and-runner-evaluator-sovereignty.md`
 - `.ai-workspace/tickets/completed/T-152-data-mapper-scale-transformation-set-partition-proof.md`
-- `.ai-workspace/tickets/backlog/T-153-live-non-close-disposition-parity-proof.md`
+- `.ai-workspace/tickets/completed/T-153-live-non-close-disposition-parity-proof.md`
 - `.ai-workspace/tickets/backlog/T-154-no-harness-target-data-mapper-parity-proof.md`
 
 ## Boundary

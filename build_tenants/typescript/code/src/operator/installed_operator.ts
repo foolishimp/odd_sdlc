@@ -2646,10 +2646,7 @@ function deriveInstalledTraversalConsequence(input: {
             intentEventRefs: evaluator.intentEventRefs,
             productAssetModelRef: evaluator.productAssetModelRef,
             gapPressureRefs: evaluator.gapPressureRefs,
-            targetBindingRefs:
-              evaluator.targetBindingRefs.length === 0
-                ? ledger.targetBindingRefs
-                : evaluator.targetBindingRefs,
+            targetBindingRefs: ledger.targetBindingRefs,
             closureDecision,
             observationRef: evaluator.observation.observationId,
             policyRefs: Object.freeze([
