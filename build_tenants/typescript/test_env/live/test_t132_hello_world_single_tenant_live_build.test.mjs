@@ -22,6 +22,10 @@ import {
   ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import {
+  evaluateHelloWorldAuthorityConformance,
+  evaluateHelloWorldProductExecution
+} from "./hello_world_live_validation.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -78,22 +82,6 @@ function assertUnique(values, label) {
 function assertNonEmptyString(value, label) {
   assert.equal(typeof value, "string", `${label} must be a string`);
   assert.notEqual(value.trim(), "", `${label} must be non-empty`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function assertTextContains(text, value, label) {
-  assert.match(text, new RegExp(escapeRegExp(value), "u"), `${label} must contain ${value}`);
-}
-
-function assertTextContainsOneOf(text, values, label) {
-  assert.equal(
-    values.some((value) => new RegExp(escapeRegExp(value), "u").test(text)),
-    true,
-    `${label} must contain one of ${values.join(", ")}`
-  );
 }
 
 function assertScenarioContract(contract) {
@@ -290,67 +278,6 @@ function assertConformedProjectWorkspace(workspace, contract) {
     requirementFiles.length > 0,
     "F_P authority conformance must induce at least one requirement surface"
   );
-  const requirementText = requirementFiles
-    .map((file) => readFileSync(path.join(requirementDir, file), "utf8"))
-    .join("\n");
-  const intentText = readFileSync(path.join(workspace, "specification/INTENT.md"), "utf8");
-  const productText = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
-  const authorityText = [intentText, productText, requirementText].join("\n");
-
-  for (const anchor of ["bootstrap document", "JavaScript", "odd_sdlc"]) {
-    assertTextContains(intentText, anchor, "INTENT.md");
-  }
-  assertTextContainsOneOf(
-    authorityText,
-    [
-      "product edge",
-      "downstream traversal",
-      "downstream product traversal",
-      "product materialization",
-      "later materialize",
-      "materialize one executable product file"
-    ],
-    "conformed authority surfaces"
-  );
-  assertTextContainsOneOf(
-    authorityText,
-    [
-      "process execution",
-      "execution proof",
-      "execution evidence",
-      "execution output evidence",
-      "running the generated program",
-      "executing the generated program"
-    ],
-    "conformed authority surfaces"
-  );
-  assertTextContains(productText, contract.product.name, "PRODUCT.md");
-  assertTextContains(productText, contract.tenant.tenantName, "PRODUCT.md");
-  assertTextContains(productText, contract.tenant.sourceFile, "PRODUCT.md");
-  assertTextContains(productText, contract.expectedOutput, "PRODUCT.md");
-
-  const generatedRequirementHeadings = new Set(
-    [
-      ...requirementText.matchAll(
-        /^\s{0,3}#{1,6}\s+(?:REQ-[A-Z0-9-]+|RF-[A-Z0-9-]+|R-\d{1,4}|\d{1,3}[.)])\b[^\n]*$/gimu
-      )
-    ].map((match) => match[0].trim())
-  );
-  assert.ok(
-    generatedRequirementHeadings.size >= 4,
-    `generated requirements must contain at least four parseable requirement authority headings: ${[
-      ...generatedRequirementHeadings
-    ].join(", ")}`
-  );
-  for (const anchor of [
-    contract.tenant.tenantName,
-    contract.tenant.sourceFile,
-    contract.expectedOutput,
-    `${contract.tenant.run.command} ${contract.tenant.run.args.join(" ")}`
-  ]) {
-    assertTextContains(requirementText, anchor, "generated requirements");
-  }
-  assertTextContains(authorityText, FG_CONFORM_PROJECT_AUTHORITY, "conformed authority surfaces");
 }
 
 function installedCommandEnv() {
@@ -661,6 +588,15 @@ test(
       "Fg_conform_project_authority must be a published bootstrap target"
     );
     assertConformedProjectWorkspace(workspace, contract);
+    const authorityValidation = evaluateHelloWorldAuthorityConformance({
+      scenarioId: contract.scenarioId,
+      workspace,
+      contract,
+      conformanceGraphFunction: FG_CONFORM_PROJECT_AUTHORITY,
+      languageAnchors: ["JavaScript"]
+    });
+    writeJson(path.join(archiveRoot, "authority_conformance_live_validation.json"), authorityValidation);
+    assert.equal(authorityValidation.verdict, "passed", JSON.stringify(authorityValidation, null, 2));
     if (CONFORMANCE_ONLY) {
       writeJson(path.join(archiveRoot, "steps.json"), steps);
       writeJson(path.join(archiveRoot, "run_summary.json"), {
@@ -671,7 +607,8 @@ test(
         installCommandTimeoutMs: INSTALL_COMMAND_TIMEOUT_MS,
         installedCommandTimeoutMs:
           INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
-        steps
+        steps,
+        authorityValidation
       });
       return;
     }
@@ -767,6 +704,22 @@ test(
     );
 
     const tenantProof = executeTenant(workspace, archiveRoot, contract);
+    const productExecutionValidation = evaluateHelloWorldProductExecution({
+      scenarioId: contract.scenarioId,
+      workspace,
+      contract,
+      terminalState,
+      tenantProof
+    });
+    writeJson(
+      path.join(archiveRoot, "product_execution_live_validation.json"),
+      productExecutionValidation
+    );
+    assert.equal(
+      productExecutionValidation.verdict,
+      "passed",
+      JSON.stringify(productExecutionValidation, null, 2)
+    );
     writeJson(path.join(archiveRoot, "hello_world_execution_proof.json"), {
       kind: "t132_hello_world_single_tenant_execution_proof",
       expectedOutput: contract.expectedOutput,
@@ -782,7 +735,9 @@ test(
       installedCommandTimeoutMs: INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
       steps,
       generatedProductState: terminalState,
-      tenantProof
+      authorityValidation,
+      tenantProof,
+      productExecutionValidation
     });
   }
 );

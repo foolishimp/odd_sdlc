@@ -82,6 +82,26 @@ function workspaceWithMarkerOnlyRequirement() {
   return root;
 }
 
+function workspaceWithLocalHeadingRequirement() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t091-local-heading-"));
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  mkdirSync(path.join(root, "specification"), { recursive: true });
+  writeConstraints(root);
+  writeFileSync(path.join(root, "specification/INTENT.md"), "# Intent\n", "utf8");
+  writeFileSync(
+    path.join(root, "specification/requirements/10-product-identity.md"),
+    [
+      "# Product Identity Requirements",
+      "",
+      "## R-10.1 Project Identity",
+      "",
+      "- `project_slug` MUST equal `t091_payload`."
+    ].join("\n"),
+    "utf8"
+  );
+  return root;
+}
+
 function manifestFor(workspaceRoot) {
   const contract = hookContractByEdgeName("derive_intent_surface");
   return deriveWorkerHandoffManifest({
@@ -168,6 +188,23 @@ test("T-091 rejects marker-only requirement pressure before worker handoff is ad
     () => writeHandoffFiles(manifest),
     /traversal obligation payload insufficient: requirement:REQ-T091-999/u
   );
+});
+
+test("T-091 derives concrete payload from local requirement headings after blank lines", () => {
+  const manifest = manifestFor(workspaceWithLocalHeadingRequirement());
+  const obligation = manifest.traversalObligationContext.obligations.find(
+    (item) =>
+      item.obligationId.includes("/R-010/1-project-identity/")
+  );
+
+  assert(obligation);
+  assert.equal(obligation.payload.status, "concrete");
+  assert(
+    obligation.payload.sourceSnippets.some((snippet) =>
+      snippet.includes("R-10.1 Project Identity")
+    )
+  );
+  assert.doesNotThrow(() => writeHandoffFiles(manifest));
 });
 
 test("T-091 postflight rejects fulfilled requirement without output coverage evidence", () => {

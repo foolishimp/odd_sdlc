@@ -24,6 +24,10 @@ import {
   ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import {
+  evaluateHelloWorldAuthorityConformance,
+  evaluateHelloWorldProductExecution
+} from "./hello_world_live_validation.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -87,14 +91,6 @@ function escapeRegExp(value) {
 
 function assertTextContains(text, value, label) {
   assert.match(text, new RegExp(escapeRegExp(value), "u"), `${label} must contain ${value}`);
-}
-
-function assertTextContainsOneOf(text, values, label) {
-  assert.equal(
-    values.some((value) => new RegExp(escapeRegExp(value), "u").test(text)),
-    true,
-    `${label} must contain one of ${values.join(", ")}`
-  );
 }
 
 function assertScenarioContract(contract) {
@@ -299,37 +295,6 @@ function assertConformedProjectWorkspace(workspace, contract) {
     requirementFiles.length > 0,
     "F_P authority conformance must induce at least one requirement surface"
   );
-  const requirementText = requirementFiles
-    .map((file) => readFileSync(path.join(requirementDir, file), "utf8"))
-    .join("\n");
-  const intentText = readFileSync(path.join(workspace, "specification/INTENT.md"), "utf8");
-  const productText = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
-  const authorityText = [intentText, productText, requirementText].join("\n");
-
-  for (const anchor of ["Rust", "bootstrap document", "odd_sdlc"]) {
-    assertTextContains(intentText, anchor, "INTENT.md");
-  }
-  assertTextContainsOneOf(intentText, ["process execution", "execution proof"], "INTENT.md");
-  assertTextContains(productText, contract.product.name, "PRODUCT.md");
-  assertTextContains(productText, contract.tenant.tenantName, "PRODUCT.md");
-  assertTextContains(productText, contract.tenant.manifestFile, "PRODUCT.md");
-  assertTextContains(productText, contract.tenant.sourceFile, "PRODUCT.md");
-  assertTextContains(productText, contract.expectedOutput, "PRODUCT.md");
-
-  for (const obligationId of contract.expectedRequirementIds) {
-    assert.match(requirementText, new RegExp(`\\b${escapeRegExp(obligationId)}\\b`, "u"));
-  }
-  for (const anchor of [
-    contract.tenant.tenantName,
-    contract.tenant.manifestFile,
-    contract.tenant.sourceFile,
-    contract.expectedOutput,
-    contract.tenant.run.args.join(" "),
-    contract.tenant.run.cwd
-  ]) {
-    assertTextContains(requirementText, anchor, "generated requirements");
-  }
-  assertTextContains(authorityText, FG_CONFORM_PROJECT_AUTHORITY, "conformed authority surfaces");
 }
 
 function assertNoPrebuiltRustImplementation(workspace, contract) {
@@ -722,6 +687,16 @@ test(
       "Fg_conform_project_authority must be a published bootstrap target"
     );
     assertConformedProjectWorkspace(workspace, contract);
+    const authorityValidation = evaluateHelloWorldAuthorityConformance({
+      scenarioId: contract.scenarioId,
+      workspace,
+      contract,
+      conformanceGraphFunction: FG_CONFORM_PROJECT_AUTHORITY,
+      languageAnchors: ["Rust"],
+      expectedRequirementIds: contract.expectedRequirementIds
+    });
+    writeJson(path.join(archiveRoot, "authority_conformance_live_validation.json"), authorityValidation);
+    assert.equal(authorityValidation.verdict, "passed", JSON.stringify(authorityValidation, null, 2));
     assertTextContains(
       bootstrapSummary.nextLawfulAction ?? "",
       FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
@@ -738,7 +713,8 @@ test(
         installedCommandTimeoutMs:
           INSTALLED_COMMAND_TIMEOUT_MS > 0 ? INSTALLED_COMMAND_TIMEOUT_MS : null,
         steps,
-        generatedProductState: terminalState
+        generatedProductState: terminalState,
+        authorityValidation
       });
       return;
     }
@@ -861,6 +837,22 @@ test(
     );
 
     const tenantProof = executeRustTenant(workspace, archiveRoot, contract);
+    const productExecutionValidation = evaluateHelloWorldProductExecution({
+      scenarioId: contract.scenarioId,
+      workspace,
+      contract,
+      terminalState,
+      tenantProof
+    });
+    writeJson(
+      path.join(archiveRoot, "product_execution_live_validation.json"),
+      productExecutionValidation
+    );
+    assert.equal(
+      productExecutionValidation.verdict,
+      "passed",
+      JSON.stringify(productExecutionValidation, null, 2)
+    );
     writeJson(path.join(archiveRoot, "rust_hello_world_execution_proof.json"), {
       kind: "t133_rust_hello_world_execution_proof",
       expectedOutput: contract.expectedOutput,
@@ -878,7 +870,9 @@ test(
       autonomousProductMaterializationConsequenceCount:
         productMaterializationConsequences.length,
       generatedProductState: terminalState,
-      tenantProof
+      authorityValidation,
+      tenantProof,
+      productExecutionValidation
     });
   }
 );

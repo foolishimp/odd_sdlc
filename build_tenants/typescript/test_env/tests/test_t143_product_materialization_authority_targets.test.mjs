@@ -187,6 +187,53 @@ function workspaceWithModuleTargetProductAuthority() {
   return root;
 }
 
+function workspaceWithRustExpectedFilesAuthority() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-rust-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: hello_world_rust_t143",
+      "active_tenant: hello_world_rust",
+      "build_tenants:",
+      "  hello_world_rust:",
+      "    output_dir: build_tenants/hello_world_rust",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Active Tenant",
+      "",
+      "- **Tenant**: hello_world_rust",
+      "- **Language**: Rust",
+      "- **Build Tool**: cargo",
+      "- **Output Root**: `build_tenants/hello_world_rust`",
+      "",
+      "## Expected Files",
+      "",
+      "- `build_tenants/hello_world_rust/Cargo.toml` (role: `build_config`)",
+      "- `build_tenants/hello_world_rust/src/main.rs` (role: `source`)",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/01-product-identity.md"),
+    "# Product Identity\n\nREQ-RUST-HELLO-WORLD-001: Print Hello, world! from the Rust product.\n",
+    "utf8"
+  );
+  return root;
+}
+
 function writeJsonExpectedFiles(workspaceRoot, expectedFiles) {
   writeFileSync(
     path.join(workspaceRoot, ".ai-workspace/context/expected_files.json"),
@@ -269,6 +316,24 @@ function writeMaterializedSourceFile(
   return {
     kind: "sdlc_materialized_product_file",
     role: "source",
+    relativePath,
+    absolutePath,
+    digest: sha256Text(artifact),
+    byteCount: Buffer.byteLength(artifact, "utf8")
+  };
+}
+
+function writeMaterializedProductFile(manifest, relativePath, content, role) {
+  const artifact = `${content.replace(/\n?$/u, "\n")}`;
+  const absolutePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    relativePath
+  );
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, artifact, "utf8");
+  return {
+    kind: "sdlc_materialized_product_file",
+    role,
     relativePath,
     absolutePath,
     digest: sha256Text(artifact),
@@ -452,6 +517,36 @@ test("T-143 derives product targets from conformed module structure", () => {
       (target) => target.path === "build_tenants/scala_spark/cdme-compiler/src"
     )?.targetKind,
     "directory"
+  );
+});
+
+test("T-143 derives Rust targets from Expected Files shorthand authority", () => {
+  const manifest = materializationManifest(
+    workspaceWithRustExpectedFilesAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/hello_world_rust/Cargo.toml",
+    "build_tenants/hello_world_rust/src/main.rs"
+  ]);
+  assert.deepEqual(
+    declaredProductFileTargets(manifest),
+    reconciliation.productAuthorityTargets
+  );
+  assert.equal(
+    reconciliation.productAuthorityTargetContracts.find(
+      (target) => target.path === "build_tenants/hello_world_rust/Cargo.toml"
+    )?.requiredRole,
+    "build_config"
+  );
+  assert.equal(
+    reconciliation.productAuthorityTargetContracts.find(
+      (target) => target.path === "build_tenants/hello_world_rust/src/main.rs"
+    )?.requiredRole,
+    "source"
   );
 });
 
@@ -753,4 +848,91 @@ test("T-143 executable product materialization closes with successful execution 
 
   assert.equal(report.executionEvidence?.status, "succeeded");
   assert.equal(postflight.status, "passed");
+});
+
+test("T-143 Rust product materialization admits runner-prefixed execution evidence", () => {
+  const workspace = workspaceWithRustExpectedFilesAuthority();
+  writeJsonExpectedFiles(workspace, [
+    "build_tenants/hello_world_rust/Cargo.toml",
+    "build_tenants/hello_world_rust/src/main.rs"
+  ]);
+  const manifest = materializationManifest(
+    workspace,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const output = writeOutputSurface(manifest);
+  const materializedFiles = [
+    writeMaterializedProductFile(
+      manifest,
+      "Cargo.toml",
+      [
+        "[package]",
+        "name = \"hello_world_rust\"",
+        "version = \"0.1.0\"",
+        "edition = \"2021\""
+      ].join("\n"),
+      "build_config"
+    ),
+    writeMaterializedProductFile(
+      manifest,
+      "src/main.rs",
+      "fn main() {\n    println!(\"Hello, world!\");\n}",
+      "source"
+    )
+  ];
+  const reportRef = writeExecutionLog(
+    manifest,
+    "cargo-run.log",
+    "Hello, world!\n---EXIT=0"
+  );
+
+  writeWorkerResultReport({
+    manifest,
+    output,
+    materializedFiles,
+    executionEvidence: {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command: "cargo run --quiet",
+      status: "succeeded",
+      reportRefs: [reportRef],
+      testsObserved: 1,
+      passedCount: 1,
+      failedCount: 0,
+      shardEvidence: [
+        {
+          kind: "sdlc_worker_execution_shard_evidence",
+          shardId: "rust-hello-world",
+          moduleName: "hello_world_rust",
+          lane: "test",
+          command: "cargo run --quiet",
+          status: "succeeded",
+          reportRefs: [reportRef],
+          testsObserved: 1,
+          passedCount: 1,
+          failedCount: 0
+        }
+      ]
+    }
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(manifest.productMaterialization.testExecutionContract, "cargo");
+  assert.equal(report.executionEvidence?.command, "cargo run --quiet");
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "context_expected_files_not_materialization_authority"
+    ),
+    false
+  );
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "test_execution_command_mismatch"
+    ),
+    false
+  );
 });

@@ -218,7 +218,7 @@ const POSTFLIGHT_GAP_ACTIONS = Object.freeze([
 const REQUIREMENT_MARKER_EXPRESSION =
   /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
 const LOCAL_REQUIREMENT_HEADING_EXPRESSION =
-  /^\s{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
+  /^[ \t]{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
 
 const TRAVERSAL_AUTHORITY_PATHS = Object.freeze([
   "specification/INTENT.md",
@@ -365,13 +365,26 @@ function executionCommandMatchesContract(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly command: string;
 }): boolean {
+  const observedCommand = input.command.trim().replace(/\s+/gu, " ");
+  const declaredCommand =
+    input.manifest.productMaterialization.testExecutionContract
+      .trim()
+      .replace(/\s+/gu, " ");
+  if (observedCommand === declaredCommand) {
+    return true;
+  }
   if (
-    input.command === input.manifest.productMaterialization.testExecutionContract
+    declaredCommand !== "undeclared" &&
+    /^\S+$/u.test(declaredCommand) &&
+    observedCommand.startsWith(`${declaredCommand} `)
   ) {
     return true;
   }
   const shards = input.manifest.productMaterialization.executionShards;
-  return shards.length === 1 && input.command === shards[0]?.command;
+  return (
+    shards.length === 1 &&
+    observedCommand === shards[0]?.command.trim().replace(/\s+/gu, " ")
+  );
 }
 
 function productMaterializationContract(input: {
@@ -458,7 +471,7 @@ function explicitRoleFromTargetText(input: string): {
   readonly requiredRole: SdlcMaterializedProductFileRole | null;
 } {
   const roleMatch =
-    /\brole\s*[:=]\s*(source|test|build_config|design|documentation|other)\b/iu.exec(
+    /\brole\s*[:=]\s*`?(source|test|build_config|design|documentation|other)\b`?/iu.exec(
       input
     );
   const requiredRole =
@@ -467,7 +480,7 @@ function explicitRoleFromTargetText(input: string): {
       : (roleMatch[1].toLowerCase() as SdlcMaterializedProductFileRole);
   const value = input
     .replace(
-      /\s*(?:[|;,]\s*)?\brole\s*[:=]\s*(?:source|test|build_config|design|documentation|other)\b/iu,
+      /\s*(?:[|;,]\s*)?\(?\s*\brole\s*[:=]\s*`?(?:source|test|build_config|design|documentation|other)\b`?\s*\)?/iu,
       ""
     )
     .trim();
@@ -764,7 +777,7 @@ function productAuthorityTargetsFor(
   const product = readFileSync(productPath, "utf8");
   const sections = markdownSectionBodies({
     markdown: product,
-    titlePattern: /^(?:declared|expected)\s+product\s+files$/iu
+    titlePattern: /^(?:(?:declared|expected)\s+product\s+files|(?:declared|expected)\s+files)$/iu
   });
   const declaredModuleSections = markdownSectionBodies({
     markdown: product,
@@ -930,6 +943,7 @@ function materializationRolePolicyForTarget(input: {
   }
   if (
     relativeTarget === "src" ||
+    relativeTarget.startsWith("src/") ||
     relativeTarget.endsWith("/src") ||
     relativeTarget.includes("/src/")
   ) {
@@ -941,6 +955,8 @@ function materializationRolePolicyForTarget(input: {
   if (
     relativeTarget === "test" ||
     relativeTarget === "tests" ||
+    relativeTarget.startsWith("test/") ||
+    relativeTarget.startsWith("tests/") ||
     relativeTarget.includes("/test/") ||
     relativeTarget.includes("/tests/") ||
     relativeTarget.endsWith("/test") ||
