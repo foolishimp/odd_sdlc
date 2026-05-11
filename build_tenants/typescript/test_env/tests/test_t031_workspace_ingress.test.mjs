@@ -163,8 +163,10 @@ test("T-031 portable fixture derives imported requirement authority and lineage"
         authority.requirementId === "REQ-LDM-001" &&
         authority.kind === "sdlc_requirement_transform_authority" &&
         authority.status === "current" &&
-        authority.transformRef.startsWith(
-          "requirement-transform://odd-sdlc/ingress/REQ-LDM-001/"
+        authority.requirementAuthorityRef ===
+          "data_mapper.requirements.req_ldm_001" &&
+        authority.transformRef.includes(
+          encodeURIComponent(authority.requirementAuthorityRef)
         )
     )
   );
@@ -180,7 +182,8 @@ test("T-031 portable fixture derives imported requirement authority and lineage"
   );
 
   const requirementLineage = report.lineage.find(
-    (entry) => entry.elementId === "requirement:REQ-LDM-001"
+    (entry) =>
+      entry.elementId === "requirement:data_mapper.requirements.req_ldm_001"
   );
   assert(requirementLineage);
   assert(

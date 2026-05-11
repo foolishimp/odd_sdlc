@@ -115,6 +115,23 @@ function assertScenarioContract(contract) {
   assert.equal(Array.isArray(contract.expectedFiles), true);
   assert.deepEqual(contract.expectedFiles, [tenant.sourceFile]);
   assertUnique(contract.expectedFiles, "expectedFiles");
+  assert.deepEqual(contract.expectedRequirementIds, [
+    "REQ-T132-001",
+    "REQ-T132-002",
+    "REQ-T132-003",
+    "REQ-T132-004",
+    "REQ-T132-005"
+  ]);
+  assertUnique(contract.expectedRequirementIds, "expectedRequirementIds");
+  assert.equal(Array.isArray(contract.requirements), true);
+  assert.deepEqual(
+    contract.requirements.map((requirement) => requirement.id),
+    contract.expectedRequirementIds
+  );
+  for (const requirement of contract.requirements) {
+    assertNonEmptyString(requirement.title, `${requirement.id}.title`);
+    assertNonEmptyString(requirement.text, `${requirement.id}.text`);
+  }
   for (const expectedFile of contract.expectedFiles) {
     assert.equal(
       expectedFile.startsWith(`${tenant.selectedOutputRoot}/`),
@@ -278,6 +295,12 @@ function assertConformedProjectWorkspace(workspace, contract) {
     requirementFiles.length > 0,
     "F_P authority conformance must induce at least one requirement surface"
   );
+  const requirementText = requirementFiles
+    .map((file) => readFileSync(path.join(requirementDir, file), "utf8"))
+    .join("\n");
+  for (const requirementId of contract.expectedRequirementIds) {
+    assert.match(requirementText, new RegExp(`\\b${requirementId}\\b`, "u"));
+  }
 }
 
 function installedCommandEnv() {
@@ -593,7 +616,8 @@ test(
       workspace,
       contract,
       conformanceGraphFunction: FG_CONFORM_PROJECT_AUTHORITY,
-      languageAnchors: ["JavaScript"]
+      languageAnchors: ["JavaScript"],
+      expectedRequirementIds: contract.expectedRequirementIds
     });
     writeJson(path.join(archiveRoot, "authority_conformance_live_validation.json"), authorityValidation);
     assert.equal(authorityValidation.verdict, "passed", JSON.stringify(authorityValidation, null, 2));

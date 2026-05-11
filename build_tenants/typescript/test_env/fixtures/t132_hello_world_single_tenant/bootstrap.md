@@ -195,6 +195,40 @@ generates the tenant source through installed traversal, and executes it.
   "expectedFiles": [
     "build_tenants/hello_world_javascript/src/hello.js"
   ],
+  "expectedRequirementIds": [
+    "REQ-T132-001",
+    "REQ-T132-002",
+    "REQ-T132-003",
+    "REQ-T132-004",
+    "REQ-T132-005"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-T132-001",
+      "title": "Single JavaScript product tenant",
+      "text": "hello_world_javascript_single_tenant contains exactly one generated product tenant for this proof lane."
+    },
+    {
+      "id": "REQ-T132-002",
+      "title": "Node runtime tenant",
+      "text": "The generated tenant is named hello_world_javascript, uses the Node runtime, and is rooted at build_tenants/hello_world_javascript."
+    },
+    {
+      "id": "REQ-T132-003",
+      "title": "Declared JavaScript source file",
+      "text": "Product materialization writes the declared source file build_tenants/hello_world_javascript/src/hello.js and does not use a prebuilt fixture source file."
+    },
+    {
+      "id": "REQ-T132-004",
+      "title": "Exact stdout contract",
+      "text": "Running the generated JavaScript program emits exactly Hello, world! after trimming trailing whitespace."
+    },
+    {
+      "id": "REQ-T132-005",
+      "title": "Declared execution command",
+      "text": "The product proof runs node build_tenants/hello_world_javascript/src/hello.js and records process evidence for that command."
+    }
+  ],
   "commands": {
     "installOddSdlc": [
       "odd-sdlc-ts install --target <workspace> --package-source <odd_sdlc_source>"
@@ -217,6 +251,7 @@ generates the tenant source through installed traversal, and executes it.
     "The build tenant contains one generated JavaScript source file.",
     "The generated source file is executable by its declared runtime.",
     "The execution emits exactly `Hello, world!` after trimming trailing whitespace.",
+    "Generated requirement authority preserves every keyed requirement identifier declared by this bootstrap.",
     "The test archive contains process records and stdout/stderr captures.",
     "Completion is based on the selected tenant source file and execution output evidence, not worker narrative."
   ]

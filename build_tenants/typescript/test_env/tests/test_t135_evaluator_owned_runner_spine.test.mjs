@@ -363,13 +363,19 @@ test("T-135 requirement surface records requirement obligations as future pressu
 
   const report = buildPostTransformWorkerResultReport({ manifest, before });
   const requirementAssessment = report.obligationAssessments.find(
-    (assessment) => assessment.obligationId === "requirement:REQ-T135-001"
+    (assessment) =>
+      manifest.traversalObligationContext.obligations.some(
+        (obligation) =>
+          obligation.obligationId === assessment.obligationId &&
+          obligation.obligationKind === "requirement" &&
+          obligation.summary.includes("REQ-T135-001")
+      )
   );
 
   assert(requirementAssessment);
   assert.equal(requirementAssessment.fulfillmentStatus, "partial");
   assert.deepEqual(requirementAssessment.blockingReasons, [
-    "requirement_recorded_for_future_closure:REQ-T135-001"
+    `requirement_recorded_for_future_closure:${requirementAssessment.obligationId.slice("requirement:".length)}`
   ]);
 
   const projection = deriveSdlcEdgeFulfillmentCountsFromAssessments({

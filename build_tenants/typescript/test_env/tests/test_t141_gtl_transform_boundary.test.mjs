@@ -288,6 +288,8 @@ test("T-141 requirement obligations can carry downstream without blocking the re
 
 test("T-141 assurance gate does not retry requirement rows carried to product materialization", () => {
   const manifest = requirementSurfaceManifest(writeRequirementWorkspace());
+  const requirementAuthorityRef =
+    "t141_requirement_carry.stage_01_rust_hello_world.req_t141_001";
   const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
   mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
   writeFileSync(
@@ -302,12 +304,13 @@ test("T-141 assurance gate does not retry requirement rows carried to product ma
 
   const report = buildPostTransformWorkerResultReport({ manifest, before });
   const requirementAssessment = report.obligationAssessments.find(
-    (assessment) => assessment.obligationId === "requirement:REQ-T141-001"
+    (assessment) =>
+      assessment.obligationId === `requirement:${requirementAuthorityRef}`
   );
   assert(requirementAssessment);
   assert.equal(requirementAssessment.fulfillmentStatus, "partial");
   assert.deepEqual(requirementAssessment.blockingReasons, [
-    "requirement_recorded_for_future_closure:REQ-T141-001"
+    `requirement_recorded_for_future_closure:${requirementAuthorityRef}`
   ]);
 
   const gate = deriveSdlcOperatorAssuranceGate({
@@ -333,7 +336,9 @@ test("T-141 assurance gate does not retry requirement rows carried to product ma
   assert(semanticLedger);
   assert.equal(semanticLedger.verdict, "satisfied");
   assert.equal(
-    semanticLedger.carryForwardObligationRefs.includes("requirement:REQ-T141-001"),
+    semanticLedger.carryForwardObligationRefs.includes(
+      `requirement:${requirementAuthorityRef}`
+    ),
     true
   );
   assert(requirementLedger);

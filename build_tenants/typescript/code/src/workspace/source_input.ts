@@ -69,6 +69,21 @@ export interface SdlcRequirementAuthorityIdentity {
   readonly authorityDerivationRefs: readonly string[];
 }
 
+export function normalizeSdlcAuthoritySegment(
+  rawValue: string,
+  fallbackPrefix: string
+): string {
+  const slug = rawValue
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/gu, "_")
+    .replace(/^_+|_+$/gu, "")
+    .replace(/_+/gu, "_");
+  const fallback = fallbackPrefix.length === 0 ? "segment" : fallbackPrefix;
+  const value = slug.length === 0 ? fallback : slug;
+  return /^[a-z]/u.test(value) ? value : `${fallback}_${value}`;
+}
+
 export function normalizeSdlcRequirementDisplayId(rawId: string): string {
   const normalized = rawId.trim().toUpperCase();
   const requirementMatch = /^R-(\d+)$/u.exec(normalized);
@@ -112,23 +127,44 @@ function sourceDigestRef(sourceDigest: string): string {
   return `source-digest://odd-sdlc/${encodeURIComponent(sourceDigest)}`;
 }
 
-function localRequirementAuthorityRef(input: {
+function sourceStageKey(relativePath: string): string {
+  const withoutKnownPrefix = relativePath
+    .replace(/^specification\/requirements\//u, "")
+    .replace(/^specification\//u, "");
+  const withoutExtension = withoutKnownPrefix.replace(/\.[^/.]+$/u, "");
+  return normalizeSdlcAuthoritySegment(
+    withoutExtension
+      .split("/")
+      .map((part) => normalizeSdlcAuthoritySegment(part, "stage"))
+      .join("_"),
+    "stage"
+  );
+}
+
+function requirementKey(requirementDisplayId: string): string {
+  return normalizeSdlcAuthoritySegment(requirementDisplayId, "requirement");
+}
+
+function structuralRequirementAuthorityRef(input: {
+  readonly projectSlug: string;
+  readonly sourceRelativePath: string;
   readonly requirementDisplayId: string;
-  readonly sourceUri: string;
-  readonly sourceDigest: string;
-  readonly headingSlug: string;
 }): string {
   return [
-    "requirement-authority://odd-sdlc/local",
-    encodeURIComponent(input.sourceUri),
-    encodeURIComponent(input.requirementDisplayId),
-    encodeURIComponent(input.headingSlug),
-    encodeURIComponent(input.sourceDigest)
-  ].join("/");
+    normalizeSdlcAuthoritySegment(input.projectSlug, "project"),
+    sourceStageKey(input.sourceRelativePath),
+    requirementKey(input.requirementDisplayId)
+  ].join(".");
+}
+
+function authorityScopeRef(requirementAuthorityRef: string): string {
+  return `requirement-authority-scope://odd-sdlc/${encodeURIComponent(requirementAuthorityRef)}`;
 }
 
 export function requirementAuthorityIdentityForMarker(input: {
   readonly marker: string;
+  readonly projectSlug: string;
+  readonly sourceRelativePath: string;
   readonly sourceUri: string;
   readonly sourceDigest: string;
 }): SdlcRequirementAuthorityIdentity | null {
@@ -150,19 +186,21 @@ export function requirementAuthorityIdentityForMarker(input: {
       );
       const headingSlug = decodeURIComponent(encodedHeadingSlug);
       const authorityMarkerRef = input.marker;
+      const requirementAuthorityRef = structuralRequirementAuthorityRef({
+        projectSlug: input.projectSlug,
+        sourceRelativePath: input.sourceRelativePath,
+        requirementDisplayId
+      });
       return Object.freeze({
         requirementDisplayId,
-        requirementAuthorityRef: localRequirementAuthorityRef({
-          requirementDisplayId,
-          sourceUri: input.sourceUri,
-          sourceDigest: input.sourceDigest,
-          headingSlug
-        }),
+        requirementAuthorityRef,
         authorityMarkerRef,
         authorityDerivationRefs: uniqueSorted([
+          authorityScopeRef(requirementAuthorityRef),
           input.sourceUri,
           sourceDigestRef(input.sourceDigest),
-          authorityMarkerRef
+          authorityMarkerRef,
+          `heading-slug://odd-sdlc/${encodeURIComponent(headingSlug)}`
         ])
       });
     } catch {
@@ -173,11 +211,17 @@ export function requirementAuthorityIdentityForMarker(input: {
     const requirementDisplayId = normalizeSdlcRequirementDisplayId(input.marker);
     const authorityMarkerRef =
       `requirement-marker://odd-sdlc/${encodeURIComponent(input.marker)}`;
+    const requirementAuthorityRef = structuralRequirementAuthorityRef({
+      projectSlug: input.projectSlug,
+      sourceRelativePath: input.sourceRelativePath,
+      requirementDisplayId
+    });
     return Object.freeze({
       requirementDisplayId,
-      requirementAuthorityRef: requirementDisplayId,
+      requirementAuthorityRef,
       authorityMarkerRef,
       authorityDerivationRefs: uniqueSorted([
+        authorityScopeRef(requirementAuthorityRef),
         input.sourceUri,
         sourceDigestRef(input.sourceDigest),
         authorityMarkerRef

@@ -1034,6 +1034,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly inlineObligations: readonly SdlcWorkerInvocationObligation[];
   readonly inlineObligationIds: readonly string[];
   readonly requirementTraceObligationIds: readonly string[];
+  readonly omittedRequirementTraceObligationCount: number;
   readonly trancheKeys: readonly string[];
   readonly omittedObligationCount: number;
   readonly retrievalHints: readonly SdlcRetrievalHint[];

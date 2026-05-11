@@ -109,7 +109,8 @@ test("T-089 early non-materializing edge carries target evaluator and requiremen
   );
   assert(
     obligations.some((obligation) =>
-      obligation.obligationId === "requirement:REQ-T089-002"
+      obligation.obligationKind === "requirement" &&
+      obligation.summary.includes("REQ-T089-002")
     )
   );
 });

@@ -98,6 +98,14 @@ function queryDomain() {
   });
 }
 
+function rowByDisplayId(projection, requirementDisplayId) {
+  const row = projection.rows.find(
+    (candidate) => candidate.requirementDisplayId === requirementDisplayId
+  );
+  assert(row);
+  return row;
+}
+
 function conformantWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t139-"));
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
@@ -166,11 +174,8 @@ test("T-139 query-domain publishes read-only requirement fulfillment measurement
     "REQ-T139-002"
   ]);
 
-  const row = projection.rows.find(
-    (candidate) => candidate.requirementId === "REQ-T139-001"
-  );
-  assert(row);
-  assert.equal(row.obligationRef, "requirement:REQ-T139-001");
+  const row = rowByDisplayId(projection, "REQ-T139-001");
+  assert.equal(row.obligationRef, `requirement:${row.requirementAuthorityRef}`);
   assert.equal(row.fulfillmentStatus, "missing");
   assert.equal(row.carryStatus, "carried_forward");
   assert.equal(row.openReasons.includes("no_generated_asset_lineage"), true);
@@ -217,6 +222,9 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
     entries: domain.requirementFulfillment.rows.map((row) => ({
       kind: "sdlc_requirement_closure_entry",
       requirementId: row.requirementId,
+      requirementDisplayId: row.requirementDisplayId,
+      requirementAuthorityRef: row.requirementAuthorityRef,
+      authorityDerivationRefs: row.authorityDerivationRefs,
       sourceInputUris: row.sourceInputUris,
       assetIds: [],
       producedByGraphFunctions: [],
@@ -235,8 +243,15 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
       domain.requirementFulfillment.carriedForwardRequirementIds,
     unresolvedRequirementIds:
       domain.requirementFulfillment.unresolvedRequirementIds,
+    fulfilledRequirementAuthorityRefs: [],
+    carriedForwardRequirementAuthorityRefs:
+      domain.requirementFulfillment.carriedForwardRequirementAuthorityRefs,
+    unresolvedRequirementAuthorityRefs:
+      domain.requirementFulfillment.unresolvedRequirementAuthorityRefs,
     emittedRuntimeEventKinds: []
   };
+  const req001 = rowByDisplayId(domain.requirementFulfillment, "REQ-T139-001");
+  const req002 = rowByDisplayId(domain.requirementFulfillment, "REQ-T139-002");
   const ledger = constructSdlcEdgeFulfillmentLedger({
     ledgerRef: "ledger://t139/edge",
     ledgerVersionRef: "ledger-version://t139/edge/1",
@@ -282,15 +297,17 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
     closureRegister,
     assessments: [
       {
-        obligationId: "requirement:REQ-T139-001",
+        obligationId: req001.obligationRef,
         fulfillmentStatus: "fulfilled",
         evidenceRefs: ["file:///workspace/t139/product-evidence.md"]
       },
       {
-        obligationId: "requirement:REQ-T139-002",
+        obligationId: req002.obligationRef,
         fulfillmentStatus: "partial",
         evidenceRefs: ["file:///workspace/t139/requirement_surface.md"],
-        blockingReasons: ["requirement_recorded_for_future_closure:REQ-T139-002"]
+        blockingReasons: [
+          `requirement_recorded_for_future_closure:${req002.requirementAuthorityRef}`
+        ]
       }
     ],
     edgeFulfillmentLedger: ledger,
@@ -304,10 +321,7 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
   assert.equal(publicView.nextActionEvaluationFunction, "evaluate_next");
   assert.deepEqual(publicView.edgeFulfillmentCounts, ledger.counts);
   assert.equal(publicView.edgeClosureDisposition, closureDecision.disposition);
-  const partial = publicView.rows.find(
-    (row) => row.requirementId === "REQ-T139-002"
-  );
-  assert(partial);
+  const partial = rowByDisplayId(publicView, "REQ-T139-002");
   assert.equal(partial.fulfillmentStatus, "partial");
   assert.equal(partial.carryStatus, "carried_forward");
   assert.deepEqual(partial.ledgerRefs, [
@@ -318,7 +332,7 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
   assert(partial.evaluatorSourceRefs.includes(nextActionProjection.nextActionProjectionRef));
   assert.equal(
     partial.openReasons.includes(
-      "requirement_recorded_for_future_closure:REQ-T139-002"
+      `requirement_recorded_for_future_closure:${req002.requirementAuthorityRef}`
     ),
     true
   );
@@ -485,6 +499,10 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
     actionCatalogRefs: ["catalog://t139/archive"],
     readOnly: true
   });
+  const req001AuthorityRef =
+    "t139_public_gaps.stage_01_t139.req_t139_001";
+  const req002AuthorityRef =
+    "t139_public_gaps.stage_01_t139.req_t139_002";
   writeFileSync(
     path.join(operatorRunRoot, "sdlc_edge_fulfillment_ledger.json"),
     JSON.stringify(ledger, null, 2),
@@ -507,16 +525,16 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
         kind: "odd_sdlc.worker_result_report",
         obligationAssessments: [
           {
-            obligationId: "requirement:REQ-T139-001",
+            obligationId: `requirement:${req001AuthorityRef}`,
             fulfillmentStatus: "fulfilled",
             evidenceRefs: ["file:///workspace/t139/archive.md"]
           },
           {
-            obligationId: "requirement:REQ-T139-002",
+            obligationId: `requirement:${req002AuthorityRef}`,
             fulfillmentStatus: "partial",
             evidenceRefs: ["file:///workspace/t139/archive.md"],
             blockingReasons: [
-              "requirement_recorded_for_future_closure:REQ-T139-002"
+              `requirement_recorded_for_future_closure:${req002AuthorityRef}`
             ]
           }
         ]

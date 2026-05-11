@@ -571,7 +571,7 @@ export function withSdlcRequirementFulfillmentArchiveRehydration(input: {
 interface RequirementFulfillmentPublicRowBasis {
   readonly requirementId: string;
   readonly requirementDisplayId?: string;
-  readonly requirementAuthorityRef?: string;
+  readonly requirementAuthorityRef: string;
   readonly authorityDerivationRefs?: readonly string[];
   readonly sourceInputUris: readonly string[];
   readonly evidenceRefs: readonly string[];
@@ -593,8 +593,7 @@ function constructSdlcRequirementFulfillmentPublicProjection(input: {
   const rows = Object.freeze(
     input.rows.map((row) => {
       const requirementDisplayId = row.requirementDisplayId ?? row.requirementId;
-      const requirementAuthorityRef =
-        row.requirementAuthorityRef ?? row.requirementId;
+      const requirementAuthorityRef = row.requirementAuthorityRef;
       return Object.freeze({
         kind: "sdlc_requirement_fulfillment_public_row" as const,
         readOnly: true as const,
@@ -705,8 +704,7 @@ export function projectSdlcRequirementFulfillmentPublicView(input: {
       Object.freeze({
         requirementId: entry.requirementId,
         requirementDisplayId: entry.requirementDisplayId ?? entry.requirementId,
-        requirementAuthorityRef:
-          entry.requirementAuthorityRef ?? entry.requirementId,
+        requirementAuthorityRef: entry.requirementAuthorityRef,
         authorityDerivationRefs: entry.authorityDerivationRefs ?? Object.freeze([]),
         sourceInputUris: entry.sourceInputUris,
         evidenceRefs: entry.evidenceRefs,
@@ -787,7 +785,7 @@ export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input
   );
   const entryByRequirementAuthorityRef = new Map(
     input.closureRegister.entries.map((entry) => [
-      entry.requirementAuthorityRef ?? entry.requirementId,
+      entry.requirementAuthorityRef,
       entry
     ])
   );
@@ -795,7 +793,7 @@ export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input
     [
       ...new Set([
         ...input.closureRegister.entries.map(
-          (entry) => entry.requirementAuthorityRef ?? entry.requirementId
+          (entry) => entry.requirementAuthorityRef
         ),
         ...assessmentByRequirementAuthorityRef.keys()
       ])

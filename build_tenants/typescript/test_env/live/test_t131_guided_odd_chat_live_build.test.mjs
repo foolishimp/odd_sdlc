@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -35,6 +36,9 @@ const ABG_TYPESCRIPT_ROOT = resolve(
 );
 const FIXTURE_ROOT = resolve(TEST_DIR, "../fixtures/t131_guided_odd_chat");
 const BOOTSTRAP_PATH = path.join(FIXTURE_ROOT, "bootstrap.md");
+const DOMAIN_PACKAGE_ROOT = path.join(FIXTURE_ROOT, "domains/document_to_requirements");
+const DOMAIN_PACKAGE_PATH = path.join(DOMAIN_PACKAGE_ROOT, "domain.json");
+const START_DOCUMENT_PATH = path.join(FIXTURE_ROOT, "examples/start_document.md");
 const SOURCE_ODD_SDLC_CLI = path.join(PACKAGE_ROOT, "build/semantic/code/src/cli/main.js");
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_LIVE"] === "1";
 const CONFORMANCE_ONLY = process.env["ODD_SDLC_TS_LIVE_CONFORMANCE_ONLY"] === "1";
@@ -61,6 +65,10 @@ function archiveTimestamp() {
 function writeJson(filePath, payload) {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function readJson(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
 function sha256Text(content) {
@@ -330,6 +338,61 @@ function assertScenarioContract(contract) {
   );
 }
 
+function domainContractShape(domainPackage) {
+  return {
+    name: domainPackage.name,
+    kind: domainPackage.kind,
+    purpose: domainPackage.purpose,
+    entryAsset: domainPackage.entryAsset,
+    terminalAsset: domainPackage.terminalAsset,
+    nodes: domainPackage.nodes,
+    vectors: domainPackage.vectors,
+    lawfulActions: domainPackage.lawfulActions
+  };
+}
+
+function assertFixtureInputAssets(contract) {
+  assert.equal(existsSync(DOMAIN_PACKAGE_PATH), true, "default domain package is missing");
+  assert.equal(existsSync(START_DOCUMENT_PATH), true, "start document fixture is missing");
+
+  const domainPackage = readJson(DOMAIN_PACKAGE_PATH);
+  assert.equal(domainPackage.schemaVersion, "odd_gtl_abg_domain.v1");
+  assert.deepEqual(
+    domainContractShape(domainPackage),
+    contract.defaultDomain,
+    "domain.json must remain the loadable form of bootstrap scenario_contract.defaultDomain"
+  );
+
+  const graphFunctionIds = domainPackage.graphFunctions.map((row) => row.id);
+  assertIncludesEvery(
+    graphFunctionIds,
+    [contract.graphFunctionSelection.defaultGraphFunction],
+    "deployed domain graphFunctions"
+  );
+  assertIncludesEvery(
+    graphFunctionIds,
+    contract.defaultDomain.lawfulActions.map((action) => action.graphFunction),
+    "deployed domain graphFunctions"
+  );
+
+  const aggregate = domainPackage.graphFunctions.find(
+    (row) => row.id === contract.graphFunctionSelection.defaultGraphFunction
+  );
+  assert.equal(aggregate?.kind, "aggregate");
+  assertIncludesEvery(
+    aggregate?.composedOf ?? [],
+    contract.defaultDomain.lawfulActions.map((action) => action.graphFunction),
+    "default aggregate graph function"
+  );
+
+  const carrierSchemaIds = domainPackage.carrierSchemas.map((row) => row.id);
+  assertIncludesEvery(
+    carrierSchemaIds,
+    contract.defaultDomain.lawfulActions.map((action) => action.expectedCarrier),
+    "deployed domain carrierSchemas"
+  );
+}
+
 function projectConstraintsText(contract) {
   return [
     "project:",
@@ -384,10 +447,8 @@ function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
     vectors: contract.gtlGraph.vectors,
     lawfulActions: contract.lawfulActions
   });
-  writeJson(path.join(workspace, "domains/document_to_requirements/domain.json"), {
-    kind: "t131_guided_odd_chat_default_domain_projection",
-    sourceBootstrapDigest: sha256Text(bootstrapMarkdown),
-    domain: contract.defaultDomain
+  cpSync(DOMAIN_PACKAGE_ROOT, path.join(workspace, "domains/document_to_requirements"), {
+    recursive: true
   });
   writeJson(path.join(workspace, ".odd-chat/workspace-dialogue-contract.json"), {
     kind: "t131_guided_odd_chat_workspace_dialogue_contract",
@@ -395,16 +456,7 @@ function writeBootstrapWorkspace(workspace, bootstrapMarkdown, contract) {
     workspaceDialogue: contract.workspaceDialogue,
     graphFunctionSelection: contract.graphFunctionSelection
   });
-  writeFileSync(
-    path.join(workspace, "examples/start_document.md"),
-    [
-      "# Example Start Document",
-      "",
-      "Build a small governed tool that turns this document into typed requirements.",
-      "The operator must be able to inspect lawful actions before accepting requirements."
-    ].join("\n"),
-    "utf8"
-  );
+  cpSync(START_DOCUMENT_PATH, path.join(workspace, "examples/start_document.md"));
 }
 
 function assertNoPrebuiltOddChatImplementation(workspace, contract) {
@@ -440,6 +492,16 @@ function assertBootstrapSourceWorkspace(workspace, contract) {
   const requirementFiles = readdirSync(path.join(workspace, "specification/requirements"))
     .filter((entry) => entry.endsWith(".md"));
   assert.deepEqual(requirementFiles, []);
+  assert.equal(
+    readFileSync(path.join(workspace, "domains/document_to_requirements/domain.json"), "utf8"),
+    readFileSync(DOMAIN_PACKAGE_PATH, "utf8"),
+    "sandbox must carry the fixture domain package, not a synthesized stand-in"
+  );
+  assert.equal(
+    readFileSync(path.join(workspace, "examples/start_document.md"), "utf8"),
+    readFileSync(START_DOCUMENT_PATH, "utf8"),
+    "sandbox must carry the fixture start document"
+  );
   assertNoPrebuiltOddChatImplementation(workspace, contract);
 }
 
@@ -666,6 +728,7 @@ test("T-131 bootstrap document is a complete guided odd_chat scenario contract",
   const bootstrapMarkdown = readFileSync(BOOTSTRAP_PATH, "utf8");
   const contract = extractScenarioContract(bootstrapMarkdown);
   assertScenarioContract(contract);
+  assertFixtureInputAssets(contract);
 
   const archiveRoot = resolve(
     liveTestArchiveRoot("t131_guided_odd_chat_contract", archiveTimestamp(), process.pid)
@@ -681,6 +744,7 @@ test("T-131 bootstrap-only sandbox has no prebuilt odd_chat implementation", () 
   const bootstrapMarkdown = readFileSync(BOOTSTRAP_PATH, "utf8");
   const contract = extractScenarioContract(bootstrapMarkdown);
   assertScenarioContract(contract);
+  assertFixtureInputAssets(contract);
 
   const archiveRoot = resolve(
     liveTestArchiveRoot("t131_guided_odd_chat_bootstrap_fixture", archiveTimestamp(), process.pid)
@@ -703,6 +767,7 @@ test(
     const bootstrapMarkdown = readFileSync(BOOTSTRAP_PATH, "utf8");
     const contract = extractScenarioContract(bootstrapMarkdown);
     assertScenarioContract(contract);
+    assertFixtureInputAssets(contract);
 
     const archiveRoot = resolve(
       liveTestArchiveRoot(

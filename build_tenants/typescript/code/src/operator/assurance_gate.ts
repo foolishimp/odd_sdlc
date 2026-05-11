@@ -375,6 +375,8 @@ function requirementClosureRegisterFromObligations(input: {
     return Object.freeze({
       kind: "sdlc_requirement_closure_entry" as const,
       requirementId,
+      requirementDisplayId: requirementId,
+      requirementAuthorityRef: requirementId,
       sourceInputUris: obligation.evidenceRefs,
       assetIds: Object.freeze(
         input.report.materializedFiles.map((file) => file.absolutePath)
@@ -422,6 +424,21 @@ function requirementClosureRegisterFromObligations(input: {
       entries
         .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
         .map((entry) => entry.requirementId)
+    ),
+    fulfilledRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    carriedForwardRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    unresolvedRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     emittedRuntimeEventKinds: Object.freeze([] as const)
   });

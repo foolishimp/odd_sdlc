@@ -654,7 +654,10 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
   assert.deepStrictEqual(manifest.productMaterialization.requiredRoles, ["source"]);
   assert.equal(
     manifest.traversalObligationContext.obligations.some(
-      (obligation) => obligation.obligationId === "requirement:REQ-T066-001"
+      (obligation) =>
+        obligation.obligationKind === "requirement" &&
+        obligation.summary.includes("REQ-T066-001") &&
+        obligation.obligationId !== "requirement:REQ-T066-001"
     ),
     true
   );
@@ -666,7 +669,7 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
   );
   assert.equal(
     manifest.traversalObligationContext.deltaSummary.requirementCount,
-    1
+    2
   );
   assert.equal(
     manifest.allowedWriteRoots.includes(manifest.productMaterialization.tenantRoot),
@@ -1139,6 +1142,107 @@ test("T-066 code-surface postflight rejects markdown-only realization", () => {
   );
   assert.equal(
     postflight.blockingReasons.includes("materialized_product_role_missing:source"),
+    true
+  );
+});
+
+test("T-158 product materialization repair replays prior same-edge manifest", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T000000000Z_pid158"
+  });
+  writeHandoffFiles(firstManifest);
+  const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
+  const sourcePath = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    "src/main/scala/Example.scala"
+  );
+  const sourceContent = [
+    "package example",
+    "",
+    "object Example {",
+    "  def value: String = \"ok\"",
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+  writeReport({
+    manifest: firstManifest,
+    digest: firstOutput.digest,
+    summary: "initial product source materialization",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/main/scala/Example.scala",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${sourceContent}\n`),
+        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
+      }
+    ]
+  });
+  const firstReport = readWorkerResultReport(firstManifest);
+  writeProductMaterializationManifest({
+    manifest: firstManifest,
+    report: firstReport
+  });
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T000100000Z_pid158"
+  });
+  writeHandoffFiles(repairManifest);
+  const repairOutput = writeOutputSurface(
+    repairManifest,
+    "component_code_surface_trace_repair"
+  );
+  writeReport({
+    manifest: repairManifest,
+    digest: repairOutput.digest,
+    summary: "trace-only repair with no product rewrite",
+    materializedFiles: []
+  });
+
+  const repairReport = readWorkerResultReport(repairManifest);
+  const postflight = evaluateWorkerResultPostflight({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  writeProductMaterializationManifest({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  const replayedManifest = JSON.parse(
+    readFileSync(repairManifest.productMaterialization.manifestFile, "utf8")
+  );
+
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasons.includes("materialized_product_files_missing"),
+    false
+  );
+  assert.equal(
+    postflight.blockingReasons.includes("materialized_product_role_missing:source"),
+    false
+  );
+  assert.equal(replayedManifest.files.length, 1);
+  assert.equal(
+    replayedManifest.replay.lineageRefs.includes(
+      `file://${firstManifest.productMaterialization.manifestFile}`
+    ),
     true
   );
 });

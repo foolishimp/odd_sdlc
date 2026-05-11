@@ -24,20 +24,46 @@ import {
 } from "./source_input.js";
 
 function importedRequirementAuthorities(
-  sourceInputs: readonly SdlcSourceInput[]
+  input: {
+    readonly projectConstraints: SdlcProjectConstraints;
+    readonly sourceInputs: readonly SdlcSourceInput[];
+  }
 ): readonly SdlcImportedRequirementAuthority[] {
   const authorities: SdlcImportedRequirementAuthority[] = [];
-  for (const sourceInput of sourceInputs) {
+  const seenAuthorityRefs = new Map<
+    string,
+    { readonly sourceUri: string; readonly authorityMarkerRef: string }
+  >();
+  for (const sourceInput of input.sourceInputs) {
     if (sourceInput.detectedRole !== "requirement_surface") {
       continue;
     }
     for (const marker of sourceInput.authorityMarkers) {
       const identity = requirementAuthorityIdentityForMarker({
         marker,
+        projectSlug: input.projectConstraints.projectSlug,
+        sourceRelativePath: sourceInput.relativePath,
         sourceUri: sourceInput.uri,
         sourceDigest: sourceInput.digest
       });
       if (identity !== null) {
+        const existing = seenAuthorityRefs.get(identity.requirementAuthorityRef);
+        if (
+          existing !== undefined &&
+          (identity.authorityMarkerRef.startsWith("requirement-local://") ||
+            existing.sourceUri !== sourceInput.uri)
+        ) {
+          throw new TypeError(
+            `SdlcWorkspaceIngressReport.importedRequirementAuthorities: duplicate requirementAuthorityRef ${identity.requirementAuthorityRef} from ${existing.sourceUri} and ${sourceInput.uri}`
+          );
+        }
+        if (existing !== undefined) {
+          continue;
+        }
+        seenAuthorityRefs.set(identity.requirementAuthorityRef, {
+          sourceUri: sourceInput.uri,
+          authorityMarkerRef: identity.authorityMarkerRef
+        });
         authorities.push(
           Object.freeze({
             kind: "sdlc_imported_requirement_authority",
@@ -255,7 +281,10 @@ export function deriveSdlcWorkspaceIngressReport(input: {
     input.workspaceRootUri,
     "SdlcWorkspaceIngressReport.workspaceRootUri"
   );
-  const authorities = importedRequirementAuthorities(input.sourceInputs);
+  const authorities = importedRequirementAuthorities({
+    projectConstraints: input.projectConstraints,
+    sourceInputs: input.sourceInputs
+  });
   const ingressSourceSet = deriveIngressSourceSet({
     workspaceRootUri,
     sourceInputs: input.sourceInputs

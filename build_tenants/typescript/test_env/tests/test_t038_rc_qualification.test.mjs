@@ -275,6 +275,10 @@ test("T-038 composed harnessed sandbox walks ingress to operational return", () 
   const proofClaim = admitSdlcRequirementProofClaim({
     kind: "sdlc_requirement_proof_claim",
     requirementId: "REQ-LDM-001",
+    requirementAuthorityRef:
+      ingress.importedRequirementAuthorities.find(
+        (authority) => authority.requirementId === "REQ-LDM-001"
+      )?.requirementAuthorityRef ?? "missing.requirement.authority",
     assetId: targetAssetId,
     proofKind: "behavioral_test",
     authorityVerb: "validates",

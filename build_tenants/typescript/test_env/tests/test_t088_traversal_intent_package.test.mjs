@@ -151,7 +151,14 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
     )
   );
   assert(
-    manifest.traversalIntentPackage.obligationIds.includes("requirement:REQ-T088-001")
+    manifest.traversalObligationContext.obligations.some(
+      (obligation) =>
+        obligation.obligationKind === "requirement" &&
+        obligation.summary.includes("REQ-T088-001") &&
+        manifest.traversalIntentPackage.obligationIds.includes(
+          obligation.obligationId
+        )
+    )
   );
   assert.equal(
     manifest.traversalIntentPackage.productMaterialization.tenantRoot,

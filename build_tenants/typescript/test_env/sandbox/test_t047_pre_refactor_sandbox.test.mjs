@@ -365,6 +365,10 @@ function runComposedSdlcSandboxScenario() {
   const proofClaim = admitSdlcRequirementProofClaim({
     kind: "sdlc_requirement_proof_claim",
     requirementId: "REQ-LDM-001",
+    requirementAuthorityRef:
+      ingress.importedRequirementAuthorities.find(
+        (authority) => authority.requirementId === "REQ-LDM-001"
+      )?.requirementAuthorityRef ?? "missing.requirement.authority",
     assetId: targetAssetId,
     proofKind: "behavioral_test",
     authorityVerb: "validates",
@@ -567,7 +571,7 @@ test("T-047 sandbox archives expected and actual composed traversal evidence", a
   } else {
     assert(result.closure.entries.length > 0);
   }
-  assert.equal(result.route.lawfulStartTarget.handle, "derive_requirement_surface");
+  assert.equal(result.route.lawfulStartTarget.handle, "derive_code_surface");
   assert.equal(result.ticketRoute.ticketAuthority, "TICKET_METHOD");
   assert.equal(result.ticketRoute.writesTicket, false);
   assert.equal(result.buildAdvance.stage, "result_admitted");
@@ -612,7 +616,6 @@ test("T-047 sandbox archives expected and actual composed traversal evidence", a
   assert(runJson.carriersAdmitted.every((carrier) => typeof carrier === "string"));
   assert(runJson.graphFunctionsExercised.includes("prepare_release_surface"));
   assert(runJson.graphFunctionsExercised.includes("derive_code_surface"));
-  assert(runJson.graphFunctionsExercised.includes("derive_requirement_surface"));
   assert.equal(
     runJson.installedWorkspace.kind,
     "odd_sdlc_abg_installed_sandbox_evidence"

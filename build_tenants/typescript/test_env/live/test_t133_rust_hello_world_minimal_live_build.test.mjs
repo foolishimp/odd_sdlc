@@ -127,13 +127,22 @@ function assertScenarioContract(contract) {
   assert.deepEqual(contract.expectedFiles, [tenant.manifestFile, tenant.sourceFile]);
   assertUnique(contract.expectedFiles, "expectedFiles");
   assert.deepEqual(contract.expectedRequirementIds, [
-    "REQ-T133-001-product-scope",
-    "REQ-T133-002-rust-tenant",
-    "REQ-T133-003-expected-files",
-    "REQ-T133-004-exact-output",
-    "REQ-T133-005-execution-command"
+    "REQ-T133-001",
+    "REQ-T133-002",
+    "REQ-T133-003",
+    "REQ-T133-004",
+    "REQ-T133-005"
   ]);
   assertUnique(contract.expectedRequirementIds, "expectedRequirementIds");
+  assert.equal(Array.isArray(contract.requirements), true);
+  assert.deepEqual(
+    contract.requirements.map((requirement) => requirement.id),
+    contract.expectedRequirementIds
+  );
+  for (const requirement of contract.requirements) {
+    assertNonEmptyString(requirement.title, `${requirement.id}.title`);
+    assertNonEmptyString(requirement.text, `${requirement.id}.text`);
+  }
   for (const expectedFile of contract.expectedFiles) {
     assert.equal(
       expectedFile.startsWith(`${tenant.selectedOutputRoot}/`),

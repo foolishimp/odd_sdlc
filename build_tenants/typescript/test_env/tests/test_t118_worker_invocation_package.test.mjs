@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
@@ -79,8 +80,7 @@ function manifestForLargeSurface() {
   });
 }
 
-function manifestWithDeclaredProductFileTargets() {
-  const workspaceRoot = workspaceWithLargeRequirementSurface();
+function writeDeclaredProductFileTargetSurface(workspaceRoot) {
   writeFileSync(
     path.join(workspaceRoot, "specification/PRODUCT.md"),
     [
@@ -108,6 +108,11 @@ function manifestWithDeclaredProductFileTargets() {
     ),
     "utf8"
   );
+}
+
+function manifestWithDeclaredProductFileTargets() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  writeDeclaredProductFileTargetSurface(workspaceRoot);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   return deriveWorkerHandoffManifest({
     workspaceRoot,
@@ -116,6 +121,20 @@ function manifestWithDeclaredProductFileTargets() {
     vectorIndex: 10,
     contract,
     runId: "t118-declared-product-file-targets"
+  });
+}
+
+function manifestForDeclaredProductMaterialization() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  writeDeclaredProductFileTargetSurface(workspaceRoot);
+  const contract = hookContractByEdgeName(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t118-first-pass-product-materialization"
   });
 }
 
@@ -179,7 +198,8 @@ test("T-118 writes a compact worker invocation package while preserving the full
     ).length,
     12
   );
-  assert.equal(invocationPackage.requirementTraceObligationIds.length, 160);
+  assert.equal(invocationPackage.requirementTraceObligationIds.length, 80);
+  assert.equal(invocationPackage.omittedRequirementTraceObligationCount, 240);
   assert(invocationPackage.omittedObligationCount > 100);
   assert.equal(workerBrief.kind, "sdlc_worker_brief");
   assert.equal(
@@ -246,5 +266,43 @@ test("T-002 worker package and prompt carry declared product file targets", () =
     prompt,
     /Declared product file targets: build_tenants\/scala_spark\/build\.sbt, build_tenants\/scala_spark\/src\/main\/scala\/generated\/App\.scala\./u
   );
+  const outcomeDirectives = invocationPackage.outcomeDirectives.join("\n");
+  assert.match(
+    outcomeDirectives,
+    /Declared product file targets are the exact product surface/u
+  );
+  assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
   assert.doesNotMatch(prompt, /README\.md/u);
+});
+
+test("T-157 product materialization prompt carries first-pass execution closure law", () => {
+  const manifest = manifestForDeclaredProductMaterialization();
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const outcomeDirectives = invocationPackage.outcomeDirectives.join("\n");
+
+  assert.match(
+    outcomeDirectives,
+    /Outcome: Fg_materialize_declared_product_asset -> component_code_surface/u
+  );
+  assert.match(
+    outcomeDirectives,
+    /Declared product file targets are the exact product surface/u
+  );
+  assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
+  assert.match(
+    outcomeDirectives,
+    /Use this exact closed carrier shape: \{"kind":"sdlc_worker_execution_evidence"/u
+  );
+  assert.match(
+    outcomeDirectives,
+    /shardEvidence\[\]\.kind MUST be exactly "sdlc_worker_execution_shard_evidence"/u
+  );
+  assert.match(
+    outcomeDirectives,
+    /testsObserved MUST be greater than zero/u
+  );
+  assert.doesNotMatch(outcomeDirectives, /Prior defect:/u);
 });

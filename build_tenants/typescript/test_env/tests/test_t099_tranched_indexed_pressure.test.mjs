@@ -92,6 +92,12 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   const invocationPackage = JSON.parse(
     readFileSync(files.invocationPackagePath, "utf8")
   );
+  const requirement050 = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationKind === "requirement" &&
+      obligation.summary.includes("REQ-T099-050")
+  );
+  assert(requirement050);
 
   assert.equal(existsSync(files.manifestPath), true);
   assert.equal(
@@ -115,7 +121,7 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   );
   assert(
     manifest.traversalObligationContext.retrievalHints.some(
-      (hint) => hint.obligationIds.includes("requirement:REQ-T099-050")
+      (hint) => hint.obligationIds.includes(requirement050.obligationId)
     )
   );
 
@@ -135,7 +141,7 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   assert.equal(typeof invocationPackage.omittedObligationCount, "number");
   assert(
     invocationPackage.requirementTraceObligationIds.includes(
-      "requirement:REQ-T099-050"
+      requirement050.obligationId
     )
   );
   assert(

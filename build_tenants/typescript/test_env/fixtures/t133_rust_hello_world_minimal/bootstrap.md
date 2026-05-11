@@ -70,11 +70,38 @@ program.
     "build_tenants/hello_world_rust/src/main.rs"
   ],
   "expectedRequirementIds": [
-    "REQ-T133-001-product-scope",
-    "REQ-T133-002-rust-tenant",
-    "REQ-T133-003-expected-files",
-    "REQ-T133-004-exact-output",
-    "REQ-T133-005-execution-command"
+    "REQ-T133-001",
+    "REQ-T133-002",
+    "REQ-T133-003",
+    "REQ-T133-004",
+    "REQ-T133-005"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-T133-001",
+      "title": "Single Rust product tenant",
+      "text": "hello_world_rust_minimal contains exactly one generated Rust product tenant for this proof lane."
+    },
+    {
+      "id": "REQ-T133-002",
+      "title": "Cargo runtime tenant",
+      "text": "The generated tenant is named hello_world_rust, uses Cargo as its runtime/build tool, and is rooted at build_tenants/hello_world_rust."
+    },
+    {
+      "id": "REQ-T133-003",
+      "title": "Declared Rust product files",
+      "text": "Product materialization writes the declared Cargo manifest build_tenants/hello_world_rust/Cargo.toml and Rust source file build_tenants/hello_world_rust/src/main.rs without using prebuilt fixture files."
+    },
+    {
+      "id": "REQ-T133-004",
+      "title": "Exact stdout contract",
+      "text": "Running the generated Rust program emits exactly Hello, world! after trimming trailing whitespace."
+    },
+    {
+      "id": "REQ-T133-005",
+      "title": "Declared Cargo execution command",
+      "text": "The product proof runs cargo run --quiet from build_tenants/hello_world_rust and records process evidence for that command."
+    }
   ],
   "sandbox": {
     "workspaceSlug": "t133_rust_hello_world_minimal_workspace",

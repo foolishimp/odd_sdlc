@@ -112,9 +112,20 @@ function codeWorkReport(input) {
   return outcome.workReport;
 }
 
-function proofClaim(input) {
+function authorityRefForRequirement(ingress, requirementId) {
+  const authority = ingress.importedRequirementAuthorities.find(
+    (candidate) => candidate.requirementId === requirementId
+  );
+  assert(authority);
+  return authority.requirementAuthorityRef;
+}
+
+function proofClaim(ingress, input) {
   return admitSdlcRequirementProofClaim({
     kind: "sdlc_requirement_proof_claim",
+    requirementAuthorityRef:
+      input.requirementAuthorityRef ??
+      authorityRefForRequirement(ingress, input.requirementId),
     ...input
   });
 }
@@ -131,21 +142,21 @@ test("T-035 lineage ties source requirement, graph function, generated asset, an
   const ingress = ingressReport();
   const workReport = successfulCodeWorkReport();
   const claims = [
-    proofClaim({
+    proofClaim(ingress, {
       requirementId: "REQ-EX-001",
       assetId: "asset://code_surface",
       proofKind: "trace_tag",
       authorityVerb: "implements",
       evidenceRefs: ["comment://Implements:REQ-EX-001"]
     }),
-    proofClaim({
+    proofClaim(ingress, {
       requirementId: "REQ-EX-001",
       assetId: "asset://code_surface",
       proofKind: "behavioral_test",
       authorityVerb: "validates",
       evidenceRefs: ["test://t035/REQ-EX-001"]
     }),
-    proofClaim({
+    proofClaim(ingress, {
       requirementId: "REQ-EX-002",
       assetId: "asset://code_surface",
       proofKind: "trace_tag",
@@ -180,21 +191,21 @@ test("T-035 requirement closure rejects trace-only shells and carries unresolved
     ingressReport: ingress,
     workReports: [successfulCodeWorkReport()],
     proofClaims: [
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-001",
         assetId: "asset://code_surface",
         proofKind: "trace_tag",
         authorityVerb: "implements",
         evidenceRefs: ["comment://Implements:REQ-EX-001"]
       }),
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-001",
         assetId: "asset://code_surface",
         proofKind: "behavioral_test",
         authorityVerb: "validates",
         evidenceRefs: ["test://t035/REQ-EX-001"]
       }),
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-002",
         assetId: "asset://code_surface",
         proofKind: "trace_tag",
@@ -274,7 +285,7 @@ test("T-144 requirement closure carries local requirement IDs from ingress", () 
   assert.equal(new Set(register.unresolvedRequirementAuthorityRefs).size, 2);
   assert(
     register.unresolvedRequirementAuthorityRefs.every((ref) =>
-      ref.startsWith("requirement-authority://odd-sdlc/local/")
+      ref.startsWith("t035_local.stage_01_local.r_")
     )
   );
   const localEntry = closureEntry(register, "R-001");
@@ -302,14 +313,14 @@ test("T-042 requirement closure rejects split behavioral proof and satisfied con
     ingressReport: ingress,
     workReports: [unsatisfiedBehavioralAsset, satisfiedTraceAsset],
     proofClaims: [
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-001",
         assetId: "asset://code_surface_with_behavioral_proof",
         proofKind: "behavioral_test",
         authorityVerb: "validates",
         evidenceRefs: ["test://t042/REQ-EX-001"]
       }),
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-001",
         assetId: "asset://code_surface_with_trace_only",
         proofKind: "trace_tag",
@@ -338,7 +349,7 @@ test("T-035 repair frontier separates unmet deltas from preservation truth", () 
     ingressReport: ingress,
     workReports: [successfulCodeWorkReport()],
     proofClaims: [
-      proofClaim({
+      proofClaim(ingress, {
         requirementId: "REQ-EX-001",
         assetId: "asset://code_surface",
         proofKind: "behavioral_test",

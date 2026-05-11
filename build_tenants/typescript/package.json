@@ -106,8 +106,11 @@
     "test:t152": "npm run build:semantic && node --test test_env/tests/test_t152_data_mapper_transformation_set_partition.test.mjs",
     "test:t153": "npm run build:semantic && node --test test_env/tests/test_t153_non_close_disposition_parity.test.mjs",
     "test:t154": "npm run build:semantic && node --test test_env/tests/test_t154_no_harness_target_data_mapper_parity.test.mjs",
+    "test:t155": "npm run build:semantic && node --test test_env/tests/test_t155_structural_requirement_authority_refs.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox npm run live:data-mapper-sandbox",
+    "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
+    "test:scenario:t131-odd-chat-live": "ODD_SDLC_TS_T131_ODD_CHAT_SCENARIO_LIVE=1 npm run test:scenario-sandbox",
     "test:sandbox": "npm run build:semantic && node --test test_env/sandbox/*.test.mjs",
     "test:live": "npm run build:semantic && node --test test_env/live/*.test.mjs",
     "test:reference:data-mapper": "npm run build:semantic && node --test test_env/tests/test_t031_data_mapper_reference.reference.mjs"

@@ -914,6 +914,8 @@ function closureRegisterForHomeostaticTriage(
         return Object.freeze({
           kind: "sdlc_requirement_closure_entry" as const,
           requirementId: row.requirementId,
+          requirementDisplayId: row.requirementDisplayId,
+          requirementAuthorityRef: row.requirementAuthorityRef,
           sourceInputUris: row.sourceInputUris,
           assetIds: Object.freeze([]),
           producedByGraphFunctions: Object.freeze([]),
@@ -944,6 +946,21 @@ function closureRegisterForHomeostaticTriage(
       entries
         .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
         .map((entry) => entry.requirementId)
+    ),
+    fulfilledRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    carriedForwardRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    unresolvedRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     emittedRuntimeEventKinds: Object.freeze([] as const)
   });

@@ -82,6 +82,33 @@ function workspaceWithMarkerOnlyRequirement() {
   return root;
 }
 
+function workspaceWithCanonicalRequirementSection() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t091-section-"));
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  mkdirSync(path.join(root, "specification"), { recursive: true });
+  writeConstraints(root);
+  writeFileSync(path.join(root, "specification/INTENT.md"), "# Intent\n", "utf8");
+  writeFileSync(
+    path.join(root, "specification/requirements/01-acc-requirements.md"),
+    [
+      "# ACC Requirements",
+      "",
+      "## REQ-ACC-004",
+      "",
+      "**Priority**: Critical",
+      "**Type**: Functional",
+      "**Status**: Pending",
+      "",
+      "**Description**: A run CANNOT be marked COMPLETE unless accounting verification passes.",
+      "",
+      "**Acceptance Criteria**:",
+      "- Verification runs automatically before completion."
+    ].join("\n"),
+    "utf8"
+  );
+  return root;
+}
+
 function workspaceWithLocalHeadingRequirement() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t091-local-heading-"));
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
@@ -137,6 +164,14 @@ function reportFor(manifest, obligationAssessments) {
   };
 }
 
+function requirementObligation(manifest, displayId) {
+  return manifest.traversalObligationContext.obligations.find(
+    (item) =>
+      item.obligationKind === "requirement" &&
+      item.summary.includes(displayId)
+  );
+}
+
 test("T-091 derives concrete requirement payload from imported source refs, not only marker ledger IDs", () => {
   const manifest = manifestFor(workspaceWithImportedRequirement());
   const familyPath = path.join(
@@ -148,9 +183,7 @@ test("T-091 derives concrete requirement payload from imported source refs, not 
     readFileSync(familyPath, "utf8"),
     /REQ-T091-001: Preserve the concrete source requirement text/u
   );
-  const obligation = manifest.traversalObligationContext.obligations.find(
-    (item) => item.obligationId === "requirement:REQ-T091-001"
-  );
+  const obligation = requirementObligation(manifest, "REQ-T091-001");
 
   assert(obligation);
   assert.equal(obligation.payload.status, "concrete");
@@ -178,23 +211,39 @@ test("T-091 derives concrete requirement payload from imported source refs, not 
 
 test("T-091 rejects marker-only requirement pressure before worker handoff is admitted", () => {
   const manifest = manifestFor(workspaceWithMarkerOnlyRequirement());
-  const obligation = manifest.traversalObligationContext.obligations.find(
-    (item) => item.obligationId === "requirement:REQ-T091-999"
-  );
+  const obligation = requirementObligation(manifest, "REQ-T091-999");
 
   assert(obligation);
   assert.equal(obligation.payload.status, "reference_only");
   assert.throws(
     () => writeHandoffFiles(manifest),
-    /traversal obligation payload insufficient: requirement:REQ-T091-999/u
+    new RegExp(
+      `traversal obligation payload insufficient: ${obligation.obligationId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`,
+      "u"
+    )
   );
+});
+
+test("T-091 treats canonical requirement sections with body text as concrete traversal pressure", () => {
+  const manifest = manifestFor(workspaceWithCanonicalRequirementSection());
+  const obligation = requirementObligation(manifest, "REQ-ACC-004");
+
+  assert(obligation);
+  assert.equal(obligation.payload.status, "concrete");
+  assert(
+    obligation.payload.sourceSnippets.some((snippet) =>
+      snippet.includes("A run CANNOT be marked COMPLETE")
+    )
+  );
+  assert.doesNotThrow(() => writeHandoffFiles(manifest));
 });
 
 test("T-091 derives concrete payload from local requirement headings after blank lines", () => {
   const manifest = manifestFor(workspaceWithLocalHeadingRequirement());
   const obligation = manifest.traversalObligationContext.obligations.find(
     (item) =>
-      item.obligationId.includes("/R-010/1-project-identity/")
+      item.obligationKind === "requirement" &&
+      item.summary.includes("R-010")
   );
 
   assert(obligation);
@@ -230,7 +279,10 @@ test("T-091 postflight rejects fulfilled requirement without output coverage evi
     postflight.blockingReasonCarriers.some(
       (reason) =>
         reason.code === "obligation_fulfilled_without_output_coverage" &&
-        reason.detail === "requirement:REQ-T091-001"
+        reason.detail === requirementObligation(
+          manifest,
+          "REQ-T091-001"
+        )?.obligationId
     )
   );
 });

@@ -78,7 +78,7 @@ test("T-148 duplicate local display IDs retain distinct authority refs through c
   assert.equal(new Set(authorityRefs).size, 2);
   assert(
     authorityRefs.every((ref) =>
-      ref.startsWith("requirement-authority://odd-sdlc/local/")
+      /^t148_collision_safe_requirements\.stage_0[12]_[a-z]+\.r_001$/u.test(ref)
     )
   );
   assert(authorityRefs.every((ref) => ref !== "R-001"));

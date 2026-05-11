@@ -7,7 +7,6 @@ import {
   parseEnumValue,
   parseKind,
   parseNonEmptyString,
-  parseOptionalField,
   parseStringList
 } from "../shared/validation.js";
 import type { SdlcWorkReport } from "../hooks/index.js";
@@ -36,7 +35,7 @@ export type SdlcRequirementProofAuthority =
 export interface SdlcRequirementProofClaim {
   readonly kind: "sdlc_requirement_proof_claim";
   readonly requirementId: string;
-  readonly requirementAuthorityRef?: string;
+  readonly requirementAuthorityRef: string;
   readonly assetId: string;
   readonly proofKind: SdlcRequirementProofKind;
   readonly authorityVerb: SdlcRequirementProofAuthority;
@@ -48,6 +47,17 @@ export interface SdlcLineageProof {
   readonly requirementId: string;
   readonly requirementDisplayId: string;
   readonly requirementAuthorityRef: string;
+  readonly proofKind: SdlcRequirementProofKind;
+  readonly authorityVerb: SdlcRequirementProofAuthority;
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcLineageProofClaimDiagnostic {
+  readonly kind: "sdlc_lineage_proof_claim_diagnostic";
+  readonly code: "unresolved_requirement_authority_ref";
+  readonly requirementId: string;
+  readonly requirementAuthorityRef: string;
+  readonly assetId: string;
   readonly proofKind: SdlcRequirementProofKind;
   readonly authorityVerb: SdlcRequirementProofAuthority;
   readonly evidenceRefs: readonly string[];
@@ -69,6 +79,7 @@ export interface SdlcLineageEntry {
   readonly proofKinds: readonly SdlcRequirementProofKind[];
   readonly authorityVerbs: readonly SdlcRequirementProofAuthority[];
   readonly proofs: readonly SdlcLineageProof[];
+  readonly proofClaimDiagnostics: readonly SdlcLineageProofClaimDiagnostic[];
 }
 
 export interface SdlcLineageLedger {
@@ -94,7 +105,7 @@ export interface SdlcRequirementClosureEntry {
   readonly kind: "sdlc_requirement_closure_entry";
   readonly requirementId: string;
   readonly requirementDisplayId?: string;
-  readonly requirementAuthorityRef?: string;
+  readonly requirementAuthorityRef: string;
   readonly authorityDerivationRefs?: readonly string[];
   readonly sourceInputUris: readonly string[];
   readonly assetIds: readonly string[];
@@ -162,21 +173,14 @@ export function admitSdlcRequirementProofClaim(
     "evidenceRefs"
   ]);
   parseKind(record["kind"], "sdlc_requirement_proof_claim", `${label}.kind`);
-  const requirementAuthorityRef = parseOptionalField(
-    record,
-    "requirementAuthorityRef"
+  const requirementAuthorityRef = parseNonEmptyString(
+    record["requirementAuthorityRef"],
+    `${label}.requirementAuthorityRef`
   );
   return Object.freeze({
     kind: "sdlc_requirement_proof_claim",
     requirementId: parseNonEmptyString(record["requirementId"], `${label}.requirementId`),
-    ...(requirementAuthorityRef === undefined
-      ? {}
-      : {
-          requirementAuthorityRef: parseNonEmptyString(
-            requirementAuthorityRef,
-            `${label}.requirementAuthorityRef`
-          )
-        }),
+    requirementAuthorityRef,
     assetId: parseNonEmptyString(record["assetId"], `${label}.assetId`),
     proofKind: parseEnumValue(
       record["proofKind"],
@@ -194,9 +198,9 @@ export function admitSdlcRequirementProofClaim(
 
 function authorityRefForIngressAuthority(input: {
   readonly requirementId: string;
-  readonly requirementAuthorityRef?: string;
+  readonly requirementAuthorityRef: string;
 }): string {
-  return input.requirementAuthorityRef ?? input.requirementId;
+  return input.requirementAuthorityRef;
 }
 
 function displayIdForIngressAuthority(input: {
@@ -229,21 +233,13 @@ function authorityForClaim(input: {
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly claim: SdlcRequirementProofClaim;
 }): ImportedRequirementAuthority | null {
-  if (input.claim.requirementAuthorityRef !== undefined) {
-    return (
-      input.ingressReport.importedRequirementAuthorities.find(
-        (authority) =>
-          authorityRefForIngressAuthority(authority) ===
-          input.claim.requirementAuthorityRef
-      ) ?? null
-    );
-  }
-  const candidates = input.ingressReport.importedRequirementAuthorities.filter(
-    (authority) =>
-      displayIdForIngressAuthority(authority) === input.claim.requirementId ||
-      authorityRefForIngressAuthority(authority) === input.claim.requirementId
+  return (
+    input.ingressReport.importedRequirementAuthorities.find(
+      (authority) =>
+        authorityRefForIngressAuthority(authority) ===
+        input.claim.requirementAuthorityRef
+    ) ?? null
   );
-  return candidates.length === 1 ? candidates[0] ?? null : null;
 }
 
 function proofForClaim(input: {
@@ -262,6 +258,21 @@ function proofForClaim(input: {
     proofKind: input.claim.proofKind,
     authorityVerb: input.claim.authorityVerb,
     evidenceRefs: Object.freeze([...input.claim.evidenceRefs])
+  });
+}
+
+function diagnosticForUnmatchedClaim(
+  claim: SdlcRequirementProofClaim
+): SdlcLineageProofClaimDiagnostic {
+  return Object.freeze({
+    kind: "sdlc_lineage_proof_claim_diagnostic",
+    code: "unresolved_requirement_authority_ref",
+    requirementId: claim.requirementId,
+    requirementAuthorityRef: claim.requirementAuthorityRef,
+    assetId: claim.assetId,
+    proofKind: claim.proofKind,
+    authorityVerb: claim.authorityVerb,
+    evidenceRefs: Object.freeze([...claim.evidenceRefs])
   });
 }
 
@@ -298,6 +309,15 @@ export function deriveSdlcLineageLedger(input: {
             )
             .filter((proof): proof is SdlcLineageProof => proof !== null)
         );
+        const proofClaimDiagnostics = Object.freeze(
+          claims
+            .filter(
+              (claim) =>
+                proofForClaim({ claim, ingressReport: input.ingressReport }) ===
+                null
+            )
+            .map(diagnosticForUnmatchedClaim)
+        );
         const requirementIds = uniqueSorted(claims.map((claim) => claim.requirementId));
         const requirementAuthorityRefs = uniqueSorted(
           proofs.map((proof) => proof.requirementAuthorityRef)
@@ -327,7 +347,8 @@ export function deriveSdlcLineageLedger(input: {
           ]),
           proofKinds: uniqueSorted(claims.map((claim) => claim.proofKind)),
           authorityVerbs: uniqueSorted(claims.map((claim) => claim.authorityVerb)),
-          proofs
+          proofs,
+          proofClaimDiagnostics
         });
       })
     ),
@@ -460,19 +481,97 @@ function closureForRequirement(input: {
   });
 }
 
+function unmatchedClaimClosureEntries(input: {
+  readonly liveAuthorityRefs: readonly string[];
+  readonly lineageLedger: SdlcLineageLedger;
+}): readonly SdlcRequirementClosureEntry[] {
+  const liveAuthorityRefs = new Set(input.liveAuthorityRefs);
+  const byAuthorityRef = new Map<
+    string,
+    {
+      readonly requirementIds: Set<string>;
+      readonly assetIds: Set<string>;
+      readonly producedByGraphFunctions: Set<string>;
+      readonly proofKinds: Set<SdlcRequirementProofKind>;
+      readonly authorityVerbs: Set<SdlcRequirementProofAuthority>;
+      readonly evidenceRefs: Set<string>;
+    }
+  >();
+  for (const entry of input.lineageLedger.entries) {
+    for (const diagnostic of entry.proofClaimDiagnostics) {
+      if (liveAuthorityRefs.has(diagnostic.requirementAuthorityRef)) {
+        continue;
+      }
+      const existing = byAuthorityRef.get(diagnostic.requirementAuthorityRef) ?? {
+        requirementIds: new Set<string>(),
+        assetIds: new Set<string>(),
+        producedByGraphFunctions: new Set<string>(),
+        proofKinds: new Set<SdlcRequirementProofKind>(),
+        authorityVerbs: new Set<SdlcRequirementProofAuthority>(),
+        evidenceRefs: new Set<string>()
+      };
+      existing.requirementIds.add(diagnostic.requirementId);
+      existing.assetIds.add(entry.elementId);
+      existing.producedByGraphFunctions.add(entry.producedByGraphFunction);
+      existing.proofKinds.add(diagnostic.proofKind);
+      existing.authorityVerbs.add(diagnostic.authorityVerb);
+      for (const evidenceRef of diagnostic.evidenceRefs) {
+        existing.evidenceRefs.add(evidenceRef);
+      }
+      byAuthorityRef.set(diagnostic.requirementAuthorityRef, existing);
+    }
+  }
+  return Object.freeze(
+    [...byAuthorityRef.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([requirementAuthorityRef, diagnostic]) => {
+        const requirementIds = uniqueSorted([...diagnostic.requirementIds]);
+        const requirementDisplayId =
+          requirementIds[0] ?? requirementAuthorityRef;
+        return Object.freeze({
+          kind: "sdlc_requirement_closure_entry" as const,
+          requirementId: requirementDisplayId,
+          requirementDisplayId,
+          requirementAuthorityRef,
+          authorityDerivationRefs: Object.freeze([]),
+          sourceInputUris: Object.freeze([]),
+          assetIds: uniqueSorted([...diagnostic.assetIds]),
+          producedByGraphFunctions: uniqueSorted([
+            ...diagnostic.producedByGraphFunctions
+          ]),
+          proofKinds: uniqueSorted([...diagnostic.proofKinds]),
+          authorityVerbs: uniqueSorted([...diagnostic.authorityVerbs]),
+          evidenceRefs: uniqueSorted([...diagnostic.evidenceRefs]),
+          traceabilityStatus: "absent" as const,
+          fulfillmentStatus: "missing" as const,
+          carryStatus: "carried_forward" as const,
+          openReasons: Object.freeze([
+            "proof_claim_requirement_authority_unresolved"
+          ])
+        });
+      })
+  );
+}
+
 export function projectSdlcRequirementClosureRegister(input: {
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly lineageLedger: SdlcLineageLedger;
 }): SdlcRequirementClosureRegister {
-  const entries = Object.freeze(
-    liveRequirementAuthorities(input.ingressReport).map((authority) =>
+  const liveAuthorities = liveRequirementAuthorities(input.ingressReport);
+  const liveAuthorityRefs = liveAuthorities.map(authorityRefForIngressAuthority);
+  const entries = Object.freeze([
+    ...liveAuthorities.map((authority) =>
       closureForRequirement({
         authority,
         ingressReport: input.ingressReport,
         lineageLedger: input.lineageLedger
       })
-    )
-  );
+    ),
+    ...unmatchedClaimClosureEntries({
+      liveAuthorityRefs,
+      lineageLedger: input.lineageLedger
+    })
+  ]);
   return Object.freeze({
     kind: "sdlc_requirement_closure_register",
     entries,
@@ -494,17 +593,17 @@ export function projectSdlcRequirementClosureRegister(input: {
     fulfilledRequirementAuthorityRefs: uniqueSorted(
       entries
         .filter((entry) => entry.fulfillmentStatus === "fulfilled")
-        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     carriedForwardRequirementAuthorityRefs: uniqueSorted(
       entries
         .filter((entry) => entry.carryStatus === "carried_forward")
-        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     unresolvedRequirementAuthorityRefs: uniqueSorted(
       entries
         .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
-        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     emittedRuntimeEventKinds: EMPTY_RUNTIME_EVENT_KINDS
   });
