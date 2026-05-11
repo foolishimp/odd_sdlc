@@ -210,7 +210,7 @@ The model treats requirements as documentation, not as a typed carrier. When ask
 **Examples:** abg T-008 (one runtime execution law), T-038 (constitutional design monoliths into authority surfaces), T-040 (delete retired monolith stubs); sdlc T-003 (spec-method build topology), T-004 (homeostatic loop), T-009 (closure with constitutional reentry), T-018 (workspace assets canonical path), T-064 (ABG and odd_sdlc installer contract before RC), T-093 (governed scheduling phase between design and realization)
 
 **Constitutional truth at stake:**
-Specification surfaces are active-tense and constitutional. Design surfaces decompose into governed modules with explicit derivation back to specification. STDO (SPEC + TICKET + DESIGN_MODULE + ODD) governs change. No constitutional change is lawful outside these four methods. Monolithic design documents lose the per-module derivation; they need to be split into constituent authority surfaces.
+Specification surfaces are active-tense and constitutional. Design surfaces decompose into governed modules with explicit derivation back to specification. STDO (SPEC + TICKET + DESIGN_MODULE + ODD) names the common governance surfaces; the broader shared standards library (`IDENTITY_METHOD.md`, `WORLD_MODEL_METHOD.md`, `RELEASE_METHOD.md`, `UX_METHOD.md`, `POSTING_GUIDE.md`, `WRITING_GUIDE.md`, `GLOSSARY_GUIDE.md` per `specification_methodology/specification/standards/README.md`) carries additional ratified surfaces. Constitutional change happens through the relevant method surface. Monolithic design documents lose the per-module derivation; they need to be split into constituent authority surfaces.
 
 **Why the trap regenerates under LLM iteration:**
 Design documents grow because the model writes coherent paragraphs that span topics, and reviewers (including the model itself) accept the coherence as authoritative. The decomposition discipline ("this paragraph is its own module with its own requirement trace") requires resisting prose flow. T-038 split GTL/ABG constitutional design monoliths into constituent authority surfaces; T-040 retired the monolith stubs; the cycle is likely to repeat as new design work accretes.
@@ -312,25 +312,25 @@ Examining the repo distribution per theme surfaces three repo-specific patterns 
 
 What to elevate, where to elevate it, and why current placement fails to constrain behavior.
 
-### P1: The constructive carrier discipline must be primary in `ODD_METHOD.md`
+### P1: Enforce the constructive carrier discipline that is already constitutional
 
-**Truth to elevate:** An ODD product is a graph: typed assets, published graph functions, runtime that admits typed carriers, projection over admitted events. The constructive carrier is the primary realization shape. Imperative service methods, orchestration loops, and one-off scripts are not lawful substitutes.
+**Truth at stake:** An ODD product is a graph: typed assets, published graph functions, runtime that admits typed carriers, projection over admitted events. The constructive carrier is the primary realization shape. Imperative service methods, orchestration loops, and one-off scripts are not lawful substitutes.
 
-**Current placement:** Named in `CLAUDE.md` `## Embedded Method Compression / ODD Compression` (workspace bootstrap). Visible only when the workspace bootstrap is in context.
+**Current placement (constitutional):** `ODD_METHOD.md:48` declares GTL graph functions as the primary constructive carrier. `ODD_METHOD.md:528` limits imperative adapter code to transport/persist facts. `ODD_METHOD.md:1410` (Canonical Compression §20) names outcome-first construction, declarative GTL/ABG carrier structure, and minimal imperative adapter code as the law. The construct is ratified, not absent.
 
-**Why it fails to constrain:** The construct is in the bootstrap, but the substrate's own ergonomics (TypeScript module shape, helper functions, controller classes) make the imperative alternative the path of least resistance. The model writes the loop because the loop is in scope; the constructive carrier is in the docs.
+**Why the law fails to constrain in practice:** This is an enforcement/code-ergonomics gap, not a missing-law gap. The substrate's TypeScript module shape, helper functions, and controller classes make the imperative alternative the path of least resistance. The model writes the loop because the loop is in scope; the constructive carrier law is in the methodology surface but not in the immediate code context.
 
-**Primacy proposal:** ODD_METHOD.md §1 (Core Position) should open with the constructive carrier rule and name the failure modes — orchestration loops, controller-owned semantic centers, prompt-prose routing, CLI retry controllers — as primary anti-patterns. Then ODD-shaped repos should have a `make-carrier.sh` or equivalent template that produces a typed carrier scaffold by default when adding new state, so the path of least resistance flips.
+**Enforcement proposal:** ODD-shaped repos should have a typed-carrier scaffold template (`make-carrier` or equivalent) that produces a graph-function plus typed asset shape by default when adding new state, so the path of least resistance flips. Lint or code-review rules can flag controller-owned semantic centers, orchestration loops, prompt-prose routing, and CLI retry controllers as ODD_METHOD §48/§528 violations. The methodology surface does not need new content — the substrate needs new ergonomics that make the lawful path the default path.
 
-### P2: "Closure decision is replay-reproducible" must be primary in `ODD_METHOD.md` and `SPEC_METHOD.md`
+### P2: Audit implementation against the existing A13 replay law
 
-**Truth to elevate:** A closure decision is lawful only if replay can reproduce it. Carriers in the consequence chain carry predecessor refs sufficient to reconstruct the decision from the event log without local memory, wall-clock ordering, or runner-local arrays.
+**Truth at stake:** A closure decision is lawful only if replay can reproduce it. Carriers in the consequence chain carry predecessor refs sufficient to reconstruct the decision from the event log without local memory, wall-clock ordering, or runner-local arrays.
 
-**Current placement:** T-138 codifies it as ticket-local closure law; it appears in CLAUDE.md §7 Runtime Truth Rules as items 1–6 but not as the primary headline rule.
+**Current placement (constitutional):** `ODD_METHOD.md:915` states each disposition is replay-visible and must carry basis and reason refs sufficient to reproduce the decision. `ODD_METHOD.md:957` is A13 Replayability, declaring every closure decision and next-action selection must be reproducible from event-log truth plus causal predecessor refs. A13a (Causal Chain Integrity, ratified in v1.6.0) extends this to require each governing admitted or replay-derived carrier to carry causal predecessor refs.
 
-**Why it fails to constrain:** Replay-reproducibility is one rule among many in §7. The model treats it as "good practice" and complies when reminded, but reaches for in-process state when not reminded. The construct is not in the model's *default planning* for runtime work.
+**Why the law fails to constrain in practice:** This is an enforcement/audit gap, not a missing-law gap. A13 and A13a are ratified at constitutional level. The model treats them as good practice and complies when reminded but reaches for in-process state when not reminded. The construct is not in the model's default planning for runtime work because the substrate does not refuse to admit a carrier missing predecessor refs.
 
-**Primacy proposal:** SPEC_METHOD.md should declare "replay-reproducibility is a closure prerequisite" at constitutional level, and any closure decision admitted without predecessor refs should be a process defect. ODD_METHOD.md should specify that admitting evidence without causal basis fails closed at the carrier admission boundary, not at later projection time.
+**Enforcement proposal:** Audit substrate code against A13/A13a. Any carrier admission that does not require predecessor refs in its admission schema is a violation. The fail-closed boundary belongs at admission time, not later projection. No new constitutional content needed — the work is enforcing the constitutional content that already exists.
 
 ### P3: "F_P owns per-obligation semantic judgment; deterministic checks behind F_P are still F_P" needs a primary fail-closed boundary
 
@@ -342,6 +342,8 @@ What to elevate, where to elevate it, and why current placement fails to constra
 
 **Primacy proposal:** Make the closure-fold typed admission refuse closure when a deterministic check sits between F_P assessment and closure decision unless that check is explicitly registered as F_D-mechanics-class (existence, schema, digest, write-root, identity, admission envelope, target certification). Anything outside that closed class fails admission as "behavioral F_D leakage." Document the closed F_D-mechanics class in ODD_METHOD.md as primary.
 
+**Scope clarification:** This boundary is at **closure and admission**, not at F_P dispatch. F_P dispatch remains lawful whenever authority, target obligation binding, allowed write roots, and declared side-effect capability are present. The fail-closed gate operates on the closure-fold path, refusing closure when a behavioural-F_D check intervenes. The same gate does not gate dispatch, does not refuse F_P invocation, and does not interfere with F_P's lawful semantic transformation.
+
 ### P4: "Source project / release cut / product / install / dev product" must be a typed boundary, not a documented ontology
 
 **Truth to elevate:** Source project ≠ release cut ≠ product ≠ install ≠ builder substrate. PRODUCT.md is product-definition surface, not artifact. `.genesis/` is install root, not source. `build_tenants/<family>/<variant>/` is tenant lane, not source-tree root.
@@ -350,7 +352,7 @@ What to elevate, where to elevate it, and why current placement fails to constra
 
 **Why it fails to constrain:** Stated as ontology. Not enforced by the file system, by URL scheme strictness, or by typed path carriers. The model reads the names and then writes file operations against bare paths that don't preserve the distinction.
 
-**Primacy proposal:** Introduce typed path carriers (`SourceTreePath`, `InstallRoot`, `TenantLane`, `SandboxPath`, `BuilderSubstrate`) that are mutually non-assignable. Bare file operations against unknown paths fail closed. Update ODD_METHOD.md and SPEC_METHOD.md to require typed path carriers at the substrate boundary. This is the same construct as theme P1 (typed carrier) applied to filesystem operations.
+**Primacy proposal:** Introduce typed path carriers (`SourceTreePath`, `InstallRoot`, `TenantLane`, `SandboxPath`, `BuilderSubstrate`) that are mutually non-assignable. **Scope:** typed path carriers govern cross-boundary write roots, install/source/sandbox admission, and replay-visible materialization. They are not required for adapter-internal paths, test fixtures, internal helper functions, or transient implementation paths that never cross an admission boundary. Update ODD_METHOD.md and SPEC_METHOD.md to require typed path carriers at the substrate boundary (install root admission, materialization root admission, tenant-lane resolution, sandbox preparation). This is the same construct as theme P1 (typed carrier) applied to admission-boundary filesystem operations, scoped to avoid over-hardening adapter code.
 
 ### P5: "Published catalog is the only lookup authority" needs to be primary in operator-facing surfaces
 
@@ -384,6 +386,7 @@ What to elevate, where to elevate it, and why current placement fails to constra
 
 ## Caveats
 
+- **Counts are heuristic, not reproducible.** Clustering was regex over title + target_truth + superseded_truth + change_intent + intake_source + affected_boundary; overlap was permitted; no per-ticket assignment manifest or match-rule script is published with this analysis. The counts should be read as heuristic signal of relative theme weight, not as ratification-grade evidence. Promoting any specific count into shared method requires a reproducible match manifest first.
 - **One-month window.** Cycles longer than 30 days are invisible. Themes that recur every 6 weeks would show as one ticket here.
 - **Ticket-as-classification-unit bias.** A single conceptual issue can show up as one design ticket + one realization ticket + one cleanup ticket, inflating counts. Conversely, a diffuse pattern may not surface as any single ticket.
 - **Single-author bias.** The themes may reflect one developer's preferences plus one model's defaults more than a universal pattern.
@@ -391,6 +394,7 @@ What to elevate, where to elevate it, and why current placement fails to constra
 - **Theme overlap is high.** A single ticket frequently matches 3–5 themes. The counts are correlated; the *primacy* recommendations are not.
 - **Active-surface writing discipline assertion.** The themes are written present-tense; the analysis text describes recurring failures in past tense where the failure itself is historical. This is commentary, not constitutional law.
 - **No code was read or modified.** This analysis is over ticket text and CLAUDE.md context only.
+- **Promotion gate to shared method.** Treat this artifact as commentary. Promotion into shared method surfaces (`SPEC_METHOD.md`, `ODD_METHOD.md`, etc.) requires (a) verifying each "current placement" claim against the live methodology surfaces (a 2026-05-11 review caught two stale placement claims in P1 and P2 where the constitutional law already exists; both are corrected above), and (b) attaching a reproducible per-ticket match manifest so the quantitative claims survive audit.
 
 ## Closing Observation
 
