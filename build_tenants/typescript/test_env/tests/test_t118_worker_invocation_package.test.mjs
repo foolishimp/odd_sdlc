@@ -82,6 +82,18 @@ function manifestForLargeSurface() {
 function manifestWithDeclaredProductFileTargets() {
   const workspaceRoot = workspaceWithLargeRequirementSurface();
   writeFileSync(
+    path.join(workspaceRoot, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Expected Product Files",
+      "",
+      "- build_tenants/scala_spark/build.sbt role=build_config",
+      "- build_tenants/scala_spark/src/main/scala/generated/App.scala role=source"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
     path.join(workspaceRoot, ".ai-workspace/context/t118_expected_files.json"),
     JSON.stringify(
       {

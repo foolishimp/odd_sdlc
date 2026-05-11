@@ -977,6 +977,7 @@ export interface SdlcWorkerInvocationOutputContract {
   readonly tenantRoot: string;
   readonly selectedOutputRoot: string;
   readonly declaredProductFileTargets: readonly string[];
+  readonly declaredProductTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly requiredRoles: readonly SdlcMaterializedProductFileRole[];
   readonly buildExecutionContract: string;
   readonly testExecutionContract: string;
@@ -986,6 +987,8 @@ export interface SdlcProductMaterializationAuthorityTarget {
   readonly kind: "sdlc_product_materialization_authority_target";
   readonly path: string;
   readonly targetKind: "file" | "directory";
+  readonly requiredRole: SdlcMaterializedProductFileRole;
+  readonly policyRef: string;
   readonly source: "context_expected_files" | "product_authority";
   readonly sourceRef: string;
 }

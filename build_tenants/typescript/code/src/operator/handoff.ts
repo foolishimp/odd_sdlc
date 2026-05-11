@@ -445,11 +445,41 @@ function productMaterializationForFeatureScope(input: {
   });
 }
 
+type DeclaredProductTargetSeed = Pick<
+  SdlcProductMaterializationAuthorityTarget,
+  "path" | "targetKind"
+> & {
+  readonly requiredRole: SdlcMaterializedProductFileRole | null;
+  readonly policyRef: string | null;
+};
+
+function explicitRoleFromTargetText(input: string): {
+  readonly value: string;
+  readonly requiredRole: SdlcMaterializedProductFileRole | null;
+} {
+  const roleMatch =
+    /\brole\s*[:=]\s*(source|test|build_config|design|documentation|other)\b/iu.exec(
+      input
+    );
+  const requiredRole =
+    roleMatch?.[1] === undefined
+      ? null
+      : (roleMatch[1].toLowerCase() as SdlcMaterializedProductFileRole);
+  const value = input
+    .replace(
+      /\s*(?:[|;,]\s*)?\brole\s*[:=]\s*(?:source|test|build_config|design|documentation|other)\b/iu,
+      ""
+    )
+    .trim();
+  return Object.freeze({ value, requiredRole });
+}
+
 function normalizeDeclaredProductFileTarget(input: {
   readonly value: string;
   readonly selectedOutputRoot: string;
-}): Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind"> | null {
-  const withoutComment = input.value.replace(/\s+#.*$/u, "");
+}): DeclaredProductTargetSeed | null {
+  const parsedRole = explicitRoleFromTargetText(input.value);
+  const withoutComment = parsedRole.value.replace(/\s+#.*$/u, "");
   const trimmed = withoutComment
     .trim()
     .replace(/^[-*]\s+/u, "")
@@ -487,7 +517,12 @@ function normalizeDeclaredProductFileTarget(input: {
   ) {
     return Object.freeze({
       path: normalized,
-      targetKind
+      targetKind,
+      requiredRole: parsedRole.requiredRole,
+      policyRef:
+        parsedRole.requiredRole === null
+          ? null
+          : `target-role-policy://odd-sdlc/explicit/${parsedRole.requiredRole}`
     });
   }
   return null;
@@ -532,11 +567,8 @@ function markdownSectionBodies(input: {
 function targetsFromProductAuthoritySection(input: {
   readonly body: string;
   readonly selectedOutputRoot: string;
-}): readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[] {
-  const targets = new Map<
-    string,
-    Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">
-  >();
+}): readonly DeclaredProductTargetSeed[] {
+  const targets = new Map<string, DeclaredProductTargetSeed>();
   let fenced = false;
   let sectionTreeRoot: string | null = null;
   const addTarget = (candidate: string): void => {
@@ -666,11 +698,8 @@ function targetsFromDeclaredModuleTargets(input: {
   readonly body: string;
   readonly selectedOutputRoot: string;
   readonly buildTool: string | null;
-}): readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[] {
-  const targets = new Map<
-    string,
-    Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">
-  >();
+}): readonly DeclaredProductTargetSeed[] {
+  const targets = new Map<string, DeclaredProductTargetSeed>();
   const addDirectory = (pathValue: string): void => {
     const normalized = normalizeDeclaredProductFileTarget({
       value: `${pathValue.replace(/\/+$/u, "")}/`,
@@ -746,6 +775,7 @@ function productAuthorityTargetsFor(
   const targets = targetContractsFromSeeds({
     source: "product_authority",
     sourceRef,
+    manifest,
     seeds: [
       ...sections.flatMap((body) =>
         targetsFromProductAuthoritySection({
@@ -824,7 +854,12 @@ function contextExpectedFileTargetsFor(
           normalized.path,
           Object.freeze({
             kind: "sdlc_product_materialization_authority_target" as const,
-            ...normalized,
+            path: normalized.path,
+            targetKind: normalized.targetKind,
+            ...materializationRolePolicyForTarget({
+              manifest,
+              seed: normalized
+            }),
             source: "context_expected_files" as const,
             sourceRef
           })
@@ -841,38 +876,127 @@ function contextExpectedFileTargetsFor(
   });
 }
 
+function materializationRolePolicyForTarget(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly seed: DeclaredProductTargetSeed;
+}): Pick<SdlcProductMaterializationAuthorityTarget, "requiredRole" | "policyRef"> {
+  if (input.seed.requiredRole !== null && input.seed.policyRef !== null) {
+    return Object.freeze({
+      requiredRole: input.seed.requiredRole,
+      policyRef: input.seed.policyRef
+    });
+  }
+  const relativeTarget = targetRelativeToSelectedOutputRoot({
+    targetPath: input.seed.path,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot
+  }).toLowerCase();
+  if (
+    declaredTechnologyIncludes(input.manifest, "sbt") &&
+    (relativeTarget === "build.sbt" || relativeTarget === "project" ||
+      relativeTarget.startsWith("project/"))
+  ) {
+    return Object.freeze({
+      requiredRole: "build_config" as const,
+      policyRef: "target-role-policy://odd-sdlc/scala-sbt/build-config"
+    });
+  }
+  if (
+    (declaredTechnologyIncludes(input.manifest, "cargo") ||
+      declaredTechnologyIncludes(input.manifest, "rust")) &&
+    relativeTarget === "cargo.toml"
+  ) {
+    return Object.freeze({
+      requiredRole: "build_config" as const,
+      policyRef: "target-role-policy://odd-sdlc/rust-cargo/build-config"
+    });
+  }
+  if (
+    declaredTechnologyIncludes(input.manifest, "maven") &&
+    relativeTarget === "pom.xml"
+  ) {
+    return Object.freeze({
+      requiredRole: "build_config" as const,
+      policyRef: "target-role-policy://odd-sdlc/maven/build-config"
+    });
+  }
+  if (
+    declaredTechnologyIncludes(input.manifest, "gradle") &&
+    (relativeTarget === "build.gradle" || relativeTarget === "build.gradle.kts")
+  ) {
+    return Object.freeze({
+      requiredRole: "build_config" as const,
+      policyRef: "target-role-policy://odd-sdlc/gradle/build-config"
+    });
+  }
+  if (
+    relativeTarget === "src" ||
+    relativeTarget.endsWith("/src") ||
+    relativeTarget.includes("/src/")
+  ) {
+    return Object.freeze({
+      requiredRole: "source" as const,
+      policyRef: "target-role-policy://odd-sdlc/product-source-tree"
+    });
+  }
+  if (
+    relativeTarget === "test" ||
+    relativeTarget === "tests" ||
+    relativeTarget.includes("/test/") ||
+    relativeTarget.includes("/tests/") ||
+    relativeTarget.endsWith("/test") ||
+    relativeTarget.endsWith("/tests")
+  ) {
+    return Object.freeze({
+      requiredRole: "test" as const,
+      policyRef: "target-role-policy://odd-sdlc/product-test-tree"
+    });
+  }
+  if (
+    relativeTarget === "design" ||
+    relativeTarget.startsWith("design/") ||
+    relativeTarget.endsWith("/design")
+  ) {
+    return Object.freeze({
+      requiredRole: "design" as const,
+      policyRef: "target-role-policy://odd-sdlc/product-design-surface"
+    });
+  }
+  if (/\.(?:md|markdown)$/u.test(relativeTarget)) {
+    return Object.freeze({
+      requiredRole: "documentation" as const,
+      policyRef: "target-role-policy://odd-sdlc/product-documentation"
+    });
+  }
+  return Object.freeze({
+    requiredRole: "other" as const,
+    policyRef: "target-role-policy://odd-sdlc/declared-other"
+  });
+}
+
 function targetContractsFromSeeds(input: {
   readonly source: SdlcProductMaterializationAuthorityTarget["source"];
   readonly sourceRef: string;
-  readonly seeds: readonly Pick<SdlcProductMaterializationAuthorityTarget, "path" | "targetKind">[];
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly seeds: readonly DeclaredProductTargetSeed[];
 }): readonly SdlcProductMaterializationAuthorityTarget[] {
   const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
   for (const seed of input.seeds) {
+    const rolePolicy = materializationRolePolicyForTarget({
+      manifest: input.manifest,
+      seed
+    });
     targets.set(
       seed.path,
       Object.freeze({
         kind: "sdlc_product_materialization_authority_target" as const,
-        ...seed,
+        path: seed.path,
+        targetKind: seed.targetKind,
+        requiredRole: rolePolicy.requiredRole,
+        policyRef: rolePolicy.policyRef,
         source: input.source,
         sourceRef: input.sourceRef
       })
     );
-  }
-  return Object.freeze(
-    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
-  );
-}
-
-function mergedTargetContracts(
-  contextTargets: readonly SdlcProductMaterializationAuthorityTarget[],
-  productTargets: readonly SdlcProductMaterializationAuthorityTarget[]
-): readonly SdlcProductMaterializationAuthorityTarget[] {
-  const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
-  for (const target of contextTargets) {
-    targets.set(target.path, target);
-  }
-  for (const target of productTargets) {
-    targets.set(target.path, target);
   }
   return Object.freeze(
     [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
@@ -984,15 +1108,12 @@ export function reconcileSdlcProductMaterializationAuthority(
   });
   const contextTargetPaths = uniqueSorted(contextTargets.map((target) => target.path));
   const productTargetPaths = uniqueSorted(productTargets.map((target) => target.path));
-  const declaredProductTargetContracts = mergedTargetContracts(
-    contextTargets,
-    productTargets
-  );
-  const declaredProductFileTargets = uniqueSorted([
-    ...contextTargetPaths,
-    ...productTargetPaths
-  ]);
+  const declaredProductTargetContracts = productTargets;
+  const declaredProductFileTargets = productTargetPaths;
   const reasonRefs = new Set<string>(context.reasonRefs);
+  if (contextTargetPaths.length > 0) {
+    reasonRefs.add("context_expected_files_observation_only");
+  }
   if (
     contextTargets.length !== context.targets.length ||
     productTargets.length !== product.targets.length
@@ -1018,8 +1139,6 @@ export function reconcileSdlcProductMaterializationAuthority(
     kind: "sdlc_product_materialization_authority_reconciliation",
     status: !manifest.productMaterialization.required
       ? "not_required"
-      : reasonRefs.has("product_context_target_mismatch")
-        ? "ambiguous"
       : declaredProductFileTargets.length > 0
         ? "passed"
         : "missing",
@@ -3204,6 +3323,14 @@ function outcomeDirectivesForWorker(
       productFileTargets.length === 0
         ? "Declared product file targets: none."
         : `Declared product file targets: ${productFileTargets.join(", ")}.`,
+      productMaterializationAuthority.declaredProductTargetContracts.length === 0
+        ? "Declared product target role policy: none."
+        : `Declared product target role policy: ${productMaterializationAuthority.declaredProductTargetContracts
+            .map(
+              (target) =>
+                `${target.path} (${target.targetKind}, role=${target.requiredRole}, policy=${target.policyRef})`
+            )
+            .join("; ")}.`,
       `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
       `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`,
       "Do not create or modify product files outside the declared product file targets and allowed shared build roots for this edge.",
@@ -3312,6 +3439,10 @@ export function constructWorkerInvocationPackage(input: {
       ),
       selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
       declaredProductFileTargets: productFileTargets,
+      declaredProductTargetContracts: workerFacingTargetContracts(
+        input.manifest,
+        productMaterializationAuthority.declaredProductTargetContracts
+      ),
       requiredRoles: input.manifest.productMaterialization.requiredRoles,
       buildExecutionContract:
         input.manifest.productMaterialization.buildExecutionContract,
@@ -3508,12 +3639,38 @@ function workerFacingRefs(
   return Object.freeze(refs.map((ref) => workerFacingRef(manifest, ref)));
 }
 
+function workerFacingTargetContracts(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  targets: readonly SdlcProductMaterializationAuthorityTarget[]
+): readonly SdlcProductMaterializationAuthorityTarget[] {
+  return Object.freeze(
+    targets.map((target) =>
+      Object.freeze({
+        ...target,
+        sourceRef: workerFacingRef(manifest, target.sourceRef)
+      })
+    )
+  );
+}
+
 function workerFacingProductMaterializationAuthority(
   manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
   reconciliation: SdlcProductMaterializationAuthorityReconciliation
 ): SdlcProductMaterializationAuthorityReconciliation {
   return Object.freeze({
     ...reconciliation,
+    contextExpectedTargetContracts: workerFacingTargetContracts(
+      manifest,
+      reconciliation.contextExpectedTargetContracts
+    ),
+    productAuthorityTargetContracts: workerFacingTargetContracts(
+      manifest,
+      reconciliation.productAuthorityTargetContracts
+    ),
+    declaredProductTargetContracts: workerFacingTargetContracts(
+      manifest,
+      reconciliation.declaredProductTargetContracts
+    ),
     sourceRefs: workerFacingRefs(manifest, reconciliation.sourceRefs)
   });
 }
@@ -4343,27 +4500,7 @@ function declaredProductAuthorityRoleForObservedFile(input: {
   if (target === undefined) {
     return null;
   }
-  const targetRelativePath = targetRelativeToSelectedOutputRoot({
-    targetPath: target.path,
-    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot
-  }).toLowerCase();
-  if (targetRelativePath === "build.sbt") {
-    return "build_config";
-  }
-  if (
-    targetRelativePath === "src" ||
-    targetRelativePath.endsWith("/src") ||
-    targetRelativePath.includes("/src/")
-  ) {
-    return "source";
-  }
-  if (
-    targetRelativePath === "design" ||
-    targetRelativePath.startsWith("design/")
-  ) {
-    return "design";
-  }
-  return null;
+  return target.requiredRole;
 }
 
 function materializedRoleForObservedFile(input: {
@@ -4425,10 +4562,14 @@ function observedFileSatisfiesRequiredRole(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly file: SdlcObservedProductFileSnapshot;
 }): boolean {
-  const role = materializedRoleForObservedFile({
+  const normalized = input.file.relativePath.split(path.sep).join("/");
+  const role = declaredProductAuthorityRoleForObservedFile({
     manifest: input.manifest,
-    relativePath: input.file.relativePath
+    normalizedRelativePath: normalized
   });
+  if (role === null) {
+    return false;
+  }
   if (!input.manifest.productMaterialization.requiredRoles.includes(role)) {
     return false;
   }
@@ -4508,6 +4649,23 @@ function materializedFileFromObservedFile(input: {
     digest: input.file.digest,
     byteCount: input.file.byteCount
   });
+}
+
+function targetContractForMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): SdlcProductMaterializationAuthorityTarget | null {
+  const normalized = input.relativePath.split(path.sep).join("/");
+  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
+  return (
+    authority.declaredProductTargetContracts.find((candidate) =>
+      productAuthorityTargetCoversRelativePath({
+        manifest: input.manifest,
+        target: candidate,
+        normalizedRelativePath: normalized
+      })
+    ) ?? null
+  );
 }
 
 export function observeProductMaterializationDelta(input: {
@@ -5091,6 +5249,8 @@ function evaluateMaterializedProductFiles(input: {
   readonly blockingReasonCarriers: SdlcBlockingReason[];
 }): void {
   const contract = input.manifest.productMaterialization;
+  const materializationAuthority =
+    reconcileSdlcProductMaterializationAuthority(input.manifest);
   const reportedProductFiles = input.report.materializedFiles.filter(
     (file) => resolve(file.absolutePath) !== resolve(input.manifest.outputFile)
   );
@@ -5115,6 +5275,17 @@ function evaluateMaterializedProductFiles(input: {
   }
   if (!contract.required) {
     return;
+  }
+  if (
+    materializationAuthority.contextExpectedFileTargets.length > 0 &&
+    materializationAuthority.declaredProductTargetContracts.length === 0
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "context_expected_files_not_materialization_authority",
+        evidenceRefs: materializationAuthority.sourceRefs
+      })
+    );
   }
   if (reportedProductFiles.length === 0) {
     input.blockingReasonCarriers.push(
@@ -5141,6 +5312,31 @@ function evaluateMaterializedProductFiles(input: {
     const fileEvidenceRef = pathToFileURL(absolutePath).href;
     if (absolutePath === resolve(input.manifest.outputFile)) {
       continue;
+    }
+    const targetContract = targetContractForMaterializedFile({
+      manifest: input.manifest,
+      relativePath: file.relativePath
+    });
+    if (
+      materializationAuthority.declaredProductTargetContracts.length > 0 &&
+      targetContract === null
+    ) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_file_unbound_to_declared_target",
+          detail: file.relativePath,
+          evidenceRefs: [fileEvidenceRef]
+        })
+      );
+    }
+    if (targetContract !== null && file.role !== targetContract.requiredRole) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_role_policy_mismatch",
+          detail: `${file.relativePath}: ${file.role} != ${targetContract.requiredRole}`,
+          evidenceRefs: [fileEvidenceRef, targetContract.sourceRef]
+        })
+      );
     }
     if (!pathIsInside(absolutePath, tenantRoot)) {
       input.blockingReasonCarriers.push(

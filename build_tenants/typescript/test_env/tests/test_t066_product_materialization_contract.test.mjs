@@ -1298,6 +1298,19 @@ test("T-131 component-depth assurance admits already-materialized declared produ
 
 test("T-102 post-transform observation admits existing discoverable test files", () => {
   const workspace = makeWorkspace();
+  const testRelativePath =
+    "cdme-compiler/src/test/scala/cdme/compiler/ExistingSpec.scala";
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Expected Product Files",
+      "",
+      `- build_tenants/scala_spark/${testRelativePath} role=test`
+    ].join("\n"),
+    "utf8"
+  );
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_test_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -1309,8 +1322,6 @@ test("T-102 post-transform observation admits existing discoverable test files",
     projectConstraints: constraints,
     runId: "t102-existing-test-materialization"
   });
-  const testRelativePath =
-    "cdme-compiler/src/test/scala/cdme/compiler/ExistingSpec.scala";
   const testPath = path.join(
     manifest.productMaterialization.tenantRoot,
     testRelativePath

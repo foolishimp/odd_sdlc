@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: refactor_existing_product_materialization_contract_and_role_inference
 governing_library: odd_sdlc TypeScript target-obligation binding, product materialization authority, and technology capability policy
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 5
 execution_order_reason: Establishes exact target and product-materialization authority before assurance and proof work rely on it.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old_and_replaces_context_scan_authority
 authority_ruling:
@@ -150,6 +151,45 @@ Run from `build_tenants/typescript`:
 - `node --test test_env/tests/test_t137_target_obligation_binding.test.mjs`
 - `node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs`
 - Add and run a focused `test_env/tests/test_t147_tenant_role_policy_materialization.test.mjs`.
+
+## Closure Evidence
+
+Completed on 2026-05-11.
+
+Implementation moved product materialization role satisfaction behind declared
+target policy:
+
+- Worker invocation contracts now carry declared product target obligations
+  with path, target kind, required role, source ref, and policy ref.
+- Declared product targets are derived from conformed `PRODUCT.md` authority
+  and module structure. `.ai-workspace/context/expected_files.json` remains
+  observation only and cannot define closure-relevant targets.
+- Materialized product evidence must bind to a declared target contract before
+  it can satisfy a required product role.
+- Role assignment is policy-visible through product target declarations and
+  deterministic capability policy refs, rather than direct closure authority
+  from ecosystem filenames or path heuristics.
+- Worker prompt/package rendering now names declared target role policy.
+
+Regression coverage:
+
+- `test_t147_tenant_role_policy_materialization.test.mjs` proves an unknown
+  file family can satisfy a source role when explicitly declared by product
+  target policy.
+- The same test proves known ecosystem files cannot satisfy undeclared product
+  roles and context expected files alone cannot define materialization targets.
+- Existing T-066, T-118, and T-143 tests were updated to consume declared
+  product target authority instead of context-derived targets.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run build:semantic` passed.
+- `node --test test_env/tests/test_t066_product_materialization_contract.test.mjs` passed.
+- `node --test test_env/tests/test_t137_target_obligation_binding.test.mjs` passed.
+- `node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs` passed.
+- `node --test test_env/tests/test_t147_tenant_role_policy_materialization.test.mjs` passed.
+- `node --test test_env/tests/test_t118_worker_invocation_package.test.mjs` passed after updating the fixture to declare product targets through `PRODUCT.md`.
+- `npm run test:semantic` passed on 2026-05-11 with 400 tests, 0 failures.
 
 ## Non-Closure Conditions
 

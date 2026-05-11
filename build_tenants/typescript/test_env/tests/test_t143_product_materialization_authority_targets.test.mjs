@@ -580,7 +580,7 @@ test("T-143 build-only files do not satisfy component source materialization", (
   assert.equal(materialized.some((file) => file.role === "source"), false);
 });
 
-test("T-143 context and PRODUCT target conflicts become typed ambiguity", () => {
+test("T-143 context expected-file targets are observation beside product authority", () => {
   const workspace = workspaceWithProductAuthority();
   writeJsonExpectedFiles(workspace, [
     "build_tenants/scala_spark/build.sbt",
@@ -589,13 +589,23 @@ test("T-143 context and PRODUCT target conflicts become typed ambiguity", () => 
   const manifest = materializationManifest(workspace);
   const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
 
-  assert.equal(reconciliation.status, "ambiguous");
+  assert.equal(reconciliation.status, "passed");
   assert.equal(
     reconciliation.reasonRefs.includes("product_context_target_mismatch"),
     true
   );
   assert.equal(
-    reconciliation.declaredProductTargetContracts.find(
+    reconciliation.reasonRefs.includes("context_expected_files_observation_only"),
+    true
+  );
+  assert.equal(
+    reconciliation.declaredProductTargetContracts.some(
+      (target) => target.source === "context_expected_files"
+    ),
+    false
+  );
+  assert.equal(
+    reconciliation.contextExpectedTargetContracts.find(
       (target) => target.path === "build_tenants/scala_spark/other/src"
     )?.source,
     "context_expected_files"

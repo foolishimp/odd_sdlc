@@ -20,6 +20,9 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_file_is_output_artifact",
   "materialized_product_files_missing",
   "materialized_product_role_missing",
+  "context_expected_files_not_materialization_authority",
+  "materialized_product_file_unbound_to_declared_target",
+  "materialized_product_role_policy_mismatch",
   "materialized_product_file_outside_tenant_root",
   "materialized_product_relative_path_absolute",
   "materialized_product_relative_path_mismatch",
@@ -194,6 +197,13 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
         : "authority_to_code",
       lawfulReentryPoint: "same_edge_retry",
       message: "Materialized product evidence does not satisfy the product contract."
+    });
+  }
+  if (code === "context_expected_files_not_materialization_authority") {
+    return Object.freeze({
+      reasonClass: "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Context expected-file observations are not materialization authority."
     });
   }
   if (code.startsWith("test_execution_")) {

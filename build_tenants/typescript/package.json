@@ -97,6 +97,7 @@
     "test:t142": "npm run build:semantic && node --test test_env/tests/test_t142_autonomous_product_materialization.test.mjs",
     "test:t143": "npm run build:semantic && node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs",
     "test:t145": "npm run build:semantic && node --test test_env/tests/test_t145_replay_visible_closure_authority.test.mjs",
+    "test:t147": "npm run build:semantic && node --test test_env/tests/test_t147_tenant_role_policy_materialization.test.mjs",
     "test:t148": "npm run build:semantic && node --test test_env/tests/test_t148_collision_safe_requirement_authority_refs.test.mjs",
     "test:t150": "npm run build:semantic && node --test test_env/tests/test_t150_visible_defaults_catalog_lookup.test.mjs",
     "test:t151": "npm run build:semantic && node --test test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs",
