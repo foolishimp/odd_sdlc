@@ -83,15 +83,15 @@ The completed base for this wave is:
     governing assurance verdicts are replayable closure inputs.
 13. T-149 cleans repairable-vs-no-basis assurance re-entry outliers for
     capability and component-depth evidence gaps.
+14. T-152 proves data_mapper-scale downstream transformation-set partition over
+    multiple requirements and product evidence families.
 
-With T-149 closed, the current executable order remains axiomatic first, proof
+With T-152 closed, the current executable order remains axiomatic first, proof
 second:
 
-1. T-152: prove data_mapper-scale transformation-set partition after identity,
-   target, and runner authority are lawful.
-2. T-153: prove live or live-equivalent non-close dispositions from admitted
+1. T-153: prove live or live-equivalent non-close dispositions from admitted
    evidence and replay-visible closure/evaluator truth.
-3. T-154: prove source/specification-only data_mapper parity without an explicit
+2. T-154: prove source/specification-only data_mapper parity without an explicit
    product-materialization harness target.
 
 ## Current Computational Target
@@ -163,7 +163,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-149-assurance-reentry-outlier-cleanup.md`
 - `.ai-workspace/tickets/completed/T-150-visible-defaults-and-published-catalog-lookup-discipline.md`
 - `.ai-workspace/tickets/completed/T-151-one-closed-computational-loop-and-runner-evaluator-sovereignty.md`
-- `.ai-workspace/tickets/backlog/T-152-data-mapper-scale-transformation-set-partition-proof.md`
+- `.ai-workspace/tickets/completed/T-152-data-mapper-scale-transformation-set-partition-proof.md`
 - `.ai-workspace/tickets/backlog/T-153-live-non-close-disposition-parity-proof.md`
 - `.ai-workspace/tickets/backlog/T-154-no-harness-target-data-mapper-parity-proof.md`
 

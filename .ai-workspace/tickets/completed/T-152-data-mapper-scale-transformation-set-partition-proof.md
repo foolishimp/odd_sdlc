@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_requirement_transform_boundary_and_product_pressure_carriers
 governing_library: odd_sdlc TypeScript requirement closure, transformation-set pressure, product materialization binding, and data_mapper parity lane
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 8
 execution_order_reason: Proves downstream transformation-set partition after identity, target, and runner authority are lawful.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old
 authority_ruling:
@@ -136,6 +137,37 @@ Run from `build_tenants/typescript`:
 - `node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs`
 - Add and run a focused `test_env/tests/test_t152_data_mapper_transformation_set_partition.test.mjs`.
 - If using the sandbox proof lane, run `npm run live:data-mapper-steel-thread-sandbox`.
+
+## Closure Evidence
+
+Completed on 2026-05-11.
+
+Implementation and proof:
+
+- Added exported pure helper
+  `deriveSdlcPostProductMaterializationActionInput` so post-close product
+  materialization action derivation is testable as a function of downstream
+  transformation-set pressure and downstream target binding refs.
+- The installed runner now uses that helper for post-close downstream product
+  materialization candidates.
+- `test_t152_data_mapper_transformation_set_partition.test.mjs` builds a
+  data_mapper-scale proof fixture with multiple requirements plus source, test,
+  and build evidence families.
+- The proof shows downstream transformation-set obligations are excluded from
+  edge-local closure counts while their downstream pressure refs and downstream
+  target binding refs remain on the edge ledger.
+- The proof shows the next materialization action cites downstream pressure and
+  target binding refs and fails closed when the downstream target binding is not
+  published by the materializer.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run build:semantic` passed.
+- `npm run test:t152` passed.
+- `node --test test_env/tests/test_t141_gtl_transform_boundary.test.mjs` passed.
+- `node --test test_env/tests/test_t142_autonomous_product_materialization.test.mjs` passed.
+- `node --test test_env/tests/test_t143_product_materialization_authority_targets.test.mjs` passed.
+- `npm run test:semantic` passed on 2026-05-11 with 411 tests, 0 failures.
 
 ## Non-Closure Conditions
 

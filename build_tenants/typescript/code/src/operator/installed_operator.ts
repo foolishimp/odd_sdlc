@@ -2258,9 +2258,9 @@ function postActionCandidateFor(input: {
   });
 }
 
-function postProductMaterializationCandidateFor(input: {
+export function deriveSdlcPostProductMaterializationActionInput(input: {
   readonly module: Module;
-  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly runRef: string;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
   readonly scopeModuleName?: string | null | undefined;
@@ -2288,12 +2288,12 @@ function postProductMaterializationCandidateFor(input: {
       ? EMPTY_SCOPE_PATH
       : Object.freeze(["scope", encodeURIComponent(scopeModuleName)]);
   const targetOutcomeRef = [
-    "target-outcome://odd-sdlc/post-action",
-    materializationAction.graphFunctionRef,
-    targetAssetType,
-    ...scopePath,
-    encodeURIComponent(manifestRefSegment(input.state.manifest))
-  ].join("/");
+      "target-outcome://odd-sdlc/post-action",
+      materializationAction.graphFunctionRef,
+      targetAssetType,
+      ...scopePath,
+      encodeURIComponent(input.runRef)
+    ].join("/");
   return Object.freeze({
     actionRef: [
       "construction-action://odd-sdlc/post-action",
@@ -2329,6 +2329,24 @@ function postProductMaterializationCandidateFor(input: {
       ...input.downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
       ...input.downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
     ])
+  });
+}
+
+function postProductMaterializationCandidateFor(input: {
+  readonly module: Module;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+  readonly scopeModuleName?: string | null | undefined;
+  readonly scopeScheduleRef?: string | null | undefined;
+}): OddSdlcEvaluateNextActionInput | null {
+  return deriveSdlcPostProductMaterializationActionInput({
+    module: input.module,
+    runRef: manifestRefSegment(input.state.manifest),
+    downstreamPressureRefs: input.downstreamPressureRefs,
+    downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+    scopeModuleName: input.scopeModuleName,
+    scopeScheduleRef: input.scopeScheduleRef
   });
 }
 
