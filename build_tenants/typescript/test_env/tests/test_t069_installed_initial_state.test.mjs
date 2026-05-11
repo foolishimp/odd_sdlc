@@ -94,7 +94,9 @@ test("T-069 validates installed data_mapper initial state before traversal", asy
 
   const eventLog = path.join(workspaceRoot, ".ai-workspace/events/events.jsonl");
   assert.equal(existsSync(eventLog), true);
-  assert.equal(readFileSync(eventLog, "utf8"), "");
+  const eventLines = readFileSync(eventLog, "utf8").trim().split(/\r?\n/u);
+  assert.equal(eventLines.length, 1);
+  assert.equal(JSON.parse(eventLines[0]).kind, "workspace_installation_admitted");
 });
 
 test("T-069 initial-state validation fails closed without installed topology", () => {

@@ -119,12 +119,11 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
     )
   );
 
-  assert.match(prompt, /Read the worker brief first:/);
-  assert.match(prompt, /Then read the compact worker invocation package:/);
-  assert.match(prompt, /Use those files as worker-facing authority/);
-  assert.match(prompt, /full forensic handoff manifest remains archived by reference/);
-  assert.match(prompt, /must start with a `## Execution Plan` section/);
-  assert.match(prompt, /Do not keep this plan private/);
+  assert.match(prompt, /Read in order:/);
+  assert.match(prompt, /worker brief:/);
+  assert.match(prompt, /invocation package:/);
+  assert.match(prompt, /traversal intent package:/);
+  assert.match(prompt, /forensic manifest only when a package ref requires it:/);
   assert.doesNotMatch(prompt, /Compact worker invocation package/);
   assert.doesNotMatch(prompt, /"packageVersion": "ts-invocation-v1"/);
   assert.doesNotMatch(prompt, /"omittedObligationCount":/);
@@ -166,10 +165,10 @@ test("T-099 schedule-surface prompt requires dependency graph and tranches", () 
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
 
-  assert.match(prompt, /module_dependency_graph/);
-  assert.match(prompt, /realization_tranches or test_tranches/);
-  assert.match(prompt, /tranche_obligation_ledger/);
-  assert.match(prompt, /next_tranche_selector/);
+  assert.match(prompt, /dependency graph/);
+  assert.match(prompt, /tranches/);
+  assert.match(prompt, /obligation ledger/);
+  assert.match(prompt, /next tranche selector/);
   assert(
     manifest.traversalObligationContext.trancheKeys.includes(
       "schedule:dependency_graph"

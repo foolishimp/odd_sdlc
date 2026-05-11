@@ -142,8 +142,8 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   assert.equal(archivedIntent.packageDigest, packageDigest);
   assert.equal(existsSync(intentPath), true);
   assert.equal(existsSync(files.workerBriefPath), true);
-  assert.match(prompt, /Read the worker brief first:/u);
-  assert.match(prompt, /typed cumulative intent package/u);
+  assert.match(prompt, /Read in order:/u);
+  assert.match(prompt, /traversal intent package:/u);
   assert.match(prompt, /traversal_intent_package\.json/u);
   assert(
     manifest.traversalIntentPackage.authorityRefs.some((ref) =>
@@ -207,8 +207,8 @@ test("T-088 retry pressure stays linked and does not expand into prior-gap oblig
     "proof://gap-a",
     "proof://gap-b"
   ]);
-  assert.match(prompt, /priorGapFrontier/u);
-  assert.match(prompt, /read those files selectively/u);
+  assert.match(prompt, /Prior defect:/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
   assert(
     invocationPackage.retryRepairInstructions.length > 0,
     "retry-local repair instructions may cite prior gap reasons without expanding them into obligations"

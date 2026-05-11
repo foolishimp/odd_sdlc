@@ -118,7 +118,16 @@ test("T-137 published target action is eligible only when bound to target asset"
 
   assert.equal(binding.status, "eligible");
   assert.equal(binding.disposition, "published_action_eligible");
-  assert.deepEqual(binding.admissibleGraphFunctionNames, ["derive_component_code_surface"]);
+  assert.deepEqual(binding.admissibleGraphFunctionNames, [
+    "Fg_materialize_declared_product_asset",
+    "derive_component_code_surface"
+  ]);
+  assert.equal(
+    binding.publishedActionRefs.includes(
+      "published-action://odd-sdlc/graph-function/Fg_materialize_declared_product_asset"
+    ),
+    true
+  );
   assert.equal(
     binding.publishedActionRefs.includes(
       "published-action://odd-sdlc/graph-function/derive_component_code_surface"

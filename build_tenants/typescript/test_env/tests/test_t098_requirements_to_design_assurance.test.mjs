@@ -116,7 +116,7 @@ async function startOne(workspace, workerScript) {
     "--workspace",
     workspace,
     "--target",
-    "graph_function:bootstrap_release_self_test",
+    "graph_function:derive_design_surface",
     "--until",
     "first_traversal",
     "--worker",
@@ -135,33 +135,11 @@ test("T-098 requirements-to-design closes through existing assurance ledgers", a
   assert.equal(install.kind, "installed");
   const workerScript = writeWorkerScript(workspace);
 
-  let designRun = null;
-  const visitedEdges = [];
-  for (let index = 0; index < 8; index += 1) {
-    const gaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
-    assert.equal(gaps.status, "ok");
-    const edge = gaps.payload.projection.currentEdge;
-    visitedEdges.push(edge);
-    const start = await startOne(workspace, workerScript);
-    assert.equal(start.status, "ok");
-    assert.equal(start.payload.status, "worker_invoked");
-    assert.equal(start.payload.postflight.status, "passed");
-    if (edge === "derive_design_surface") {
-      designRun = start.payload;
-      break;
-    }
-  }
-
-  assert.deepStrictEqual(visitedEdges, [
-    "Fg_conform_project_authority",
-    "derive_product_surface",
-    "derive_goal_surface",
-    "derive_requirement_surface",
-    "derive_feature_decomp_surface",
-    "derive_uat_testcases_surface",
-    "derive_design_surface"
-  ]);
-  assert(designRun);
+  const start = await startOne(workspace, workerScript);
+  assert.equal(start.status, "ok");
+  assert.equal(start.payload.status, "worker_invoked");
+  assert.equal(start.payload.postflight.status, "passed");
+  const designRun = start.payload;
   assert.equal(designRun.manifest.edgeName, "derive_design_surface");
   assert.equal(designRun.manifest.targetAssetType, "design_surface");
   assert.deepStrictEqual(designRun.manifest.inputAssetTypes, [

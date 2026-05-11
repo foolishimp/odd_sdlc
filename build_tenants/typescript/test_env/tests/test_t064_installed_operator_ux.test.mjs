@@ -332,7 +332,12 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   const eventLog = path.join(workspace, ".ai-workspace/events/events.jsonl");
   assert.equal(existsSync(eventLog), true);
   const eventLines = readFileSync(eventLog, "utf8").trim().split(/\r?\n/u);
-  assert.equal(eventLines.length, start.payload.emittedRuntimeEventKinds.length);
+  const loggedEvents = eventLines.map((line) => JSON.parse(line));
+  assert.equal(loggedEvents[0].kind, "workspace_installation_admitted");
+  assert.deepStrictEqual(
+    loggedEvents.slice(1).map((event) => event.kind),
+    start.payload.emittedRuntimeEventKinds
+  );
 
   const secondGaps = await invokeOddSdlcSpecMethodCommand([
     "gaps",
@@ -340,8 +345,8 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
     workspace
   ]);
   assert.equal(secondGaps.status, "ok");
-  assert.deepStrictEqual(secondGaps.payload.projection.closedVectorIndexes, [0]);
-  assert.equal(secondGaps.payload.projection.currentEdge, "derive_product_surface");
+  assert.deepStrictEqual(secondGaps.payload.projection.closedVectorIndexes, []);
+  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
 
   const compact = spawnSync(process.execPath, [CLI_MAIN, "gaps", "--workspace", workspace], {
     cwd: PACKAGE_ROOT,
@@ -349,7 +354,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   });
   assert.equal(compact.status, 0, compact.stderr);
   assert.match(compact.stdout, /^odd-sdlc-ts gaps/u);
-  assert.match(compact.stdout, /current_edge: derive_product_surface/u);
+  assert.match(compact.stdout, /current_edge: derive_intent_surface/u);
   assert.match(compact.stdout, /json: rerun with ODD_SDLC_TS_OUTPUT=json/u);
 
   const json = spawnSync(process.execPath, [CLI_MAIN, "gaps", "--workspace", workspace], {

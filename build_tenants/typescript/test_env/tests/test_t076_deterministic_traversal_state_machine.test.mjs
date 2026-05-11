@@ -336,8 +336,11 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
       "const materializedRefs = materializedFiles.map((file) => `file://${file.absolutePath}`);",
       "const outputRef = `file://${manifest.outputFile}`;",
+      "const executionReportPath = path.join(manifest.archiveRoot, 't076_execution_report.txt');",
+      "const executionEvidence = manifest.productMaterialization.required ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [`file://${executionReportPath}`], testsObserved: 1, passedCount: 1, failedCount: 0, shardEvidence: [] } : null;",
+      "if (executionEvidence !== null) writeFileSync(executionReportPath, 't076 execution evidence\\n', 'utf8');",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [outputRef, ...materializedRefs, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'installed data_mapper retry-aware worker output', unresolvedReasons: [], materializedFiles, executionEvidence: null, obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'installed data_mapper retry-aware worker output', unresolvedReasons: [], materializedFiles, executionEvidence, obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );
@@ -392,13 +395,12 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
   const commandPath = installedOddSdlcCommand(install);
   const workerScript = writeInstalledRetryWorkerScript(workspace);
   const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
-  const target = "graph_function:bootstrap_release_self_test";
+  const nextTarget = "next";
+  let blockedMaterialization = null;
+  let repairedMaterialization = null;
 
   for (let guard = 0; guard < 20; guard += 1) {
     const gaps = runInstalledOddSdlc(commandPath, ["gaps", "--workspace", workspace], workspace);
-    if (gaps.projection.currentEdge === "derive_component_code_surface") {
-      break;
-    }
     if (gaps.projection.currentEdge === FG_CONFORM_PROJECT) {
       const induction = runInstalledOddSdlc(
         commandPath,
@@ -417,7 +419,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
           "--workspace",
           workspace,
           "--target",
-          target,
+          nextTarget,
           "--until",
           "first_traversal",
           "--worker",
@@ -441,7 +443,7 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
         "--workspace",
         workspace,
         "--target",
-        target,
+        nextTarget,
         "--until",
         "first_traversal",
         "--worker",
@@ -449,41 +451,77 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
       ],
       workspace
     );
-    assert.equal(start.status, "worker_invoked");
-    assert.equal(start.postflight.status, "passed");
+    if (start.status === "postflight_failed") {
+      assert.equal(start.postflight.status, "blocked", gaps.projection.currentEdge);
+      assert.equal(start.manifest.graphFunctionName, "Fg_materialize_declared_product_asset");
+      assert.equal(start.manifest.targetAssetType, "component_code_surface");
+      assert.equal(
+        start.postflight.blockingReasons.includes("materialized_product_relative_path_mismatch"),
+        true
+      );
+      blockedMaterialization = start;
+      break;
+    }
+    if (start.status === "converged") {
+      continue;
+    }
+    assert.equal(start.status, "worker_invoked", gaps.projection.currentEdge);
+    assert.equal(start.postflight.status, "passed", gaps.projection.currentEdge);
+    if (
+      start.manifest.graphFunctionName === "Fg_materialize_declared_product_asset" &&
+      start.manifest.targetAssetType === "component_code_surface"
+    ) {
+      repairedMaterialization = start;
+      break;
+    }
   }
 
-  const beforeFailure = runInstalledOddSdlc(
-    commandPath,
-    ["gaps", "--workspace", workspace],
-    workspace
+  if (blockedMaterialization !== null) {
+    const beforeRepair = runInstalledOddSdlc(
+      commandPath,
+      ["gaps", "--workspace", workspace],
+      workspace
+    );
+    assert.equal(beforeRepair.projection.currentEdge, "Fg_materialize_declared_product_asset");
+    repairedMaterialization = runInstalledOddSdlc(
+      commandPath,
+      [
+        "start",
+        "--workspace",
+        workspace,
+        "--target",
+        nextTarget,
+        "--until",
+        "first_traversal",
+        "--worker",
+        workerTransport
+      ],
+      workspace
+    );
+  }
+  assert(repairedMaterialization, "component-code materialization retry did not run");
+  assert.equal(repairedMaterialization.status, "worker_invoked");
+  assert.equal(repairedMaterialization.postflight.status, "passed");
+  assert.equal(
+    repairedMaterialization.manifest.retryContext.priorGapDossiers.length,
+    1
   );
-  assert.equal(beforeFailure.projection.currentEdge, "derive_component_code_surface");
-
-  const repaired = runInstalledOddSdlc(
-    commandPath,
-    [
-      "start",
-      "--workspace",
-      workspace,
-      "--target",
-      target,
-      "--until",
-      "first_traversal",
-      "--worker",
-      workerTransport
-    ],
-    workspace
+  const priorGap = repairedMaterialization.manifest.retryContext.priorGapDossiers[0];
+  assert.equal(priorGap.graphFunctionName, "Fg_materialize_declared_product_asset");
+  assert.equal(priorGap.targetAssetType, "component_code_surface");
+  assert.equal(
+    priorGap.reasons.some(
+      (reason) => reason.reason === "materialized_product_relative_path_mismatch"
+    ),
+    true
   );
-  assert.equal(repaired.status, "worker_invoked");
-  assert.equal(repaired.postflight.status, "passed");
 
   const afterRepair = runInstalledOddSdlc(
     commandPath,
     ["gaps", "--workspace", workspace],
     workspace
   );
-  assert.notEqual(afterRepair.projection.currentEdge, "derive_component_code_surface");
+  assert.notEqual(afterRepair.projection.currentEdge, "Fg_materialize_declared_product_asset");
   assert.equal(
     existsSync(
       path.join(

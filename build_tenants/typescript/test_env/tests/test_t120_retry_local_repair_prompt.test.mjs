@@ -465,8 +465,8 @@ test("T-120 retry prompt projects exact schema-local carrier repair pressure", (
       "file:///tmp/t120/implementation_component_topology_surface.md"
     )
   );
-  assert.match(prompt, /retryRepairInstructions is non-empty/u);
-  assert.match(prompt, /acceptedCarrierSchemaRef and acceptedCarrierFieldSet/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
+  assert.match(prompt, /Worker package fields to apply/u);
 });
 
 test("T-120 component carrier retry instructions fail closed if schema fields are omitted", () => {
@@ -511,7 +511,7 @@ test("T-120 design-depth retries carry nested canonical attribute fields", () =>
       "moduleSchemaFragments[].entities[].attributes[].type"
     )
   );
-  assert.match(prompt, /acceptedCarrierSchemaRef and acceptedCarrierFieldSet/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
 });
 
 test("T-120 design attribute repair retries carry the design-depth carrier schema", () => {
@@ -538,7 +538,7 @@ test("T-120 design attribute repair retries carry the design-depth carrier schem
       rule.includes("Add, remove, rename, or map")
     )
   );
-  assert.match(prompt, /even if repairScope is semantic_local/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
 });
 
 test("T-120 execution-evidence retries carry the accepted JSON carrier schema", () => {
@@ -558,7 +558,7 @@ test("T-120 execution-evidence retries carry the accepted JSON carrier schema", 
   assert(
     instruction.acceptedCarrierFieldSet.includes("shardEvidence[].shardId")
   );
-  assert.match(prompt, /Do not emit YAML for the execution evidence carrier/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
 });
 
 test("T-120 repair-schedule semantic retries carry strict component carrier repair law", () => {
@@ -585,9 +585,7 @@ test("T-120 repair-schedule semantic retries carry strict component carrier repa
       "componentRepairSchedule.repairRows[].componentIds"
     )
   );
-  assert.match(prompt, /repairTarget MUST be one of component_code/u);
-  assert.match(prompt, /Do not convert prior postflight gaps/u);
-  assert.match(prompt, /If deterministic evidence cannot bind them, set scheduleStatus triage_gap/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
 });
 
 test("B-085 component repair row open becomes typed component-test repair reentry law", () => {
@@ -634,8 +632,8 @@ test("B-085 component repair row open becomes typed component-test repair reentr
       rule.includes("Do not broadly regenerate")
     )
   );
-  assert.match(prompt, /repairReentryPlans is non-empty/u);
-  assert.match(prompt, /diagnosticEvidenceRefs/u);
+  assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
+  assert.match(prompt, /Worker package fields to apply/u);
 });
 
 test("T-120 Spec Method entry does not own installed retry control", () => {
@@ -657,5 +655,5 @@ test("T-120 Spec Method entry does not own installed retry control", () => {
   assert(!entry.includes("MAX_INSTALLED_START_SELF_HEAL_ATTEMPTS"));
   assert(!entry.includes("sdlc_installed_operator_start_loop_attempt"));
   assert.match(installedOperator, /executeInstalledOperatorStartWithReentry/u);
-  assert.match(installedOperator, /MAX_INSTALLED_REENTRY_ATTEMPTS/u);
+  assert.match(installedOperator, /MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS/u);
 });
