@@ -59,16 +59,34 @@ function detectRole(relativePath: string): SdlcSourceInputRole {
   return "unstructured";
 }
 
-function normalizeLocalRequirementId(rawId: string): string {
+export const SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX =
+  "requirement-local://odd-sdlc/" as const;
+
+export interface SdlcRequirementAuthorityIdentity {
+  readonly requirementDisplayId: string;
+  readonly requirementAuthorityRef: string;
+  readonly authorityMarkerRef: string;
+  readonly authorityDerivationRefs: readonly string[];
+}
+
+export function normalizeSdlcRequirementDisplayId(rawId: string): string {
   const normalized = rawId.trim().toUpperCase();
   const requirementMatch = /^R-(\d+)$/u.exec(normalized);
   if (requirementMatch !== null && requirementMatch[1] !== undefined) {
     return `R-${requirementMatch[1].padStart(3, "0")}`;
   }
+  const parts = normalized.split("-");
+  if (parts[0] === "REQ" || parts[0] === "RF") {
+    const head = parts[0] === "RF" ? "REQ" : parts[0];
+    const tail = parts.slice(1).map((part) =>
+      /^\d+$/u.test(part) && part.length < 3 ? part.padStart(3, "0") : part
+    );
+    return [head, ...tail].join("-");
+  }
   return normalized;
 }
 
-function localRequirementSlug(title: string): string {
+export function localRequirementSlug(title: string): string {
   const slug = title
     .trim()
     .toLowerCase()
@@ -79,15 +97,94 @@ function localRequirementSlug(title: string): string {
   return slug.length === 0 ? "requirement" : slug;
 }
 
-function localRequirementMarker(input: {
+export function localRequirementMarker(input: {
   readonly requirementId: string;
   readonly title: string;
 }): string {
   return [
-    "requirement-local://odd-sdlc",
-    encodeURIComponent(normalizeLocalRequirementId(input.requirementId)),
+    SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX.slice(0, -1),
+    encodeURIComponent(normalizeSdlcRequirementDisplayId(input.requirementId)),
     encodeURIComponent(localRequirementSlug(input.title))
   ].join("/");
+}
+
+function sourceDigestRef(sourceDigest: string): string {
+  return `source-digest://odd-sdlc/${encodeURIComponent(sourceDigest)}`;
+}
+
+function localRequirementAuthorityRef(input: {
+  readonly requirementDisplayId: string;
+  readonly sourceUri: string;
+  readonly sourceDigest: string;
+  readonly headingSlug: string;
+}): string {
+  return [
+    "requirement-authority://odd-sdlc/local",
+    encodeURIComponent(input.sourceUri),
+    encodeURIComponent(input.requirementDisplayId),
+    encodeURIComponent(input.headingSlug),
+    encodeURIComponent(input.sourceDigest)
+  ].join("/");
+}
+
+export function requirementAuthorityIdentityForMarker(input: {
+  readonly marker: string;
+  readonly sourceUri: string;
+  readonly sourceDigest: string;
+}): SdlcRequirementAuthorityIdentity | null {
+  if (input.marker.startsWith(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX)) {
+    const [encodedRequirementId, encodedHeadingSlug] = input.marker
+      .slice(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX.length)
+      .split("/");
+    if (
+      encodedRequirementId === undefined ||
+      encodedRequirementId.length === 0 ||
+      encodedHeadingSlug === undefined ||
+      encodedHeadingSlug.length === 0
+    ) {
+      return null;
+    }
+    try {
+      const requirementDisplayId = normalizeSdlcRequirementDisplayId(
+        decodeURIComponent(encodedRequirementId)
+      );
+      const headingSlug = decodeURIComponent(encodedHeadingSlug);
+      const authorityMarkerRef = input.marker;
+      return Object.freeze({
+        requirementDisplayId,
+        requirementAuthorityRef: localRequirementAuthorityRef({
+          requirementDisplayId,
+          sourceUri: input.sourceUri,
+          sourceDigest: input.sourceDigest,
+          headingSlug
+        }),
+        authorityMarkerRef,
+        authorityDerivationRefs: uniqueSorted([
+          input.sourceUri,
+          sourceDigestRef(input.sourceDigest),
+          authorityMarkerRef
+        ])
+      });
+    } catch {
+      return null;
+    }
+  }
+  if (input.marker.startsWith("REQ-") || input.marker.startsWith("RF-")) {
+    const requirementDisplayId = normalizeSdlcRequirementDisplayId(input.marker);
+    const authorityMarkerRef =
+      `requirement-marker://odd-sdlc/${encodeURIComponent(input.marker)}`;
+    return Object.freeze({
+      requirementDisplayId,
+      requirementAuthorityRef: requirementDisplayId,
+      authorityMarkerRef,
+      authorityDerivationRefs: uniqueSorted([
+        input.sourceUri,
+        sourceDigestRef(input.sourceDigest),
+        authorityMarkerRef
+      ])
+    });
+  }
+  return null;
 }
 
 function detectLocalRequirementMarkers(content: string): readonly string[] {

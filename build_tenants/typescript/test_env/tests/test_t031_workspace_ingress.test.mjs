@@ -235,16 +235,23 @@ test("T-144 imports local requirement headings as replay-visible authority", () 
     ["R-001", "R-002"]
   );
   assert.deepEqual(report.bootstrapGapSet, []);
+  const localTransform = report.requirementTransformAuthorities.find(
+    (authority) =>
+      authority.requirementId === "R-001" &&
+      authority.requirementDisplayId === "R-001"
+  );
+  assert(localTransform);
+  assert.notEqual(localTransform.requirementAuthorityRef, "R-001");
   assert(
-    report.requirementTransformAuthorities.some(
-      (authority) =>
-        authority.requirementId === "R-001" &&
-        authority.transformRef.startsWith(
-          "requirement-transform://odd-sdlc/ingress/R-001/"
-        )
+    localTransform.transformRef.includes(
+      encodeURIComponent(localTransform.requirementAuthorityRef)
     )
   );
   assert(
-    report.lineage.some((entry) => entry.elementId === "requirement:R-002")
+    report.lineage.some(
+      (entry) =>
+        entry.requirementDisplayId === "R-002" &&
+        entry.elementId === `requirement:${entry.requirementAuthorityRef}`
+    )
   );
 });

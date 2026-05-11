@@ -18,35 +18,10 @@ import {
   type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
 } from "./carriers.js";
-import { uniqueSorted } from "./source_input.js";
-
-function normalizeRequirementId(requirementId: string): string {
-  const parts = requirementId.toUpperCase().split("-");
-  const head = parts[0] === "RF" ? "REQ" : parts[0];
-  const tail = parts.slice(1).map((part) =>
-    /^\d+$/.test(part) && part.length < 3 ? part.padStart(3, "0") : part
-  );
-  return [head, ...tail].join("-");
-}
-
-function requirementIdForAuthorityMarker(marker: string): string | null {
-  if (marker.startsWith("REQ-") || marker.startsWith("RF-")) {
-    return normalizeRequirementId(marker);
-  }
-  const localPrefix = "requirement-local://odd-sdlc/";
-  if (marker.startsWith(localPrefix)) {
-    const [encodedRequirementId] = marker.slice(localPrefix.length).split("/");
-    if (encodedRequirementId === undefined || encodedRequirementId.length === 0) {
-      return null;
-    }
-    try {
-      return normalizeRequirementId(decodeURIComponent(encodedRequirementId));
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
+import {
+  requirementAuthorityIdentityForMarker,
+  uniqueSorted
+} from "./source_input.js";
 
 function importedRequirementAuthorities(
   sourceInputs: readonly SdlcSourceInput[]
@@ -57,12 +32,20 @@ function importedRequirementAuthorities(
       continue;
     }
     for (const marker of sourceInput.authorityMarkers) {
-      const requirementId = requirementIdForAuthorityMarker(marker);
-      if (requirementId !== null) {
+      const identity = requirementAuthorityIdentityForMarker({
+        marker,
+        sourceUri: sourceInput.uri,
+        sourceDigest: sourceInput.digest
+      });
+      if (identity !== null) {
         authorities.push(
           Object.freeze({
             kind: "sdlc_imported_requirement_authority",
-            requirementId,
+            requirementId: identity.requirementDisplayId,
+            requirementDisplayId: identity.requirementDisplayId,
+            requirementAuthorityRef: identity.requirementAuthorityRef,
+            authorityMarkerRef: identity.authorityMarkerRef,
+            authorityDerivationRefs: identity.authorityDerivationRefs,
             sourceUri: sourceInput.uri,
             sourceDigest: sourceInput.digest
           })
@@ -114,28 +97,31 @@ function requirementTransformAuthorities(input: {
 }): readonly SdlcRequirementTransformAuthority[] {
   return Object.freeze(
     input.authorities.map((authority) => {
-      const encodedRequirementId = encodeURIComponent(authority.requirementId);
+      const encodedAuthorityRef = encodeURIComponent(authority.requirementAuthorityRef);
       const sourceInput = sourceInputForAuthority({
         sourceInputs: input.sourceInputs,
         authority
       });
       const sourceInputUris = Object.freeze([authority.sourceUri]);
       const transformRef =
-        `requirement-transform://odd-sdlc/ingress/${encodedRequirementId}/${encodeURIComponent(authority.sourceDigest)}`;
+        `requirement-transform://odd-sdlc/ingress/${encodedAuthorityRef}/${encodeURIComponent(authority.sourceDigest)}`;
       return Object.freeze({
         kind: "sdlc_requirement_transform_authority" as const,
         requirementId: authority.requirementId,
+        requirementDisplayId: authority.requirementDisplayId,
+        requirementAuthorityRef: authority.requirementAuthorityRef,
         transformRef,
         predecessorTransformRefs: requirementTransformRefsFromSource(sourceInput),
         transformInputAuthorityRef:
-          `source-authority://odd-sdlc/${encodedRequirementId}/${encodeURIComponent(authority.sourceDigest)}`,
+          `source-authority://odd-sdlc/${encodedAuthorityRef}/${encodeURIComponent(authority.sourceDigest)}`,
         transformOutputAuthorityRef:
-          `requirement-authority://odd-sdlc/${encodedRequirementId}/An`,
+          `requirement-authority://odd-sdlc/${encodedAuthorityRef}/An`,
         sourceInputUris,
-        evidenceRefs: Object.freeze([
+        evidenceRefs: uniqueSorted([
           authority.sourceUri,
           `source-digest://odd-sdlc/${encodeURIComponent(authority.sourceDigest)}`,
-          transformRef
+          transformRef,
+          ...authority.authorityDerivationRefs
         ]),
         status: transformAuthorityStatus(sourceInput)
       });
@@ -167,9 +153,13 @@ function lineageFor(input: {
     records.push(
       Object.freeze({
         kind: "sdlc_bootstrap_lineage_record",
-        elementId: `requirement:${authority.requirementId}`,
+        elementId: `requirement:${authority.requirementAuthorityRef}`,
         elementKind: "requirement_seed",
-        sourceInputUris: Object.freeze([authority.sourceUri])
+        sourceInputUris: Object.freeze([authority.sourceUri]),
+        requirementId: authority.requirementId,
+        requirementDisplayId: authority.requirementDisplayId,
+        requirementAuthorityRef: authority.requirementAuthorityRef,
+        authorityDerivationRefs: authority.authorityDerivationRefs
       })
     );
   }

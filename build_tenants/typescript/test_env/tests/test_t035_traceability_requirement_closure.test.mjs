@@ -271,8 +271,16 @@ test("T-144 requirement closure carries local requirement IDs from ingress", () 
 
   assert.deepStrictEqual(register.unresolvedRequirementIds, ["R-001", "R-002"]);
   assert.deepStrictEqual(register.carriedForwardRequirementIds, ["R-001", "R-002"]);
+  assert.equal(new Set(register.unresolvedRequirementAuthorityRefs).size, 2);
+  assert(
+    register.unresolvedRequirementAuthorityRefs.every((ref) =>
+      ref.startsWith("requirement-authority://odd-sdlc/local/")
+    )
+  );
   const localEntry = closureEntry(register, "R-001");
   assert.equal(localEntry.fulfillmentStatus, "missing");
+  assert.equal(localEntry.requirementDisplayId, "R-001");
+  assert.notEqual(localEntry.requirementAuthorityRef, "R-001");
   assert(
     localEntry.sourceInputUris.some((uri) =>
       uri.endsWith("specification/requirements/01-local.md")

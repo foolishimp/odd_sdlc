@@ -137,6 +137,9 @@ export interface SdlcRequirementFulfillmentPublicRow {
   readonly readOnly: true;
   readonly choosesNextTraversal: false;
   readonly requirementId: string;
+  readonly requirementDisplayId: string;
+  readonly requirementAuthorityRef: string;
+  readonly authorityDerivationRefs: readonly string[];
   readonly obligationRef: string;
   readonly sourceInputUris: readonly string[];
   readonly evidenceRefs: readonly string[];
@@ -166,6 +169,9 @@ export interface SdlcRequirementFulfillmentPublicProjection {
   readonly fulfilledRequirementIds: readonly string[];
   readonly carriedForwardRequirementIds: readonly string[];
   readonly unresolvedRequirementIds: readonly string[];
+  readonly fulfilledRequirementAuthorityRefs?: readonly string[];
+  readonly carriedForwardRequirementAuthorityRefs?: readonly string[];
+  readonly unresolvedRequirementAuthorityRefs?: readonly string[];
   readonly emittedRuntimeEventKinds: readonly [];
 }
 
@@ -504,12 +510,12 @@ function sortedStrings(values: readonly string[]): readonly string[] {
 }
 
 function requirementOpenReasonRef(input: {
-  readonly requirementId: string;
+  readonly requirementAuthorityRef: string;
   readonly reason: string;
 }): string {
   return [
     "requirement-open://odd-sdlc",
-    encodeURIComponent(input.requirementId),
+    encodeURIComponent(input.requirementAuthorityRef),
     encodeURIComponent(input.reason)
   ].join("/");
 }
@@ -564,6 +570,9 @@ export function withSdlcRequirementFulfillmentArchiveRehydration(input: {
 
 interface RequirementFulfillmentPublicRowBasis {
   readonly requirementId: string;
+  readonly requirementDisplayId?: string;
+  readonly requirementAuthorityRef?: string;
+  readonly authorityDerivationRefs?: readonly string[];
   readonly sourceInputUris: readonly string[];
   readonly evidenceRefs: readonly string[];
   readonly fulfillmentStatus: SdlcRequirementFulfillmentPublicStatus;
@@ -582,13 +591,21 @@ function constructSdlcRequirementFulfillmentPublicProjection(input: {
   readonly archiveRehydration?: SdlcRequirementFulfillmentArchiveRehydration;
 }): SdlcRequirementFulfillmentPublicProjection {
   const rows = Object.freeze(
-    input.rows.map((row) =>
-      Object.freeze({
+    input.rows.map((row) => {
+      const requirementDisplayId = row.requirementDisplayId ?? row.requirementId;
+      const requirementAuthorityRef =
+        row.requirementAuthorityRef ?? row.requirementId;
+      return Object.freeze({
         kind: "sdlc_requirement_fulfillment_public_row" as const,
         readOnly: true as const,
         choosesNextTraversal: false as const,
-        requirementId: row.requirementId,
-        obligationRef: `requirement:${row.requirementId}`,
+        requirementId: requirementDisplayId,
+        requirementDisplayId,
+        requirementAuthorityRef,
+        authorityDerivationRefs: Object.freeze([
+          ...(row.authorityDerivationRefs ?? [])
+        ]),
+        obligationRef: `requirement:${requirementAuthorityRef}`,
         sourceInputUris: row.sourceInputUris,
         evidenceRefs: row.evidenceRefs,
         fulfillmentStatus: row.fulfillmentStatus,
@@ -596,7 +613,7 @@ function constructSdlcRequirementFulfillmentPublicProjection(input: {
         openReasonRefs: Object.freeze(
           row.openReasons.map((reason) =>
             requirementOpenReasonRef({
-              requirementId: row.requirementId,
+              requirementAuthorityRef,
               reason
             })
           )
@@ -606,8 +623,8 @@ function constructSdlcRequirementFulfillmentPublicProjection(input: {
         closureDecisionRefs: input.closureDecisionRefs,
         evaluatorSourceRefs: input.evaluatorSourceRefs,
         sourceRegisterRef: input.sourceRegisterRef
-      })
-    )
+      });
+    })
   );
   return Object.freeze({
     kind: "sdlc_requirement_fulfillment_public_projection" as const,
@@ -642,6 +659,21 @@ function constructSdlcRequirementFulfillmentPublicProjection(input: {
         .filter((row) => row.fulfillmentStatus !== "fulfilled")
         .map((row) => row.requirementId)
     ),
+    fulfilledRequirementAuthorityRefs: Object.freeze(
+      rows
+        .filter((row) => row.fulfillmentStatus === "fulfilled")
+        .map((row) => row.requirementAuthorityRef)
+    ),
+    carriedForwardRequirementAuthorityRefs: Object.freeze(
+      rows
+        .filter((row) => row.carryStatus === "carried_forward")
+        .map((row) => row.requirementAuthorityRef)
+    ),
+    unresolvedRequirementAuthorityRefs: Object.freeze(
+      rows
+        .filter((row) => row.fulfillmentStatus !== "fulfilled")
+        .map((row) => row.requirementAuthorityRef)
+    ),
     emittedRuntimeEventKinds: Object.freeze([] as const)
   });
 }
@@ -672,6 +704,10 @@ export function projectSdlcRequirementFulfillmentPublicView(input: {
     rows: input.closureRegister.entries.map((entry) =>
       Object.freeze({
         requirementId: entry.requirementId,
+        requirementDisplayId: entry.requirementDisplayId ?? entry.requirementId,
+        requirementAuthorityRef:
+          entry.requirementAuthorityRef ?? entry.requirementId,
+        authorityDerivationRefs: entry.authorityDerivationRefs ?? Object.freeze([]),
         sourceInputUris: entry.sourceInputUris,
         evidenceRefs: entry.evidenceRefs,
         fulfillmentStatus: entry.fulfillmentStatus,
@@ -682,7 +718,7 @@ export function projectSdlcRequirementFulfillmentPublicView(input: {
   });
 }
 
-function requirementIdFromObligationId(obligationId: string): string | null {
+function requirementAuthorityRefFromObligationId(obligationId: string): string | null {
   const prefix = "requirement:";
   return obligationId.startsWith(prefix) && obligationId.length > prefix.length
     ? obligationId.slice(prefix.length)
@@ -731,30 +767,37 @@ export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input
   const sourceRegisterRef =
     input.sourceRegisterRef ??
     `requirement-closure-register://odd-sdlc/${encodeURIComponent(input.edgeFulfillmentLedger.ledgerRef)}`;
-  const assessmentByRequirementId = new Map(
+  const assessmentByRequirementAuthorityRef = new Map(
     input.assessments
       .map((assessment) =>
         Object.freeze({
           assessment,
-          requirementId: requirementIdFromObligationId(assessment.obligationId)
+          requirementAuthorityRef: requirementAuthorityRefFromObligationId(
+            assessment.obligationId
+          )
         })
       )
       .filter(
         (entry): entry is {
           readonly assessment: SdlcRequirementFulfillmentAssessmentPublicInput;
-          readonly requirementId: string;
-        } => entry.requirementId !== null
+          readonly requirementAuthorityRef: string;
+        } => entry.requirementAuthorityRef !== null
       )
-      .map((entry) => [entry.requirementId, entry.assessment])
+      .map((entry) => [entry.requirementAuthorityRef, entry.assessment])
   );
-  const entryByRequirementId = new Map(
-    input.closureRegister.entries.map((entry) => [entry.requirementId, entry])
+  const entryByRequirementAuthorityRef = new Map(
+    input.closureRegister.entries.map((entry) => [
+      entry.requirementAuthorityRef ?? entry.requirementId,
+      entry
+    ])
   );
-  const requirementIds = Object.freeze(
+  const requirementAuthorityRefs = Object.freeze(
     [
       ...new Set([
-        ...input.closureRegister.entries.map((entry) => entry.requirementId),
-        ...assessmentByRequirementId.keys()
+        ...input.closureRegister.entries.map(
+          (entry) => entry.requirementAuthorityRef ?? entry.requirementId
+        ),
+        ...assessmentByRequirementAuthorityRef.keys()
       ])
     ].sort()
   );
@@ -779,9 +822,10 @@ export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input
     ...(input.archiveRehydration === undefined
       ? {}
       : { archiveRehydration: input.archiveRehydration }),
-    rows: requirementIds.map((requirementId) => {
-      const entry = entryByRequirementId.get(requirementId);
-      const assessment = assessmentByRequirementId.get(requirementId);
+    rows: requirementAuthorityRefs.map((requirementAuthorityRef) => {
+      const entry = entryByRequirementAuthorityRef.get(requirementAuthorityRef);
+      const assessment =
+        assessmentByRequirementAuthorityRef.get(requirementAuthorityRef);
       const fulfillmentStatus =
         assessment === undefined
           ? entry?.fulfillmentStatus ?? "missing"
@@ -803,7 +847,12 @@ export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input
                   ]
             );
       return Object.freeze({
-        requirementId,
+        requirementId: entry?.requirementId ?? requirementAuthorityRef,
+        requirementDisplayId:
+          entry?.requirementDisplayId ?? entry?.requirementId ?? requirementAuthorityRef,
+        requirementAuthorityRef,
+        authorityDerivationRefs:
+          entry?.authorityDerivationRefs ?? Object.freeze([]),
         sourceInputUris: entry?.sourceInputUris ?? Object.freeze([]),
         evidenceRefs: Object.freeze(
           assessment === undefined
@@ -829,6 +878,9 @@ function closureRegisterFromRequirementFulfillmentPublicProjection(
       Object.freeze({
         kind: "sdlc_requirement_closure_entry" as const,
         requirementId: row.requirementId,
+        requirementDisplayId: row.requirementDisplayId,
+        requirementAuthorityRef: row.requirementAuthorityRef,
+        authorityDerivationRefs: row.authorityDerivationRefs,
         sourceInputUris: row.sourceInputUris,
         assetIds: Object.freeze([]),
         producedByGraphFunctions: Object.freeze([]),
@@ -861,6 +913,21 @@ function closureRegisterFromRequirementFulfillmentPublicProjection(
       entries
         .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
         .map((entry) => entry.requirementId)
+    ),
+    fulfilledRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    carriedForwardRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementAuthorityRef)
+    ),
+    unresolvedRequirementAuthorityRefs: Object.freeze(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef)
     ),
     emittedRuntimeEventKinds: Object.freeze([] as const)
   });

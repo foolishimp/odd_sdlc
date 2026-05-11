@@ -165,7 +165,15 @@ export interface SdlcManagedTraversalLedger {
 
 export interface SdlcImportedRequirementAuthority {
   readonly kind: "sdlc_imported_requirement_authority";
+  /**
+   * Backward-compatible operator display alias. Closure authority is
+   * `requirementAuthorityRef`.
+   */
   readonly requirementId: string;
+  readonly requirementDisplayId: string;
+  readonly requirementAuthorityRef: string;
+  readonly authorityMarkerRef: string;
+  readonly authorityDerivationRefs: readonly string[];
   readonly sourceUri: string;
   readonly sourceDigest: string;
 }
@@ -179,6 +187,8 @@ export type SdlcRequirementTransformAuthorityStatus =
 export interface SdlcRequirementTransformAuthority {
   readonly kind: "sdlc_requirement_transform_authority";
   readonly requirementId: string;
+  readonly requirementDisplayId: string;
+  readonly requirementAuthorityRef: string;
   readonly transformRef: string;
   readonly predecessorTransformRefs: readonly string[];
   readonly transformInputAuthorityRef: string;
@@ -193,6 +203,10 @@ export interface SdlcBootstrapLineageRecord {
   readonly elementId: string;
   readonly elementKind: "project" | "requirement_seed" | "authority_marker";
   readonly sourceInputUris: readonly string[];
+  readonly requirementId?: string;
+  readonly requirementDisplayId?: string;
+  readonly requirementAuthorityRef?: string;
+  readonly authorityDerivationRefs?: readonly string[];
 }
 
 export interface SdlcWorkspaceIngressReport {

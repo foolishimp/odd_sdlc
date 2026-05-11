@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_source_input_bootstrap_lineage_and_requirement_closure
 governing_library: odd_sdlc TypeScript source input, bootstrap lineage, requirement closure, and transform authority carriers
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 4
 execution_order_reason: Establishes requirement authority identity before transformation-set and product-pressure proof.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old
 authority_ruling:
@@ -135,3 +136,29 @@ Run from `build_tenants/typescript`:
 - The source slug, source path, heading, or digest is discarded before closure.
 - Noncanonical ID style becomes a dispatch or closure failure instead of
   nonblocking hygiene.
+
+## Closure Evidence
+
+Implemented in the TypeScript tenant.
+
+- Source input now derives a stable `requirementAuthorityRef` for local
+  requirement headings from source URI, display ID, heading slug, and source
+  digest while preserving `requirementDisplayId` for operator surfaces.
+- Imported requirement authority, bootstrap lineage, requirement transform
+  authority, requirement closure entries, public fulfillment rows, and repair
+  frontier rows now carry authority refs separately from display IDs.
+- Requirement fulfillment public rows emit `obligationRef` using the authority
+  ref, so downstream transformation-set pressure consumes authority identity
+  instead of display-only IDs.
+- `test_t148_collision_safe_requirement_authority_refs.test.mjs` proves two
+  separate `R-01` requirement files produce distinct authority refs, distinct
+  closure rows, and distinct downstream pressure refs.
+
+Verification passed from `build_tenants/typescript` on 2026-05-11:
+
+- `npm run build:semantic`
+- `node --test test_env/tests/test_t031_workspace_ingress.test.mjs`
+- `node --test test_env/tests/test_t035_traceability_requirement_closure.test.mjs`
+- `node --test test_env/tests/test_t141_gtl_transform_boundary.test.mjs`
+- `node --test test_env/tests/test_t148_collision_safe_requirement_authority_refs.test.mjs`
+- `npm run test:semantic` (`397` tests passed)

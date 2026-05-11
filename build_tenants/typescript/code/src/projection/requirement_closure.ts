@@ -7,6 +7,7 @@ import {
   parseEnumValue,
   parseKind,
   parseNonEmptyString,
+  parseOptionalField,
   parseStringList
 } from "../shared/validation.js";
 import type { SdlcWorkReport } from "../hooks/index.js";
@@ -35,6 +36,7 @@ export type SdlcRequirementProofAuthority =
 export interface SdlcRequirementProofClaim {
   readonly kind: "sdlc_requirement_proof_claim";
   readonly requirementId: string;
+  readonly requirementAuthorityRef?: string;
   readonly assetId: string;
   readonly proofKind: SdlcRequirementProofKind;
   readonly authorityVerb: SdlcRequirementProofAuthority;
@@ -44,6 +46,8 @@ export interface SdlcRequirementProofClaim {
 export interface SdlcLineageProof {
   readonly kind: "sdlc_lineage_proof";
   readonly requirementId: string;
+  readonly requirementDisplayId: string;
+  readonly requirementAuthorityRef: string;
   readonly proofKind: SdlcRequirementProofKind;
   readonly authorityVerb: SdlcRequirementProofAuthority;
   readonly evidenceRefs: readonly string[];
@@ -55,6 +59,7 @@ export interface SdlcLineageEntry {
   readonly elementKind: "generated_asset";
   readonly sourceInputUris: readonly string[];
   readonly requirementIds: readonly string[];
+  readonly requirementAuthorityRefs: readonly string[];
   readonly producedByGraphFunction: string;
   readonly selectedBy: "abg_selected_edge";
   readonly targetAssetType: string;
@@ -88,6 +93,9 @@ export type SdlcRequirementTraceabilityStatus =
 export interface SdlcRequirementClosureEntry {
   readonly kind: "sdlc_requirement_closure_entry";
   readonly requirementId: string;
+  readonly requirementDisplayId?: string;
+  readonly requirementAuthorityRef?: string;
+  readonly authorityDerivationRefs?: readonly string[];
   readonly sourceInputUris: readonly string[];
   readonly assetIds: readonly string[];
   readonly producedByGraphFunctions: readonly string[];
@@ -106,6 +114,9 @@ export interface SdlcRequirementClosureRegister {
   readonly fulfilledRequirementIds: readonly string[];
   readonly carriedForwardRequirementIds: readonly string[];
   readonly unresolvedRequirementIds: readonly string[];
+  readonly fulfilledRequirementAuthorityRefs?: readonly string[];
+  readonly carriedForwardRequirementAuthorityRefs?: readonly string[];
+  readonly unresolvedRequirementAuthorityRefs?: readonly string[];
   readonly emittedRuntimeEventKinds: readonly [];
 }
 
@@ -115,6 +126,7 @@ export interface SdlcRepairFrontierEntry {
   readonly kind: "sdlc_repair_frontier_entry";
   readonly lane: SdlcRepairFrontierLane;
   readonly requirementIds: readonly string[];
+  readonly requirementAuthorityRefs?: readonly string[];
   readonly action: string;
 }
 
@@ -122,6 +134,8 @@ export interface SdlcRepairFrontier {
   readonly kind: "sdlc_repair_frontier";
   readonly unmetRequirementIds: readonly string[];
   readonly preservationRequirementIds: readonly string[];
+  readonly unmetRequirementAuthorityRefs?: readonly string[];
+  readonly preservationRequirementAuthorityRefs?: readonly string[];
   readonly lanes: readonly SdlcRepairFrontierEntry[];
   readonly lawfulEditFrontier: string;
   readonly lawfulProofFrontier: string;
@@ -141,15 +155,28 @@ export function admitSdlcRequirementProofClaim(
   const record = parseClosedRecord(input, label, [
     "kind",
     "requirementId",
+    "requirementAuthorityRef",
     "assetId",
     "proofKind",
     "authorityVerb",
     "evidenceRefs"
   ]);
   parseKind(record["kind"], "sdlc_requirement_proof_claim", `${label}.kind`);
+  const requirementAuthorityRef = parseOptionalField(
+    record,
+    "requirementAuthorityRef"
+  );
   return Object.freeze({
     kind: "sdlc_requirement_proof_claim",
     requirementId: parseNonEmptyString(record["requirementId"], `${label}.requirementId`),
+    ...(requirementAuthorityRef === undefined
+      ? {}
+      : {
+          requirementAuthorityRef: parseNonEmptyString(
+            requirementAuthorityRef,
+            `${label}.requirementAuthorityRef`
+          )
+        }),
     assetId: parseNonEmptyString(record["assetId"], `${label}.assetId`),
     proofKind: parseEnumValue(
       record["proofKind"],
@@ -165,23 +192,89 @@ export function admitSdlcRequirementProofClaim(
   });
 }
 
-function proofForClaim(claim: SdlcRequirementProofClaim): SdlcLineageProof {
+function authorityRefForIngressAuthority(input: {
+  readonly requirementId: string;
+  readonly requirementAuthorityRef?: string;
+}): string {
+  return input.requirementAuthorityRef ?? input.requirementId;
+}
+
+function displayIdForIngressAuthority(input: {
+  readonly requirementId: string;
+  readonly requirementDisplayId?: string;
+}): string {
+  return input.requirementDisplayId ?? input.requirementId;
+}
+
+function derivationRefsForIngressAuthority(input: {
+  readonly sourceUri: string;
+  readonly sourceDigest: string;
+  readonly authorityMarkerRef?: string;
+  readonly authorityDerivationRefs?: readonly string[];
+}): readonly string[] {
+  if (input.authorityDerivationRefs !== undefined) {
+    return input.authorityDerivationRefs;
+  }
+  return uniqueSorted([
+    input.sourceUri,
+    `source-digest://odd-sdlc/${encodeURIComponent(input.sourceDigest)}`,
+    ...(input.authorityMarkerRef === undefined ? [] : [input.authorityMarkerRef])
+  ]);
+}
+
+type ImportedRequirementAuthority =
+  SdlcWorkspaceIngressReport["importedRequirementAuthorities"][number];
+
+function authorityForClaim(input: {
+  readonly ingressReport: SdlcWorkspaceIngressReport;
+  readonly claim: SdlcRequirementProofClaim;
+}): ImportedRequirementAuthority | null {
+  if (input.claim.requirementAuthorityRef !== undefined) {
+    return (
+      input.ingressReport.importedRequirementAuthorities.find(
+        (authority) =>
+          authorityRefForIngressAuthority(authority) ===
+          input.claim.requirementAuthorityRef
+      ) ?? null
+    );
+  }
+  const candidates = input.ingressReport.importedRequirementAuthorities.filter(
+    (authority) =>
+      displayIdForIngressAuthority(authority) === input.claim.requirementId ||
+      authorityRefForIngressAuthority(authority) === input.claim.requirementId
+  );
+  return candidates.length === 1 ? candidates[0] ?? null : null;
+}
+
+function proofForClaim(input: {
+  readonly claim: SdlcRequirementProofClaim;
+  readonly ingressReport: SdlcWorkspaceIngressReport;
+}): SdlcLineageProof | null {
+  const authority = authorityForClaim(input);
+  if (authority === null) {
+    return null;
+  }
   return Object.freeze({
     kind: "sdlc_lineage_proof",
-    requirementId: claim.requirementId,
-    proofKind: claim.proofKind,
-    authorityVerb: claim.authorityVerb,
-    evidenceRefs: Object.freeze([...claim.evidenceRefs])
+    requirementId: displayIdForIngressAuthority(authority),
+    requirementDisplayId: displayIdForIngressAuthority(authority),
+    requirementAuthorityRef: authorityRefForIngressAuthority(authority),
+    proofKind: input.claim.proofKind,
+    authorityVerb: input.claim.authorityVerb,
+    evidenceRefs: Object.freeze([...input.claim.evidenceRefs])
   });
 }
 
 function sourceUrisForRequirement(input: {
   readonly ingressReport: SdlcWorkspaceIngressReport;
-  readonly requirementId: string;
+  readonly requirementAuthorityRef: string;
 }): readonly string[] {
   return uniqueSorted(
     input.ingressReport.importedRequirementAuthorities
-      .filter((authority) => authority.requirementId === input.requirementId)
+      .filter(
+        (authority) =>
+          authorityRefForIngressAuthority(authority) === input.requirementAuthorityRef
+      )
       .map((authority) => authority.sourceUri)
   );
 }
@@ -198,18 +291,31 @@ export function deriveSdlcLineageLedger(input: {
         const claims = input.proofClaims.filter(
           (claim) => claim.assetId === report.outputIdentity.assetId
         );
-        const proofs = Object.freeze(claims.map(proofForClaim));
+        const proofs = Object.freeze(
+          claims
+            .map((claim) =>
+              proofForClaim({ claim, ingressReport: input.ingressReport })
+            )
+            .filter((proof): proof is SdlcLineageProof => proof !== null)
+        );
         const requirementIds = uniqueSorted(claims.map((claim) => claim.requirementId));
+        const requirementAuthorityRefs = uniqueSorted(
+          proofs.map((proof) => proof.requirementAuthorityRef)
+        );
         return Object.freeze({
           kind: "sdlc_lineage_entry",
           elementId: report.outputIdentity.assetId,
           elementKind: "generated_asset",
           sourceInputUris: uniqueSorted(
-            requirementIds.flatMap((requirementId) =>
-              sourceUrisForRequirement({ ingressReport: input.ingressReport, requirementId })
+            requirementAuthorityRefs.flatMap((requirementAuthorityRef) =>
+              sourceUrisForRequirement({
+                ingressReport: input.ingressReport,
+                requirementAuthorityRef
+              })
             )
           ),
           requirementIds,
+          requirementAuthorityRefs,
           producedByGraphFunction: report.generatedAssetAuthority.graphFunctionName,
           selectedBy: report.generatedAssetAuthority.selectedBy,
           targetAssetType: report.generatedAssetAuthority.targetAssetType,
@@ -229,9 +335,19 @@ export function deriveSdlcLineageLedger(input: {
   });
 }
 
-function liveRequirementIds(ingressReport: SdlcWorkspaceIngressReport): readonly string[] {
-  return uniqueSorted(
-    ingressReport.importedRequirementAuthorities.map((authority) => authority.requirementId)
+function liveRequirementAuthorities(
+  ingressReport: SdlcWorkspaceIngressReport
+): readonly ImportedRequirementAuthority[] {
+  const byAuthorityRef = new Map<string, ImportedRequirementAuthority>();
+  for (const authority of ingressReport.importedRequirementAuthorities) {
+    byAuthorityRef.set(authorityRefForIngressAuthority(authority), authority);
+  }
+  return Object.freeze(
+    [...byAuthorityRef.values()].sort((left, right) =>
+      authorityRefForIngressAuthority(left).localeCompare(
+        authorityRefForIngressAuthority(right)
+      )
+    )
   );
 }
 
@@ -241,28 +357,32 @@ function isBehavioralProofKind(proofKind: SdlcRequirementProofKind): boolean {
 
 function entryHasSatisfiedBehavioralProof(input: {
   readonly entry: SdlcLineageEntry;
-  readonly requirementId: string;
+  readonly requirementAuthorityRef: string;
 }): boolean {
   return (
     input.entry.generatedAssetContractSatisfied &&
     input.entry.proofs.some(
       (proof) =>
-        proof.requirementId === input.requirementId &&
+        proof.requirementAuthorityRef === input.requirementAuthorityRef &&
         isBehavioralProofKind(proof.proofKind)
     )
   );
 }
 
 function closureForRequirement(input: {
-  readonly requirementId: string;
+  readonly authority: ImportedRequirementAuthority;
   readonly ingressReport: SdlcWorkspaceIngressReport;
   readonly lineageLedger: SdlcLineageLedger;
 }): SdlcRequirementClosureEntry {
+  const requirementDisplayId = displayIdForIngressAuthority(input.authority);
+  const requirementAuthorityRef = authorityRefForIngressAuthority(input.authority);
   const entries = input.lineageLedger.entries.filter((entry) =>
-    entry.requirementIds.includes(input.requirementId)
+    entry.requirementAuthorityRefs.includes(requirementAuthorityRef)
   );
   const proofs = entries.flatMap((entry) =>
-    entry.proofs.filter((proof) => proof.requirementId === input.requirementId)
+    entry.proofs.filter(
+      (proof) => proof.requirementAuthorityRef === requirementAuthorityRef
+    )
   );
   const proofKinds = uniqueSorted(proofs.map((proof) => proof.proofKind));
   const authorityVerbs = uniqueSorted(proofs.map((proof) => proof.authorityVerb));
@@ -281,7 +401,7 @@ function closureForRequirement(input: {
   const hasSatisfiedBehavioralEntry = entries.some((entry) =>
     entryHasSatisfiedBehavioralProof({
       entry,
-      requirementId: input.requirementId
+      requirementAuthorityRef
     })
   );
   const openReasons: string[] = [];
@@ -318,8 +438,14 @@ function closureForRequirement(input: {
 
   return Object.freeze({
     kind: "sdlc_requirement_closure_entry",
-    requirementId: input.requirementId,
-    sourceInputUris: sourceUrisForRequirement(input),
+    requirementId: requirementDisplayId,
+    requirementDisplayId,
+    requirementAuthorityRef,
+    authorityDerivationRefs: derivationRefsForIngressAuthority(input.authority),
+    sourceInputUris: sourceUrisForRequirement({
+      ingressReport: input.ingressReport,
+      requirementAuthorityRef
+    }),
     assetIds: uniqueSorted(entries.map((entry) => entry.elementId)),
     producedByGraphFunctions: uniqueSorted(
       entries.map((entry) => entry.producedByGraphFunction)
@@ -339,9 +465,9 @@ export function projectSdlcRequirementClosureRegister(input: {
   readonly lineageLedger: SdlcLineageLedger;
 }): SdlcRequirementClosureRegister {
   const entries = Object.freeze(
-    liveRequirementIds(input.ingressReport).map((requirementId) =>
+    liveRequirementAuthorities(input.ingressReport).map((authority) =>
       closureForRequirement({
-        requirementId,
+        authority,
         ingressReport: input.ingressReport,
         lineageLedger: input.lineageLedger
       })
@@ -365,6 +491,21 @@ export function projectSdlcRequirementClosureRegister(input: {
         .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
         .map((entry) => entry.requirementId)
     ),
+    fulfilledRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.fulfillmentStatus === "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+    ),
+    carriedForwardRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.carryStatus === "carried_forward")
+        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+    ),
+    unresolvedRequirementAuthorityRefs: uniqueSorted(
+      entries
+        .filter((entry) => entry.fulfillmentStatus !== "fulfilled")
+        .map((entry) => entry.requirementAuthorityRef ?? entry.requirementId)
+    ),
     emittedRuntimeEventKinds: EMPTY_RUNTIME_EVENT_KINDS
   });
 }
@@ -372,12 +513,20 @@ export function projectSdlcRequirementClosureRegister(input: {
 function repairLane(input: {
   readonly lane: SdlcRepairFrontierLane;
   readonly requirementIds: readonly string[];
+  readonly requirementAuthorityRefs?: readonly string[];
   readonly action: string;
 }): SdlcRepairFrontierEntry {
   return Object.freeze({
     kind: "sdlc_repair_frontier_entry",
     lane: input.lane,
     requirementIds: Object.freeze([...input.requirementIds]),
+    ...(input.requirementAuthorityRefs === undefined
+      ? {}
+      : {
+          requirementAuthorityRefs: Object.freeze([
+            ...input.requirementAuthorityRefs
+          ])
+        }),
     action: input.action
   });
 }
@@ -387,29 +536,40 @@ export function projectSdlcRepairFrontier(input: {
 }): SdlcRepairFrontier {
   const unmetRequirementIds = input.closureRegister.unresolvedRequirementIds;
   const preservationRequirementIds = input.closureRegister.fulfilledRequirementIds;
+  const unmetRequirementAuthorityRefs =
+    input.closureRegister.unresolvedRequirementAuthorityRefs ?? unmetRequirementIds;
+  const preservationRequirementAuthorityRefs =
+    input.closureRegister.fulfilledRequirementAuthorityRefs ??
+    preservationRequirementIds;
   return Object.freeze({
     kind: "sdlc_repair_frontier",
     unmetRequirementIds,
     preservationRequirementIds,
+    unmetRequirementAuthorityRefs,
+    preservationRequirementAuthorityRefs,
     lanes: Object.freeze([
       repairLane({
         lane: "requirements",
         requirementIds: unmetRequirementIds,
+        requirementAuthorityRefs: unmetRequirementAuthorityRefs,
         action: "carry unresolved requirement truth forward without erasing authority"
       }),
       repairLane({
         lane: "design",
         requirementIds: unmetRequirementIds,
+        requirementAuthorityRefs: unmetRequirementAuthorityRefs,
         action: "bind each unmet requirement to an explicit design/module carrier"
       }),
       repairLane({
         lane: "code",
         requirementIds: unmetRequirementIds,
+        requirementAuthorityRefs: unmetRequirementAuthorityRefs,
         action: "realize generated or adopted assets under graph-function authority"
       }),
       repairLane({
         lane: "test",
         requirementIds: unmetRequirementIds,
+        requirementAuthorityRefs: unmetRequirementAuthorityRefs,
         action: "add behavioral or runtime proof; trace tags alone are insufficient"
       })
     ]),

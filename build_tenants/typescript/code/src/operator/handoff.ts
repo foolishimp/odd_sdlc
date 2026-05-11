@@ -64,6 +64,10 @@ import {
   standardSdlcRuntimeLayout,
   type SdlcConformProjectProfile
 } from "../workspace/index.js";
+import {
+  localRequirementMarker,
+  requirementAuthorityIdentityForMarker
+} from "../workspace/source_input.js";
 import type {
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
@@ -213,6 +217,8 @@ const POSTFLIGHT_GAP_ACTIONS = Object.freeze([
 
 const REQUIREMENT_MARKER_EXPRESSION =
   /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
+const LOCAL_REQUIREMENT_HEADING_EXPRESSION =
+  /^\s{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
 
 const TRAVERSAL_AUTHORITY_PATHS = Object.freeze([
   "specification/INTENT.md",
@@ -1583,15 +1589,52 @@ function requirementObligations(input: {
   readonly workspaceRoot: string;
   readonly authorityRefs: readonly string[];
 }): readonly SdlcTraversalObligation[] {
-  const byId = new Map<
+  const byAuthorityRef = new Map<
     string,
     {
+      readonly displayId: string;
       readonly refs: Set<string>;
       readonly digests: Set<string>;
       readonly snippets: Set<string>;
       readonly concreteSnippets: Set<string>;
+      readonly derivationRefs: Set<string>;
     }
   >();
+  const recordRequirement = (input: {
+    readonly marker: string;
+    readonly sourceRef: string;
+    readonly sourceDigest: string;
+    readonly snippet: string;
+  }): void => {
+    const identity = requirementAuthorityIdentityForMarker({
+      marker: input.marker,
+      sourceUri: input.sourceRef,
+      sourceDigest: input.sourceDigest
+    });
+    if (identity === null) {
+      return;
+    }
+    const entry = byAuthorityRef.get(identity.requirementAuthorityRef) ?? {
+      displayId: identity.requirementDisplayId,
+      refs: new Set<string>(),
+      digests: new Set<string>(),
+      snippets: new Set<string>(),
+      concreteSnippets: new Set<string>(),
+      derivationRefs: new Set<string>()
+    };
+    entry.refs.add(input.sourceRef);
+    entry.digests.add(input.sourceDigest);
+    for (const ref of identity.authorityDerivationRefs) {
+      entry.derivationRefs.add(ref);
+    }
+    if (input.snippet.length > 0) {
+      entry.snippets.add(input.snippet);
+      if (!markerOnlySnippet(input.snippet, input.marker)) {
+        entry.concreteSnippets.add(input.snippet);
+      }
+    }
+    byAuthorityRef.set(identity.requirementAuthorityRef, entry);
+  };
   for (const ref of expandedRequirementAuthorityRefs(input.authorityRefs)) {
     const source = readableFileRef(ref);
     if (source === null) {
@@ -1600,46 +1643,38 @@ function requirementObligations(input: {
     const digest = sha256Text(source.content);
     for (const match of source.content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
       const marker = match[0] ?? "";
-      const requirementId = normalizeRequirementId(marker);
-      if (requirementId.length === 0) {
-        continue;
-      }
-      const entry = byId.get(requirementId) ?? {
-        refs: new Set<string>(),
-        digests: new Set<string>(),
-        snippets: new Set<string>(),
-        concreteSnippets: new Set<string>()
-      };
       const snippet = lineSnippetForOffset(source.content, match.index ?? 0);
-      entry.refs.add(ref);
-      entry.digests.add(digest);
-      if (snippet.length > 0) {
-        entry.snippets.add(snippet);
-        if (!markerOnlySnippet(snippet, marker)) {
-          entry.concreteSnippets.add(snippet);
-        }
-      }
-      byId.set(requirementId, entry);
+      recordRequirement({ marker, sourceRef: ref, sourceDigest: digest, snippet });
+    }
+    for (const match of source.content.matchAll(LOCAL_REQUIREMENT_HEADING_EXPRESSION)) {
+      const marker = localRequirementMarker({
+        requirementId: match[1] ?? "R-000",
+        title: match[2] ?? "requirement"
+      });
+      const snippet = lineSnippetForOffset(source.content, match.index ?? 0);
+      recordRequirement({ marker, sourceRef: ref, sourceDigest: digest, snippet });
     }
   }
   return Object.freeze(
-    [...byId.entries()]
+    [...byAuthorityRef.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([requirementId, entry]) => {
+      .map(([requirementAuthorityRef, entry]) => {
         const concreteSnippets = [...entry.concreteSnippets].sort();
         const snippets = concreteSnippets.length > 0
           ? concreteSnippets
           : [...entry.snippets].sort();
         const status = concreteSnippets.length > 0 ? "concrete" : "reference_only";
         const summary = concreteSnippets.length > 0
-          ? `Fulfill ${requirementId}: ${concreteSnippets[0]}`
-          : `Fulfill live requirement ${requirementId}.`;
+          ? `Fulfill ${entry.displayId}: ${concreteSnippets[0]}`
+          : `Fulfill live requirement ${entry.displayId}.`;
         return Object.freeze({
           kind: "sdlc_traversal_obligation" as const,
-          obligationId: `requirement:${requirementId}`,
+          obligationId: `requirement:${requirementAuthorityRef}`,
           obligationKind: "requirement" as const,
           summary,
-          evidenceRefs: Object.freeze([...entry.refs].sort()),
+          evidenceRefs: Object.freeze(
+            [...new Set([...entry.refs, ...entry.derivationRefs])].sort()
+          ),
           payload: Object.freeze({
             kind: "sdlc_traversal_obligation_payload" as const,
             status,
@@ -4729,7 +4764,8 @@ function requirementIdForObligation(obligationId: string): string | null {
   if (!obligationId.startsWith("requirement:")) {
     return null;
   }
-  return normalizeRequirementId(obligationId.slice("requirement:".length));
+  const rawRef = obligationId.slice("requirement:".length);
+  return /^(?:REQ|RF|R)-/iu.test(rawRef) ? normalizeRequirementId(rawRef) : rawRef;
 }
 
 function observedRequirementIds(input: {
