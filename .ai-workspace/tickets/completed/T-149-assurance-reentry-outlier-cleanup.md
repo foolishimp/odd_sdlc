@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: refine_existing_capability_and_component_depth_assurance_dispositions
 governing_library: odd_sdlc TypeScript assurance capability, component depth, and traversal consequence dispositions
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 7
 execution_order_reason: Cleans repairable-vs-no-basis classifier outliers after assurance law is set.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old
 authority_ruling:
@@ -129,6 +130,46 @@ Run from `build_tenants/typescript`:
 - `node --test test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs`
 - `node --test test_env/tests/test_t136_yield_closure_disposition.test.mjs`
 - Add and run a focused `test_env/tests/test_t149_assurance_reentry_outliers.test.mjs`.
+
+## Closure Evidence
+
+Completed on 2026-05-11.
+
+Implementation tightened the remaining assurance disposition outliers:
+
+- Capability observations with a constructive requirement basis but missing
+  evidence refs now emit `capability_evidence_missing:<capability>` as a
+  repairable worker-output reason.
+- Capability observations with no evidence refs and no requirement basis remain
+  hard `operator_blocked` cases under
+  `capability_evidence_missing_no_basis:<capability>`.
+- Component-depth missing output is classified as no-basis
+  `operator_blocked`; malformed or missing typed component-depth register
+  content remains repairable worker output.
+- The changed classifiers feed existing assurance reasons and
+  `SdlcEdgeClosureDecision` dispositions; no new ledger or routing authority
+  was added.
+
+Regression coverage:
+
+- `test_t149_assurance_reentry_outliers.test.mjs` proves capability evidence
+  missing with requirement basis reaches a replay-visible `repair` closure
+  disposition.
+- The same test proves capability no-basis stays `block`.
+- The same test proves component-depth missing-output no-basis stays block /
+  triage and cannot be converted to yield by liveness-only evidence.
+- The same test proves malformed component-depth register output remains
+  repairable worker output.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run build:semantic` passed.
+- `npm run test:t149` passed.
+- `node --test test_env/tests/test_t077_t083_assurance_ledgers.test.mjs` passed.
+- `node --test test_env/tests/test_t113_component_depth_register_admission.test.mjs` passed.
+- `node --test test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs` passed.
+- `node --test test_env/tests/test_t136_yield_closure_disposition.test.mjs` passed.
+- `npm run test:semantic` passed on 2026-05-11 with 408 tests, 0 failures.
 
 ## Non-Closure Conditions
 

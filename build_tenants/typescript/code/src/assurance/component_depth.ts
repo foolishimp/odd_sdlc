@@ -154,6 +154,14 @@ function reason(input: {
   });
 }
 
+function componentDepthAdmissionReentryPoint(
+  blockingReason: string
+): "repair_worker_output" | "operator_blocked" {
+  return blockingReason === "component_depth_output_missing"
+    ? "operator_blocked"
+    : "repair_worker_output";
+}
+
 function admissionReasons(
   admission: SdlcComponentDepthRegisterAdmission
 ): readonly SdlcAssuranceLedgerReason[] {
@@ -165,7 +173,8 @@ function admissionReasons(
       reason({
         code: blockingReason,
         message: `Component-depth register admission rejected: ${blockingReason}`,
-        evidenceRefs: admission.evidenceRefs
+        evidenceRefs: admission.evidenceRefs,
+        lawfulReentryPoint: componentDepthAdmissionReentryPoint(blockingReason)
       })
     )
   );
@@ -784,8 +793,15 @@ export function deriveComponentDepthAssuranceLedger(input: {
   const repriceReasonCodes = reasons
     .filter((item) => item.lawfulReentryPoint === "design_reframe")
     .map((item) => item.code);
+  const blockedReasonCodes = reasons
+    .filter((item) => item.lawfulReentryPoint === "operator_blocked")
+    .map((item) => item.code);
   const openGapReasonCodes = reasons
-    .filter((item) => item.lawfulReentryPoint !== "design_reframe")
+    .filter(
+      (item) =>
+        item.lawfulReentryPoint !== "design_reframe" &&
+        item.lawfulReentryPoint !== "operator_blocked"
+    )
     .map((item) => item.code);
   const admissionOnlyNonblocking =
     contract.requiredMaterializedRole !== null &&
@@ -798,7 +814,7 @@ export function deriveComponentDepthAssuranceLedger(input: {
   return assuranceLedger({
     dimension: "component_depth",
     verdict: verdictFromReasons({
-      blockedReasonCodes: [],
+      blockedReasonCodes,
       openGapReasonCodes,
       repriceReasonCodes
     }),

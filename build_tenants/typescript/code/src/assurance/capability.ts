@@ -90,6 +90,12 @@ export function deriveCapabilityAssuranceLedger(input: {
     const observed = observedByCapabilityId.get(capability.capabilityId);
     return observed !== undefined && observed.evidenceRefs.length === 0;
   });
+  const observedWithoutEvidenceWithBasis = observedWithoutEvidence.filter(
+    (capability) => capability.requirementRefs.length > 0
+  );
+  const observedWithoutEvidenceWithoutBasis = observedWithoutEvidence.filter(
+    (capability) => capability.requirementRefs.length === 0
+  );
   const contradictoryCapabilityIds = input.contradictoryCapabilityIds ?? [];
   const reasons = Object.freeze([
     ...missingCapabilities.map((capability) =>
@@ -136,10 +142,18 @@ export function deriveCapabilityAssuranceLedger(input: {
         lawfulReentryPoint: "same_edge_retry"
       })
     ),
-    ...observedWithoutEvidence.map((capability) =>
+    ...observedWithoutEvidenceWithBasis.map((capability) =>
       assuranceReason({
         code: `capability_evidence_missing:${capability.capabilityId}`,
         message: `Required capability ${capability.capabilityId} has no evidence refs.`,
+        evidenceRefs: capability.requirementRefs,
+        lawfulReentryPoint: "repair_worker_output"
+      })
+    ),
+    ...observedWithoutEvidenceWithoutBasis.map((capability) =>
+      assuranceReason({
+        code: `capability_evidence_missing_no_basis:${capability.capabilityId}`,
+        message: `Required capability ${capability.capabilityId} has no evidence refs or requirement basis.`,
         lawfulReentryPoint: "operator_blocked"
       })
     ),
@@ -151,8 +165,8 @@ export function deriveCapabilityAssuranceLedger(input: {
       })
     )
   ]);
-  const blockedCodes = observedWithoutEvidence.map(
-    (capability) => `capability_evidence_missing:${capability.capabilityId}`
+  const blockedCodes = observedWithoutEvidenceWithoutBasis.map(
+    (capability) => `capability_evidence_missing_no_basis:${capability.capabilityId}`
   );
   const repriceCodes = contradictoryCapabilityIds.map(
     (capabilityId) => `capability_authority_contradictory:${capabilityId}`
@@ -172,6 +186,9 @@ export function deriveCapabilityAssuranceLedger(input: {
     ),
     ...traceOnlyCapabilities.map(
       (capability) => `capability_trace_only:${capability.capabilityId}`
+    ),
+    ...observedWithoutEvidenceWithBasis.map(
+      (capability) => `capability_evidence_missing:${capability.capabilityId}`
     )
   ];
 

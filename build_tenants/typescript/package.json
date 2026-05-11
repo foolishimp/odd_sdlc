@@ -100,6 +100,7 @@
     "test:t146": "npm run build:semantic && node --test test_env/tests/test_t146_assurance_predecessor_refs.test.mjs",
     "test:t147": "npm run build:semantic && node --test test_env/tests/test_t147_tenant_role_policy_materialization.test.mjs",
     "test:t148": "npm run build:semantic && node --test test_env/tests/test_t148_collision_safe_requirement_authority_refs.test.mjs",
+    "test:t149": "npm run build:semantic && node --test test_env/tests/test_t149_assurance_reentry_outliers.test.mjs",
     "test:t150": "npm run build:semantic && node --test test_env/tests/test_t150_visible_defaults_catalog_lookup.test.mjs",
     "test:t151": "npm run build:semantic && node --test test_env/tests/test_t151_runner_evaluator_sovereignty.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
