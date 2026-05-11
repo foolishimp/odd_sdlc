@@ -253,7 +253,7 @@ test("T-058 newer terminal post-close projection prevents stale next-action repl
   );
 });
 
-test("T-143 terminal closed materialization archive retires stale public gap edge", () => {
+test("T-145 archive-only terminal closure does not retire a public gap edge", () => {
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace, {
     name: "20260510T000200000Z_pid3",
@@ -272,16 +272,23 @@ test("T-143 terminal closed materialization archive retires stale public gap edg
   ]);
 
   assert.equal(result.status, "ok");
-  assert.equal(result.payload.projection.status, "converged");
-  assert.equal(result.payload.projection.currentEdge, null);
-  assert.equal(result.payload.dossier.status, "converged");
-  assert.equal(result.payload.dossier.edge, null);
-  assert.equal(result.payload.dossier.bestGraphFunctionRef, null);
-  assert.deepEqual(result.payload.dossier.nextLawfulActions, ["close_or_reprice"]);
-  assert(
-    result.payload.dossier.rankingReasonRefs.includes(
-      `terminal_closed_edge_replayed:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
-    )
+  assert.equal(result.payload.projection.status, "open");
+  assert.equal(
+    result.payload.projection.currentEdge,
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  assert.equal(result.payload.dossier.status, "open");
+  assert.equal(result.payload.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
+  assert.equal(
+    result.payload.dossier.bestGraphFunctionRef,
+    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+  );
+  assert.notDeepEqual(result.payload.dossier.nextLawfulActions, ["close_or_reprice"]);
+  assert.equal(
+    result.payload.dossier.rankingReasonRefs.some((ref) =>
+      ref.startsWith("terminal_closed_edge_replayed:")
+    ),
+    false
   );
 });
 

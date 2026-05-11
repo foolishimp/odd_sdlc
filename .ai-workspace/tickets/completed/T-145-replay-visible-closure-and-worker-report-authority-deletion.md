@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: refactor_existing_spec_method_and_worker_report_consumers
 governing_library: odd_sdlc TypeScript replay, gaps projection, worker evidence admission, and traversal consequence surfaces
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 1
 execution_order_reason: Deletes rival closure/report authority so the one-truth-surface axiom can govern every later ticket.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: new_replaces_old
 authority_ruling:
@@ -165,3 +166,28 @@ Run from `build_tenants/typescript`:
   lower priority.
 - A passing test only checks rendered output and does not prove the replay chain
   wins when archive/report state disagrees.
+
+## Closure Evidence
+
+Implementation:
+
+- Removed archive-derived terminal closure authority from
+  `build_tenants/typescript/code/src/spec_method/entry.ts`.
+- Deleted `terminalClosedGraphFunctionFromArchive`,
+  `withTerminalClosedProjection`, `withTerminalClosedDossier`, and the public
+  gaps branch that rewrote replay projections and dossiers to `converged` from
+  archive-only state.
+- Added `test_env/tests/test_t145_replay_visible_closure_authority.test.mjs`
+  and `npm run test:t145`.
+- Updated the stale T-143 public-gap assertion in
+  `test_t058_spec_method_entrypoint.test.mjs` so archive-only terminal closure
+  remains non-converged unless replay truth closes the edge.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run test:t145` passed.
+- `npm run test:t058` passed.
+- `npm run test:t138` passed.
+- `npm run test:t139` passed.
+- `npm run lint:semantic` passed.
+- `npm run test:semantic` passed: 390 tests.

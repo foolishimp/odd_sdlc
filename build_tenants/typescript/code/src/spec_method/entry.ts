@@ -31,8 +31,6 @@ import {
   projectSdlcQueryDomain,
   projectSdlcRequirementFulfillmentPublicViewFromPriorProjection,
   withSdlcRequirementFulfillmentArchiveRehydration,
-  type SdlcGapDossier,
-  type SdlcGapProjection,
   type SdlcRequirementClosureRegister,
   type SdlcRequirementFulfillmentClosureSource,
   type SdlcRequirementFulfillmentEdgeLedgerSource,
@@ -715,13 +713,6 @@ interface SelectedNextGraphFunctionFromArchive {
   readonly closureDecisionRef: string;
 }
 
-interface TerminalClosedGraphFunctionFromArchive {
-  readonly graphFunctionName: string;
-  readonly archiveRef: string;
-  readonly nextActionProjectionRef: string;
-  readonly closureDecisionRef: string;
-}
-
 function selectedNextGraphFunctionFromArchive(input: {
   readonly context: SpecMethodWorkspaceContext;
   readonly module: ReturnType<typeof constructSdlcGtlModule>;
@@ -789,127 +780,6 @@ function selectedNextGraphFunctionFromArchive(input: {
     return null;
   }
   return null;
-}
-
-function graphFunctionNameFromOperatorArchive(archiveRoot: string): string | null {
-  const packageRecord = jsonRecordFromFile(
-    path.join(archiveRoot, "worker_invocation_package.json")
-  );
-  if (packageRecord !== null) {
-    return (
-      stringField(packageRecord, "edgeName") ??
-      stringField(packageRecord, "graphFunctionName")
-    );
-  }
-  const manifestRecord = jsonRecordFromFile(
-    path.join(archiveRoot, "handoff_manifest.json")
-  );
-  if (manifestRecord !== null) {
-    return (
-      stringField(manifestRecord, "edgeName") ??
-      stringField(manifestRecord, "graphFunctionName")
-    );
-  }
-  return null;
-}
-
-function terminalClosedGraphFunctionFromArchive(input: {
-  readonly context: SpecMethodWorkspaceContext;
-  readonly graphFunctionName: string;
-}): TerminalClosedGraphFunctionFromArchive | null {
-  for (const archiveRoot of operatorRunArchiveRootsNewestFirst(input.context)) {
-    const archivedGraphFunctionName = graphFunctionNameFromOperatorArchive(archiveRoot);
-    if (archivedGraphFunctionName !== input.graphFunctionName) {
-      continue;
-    }
-    const decision = edgeClosureDecisionFromArchive(archiveRoot);
-    if (decision?.disposition !== "close") {
-      continue;
-    }
-    const ledgerRecord = jsonRecordFromFile(
-      path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
-    );
-    if (
-      ledgerRecord?.["kind"] !== "sdlc_edge_fulfillment_ledger" ||
-      ledgerRecord["edgeConverged"] !== true
-    ) {
-      continue;
-    }
-    const record = jsonRecordFromFile(
-      path.join(archiveRoot, "sdlc_next_action_projection.json")
-    );
-    if (record?.["kind"] !== "sdlc_next_action_projection") {
-      continue;
-    }
-    const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
-    if (
-      record["choosesNextTraversal"] !== false ||
-      nextActionProjectionRef === null ||
-      stringField(record, "selectedActionRef") !== null ||
-      stringField(record, "nextGraphFunctionRef") !== null ||
-      !stringArrayField(record, "predecessorRefs").includes(decision.decisionRef)
-    ) {
-      continue;
-    }
-    return Object.freeze({
-      graphFunctionName: archivedGraphFunctionName,
-      archiveRef: archiveRefForRoot(archiveRoot),
-      nextActionProjectionRef,
-      closureDecisionRef: decision.decisionRef
-    });
-  }
-  return null;
-}
-
-function withTerminalClosedProjection(input: {
-  readonly projection: SdlcGapProjection;
-  readonly terminalArchive: TerminalClosedGraphFunctionFromArchive;
-}): SdlcGapProjection {
-  const nextVectorIndex = input.projection.nextVectorIndex;
-  const closedVectorIndexes =
-    nextVectorIndex === null
-      ? input.projection.closedVectorIndexes
-      : Object.freeze(
-          [...new Set([...input.projection.closedVectorIndexes, nextVectorIndex])].sort(
-            (left, right) => left - right
-          )
-        );
-  return Object.freeze({
-    ...input.projection,
-    status: "converged",
-    currentEdge: null,
-    nextVectorIndex: null,
-    closedVectorIndexes
-  });
-}
-
-function withTerminalClosedDossier(input: {
-  readonly dossier: SdlcGapDossier;
-  readonly terminalArchive: TerminalClosedGraphFunctionFromArchive;
-}): SdlcGapDossier {
-  return Object.freeze({
-    ...input.dossier,
-    edge: null,
-    status: "converged",
-    evidenceRefs: Object.freeze([
-      ...input.dossier.evidenceRefs,
-      input.terminalArchive.archiveRef,
-      input.terminalArchive.closureDecisionRef
-    ]),
-    gapPressureRefs: Object.freeze([
-      ...input.dossier.gapPressureRefs,
-      `closed-edge://odd-sdlc/${input.terminalArchive.graphFunctionName}`
-    ]),
-    nextActionProjectionRef: input.terminalArchive.nextActionProjectionRef,
-    bestActionRef: null,
-    bestGraphFunctionRef: null,
-    bestGraphVectorRef: null,
-    rankingReasonRefs: Object.freeze([
-      ...input.dossier.rankingReasonRefs,
-      `terminal_closed_edge_replayed:${input.terminalArchive.graphFunctionName}`
-    ]),
-    nextLawfulActions: Object.freeze(["close_or_reprice"])
-  });
 }
 
 function assessmentStatusFromRecord(
@@ -1412,30 +1282,16 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     basis: start.executionContract.basis,
     events
   });
-  const terminalClosedEdge =
-    projection.currentEdge === null
-      ? null
-      : terminalClosedGraphFunctionFromArchive({
-          context,
-          graphFunctionName: projection.currentEdge
-        });
-  const publicProjection =
-    terminalClosedEdge === null
-      ? projection
-      : withTerminalClosedProjection({
-          projection,
-          terminalArchive: terminalClosedEdge
-        });
   const priorityScheme = constructionPrioritySchemeForSpecMethodGaps({
     request,
     basis: start.executionContract.basis,
-    closedVectorIndexes: publicProjection.closedVectorIndexes
+    closedVectorIndexes: projection.closedVectorIndexes
   });
   const requirementFulfillment = requirementFulfillmentForGaps({
     context,
     sourceProjection: queryDomain.requirementFulfillment
   });
-  const sourceDossier = deriveSdlcGapDossier({
+  const dossier = deriveSdlcGapDossier({
     basis: start.executionContract.basis,
     events,
     triageInput: "spec_method:gaps",
@@ -1443,13 +1299,6 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     requirementFulfillment,
     ...(priorityScheme === undefined ? {} : { priorityScheme })
   });
-  const dossier =
-    terminalClosedEdge === null
-      ? sourceDossier
-      : withTerminalClosedDossier({
-          dossier: sourceDossier,
-          terminalArchive: terminalClosedEdge
-        });
   const homeostaticTriage = homeostaticGapTriageForGaps({
     dossier,
     requirementFulfillment,
@@ -1457,7 +1306,7 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   });
   return Object.freeze({
     start,
-    projection: publicProjection,
+    projection,
     dossier,
     requirementFulfillment,
     homeostaticTriage

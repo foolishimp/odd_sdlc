@@ -66,25 +66,25 @@ The completed base for this wave is:
 5. T-143 closes the conformed-authority product target-contract framework
    repair on the authoritative internal controlled data_mapper lane.
 6. T-144 closes the immediate F_D-overreach and tenant grammar boundary repair.
+7. T-145 deletes archive-derived public-gap closure authority and proves worker
+   report prose cannot alter closure or routing.
 
-With T-143 validation closed, the current executable order is axiomatic first,
-proof second:
+With T-145 closed, the current executable order remains axiomatic first, proof
+second:
 
-1. T-145: delete rival closure/report authority so one truth surface governs
-   closure, routing, retry, repair, re-entry, reprice, block, and next action.
-2. T-151: make the installed runner sovereign over the consequence chain.
-3. T-150: make defaults and catalog lookup visible, versioned, and replayable.
-4. T-148: stabilize local requirement authority refs so display IDs cannot
+1. T-151: make the installed runner sovereign over the consequence chain.
+2. T-150: make defaults and catalog lookup visible, versioned, and replayable.
+3. T-148: stabilize local requirement authority refs so display IDs cannot
    collapse source truth.
-5. T-147: move product-file role satisfaction and exact target binding into
+4. T-147: move product-file role satisfaction and exact target binding into
    declared target/capability policy.
-6. T-146: add assurance predecessor refs and a closed F_D mechanics class.
-7. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
-8. T-152: prove data_mapper-scale transformation-set partition after identity,
+5. T-146: add assurance predecessor refs and a closed F_D mechanics class.
+6. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
+7. T-152: prove data_mapper-scale transformation-set partition after identity,
    target, and runner authority are lawful.
-9. T-153: prove live or live-equivalent non-close dispositions from admitted
+8. T-153: prove live or live-equivalent non-close dispositions from admitted
    evidence and replay-visible closure/evaluator truth.
-10. T-154: prove source/specification-only data_mapper parity without an explicit
+9. T-154: prove source/specification-only data_mapper parity without an explicit
     product-materialization harness target.
 
 ## Current Computational Target
@@ -149,7 +149,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-142-prove-autonomous-product-materialization-from-consequence-chain.md`
 - `.ai-workspace/tickets/completed/T-143-derive-product-materialization-targets-from-conformed-authority.md`
 - `.ai-workspace/tickets/completed/T-144-reclassify-repairable-assurance-and-tenant-grammar-boundaries.md`
-- `.ai-workspace/tickets/backlog/T-145-replay-visible-closure-and-worker-report-authority-deletion.md`
+- `.ai-workspace/tickets/completed/T-145-replay-visible-closure-and-worker-report-authority-deletion.md`
 - `.ai-workspace/tickets/backlog/T-146-assurance-carrier-predecessor-refs-and-closed-fd-class.md`
 - `.ai-workspace/tickets/backlog/T-147-tenant-role-policy-for-product-materialization.md`
 - `.ai-workspace/tickets/backlog/T-148-collision-safe-local-requirement-authority-refs.md`
