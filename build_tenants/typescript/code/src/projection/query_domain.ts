@@ -1,6 +1,7 @@
 // Implements: REQ-F-ODDSDLC-020
 // Implements: REQ-F-ODDSDLC-035
 
+import { createHash } from "node:crypto";
 import {
   constructConstructionPriorityRule,
   constructConstructionPriorityScheme,
@@ -184,6 +185,72 @@ export interface SdlcRequirementFulfillmentNextActionSource {
   readonly selectedActionRef: string | null;
 }
 
+export interface SdlcDomainDefaultsCarrier {
+  readonly kind: "odd_sdlc_domain_defaults";
+  readonly defaultsVersion: "ts-domain-defaults-v1";
+  readonly carrierRef: string;
+  readonly digest: string;
+  readonly digestRef: string;
+  readonly policyScope:
+    | "query_domain"
+    | "public_gap_evaluator"
+    | "installed_runner";
+  readonly substrateBoundary: "odd_sdlc_domain_policy_not_abg_defaults";
+  readonly defaultRegime: "F_P";
+  readonly defaultGapPriorityPolicyRef: string;
+  readonly defaultGapPrioritySchemeRef: string;
+  readonly sourceRefs: readonly string[];
+}
+
+const ODD_SDLC_DOMAIN_DEFAULTS_VERSION = "ts-domain-defaults-v1" as const;
+const ODD_SDLC_DOMAIN_DEFAULTS_REF =
+  `domain-defaults://odd-sdlc/${ODD_SDLC_DOMAIN_DEFAULTS_VERSION}`;
+const ODD_SDLC_DEFAULT_GAP_PRIORITY_POLICY_REF =
+  `${ODD_SDLC_DOMAIN_DEFAULTS_REF}/policy/default-follow-graph`;
+const ODD_SDLC_DEFAULT_GAP_PRIORITY_SCHEME_REF =
+  `${ODD_SDLC_DOMAIN_DEFAULTS_REF}/priority-scheme/default-follow-graph`;
+
+function domainDefaultsDigest(input: {
+  readonly defaultsVersion: typeof ODD_SDLC_DOMAIN_DEFAULTS_VERSION;
+  readonly defaultRegime: "F_P";
+  readonly defaultGapPriorityPolicyRef: string;
+  readonly defaultGapPrioritySchemeRef: string;
+  readonly substrateBoundary: SdlcDomainDefaultsCarrier["substrateBoundary"];
+  readonly sourceRefs: readonly string[];
+}): string {
+  return `sha256:${createHash("sha256")
+    .update(JSON.stringify(input), "utf8")
+    .digest("hex")}`;
+}
+
+export function constructSdlcDomainDefaultsCarrier(): SdlcDomainDefaultsCarrier {
+  const sourceRefs = Object.freeze([
+    "specification/GOALS.md#Current-Computational-Target",
+    "specification/PRODUCT.md#Installed-Operator-Loop"
+  ]);
+  const digest = domainDefaultsDigest({
+    defaultsVersion: ODD_SDLC_DOMAIN_DEFAULTS_VERSION,
+    defaultRegime: "F_P",
+    defaultGapPriorityPolicyRef: ODD_SDLC_DEFAULT_GAP_PRIORITY_POLICY_REF,
+    defaultGapPrioritySchemeRef: ODD_SDLC_DEFAULT_GAP_PRIORITY_SCHEME_REF,
+    substrateBoundary: "odd_sdlc_domain_policy_not_abg_defaults",
+    sourceRefs
+  });
+  return Object.freeze({
+    kind: "odd_sdlc_domain_defaults",
+    defaultsVersion: ODD_SDLC_DOMAIN_DEFAULTS_VERSION,
+    carrierRef: ODD_SDLC_DOMAIN_DEFAULTS_REF,
+    digest,
+    digestRef: `${ODD_SDLC_DOMAIN_DEFAULTS_REF}/digest/${digest.slice("sha256:".length)}`,
+    policyScope: "public_gap_evaluator",
+    substrateBoundary: "odd_sdlc_domain_policy_not_abg_defaults",
+    defaultRegime: "F_P",
+    defaultGapPriorityPolicyRef: ODD_SDLC_DEFAULT_GAP_PRIORITY_POLICY_REF,
+    defaultGapPrioritySchemeRef: ODD_SDLC_DEFAULT_GAP_PRIORITY_SCHEME_REF,
+    sourceRefs
+  });
+}
+
 export interface SdlcQueryDomainProjection {
   readonly kind: "sdlc_query_domain_projection";
   readonly contractName: "odd_sdlc.query-domain";
@@ -196,6 +263,7 @@ export interface SdlcQueryDomainProjection {
   readonly assetTypes: typeof SOFTWARE_DOMAIN_ASSET_TYPES;
   readonly assetFamilies: typeof SOFTWARE_DOMAIN_ASSET_FAMILIES;
   readonly workActTypes: typeof SOFTWARE_DOMAIN_WORK_ACT_TYPES;
+  readonly domainDefaults: SdlcDomainDefaultsCarrier;
   readonly libraryFunctions: SdlcGraphFunctionCatalog["libraryFunctions"];
   readonly functions: SdlcGraphFunctionCatalog["functions"];
   readonly programs: SdlcGraphFunctionCatalog["executives"];
@@ -1034,6 +1102,7 @@ export function projectSdlcQueryDomain(input: {
   assertModuleMatchesCatalog({ module: input.module, catalog });
   const graphFunctionSurfaces = graphFunctionSurface(input.module);
   const assetOwnershipRows = assetOwnership(catalog);
+  const domainDefaults = constructSdlcDomainDefaultsCarrier();
   const requirementFulfillment = projectSdlcRequirementFulfillmentForIngress(
     input.ingressReport
   );
@@ -1049,6 +1118,7 @@ export function projectSdlcQueryDomain(input: {
     assetTypes: SOFTWARE_DOMAIN_ASSET_TYPES,
     assetFamilies: SOFTWARE_DOMAIN_ASSET_FAMILIES,
     workActTypes: SOFTWARE_DOMAIN_WORK_ACT_TYPES,
+    domainDefaults,
     libraryFunctions: catalog.libraryFunctions,
     functions: catalog.functions,
     programs: catalog.executives,
@@ -1122,6 +1192,7 @@ export function deriveSdlcGapDossier(input: {
   readonly triageInput: string;
   readonly evidenceRefs: readonly string[];
   readonly priorityScheme?: ConstructionPriorityScheme;
+  readonly domainDefaults?: SdlcDomainDefaultsCarrier;
   readonly requirementFulfillment?: SdlcRequirementFulfillmentPublicProjection;
 }): SdlcGapDossier {
   const gaps = evalSdlcGapFromReplay({
@@ -1131,6 +1202,12 @@ export function deriveSdlcGapDossier(input: {
   const intentEventRefs = Object.freeze([
     `event://odd-sdlc/intent/${input.triageInput}`
   ]);
+  const domainDefaults =
+    input.domainDefaults ?? constructSdlcDomainDefaultsCarrier();
+  const defaultParticipationRefs =
+    input.priorityScheme === undefined && gaps.nextVectorIndex !== null
+      ? Object.freeze([domainDefaults.carrierRef, domainDefaults.digestRef])
+      : Object.freeze([]);
   const evaluator =
     gaps.nextVectorIndex === null
       ? null
@@ -1143,7 +1220,8 @@ export function deriveSdlcGapDossier(input: {
             triageInput: input.triageInput,
             evidenceRefs: input.evidenceRefs,
             intentEventRefs,
-            productAssetModelRef: gaps.productAssetModelRef
+            productAssetModelRef: gaps.productAssetModelRef,
+            domainDefaults
           },
           input.priorityScheme
         );
@@ -1158,7 +1236,7 @@ export function deriveSdlcGapDossier(input: {
     localRankingAuthority: false,
     edge: gaps.currentEdge,
     status: gaps.status,
-    evidenceRefs: Object.freeze([...input.evidenceRefs]),
+    evidenceRefs: Object.freeze([...input.evidenceRefs, ...defaultParticipationRefs]),
     triageInput: input.triageInput,
     nextActionBasisKind: "initial_selection",
     intentEventRefs,
@@ -1172,7 +1250,12 @@ export function deriveSdlcGapDossier(input: {
     bestGraphFunctionRef: evaluator?.bestGraphFunctionRef ?? null,
     bestGraphVectorRef: evaluator?.bestGraphVectorRef ?? null,
     rankingReasonRefs: Object.freeze(
-      evaluator?.selectedPriorityRow?.rankReasonRefs ?? []
+      evaluator === null
+        ? []
+        : [
+            ...defaultParticipationRefs,
+            ...(evaluator.selectedPriorityRow?.rankReasonRefs ?? [])
+          ]
     ),
     requirementFulfillment:
       input.requirementFulfillment ?? emptyRequirementFulfillmentPublicView(),
@@ -1192,6 +1275,7 @@ function evaluateSdlcNextAction(
     readonly evidenceRefs: readonly string[];
     readonly intentEventRefs: readonly string[];
     readonly productAssetModelRef: string;
+    readonly domainDefaults: SdlcDomainDefaultsCarrier;
   },
   priorityScheme?: ConstructionPriorityScheme
 ): OddSdlcEvaluateNextReport {
@@ -1215,17 +1299,17 @@ function evaluateSdlcNextAction(
     priorityScheme ??
     constructConstructionPriorityScheme({
       schemeRef:
-        `priority-scheme://odd-sdlc/default-follow-graph/${input.basis.graphFunction.id}/${vector.id}`,
-      sourcePolicyRef: "policy://odd-sdlc/default-follow-graph",
+        `${input.domainDefaults.defaultGapPrioritySchemeRef}/${input.basis.graphFunction.id}/${vector.id}`,
+      sourcePolicyRef: input.domainDefaults.defaultGapPriorityPolicyRef,
       rules: Object.freeze([
         constructConstructionPriorityRule({
           priorityRuleRef:
-            `priority-rule://odd-sdlc/default-follow-graph/${input.basis.graphFunction.id}/${vector.id}`,
+            `${input.domainDefaults.defaultGapPriorityPolicyRef}/rule/${input.basis.graphFunction.id}/${vector.id}`,
           axis: "gap_repair",
           weight: 100,
           appliesToActionKinds: Object.freeze(["continue_graph_call"]),
           appliesToOutcomeRefs: Object.freeze([currentTargetOutcomeRef]),
-          sourcePolicyRef: "policy://odd-sdlc/default-follow-graph",
+          sourcePolicyRef: input.domainDefaults.defaultGapPriorityPolicyRef,
           strategyLabel: "follow_current_graph_edge"
         })
       ])
@@ -1268,7 +1352,8 @@ function evaluateSdlcNextAction(
           expectedOutputAssetRefs: Object.freeze([candidate.target.id]),
           requiredAuthorityRefs: Object.freeze([publishedTraversalTargetRef]),
           eligibleReasonRefs: Object.freeze([
-            "odd_sdlc_gap_dossier_read_only_evaluator_view"
+            "odd_sdlc_gap_dossier_read_only_evaluator_view",
+            input.domainDefaults.carrierRef
           ])
         };
       })

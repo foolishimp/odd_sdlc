@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: introduce_odd_sdlc_defaults_carrier_and_harden_catalog_lookup_on_touched_paths
 governing_library: odd_sdlc TypeScript query-domain catalogs, domain defaults, and ABG substrate default boundary
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 3
 execution_order_reason: Makes defaults and catalog lookup replay-visible before executor proofs rely on evaluator attention.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: new_is_new_and_replaces_hidden_default_authority
 authority_ruling:
@@ -142,3 +143,33 @@ Run from `build_tenants/typescript`:
   closure, routing, or action selection without replay-visible evidence.
 - A touched path resolves graph functions or assets by lexical search when a
   published catalog exists.
+
+## Closure Evidence
+
+Implementation:
+
+- Added a versioned `odd_sdlc_domain_defaults` carrier in
+  `projection/query_domain.ts` with stable ref, digest, source refs, and an
+  explicit substrate boundary that keeps domain policy out of `abg_defaults`.
+- Published the domain-defaults carrier on `SdlcQueryDomainProjection`.
+- Threaded the carrier through public gap dossier ranking so default evaluator
+  participation is cited in evidence and ranking refs when no explicit priority
+  scheme is supplied.
+- Kept explicit priority schemes free of implicit default evidence.
+- Removed the touched suffix/lexical graph-function lookup fallback from
+  `selectedNextGraphFunctionFromArchive`; archive next-action replay now
+  requires a published catalog id/name ref.
+- Added `test_env/tests/test_t150_visible_defaults_catalog_lookup.test.mjs`
+  and `npm run test:t150`.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run test:t150` passed.
+- `npm run test:t030` passed.
+- `npm run test:t039` passed.
+- `npm run test:t135` passed.
+- `npm run test:t139` passed.
+- `npm run test:t032` passed.
+- `npm run test:t129` passed.
+- `npm run lint:semantic` passed.
+- `npm run test:semantic` passed: 396 tests.

@@ -183,7 +183,12 @@ test("T-032 gaps and dossiers read ABI replay truth without emitting events", ()
   assert.deepStrictEqual(dossier.nextLawfulActions, [dossier.bestActionRef]);
   assert(
     dossier.rankingReasonRefs.some((ref) =>
-      ref.includes("priority-rule://odd-sdlc/default-follow-graph/")
+      ref.includes("domain-defaults://odd-sdlc/ts-domain-defaults-v1")
+    )
+  );
+  assert(
+    dossier.rankingReasonRefs.some((ref) =>
+      ref.includes("/policy/default-follow-graph/rule/")
     )
   );
 });

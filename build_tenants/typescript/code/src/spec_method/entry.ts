@@ -766,17 +766,6 @@ function selectedNextGraphFunctionFromArchive(input: {
         closureDecisionRef: decision.decisionRef
       });
     }
-    const suffixMatch = input.module.graphFunctions.find((graphFunction) =>
-      nextGraphFunctionRef.endsWith(`:${graphFunction.name}`)
-    );
-    if (suffixMatch !== undefined) {
-      return Object.freeze({
-        graphFunctionName: suffixMatch.name,
-        nextActionProjectionRef,
-        selectedActionRef,
-        closureDecisionRef: decision.decisionRef
-      });
-    }
     return null;
   }
   return null;
@@ -1297,6 +1286,7 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     triageInput: "spec_method:gaps",
     evidenceRefs: ["spec-method://odd-sdlc-ts/gaps"],
     requirementFulfillment,
+    domainDefaults: queryDomain.domainDefaults,
     ...(priorityScheme === undefined ? {} : { priorityScheme })
   });
   const homeostaticTriage = homeostaticGapTriageForGaps({

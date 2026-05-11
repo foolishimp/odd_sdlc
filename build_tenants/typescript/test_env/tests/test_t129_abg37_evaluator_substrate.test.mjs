@@ -698,7 +698,12 @@ test("T-129 public gap dossier follows graph order by default when no priority a
   ]);
   assert(
     dossier.rankingReasonRefs.some((ref) =>
-      ref.includes("priority-rule://odd-sdlc/default-follow-graph/")
+      ref.includes("domain-defaults://odd-sdlc/ts-domain-defaults-v1")
+    )
+  );
+  assert(
+    dossier.rankingReasonRefs.some((ref) =>
+      ref.includes("/policy/default-follow-graph/rule/")
     )
   );
 });

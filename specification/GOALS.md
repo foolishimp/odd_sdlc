@@ -70,22 +70,24 @@ The completed base for this wave is:
    report prose cannot alter closure or routing.
 8. T-151 makes installed `first_traversal` return the first admitted
    consequence-chain result instead of continuing from local runner status.
+9. T-150 makes the public gap default ranking policy replay-visible through an
+   `odd_sdlc_domain_defaults` carrier and hardens touched archive next-action
+   lookup to published graph-function refs.
 
-With T-151 closed, the current executable order remains axiomatic first, proof
+With T-150 closed, the current executable order remains axiomatic first, proof
 second:
 
-1. T-150: make defaults and catalog lookup visible, versioned, and replayable.
-2. T-148: stabilize local requirement authority refs so display IDs cannot
+1. T-148: stabilize local requirement authority refs so display IDs cannot
    collapse source truth.
-3. T-147: move product-file role satisfaction and exact target binding into
+2. T-147: move product-file role satisfaction and exact target binding into
    declared target/capability policy.
-4. T-146: add assurance predecessor refs and a closed F_D mechanics class.
-5. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
-6. T-152: prove data_mapper-scale transformation-set partition after identity,
+3. T-146: add assurance predecessor refs and a closed F_D mechanics class.
+4. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
+5. T-152: prove data_mapper-scale transformation-set partition after identity,
    target, and runner authority are lawful.
-7. T-153: prove live or live-equivalent non-close dispositions from admitted
+6. T-153: prove live or live-equivalent non-close dispositions from admitted
    evidence and replay-visible closure/evaluator truth.
-8. T-154: prove source/specification-only data_mapper parity without an explicit
+7. T-154: prove source/specification-only data_mapper parity without an explicit
     product-materialization harness target.
 
 ## Current Computational Target
@@ -155,7 +157,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/backlog/T-147-tenant-role-policy-for-product-materialization.md`
 - `.ai-workspace/tickets/backlog/T-148-collision-safe-local-requirement-authority-refs.md`
 - `.ai-workspace/tickets/backlog/T-149-assurance-reentry-outlier-cleanup.md`
-- `.ai-workspace/tickets/backlog/T-150-visible-defaults-and-published-catalog-lookup-discipline.md`
+- `.ai-workspace/tickets/completed/T-150-visible-defaults-and-published-catalog-lookup-discipline.md`
 - `.ai-workspace/tickets/completed/T-151-one-closed-computational-loop-and-runner-evaluator-sovereignty.md`
 - `.ai-workspace/tickets/backlog/T-152-data-mapper-scale-transformation-set-partition-proof.md`
 - `.ai-workspace/tickets/backlog/T-153-live-non-close-disposition-parity-proof.md`
