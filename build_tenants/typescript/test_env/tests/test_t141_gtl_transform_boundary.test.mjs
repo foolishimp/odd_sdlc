@@ -617,7 +617,11 @@ test("T-141 installed runner closes authority induction and selects product mate
   );
   assert.equal(
     outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
-    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    "derive_component_code_surface"
+  );
+  assert.match(
+    outcome.traversalConsequence.nextActionProjection.nextGraphVectorRef ?? "",
+    /derive_component_code_surface/u
   );
   assert.match(
     outcome.traversalConsequence.nextActionProjection.selectedActionRef ?? "",

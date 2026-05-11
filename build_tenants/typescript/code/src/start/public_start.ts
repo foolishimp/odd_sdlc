@@ -70,6 +70,7 @@ export interface SdlcPublicStartRequest {
   readonly defaultRegime: RuntimeRegime;
   readonly replayNextActionProjectionRef?: string | null;
   readonly replaySelectedActionRef?: string | null;
+  readonly replayNextGraphVectorRef?: string | null;
   readonly replayClosureDecisionRef?: string | null;
 }
 
@@ -124,6 +125,7 @@ export function admitSdlcPublicStartRequest(
     "defaultRegime",
     "replayNextActionProjectionRef",
     "replaySelectedActionRef",
+    "replayNextGraphVectorRef",
     "replayClosureDecisionRef"
   ]);
   const target = parseClosedRecord(record["target"], `${label}.target`, [
@@ -169,6 +171,14 @@ export function admitSdlcPublicStartRequest(
         : parseNonEmptyString(
             record["replaySelectedActionRef"],
             `${label}.replaySelectedActionRef`
+          ),
+    replayNextGraphVectorRef:
+      record["replayNextGraphVectorRef"] === undefined ||
+      record["replayNextGraphVectorRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayNextGraphVectorRef"],
+            `${label}.replayNextGraphVectorRef`
           ),
     replayClosureDecisionRef:
       record["replayClosureDecisionRef"] === undefined ||
@@ -505,7 +515,7 @@ function evaluateInitialPublicStartAction(input: {
     actionCatalogRefs: evaluator.actionCatalogRefs,
     selectedActionRef,
     nextGraphFunctionRef: selectedCandidate.graphFunctionId,
-    nextGraphVectorRef: null
+    nextGraphVectorRef: input.request.replayNextGraphVectorRef ?? null
   });
   const constructionIntent = constructSdlcConstructionIntent({
     intentRef:

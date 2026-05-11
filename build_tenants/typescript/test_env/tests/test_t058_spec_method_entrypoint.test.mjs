@@ -15,11 +15,13 @@ import {
   constructFrameOpenedEvent,
   constructGraphCallOpenedEvent,
   constructVectorClosedEvent,
-  constructVectorTraversalPlannedEvent
+  constructVectorTraversalPlannedEvent,
+  materializeGraphFunction
 } from "@abiogenesis/typescript-tenant";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  constructSdlcGtlModule,
   invokeOddSdlcSpecMethodCommandSync,
   serializeOddSdlcSpecMethodResult
 } from "../../build/semantic/code/src/index.js";
@@ -102,6 +104,19 @@ function writeRuntimeEvents(workspace, events) {
   );
 }
 
+function graphTrackRefs(graphFunctionName) {
+  const graphFunction = constructSdlcGtlModule().graphFunctions.find(
+    (candidate) => candidate.name === graphFunctionName
+  );
+  assert(graphFunction);
+  const vector = materializeGraphFunction(graphFunction).vectors[0];
+  assert(vector);
+  return {
+    graphFunctionRef: graphFunction.name,
+    graphVectorRef: vector.id
+  };
+}
+
 function writePostCloseNextActionArchive(workspace, input = {}) {
   const archiveRoot = path.join(
     workspace,
@@ -113,7 +128,20 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
     input.decisionRef ??
     `closure-decision://t058/${input.name ?? "post-close"}`;
   const graphFunctionName =
-    input.graphFunctionName ?? FG_MATERIALIZE_DECLARED_PRODUCT_ASSET;
+    input.graphFunctionName ?? "derive_component_code_surface";
+  const trackRefs = graphTrackRefs(graphFunctionName);
+  const effectiveNextGraphFunctionRef =
+    input.nextGraphFunctionRef === undefined
+      ? input.choosesNextTraversal === false
+        ? null
+        : trackRefs.graphFunctionRef
+      : input.nextGraphFunctionRef;
+  const effectiveNextGraphVectorRef =
+    input.nextGraphVectorRef === undefined
+      ? effectiveNextGraphFunctionRef === null
+        ? null
+        : trackRefs.graphVectorRef
+      : input.nextGraphVectorRef;
   writeFileSync(
     path.join(archiveRoot, "worker_invocation_package.json"),
     `${JSON.stringify(
@@ -176,10 +204,8 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
         nextActionProjectionRef:
           input.nextActionProjectionRef ??
           "construction-priority-projection://t058/post-close/materialize",
-        nextGraphFunctionRef:
-          input.nextGraphFunctionRef === undefined
-            ? `graph-function:odd_sdlc:${graphFunctionName}`
-            : input.nextGraphFunctionRef,
+        nextGraphFunctionRef: effectiveNextGraphFunctionRef,
+        nextGraphVectorRef: effectiveNextGraphVectorRef,
         predecessorRefs: input.predecessorRefs ?? [decisionRef]
       },
       null,
@@ -207,7 +233,7 @@ test("T-058 Spec Method catalog command reads graph catalog without workspace mu
   );
 });
 
-test("T-058 replay-backed post-close next action becomes the next start target", () => {
+test("T-058 vector-backed post-close next action becomes the next start target", () => {
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace);
 
@@ -220,11 +246,15 @@ test("T-058 replay-backed post-close next action becomes the next start target",
   assert.equal(result.status, "ok");
   assert.equal(
     result.payload.start.executionContract.targetGraphFunction,
-    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+    "derive_component_code_surface"
   );
   assert.equal(
     result.payload.projection.currentEdge,
-    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+    "derive_component_code_surface"
+  );
+  assert.equal(
+    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    graphTrackRefs("derive_component_code_surface").graphVectorRef
   );
 });
 

@@ -710,6 +710,7 @@ interface SelectedNextGraphFunctionFromArchive {
   readonly graphFunctionName: string;
   readonly nextActionProjectionRef: string;
   readonly selectedActionRef: string;
+  readonly nextGraphVectorRef: string;
   readonly closureDecisionRef: string;
 }
 
@@ -748,10 +749,12 @@ function selectedNextGraphFunctionFromArchive(input: {
       return null;
     }
     const nextGraphFunctionRef = stringField(record, "nextGraphFunctionRef");
+    const nextGraphVectorRef = stringField(record, "nextGraphVectorRef");
     const nextActionProjectionRef = stringField(record, "nextActionProjectionRef");
     const selectedActionRef = stringField(record, "selectedActionRef");
     if (
       nextGraphFunctionRef === null ||
+      nextGraphVectorRef === null ||
       nextActionProjectionRef === null ||
       selectedActionRef === null
     ) {
@@ -763,6 +766,7 @@ function selectedNextGraphFunctionFromArchive(input: {
         graphFunctionName: direct,
         nextActionProjectionRef,
         selectedActionRef,
+        nextGraphVectorRef,
         closureDecisionRef: decision.decisionRef
       });
     }
@@ -1016,6 +1020,7 @@ function startOutcomeFor(
   replayNextAction?: {
     readonly nextActionProjectionRef: string;
     readonly selectedActionRef: string;
+    readonly nextGraphVectorRef: string;
     readonly closureDecisionRef: string;
   }
 ): ReturnType<typeof publicStartOnce> {
@@ -1041,6 +1046,7 @@ function startOutcomeFor(
             replayNextActionProjectionRef:
               replayNextAction.nextActionProjectionRef,
             replaySelectedActionRef: replayNextAction.selectedActionRef,
+            replayNextGraphVectorRef: replayNextAction.nextGraphVectorRef,
             replayClosureDecisionRef: replayNextAction.closureDecisionRef
           })
     },
@@ -1093,6 +1099,7 @@ function startOutcomeForObservedReplay(input: {
     }, {
       nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
       selectedActionRef: selectedNextGraphFunction.selectedActionRef,
+      nextGraphVectorRef: selectedNextGraphFunction.nextGraphVectorRef,
       closureDecisionRef: selectedNextGraphFunction.closureDecisionRef
     });
     if (selected.executionContract !== null) {

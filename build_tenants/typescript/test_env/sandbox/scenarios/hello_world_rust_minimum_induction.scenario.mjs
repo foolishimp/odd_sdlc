@@ -56,7 +56,7 @@ export const helloWorldRustMinimumInductionScenario = Object.freeze({
 export function helloWorldRustMinimumInductionLiveScenario({
   worker,
   maxAdvances = 6,
-  startUntil = "converged"
+  startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
     throw new Error("helloWorldRustMinimumInductionLiveScenario requires a worker URI");
@@ -88,6 +88,7 @@ export function helloWorldRustMinimumInductionLiveScenario({
     startTarget: "next",
     startUntil,
     maxAdvances,
-    continueOnEdgeConverge: true
+    continueOnEdgeConverge: true,
+    stopAfterWorkspaceFilesExist: true
   });
 }

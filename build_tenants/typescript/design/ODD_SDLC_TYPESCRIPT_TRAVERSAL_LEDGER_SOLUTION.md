@@ -808,6 +808,8 @@ sequenceDiagram
   Fold->>ProjectLedger: append closure_decision
   Fold->>Projection: update derived requirement resolution view
 
+  Note over Operator,Projection: Dispatch returns only after WorksiteEvidence, EdgeLedger, ClosureDecision, and NextActionProjection are archived.
+
   alt close
     Fold-->>ABG: close_allowed from ledger predicate
     ABG->>Operator: advance to next edge

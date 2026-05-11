@@ -17,7 +17,8 @@ import {
   admitExecutionBasis,
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
-  admitStartIntent
+  admitStartIntent,
+  materializeGraphFunction
 } from "@abiogenesis/typescript-tenant";
 
 import {
@@ -113,6 +114,13 @@ function uniqueRequirementAuthorities(authorities) {
 function sourceSpecContext() {
   const workspaceRoot = dataMapperWorkspace();
   const module = constructSdlcGtlModule();
+  const componentCodeGraphFunction = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "derive_component_code_surface"
+  );
+  assert(componentCodeGraphFunction);
+  const componentCodeVector =
+    materializeGraphFunction(componentCodeGraphFunction).vectors[0];
+  assert(componentCodeVector);
   const sourceInputs = INTERNAL_DATA_MAPPER_SOURCE_FILES.map((relativePath) =>
     deriveSdlcSourceInput(sourceSnapshot(workspaceRoot, relativePath))
   );
@@ -168,6 +176,8 @@ function sourceSpecContext() {
     ingressReport,
     requirementAuthorities,
     targetBinding,
+    componentCodeGraphFunction,
+    componentCodeVector,
     materializationAction
   });
 }
@@ -479,7 +489,11 @@ test("T-154 source/spec data_mapper pressure selects and replays product materia
   );
   assert.equal(
     authority.action.graphFunctionRef,
-    context.materializationAction.graphFunctionRef
+    context.componentCodeGraphFunction.name
+  );
+  assert.equal(
+    authority.action.graphVectorRef,
+    context.componentCodeVector.id
   );
   assert.equal(
     authority.action.publishedTraversalTargetRef,
@@ -504,7 +518,11 @@ test("T-154 source/spec data_mapper pressure selects and replays product materia
   );
   assert.equal(
     authority.nextActionProjection.nextGraphFunctionRef,
-    context.materializationAction.graphFunctionRef
+    context.componentCodeGraphFunction.name
+  );
+  assert.equal(
+    authority.nextActionProjection.nextGraphVectorRef,
+    context.componentCodeVector.id
   );
   assert.equal(
     authority.constructionIntent.selectedActionRef,

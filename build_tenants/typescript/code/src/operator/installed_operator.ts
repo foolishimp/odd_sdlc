@@ -24,6 +24,7 @@ import {
   deriveRuntimeAggregateProjection,
   deriveRuntimeLivenessObserverProjection,
   invokeSupervisedProcessActor,
+  materializeGraphFunction,
   runEngineIterateAsync,
   runtimeEventsForFpTransformResult,
   runtimeEventsForIterationDecision,
@@ -2017,6 +2018,74 @@ function assetTypeRefFor(assetType: string): string {
   return `asset-type://odd-sdlc/${assetType}`;
 }
 
+interface SdlcGraphTrackActionTarget {
+  readonly graphFunctionName: string;
+  readonly graphFunctionRef: string;
+  readonly graphVectorName: string;
+  readonly graphVectorRef: string;
+  readonly targetAssetType: string;
+  readonly targetNodeRef: string;
+  readonly publishedTraversalTargetRef: string;
+  readonly targetOutcomeRef: string;
+}
+
+function targetAssetTypeFromBindingRef(ref: string): string | null {
+  const prefix = "target-binding://odd-sdlc/";
+  if (!ref.startsWith(prefix)) {
+    return null;
+  }
+  const assetType = ref.slice(prefix.length);
+  return assetType.length === 0 ? null : assetType;
+}
+
+function graphTrackActionTargetFor(input: {
+  readonly module: Module;
+  readonly downstreamTargetBindingRefs: readonly string[];
+}): SdlcGraphTrackActionTarget | null {
+  const targetAssetTypes = uniqueSorted(
+    input.downstreamTargetBindingRefs.flatMap((ref) => {
+      const assetType = targetAssetTypeFromBindingRef(ref);
+      return assetType === null ? [] : [assetType];
+    })
+  );
+  for (const targetAssetType of targetAssetTypes) {
+    const candidates = input.module.graphFunctions.flatMap((graphFunction) => {
+      if (graphFunction.name.startsWith("Fg_")) {
+        return [];
+      }
+      const graph = materializeGraphFunction(graphFunction);
+      return graph.vectors
+        .filter((vector) => vector.target.name === targetAssetType)
+        .map((vector) =>
+          Object.freeze({
+            graphFunction,
+            vector
+          })
+        );
+    });
+    const selected =
+      candidates.find(({ graphFunction }) =>
+        graphFunction.tags.includes("published_leaf")
+      ) ?? candidates[0] ?? null;
+    if (selected !== null) {
+      const publishedTraversalTargetRef =
+        `published-traversal-target://odd-sdlc/${selected.graphFunction.name}/${selected.vector.id}`;
+      return Object.freeze({
+        graphFunctionName: selected.graphFunction.name,
+        graphFunctionRef: selected.graphFunction.name,
+        graphVectorName: selected.vector.name,
+        graphVectorRef: selected.vector.id,
+        targetAssetType,
+        targetNodeRef: selected.vector.target.id,
+        publishedTraversalTargetRef,
+        targetOutcomeRef:
+          `outcome://odd-sdlc/${selected.graphFunction.name}/${selected.vector.target.id}`
+      });
+    }
+  }
+  return null;
+}
+
 export function deriveSdlcPublishedProductMaterializationAction(input: {
   readonly module: Module;
   readonly downstreamTargetBindingRefs?: readonly string[];
@@ -2291,6 +2360,10 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
   if (targetAssetType === undefined) {
     return null;
   }
+  const graphTrackTarget = graphTrackActionTargetFor({
+    module: input.module,
+    downstreamTargetBindingRefs
+  });
   const scopeModuleName = input.scopeModuleName ?? null;
   const scopeScheduleRef = input.scopeScheduleRef ?? null;
   const scopePath =
@@ -2315,20 +2388,34 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
       targetOutcomeRef
     ].join("/"),
     actionKind: "invoke_graph_function" as const,
-    graphFunctionRef: materializationAction.graphFunctionRef,
-    graphVectorRef: null,
+    graphFunctionRef:
+      graphTrackTarget?.graphFunctionRef ?? materializationAction.graphFunctionRef,
+    graphVectorRef: graphTrackTarget?.graphVectorRef ?? null,
     publishedTraversalTargetRef: materializationAction.publishedActionRef,
-    targetOutcomeRef,
+    targetOutcomeRef: graphTrackTarget?.targetOutcomeRef ?? targetOutcomeRef,
     inputAssetRefs: Object.freeze([]),
     expectedOutputAssetRefs: Object.freeze(
       uniqueSorted([
         ...materializationAction.outputAssetTypes.map(assetTypeRefFor),
-        targetOutcomeRef
+        targetOutcomeRef,
+        ...(graphTrackTarget === null ? [] : [graphTrackTarget.targetOutcomeRef])
       ])
     ),
-    requiredAuthorityRefs: Object.freeze([materializationAction.publishedActionRef]),
+    requiredAuthorityRefs: uniqueSorted([
+      materializationAction.publishedActionRef,
+      ...(graphTrackTarget === null
+        ? []
+        : [graphTrackTarget.publishedTraversalTargetRef])
+    ]),
     eligibleReasonRefs: uniqueSorted([
       "evaluate_next_downstream_requirement_transformation_set",
+      ...(graphTrackTarget === null
+        ? ["graph_track_target_unresolved_for_product_materialization_action"]
+        : [
+            `graph_track_function:${graphTrackTarget.graphFunctionName}`,
+            `graph_track_vector:${graphTrackTarget.graphVectorName}`,
+            `graph_track_target:${graphTrackTarget.publishedTraversalTargetRef}`
+          ]),
       ...(scopeModuleName === null
         ? []
         : [`feature_scope_deferred_module:${scopeModuleName}`]),
@@ -3246,6 +3333,30 @@ export async function executeInstalledOperatorStart(input: {
     current: null
   };
   const emitted: RuntimeEvent[] = [];
+  const admitDispatchConsequence = (
+    state: SdlcAbgOwnedFpDispatchState,
+    nextVectorIndex: number | null = null
+  ): SdlcInstalledOperatorTraversalConsequence => {
+    const consequence = deriveInstalledTraversalConsequence({
+      basis,
+      start: input.start,
+      state,
+      replayEvents: input.replayEvents,
+      emittedEvents: emitted,
+      nextVectorIndex
+    });
+    writeTraversalConsequenceArchive({
+      manifest: state.manifest,
+      consequence
+    });
+    return consequence;
+  };
+  const publishDispatchState = (
+    state: SdlcAbgOwnedFpDispatchState
+  ): SdlcInstalledOperatorTraversalConsequence => {
+    dispatchState.current = state;
+    return admitDispatchConsequence(state);
+  };
   const fpDispatch = Object.freeze({
     contract: fpDispatchPluginContract(),
     dispatch: async (pluginInput: EnginePluginInput) => {
@@ -3313,7 +3424,7 @@ export async function executeInstalledOperatorStart(input: {
           postflight: failurePostflight
         });
         writePostflightGapDossier({ manifest, gapDossier });
-        dispatchState.current = {
+        const current: SdlcAbgOwnedFpDispatchState = {
           status: "worker_failed",
           manifest,
           workerRun,
@@ -3326,9 +3437,12 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: failurePostflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
+        const consequence = publishDispatchState(current);
         return constructFpDispatchOutcome({
           status: "blocked",
-          resultRef: gapDossier.currentGapDossierRef,
+          resultRef: stopForRuntimeTriage
+            ? consequence.nextActionProjection.nextActionProjectionRef
+            : gapDossier.currentGapDossierRef,
           attachedResultArtifact: stopForRuntimeTriage
             ? null
             : runtimeFailureArtifact({
@@ -3388,7 +3502,7 @@ export async function executeInstalledOperatorStart(input: {
             postflight: rejectionPostflight
           });
           writePostflightGapDossier({ manifest, gapDossier });
-          dispatchState.current = {
+          const current: SdlcAbgOwnedFpDispatchState = {
             status: "worker_report_rejected",
             manifest,
             workerRun,
@@ -3401,6 +3515,7 @@ export async function executeInstalledOperatorStart(input: {
             blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
             currentEdge: pluginInput.edge
           };
+          publishDispatchState(current);
           return constructFpDispatchOutcome({
             status: "blocked",
             resultRef: gapDossier.currentGapDossierRef,
@@ -3452,7 +3567,7 @@ export async function executeInstalledOperatorStart(input: {
           postflight
         });
         writePostflightGapDossier({ manifest, gapDossier });
-        dispatchState.current = {
+        const current: SdlcAbgOwnedFpDispatchState = {
           status: "postflight_failed",
           manifest,
           workerRun,
@@ -3465,6 +3580,7 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: postflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
+        publishDispatchState(current);
         return constructFpDispatchOutcome({
           status: "dispatched",
           resultRef: gapDossier.currentGapDossierRef,
@@ -3509,7 +3625,7 @@ export async function executeInstalledOperatorStart(input: {
           postflight: assuranceGate.blockingPostflight
         });
         writePostflightGapDossier({ manifest, gapDossier });
-        dispatchState.current = {
+        const current: SdlcAbgOwnedFpDispatchState = {
           status:
             assuranceGate.satisfaction.status === "fp_escalation"
               ? "fp_escalation"
@@ -3526,10 +3642,11 @@ export async function executeInstalledOperatorStart(input: {
             assuranceGate.blockingPostflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
+        const consequence = publishDispatchState(current);
         if (assuranceGate.satisfaction.status === "reprice_required") {
           return constructFpDispatchOutcome({
             status: "blocked",
-            resultRef: gapDossier.currentGapDossierRef,
+            resultRef: consequence.nextActionProjection.nextActionProjectionRef,
             attachedResultArtifact: null,
             evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs,
             reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
@@ -3610,7 +3727,8 @@ export async function executeInstalledOperatorStart(input: {
           manifest,
           postflight: hookPostflight
         });
-        writePostflightGapDossier({ manifest, gapDossier });        dispatchState.current = {
+        writePostflightGapDossier({ manifest, gapDossier });
+        const current: SdlcAbgOwnedFpDispatchState = {
           status: "postflight_failed",
           manifest,
           workerRun,
@@ -3623,6 +3741,7 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: hookPostflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
+        publishDispatchState(current);
         return constructFpDispatchOutcome({
           status: "dispatched",
           resultRef: gapDossier.currentGapDossierRef,
@@ -3640,7 +3759,7 @@ export async function executeInstalledOperatorStart(input: {
           reason: hookPostflight.blockingReasons.join(",")
         });
       }
-      dispatchState.current = {
+      const current: SdlcAbgOwnedFpDispatchState = {
         status: "worker_invoked",
         manifest,
         workerRun,
@@ -3653,6 +3772,7 @@ export async function executeInstalledOperatorStart(input: {
         blockingReasonCarriers: Object.freeze([]),
         currentEdge: null
       };
+      publishDispatchState(current);
       return constructFpDispatchOutcome({
         status: "dispatched",
         resultRef: dispatchResultRef(manifest),

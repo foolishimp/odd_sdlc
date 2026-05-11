@@ -128,3 +128,27 @@ IntentLineage
 This spine is the one traversal consequence surface. Additional ledgers or
 registers are lawful only when they have a distinct evaluation role and feed
 this spine without becoming a second action-selection authority.
+
+## Admission Timing Invariant
+
+After `F_P.transform` output is observed and admitted, any result returned to
+ABG must already have the consequence chain on disk:
+
+```text
+WorksiteEvidence
+-> SdlcEdgeFulfillmentLedger
+-> SdlcEdgeClosureDecision
+-> SdlcNextActionProjection
+```
+
+The admitted `SdlcNextActionProjection` is the closure/action truth for that
+result. ABG transport fields that identify an attached result
+artifact may still point at the attached artifact or gap-pressure carrier; that
+transport identity must not be treated as closure authority. Gap dossiers
+remain pressure evidence. They do not substitute for closure or next-action
+truth.
+
+This is an executable invariant, not a reporting preference. If a retry,
+close, retry, repair, re-entry, reprice, or block branch returns before the
+consequence chain is written, the next traversal can lose the only lawful resume carrier and
+public `gaps` can only report missing consequence truth.

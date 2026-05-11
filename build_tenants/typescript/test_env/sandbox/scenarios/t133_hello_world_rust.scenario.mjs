@@ -48,7 +48,7 @@ export const t133HelloWorldRustScenario = Object.freeze({
 export function t133HelloWorldRustLiveScenario({
   worker,
   maxAdvances = 6,
-  startUntil = "converged"
+  startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
     throw new Error("t133HelloWorldRustLiveScenario requires a worker URI");
@@ -76,6 +76,7 @@ export function t133HelloWorldRustLiveScenario({
     startTarget: "next",
     startUntil,
     maxAdvances,
-    continueOnEdgeConverge: true
+    continueOnEdgeConverge: true,
+    stopAfterWorkspaceFilesExist: true
   });
 }

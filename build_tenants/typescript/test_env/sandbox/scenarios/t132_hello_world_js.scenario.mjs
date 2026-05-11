@@ -49,7 +49,7 @@ export const t132HelloWorldJsScenario = Object.freeze({
 export function t132HelloWorldJsLiveScenario({
   worker,
   maxAdvances = 6,
-  startUntil = "converged"
+  startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
     throw new Error("t132HelloWorldJsLiveScenario requires a worker URI");
@@ -75,6 +75,7 @@ export function t132HelloWorldJsLiveScenario({
     startTarget: "next",
     startUntil,
     maxAdvances,
-    continueOnEdgeConverge: true
+    continueOnEdgeConverge: true,
+    stopAfterWorkspaceFilesExist: true
   });
 }

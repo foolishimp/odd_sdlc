@@ -34,6 +34,8 @@ affected_boundary:
   - build_tenants/typescript/code/src/operator/handoff.ts
   - build_tenants/typescript/code/src/operator/installed_operator.ts
   - build_tenants/typescript/code/src/operator/traversal_consequence.ts
+  - build_tenants/typescript/code/src/start/public_start.ts
+  - build_tenants/typescript/code/src/spec_method/entry.ts
   - build_tenants/typescript/test_env/live/run_full_external_data_mapper_sandbox.mjs
   - build_tenants/typescript/test_env/tests/
 implementation_refs:
@@ -152,6 +154,45 @@ Archive replay check against
 ```
 
 `assertTraversalIntentPackagePressure` passes over that preserved workspace.
+
+## Additional Runtime Bug: Eval Action Replaced Graph Edge Track
+
+A fresh hello-world live run exposed a traversal identity drift introduced by the
+Eval_Action wave:
+
+```text
+state path: initial_unstructured_docs -> Fg_conform_project -> Fg_conform_project_authority -> next
+observed next: Fg_materialize_declared_product_asset
+expected next: admitted graph edge track, with Eval_Action selecting the traversal/action for that edge
+```
+
+The failure was visible in the preserved live sandbox because product source
+(`hello.js`) was created under the generic materialization graph function before
+the graph-edge carrier for the component code surface was admitted. That is the
+same design-law failure class as controller-side reconstruction: the runtime had
+one field for "selected action" and reused it as "next graph target".
+
+Targeted fix:
+
+- `SdlcNextActionProjection.nextGraphFunctionRef` / `nextGraphVectorRef` carry
+  the graph edge track that ABG should traverse next.
+- `SdlcNextActionProjection.selectedActionRef` remains the Eval_Action result:
+  the action/traversal guidance for that edge.
+- post-authority product-materialization pressure may select the declared
+  materialization action, but it must bind that action to the published graph
+  edge that owns the target asset, e.g. `derive_component_code_surface` for
+  `component_code_surface`.
+- archive replay must fail closed for automatic next-target replay when
+  `choosesNextTraversal=true` but `nextGraphVectorRef` is absent. Old action-only
+  projections are not authoritative graph-track replay.
+
+Design-module boundary:
+
+This is one carrier seam, not a broad handoff rewrite. The producer, admitted
+public-start replay carrier, and replay reader are the only lawful implementation
+touches. Handoff, prompt, postflight, and assurance must continue consuming the
+resolved execution basis and hook contract; they must not invent their own next
+edge.
 
 ## STDO Triage
 
@@ -491,3 +532,60 @@ Closure evidence must also include a fresh live data_mapper run:
 The live proof is accepted only if it produces a terminal closure or a typed
 non-close disposition with postflight/assurance carriers. Harness timeout with
 missing postflight files is not closure.
+
+## Added Runtime Bug: Late Consequence Admission After F_P.transform
+
+The data_mapper live failure exposed a second closure bug in the same recovery
+surface. `F_P.transform` produced a worker result, postflight/assurance admitted
+the non-close state, and the installed operator returned a dispatch outcome
+whose `resultRef` pointed at the gap dossier. The authoritative consequence
+chain was written only after the outer ABG iteration returned.
+
+That made the run vulnerable to losing lawful resume truth if the next
+retry/pre-handoff path failed, hung, or was killed after postflight files had
+already been written. The archive then contained report, postflight, assurance,
+and gap artifacts, but not the replay-visible chain that `gaps` and retry
+selection are meant to consume:
+
+```text
+SdlcWorksiteEvidence
+-> SdlcEdgeFulfillmentLedger
+-> SdlcEdgeClosureDecision
+-> SdlcNextActionProjection
+```
+
+### Root Cause
+
+The installed operator treated `fp_evaluate_result.json` and gap dossiers as
+enough post-transform evidence until the outer runner completed. That violates
+the TypeScript F_P evaluation design: report admission and gap pressure are not
+closure or action-selection authority. The consequence chain is the authority
+surface.
+
+### Design Repair
+
+- Publish `SdlcWorksiteEvidence`, `SdlcEdgeFulfillmentLedger`,
+  `SdlcEdgeClosureDecision`, and `SdlcNextActionProjection` immediately for
+  every admitted F_P dispatch branch.
+- Keep ABG `resultRef` semantics intact where it identifies an attached result
+  artifact; that transport field is not closure authority.
+- Return the admitted `SdlcNextActionProjection.nextActionProjectionRef` only
+  for branches that do not attach an artifact carrier.
+- Keep gap dossiers as evidence/pressure only.
+- Let public `gaps` continue to rehydrate from the consequence triple; if the
+  triple is missing, that is a missing consequence diagnostic, not a recomputed
+  closure result.
+
+### Regression
+
+`test_t158_consequence_admission_regression.test.mjs` reproduces an admitted
+non-close `F_P.transform` result: product output is present, assurance blocks
+because traversal obligations are unassessed, and the edge disposition is
+`retry`.
+
+The test asserts:
+
+- the archive contains the closure decision and next-action projection,
+- the source-level dispatch branches publish the consequence chain before
+  returning to ABG,
+- `gaps` rehydrates the retry disposition from the admitted consequence chain.

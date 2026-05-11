@@ -89,6 +89,11 @@ function isStopStatus(status, stopStatuses) {
   return stopStatuses.includes(status);
 }
 
+function workspaceFilesExist(workspace, files) {
+  if (!Array.isArray(files) || files.length === 0) return false;
+  return files.every((rel) => existsSync(path.join(workspace, rel)));
+}
+
 export async function runScenarioSandbox(scenario, options = {}) {
   if (scenario === null || typeof scenario !== "object") {
     throw new Error("scenario descriptor is required");
@@ -180,6 +185,12 @@ export async function runScenarioSandbox(scenario, options = {}) {
       throw new Error(
         `${scenario.scenarioId}: start command failed at step ${step}: ${JSON.stringify(start)}`
       );
+    }
+    if (
+      scenario.stopAfterWorkspaceFilesExist === true &&
+      workspaceFilesExist(workspace, scenario.expectations?.workspaceFiles)
+    ) {
+      break;
     }
     if (isStopStatus(lastStatus, stopStatuses)) break;
   }
