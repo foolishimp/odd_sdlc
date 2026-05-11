@@ -29,6 +29,25 @@ function normalizeRequirementId(requirementId: string): string {
   return [head, ...tail].join("-");
 }
 
+function requirementIdForAuthorityMarker(marker: string): string | null {
+  if (marker.startsWith("REQ-") || marker.startsWith("RF-")) {
+    return normalizeRequirementId(marker);
+  }
+  const localPrefix = "requirement-local://odd-sdlc/";
+  if (marker.startsWith(localPrefix)) {
+    const [encodedRequirementId] = marker.slice(localPrefix.length).split("/");
+    if (encodedRequirementId === undefined || encodedRequirementId.length === 0) {
+      return null;
+    }
+    try {
+      return normalizeRequirementId(decodeURIComponent(encodedRequirementId));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function importedRequirementAuthorities(
   sourceInputs: readonly SdlcSourceInput[]
 ): readonly SdlcImportedRequirementAuthority[] {
@@ -38,11 +57,12 @@ function importedRequirementAuthorities(
       continue;
     }
     for (const marker of sourceInput.authorityMarkers) {
-      if (marker.startsWith("REQ-") || marker.startsWith("RF-")) {
+      const requirementId = requirementIdForAuthorityMarker(marker);
+      if (requirementId !== null) {
         authorities.push(
           Object.freeze({
             kind: "sdlc_imported_requirement_authority",
-            requirementId: normalizeRequirementId(marker),
+            requirementId,
             sourceUri: sourceInput.uri,
             sourceDigest: sourceInput.digest
           })

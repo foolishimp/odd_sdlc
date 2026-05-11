@@ -614,7 +614,9 @@ export function deriveSdlcOperatorAssuranceGate(input: {
   });
   if (componentDepth !== null) {
     ledgers.push(componentDepth);
-    requiredDimensions.push("component_depth");
+    if (componentDepth.required !== false) {
+      requiredDimensions.push("component_depth");
+    }
   }
 
   const designCompleteness = deriveDesignCompletenessAssuranceLedger({

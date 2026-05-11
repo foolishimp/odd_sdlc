@@ -189,3 +189,62 @@ test("T-031 portable fixture derives imported requirement authority and lineage"
     )
   );
 });
+
+test("T-144 imports local requirement headings as replay-visible authority", () => {
+  const localRequirementText = [
+    "# Requirements",
+    "",
+    "## R-01: Single Build Tenant",
+    "",
+    "The product has one build tenant under build_tenants/javascript.",
+    "",
+    "## R-02: Executable Hello World",
+    "",
+    "The product prints Hello, world! when invoked."
+  ].join("\n");
+  const sourceInputs = [
+    deriveSdlcSourceInput(
+      fixtureSnapshot("specification/requirements/01-local.md", localRequirementText)
+    )
+  ];
+  const constraints = admitSdlcProjectConstraints({
+    projectSlug: "local_requirements",
+    activeTenant: "javascript",
+    selectedOutputRoot: "build_tenants/javascript",
+    ambiguityRiskAppetite: "medium",
+    capabilityContracts: ["local_requirement_lineage"]
+  });
+  const source = sourceInputs[0];
+  assert(source);
+  assert.equal(source.detectedRole, "requirement_surface");
+  assert.equal(source.ambiguity.kind, "none");
+  assert(
+    source.authorityMarkers.some((marker) =>
+      marker.startsWith("requirement-local://odd-sdlc/R-001/")
+    )
+  );
+
+  const report = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: "fixture://portable-t144-local-requirements",
+    projectConstraints: constraints,
+    sourceInputs
+  });
+
+  assert.deepEqual(
+    report.importedRequirementAuthorities.map((authority) => authority.requirementId),
+    ["R-001", "R-002"]
+  );
+  assert.deepEqual(report.bootstrapGapSet, []);
+  assert(
+    report.requirementTransformAuthorities.some(
+      (authority) =>
+        authority.requirementId === "R-001" &&
+        authority.transformRef.startsWith(
+          "requirement-transform://odd-sdlc/ingress/R-001/"
+        )
+    )
+  );
+  assert(
+    report.lineage.some((entry) => entry.elementId === "requirement:R-002")
+  );
+});

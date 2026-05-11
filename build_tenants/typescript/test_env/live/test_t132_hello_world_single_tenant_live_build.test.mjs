@@ -329,13 +329,17 @@ function assertConformedProjectWorkspace(workspace, contract) {
   assertTextContains(productText, contract.tenant.sourceFile, "PRODUCT.md");
   assertTextContains(productText, contract.expectedOutput, "PRODUCT.md");
 
-  const t132RequirementMarkers = new Set(
-    requirementText.match(/\b(?:REQ-T132|T132-HW|requirement:[Tt]132)[A-Za-z0-9:_-]*\b/gu) ?? []
+  const generatedRequirementHeadings = new Set(
+    [
+      ...requirementText.matchAll(
+        /^\s{0,3}#{1,6}\s+(?:REQ-[A-Z0-9-]+|RF-[A-Z0-9-]+|R-\d{1,4}|\d{1,3}[.)])\b[^\n]*$/gimu
+      )
+    ].map((match) => match[0].trim())
   );
   assert.ok(
-    t132RequirementMarkers.size >= 4,
-    `generated requirements must contain at least four T132 requirement markers: ${[
-      ...t132RequirementMarkers
+    generatedRequirementHeadings.size >= 4,
+    `generated requirements must contain at least four parseable requirement authority headings: ${[
+      ...generatedRequirementHeadings
     ].join(", ")}`
   );
   for (const anchor of [

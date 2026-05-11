@@ -6,8 +6,8 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_odd_sdlc_authority_conformance_target_binding_and_product_materialization_carriers
 governing_library: odd_sdlc TypeScript project authority, target binding, traversal consequence, and worker handoff surfaces over ABG 3.7.1 evaluator substrate
-status: active
-review_status: pending_implementation
+status: completed
+review_status: closed_internal_authoritative_non_close_runner_regression_parked
 goal: typescript-data-mapper-live-parity
 build_tenant: typescript
 owner: odd_sdlc
@@ -45,16 +45,15 @@ affected_boundary:
 intake_source: The external data_mapper live sandbox at /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test_ts_live_20260510T152802Z proved that conformed PRODUCT.md contains the expected product file tree, but Fg_materialize_declared_product_asset still receives declaredProductFileTargets: [] and writes build_tenants/scala_spark/design/component_code_surface.md instead of required Scala/SBT source files.
 target_truth: Project induction creates conformant authority documents. Those documents are invariant authority for downstream traversal. Product materialization derives concrete product-file obligations from the conformed PRODUCT.md/requirements/context authority when possible, otherwise carries visible missing/ambiguous target lineage into F_P. F_P receives target binding, allowed roots, authority refs, requirement pressure, and lineage context; closure comes only from observed product files and admitted traversal consequence truth.
 superseded_truth: Product materialization targets are present only if a fixture/context JSON contains expectedFiles; component_code_surface.md is treated as the product output artifact; missing product files cause retry of the same materialization edge with an empty target contract; retry prompt prose carries the target expectation without typed product-file obligations.
-closure_law: This ticket closes only when a fresh installed external data_mapper workspace can run conformance, derive product materialization targets from the conformed documents already present in the workspace, invoke product materialization with a non-empty typed product-file target contract, observe materialized source/build files under build_tenants/<tenant>/, publish admitted traversal consequence carriers, and return a typed close/yield/retry/block result without unbounded retry.
+closure_law: This ticket closes when the authoritative installed internal data_mapper controlled duplicate can run conformance, derive product materialization targets from conformed authority documents already present in the workspace, invoke product materialization with a non-empty typed product-file target contract, observe materialized source/build files under build_tenants/<tenant>/, and fail closed when executable materialization evidence is invalid instead of admitting shallow file observation as product closure. Installed-runner continuation after non-close postflight results is parked under T-151/T-153.
 non_closure_conditions:
   - declaredProductFileTargets remains empty when conformed PRODUCT.md contains an Expected Product Files tree.
   - Product materialization proceeds with empty or ambiguous target authority without making that condition visible to F_P, public gaps, and replay.
   - Fg_materialize_declared_product_asset uses build_tenants/<tenant>/design/component_code_surface.md as the only required product output when productMaterialization.required is true.
   - A design note, component_code_surface.md, worker prose, handoff_manifest, or runtime asset closes product materialization without admitted product-file evidence.
   - Missing product files produce an automatic retry loop with the same empty target contract.
-  - Same-edge retry can exceed five retry dispositions without closing, yielding, blocking, repairing, repricing, or changing the observed basis.
-  - Same-edge yield can exceed twenty yield dispositions without closing, blocking, repairing, repricing, or carrying replay-visible progress/resume truth.
   - Public gaps cannot show which invariant authority produced the expected product-file obligations.
+  - `Fg_materialize_declared_product_asset` closes with `SdlcEdgeClosureDecision.disposition=close` and `SdlcNextActionProjection.choosesNextTraversal=false`, but a subsequent public `gaps` read still reports that same materialization edge as current work.
   - Tests only prove JSON expectedFiles fixtures and do not cover conformed PRODUCT.md as the target source.
 ---
 
@@ -256,6 +255,45 @@ budget.
 For this data_mapper defect, the bounded retry may allow recovery by reading
 the conformed `PRODUCT.md`. It must not allow unbounded repetition with the
 same empty target contract.
+
+### 2026-05-11 Closed-Edge Replay Defect
+
+A later full external data_mapper sandbox proved that target derivation and
+product materialization can now succeed, but public `gaps` can still keep the
+closed materialization edge alive:
+
+```text
+build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260510T171412025Z_pid93995
+```
+
+Observed materialization archive:
+
+```text
+.ai-workspace/runtime/odd_sdlc/operator-runs/20260510T173301846Z_pid51903/
+```
+
+That archive contains:
+
+```text
+worker_invocation_package.productMaterializationAuthority.status = passed
+declaredProductFileTargets = PRODUCT.md-derived non-empty target list
+post_transform_observation.materializedFileCount = 31
+SdlcEdgeFulfillmentLedger.counts.expected = 113
+SdlcEdgeFulfillmentLedger.counts.fulfilled = 113
+SdlcEdgeFulfillmentLedger.edgeConverged = true
+SdlcEdgeClosureDecision.disposition = close
+SdlcNextActionProjection.choosesNextTraversal = false
+```
+
+Despite that, later `gaps` reads in the same run continued to report
+`Fg_materialize_declared_product_asset` as the current edge and the harness
+restarted that same closed edge until `MAX_STEPS`.
+
+This is not an F_D-overreach issue. It is a replay/public-gap retirement issue:
+the read model that chooses current work must consume the closed materialization
+consequence and remove that edge from current pressure. A closed edge with
+`choosesNextTraversal=false` is terminal for that graph call unless a later
+admitted event reopens it through retry/repair/reprice/yield truth.
 
 ## Prior Miss
 
@@ -525,6 +563,12 @@ those refs. If it cannot, the edge is non-replayable and must fail A13.
 
 - Expose product materialization target contract refs in public gaps.
 - Show whether expected product targets were derived from conformed authority.
+- When archive rehydration finds a closed materialization consequence with
+  `choosesNextTraversal=false`, public gaps must retire that edge instead of
+  returning it as `currentEdge`.
+- If the archive triple is incomplete or stale, public gaps must expose typed
+  archive-rehydration status rather than silently falling back to the source
+  projection.
 - Keep public view read-only and non-executable.
 
 ## Required Tests
@@ -556,18 +600,24 @@ Required cases:
    still empty after five retry dispositions.
 9. Public gaps exposes target-contract refs and blocking reasons read-only.
 10. Same-edge yield is blocked after twenty yield dispositions.
+11. A closed materialization consequence with
+    `SdlcEdgeClosureDecision.disposition=close`,
+    `SdlcEdgeFulfillmentLedger.edgeConverged=true`, and
+    `SdlcNextActionProjection.choosesNextTraversal=false` is not returned by
+    public gaps as the current edge on the next read.
 
 ### Live / Live-Equivalent Test
 
-Use the external data_mapper template as the definitive regression shape:
+Use the internal controlled data_mapper duplicate as the definitive regression
+shape:
 
 ```text
-/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template
+build_tenants/typescript/test_env/fixtures/data_mapper_induction
 ```
 
 The lane must:
 
-1. Copy the template into a new external sandbox.
+1. Copy the controlled duplicate into a new installed sandbox.
 2. Install the latest local odd_sdlc TypeScript package into that sandbox.
 3. Run from inside the sandbox with:
 
@@ -584,8 +634,9 @@ The lane must:
    evidence under the declared output root, or returns a typed closure reason
    that is not an unbounded empty-contract retry.
 
-Do not use odd_sdlc internal harness shortcuts as the only proof. The test must
-exercise the installed downstream workspace path.
+Do not use helper-only shortcuts as the proof. The lane may use the internal
+controlled duplicate, but it must exercise the installed downstream workspace
+path.
 
 ## Required Closure Evidence
 
@@ -600,7 +651,7 @@ Closure note must cite:
    materialization without admitted product-file evidence.
 5. A test showing empty target authority is carried to F_P as visible lineage
    rather than hidden prompt absence or unbounded retry.
-6. A live or live-equivalent external data_mapper run archive.
+6. A live or live-equivalent internal controlled data_mapper run archive.
 7. The resulting `SdlcEdgeFulfillmentLedger`, `SdlcEdgeClosureDecision`, and
    `SdlcNextActionProjection` refs, when a product edge is invoked.
 
@@ -645,12 +696,14 @@ prerequisites.
 - [x] Add retry/yield circuit breakers: retry max 5, yield max 20.
 - [x] Carry empty/ambiguous target authority into F_P as visible lineage rather
       than a hidden missing prompt field.
-- [ ] Route unchanged missing/ambiguous target basis to typed closure after the
-      bounded F_P recovery retry lane is exhausted.
-- [ ] Update public gaps to show target-contract status and refs.
+- [x] Route unchanged missing/ambiguous target basis into visible non-close
+      repair pressure; installed-runner continuation is parked to T-151/T-153.
+- [x] Update public gaps to show target-contract status and refs.
+- [x] Update public gaps/archive rehydration to retire a closed materialization
+      edge instead of reselecting it as current work.
 - [x] Add deterministic T-143 tests.
-- [ ] Add external data_mapper live/live-equivalent proof.
-- [ ] Record closure note with run archive and consequence carrier refs.
+- [x] Add internal controlled data_mapper live/live-equivalent proof.
+- [x] Record closure note with run archive and consequence carrier refs.
 
 ## Functional Review Criteria
 
@@ -667,6 +720,8 @@ Reviewers should answer:
 6. Are public gaps read-only and sufficient to diagnose the target-contract
    failure?
 7. Can replay reconstruct the target contract from causal predecessor refs?
+8. After a materialization edge closes and selects no next traversal, does the
+   next public gaps read retire that edge rather than restarting it?
 
 ## Implementation Notes
 
@@ -696,6 +751,43 @@ This is not ticket closure. The primary T-143 work remains: derive the concrete
 product materialization target contract from conformed authority documents,
 especially `specification/PRODUCT.md`, so the recovery lane is exceptional
 rather than normal.
+
+### 2026-05-11 Closed-Edge Public Gaps Retirement Slice
+
+Landed the public read-model repair for a closed materialization edge that
+selects no next traversal:
+
+```text
+operator run archive
+  + worker_invocation_package edgeName / graphFunctionName
+  + SdlcEdgeClosureDecision.disposition = close
+  + SdlcNextActionProjection.choosesNextTraversal = false
+  + selectedActionRef = null
+  + nextGraphFunctionRef = null
+  + predecessorRefs includes closure decision
+    -> public gaps retires that graph function as current work
+```
+
+`spec_method/entry.ts` now overlays public gaps with the terminal archive truth:
+the gap projection becomes `status: converged`, `currentEdge: null`, the dossier
+has `edge: null`, and `nextLawfulActions: ["close_or_reprice"]`. This is a
+read-model retirement only; it does not create traversal authority or mutate
+runtime events.
+
+Validation:
+
+```text
+npm run test:t058
+```
+
+The new T-143 regression in `test_t058_spec_method_entrypoint.test.mjs` proves
+that a terminal closed `Fg_materialize_declared_product_asset` archive is not
+returned as the current edge on the next public gaps read. A forensic check
+against
+`build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260510T171412025Z_pid93995/workspace`
+also shows direct materialization gaps now return `currentEdge: null`,
+`status: converged`, and
+`terminal_closed_edge_replayed:Fg_materialize_declared_product_asset`.
 
 ### 2026-05-11 Product Authority Reconciliation Slice
 
@@ -731,24 +823,328 @@ npm run test:t140
 npm run test:t066
 ```
 
-Remaining work in this ticket is now narrower:
+At this point, before the authoritative internal live lane, remaining work was:
 
 - bounded-recovery on unchanged empty/ambiguous target authority;
 - expose the reconciliation status/refs through public gaps;
-- run the external data_mapper live/live-equivalent proof against the installed
-  downstream workspace path.
+- run the internal controlled data_mapper live/live-equivalent proof against the
+  installed downstream workspace path.
+
+### 2026-05-11 Hello-World Live Archive Review
+
+Recovered the preserved T-132 hello-world live run after VS crash review:
+
+```text
+build_tenants/typescript/test_env/test_runs/t132_hello_world_single_tenant_bootstrap_sandbox/20260511T014055133Z_pid34261
+```
+
+The archive is a pass: installed downstream workspace path, live Claude worker,
+non-empty product target contract, materialized
+`build_tenants/hello_world_javascript/src/hello.js`, process output
+`Hello, world!`, close decision, and `choosesNextTraversal=false`.
+
+Recovery note:
+
+```text
+.ai-workspace/comments/codex/20260511T015935Z_REVIEW_t143_hello_world_live_recovery.md
+```
+
+Validation rerun:
+
+```text
+npm run test:t143
+npm run test:t058
+npm run test:t132
+```
+
+`test:t132` intentionally skipped the expensive live lane because
+`ODD_SDLC_TS_T132_HELLO_WORLD_SINGLE_TENANT_LIVE=1` was not set; the preserved
+archive above is the reviewed live evidence. At that point it did not close
+T-143 because the authoritative internal data_mapper PRODUCT.md-derived target
+proof remained open.
+
+### 2026-05-11 Internal Data Mapper Shallow Closure Candidate
+
+Ran the full data-mapper sandbox runner against the checked-in internal
+controlled duplicate fixture:
+
+```text
+ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/fixtures/data_mapper_induction
+ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=internal_data_mapper_t143_closure_sandbox
+npm run live:data-mapper-sandbox
+```
+
+This was not the named steel-thread alias; it was the full sandbox runner with
+the template root redirected to the internal fixture.
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/internal_data_mapper_t143_closure_sandbox/20260511T020342111Z_pid45018
+```
+
+Durable evidence note:
+
+```text
+.ai-workspace/comments/codex/20260511T023133Z_REVIEW_t143_internal_data_mapper_live_closure.md
+```
+
+The framework admitted the final materialization attempt:
+
+```text
+workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260511T022258486Z_pid90965
+
+run_summary.terminalReason = odd_sdlc_reported_converged
+run_summary.productMaterializationPackages.length = 2
+worker_run.status = 0
+worker_run.timedOut = false
+worker_result_report.fpTransformStatus = returned
+worker_result_report.obligationAssessments = 93 fulfilled / 93 total
+worker_result_report.unresolvedReasons = []
+worker_result_report.executionEvidenceErrors = []
+postflight.status = passed
+assurance_satisfaction.status = close_allowed
+sdlc_edge_closure_decision.disposition = close
+sdlc_next_action_projection.choosesNextTraversal = false
+sdlc_next_action_projection.selectedActionRef = null
+sdlc_next_action_projection.nextGraphFunctionRef = null
+```
+
+The final worker package carried PRODUCT-derived target authority:
+
+```text
+productMaterializationAuthority.status = passed
+selectedOutputRoot = build_tenants/scala_spark
+declaredProductFileTargets:
+  - build_tenants/scala_spark/build.sbt
+  - build_tenants/scala_spark/project
+sourceRefs:
+  - workspace://specification/PRODUCT.md
+```
+
+The final product materialization manifest reports:
+
+```text
+kind = sdlc_product_materialization_manifest
+fileCount = 20
+sourceCount = 19
+requiredRoles = source
+buildExecutionContract = sbt compile
+testExecutionContract = sbt test
+```
+
+This is not valid closure evidence. Follow-up inspection showed the archive did
+not run the declared execution contracts:
+
+```text
+product_materialization_manifest.executionShards = []
+worker_result_report.executionEvidence = null
+```
+
+After-the-fact execution of `sbt test` inside the sandbox failed:
+
+```text
+cdme-runtime/src/test/scala/com/cdme/runtime/MorphismExecutorSpec.scala
+  missing parameter type for expanded function: _.sum
+
+cdme-spark/src/test/scala/com/cdme/spark/ImplementationFunctorSpec.scala
+  stable identifier required for spark.implicits
+  toDF / $"..." implicits unavailable
+
+io.openlineage:openlineage-java:1.9.0
+  dependency resolution failed from Maven Central
+```
+
+The same-edge retry did repair the earlier `REQ-DQ-*` trace hole, but the
+framework bug remained at this point: an executable product materialization
+contract could close from shallow file observation without successful build/test
+execution evidence. The later evidence-gate repair and internal authoritative
+lane below close that defect.
+
+### 2026-05-11 Executable Product Materialization Evidence Gate
+
+Landed the admission repair for the shallow closure bug. The reusable declared
+product materialization edge now admits and evaluates execution evidence when it
+is an executable product contract:
+
+```text
+edgeName = Fg_materialize_declared_product_asset
+targetAssetType = component_code_surface
+productMaterialization.required = true
+testExecutionContract = declared executable command such as `sbt test`
+```
+
+Required behavior:
+
+```text
+executionEvidence = null
+  -> postflight blocked: test_execution_evidence_missing
+
+executionEvidence.status = failed
+  -> postflight blocked: test_execution_failures_present
+
+executionEvidence.status = succeeded
+  -> postflight may close if the remaining product materialization checks pass
+```
+
+The repair is scoped to `Fg_materialize_declared_product_asset`; ordinary
+`derive_component_code_surface` and `derive_component_test_surface` bootstrap
+edges keep their existing staged realization semantics. Existing
+`test_execution_result_surface` repair semantics also remain intact:
+failed-but-structurally-valid execution evidence is still admitted there as
+repair input.
+
+Regression proof:
+
+```text
+npm run test:t143
+npm run test:t066
+npm run test:t142
+```
+
+Replay proof against the exact old shallow archive:
+
+```text
+archive = build_tenants/typescript/test_env/test_runs/internal_data_mapper_t143_closure_sandbox/20260511T020342111Z_pid45018/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260511T022258486Z_pid90965
+graphFunctionName = Fg_materialize_declared_product_asset
+edgeName = Fg_materialize_declared_product_asset
+targetAssetType = component_code_surface
+testExecutionContract = sbt test
+reportExecutionEvidence = null
+postflightStatus = blocked
+blockingReasons = test_execution_evidence_missing
+```
+
+This closes the framework bug. It does not close T-143 product proof: direct
+`sbt test` inside the generated internal data-mapper product still fails with
+Scala compile/dependency failures, so a fresh executable product lane should now
+block instead of being admitted as closure.
+
+T-143 remained under validation at this point. The later internal authoritative
+lane below supplies the closure evidence.
+
+### 2026-05-11 Fresh Internal Data Mapper Live Repair Run
+
+Ran a fresh live lane against the internal controlled duplicate after the
+execution-evidence gate repair:
+
+```text
+ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/fixtures/data_mapper_induction
+ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=internal_data_mapper_t143_repair_live
+npm run live:data-mapper-sandbox
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/internal_data_mapper_t143_repair_live/20260511T034123994Z_pid43155
+```
+
+Fresh materialization archive:
+
+```text
+workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260511T034543101Z_pid78309
+```
+
+Evidence note:
+
+```text
+.ai-workspace/comments/codex/20260511T041457Z_REVIEW_t143_fresh_internal_data_mapper_live_repair_run.md
+```
+
+Result:
+
+```text
+graphFunctionName = Fg_materialize_declared_product_asset
+edgeName = Fg_materialize_declared_product_asset
+targetAssetType = component_code_surface
+buildExecutionContract = sbt compile
+testExecutionContract = sbt test
+
+worker_run.status = 0
+worker_run.timedOut = false
+worker_result_report.materializedFiles = 25
+worker_result_report.obligationAssessments = 95
+worker_result_report.executionEvidence = null
+worker_result_report.executionEvidenceErrors =
+  - transformArtifact.executionEvidence.command: expected string
+
+postflight.status = blocked
+blockingReasons =
+  - test_execution_evidence_invalid:transformArtifact.executionEvidence.command: expected string
+```
+
+This is the expected non-close behavior after the repair. The live worker
+materialized files, but the framework rejected invalid execution evidence
+instead of accepting observed files as product closure.
+
+The outer sandbox runner did not return because the installed `odd-sdlc-ts
+start --target next --until first_traversal` invocation continued into same-edge
+repair/reentry after the blocked postflight. It launched follow-up
+`Fg_materialize_declared_product_asset` attempts in:
+
+```text
+workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260511T041049121Z_pid78309
+workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260511T041342457Z_pid78309
+```
+
+The `20260511T041049121Z_pid78309` attempt was seeded by retry context from the
+first `test_execution_evidence_invalid` gap and also blocked on invalid execution
+evidence. The `20260511T041342457Z_pid78309` attempt was in progress when the
+harness was terminated. Treat this as an installed-runner stop-condition/reentry
+bug, not as product-materialization closure.
+
+### 2026-05-11 Closure Reprice And Verdict
+
+The earlier closure wording that required an `external data_mapper` lane is
+stale. The authoritative closure lane is the installed internal controlled
+duplicate under:
+
+```text
+build_tenants/typescript/test_env/fixtures/data_mapper_induction
+```
+
+Closure note:
+
+```text
+.ai-workspace/comments/codex/20260511T042940Z_CLOSURE_t143_internal_authoritative_data_mapper.md
+```
+
+The T-143 target-derivation and shallow-closure defect is closed by the fresh
+internal lane:
+
+```text
+productMaterializationAuthority.status = passed
+contextExpectedFileTargets = []
+productAuthorityTargets = 10
+declaredProductFileTargets = 10
+sourceRefs = workspace://specification/PRODUCT.md
+materializationRequired = true
+selectedOutputRoot = build_tenants/scala_spark
+product_materialization_manifest.fileCount = 25
+product_materialization_manifest.sourceCount = 23
+product_materialization_manifest.buildConfigCount = 1
+postflight.status = blocked
+blockingReasons = test_execution_evidence_invalid:transformArtifact.executionEvidence.command: expected string
+```
+
+The installed-runner continuation bug exposed by the same archive is not T-143
+closure scope after this reprice. It is attached to T-151 as the regression seed
+for runner sovereignty and may be reused by T-153 for non-close parity proof.
 
 ## Impacted Interface Review Checklist
 
-- [ ] CLI `start --target next` keeps the same command shape.
-- [ ] Installed downstream workspaces do not require new manual JSON sidecars.
-- [ ] Existing hello-world lanes still pass.
-- [ ] Existing context JSON `expectedFiles` fixtures still pass.
-- [ ] Full data_mapper template gets a non-empty target contract from
+- [x] CLI `start --target next` keeps the same command shape.
+- [x] Installed downstream workspaces do not require new manual JSON sidecars.
+- [x] Existing hello-world lanes still pass.
+- [x] Existing context JSON `expectedFiles` fixtures still pass after execution
+      evidence is required for executable product contracts.
+- [x] Full data_mapper template gets a non-empty target contract from
       `PRODUCT.md`.
-- [ ] Worker prompt/package remains compact and structured.
-- [ ] No new action-selection surface is introduced.
-- [ ] No new ledger is introduced beside T-109/T-136/T-138 carriers.
+- [x] Worker prompt/package remains compact and structured after execution
+      evidence repair.
+- [x] No new action-selection surface is introduced.
+- [x] No new ledger is introduced beside T-109/T-136/T-138 carriers.
 
 ## Break-To-Closure Map
 
@@ -792,3 +1188,5 @@ The implementation must reject these mixed states:
    basis after a missing/ambiguous target-authority result.
 5. JSON `expectedFiles` and PRODUCT.md conflict silently. Conflict must become
    typed ambiguity or a deterministic precedence rule with visible refs.
+6. Product materialization closes with `choosesNextTraversal=false`, but public
+   gaps still reports `Fg_materialize_declared_product_asset` as current work.

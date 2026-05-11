@@ -59,7 +59,68 @@ function detectRole(relativePath: string): SdlcSourceInputRole {
   return "unstructured";
 }
 
-function detectAuthorityMarkers(content: string): readonly string[] {
+function normalizeLocalRequirementId(rawId: string): string {
+  const normalized = rawId.trim().toUpperCase();
+  const requirementMatch = /^R-(\d+)$/u.exec(normalized);
+  if (requirementMatch !== null && requirementMatch[1] !== undefined) {
+    return `R-${requirementMatch[1].padStart(3, "0")}`;
+  }
+  return normalized;
+}
+
+function localRequirementSlug(title: string): string {
+  const slug = title
+    .trim()
+    .toLowerCase()
+    .replace(/[`*_()[\]{}]/gu, "")
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 72);
+  return slug.length === 0 ? "requirement" : slug;
+}
+
+function localRequirementMarker(input: {
+  readonly requirementId: string;
+  readonly title: string;
+}): string {
+  return [
+    "requirement-local://odd-sdlc",
+    encodeURIComponent(normalizeLocalRequirementId(input.requirementId)),
+    encodeURIComponent(localRequirementSlug(input.title))
+  ].join("/");
+}
+
+function detectLocalRequirementMarkers(content: string): readonly string[] {
+  const explicitRequirementHeading =
+    /^\s{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
+  const canonicalRequirementMarker =
+    /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/gu;
+  const explicitMarkers = [...content.matchAll(explicitRequirementHeading)].map(
+    (match) =>
+      localRequirementMarker({
+        requirementId: match[1] ?? "R-000",
+        title: match[2] ?? "requirement"
+      })
+  );
+  if (explicitMarkers.length > 0 || canonicalRequirementMarker.test(content)) {
+    return uniqueSorted(explicitMarkers);
+  }
+  const numberedRequirementHeading =
+    /^\s{0,3}#{1,6}\s+(\d{1,3})[.)]\s+([^\n]+?)\s*$/gmu;
+  return uniqueSorted(
+    [...content.matchAll(numberedRequirementHeading)].map((match) =>
+      localRequirementMarker({
+        requirementId: `R-${match[1] ?? "000"}`,
+        title: match[2] ?? "requirement"
+      })
+    )
+  );
+}
+
+function detectAuthorityMarkers(
+  content: string,
+  role: SdlcSourceInputRole
+): readonly string[] {
   const markerExpression = /\b(?:INT-\d{3}|RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
   const transformRefExpression =
     /\b(?:transform-obligation|requirement-transform|requirement-lineage):\/\/[^\s\])}>,]+/g;
@@ -71,7 +132,14 @@ function detectAuthorityMarkers(content: string): readonly string[] {
   const projectMarkers = [...content.matchAll(projectExpression)].map(
     (match) => `Project:${match[1] ?? ""}`
   );
-  return uniqueSorted([...markers, ...transformRefs, ...projectMarkers]);
+  const localRequirementMarkers =
+    role === "requirement_surface" ? detectLocalRequirementMarkers(content) : [];
+  return uniqueSorted([
+    ...markers,
+    ...localRequirementMarkers,
+    ...transformRefs,
+    ...projectMarkers
+  ]);
 }
 
 function ambiguityFor(input: {
@@ -95,7 +163,7 @@ export function deriveSdlcSourceInput(
   snapshot: SdlcSourceInputSnapshot
 ): SdlcSourceInput {
   const role = detectRole(snapshot.relativePath);
-  const authorityMarkers = detectAuthorityMarkers(snapshot.content);
+  const authorityMarkers = detectAuthorityMarkers(snapshot.content, role);
   return Object.freeze({
     kind: "sdlc_source_input",
     uri: snapshot.uri,

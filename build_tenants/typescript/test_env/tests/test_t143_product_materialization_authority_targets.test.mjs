@@ -20,14 +20,18 @@ import {
   constructWorkerInvocationPackage,
   declaredProductFileTargets,
   deriveWorkerHandoffManifest,
+  evaluateWorkerResultPostflight,
   hookContractByEdgeName,
   installedReentryAttemptLimit,
   installedReentryDispositionForOutcome,
   observeProductMaterializationDelta,
   promptForHandoff,
+  readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
+  sha256Text,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
+  writeProductMaterializationManifest,
 } from "../../build/semantic/code/src/index.js";
 
 const installedOperatorSource = () =>
@@ -233,6 +237,98 @@ function steelThreadEnvelope(edgeName = FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
     retryBudgetRemaining: 1,
     mustExitAfterBoundedAttempt: true
   };
+}
+
+function writeOutputSurface(manifest, title = "component_code_surface") {
+  const content = [`# ${title}`, "", `edge: ${manifest.edgeName}`].join("\n");
+  const artifact = `${content}\n`;
+  mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, artifact, "utf8");
+  return {
+    digest: sha256Text(artifact),
+    byteCount: Buffer.byteLength(artifact, "utf8")
+  };
+}
+
+function writeMaterializedSourceFile(
+  manifest,
+  relativePath = "cdme-compiler/src/main/scala/com/cdme/compiler/Probe.scala"
+) {
+  const content = [
+    "package com.cdme.compiler",
+    "",
+    "final case class Probe(value: String)"
+  ].join("\n");
+  const artifact = `${content}\n`;
+  const absolutePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    relativePath
+  );
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, artifact, "utf8");
+  return {
+    kind: "sdlc_materialized_product_file",
+    role: "source",
+    relativePath,
+    absolutePath,
+    digest: sha256Text(artifact),
+    byteCount: Buffer.byteLength(artifact, "utf8")
+  };
+}
+
+function writeExecutionLog(manifest, filename, content) {
+  const absolutePath = path.join(manifest.archiveRoot, filename);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, `${content}\n`, "utf8");
+  return `file://${absolutePath}`;
+}
+
+function writeWorkerResultReport(input) {
+  const outputRef = `file://${input.manifest.outputFile}`;
+  const materializedRefs = input.materializedFiles.map(
+    (file) => `file://${file.absolutePath}`
+  );
+  const executionRefs = input.executionEvidence?.reportRefs ?? [];
+  const evidenceRefs = [
+    outputRef,
+    ...materializedRefs,
+    ...executionRefs
+  ];
+  mkdirSync(path.dirname(input.manifest.reportFile), { recursive: true });
+  writeFileSync(
+    input.manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        graphFunctionName: input.manifest.graphFunctionName,
+        edgeName: input.manifest.edgeName,
+        targetAssetType: input.manifest.targetAssetType,
+        outputFile: input.manifest.outputFile,
+        digest: input.output.digest,
+        summary: input.summary ?? "generated product source under tenant root",
+        unresolvedReasons: [],
+        materializedFiles: input.materializedFiles,
+        executionEvidence: input.executionEvidence ?? null,
+        executionEvidenceErrors: [],
+        obligationAssessments:
+          input.manifest.traversalObligationContext.obligations.map(
+            (obligation) => ({
+              kind: "sdlc_worker_obligation_assessment",
+              obligationId: obligation.obligationId,
+              fulfillmentStatus: "fulfilled",
+              evidenceRefs:
+                evidenceRefs.length > 0
+                  ? evidenceRefs
+                  : [...obligation.evidenceRefs],
+              blockingReasons: []
+            })
+          )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }
 
 test("T-143 installed loop circuit breakers distinguish retry and yield", () => {
@@ -529,4 +625,122 @@ test("T-143 empty product target authority is visible to F_P without FD role gat
   );
   assert.match(prompt, /Product authority reconciliation: missing/u);
   assert.match(prompt, /derive the product topology/u);
+});
+
+test("T-143 executable product materialization blocks without execution evidence", () => {
+  const manifest = materializationManifest(
+    workspaceWithProductAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const prompt = promptForHandoff(manifest);
+  const output = writeOutputSurface(manifest);
+  const materializedFiles = [writeMaterializedSourceFile(manifest)];
+
+  writeWorkerResultReport({
+    manifest,
+    output,
+    materializedFiles,
+    executionEvidence: null
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.match(
+    prompt,
+    /executable product materialization must run or explicitly fail\/pending its test contract/u
+  );
+  assert.equal(report.executionEvidence, null);
+  assert.equal(postflight.status, "blocked");
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "test_execution_evidence_missing"
+    ),
+    true
+  );
+});
+
+test("T-143 executable product materialization blocks failed execution evidence", () => {
+  const manifest = materializationManifest(
+    workspaceWithProductAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const output = writeOutputSurface(manifest);
+  const materializedFiles = [writeMaterializedSourceFile(manifest)];
+  const reportRef = writeExecutionLog(
+    manifest,
+    "sbt-test.log",
+    "sbt test exited 1"
+  );
+
+  writeWorkerResultReport({
+    manifest,
+    output,
+    materializedFiles,
+    executionEvidence: {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command: manifest.productMaterialization.testExecutionContract,
+      status: "failed",
+      reportRefs: [reportRef],
+      testsObserved: 1,
+      passedCount: 0,
+      failedCount: 1,
+      shardEvidence: []
+    }
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(report.executionEvidence?.status, "failed");
+  assert.equal(postflight.status, "blocked");
+  assert.equal(
+    postflight.blockingReasonCarriers.some(
+      (reason) =>
+        reason.code === "test_execution_failures_present" &&
+        reason.detail === "failed"
+    ),
+    true
+  );
+});
+
+test("T-143 executable product materialization closes with successful execution evidence", () => {
+  const manifest = materializationManifest(
+    workspaceWithProductAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const output = writeOutputSurface(manifest);
+  const materializedFiles = [writeMaterializedSourceFile(manifest)];
+  const reportRef = writeExecutionLog(
+    manifest,
+    "sbt-test.log",
+    "sbt test exited 0"
+  );
+
+  writeWorkerResultReport({
+    manifest,
+    output,
+    materializedFiles,
+    executionEvidence: {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command: manifest.productMaterialization.testExecutionContract,
+      status: "succeeded",
+      reportRefs: [reportRef],
+      testsObserved: 1,
+      passedCount: 1,
+      failedCount: 0,
+      shardEvidence: []
+    }
+  });
+
+  const report = readWorkerResultReport(manifest);
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(report.executionEvidence?.status, "succeeded");
+  assert.equal(postflight.status, "passed");
 });

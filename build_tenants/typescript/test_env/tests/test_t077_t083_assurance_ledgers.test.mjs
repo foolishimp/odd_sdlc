@@ -248,7 +248,7 @@ test("T-078 semantic convergence ledger covers missing, insufficient, and contra
   assert.deepStrictEqual(missingClaim.reasons.map((reason) => reason.code), [
     "semantic_claim_missing:target://mapper/lineage"
   ]);
-  assert.equal(contradicted.verdict, "blocked");
+  assert.equal(contradicted.verdict, "reprice_required");
   assert.equal(contradicted.reasons[0].lawfulReentryPoint, "design_reframe");
 });
 

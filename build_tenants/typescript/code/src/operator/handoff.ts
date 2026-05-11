@@ -306,6 +306,37 @@ function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
   return targetAssetType === "test_execution_result_surface";
 }
 
+function declaredExecutionContract(input: string): boolean {
+  const contract = input.trim().toLowerCase();
+  return (
+    contract.length > 0 &&
+    contract !== "undeclared" &&
+    contract !== "none" &&
+    contract !== "n/a" &&
+    contract !== "not_applicable"
+  );
+}
+
+function productMaterializationRequiresTestExecutionEvidence(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return (
+    manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
+    manifest.targetAssetType === "component_code_surface" &&
+    manifest.productMaterialization.required &&
+    declaredExecutionContract(manifest.productMaterialization.testExecutionContract)
+  );
+}
+
+function manifestAdmitsTestExecutionEvidence(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return (
+    targetAdmitsTestExecutionEvidence(manifest.targetAssetType) ||
+    productMaterializationRequiresTestExecutionEvidence(manifest)
+  );
+}
+
 function targetIgnoresExecutionByproducts(targetAssetType: string): boolean {
   return (
     targetAssetType === "component_code_surface" ||
@@ -1448,7 +1479,11 @@ function trancheKeysFor(input: {
   }
   if (
     input.contract.targetAssetType === "test_module_surface" ||
-    targetAdmitsTestExecutionEvidence(input.contract.targetAssetType)
+    targetAdmitsTestExecutionEvidence(input.contract.targetAssetType) ||
+    (input.contract.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
+      input.contract.targetAssetType === "component_code_surface" &&
+      input.materialization.required &&
+      declaredExecutionContract(input.materialization.testExecutionContract))
   ) {
     keys.push("qualification:tranche_execution");
   }
@@ -2227,27 +2262,11 @@ function listForPrompt(values: readonly string[]): string {
   return values.length === 0 ? "(none declared)" : values.join(", ");
 }
 
-function isSbtTestContract(testExecutionContract: string): boolean {
-  return /\bsbt\b/u.test(testExecutionContract) && /\btest\b/u.test(testExecutionContract);
-}
-
 function textIfFile(filePath: string): string | null {
   if (!existsSync(filePath) || !statSync(filePath).isFile()) {
     return null;
   }
   return readFileSync(filePath, "utf8");
-}
-
-function hasSbtTestFrameworkBinding(content: string): boolean {
-  return /(?:scalaTest|scalatest|munit|utest|specs2|TestFramework|%+\s*Test)/iu.test(
-    content
-  );
-}
-
-function looksLikeSbtDiscoverableTest(content: string): boolean {
-  return /(?:org\.scalatest|munit\.|utest\.|org\.specs2|extends\s+[A-Za-z0-9_.$]*(?:Suite|Spec|FunSuite|AnyFunSuite|AnyFlatSpec|AnyWordSpec|AnyFreeSpec|FunSpec|TestSuite|Specification))/u.test(
-    content
-  );
 }
 
 function compactObligation(
@@ -3035,10 +3054,10 @@ function compactExecutionEvidenceDirective(
   if (manifest.targetAssetType === "test_run_archive_surface") {
     return "Archive the admitted test_execution_result_surface truth; do not run test commands, do not emit fresh sdlc_worker_execution_evidence, and do not synthesize release evidence.";
   }
-  if (!targetAdmitsTestExecutionEvidence(manifest.targetAssetType)) {
+  if (!manifestAdmitsTestExecutionEvidence(manifest)) {
     return null;
   }
-  return "Emit sdlc_worker_execution_evidence JSON; executionEvidence.status MUST be one of: succeeded, failed, pending. Do not use status values such as not_run. executionEvidence.lane MUST be exactly \"test\". executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null. If execution exits non-zero during compile, discovery, or test phases, record failed, not pending. Use pending only when execution did not run or external evidence is still unavailable. Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence.";
+  return "Emit sdlc_worker_execution_evidence JSON for the declared test execution contract; executable product materialization must run or explicitly fail/pending its test contract before closure. executionEvidence.status MUST be one of: succeeded, failed, pending. Do not use status values such as not_run. executionEvidence.lane MUST be exactly \"test\". executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null. If execution exits non-zero during compile, discovery, or test phases, record failed, not pending. Use pending only when execution did not run or external evidence is still unavailable. Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence.";
 }
 
 function compactScheduleDirective(
@@ -3922,7 +3941,7 @@ export function admitWorkerResultReport(
     "SdlcWorkerResultReport.executionEvidence"
   );
   if (
-    !targetAdmitsTestExecutionEvidence(manifest.targetAssetType) &&
+    !manifestAdmitsTestExecutionEvidence(manifest) &&
     executionEvidence !== null
   ) {
     throw new TypeError(
@@ -4198,27 +4217,157 @@ function isExecutionByproductPath(relativePath: string): boolean {
   );
 }
 
+function declaredTechnologyText(manifest: SdlcWorkerHandoffManifest): string {
+  const project = manifest.conformedProject;
+  return [
+    project?.language ?? "",
+    project?.tool ?? "",
+    manifest.productMaterialization.buildExecutionContract,
+    manifest.productMaterialization.testExecutionContract,
+    ...(project?.capabilityContracts.flatMap((contract) => [
+      contract.name,
+      contract.value
+    ]) ?? [])
+  ].join(" ").toLowerCase();
+}
+
+function declaredTechnologyIncludes(
+  manifest: SdlcWorkerHandoffManifest,
+  token: string
+): boolean {
+  return declaredTechnologyText(manifest).includes(token.toLowerCase());
+}
+
+function declaredBuildConfigRoleForObservedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly normalizedRelativePath: string;
+}): SdlcMaterializedProductFileRole | null {
+  const lower = input.normalizedRelativePath.toLowerCase();
+  if (
+    declaredTechnologyIncludes(input.manifest, "sbt") &&
+    (lower === "build.sbt" || lower.endsWith("/build.sbt"))
+  ) {
+    return "build_config";
+  }
+  if (
+    (declaredTechnologyIncludes(input.manifest, "cargo") ||
+      declaredTechnologyIncludes(input.manifest, "rust")) &&
+    (lower === "cargo.toml" || lower.endsWith("/cargo.toml"))
+  ) {
+    return "build_config";
+  }
+  if (
+    declaredTechnologyIncludes(input.manifest, "maven") &&
+    (lower === "pom.xml" || lower.endsWith("/pom.xml"))
+  ) {
+    return "build_config";
+  }
+  if (
+    declaredTechnologyIncludes(input.manifest, "gradle") &&
+    (lower === "build.gradle" ||
+      lower.endsWith("/build.gradle") ||
+      lower === "build.gradle.kts" ||
+      lower.endsWith("/build.gradle.kts"))
+  ) {
+    return "build_config";
+  }
+  return null;
+}
+
+function productAuthorityTargetCoversRelativePath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly target: SdlcProductMaterializationAuthorityTarget;
+  readonly normalizedRelativePath: string;
+}): boolean {
+  const targetRelativePath = targetRelativeToSelectedOutputRoot({
+    targetPath: input.target.path,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot
+  }).toLowerCase();
+  const relativePath = input.normalizedRelativePath.toLowerCase();
+  if (input.target.targetKind === "file") {
+    return relativePath === targetRelativePath;
+  }
+  return (
+    relativePath === targetRelativePath ||
+    relativePath.startsWith(`${targetRelativePath}/`)
+  );
+}
+
+function declaredProductAuthorityRoleForObservedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly normalizedRelativePath: string;
+}): SdlcMaterializedProductFileRole | null {
+  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
+  const target = authority.declaredProductTargetContracts.find((candidate) =>
+    productAuthorityTargetCoversRelativePath({
+      manifest: input.manifest,
+      target: candidate,
+      normalizedRelativePath: input.normalizedRelativePath
+    })
+  );
+  if (target === undefined) {
+    return null;
+  }
+  const targetRelativePath = targetRelativeToSelectedOutputRoot({
+    targetPath: target.path,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot
+  }).toLowerCase();
+  if (targetRelativePath === "build.sbt") {
+    return "build_config";
+  }
+  if (
+    targetRelativePath === "src" ||
+    targetRelativePath.endsWith("/src") ||
+    targetRelativePath.includes("/src/")
+  ) {
+    return "source";
+  }
+  if (
+    targetRelativePath === "design" ||
+    targetRelativePath.startsWith("design/")
+  ) {
+    return "design";
+  }
+  return null;
+}
+
 function materializedRoleForObservedFile(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly relativePath: string;
 }): SdlcMaterializedProductFileRole {
   const normalized = input.relativePath.split(path.sep).join("/");
+  const declaredBuildConfigRole = declaredBuildConfigRoleForObservedFile({
+    manifest: input.manifest,
+    normalizedRelativePath: normalized
+  });
+  if (declaredBuildConfigRole !== null) {
+    return declaredBuildConfigRole;
+  }
+  const declaredAuthorityRole = declaredProductAuthorityRoleForObservedFile({
+    manifest: input.manifest,
+    normalizedRelativePath: normalized
+  });
+  if (declaredAuthorityRole !== null) {
+    return declaredAuthorityRole;
+  }
+  if (normalized === tenantRelativeOutputArtifactPath(input.manifest)) {
+    return "design";
+  }
   const lower = normalized.toLowerCase();
-  if (lower === "cargo.toml" || lower.endsWith("/cargo.toml")) {
-    return "build_config";
+  if (lower.startsWith("design/") || lower === "design") {
+    return "design";
   }
   if (
-    lower === "build.sbt" ||
-    lower.endsWith("/build.sbt") ||
-    lower.endsWith(".sbt") ||
-    lower.endsWith("/pom.xml") ||
-    lower.endsWith("/build.gradle") ||
-    lower.endsWith("/build.gradle.kts")
+    input.manifest.targetAssetType === "component_code_surface" &&
+    isLikelySourceMaterialization(input.relativePath)
   ) {
-    return "build_config";
-  }
-  if (input.manifest.targetAssetType === "code_surface") {
     return "source";
+  }
+  if (
+    input.manifest.targetAssetType === "component_test_surface" &&
+    isLikelyTestMaterialization(input.relativePath)
+  ) {
+    return "test";
   }
   if (
     input.manifest.targetAssetType === "test_module_surface" ||
@@ -4226,50 +4375,39 @@ function materializedRoleForObservedFile(input: {
   ) {
     return "test";
   }
-  if (normalized === tenantRelativeOutputArtifactPath(input.manifest)) {
-    return "design";
-  }
-  if (lower.startsWith("design/") || lower === "design") {
-    return "design";
-  }
   if (isLikelySourceMaterialization(input.relativePath)) {
     return "source";
   }
   return "other";
 }
 
-function normalizedRelativePath(relativePath: string): string {
-  return relativePath.split(path.sep).join("/");
+function observedRoleHasNonemptyFile(input: SdlcObservedProductFileSnapshot): boolean {
+  const content = textIfFile(input.absolutePath);
+  return content !== null && content.trim().length > 0;
 }
 
-function isLikelyTestMaterialization(input: {
-  readonly relativePath: string;
-  readonly absolutePath: string;
+function observedFileSatisfiesRequiredRole(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcObservedProductFileSnapshot;
 }): boolean {
-  const normalized = normalizedRelativePath(input.relativePath).toLowerCase();
-  if (isExecutionByproductPath(normalized)) {
+  const role = materializedRoleForObservedFile({
+    manifest: input.manifest,
+    relativePath: input.file.relativePath
+  });
+  if (!input.manifest.productMaterialization.requiredRoles.includes(role)) {
     return false;
   }
-  if (
-    !(
-      normalized.includes("/src/test/") ||
-      normalized.startsWith("src/test/") ||
-      /\b(test|spec)s?\b/u.test(normalized) ||
-      /(?:test|spec)\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt)$/u.test(
-        normalized
-      )
-    )
-  ) {
-    return false;
+  if (role === "source" || role === "test" || role === "design") {
+    return observedRoleHasNonemptyFile(input.file);
   }
-  const content = textIfFile(input.absolutePath);
-  if (content === null) {
-    return false;
+  if (role === "build_config") {
+    return textIfFile(input.file.absolutePath) !== null;
   }
-  if (normalized.endsWith(".scala")) {
-    return looksLikeSbtDiscoverableTest(content);
-  }
-  return content.trim().length > 0;
+  return false;
+}
+
+function normalizedRelativePath(relativePath: string): string {
+  return relativePath.split(path.sep).join("/");
 }
 
 function isLikelySourceMaterialization(relativePath: string): boolean {
@@ -4284,6 +4422,22 @@ function isLikelySourceMaterialization(relativePath: string): boolean {
   }
   return /(?:^|\/)src\/(?:main\/)?/u.test(normalized) &&
     /\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt|rs|sql)$/u.test(normalized);
+}
+
+function isLikelyTestMaterialization(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  const hasTestPath =
+    normalized.includes("/src/test/") ||
+    normalized.startsWith("src/test/") ||
+    normalized.includes("/test/") ||
+    normalized.includes("/tests/") ||
+    normalized.includes("/spec/") ||
+    normalized.includes("/specs/");
+  const hasTestName =
+    /(?:^|\/)[^/]*(?:test|spec|suite)[^/]*\.(?:scala|ts|tsx|js|jsx|mjs|cjs|py|java|kt|rs)$/u.test(
+      normalized
+    );
+  return hasTestPath || hasTestName;
 }
 
 function isLikelyDesignMaterialization(input: {
@@ -4302,29 +4456,6 @@ function isLikelyDesignMaterialization(input: {
   }
   const content = textIfFile(input.absolutePath);
   return content !== null && content.trim().length > 0;
-}
-
-function observedFileSatisfiesRequiredRole(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly file: SdlcObservedProductFileSnapshot;
-}): boolean {
-  const role = materializedRoleForObservedFile({
-    manifest: input.manifest,
-    relativePath: input.file.relativePath
-  });
-  if (!input.manifest.productMaterialization.requiredRoles.includes(role)) {
-    return false;
-  }
-  if (role === "test") {
-    return isLikelyTestMaterialization(input.file);
-  }
-  if (role === "source") {
-    return isLikelySourceMaterialization(input.file.relativePath);
-  }
-  if (role === "design") {
-    return isLikelyDesignMaterialization(input.file);
-  }
-  return role === "build_config";
 }
 
 function materializedFileFromObservedFile(input: {
@@ -4531,7 +4662,7 @@ function extractExecutionEvidenceFromTransformArtifact(input: {
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
   readonly errors: readonly string[];
 } {
-  if (!targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)) {
+  if (!manifestAdmitsTestExecutionEvidence(input.manifest)) {
     return Object.freeze({
       executionEvidence: null,
       errors: Object.freeze([])
@@ -4918,54 +5049,6 @@ export function writeWorkerFpTransformResult(input: {
   return result;
 }
 
-function evaluateSbtTestDiscoverability(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly report: SdlcWorkerResultReport;
-  readonly blockingReasonCarriers: SdlcBlockingReason[];
-}): void {
-  if (
-    input.manifest.targetAssetType !== "test_module_surface" ||
-    !isSbtTestContract(input.manifest.productMaterialization.testExecutionContract)
-  ) {
-    return;
-  }
-  const testFiles = input.report.materializedFiles.filter(
-    (file) => file.role === "test"
-  );
-  const testFileContents = testFiles
-    .map((file) => textIfFile(file.absolutePath))
-    .filter((content): content is string => content !== null);
-  const hasDiscoverableTest = testFileContents.some(looksLikeSbtDiscoverableTest);
-  const existingBuildConfig = textIfFile(
-    join(input.manifest.productMaterialization.tenantRoot, "build.sbt")
-  );
-  const reportedBuildConfig = input.report.materializedFiles
-    .filter((file) => file.role === "build_config")
-    .map((file) => textIfFile(file.absolutePath))
-    .filter((content): content is string => content !== null)
-    .join("\n");
-  const hasFrameworkBinding =
-    (existingBuildConfig !== null && hasSbtTestFrameworkBinding(existingBuildConfig)) ||
-    hasSbtTestFrameworkBinding(reportedBuildConfig);
-
-  if (hasDiscoverableTest && hasFrameworkBinding) {
-    return;
-  }
-  input.blockingReasonCarriers.push(
-    makeSdlcBlockingReason({
-      code: "test_materialization_not_discoverable",
-      detail: [
-        `discoverable_test:${hasDiscoverableTest}`,
-        `test_framework_binding:${hasFrameworkBinding}`
-      ].join(","),
-      evidenceRefs: [
-        pathToFileURL(input.manifest.productMaterialization.tenantRoot).href,
-        ...testFiles.map((file) => pathToFileURL(file.absolutePath).href)
-      ]
-    })
-  );
-}
-
 function evaluateMaterializedProductFiles(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
@@ -5102,7 +5185,6 @@ function evaluateMaterializedProductFiles(input: {
       );
     }
   }
-  evaluateSbtTestDiscoverability(input);
 }
 
 function evaluateExecutionEvidence(input: {
@@ -5111,7 +5193,7 @@ function evaluateExecutionEvidence(input: {
   readonly blockingReasonCarriers: SdlcBlockingReason[];
   readonly evidenceRefs: string[];
 }): void {
-  if (!targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)) {
+  if (!manifestAdmitsTestExecutionEvidence(input.manifest)) {
     return;
   }
   const executionEvidence = input.report.executionEvidence;
@@ -5137,6 +5219,8 @@ function evaluateExecutionEvidence(input: {
     );
     return;
   }
+  const executableProductMaterialization =
+    productMaterializationRequiresTestExecutionEvidence(input.manifest);
   input.evidenceRefs.push(...executionEvidence.reportRefs);
   if (executionEvidence.lane !== "test") {
     input.blockingReasonCarriers.push(
@@ -5207,6 +5291,20 @@ function evaluateExecutionEvidence(input: {
     }
     return;
   }
+  if (
+    executableProductMaterialization &&
+    executionEvidence.status !== "succeeded"
+  ) {
+    input.blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: "test_execution_failures_present",
+        detail: executionEvidence.status,
+        evidenceRefs: executionEvidence.reportRefs,
+        message:
+          "Executable product materialization did not pass its declared test execution contract."
+      })
+    );
+  }
   // Failed-but-structurally-valid execution evidence is admitted here.
   // T-115 maps failed rows to component_test_qualification_surface and
   // component_repair_schedule_surface instead of retrying this edge.
@@ -5231,26 +5329,9 @@ function evaluateExecutionEvidence(input: {
   }
 }
 
-function hasAdrField(content: string, field: string): boolean {
-  const escaped = field.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  return new RegExp(`(?:^|[|\\n\\r])\\s*\`?${escaped}:\`?\\s*(?:[|:]|$)`, "imu").test(
-    content
-  );
-}
-
-function adrStatusValue(content: string): string | null {
-  const match = /(?:^|\|)\s*`?Status:`?\s*\|\s*`?([a-z_ -]+)`?/imu.exec(content);
-  if (match?.[1] !== undefined) {
-    return match[1].trim().toLowerCase();
-  }
-  const lineMatch = /^Status:\s*([a-z_ -]+)\s*$/imu.exec(content);
-  return lineMatch?.[1]?.trim().toLowerCase() ?? null;
-}
-
 function evaluateAdrOutputArtifact(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly outputFile: string;
-  readonly content: string;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
 }): void {
   if (!tenantOutputArtifactIsAdr(input.manifest)) {
@@ -5263,35 +5344,6 @@ function evaluateAdrOutputArtifact(input: {
       makeSdlcBlockingReason({
         code: "adr_output_filename_invalid",
         detail: filename,
-        evidenceRefs
-      })
-    );
-  }
-  const requiredFields = Object.freeze([
-    "Status",
-    "Implements",
-    "Derives from",
-    "Supersedes",
-    "Superseded by",
-    "Retained special case"
-  ]);
-  for (const field of requiredFields) {
-    if (!hasAdrField(input.content, field)) {
-      input.blockingReasonCarriers.push(
-        makeSdlcBlockingReason({
-          code: "adr_output_required_field_missing",
-          detail: field,
-          evidenceRefs
-        })
-      );
-    }
-  }
-  const status = adrStatusValue(input.content);
-  if (status !== "active" && status !== "superseded" && status !== "retired") {
-    input.blockingReasonCarriers.push(
-      makeSdlcBlockingReason({
-        code: "adr_output_status_invalid",
-        detail: status ?? "missing",
         evidenceRefs
       })
     );
@@ -5728,7 +5780,6 @@ export function evaluateWorkerResultPostflight(input: {
     evaluateAdrOutputArtifact({
       manifest: input.manifest,
       outputFile,
-      content,
       blockingReasonCarriers
     });
     if (sha256Text(content) !== input.report.digest) {

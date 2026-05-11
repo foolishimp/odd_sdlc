@@ -1595,7 +1595,7 @@ test("B-086 assurance dimensions expose positive and negative F_D outcomes", () 
     ]
   });
   assert.equal(semanticCovered.verdict, "satisfied");
-  assert.equal(semanticContradiction.verdict, "blocked");
+  assert.equal(semanticContradiction.verdict, "reprice_required");
   assert.equal(semanticContradiction.reasons[0].lawfulReentryPoint, "design_reframe");
 
   const prior = gapDossier("materialized_product_relative_path_mismatch");

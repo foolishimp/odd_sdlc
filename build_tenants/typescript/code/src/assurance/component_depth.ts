@@ -171,6 +171,28 @@ function admissionReasons(
   );
 }
 
+function isComponentDepthAdmissionReason(code: string): boolean {
+  return (
+    code === "component_depth_output_missing" ||
+    code === "component_depth_register_missing" ||
+    code.startsWith("component_depth_register_invalid:") ||
+    code.startsWith("component_depth_register_target_mismatch:")
+  );
+}
+
+function requiredMaterializedRoleSatisfied(input: {
+  readonly report: SdlcWorkerResultReport;
+  readonly contract: ComponentDepthContract;
+}): boolean {
+  return (
+    input.contract.requiredMaterializedRole === null ||
+    pathSetForRole({
+      report: input.report,
+      role: input.contract.requiredMaterializedRole
+    }).size > 0
+  );
+}
+
 function requiredMaterializationReasons(input: {
   readonly report: SdlcWorkerResultReport;
   readonly contract: ComponentDepthContract;
@@ -426,7 +448,7 @@ function componentTestQualificationReasons(input: {
               code: `execution_test_class_blocked_without_failure:${row.testClassId}`,
               message: `Blocked test class ${row.testClassId} has no admitted component execution failure row to drive repair.`,
               evidenceRefs: uniqueSorted([...input.evidenceRefs, ...row.evidenceRefs]),
-              lawfulReentryPoint: "operator_blocked"
+              lawfulReentryPoint: "repair_worker_output"
             })
           ]
         : []),
@@ -436,7 +458,7 @@ function componentTestQualificationReasons(input: {
               code: `component_execution_failure_unattributed:${row.testClassId}`,
               message: `Failed test class ${row.testClassId} has no admitted component execution failure row.`,
               evidenceRefs: uniqueSorted([...input.evidenceRefs, ...row.evidenceRefs]),
-              lawfulReentryPoint: "operator_blocked"
+              lawfulReentryPoint: "repair_worker_output"
             })
           ]
         : []),
@@ -449,9 +471,9 @@ function componentTestQualificationReasons(input: {
         ? [
             reason({
               code: `component_execution_failure_low_confidence:${row.testClassId}`,
-              message: `Failed test class ${row.testClassId} only has low-confidence attribution; repair is not lawful.`,
+              message: `Failed test class ${row.testClassId} only has low-confidence attribution; repair requires stronger attribution evidence.`,
               evidenceRefs: uniqueSorted([...input.evidenceRefs, ...row.evidenceRefs]),
-              lawfulReentryPoint: "operator_blocked"
+              lawfulReentryPoint: "repair_worker_output"
             })
           ]
         : []),
@@ -522,9 +544,10 @@ function componentRepairScheduleReasons(input: {
       ? [
           reason({
             code: "component_repair_schedule_triage_gap",
-            message: "Repair schedule stopped at triage_gap; no code/test mutation is lawful.",
+            message:
+              "Repair schedule stopped at triage_gap; repair worker output must supply a typed schedule or upstream repricing evidence before code/test mutation.",
             evidenceRefs: scheduleRefs,
-            lawfulReentryPoint: "operator_blocked"
+            lawfulReentryPoint: "repair_worker_output"
           })
         ]
       : []),
@@ -764,6 +787,14 @@ export function deriveComponentDepthAssuranceLedger(input: {
   const openGapReasonCodes = reasons
     .filter((item) => item.lawfulReentryPoint !== "design_reframe")
     .map((item) => item.code);
+  const admissionOnlyNonblocking =
+    contract.requiredMaterializedRole !== null &&
+    requiredMaterializedRoleSatisfied({
+      report: input.report,
+      contract
+    }) &&
+    reasons.length > 0 &&
+    reasons.every((item) => isComponentDepthAdmissionReason(item.code));
   return assuranceLedger({
     dimension: "component_depth",
     verdict: verdictFromReasons({
@@ -771,6 +802,7 @@ export function deriveComponentDepthAssuranceLedger(input: {
       openGapReasonCodes,
       repriceReasonCodes
     }),
+    required: !admissionOnlyNonblocking,
     reasons,
     evidenceRefs,
     carryForwardObligationRefs: reasons.map((item) => item.code)

@@ -804,6 +804,97 @@ test("T-144 assurance gate routes missing obligation assessments to same-edge re
   assert.notEqual(missingAssessmentReason.lawfulReentryPoint, "operator_blocked");
 });
 
+test("T-144 invalid component-depth register is observable but does not block fulfilled product materialization", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "derive_component_code_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t144-component-depth-nonblocking"
+  });
+  writeHandoffFiles(manifest);
+  const sourcePath = path.join(manifest.productMaterialization.tenantRoot, "src/hello.js");
+  const sourceContent = "console.log('Hello, world!');\n";
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(sourcePath, sourceContent, "utf8");
+  const invalidRegisterArtifact = [
+    "# component_code_surface",
+    "",
+    "```json component_depth_register",
+    JSON.stringify(
+      {
+        kind: "sdlc_component_depth_register",
+        registerVersion: "ts-component-depth-v1",
+        targetAssetType: "component_code_surface",
+        componentRealizationRows: [
+          {
+            kind: "sdlc_component_realization_row",
+            componentId: "component:hello",
+            moduleName: "hello_world_javascript",
+            relativePath: "src/hello.js",
+            publicBoundary: 3,
+            requirementIds: ["REQ-T066-001"],
+            sourceAssetRefs: ["fixture://t144"]
+          }
+        ]
+      },
+      null,
+      2
+    ),
+    "```",
+    ""
+  ].join("\n");
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, invalidRegisterArtifact, "utf8");
+  writeReport({
+    manifest,
+    digest: sha256Text(invalidRegisterArtifact),
+    summary: "materialized source with noncanonical component-depth register",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/hello.js",
+        absolutePath: sourcePath,
+        digest: sha256Text(sourceContent),
+        byteCount: Buffer.byteLength(sourceContent, "utf8")
+      }
+    ]
+  });
+
+  const report = readWorkerResultReport(manifest);
+  const gate = deriveSdlcOperatorAssuranceGate({
+    manifest,
+    report,
+    postflight: {
+      kind: "sdlc_operator_postflight_result",
+      status: "passed",
+      blockingReasons: [],
+      blockingReasonCarriers: [],
+      evidenceRefs: [`file://${sourcePath}`]
+    }
+  });
+  const componentDepth = gate.ledgers.find((ledger) => ledger.dimension === "component_depth");
+
+  assert(componentDepth);
+  assert.equal(componentDepth.required, false);
+  assert.equal(componentDepth.verdict, "open_gap");
+  assert.equal(
+    componentDepth.reasons.some((reason) =>
+      reason.code.startsWith("component_depth_register_invalid:")
+    ),
+    true,
+    JSON.stringify(componentDepth.reasons, null, 2)
+  );
+  assert.equal(gate.satisfaction.status, "close_allowed");
+  assert.equal(gate.blockingPostflight, null);
+});
+
 test("T-004 tenant-local surface output is not counted as product source materialization", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -915,7 +1006,7 @@ test("T-002 component-code materialization ignores build execution byproducts", 
     report.materializedFiles.map((file) => file.relativePath),
     [sbtProjectRelativePath, sourceRelativePath]
   );
-  assert.equal(report.materializedFiles[0].role, "source");
+  assert.equal(report.materializedFiles[0].role, "other");
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
@@ -950,7 +1041,7 @@ test("T-004 design edges write tenant-local design surfaces instead of runtime a
   assert.match(prompt, /Status:, Implements:, Derives from:, Supersedes:, Superseded by:/u);
 });
 
-test("T-004 ADR output artifacts must carry SPEC_METHOD ADR fields", () => {
+test("T-144 ADR field grammar is worker context, not a postflight FD gate", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_implementation_design_surface");
@@ -971,14 +1062,14 @@ test("T-004 ADR output artifacts must carry SPEC_METHOD ADR fields", () => {
     summary: "generated ADR path without ADR fields",
     materializedFiles: []
   });
-  const blocked = evaluateWorkerResultPostflight({
+  const advisory = evaluateWorkerResultPostflight({
     manifest,
     report: readWorkerResultReport(manifest)
   });
-  assert.equal(blocked.status, "blocked");
+  assert.equal(advisory.status, "passed");
   assert.equal(
-    blocked.blockingReasons.includes("adr_output_required_field_missing:Status"),
-    true
+    advisory.blockingReasons.includes("adr_output_required_field_missing:Status"),
+    false
   );
 
   const adr = [

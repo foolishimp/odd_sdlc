@@ -77,7 +77,7 @@ export function deriveSemanticConvergenceAssuranceLedger(input: {
     dimension: "semantic_convergence",
     verdict:
       hasContradiction
-        ? "blocked"
+        ? "reprice_required"
         : reasons.length > 0
           ? "open_gap"
           : "satisfied",

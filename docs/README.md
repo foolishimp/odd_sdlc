@@ -8,13 +8,15 @@ surfaces under `build_tenants/`.
 
 ## Current Supporting Docs
 
-- [ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md)
-  records the current `odd_sdlc` v2.0.0-rc.1 release-candidate identity,
+- [ODD_SDLC_V2_0_0_RC_2_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RC_2_RELEASE_NOTE.md)
+  records the current `odd_sdlc` v2.0.0-rc.2 release-candidate identity,
   shipment summary, qualification bundle, and known limitations
+- [ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md](./ODD_SDLC_V2_0_0_RC_1_RELEASE_NOTE.md)
+  records the first `odd_sdlc` v2.0.0 release-candidate identity and boundary
 
 ## Archived Material
 
-`old/` holds prior-wave supporting documents superseded by the v2.0.0-rc.1
+`old/` holds prior-wave supporting documents superseded by the v2.0.0-rc.2
 boundary. They remain in the repository as provenance and read-model history,
 not as current authority. Treat any guidance, strategy, task plan, or
 traceability claim under `old/` as historical until rewritten against the

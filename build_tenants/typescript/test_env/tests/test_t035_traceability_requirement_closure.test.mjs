@@ -233,6 +233,53 @@ test("T-035 requirement closure rejects trace-only shells and carries unresolved
   assert.deepStrictEqual(register.emittedRuntimeEventKinds, []);
 });
 
+test("T-144 requirement closure carries local requirement IDs from ingress", () => {
+  const localIngress = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: "fixture://t035-local",
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t035_local",
+      activeTenant: "typescript",
+      selectedOutputRoot: "build_tenants/typescript",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: ["local_requirement_lineage"]
+    }),
+    sourceInputs: [
+      sourceInput(
+        "specification/requirements/01-local.md",
+        [
+          "# Requirements",
+          "",
+          "## R-01: Local product behavior",
+          "",
+          "The local product behavior remains open until evidence arrives.",
+          "",
+          "## R-02: Local runtime proof",
+          "",
+          "Runtime proof remains visible until closure."
+        ].join("\n")
+      )
+    ]
+  });
+  const register = projectSdlcRequirementClosureRegister({
+    ingressReport: localIngress,
+    lineageLedger: deriveSdlcLineageLedger({
+      ingressReport: localIngress,
+      workReports: [],
+      proofClaims: []
+    })
+  });
+
+  assert.deepStrictEqual(register.unresolvedRequirementIds, ["R-001", "R-002"]);
+  assert.deepStrictEqual(register.carriedForwardRequirementIds, ["R-001", "R-002"]);
+  const localEntry = closureEntry(register, "R-001");
+  assert.equal(localEntry.fulfillmentStatus, "missing");
+  assert(
+    localEntry.sourceInputUris.some((uri) =>
+      uri.endsWith("specification/requirements/01-local.md")
+    )
+  );
+});
+
 test("T-042 requirement closure rejects split behavioral proof and satisfied contract", () => {
   const ingress = ingressReport();
   const unsatisfiedBehavioralAsset = codeWorkReport({

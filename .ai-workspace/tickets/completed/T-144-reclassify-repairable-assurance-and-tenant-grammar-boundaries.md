@@ -6,8 +6,8 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: refactor_existing_assurance_and_materialization_classification_surfaces
 governing_library: odd_sdlc TypeScript assurance gate, product materialization postflight, component depth, and traversal consequence surfaces
-status: active
-review_status: pre_data_mapper_blocker_slice_implemented
+status: completed
+review_status: closed_implemented
 goal: typescript-data-mapper-live-parity
 build_tenant: typescript
 owner: odd_sdlc
@@ -18,6 +18,7 @@ priority: high
 triaged_at: 2026-05-11
 created_at: 2026-05-11
 updated_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 dependencies:
   - T-143 keeps product target authority F_P-visible instead of adding a pre-dispatch F_D gate.
@@ -29,6 +30,9 @@ affected_boundary:
   - build_tenants/typescript/code/src/materialization/materialization.ts
   - build_tenants/typescript/code/src/operator/installed_operator.ts
   - build_tenants/typescript/code/src/shared/traversal_strategy_plan.ts
+  - build_tenants/typescript/code/src/workspace/source_input.ts
+  - build_tenants/typescript/code/src/workspace/bootstrap_lineage.ts
+  - build_tenants/typescript/code/src/projection/requirement_closure.ts
   - build_tenants/typescript/test_env/live/test_t132_hello_world_single_tenant_live_build.test.mjs
   - build_tenants/typescript/test_env/tests/
 intake_source: 2026-05-11 F_D-overreach review against PRODUCT.md Technology Capability Asset law and current T-143 product-authority correction.
@@ -137,6 +141,8 @@ transform chain.
 5. Preserve noncanonical F_P authority lineage:
    - replace ticket/test-specific requirement marker gates with content and
      authority-contract assertions;
+   - update `workspace/source_input.ts` and `workspace/bootstrap_lineage.ts` so
+     requirement authority is not limited to `RF-*` / `REQ-*` marker spelling;
    - extend requirement extraction to preserve parseable requirement sections
      even when IDs are local (`R-01`, numbered headings, or other project-local
      forms);
@@ -197,18 +203,74 @@ Validation:
 - `npm run test:t143` passed 7/7.
 - `npm run test:t077-t083` passed 15/15.
 
-Remaining T-144 scope:
+## Implemented Requirement-Lineage Slice
 
-- Align semantic contradiction verdicts with `design_reframe` / reprice
-  semantics.
-- Finish the component-depth mixed-state cleanup for non-data-mapper-blocking
-  open-gap/operator-blocked edge cases.
-- Move ADR field grammar and ecosystem build/test discovery patterns behind
-  declared tenant/capability surfaces without removing deterministic path,
-  digest, existence, and containment checks.
-- Repair the T-132/T-143 requirement-lineage extraction boundary so
-  noncanonical but parseable F_P authority output preserves downstream
-  transformation pressure instead of becoming a no-action projection.
+Landed on 2026-05-11:
+
+- `workspace/source_input.ts` now detects local requirement authority headings on
+  requirement surfaces, including `R-01` style headings and numbered requirement
+  headings when no canonical `REQ-*` / `RF-*` marker exists.
+- `workspace/bootstrap_lineage.ts` imports those local markers as
+  `SdlcImportedRequirementAuthority` rows and derives normal
+  `SdlcRequirementTransformAuthority` refs for replay-visible lineage.
+- `projection/requirement_closure.ts` already consumed imported authority rows,
+  so local IDs now flow through requirement closure without a separate projection
+  path.
+- The T-132 assertion now checks parseable requirement authority headings and
+  required content anchors instead of requiring ticket-specific `REQ-T132`
+  spelling.
+
+Validation:
+
+- `npm run test:t031` passed 4/4, including local `R-01` / `R-02` import and
+  transform-authority proof.
+- `npm run test:t035` passed 6/6, including requirement closure over local IDs.
+- `npm run test:t036` passed 14/14.
+- `npm run test:t132` passed its non-live assertions; the live lane remains
+  env-gated by `ODD_SDLC_TS_T132_HELLO_WORLD_SINGLE_TENANT_LIVE=1`.
+
+## Implemented Closure Slice
+
+Landed on 2026-05-11:
+
+- `assurance/semantic_convergence.ts` now returns `reprice_required` when a
+  semantic contradiction carries `design_reframe`, instead of advertising reprice
+  re-entry while producing a blocked verdict.
+- `assurance/component_depth.ts` now routes failed-test attribution gaps,
+  low-confidence attribution, blocked test rows without admitted failure rows, and
+  repair-schedule `triage_gap` through `repair_worker_output`, preserving them as
+  repair pressure rather than mixed `open_gap` / `operator_blocked` state.
+- `operator/handoff.ts` no longer treats ADR required-field strings or SBT
+  discoverability grammar as core postflight F_D blockers. The worker prompt still
+  carries the ADR directive, and deterministic mechanics remain enforced: output
+  path, allowed root, file existence, digest, byte count, tenant containment, and
+  relative-path integrity.
+- Product-file role inference now prefers declared product authority and declared
+  technology context for build config recognition, and otherwise treats
+  worker-reported roles as the product-semantics carrier. The core observer keeps
+  fallback heuristics only for framework-generated reports.
+- Noncanonical requirement IDs are currently resolved by imported local authority
+  refs and transform-authority refs. That is sufficient observability for the
+  current live lanes; a dedicated nonblocking hygiene projection is not required
+  for T-144 closure.
+
+Validation:
+
+- `npm run build:semantic` passed.
+- `npm run test:t066` passed 32/32.
+- `npm run test:t143` passed 12/12.
+- `npm run test:t077-t083` passed 15/15.
+- `node --test test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs` passed
+  17/17.
+- `node --test test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs`
+  passed 9/9.
+- `npm run test:t031` passed 4/4.
+- `npm run test:t035` passed 6/6.
+- `npm run test:t036` passed 14/14.
+- `npm run test:t123` passed 11/11.
+- `npm run test:t132` passed its non-live assertions; the live lane remained
+  skipped because `ODD_SDLC_TS_T132_HELLO_WORLD_SINGLE_TENANT_LIVE=1` was not set.
+- `git diff --check` passed.
 
 ## Default Full-Wave Addendum - 2026-05-11
 

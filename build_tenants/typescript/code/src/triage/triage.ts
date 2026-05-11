@@ -30,6 +30,7 @@ import {
 } from "./policy.js";
 
 const EMPTY_RUNTIME_EVENT_KINDS: readonly [] = Object.freeze([]);
+const EMPTY_LINEAGE_AUTHORITY_REFS: readonly string[] = Object.freeze([]);
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
@@ -163,7 +164,7 @@ function transformLineageFor(input: {
           transformAuthorityByRequirementId.get(entry.requirementId) ?? null;
         const lineageAuthorityRefs =
           transformAuthority === null
-            ? Object.freeze([] as string[])
+            ? EMPTY_LINEAGE_AUTHORITY_REFS
             : uniqueSorted([
                 transformAuthority.transformRef,
                 transformAuthority.transformInputAuthorityRef,

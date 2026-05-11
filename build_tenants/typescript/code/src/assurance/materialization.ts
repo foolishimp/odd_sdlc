@@ -12,8 +12,6 @@ import { assuranceLedger, assuranceReason, verdictFromReasons } from "./shared.j
 
 const MATERIALIZATION_CONTRACT_VIOLATIONS = Object.freeze([
   "adr_output_filename_invalid",
-  "adr_output_required_field_missing",
-  "adr_output_status_invalid",
   "materialized_product_relative_path_mismatch",
   "materialized_product_relative_path_absolute",
   "materialized_product_file_is_output_artifact",

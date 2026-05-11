@@ -67,22 +67,23 @@ function statusFor(input: {
   readonly missingRequiredDimensions: readonly SdlcAssuranceLedgerDimension[];
   readonly ledgers: readonly SdlcAssuranceLedger[];
 }): SdlcTraversalRequirementSatisfactionStatus {
+  const gatingLedgers = input.ledgers.filter((ledger) => ledger.required !== false);
   if (input.missingRequiredDimensions.length > 0) {
     return "blocked";
   }
-  if (input.ledgers.some((ledger) => ledger.verdict === "blocked")) {
+  if (gatingLedgers.some((ledger) => ledger.verdict === "blocked")) {
     return "blocked";
   }
-  if (input.ledgers.some((ledger) => ledger.verdict === "reprice_required")) {
+  if (gatingLedgers.some((ledger) => ledger.verdict === "reprice_required")) {
     return "reprice_required";
   }
-  if (input.ledgers.some((ledger) => ledger.verdict === "fp_escalation")) {
+  if (gatingLedgers.some((ledger) => ledger.verdict === "fp_escalation")) {
     return "fp_escalation";
   }
-  if (input.ledgers.some((ledger) => ledger.verdict === "open_gap")) {
+  if (gatingLedgers.some((ledger) => ledger.verdict === "open_gap")) {
     return "retry_same_edge";
   }
-  if (input.ledgers.length === 0) {
+  if (gatingLedgers.length === 0) {
     return "not_applicable";
   }
   return "close_allowed";
@@ -98,19 +99,22 @@ export function foldSdlcAssuranceLedgers(
   const missingRequiredDimensions = Object.freeze(
     requiredDimensions.filter((dimension) => !ledgerDimensions.has(dimension))
   );
+  const gatingLedgers = Object.freeze(
+    input.ledgers.filter((ledger) => ledger.required !== false)
+  );
   const missingReasons = missingRequiredReasons(missingRequiredDimensions);
   const blockedReasons = Object.freeze([
     ...missingReasons,
-    ...reasonsForVerdict(input.ledgers, "blocked")
+    ...reasonsForVerdict(gatingLedgers, "blocked")
   ]);
-  const repriceReasons = reasonsForVerdict(input.ledgers, "reprice_required");
+  const repriceReasons = reasonsForVerdict(gatingLedgers, "reprice_required");
   const gapReasons = Object.freeze(
-    reasonsForVerdict(input.ledgers, "open_gap").filter(
+    reasonsForVerdict(gatingLedgers, "open_gap").filter(
       (reason) => reason.lawfulReentryPoint !== "escalate_to_fp"
     )
   );
   const fpEscalationReasons = reasonsForLawfulReentry(
-    input.ledgers,
+    gatingLedgers,
     "escalate_to_fp"
   );
   const retryReasonCodes = Object.freeze(
@@ -124,7 +128,7 @@ export function foldSdlcAssuranceLedgers(
     )
   );
   const retryEvidenceRefs = uniqueSorted(
-    input.ledgers.flatMap((ledger) => [
+    gatingLedgers.flatMap((ledger) => [
       ...ledger.evidenceRefs,
       ...ledger.reasons.flatMap((reason) => reason.evidenceRefs)
     ])

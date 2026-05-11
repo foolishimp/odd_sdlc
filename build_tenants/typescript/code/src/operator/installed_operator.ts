@@ -139,6 +139,7 @@ import {
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
 const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 5;
+const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
 export type SdlcInstalledReentryDisposition = "retry" | "yield" | "other";
 
@@ -2285,7 +2286,7 @@ function postProductMaterializationCandidateFor(input: {
   const scopeScheduleRef = input.scopeScheduleRef ?? null;
   const scopePath =
     scopeModuleName === null
-      ? Object.freeze([] as string[])
+      ? EMPTY_SCOPE_PATH
       : Object.freeze(["scope", encodeURIComponent(scopeModuleName)]);
   const targetOutcomeRef = [
     "target-outcome://odd-sdlc/post-action",

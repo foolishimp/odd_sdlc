@@ -4,7 +4,7 @@ State the current overriding concerns for `odd_sdlc` in present tense.
 
 Use the shared method surfaces under
 `/Users/jim/src/apps/specification_methodology/specification/standards/` as the
-governing standards while you fill this document out.
+governing standards while this document is maintained.
 
 ## Position
 
@@ -12,113 +12,103 @@ Goals focus one bounded wave of work.
 
 They are narrower than product definition and shorter-lived than intent.
 
-They keep the current repricing and closure work oriented without turning
-temporary focus into accidental constitutional law.
+They keep current repricing and closure work oriented without turning temporary
+focus into accidental constitutional law.
 
 ## Current Goals
 
-- open the `odd_sdlc.TS` build line as an ODD-native tenant that uses graph
-  functions as programs, ABG as runtime truth, Python as discovery evidence,
-  and ABIogenesis TypeScript as substrate proof rather than as a finished SDLC
-  product
-- close the current TypeScript feature gap against the successful
-  `data_mapper.test35` Python processing loop, using the Final Uplift Table in
-  `.ai-workspace/comments/codex/20260509_test35_capability_gap_computational_breakdown.md`
-  as the current-wave operational driver while keeping specification and
-  ratified design as the constitutional authority
-- ratify and implement the current odd_sdlc repair wave as a strict inside-out
-  migration over live inherited-workspace bug reproducers rather than as
-  prompt folklore, bridge surfaces, or compatibility facades
-- keep one truthful closure model across the software-domain chain: no mixed
-  fulfillment carriers for comparable requirement-bearing constructive lanes,
-  no facade projections that disagree with live deterministic or admitted
-  truth, and no duplicate operator stories
-- keep the current `odd_sdlc` wave focused on truthful gap analysis, lawful
-  re-entry, requirement/design traceability publication, and inherited-workspace
-  qualification
-- keep inherited-workspace qualification centered on live bug reproducers for
-  the active software-domain package rather than on template lore or one-off
-  operator memory
+- complete the T-143 validation handoff without pre-claiming closure: the
+  validation-owning session decides whether the conformed-authority product
+  target-contract repair is closed
+- prepare the axiomatic-setting wave for the TypeScript line so it can execute
+  after the T-143 validation result: one truth surface, replay-visible
+  ledger/event authority, evaluator output admitted back into ledger/event truth,
+  and no rival closure or routing paths
+- preserve the W/L/E/Ev governed-work pair as the current wave's controlling
+  design algebra:
+  - W is the mutable workspace under construction
+  - L is the immutable governed ledger of work over W
+  - E is the immutable event log / replay spine
+  - Ev is evaluator work over L whose output must itself be admitted into L/E
+- delete old authority-producing paths when replacement is required; do not keep
+  bridge authority, lower-priority fallbacks, compatibility facades, or shadow
+  tracker truth beside the admitted consequence chain
+- make installed-runner continuation consume only
+  `SdlcEdgeFulfillmentLedger -> SdlcEdgeClosureDecision -> SdlcNextActionProjection`
+  after work output is admitted
+- make domain defaults, catalog lookup, requirement identity, product target
+  binding, materialization role policy, and assurance predecessor attention
+  replay-visible before treating follow-on proof lanes as authoritative
 - keep GTL and ABG substrate ownership explicit and small while `odd_sdlc`
-  carries software-domain semantics on the live `odd_sdlc` line
-- complete odd_sdlc-side adoption of the ABG operator and fulfillment substrate
-  by repricing domain operator surfaces around `start` / `gaps`, publishing
-  lawful target routing for ticket and asset starts, and removing remaining
-  mixed tracker or mixed command truth
+  carries software-domain semantics, policy overlays, query overlays, and proof
+  interpretation on the live TypeScript line
 - keep stateful builder behavior grounded in the enduring asset under
-  construction so generic builder prompts preserve satisfied structure and
-  repair only unmet requirement deltas unless deterministic truth lawfully
-  widens scope
-- use full-wave transformation as the default delivery strategy for unqualified
-  `odd_sdlc` operation until steel-thread traversal has live proof across
-  conformance, downstream pressure, product materialization, bounded retry/yield,
-  and lineage replay; steel-thread remains an explicit qualified lane, not the
-  default live-parity path
-- dogfood the current ticket execution discipline into prompt-bearing surfaces
-  so constructive edge traversal and gap-analysis prompts consume published
-  execution contracts and gap dossiers rather than ad hoc section assembly
-- apply strict inside-out sequencing in this wave: publish and admit new
-  authoritative source carriers before downstream dossier, prompt, projection,
-  or review-surface consumers, and do not let downstream closure claims run
-  ahead of the source migration
-- ratify declarative operational state transitions as explicit command,
-  admitted-result, and projected-state law rather than as ambient release
-  appendages
-- keep `odd_service` incubation subordinate to current ABG runtime truth and
-  `odd_sdlc` domain law
-- keep current-wave changes traceable back to the live intent, product, and
-  requirement surfaces before they are treated as closed
-- keep one-truth migration discipline explicit in this wave:
-  - no bridge authority
-  - no compatibility facades as closure evidence
-  - no shadow tracker beside the admitted domain ledger / closure family
+  construction so F_P work repairs unmet obligation deltas without widening scope
+  from worker prose, archive summaries, hidden defaults, or local runner memory
+- keep current-wave changes traceable back to live intent, product, requirement,
+  design, ticket, and replay evidence before they are treated as closed
+- keep T-131 as a separate guided OddChat live-build lane; it does not displace
+  the T-145 through T-154 axiomatic and parity wave
 
-## Current Ticket Sequence
+## Current Work-Wave Sequence
 
-The current wave preserves this inside-out ticket sequence so the feature-gap
-closure path is not lost:
+The completed base for this wave is:
 
-1. Treat T-109 and T-134 through T-140 as the completed carrier, conformance,
+1. T-109 and T-134 through T-140 provide the completed carrier, conformance,
    evaluator, target-binding, public-gap, and local-iteration retirement base.
-2. Treat T-132 and T-133 as completed single-tenant live calibration lanes for
+2. T-132 and T-133 provide completed single-tenant live calibration lanes for
    JavaScript and Rust hello-world product materialization.
-3. Treat T-142 as completed proof that the runner can progress from authority
-   conformance and transformation-set pressure to product materialization
-   through the traversal consequence chain.
-4. Treat T-141 as completed transform-boundary closure: requirements are a
-   downstream transformation set for product materialization, not proof that
-   the requirement/authority edge failed.
-5. Re-enter T-004 next for the remaining `test35` parity gap: homeostatic
-   semantic gap triage and lawful renewal into implementation, design,
-   requirements, goals, or intent.
-6. Continue T-002 as the prompt/control-frame discipline: stateless graph and
-   F_P functions over an observed stateful worksite, with exact worksite,
-   obligation, target-binding, and product-proof refs instead of duplicated
-   serialized context.
-7. Keep T-131 as a separate guided odd_chat live-build lane; it must not
-   displace the `test35` feature-gap closure sequence.
+3. T-141 closes the transform-boundary rule: requirements are a downstream
+   transformation set for product materialization, not proof that the producing
+   authority edge failed.
+4. T-142 proves autonomous bounded product materialization from the consequence
+   chain.
+5. T-143 closes the conformed-authority product target-contract framework
+   repair on the authoritative internal controlled data_mapper lane.
+6. T-144 closes the immediate F_D-overreach and tenant grammar boundary repair.
+
+With T-143 validation closed, the current executable order is axiomatic first,
+proof second:
+
+1. T-145: delete rival closure/report authority so one truth surface governs
+   closure, routing, retry, repair, re-entry, reprice, block, and next action.
+2. T-151: make the installed runner sovereign over the consequence chain.
+3. T-150: make defaults and catalog lookup visible, versioned, and replayable.
+4. T-148: stabilize local requirement authority refs so display IDs cannot
+   collapse source truth.
+5. T-147: move product-file role satisfaction and exact target binding into
+   declared target/capability policy.
+6. T-146: add assurance predecessor refs and a closed F_D mechanics class.
+7. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
+8. T-152: prove data_mapper-scale transformation-set partition after identity,
+   target, and runner authority are lawful.
+9. T-153: prove live or live-equivalent non-close dispositions from admitted
+   evidence and replay-visible closure/evaluator truth.
+10. T-154: prove source/specification-only data_mapper parity without an explicit
+    product-materialization harness target.
 
 ## Current Computational Target
 
 The current TypeScript line must converge on this loop:
 
 ```text
-observe current worksite
--> bind missing or required work to current edge obligations
+observe mutable W
+-> bind missing or required work to exact target obligations
 -> rank only published lawful graph actions
 -> admit selected construction intent
--> invoke the bounded F_P worker/action
--> admit worker/process/product evidence
+-> invoke the bounded F_P worker/action in W
+-> admit worker/process/product evidence into L
+-> anchor L entries through E predecessor refs
 -> publish SdlcEdgeFulfillmentLedger
--> compute edgeConverged = carry && fulfillment && admitted
 -> decide close / yield / retry / repair / re-enter / reprice / block
+-> run Ev only over a declared reachable L snapshot
+-> admit Ev output back into L/E
 -> continue from replay-visible SdlcNextActionProjection state
 ```
 
-Existing registers, counters, summaries, manifests, and gap dossiers are
-evidence sources or read models. They must be retired or repurposed wherever
-they imply closure, routing, retry, repair, re-entry, or next-action authority
-outside the admitted ledger / closure decision / evaluator projection chain.
+Existing registers, counters, summaries, manifests, gap dossiers, archives, and
+worker reports are not closure or routing truth. If they remain, they are raw
+evidence or projections generated from the single governing consequence surface.
 
 ## Current Trace Boundary
 
@@ -134,6 +124,7 @@ This wave reads current invariant truth from:
 - `specification/requirements/13-odd-sdlc-typescript-tenant.md`
 - `specification/requirements/14-odd-sdlc-installed-product-contract.md`
 - `specification/requirements/15-odd-sdlc-scheduling-phase.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md`
 
 `specification/requirements/08-odd-sdlc-first-slice.md` remains superseded
 provenance only. It is not current operative law for this wave unless an active
@@ -142,13 +133,13 @@ requirement explicitly carries a retained obligation forward.
 This wave also reads current operational sequencing and review evidence from:
 
 - `.ai-workspace/comments/codex/20260509_test35_capability_gap_computational_breakdown.md`
-- `.ai-workspace/tickets/active/T-002-refactor-odd-sdlc-from-pure-function-builder-framing-to-stateful-iterator.md`
-- `.ai-workspace/tickets/active/T-004-restore-homeostatic-gap-triage-and-intent-renewal.md`
+- `.ai-workspace/comments/codex/20260511T012031Z_STRATEGY_t144_follow_on_fd_overreach_next_steps.md`
+- `.ai-workspace/comments/codex/20260511T025029Z_DESIGN_REVIEW_current_and_proposed_ledgers.md`
 - `.ai-workspace/tickets/completed/T-109-publish-authoritative-edge-ledger-lineage-chain-for-typescript-traversal-parity.md`
 - `.ai-workspace/tickets/completed/T-132-create-hello-world-single-tenant-live-proof-lane.md`
 - `.ai-workspace/tickets/completed/T-133-create-minimum-overhead-rust-hello-world-live-lane.md`
 - `.ai-workspace/tickets/completed/T-134-conform-project-authority-from-defined-workspace.md`
-- `.ai-workspace/tickets/completed/T-135-realize-evaluator-owned-runner-traversal-spine.md`
+- `.ai-workspace/tickets/completed/T-135-realize-evaluator-owned-runner-spine.md`
 - `.ai-workspace/tickets/completed/T-136-add-yield-closure-disposition-and-resume-basis.md`
 - `.ai-workspace/tickets/completed/T-137-enforce-target-obligation-binding-and-published-action-law.md`
 - `.ai-workspace/tickets/completed/T-138-preserve-causal-chain-and-replayability-for-traversal-consequence.md`
@@ -156,16 +147,28 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-140-retire-local-forced-iteration-tech-debt.md`
 - `.ai-workspace/tickets/completed/T-141-restore-gtl-transform-boundary-for-requirement-to-product-materialization.md`
 - `.ai-workspace/tickets/completed/T-142-prove-autonomous-product-materialization-from-consequence-chain.md`
+- `.ai-workspace/tickets/completed/T-143-derive-product-materialization-targets-from-conformed-authority.md`
+- `.ai-workspace/tickets/completed/T-144-reclassify-repairable-assurance-and-tenant-grammar-boundaries.md`
+- `.ai-workspace/tickets/backlog/T-145-replay-visible-closure-and-worker-report-authority-deletion.md`
+- `.ai-workspace/tickets/backlog/T-146-assurance-carrier-predecessor-refs-and-closed-fd-class.md`
+- `.ai-workspace/tickets/backlog/T-147-tenant-role-policy-for-product-materialization.md`
+- `.ai-workspace/tickets/backlog/T-148-collision-safe-local-requirement-authority-refs.md`
+- `.ai-workspace/tickets/backlog/T-149-assurance-reentry-outlier-cleanup.md`
+- `.ai-workspace/tickets/backlog/T-150-visible-defaults-and-published-catalog-lookup-discipline.md`
+- `.ai-workspace/tickets/backlog/T-151-one-closed-computational-loop-and-runner-evaluator-sovereignty.md`
+- `.ai-workspace/tickets/backlog/T-152-data-mapper-scale-transformation-set-partition-proof.md`
+- `.ai-workspace/tickets/backlog/T-153-live-non-close-disposition-parity-proof.md`
+- `.ai-workspace/tickets/backlog/T-154-no-harness-target-data-mapper-parity-proof.md`
 
 ## Boundary
 
 This file does not define:
 
 - future product end-state expansion
-- detailed acceptance criteria for ambiguity, closure, capability, or
-  traceability
-- proving-lane plans such as named test-wave completion targets
+- detailed acceptance criteria for each ticket
+- test-wave implementation plans
+- release-cut qualification
 - supporting strategy for later repricing
 
-Those belong in the current product and requirement surfaces, or in
-commentary/ticket layers until they are ratified.
+Those belong in product, requirement, design, ticket, and commentary layers until
+they are ratified into the appropriate constitutional surface.

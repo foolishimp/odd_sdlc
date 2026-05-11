@@ -112,6 +112,21 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
   const decisionRef =
     input.decisionRef ??
     `closure-decision://t058/${input.name ?? "post-close"}`;
+  const graphFunctionName =
+    input.graphFunctionName ?? FG_MATERIALIZE_DECLARED_PRODUCT_ASSET;
+  writeFileSync(
+    path.join(archiveRoot, "worker_invocation_package.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_worker_invocation_package",
+        graphFunctionName,
+        edgeName: graphFunctionName
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   writeFileSync(
     path.join(archiveRoot, "sdlc_edge_closure_decision.json"),
     `${JSON.stringify(
@@ -119,6 +134,29 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
         kind: "sdlc_edge_closure_decision",
         decisionRef,
         disposition: "close"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_edge_fulfillment_ledger",
+        ledgerRef: `ledger://t058/${input.name ?? "post-close"}`,
+        ledgerVersionRef: `ledger-version://t058/${input.name ?? "post-close"}/1`,
+        counts: {
+          expected: 1,
+          fulfilled: 1,
+          partial: 0,
+          blocked: 0,
+          unfulfilled: 0,
+          missing: 0,
+          extra: 0
+        },
+        edgeConverged: true
       },
       null,
       2
@@ -139,8 +177,9 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
           input.nextActionProjectionRef ??
           "construction-priority-projection://t058/post-close/materialize",
         nextGraphFunctionRef:
-          input.nextGraphFunctionRef ??
-          `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`,
+          input.nextGraphFunctionRef === undefined
+            ? `graph-function:odd_sdlc:${graphFunctionName}`
+            : input.nextGraphFunctionRef,
         predecessorRefs: input.predecessorRefs ?? [decisionRef]
       },
       null,
@@ -211,6 +250,38 @@ test("T-058 newer terminal post-close projection prevents stale next-action repl
   assert.notEqual(
     result.payload.start.executionContract.targetGraphFunction,
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+});
+
+test("T-143 terminal closed materialization archive retires stale public gap edge", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    name: "20260510T000200000Z_pid3",
+    graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    choosesNextTraversal: false,
+    selectedActionRef: null,
+    nextGraphFunctionRef: null
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    `graph_function:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.payload.projection.status, "converged");
+  assert.equal(result.payload.projection.currentEdge, null);
+  assert.equal(result.payload.dossier.status, "converged");
+  assert.equal(result.payload.dossier.edge, null);
+  assert.equal(result.payload.dossier.bestGraphFunctionRef, null);
+  assert.deepEqual(result.payload.dossier.nextLawfulActions, ["close_or_reprice"]);
+  assert(
+    result.payload.dossier.rankingReasonRefs.includes(
+      `terminal_closed_edge_replayed:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    )
   );
 });
 
