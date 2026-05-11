@@ -40,6 +40,7 @@ function ledger(dimension, verdict, input = {}) {
     verdict,
     reasons: input.reasons ?? [],
     evidenceRefs: input.evidenceRefs ?? [],
+    predecessorRefs: input.predecessorRefs ?? [`proof://${dimension}/${verdict}`],
     carryForwardObligationRefs: input.carryForwardObligationRefs ?? []
   });
 }
@@ -386,7 +387,10 @@ test("T-084 folds real outputs from every assurance dimension", () => {
   const requirement = deriveRequirementFulfillmentAssuranceLedger({
     closureRegister: fulfilledClosureRegister()
   });
-  const ambiguity = deriveAmbiguityAssuranceLedger({ findings: [] });
+  const ambiguity = deriveAmbiguityAssuranceLedger({
+    findings: [],
+    predecessorRefs: ["proof://ambiguity/no-findings"]
+  });
   const capability = deriveCapabilityAssuranceLedger({
     requiredCapabilities: [
       {

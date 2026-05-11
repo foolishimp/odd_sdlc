@@ -16,6 +16,7 @@ export interface SdlcSemanticConvergenceClaim {
   readonly targetRef: string;
   readonly status: SdlcSemanticClaimStatus;
   readonly evidenceRefs: readonly string[];
+  readonly predecessorRefs?: readonly string[];
 }
 
 function isSemanticConvergenceClaim(
@@ -56,6 +57,7 @@ export function deriveSemanticConvergenceAssuranceLedger(input: {
       assuranceReason({
         code: `semantic_claim_missing:${targetRef}`,
         message: `No semantic convergence claim exists for ${targetRef}.`,
+        predecessorRefs: [targetRef],
         lawfulReentryPoint: "same_edge_retry"
       })
     ),
@@ -64,6 +66,10 @@ export function deriveSemanticConvergenceAssuranceLedger(input: {
         code: `semantic_${claim.status}:${claim.targetRef}`,
         message: `Semantic convergence for ${claim.targetRef} is ${claim.status}.`,
         evidenceRefs: claim.evidenceRefs,
+        predecessorRefs: Object.freeze([
+          claim.targetRef,
+          ...(claim.predecessorRefs ?? claim.evidenceRefs)
+        ]),
         lawfulReentryPoint:
           claim.status === "contradicted" ? "design_reframe" : "same_edge_retry"
       })
@@ -83,6 +89,13 @@ export function deriveSemanticConvergenceAssuranceLedger(input: {
           : "satisfied",
     reasons,
     evidenceRefs: uniqueSorted(input.claims.flatMap((claim) => claim.evidenceRefs)),
+    predecessorRefs: uniqueSorted([
+      ...input.targetRefs,
+      ...input.claims.flatMap((claim) => [
+        ...(claim.predecessorRefs ?? claim.evidenceRefs),
+        ...claim.evidenceRefs
+      ])
+    ]),
     carryForwardObligationRefs: uniqueSorted(
       reasons.map((reason) => `semantic://${reason.code}`)
     )

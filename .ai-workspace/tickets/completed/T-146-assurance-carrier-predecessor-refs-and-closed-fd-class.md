@@ -6,7 +6,7 @@ ticket_category: implementation_migration
 migration_strategy: inside_out_hard_break
 library_usage: extend_existing_assurance_carriers_and_gates
 governing_library: odd_sdlc TypeScript assurance carriers, assurance gates, and ODD_METHOD A1a/A1b/A13/A13a
-status: backlog
+status: completed
 goal: typescript-test35-parity-follow-on
 build_tenant: typescript
 owner: odd_sdlc
@@ -19,6 +19,7 @@ execution_order: 6
 execution_order_reason: Sets assurance attention and closed F_D law after identity and target authority exist.
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+completed_at: 2026-05-11
 governance_scope: STDO Method
 ledger_ruling: evolves_old_with_new_closed_fd_class
 authority_ruling:
@@ -136,6 +137,47 @@ Run from `build_tenants/typescript`:
 - `node --test test_env/tests/test_t084_assurance_ledger_composition.test.mjs`
 - `node --test test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs`
 - Add and run a focused `test_env/tests/test_t146_assurance_predecessor_refs.test.mjs`.
+
+## Closure Evidence
+
+Completed on 2026-05-11.
+
+Implementation changed assurance ledgers from verdict-only summaries into
+replayable assurance carriers:
+
+- `SdlcAssuranceLedger` and `SdlcAssuranceLedgerReason` now carry
+  `predecessorRefs` and a `fdMechanicsClassRef`.
+- The closed F_D mechanics class is named as
+  `fd-mechanics://odd-sdlc/assurance/closed-fd-mechanics/v1` and enumerates the
+  allowed deterministic mechanics: carrier shape, ref resolution, path
+  containment, file existence, digest or byte-count validation,
+  replay/predecessor completeness, declared deterministic validator result, and
+  required evidence presence.
+- `foldSdlcAssuranceLedgers` blocks required/governing assurance ledgers that
+  lack predecessor refs or do not cite the closed F_D mechanics class.
+- Semantic convergence claims may carry admitted evaluator predecessor refs;
+  the deterministic fold consumes the admitted claim status and does not
+  rejudge semantic fulfillment from ambient content.
+- Ambiguity and semantic convergence derivations expose explicit predecessor
+  inputs where the judged fact is outside local file evidence.
+
+Regression coverage:
+
+- `test_t146_assurance_predecessor_refs.test.mjs` proves missing predecessor
+  refs fail closed, operator assurance gate ledgers carry replay refs,
+  component-depth assurance cites artifact predecessors and the closed F_D
+  class, and semantic convergence consumes an admitted evaluator fact.
+- `test_t084_assurance_ledger_composition.test.mjs` was updated so hand-built
+  fold fixtures carry predecessor refs.
+
+Verification from `build_tenants/typescript`:
+
+- `npm run build:semantic` passed.
+- `npm run test:t146` passed.
+- `node --test test_env/tests/test_t077_t083_assurance_ledgers.test.mjs` passed.
+- `node --test test_env/tests/test_t084_assurance_ledger_composition.test.mjs` passed.
+- `node --test test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs` passed.
+- `npm run test:semantic` passed on 2026-05-11 with 404 tests, 0 failures.
 
 ## Non-Closure Conditions
 

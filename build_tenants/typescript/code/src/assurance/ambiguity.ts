@@ -51,11 +51,13 @@ function lawfulReentryPointFor(finding: SdlcAmbiguityFinding) {
 
 export function deriveAmbiguityAssuranceLedger(input: {
   readonly findings: readonly SdlcAmbiguityFinding[];
+  readonly predecessorRefs?: readonly string[];
 }): SdlcAssuranceLedger {
   if (input.findings.length === 0) {
     return assuranceLedger({
       dimension: "ambiguity",
-      verdict: "satisfied"
+      verdict: "satisfied",
+      predecessorRefs: input.predecessorRefs ?? []
     });
   }
   const repriceFindings = input.findings.filter(isRepriceAmbiguity);
@@ -83,6 +85,10 @@ export function deriveAmbiguityAssuranceLedger(input: {
     }),
     reasons,
     evidenceRefs: uniqueSorted(input.findings.flatMap((finding) => finding.evidenceRefs)),
+    predecessorRefs: uniqueSorted([
+      ...(input.predecessorRefs ?? []),
+      ...input.findings.flatMap((finding) => finding.evidenceRefs)
+    ]),
     carryForwardObligationRefs: uniqueSorted(
       input.findings.map((finding) => `ambiguity://${finding.code}`)
     )

@@ -4,6 +4,7 @@
 
 import {
   SDLC_ASSURANCE_LEDGER_DIMENSIONS,
+  SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF,
   makeSdlcAssuranceLedgerReason,
   type SdlcAssuranceFoldInput,
   type SdlcAssuranceLedger,
@@ -57,18 +58,59 @@ function missingRequiredReasons(
       makeSdlcAssuranceLedgerReason({
         code: `missing_required_ledger:${dimension}`,
         message: `Missing required assurance ledger: ${dimension}`,
+        predecessorRefs: [SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF],
         lawfulReentryPoint: "operator_blocked"
       })
     )
   );
 }
 
+function predecessorCompletenessReasons(
+  ledgers: readonly SdlcAssuranceLedger[]
+): readonly SdlcAssuranceLedgerReason[] {
+  return Object.freeze(
+    ledgers.flatMap((ledger) => {
+      const reasons: SdlcAssuranceLedgerReason[] = [];
+      if (ledger.predecessorRefs.length === 0) {
+        reasons.push(
+          makeSdlcAssuranceLedgerReason({
+            code: `assurance_predecessor_refs_missing:${ledger.dimension}`,
+            message: `Required assurance ledger ${ledger.dimension} lacks predecessor refs for replay.`,
+            evidenceRefs: ledger.evidenceRefs,
+            predecessorRefs: [ledger.fdMechanicsClassRef],
+            lawfulReentryPoint: "operator_blocked"
+          })
+        );
+      }
+      if (ledger.fdMechanicsClassRef !== SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF) {
+        reasons.push(
+          makeSdlcAssuranceLedgerReason({
+            code: `assurance_fd_mechanics_class_invalid:${ledger.dimension}`,
+            message: `Required assurance ledger ${ledger.dimension} does not cite the closed F_D mechanics class.`,
+            evidenceRefs: ledger.evidenceRefs,
+            predecessorRefs: [
+              ledger.fdMechanicsClassRef,
+              SDLC_ASSURANCE_CLOSED_FD_MECHANICS_CLASS_REF
+            ],
+            lawfulReentryPoint: "operator_blocked"
+          })
+        );
+      }
+      return reasons;
+    })
+  );
+}
+
 function statusFor(input: {
   readonly missingRequiredDimensions: readonly SdlcAssuranceLedgerDimension[];
+  readonly predecessorCompletenessReasons: readonly SdlcAssuranceLedgerReason[];
   readonly ledgers: readonly SdlcAssuranceLedger[];
 }): SdlcTraversalRequirementSatisfactionStatus {
   const gatingLedgers = input.ledgers.filter((ledger) => ledger.required !== false);
   if (input.missingRequiredDimensions.length > 0) {
+    return "blocked";
+  }
+  if (input.predecessorCompletenessReasons.length > 0) {
     return "blocked";
   }
   if (gatingLedgers.some((ledger) => ledger.verdict === "blocked")) {
@@ -103,8 +145,10 @@ export function foldSdlcAssuranceLedgers(
     input.ledgers.filter((ledger) => ledger.required !== false)
   );
   const missingReasons = missingRequiredReasons(missingRequiredDimensions);
+  const predecessorReasons = predecessorCompletenessReasons(gatingLedgers);
   const blockedReasons = Object.freeze([
     ...missingReasons,
+    ...predecessorReasons,
     ...reasonsForVerdict(gatingLedgers, "blocked")
   ]);
   const repriceReasons = reasonsForVerdict(gatingLedgers, "reprice_required");
@@ -130,11 +174,16 @@ export function foldSdlcAssuranceLedgers(
   const retryEvidenceRefs = uniqueSorted(
     gatingLedgers.flatMap((ledger) => [
       ...ledger.evidenceRefs,
-      ...ledger.reasons.flatMap((reason) => reason.evidenceRefs)
+      ...ledger.predecessorRefs,
+      ledger.fdMechanicsClassRef,
+      ...ledger.reasons.flatMap((reason) => reason.evidenceRefs),
+      ...ledger.reasons.flatMap((reason) => reason.predecessorRefs),
+      ...ledger.reasons.map((reason) => reason.fdMechanicsClassRef)
     ])
   );
   const status = statusFor({
     missingRequiredDimensions,
+    predecessorCompletenessReasons: predecessorReasons,
     ledgers: input.ledgers
   });
 
@@ -147,6 +196,7 @@ export function foldSdlcAssuranceLedgers(
     repriceReasons,
     gapReasons,
     fpEscalationReasons,
+    predecessorCompletenessReasons: predecessorReasons,
     satisfiedDimensions: Object.freeze(
       input.ledgers
         .filter((ledger) => ledger.verdict === "satisfied")

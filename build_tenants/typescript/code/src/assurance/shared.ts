@@ -20,6 +20,8 @@ export function assuranceReason(input: {
   readonly code: string;
   readonly message: string;
   readonly evidenceRefs?: readonly string[];
+  readonly predecessorRefs?: readonly string[];
+  readonly fdMechanicsClassRef?: string;
   readonly lawfulReentryPoint: SdlcAssuranceLawfulReentryPoint;
 }): SdlcAssuranceLedgerReason {
   return makeSdlcAssuranceLedgerReason(input);
@@ -31,6 +33,8 @@ export function assuranceLedger(input: {
   readonly required?: boolean;
   readonly reasons?: readonly SdlcAssuranceLedgerReason[];
   readonly evidenceRefs?: readonly string[];
+  readonly predecessorRefs?: readonly string[];
+  readonly fdMechanicsClassRef?: string;
   readonly carryForwardObligationRefs?: readonly string[];
 }): SdlcAssuranceLedger {
   return makeSdlcAssuranceLedger(input);

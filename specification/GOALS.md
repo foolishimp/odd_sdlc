@@ -79,17 +79,18 @@ The completed base for this wave is:
 11. T-147 moves product-file role satisfaction and exact target binding into
     declared target/capability policy, with context expected-file state reduced
     to observation only.
+12. T-146 adds assurance predecessor refs and a closed F_D mechanics class so
+    governing assurance verdicts are replayable closure inputs.
 
-With T-147 closed, the current executable order remains axiomatic first, proof
+With T-146 closed, the current executable order remains axiomatic first, proof
 second:
 
-1. T-146: add assurance predecessor refs and a closed F_D mechanics class.
-2. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
-3. T-152: prove data_mapper-scale transformation-set partition after identity,
+1. T-149: clean up repairable-vs-no-basis assurance re-entry outliers.
+2. T-152: prove data_mapper-scale transformation-set partition after identity,
    target, and runner authority are lawful.
-4. T-153: prove live or live-equivalent non-close dispositions from admitted
+3. T-153: prove live or live-equivalent non-close dispositions from admitted
    evidence and replay-visible closure/evaluator truth.
-5. T-154: prove source/specification-only data_mapper parity without an explicit
+4. T-154: prove source/specification-only data_mapper parity without an explicit
    product-materialization harness target.
 
 ## Current Computational Target
@@ -155,7 +156,7 @@ This wave also reads current operational sequencing and review evidence from:
 - `.ai-workspace/tickets/completed/T-143-derive-product-materialization-targets-from-conformed-authority.md`
 - `.ai-workspace/tickets/completed/T-144-reclassify-repairable-assurance-and-tenant-grammar-boundaries.md`
 - `.ai-workspace/tickets/completed/T-145-replay-visible-closure-and-worker-report-authority-deletion.md`
-- `.ai-workspace/tickets/backlog/T-146-assurance-carrier-predecessor-refs-and-closed-fd-class.md`
+- `.ai-workspace/tickets/completed/T-146-assurance-carrier-predecessor-refs-and-closed-fd-class.md`
 - `.ai-workspace/tickets/completed/T-147-tenant-role-policy-for-product-materialization.md`
 - `.ai-workspace/tickets/completed/T-148-collision-safe-local-requirement-authority-refs.md`
 - `.ai-workspace/tickets/backlog/T-149-assurance-reentry-outlier-cleanup.md`
