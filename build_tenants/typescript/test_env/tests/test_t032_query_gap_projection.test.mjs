@@ -175,10 +175,10 @@ test("T-032 gaps and dossiers read ABI replay truth without emitting events", ()
     dossier.nextActionProjectionRef,
     /^construction-priority-projection:/
   );
-  assert.equal(dossier.bestGraphFunctionRef, basis.graphFunction.id);
+  assert.equal(dossier.bestGraphFunctionRef, basis.graphFunction.name);
   assert.equal(
     dossier.bestGraphVectorRef,
-    basis.graph.vectors[1].id
+    basis.graph.vectors[1].name
   );
   assert.deepStrictEqual(dossier.nextLawfulActions, [dossier.bestActionRef]);
   assert(

@@ -167,6 +167,68 @@ function retryManifest() {
   });
 }
 
+function outsidePathRetryManifest() {
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const root = workspaceRoot();
+  const detail =
+    "worker_stdout.log:1.message.content[0].input.path=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/code/src";
+  const reason = `worker_authority_read_outside_workspace:${detail}`;
+  return deriveWorkerHandoffManifest({
+    workspaceRoot: root,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 14,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 14,
+          targetAssetType: "component_code_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason,
+              reasonClass: "authority_to_code",
+              blockingReason: {
+                ...sdlcBlockingReasonFromLegacy({ reason }),
+                detail,
+                evidenceRefs: [],
+                lawfulReentryPoint: "same_edge_retry"
+              }
+            }
+          ],
+          evidenceRefs: [],
+          priorManifestId: "file:///tmp/t120/code-handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t120/code-gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t120-outside-path-retry"
+  });
+}
+
+function componentRealizationScheduleManifest() {
+  const contract = hookContractByEdgeName(
+    "derive_component_realization_schedule_surface"
+  );
+  return deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 13,
+    contract,
+    runId: "t120-component-realization-schedule"
+  });
+}
+
 function designRetryManifest() {
   const contract = hookContractByEdgeName("derive_implementation_module_surface");
   return deriveWorkerHandoffManifest({
@@ -480,6 +542,78 @@ test("T-120 component carrier retry instructions fail closed if schema fields ar
   assert.equal(instruction.repairScope, "schema_local");
   assert.notEqual(instruction.acceptedCarrierSchemaRef, null);
   assert(instruction.acceptedCarrierFieldSet.length >= 10);
+});
+
+test("T-120 retry prompts redact outside-workspace diagnostic paths", () => {
+  const files = writeHandoffFiles(outsidePathRetryManifest());
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+  const [instruction] = invocationPackage.retryRepairInstructions;
+  const directives = invocationPackage.outcomeDirectives.join("\n");
+
+  assert(instruction);
+  assert.doesNotMatch(directives, /\/Users\/jim\/src\/apps/u);
+  assert.doesNotMatch(instruction.reason, /\/Users\/jim\/src\/apps/u);
+  assert.doesNotMatch(instruction.blockingReasonDetail, /\/Users\/jim\/src\/apps/u);
+  assert.match(directives, /\[outside-workspace-path:src\]/u);
+  assert.match(instruction.blockingReasonDetail, /\[outside-workspace-path:src\]/u);
+  assert.doesNotMatch(prompt, /\/Users\/jim\/src\/apps/u);
+});
+
+test("T-120 component realization schedule prompt publishes admitted row schema", () => {
+  const files = writeHandoffFiles(componentRealizationScheduleManifest());
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes(
+        "componentRealizationRows with kind=sdlc_component_realization_row"
+      )
+    )
+  );
+  assert(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes("sourceAssetRefs")
+    )
+  );
+  assert.match(prompt, /componentRealizationRows with kind=sdlc_component_realization_row/u);
+  assert.match(prompt, /sourceAssetRefs/u);
+});
+
+test("T-120 component topology prompt declares publicBoundary as a string field", () => {
+  const files = writeHandoffFiles(retryManifest());
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes(
+        "componentTopologyRows with kind=sdlc_component_topology_row"
+      )
+    )
+  );
+  assert(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes("publicBoundary must be a string")
+    )
+  );
+  assert(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes(
+        "concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other"
+      )
+    )
+  );
+  assert.match(prompt, /publicBoundary must be a string/u);
+  assert.match(prompt, /node-entry-script/u);
+  assert.match(prompt, /concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other/u);
 });
 
 test("T-120 design-depth retries carry nested canonical attribute fields", () => {

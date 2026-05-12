@@ -7,7 +7,8 @@ import {
   admitExecutionBasis,
   admitResolvedPolicyIdentity,
   admitResolvedRuntimeIdentity,
-  admitStartIntent
+  admitStartIntent,
+  materializeGraphFunction
 } from "@abiogenesis/typescript-tenant";
 
 import {
@@ -23,6 +24,29 @@ import {
 
 const DATA_MAPPER_TARGET_BINDING =
   "target-binding://odd-sdlc/component_code_surface";
+const COMPONENT_CODE_PREREQUISITES = Object.freeze([
+  "implementation_component_topology_surface",
+  "component_realization_schedule_surface",
+  "implementation_stack_profile"
+]);
+
+function graphTrackRefs(module, graphFunctionName) {
+  const graphFunction = module.graphFunctions.find(
+    (candidate) => candidate.name === graphFunctionName
+  );
+  assert(graphFunction);
+  const vector = materializeGraphFunction(graphFunction).vectors[0];
+  assert(vector);
+  return {
+    graphFunctionRef: graphFunction.name,
+    graphVectorRef: vector.name,
+    publishedTraversalTargetRef: [
+      "published-traversal-target://odd-sdlc",
+      graphFunction.name,
+      vector.name
+    ].join("/")
+  };
+}
 
 function moduleBasis() {
   const module = constructSdlcGtlModule();
@@ -175,6 +199,7 @@ test("T-152 data_mapper-scale downstream obligations do not block local edge clo
 
 test("T-152 product materialization action is selected from downstream pressure and target binding", () => {
   const module = constructSdlcGtlModule();
+  const componentCodeTrack = graphTrackRefs(module, "derive_component_code_surface");
   const materializationAction = deriveSdlcPublishedProductMaterializationAction({
     module,
     downstreamTargetBindingRefs: [DATA_MAPPER_TARGET_BINDING]
@@ -193,11 +218,17 @@ test("T-152 product materialization action is selected from downstream pressure 
     module,
     runRef: "run://odd-sdlc/t152/data-mapper",
     downstreamPressureRefs: counts.downstreamPressureRefs,
-    downstreamTargetBindingRefs: counts.downstreamTargetBindingRefs
+    downstreamTargetBindingRefs: counts.downstreamTargetBindingRefs,
+    admittedAssetTypes: COMPONENT_CODE_PREREQUISITES
   });
   assert(action);
-  assert.equal(action.graphFunctionRef, materializationAction.graphFunctionRef);
-  assert.equal(action.graphFunctionRef?.endsWith(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET), true);
+  assert.equal(action.actionRef.includes(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET), true);
+  assert.equal(action.graphFunctionRef, componentCodeTrack.graphFunctionRef);
+  assert.equal(action.graphVectorRef, componentCodeTrack.graphVectorRef);
+  assert.equal(
+    action.publishedTraversalTargetRef,
+    componentCodeTrack.publishedTraversalTargetRef
+  );
   assert(action.eligibleReasonRefs.includes(
     `target_binding:${DATA_MAPPER_TARGET_BINDING}`
   ));
@@ -225,7 +256,7 @@ test("T-152 product materialization action is selected from downstream pressure 
     actions: [action]
   });
 
-  assert.equal(report.bestGraphFunctionRef, materializationAction.graphFunctionRef);
+  assert.equal(report.bestGraphFunctionRef, componentCodeTrack.graphFunctionRef);
   assert.deepEqual(report.nextLawfulActionRefs, [action.actionRef]);
   assert.equal(report.gapPressureRefs[0], "pressure://t152/data-mapper/downstream-transform-set");
   assert.equal(report.actionCatalog.rows[0].requiredAuthorityRefs[0], materializationAction.publishedActionRef);
@@ -237,6 +268,7 @@ test("T-152 unmatched downstream target binding does not select broad materializ
     module,
     runRef: "run://odd-sdlc/t152/unmatched",
     downstreamPressureRefs: ["downstream-transformation-set://odd-sdlc/REQ-DM-HARNESS"],
+    admittedAssetTypes: [],
     downstreamTargetBindingRefs: [
       "target-binding://odd-sdlc/unpublished_harness_target"
     ]

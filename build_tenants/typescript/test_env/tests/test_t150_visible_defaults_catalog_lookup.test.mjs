@@ -101,7 +101,7 @@ function customPrioritySchemeFor(basis) {
         weight: 1000,
         appliesToActionKinds: Object.freeze(["continue_graph_call"]),
         appliesToOutcomeRefs: Object.freeze([
-          `outcome://odd-sdlc/${basis.graphFunction.id}/${vector.target.id}`
+          `outcome://odd-sdlc/${basis.graphFunction.name}/${vector.target.id}`
         ]),
         sourcePolicyRef: "policy://t150/custom",
         strategyLabel: "t150_custom_priority"
@@ -195,6 +195,7 @@ function writeArchiveNextAction(workspace, nextGraphFunctionRef) {
         nextActionProjectionRef:
           "construction-priority-projection://t150/post-close/materialize",
         nextGraphFunctionRef,
+        nextGraphVectorRef: "vector:odd_sdlc:Fg_materialize_declared_product_asset",
         predecessorRefs: [decisionRef]
       },
       null,
@@ -273,13 +274,6 @@ test("T-150 archive next-action lookup requires a published catalog ref", () => 
     workspace
   ]);
 
-  assert.equal(result.status, "ok");
-  assert.notEqual(
-    result.payload.start.executionContract?.targetGraphFunction,
-    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
-  );
-  assert.equal(
-    result.payload.start.executionContract?.replayNextGraphFunctionRef ?? null,
-    null
-  );
+  assert.equal(result.status, "error");
+  assert.match(result.payload.error, /unknown_graph_function_boundary_ref/u);
 });

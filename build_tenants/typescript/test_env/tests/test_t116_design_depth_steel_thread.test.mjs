@@ -263,6 +263,29 @@ test("T-116 admits aggregate domain model and sunny-day sequence steel thread", 
   assert.equal(sequence.ledger.verdict, "satisfied");
 });
 
+test("T-116 aggregate domain model does not retry for downstream sunny-day flow", () => {
+  const downstreamOwnedFlowVerdict = {
+    ...satisfiedVerdict(),
+    flow: axis("flow", "partial", [
+      "Sunny-day sequence projection is owned by downstream derive_aggregate_sunny_day_sequence_surface."
+    ])
+  };
+  const { admission, ledger } = ledgerFor(
+    "aggregate_domain_model_surface",
+    aggregateDomainRegister(aggregateDomainModel(), downstreamOwnedFlowVerdict)
+  );
+
+  assert.equal(admission.status, "admitted");
+  assert(ledger);
+  assert.equal(ledger.verdict, "satisfied");
+  assert.equal(
+    ledger.reasons.some((reason) =>
+      reason.code === "design_completeness_flow_partial"
+    ),
+    false
+  );
+});
+
 test("T-116 blocks design completeness when an aggregate entity omits attributes", () => {
   const missingAttributeEntity = {
     kind: "sdlc_aggregate_domain_entity",

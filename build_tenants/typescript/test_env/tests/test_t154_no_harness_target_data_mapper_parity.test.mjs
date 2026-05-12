@@ -280,7 +280,12 @@ function authorityConsequence(context) {
     module: context.module,
     runRef: "run://odd-sdlc/t154/source-spec/no-harness",
     downstreamPressureRefs: ledger.downstreamPressureRefs,
-    downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs
+    downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs,
+    admittedAssetTypes: [
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
+      "implementation_stack_profile"
+    ]
   });
   assert(action);
   const evaluator = deriveOddSdlcEvaluateNextReport({
@@ -493,11 +498,15 @@ test("T-154 source/spec data_mapper pressure selects and replays product materia
   );
   assert.equal(
     authority.action.graphVectorRef,
-    context.componentCodeVector.id
+    context.componentCodeVector.name
   );
   assert.equal(
     authority.action.publishedTraversalTargetRef,
-    context.materializationAction.publishedActionRef
+    [
+      "published-traversal-target://odd-sdlc",
+      context.componentCodeGraphFunction.name,
+      context.componentCodeVector.name
+    ].join("/")
   );
   assert(
     authority.action.eligibleReasonRefs.some((ref) =>
@@ -522,7 +531,7 @@ test("T-154 source/spec data_mapper pressure selects and replays product materia
   );
   assert.equal(
     authority.nextActionProjection.nextGraphVectorRef,
-    context.componentCodeVector.id
+    context.componentCodeVector.name
   );
   assert.equal(
     authority.constructionIntent.selectedActionRef,
@@ -563,13 +572,15 @@ test("T-154 post-product materialization candidate requires source/spec pressure
     module: context.module,
     runRef: "run://odd-sdlc/t154/pressure-only",
     downstreamPressureRefs: ["requirement-authority://t154/source-spec"],
-    downstreamTargetBindingRefs: []
+    downstreamTargetBindingRefs: [],
+    admittedAssetTypes: []
   });
   const bindingOnly = deriveSdlcPostProductMaterializationActionInput({
     module: context.module,
     runRef: "run://odd-sdlc/t154/binding-only",
     downstreamPressureRefs: [],
-    downstreamTargetBindingRefs: [context.targetBinding.bindingRef]
+    downstreamTargetBindingRefs: [context.targetBinding.bindingRef],
+    admittedAssetTypes: []
   });
 
   assert.equal(pressureOnly, null);

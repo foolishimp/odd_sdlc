@@ -113,7 +113,7 @@ function graphTrackRefs(graphFunctionName) {
   assert(vector);
   return {
     graphFunctionRef: graphFunction.name,
-    graphVectorRef: vector.id
+    graphVectorRef: vector.name
   };
 }
 
@@ -311,7 +311,7 @@ test("T-145 archive-only terminal closure does not retire a public gap edge", ()
   assert.equal(result.payload.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
     result.payload.dossier.bestGraphFunctionRef,
-    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   assert.notDeepEqual(result.payload.dossier.nextLawfulActions, ["close_or_reprice"]);
   assert.equal(
@@ -424,10 +424,10 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
   );
   assert.equal(
     result.payload.dossier.bestGraphVectorRef,
-    "vector:odd_sdlc:Fg_conform_project_authority"
+    "Fg_conform_project_authority"
   );
   assert.deepEqual(result.payload.dossier.nextLawfulActions, [
-    "construction-action:graph-function:odd_sdlc:Fg_conform_project_authority:vector:odd_sdlc:Fg_conform_project_authority"
+    "construction-action:Fg_conform_project_authority:Fg_conform_project_authority"
   ]);
   assert(
     result.payload.dossier.rankingReasonRefs.includes(

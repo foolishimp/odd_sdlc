@@ -33,6 +33,7 @@ import {
   readWorkerResultReport,
   invokeOddSdlcSpecMethodCommand,
   runSdlcHookTurn,
+  serializeOddSdlcSpecMethodResult,
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
@@ -167,6 +168,31 @@ function writeTransformOnlyWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
+  const workerPath = path.join(
+    workspaceRoot,
+    "t064_invalid_component_topology_worker.mjs"
+  );
+  writeFileSync(
+    workerPath,
+    [
+      "import { createHash } from 'node:crypto';",
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import { dirname } from 'node:path';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "const register = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: 'implementation_component_topology_surface', componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }] };",
+      "const content = ['# implementation_component_topology_surface', '', '```json component_depth_register', JSON.stringify(register, null, 2), '```', ''].join('\\n');",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, content, 'utf8');",
+      "const digest = `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`;",
+      "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile], blockingReasons: [] }));",
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'invalid component topology register for assurance regression', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
 function writeSilentWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t064_silent_worker.mjs");
   writeFileSync(
@@ -186,6 +212,56 @@ function writeFailingWorkerScript(workspaceRoot) {
   writeFileSync(workerPath, "process.exit(7);\n", "utf8");
   return workerPath;
 }
+
+test("T-158 installed start JSON serialization emits compact CLI projection", () => {
+  const archiveRoot = path.join(makeWorkspace(), ".ai-workspace/runtime/odd_sdlc/operator-runs/t158-cli-projection");
+  const previous = process.env["ODD_SDLC_TS_OUTPUT"];
+  process.env["ODD_SDLC_TS_OUTPUT"] = "json";
+  try {
+    const serialized = serializeOddSdlcSpecMethodResult({
+      kind: "odd_sdlc_spec_method_result",
+      command: "start",
+      status: "ok",
+      exitCode: 0,
+      payload: {
+        kind: "sdlc_installed_operator_start_outcome",
+        status: "worker_invoked",
+        archiveRoot,
+        summary: {
+          status: "worker_invoked",
+          archiveRoot,
+          graphFunctionName: "bootstrap_release_self_test",
+          currentEdge: "derive_component_code_surface",
+          blockingReason: null,
+          nextLawfulAction: "close_or_reprice"
+        },
+        manifest: { kind: "large_manifest" },
+        workerReport: { kind: "large_report" },
+        postflight: { kind: "large_postflight" },
+        gapDossier: null,
+        traversalConsequence: { kind: "sdlc_installed_operator_traversal_consequence" },
+        emittedRuntimeEventKinds: ["basis_admitted"]
+      }
+    });
+    const result = JSON.parse(serialized);
+
+    assert.equal(result.kind, "odd_sdlc_spec_method_result");
+    assert.equal(result.payload.kind, "sdlc_installed_operator_start_cli_projection");
+    assert.equal(result.payload.sourceOutcomeKind, "sdlc_installed_operator_start_outcome");
+    assert.equal(result.payload.compacted, true);
+    assert.match(result.payload.sourceOutcomeRef, /\/run\.json$/u);
+    assert.equal(
+      result.payload.omittedCarrierRefs.some((ref) => ref.endsWith("/handoff_manifest.json")),
+      true
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env["ODD_SDLC_TS_OUTPUT"];
+    } else {
+      process.env["ODD_SDLC_TS_OUTPUT"] = previous;
+    }
+  }
+});
 
 test("T-064 installed operator start invokes worker and replay-backed gaps advances", async () => {
   const workspace = makeWorkspace();
@@ -785,6 +861,47 @@ test("T-064 operator observes F_P.transform output and generates report", async 
   assert.equal(
     existsSync(path.join(start.payload.archiveRoot, "post_transform_observation.json")),
     true
+  );
+});
+
+test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async () => {
+  const workspace = makeWorkspace();
+  const install = await installOddSdlcTypescript({
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t159-fp-evaluate-effective"
+  });
+  assert.equal(install.kind, "installed");
+  const workerScript = writeInvalidComponentTopologyWorkerScript(workspace);
+
+  const start = await invokeOddSdlcSpecMethodCommand([
+    "start",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:derive_implementation_component_topology_surface",
+    "--until",
+    "first_traversal",
+    "--worker",
+    `process://node?script=${encodeURIComponent(workerScript)}`
+  ]);
+
+  assert.equal(start.status, "ok");
+  assert.equal(
+    existsSync(path.join(start.payload.archiveRoot, "assurance_postflight.json")),
+    true
+  );
+  const evaluateResult = JSON.parse(
+    readFileSync(path.join(start.payload.archiveRoot, "fp_evaluate_result.json"), "utf8")
+  );
+  assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
+  assert.equal(evaluateResult.status, "blocked");
+  assert.equal(evaluateResult.postflightStatus, "blocked");
+  assert.match(evaluateResult.postflightRef, /assurance_postflight\.json$/u);
+  assert.match(
+    evaluateResult.blockingReasons.join(","),
+    /component_depth_register_invalid/u
   );
 });
 

@@ -63,7 +63,7 @@ function graphFunctionRefFor(caseId) {
     (candidate) => candidate.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   assert(graphFunction, `${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET} must be published`);
-  return graphFunction.id ?? `graph-function://t153/${caseId}/materialize`;
+  return graphFunction.name;
 }
 
 function context(caseId, counts) {
@@ -167,7 +167,7 @@ function evaluatorProjection(rows, decision, actionKind) {
     actionRef: `action://t153/${rows.caseId}/${actionKind}`,
     actionKind,
     graphFunctionRef: graphFunctionRefFor(rows.caseId),
-    graphVectorRef: null,
+    graphVectorRef: `vector://t153/${rows.caseId}/${actionKind}`,
     publishedTraversalTargetRef: `published-traversal-target://t153/${rows.caseId}/${actionKind}`,
     targetOutcomeRef,
     expectedOutputAssetRefs: [`asset://t153/${rows.caseId}/${actionKind}/output`],

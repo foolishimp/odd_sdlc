@@ -814,6 +814,8 @@ export function constructSdlcNextActionProjection(input: {
   readonly readOnly?: boolean;
 }): SdlcNextActionProjection {
   const selectedActionRef = input.selectedActionRef ?? null;
+  const nextGraphFunctionRef = input.nextGraphFunctionRef ?? null;
+  const nextGraphVectorRef = input.nextGraphVectorRef ?? null;
   const intentEventRefs = nonEmptyUniqueSorted(
     input.intentEventRefs,
     "intentEventRefs"
@@ -865,9 +867,12 @@ export function constructSdlcNextActionProjection(input: {
     policyRefs: uniqueSorted(input.policyRefs),
     actionCatalogRefs: uniqueSorted(input.actionCatalogRefs),
     selectedActionRef,
-    nextGraphFunctionRef: input.nextGraphFunctionRef ?? null,
-    nextGraphVectorRef: input.nextGraphVectorRef ?? null,
-    choosesNextTraversal: selectedActionRef !== null,
+    nextGraphFunctionRef,
+    nextGraphVectorRef,
+    choosesNextTraversal:
+      selectedActionRef !== null &&
+      nextGraphFunctionRef !== null &&
+      nextGraphVectorRef !== null,
     readOnly: input.readOnly ?? false,
     predecessorRefs: uniqueSorted([
       ...intentEventRefs,

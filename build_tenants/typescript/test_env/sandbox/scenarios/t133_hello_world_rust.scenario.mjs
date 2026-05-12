@@ -47,7 +47,7 @@ export const t133HelloWorldRustScenario = Object.freeze({
 
 export function t133HelloWorldRustLiveScenario({
   worker,
-  maxAdvances = 6,
+  maxAdvances = 16,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {

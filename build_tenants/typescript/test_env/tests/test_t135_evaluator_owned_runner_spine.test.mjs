@@ -111,6 +111,18 @@ function requirementSurfaceManifest(workspaceRoot) {
   });
 }
 
+function featureDecompManifest(workspaceRoot) {
+  const contract = hookContractByEdgeName("derive_feature_decomp_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_feature_decomp_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t135-feature-exact-obligation-trace"
+  });
+}
+
 test("T-135 public start admits initial evaluate_next projection and construction intent", () => {
   const { module, queryDomain, conformedProject, workspaceRoot } = context();
   const outcome = publicStartOnce({
@@ -139,7 +151,15 @@ test("T-135 public start admits initial evaluate_next projection and constructio
   );
   assert.equal(
     outcome.executionContract.nextActionProjection.choosesNextTraversal,
-    true
+    false
+  );
+  assert.equal(
+    outcome.executionContract.nextActionProjection.nextGraphFunctionRef,
+    "bootstrap_release_self_test"
+  );
+  assert.equal(
+    outcome.executionContract.nextActionProjection.nextGraphVectorRef,
+    null
   );
   assert.equal(
     outcome.executionContract.constructionIntent.selectedActionRef,
@@ -387,4 +407,36 @@ test("T-135 requirement surface records requirement obligations as future pressu
 
   assert.equal(projection.counts.partial > 0, true);
   assert.equal(projection.counts.fulfilled < projection.counts.expected, true);
+});
+
+test("T-135 post-transform report recognizes exact requirement obligation ids as observed traces", () => {
+  const manifest = featureDecompManifest(writeRequirementWorkspace());
+  const requirementObligation = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationKind === "requirement" &&
+      obligation.summary.includes("REQ-T135-001")
+  );
+  assert(requirementObligation);
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(
+    manifest.outputFile,
+    [
+      "# Feature Decomposition Surface",
+      "",
+      "## Requirement Trace Register",
+      "",
+      `- \`${requirementObligation.obligationId}\``
+    ].join("\n"),
+    "utf8"
+  );
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const requirementAssessment = report.obligationAssessments.find(
+    (assessment) => assessment.obligationId === requirementObligation.obligationId
+  );
+
+  assert(requirementAssessment);
+  assert.equal(requirementAssessment.fulfillmentStatus, "fulfilled");
+  assert.deepEqual(requirementAssessment.blockingReasons, []);
 });

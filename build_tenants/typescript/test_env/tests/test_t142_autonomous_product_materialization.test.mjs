@@ -89,7 +89,7 @@ test("T-142 authority conformance can close while requirements carry product mat
         fulfillmentStatus: "fulfilled",
         evidenceRefs: ["file:///workspace/specification/requirements/01-product.md"],
         carryDirection: "downstream_transformation_set",
-        downstreamGraphFunctionRefs: [materializeGraphFunction.id],
+        downstreamGraphFunctionRefs: [materializeGraphFunction.name],
         targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"]
       },
       {
@@ -97,7 +97,7 @@ test("T-142 authority conformance can close while requirements carry product mat
         fulfillmentStatus: "fulfilled",
         evidenceRefs: ["file:///workspace/specification/requirements/01-product.md"],
         carryDirection: "downstream_transformation_set",
-        downstreamGraphFunctionRefs: [materializeGraphFunction.id],
+        downstreamGraphFunctionRefs: [materializeGraphFunction.name],
         targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"]
       }
     ]
@@ -181,8 +181,8 @@ test("T-142 authority conformance can close while requirements carry product mat
       {
         actionRef: "construction-action://t142/materialize-declared-product",
         actionKind: "invoke_graph_function",
-        graphFunctionRef: materializeGraphFunction.id,
-        graphVectorRef: null,
+        graphFunctionRef: materializeGraphFunction.name,
+        graphVectorRef: "vector:odd_sdlc:Fg_materialize_declared_product_asset",
         publishedTraversalTargetRef:
           `published-action://odd-sdlc/graph-function/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`,
         targetOutcomeRef,
@@ -217,7 +217,7 @@ test("T-142 authority conformance can close while requirements carry product mat
   });
 
   assert.equal(nextActionProjection.choosesNextTraversal, true);
-  assert.equal(nextActionProjection.nextGraphFunctionRef, materializeGraphFunction.id);
+  assert.equal(nextActionProjection.nextGraphFunctionRef, materializeGraphFunction.name);
   assert.equal(nextActionProjection.closureDecisionRef, decision.decisionRef);
   assert.equal(nextActionProjection.readOnly, false);
 

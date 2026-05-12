@@ -654,11 +654,15 @@ function axisReasonMentionsDeferredScope(input: {
 }
 
 function axisVerdictReasons(input: {
+  readonly targetAssetType: string;
   readonly axis: SdlcDesignCompletenessAxisVerdict;
   readonly featureScope: SdlcFeatureScope;
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
   if (input.axis.status === "satisfied") {
+    return Object.freeze([]);
+  }
+  if (isDownstreamOwnedAggregateFlowPartial(input)) {
     return Object.freeze([]);
   }
   if (input.featureScope.mode !== "full_breadth") {
@@ -704,6 +708,33 @@ function axisVerdictReasons(input: {
   ]);
 }
 
+function isDownstreamOwnedAggregateFlowPartial(input: {
+  readonly targetAssetType: string;
+  readonly axis: SdlcDesignCompletenessAxisVerdict;
+}): boolean {
+  if (
+    input.targetAssetType !== "aggregate_domain_model_surface" ||
+    input.axis.axis !== "flow" ||
+    input.axis.status !== "partial" ||
+    input.axis.reasons.length === 0
+  ) {
+    return false;
+  }
+  return input.axis.reasons.every((axisReason) => {
+    const normalized = axisReason.toLowerCase();
+    const mentionsDownstream =
+      normalized.includes("downstream") ||
+      normalized.includes("next edge") ||
+      normalized.includes("next graph edge");
+    const mentionsSunnyDay =
+      normalized.includes("derive_aggregate_sunny_day_sequence_surface") ||
+      normalized.includes("aggregate_sunny_day_sequence_surface") ||
+      normalized.includes("sunny-day sequence") ||
+      normalized.includes("sunny day sequence");
+    return mentionsDownstream && mentionsSunnyDay;
+  });
+}
+
 function verdictReasons(input: {
   readonly register: SdlcDesignDepthRegister;
   readonly featureScope: SdlcFeatureScope;
@@ -715,16 +746,19 @@ function verdictReasons(input: {
   }
   return Object.freeze([
     ...axisVerdictReasons({
+      targetAssetType: input.register.targetAssetType,
       axis: verdict.entity,
       featureScope: input.featureScope,
       evidenceRefs: input.evidenceRefs
     }),
     ...axisVerdictReasons({
+      targetAssetType: input.register.targetAssetType,
       axis: verdict.attribute,
       featureScope: input.featureScope,
       evidenceRefs: input.evidenceRefs
     }),
     ...axisVerdictReasons({
+      targetAssetType: input.register.targetAssetType,
       axis: verdict.flow,
       featureScope: input.featureScope,
       evidenceRefs: input.evidenceRefs

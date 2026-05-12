@@ -44,7 +44,12 @@ import {
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  constructSdlcGtlModule
+  constructSdlcGtlModule,
+  sdlcGraphFunctionBoundaryRef,
+  sdlcGraphVectorBoundaryRef,
+  sdlcPublishedActionRef,
+  sdlcPublishedTraversalTargetRef,
+  sdlcTargetOutcomeRef
 } from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
@@ -1947,10 +1952,16 @@ function graphVectorRef(input: {
   if (vector === undefined) {
     throw new TypeError(`missing graph vector ${input.vectorIndex}`);
   }
-  return vector.id;
+  return sdlcGraphVectorBoundaryRef(vector);
 }
 
-function targetOutcomeRef(input: {
+function graphFunctionRefForBasis(input: {
+  readonly basis: ExecutionBasis;
+}): string {
+  return sdlcGraphFunctionBoundaryRef(input.basis.graphFunction);
+}
+
+function targetOutcomeRefForBasis(input: {
   readonly basis: ExecutionBasis;
   readonly vectorIndex: number;
 }): string {
@@ -1958,7 +1969,10 @@ function targetOutcomeRef(input: {
   if (vector === undefined) {
     throw new TypeError(`missing graph vector ${input.vectorIndex}`);
   }
-  return `outcome://odd-sdlc/${input.basis.graphFunction.id}/${vector.target.id}`;
+  return sdlcTargetOutcomeRef({
+    graphFunctionRef: graphFunctionRefForBasis(input),
+    targetNodeRef: vector.target.id
+  });
 }
 
 function traversalConsequenceEvidenceRefs(input: {
@@ -2018,7 +2032,31 @@ function assetTypeRefFor(assetType: string): string {
   return `asset-type://odd-sdlc/${assetType}`;
 }
 
+function materializationTargetAssetTypeFromActionRef(ref: string): string | null {
+  const marker = [
+    "target-outcome://odd-sdlc/post-action",
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+    ""
+  ].join("/");
+  const markerIndex = ref.indexOf(marker);
+  if (markerIndex < 0) {
+    return null;
+  }
+  const suffix = ref.slice(markerIndex + marker.length);
+  const encodedAssetType = suffix.split("/")[0] ?? "";
+  if (encodedAssetType.length === 0) {
+    return null;
+  }
+  try {
+    const assetType = decodeURIComponent(encodedAssetType);
+    return assetType.length === 0 ? null : assetType;
+  } catch {
+    return encodedAssetType;
+  }
+}
+
 interface SdlcGraphTrackActionTarget {
+  readonly requestedTargetAssetType: string;
   readonly graphFunctionName: string;
   readonly graphFunctionRef: string;
   readonly graphVectorName: string;
@@ -2029,6 +2067,40 @@ interface SdlcGraphTrackActionTarget {
   readonly targetOutcomeRef: string;
 }
 
+type SdlcGraphTrackActionTargetResolution =
+  | {
+      readonly status: "selected";
+      readonly target: SdlcGraphTrackActionTarget;
+    }
+  | {
+      readonly status: "unresolved" | "ambiguous";
+      readonly reasonRef: string;
+    };
+
+interface SdlcGraphTrackCandidate {
+  readonly graphFunction: Module["graphFunctions"][number];
+  readonly vector: ReturnType<typeof materializeGraphFunction>["vectors"][number];
+  readonly inputAssetTypes: readonly string[];
+  readonly targetAssetType: string;
+}
+
+export type SdlcPostProductMaterializationActionResolution =
+  | {
+      readonly status: "selected";
+      readonly action: OddSdlcEvaluateNextActionInput;
+    }
+  | {
+      readonly status: "no_pressure";
+    }
+  | {
+      readonly status: "no_candidate_matched";
+      readonly reasonRefs: readonly string[];
+    }
+  | {
+      readonly status: "blocked";
+      readonly blockingReason: SdlcBlockingReason;
+    };
+
 function targetAssetTypeFromBindingRef(ref: string): string | null {
   const prefix = "target-binding://odd-sdlc/";
   if (!ref.startsWith(prefix)) {
@@ -2038,52 +2110,310 @@ function targetAssetTypeFromBindingRef(ref: string): string | null {
   return assetType.length === 0 ? null : assetType;
 }
 
+function targetAssetTypeFromAuthorityRef(ref: string): string | null {
+  const scopedPrefix = "asset-type://odd-sdlc/";
+  if (ref.startsWith(scopedPrefix)) {
+    const assetType = ref.slice(scopedPrefix.length);
+    return assetType.length === 0 ? null : assetType;
+  }
+  const prefix = "asset-type://";
+  if (ref.startsWith(prefix)) {
+    const assetType = ref.slice(prefix.length);
+    return assetType.length === 0 ? null : assetType;
+  }
+  return null;
+}
+
+function admittedAssetTypesFromEvents(
+  events: readonly RuntimeEvent[]
+): readonly string[] {
+  return uniqueSorted(
+    events.flatMap((event) => {
+      if (event.kind !== "evidence_admitted") {
+        return [];
+      }
+      const authorityRef =
+        typeof event.authorityRef === "string" ? event.authorityRef : null;
+      if (authorityRef === null) {
+        return [];
+      }
+      const assetType = targetAssetTypeFromAuthorityRef(authorityRef);
+      return assetType === null ? [] : [assetType];
+    })
+  );
+}
+
+function graphFunctionOutputAssetTypes(input: {
+  readonly module: Module;
+  readonly graphFunctionName: string;
+}): readonly string[] {
+  const graphFunction = input.module.graphFunctions.find(
+    (candidate) => candidate.name === input.graphFunctionName
+  );
+  return graphFunction === undefined
+    ? Object.freeze([])
+    : uniqueSorted(graphFunction.outputs.map((output) => output.name));
+}
+
+function admittedAssetTypesForState(input: {
+  readonly module: Module;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly emittedEvents: readonly RuntimeEvent[];
+}): readonly string[] {
+  const currentEdgeAdmitted =
+    input.state.status === "worker_invoked" &&
+    input.state.postflight?.status === "passed";
+  return uniqueSorted([
+    ...admittedAssetTypesFromEvents(input.replayEvents),
+    ...admittedAssetTypesFromEvents(input.emittedEvents),
+    ...(currentEdgeAdmitted
+      ? [
+          input.state.manifest.targetAssetType,
+          ...graphFunctionOutputAssetTypes({
+            module: input.module,
+            graphFunctionName: input.state.manifest.graphFunctionName
+          })
+        ]
+      : [])
+  ]);
+}
+
+function inheritedMaterializationPressure(input: {
+  readonly selectedActionRef: string | null;
+  readonly basisRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
+}): {
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+} {
+  const emptyPressure = Object.freeze({
+    downstreamPressureRefs: Object.freeze([]),
+    downstreamTargetBindingRefs: Object.freeze([])
+  });
+  if (
+    input.selectedActionRef === null ||
+    !input.selectedActionRef.includes(FG_MATERIALIZE_DECLARED_PRODUCT_ASSET)
+  ) {
+    return emptyPressure;
+  }
+  const targetAssetType = materializationTargetAssetTypeFromActionRef(
+    input.selectedActionRef
+  );
+  if (
+    targetAssetType !== null &&
+    new Set(input.admittedAssetTypes).has(targetAssetType)
+  ) {
+    return emptyPressure;
+  }
+  return Object.freeze({
+    downstreamPressureRefs: uniqueSorted([
+      input.selectedActionRef,
+      ...input.basisRefs.filter(
+        (ref: string) =>
+          ref.includes("/downstream_transformation_set") ||
+          ref.startsWith("downstream-pressure://") ||
+          ref.startsWith("downstream-transformation-set://") ||
+          ref.startsWith("requirement-authority://")
+      )
+    ]),
+    downstreamTargetBindingRefs: uniqueSorted([
+      ...(targetAssetType === null
+        ? []
+        : [targetBindingRefForAssetType(targetAssetType)]),
+      ...input.basisRefs.filter((ref: string) =>
+        ref.startsWith("target-binding://odd-sdlc/")
+      )
+    ])
+  });
+}
+
+function graphTrackCandidatesForTarget(input: {
+  readonly module: Module;
+  readonly targetAssetType: string;
+}): readonly SdlcGraphTrackCandidate[] {
+  return Object.freeze(
+    input.module.graphFunctions.flatMap((graphFunction) => {
+      if (
+        graphFunction.name.startsWith("Fg_") ||
+        graphFunction.tags.includes("executive")
+      ) {
+        return [];
+      }
+      const graph = materializeGraphFunction(graphFunction);
+      return graph.vectors
+        .filter((vector) => vector.target.name === input.targetAssetType)
+        .map((vector) =>
+          Object.freeze({
+            graphFunction,
+            vector,
+            inputAssetTypes: Object.freeze(
+              vector.source.map((source) => source.name)
+            ),
+            targetAssetType: vector.target.name
+          })
+        );
+    })
+  );
+}
+
+function selectedGraphTrackCandidateTarget(input: {
+  readonly candidate: SdlcGraphTrackCandidate;
+  readonly requestedTargetAssetType: string;
+}): SdlcGraphTrackActionTarget {
+  const graphFunctionRef = sdlcGraphFunctionBoundaryRef(input.candidate.graphFunction);
+  const graphVectorRef = sdlcGraphVectorBoundaryRef(input.candidate.vector);
+  const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef,
+    graphVectorRef
+  });
+  return Object.freeze({
+    requestedTargetAssetType: input.requestedTargetAssetType,
+    graphFunctionName: input.candidate.graphFunction.name,
+    graphFunctionRef,
+    graphVectorName: input.candidate.vector.name,
+    graphVectorRef,
+    targetAssetType: input.candidate.targetAssetType,
+    targetNodeRef: input.candidate.vector.target.id,
+    publishedTraversalTargetRef,
+    targetOutcomeRef: sdlcTargetOutcomeRef({
+      graphFunctionRef,
+      targetNodeRef: input.candidate.vector.target.id
+    })
+  });
+}
+
+function uniqueGraphTrackProducerForAsset(input: {
+  readonly module: Module;
+  readonly targetAssetType: string;
+}): SdlcGraphTrackActionTargetResolution | {
+  readonly status: "producer";
+  readonly candidate: SdlcGraphTrackCandidate;
+} {
+  const candidates = graphTrackCandidatesForTarget({
+    module: input.module,
+    targetAssetType: input.targetAssetType
+  });
+  if (candidates.length > 1) {
+    return Object.freeze({
+      status: "ambiguous" as const,
+      reasonRef: `graph_track_target_ambiguous_for_product_materialization_action:${input.targetAssetType}`
+    });
+  }
+  const selected =
+    candidates.length === 1 &&
+    candidates[0]?.graphFunction.tags.includes("published_leaf")
+      ? candidates[0]
+      : null;
+  if (selected !== null) {
+    return Object.freeze({
+      status: "producer" as const,
+      candidate: selected
+    });
+  }
+  if (candidates.length === 1) {
+    return Object.freeze({
+      status: "unresolved" as const,
+      reasonRef: `graph_track_target_unpublished_for_product_materialization_action:${input.targetAssetType}`
+    });
+  }
+  return Object.freeze({
+    status: "unresolved" as const,
+    reasonRef: `graph_track_target_unresolved_for_product_materialization_action:${input.targetAssetType}`
+  });
+}
+
+function nextMissingGraphTrackTargetForAsset(input: {
+  readonly module: Module;
+  readonly requestedTargetAssetType: string;
+  readonly targetAssetType: string;
+  readonly admittedAssetTypes: ReadonlySet<string>;
+  readonly visitedAssetTypes: ReadonlySet<string>;
+}): SdlcGraphTrackActionTargetResolution {
+  if (input.admittedAssetTypes.has(input.targetAssetType)) {
+    return Object.freeze({
+      status: "unresolved" as const,
+      reasonRef: `graph_track_target_already_admitted_for_product_materialization_action:${input.targetAssetType}`
+    });
+  }
+  if (input.visitedAssetTypes.has(input.targetAssetType)) {
+    return Object.freeze({
+      status: "unresolved" as const,
+      reasonRef: `graph_track_target_cycle_for_product_materialization_action:${input.targetAssetType}`
+    });
+  }
+  const producer = uniqueGraphTrackProducerForAsset({
+    module: input.module,
+    targetAssetType: input.targetAssetType
+  });
+  if (producer.status !== "producer") {
+    return producer;
+  }
+  const visitedAssetTypes = new Set(input.visitedAssetTypes);
+  visitedAssetTypes.add(input.targetAssetType);
+  for (const sourceAssetType of producer.candidate.inputAssetTypes) {
+    if (input.admittedAssetTypes.has(sourceAssetType)) {
+      continue;
+    }
+    const upstream = nextMissingGraphTrackTargetForAsset({
+      module: input.module,
+      requestedTargetAssetType: input.requestedTargetAssetType,
+      targetAssetType: sourceAssetType,
+      admittedAssetTypes: input.admittedAssetTypes,
+      visitedAssetTypes
+    });
+    if (upstream.status === "selected" || upstream.status === "ambiguous") {
+      return upstream;
+    }
+    if (!upstream.reasonRef.includes("_already_admitted_")) {
+      return upstream;
+    }
+  }
+  return Object.freeze({
+    status: "selected" as const,
+    target: selectedGraphTrackCandidateTarget({
+      candidate: producer.candidate,
+      requestedTargetAssetType: input.requestedTargetAssetType
+    })
+  });
+}
+
 function graphTrackActionTargetFor(input: {
   readonly module: Module;
   readonly downstreamTargetBindingRefs: readonly string[];
-}): SdlcGraphTrackActionTarget | null {
+  readonly admittedAssetTypes: readonly string[];
+}): SdlcGraphTrackActionTargetResolution {
   const targetAssetTypes = uniqueSorted(
     input.downstreamTargetBindingRefs.flatMap((ref) => {
       const assetType = targetAssetTypeFromBindingRef(ref);
       return assetType === null ? [] : [assetType];
     })
   );
-  for (const targetAssetType of targetAssetTypes) {
-    const candidates = input.module.graphFunctions.flatMap((graphFunction) => {
-      if (graphFunction.name.startsWith("Fg_")) {
-        return [];
-      }
-      const graph = materializeGraphFunction(graphFunction);
-      return graph.vectors
-        .filter((vector) => vector.target.name === targetAssetType)
-        .map((vector) =>
-          Object.freeze({
-            graphFunction,
-            vector
-          })
-        );
+  if (targetAssetTypes.length === 0) {
+    return Object.freeze({
+      status: "unresolved" as const,
+      reasonRef: "graph_track_target_unresolved_for_product_materialization_action"
     });
-    const selected =
-      candidates.find(({ graphFunction }) =>
-        graphFunction.tags.includes("published_leaf")
-      ) ?? candidates[0] ?? null;
-    if (selected !== null) {
-      const publishedTraversalTargetRef =
-        `published-traversal-target://odd-sdlc/${selected.graphFunction.name}/${selected.vector.id}`;
-      return Object.freeze({
-        graphFunctionName: selected.graphFunction.name,
-        graphFunctionRef: selected.graphFunction.name,
-        graphVectorName: selected.vector.name,
-        graphVectorRef: selected.vector.id,
-        targetAssetType,
-        targetNodeRef: selected.vector.target.id,
-        publishedTraversalTargetRef,
-        targetOutcomeRef:
-          `outcome://odd-sdlc/${selected.graphFunction.name}/${selected.vector.target.id}`
-      });
-    }
   }
-  return null;
+  const admittedAssetTypes = new Set(uniqueSorted(input.admittedAssetTypes));
+  const unresolvedReasonRefs: string[] = [];
+  for (const targetAssetType of targetAssetTypes) {
+    const resolution = nextMissingGraphTrackTargetForAsset({
+      module: input.module,
+      requestedTargetAssetType: targetAssetType,
+      targetAssetType,
+      admittedAssetTypes,
+      visitedAssetTypes: new Set()
+    });
+    if (resolution.status === "selected" || resolution.status === "ambiguous") {
+      return resolution;
+    }
+    unresolvedReasonRefs.push(resolution.reasonRef);
+  }
+  return Object.freeze({
+    status: "unresolved" as const,
+    reasonRef: uniqueSorted(unresolvedReasonRefs).join(",")
+  });
 }
 
 export function deriveSdlcPublishedProductMaterializationAction(input: {
@@ -2121,14 +2451,14 @@ export function deriveSdlcPublishedProductMaterializationAction(input: {
     requiredTargetBindingRefs.length === 0
       ? targetBindingRefs
       : targetBindingRefs.filter((ref) => requiredTargetBindingRefs.includes(ref));
-  const publishedActionRef =
-    `published-action://odd-sdlc/graph-function/${graphFunction.name}`;
+  const graphFunctionRef = sdlcGraphFunctionBoundaryRef(graphFunction);
+  const publishedActionRef = sdlcPublishedActionRef({ graphFunctionRef });
   if (outputAssetTypes.length === 0) {
     return Object.freeze({
       kind: "sdlc_published_product_materialization_action" as const,
       status: "no_output_asset" as const,
       graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-      graphFunctionRef: graphFunction.id,
+      graphFunctionRef,
       publishedActionRef,
       outputAssetTypes,
       targetBindingRefs,
@@ -2146,7 +2476,7 @@ export function deriveSdlcPublishedProductMaterializationAction(input: {
       kind: "sdlc_published_product_materialization_action" as const,
       status: "target_binding_mismatch" as const,
       graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-      graphFunctionRef: graphFunction.id,
+      graphFunctionRef,
       publishedActionRef,
       outputAssetTypes,
       targetBindingRefs,
@@ -2162,7 +2492,7 @@ export function deriveSdlcPublishedProductMaterializationAction(input: {
     kind: "sdlc_published_product_materialization_action" as const,
     status: "eligible" as const,
     graphFunctionName: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-    graphFunctionRef: graphFunction.id,
+    graphFunctionRef,
     publishedActionRef,
     outputAssetTypes,
     targetBindingRefs,
@@ -2294,32 +2624,35 @@ function postActionCandidateFor(input: {
   readonly basisKind: string;
   readonly actionKind: OddSdlcEvaluateNextActionInput["actionKind"];
 }) {
+  const graphFunctionRef = graphFunctionRefForBasis({ basis: input.basis });
   const vectorRef = graphVectorRef({
     basis: input.basis,
     vectorIndex: input.vectorIndex
   });
-  const outcomeRef = targetOutcomeRef({
+  const outcomeRef = targetOutcomeRefForBasis({
     basis: input.basis,
     vectorIndex: input.vectorIndex
   });
   const actionRef = [
     "construction-action://odd-sdlc/post-action",
-    input.basis.graphFunction.id,
+    graphFunctionRef,
     input.basisKind,
     vectorRef
   ].join("/");
   return Object.freeze({
     actionRef,
     actionKind: input.actionKind,
-    graphFunctionRef: input.basis.graphFunction.id,
+    graphFunctionRef,
     graphVectorRef: vectorRef,
-    publishedTraversalTargetRef:
-      `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${vectorRef}`,
+    publishedTraversalTargetRef: sdlcPublishedTraversalTargetRef({
+      graphFunctionRef,
+      graphVectorRef: vectorRef
+    }),
     targetOutcomeRef: outcomeRef,
     inputAssetRefs: Object.freeze([]),
     expectedOutputAssetRefs: Object.freeze([outcomeRef]),
     requiredAuthorityRefs: Object.freeze([
-      `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${vectorRef}`
+      sdlcPublishedTraversalTargetRef({ graphFunctionRef, graphVectorRef: vectorRef })
     ]),
     eligibleReasonRefs: Object.freeze([
       "evaluate_next_post_action_selected_published_graph_action"
@@ -2327,23 +2660,39 @@ function postActionCandidateFor(input: {
   });
 }
 
-export function deriveSdlcPostProductMaterializationActionInput(input: {
+export function deriveSdlcPostProductMaterializationActionResolution(input: {
   readonly module: Module;
   readonly runRef: string;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
   readonly scopeModuleName?: string | null | undefined;
   readonly scopeScheduleRef?: string | null | undefined;
-}): OddSdlcEvaluateNextActionInput | null {
+}): SdlcPostProductMaterializationActionResolution {
   const downstreamPressureRefs = uniqueSorted(input.downstreamPressureRefs);
   const downstreamTargetBindingRefs = uniqueSorted(
     input.downstreamTargetBindingRefs
   );
+  const downstreamTargetAssetTypes = uniqueSorted(
+    downstreamTargetBindingRefs.flatMap((ref) => {
+      const assetType = targetAssetTypeFromBindingRef(ref);
+      return assetType === null ? [] : [assetType];
+    })
+  );
+  const admittedAssetTypes = new Set(uniqueSorted(input.admittedAssetTypes));
   if (
     downstreamPressureRefs.length === 0 ||
     downstreamTargetBindingRefs.length === 0
   ) {
-    return null;
+    return Object.freeze({ status: "no_pressure" as const });
+  }
+  if (
+    downstreamTargetAssetTypes.length > 0 &&
+    downstreamTargetAssetTypes.every((assetType) =>
+      admittedAssetTypes.has(assetType)
+    )
+  ) {
+    return Object.freeze({ status: "no_pressure" as const });
   }
   const materializationAction = deriveSdlcPublishedProductMaterializationAction({
     module: input.module,
@@ -2354,16 +2703,38 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
     materializationAction.graphFunctionRef === null ||
     materializationAction.publishedActionRef === null
   ) {
-    return null;
+    return Object.freeze({
+      status: "no_candidate_matched" as const,
+      reasonRefs: materializationAction.reasonRefs
+    });
   }
   const targetAssetType = materializationAction.outputAssetTypes[0];
   if (targetAssetType === undefined) {
-    return null;
+    return Object.freeze({
+      status: "no_candidate_matched" as const,
+      reasonRefs: materializationAction.reasonRefs
+    });
   }
-  const graphTrackTarget = graphTrackActionTargetFor({
+  const graphTrackResolution = graphTrackActionTargetFor({
     module: input.module,
-    downstreamTargetBindingRefs
+    downstreamTargetBindingRefs,
+    admittedAssetTypes: uniqueSorted(input.admittedAssetTypes)
   });
+  if (graphTrackResolution.status !== "selected") {
+    return Object.freeze({
+      status: "blocked" as const,
+      blockingReason: makeSdlcBlockingReason({
+        code: "post_materialization_graph_track_unresolved",
+        detail: graphTrackResolution.reasonRef,
+        evidenceRefs: uniqueSorted([
+          ...downstreamPressureRefs,
+          ...downstreamTargetBindingRefs,
+          ...materializationAction.reasonRefs
+        ])
+      })
+    });
+  }
+  const graphTrackTarget = graphTrackResolution.target;
   const scopeModuleName = input.scopeModuleName ?? null;
   const scopeScheduleRef = input.scopeScheduleRef ?? null;
   const scopePath =
@@ -2378,55 +2749,66 @@ export function deriveSdlcPostProductMaterializationActionInput(input: {
       encodeURIComponent(input.runRef)
     ].join("/");
   return Object.freeze({
-    actionRef: [
-      "construction-action://odd-sdlc/post-action",
-      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-      scopeModuleName === null
-        ? "post_downstream_product_materialization"
-        : "post_deferred_scope_product_materialization",
-      ...(scopeModuleName === null ? [] : [encodeURIComponent(scopeModuleName)]),
-      targetOutcomeRef
-    ].join("/"),
-    actionKind: "invoke_graph_function" as const,
-    graphFunctionRef:
-      graphTrackTarget?.graphFunctionRef ?? materializationAction.graphFunctionRef,
-    graphVectorRef: graphTrackTarget?.graphVectorRef ?? null,
-    publishedTraversalTargetRef: materializationAction.publishedActionRef,
-    targetOutcomeRef: graphTrackTarget?.targetOutcomeRef ?? targetOutcomeRef,
-    inputAssetRefs: Object.freeze([]),
-    expectedOutputAssetRefs: Object.freeze(
-      uniqueSorted([
-        ...materializationAction.outputAssetTypes.map(assetTypeRefFor),
-        targetOutcomeRef,
-        ...(graphTrackTarget === null ? [] : [graphTrackTarget.targetOutcomeRef])
+    status: "selected" as const,
+    action: Object.freeze({
+      actionRef: [
+        "construction-action://odd-sdlc/post-action",
+        FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+        scopeModuleName === null
+          ? "post_downstream_product_materialization"
+          : "post_deferred_scope_product_materialization",
+        ...(scopeModuleName === null ? [] : [encodeURIComponent(scopeModuleName)]),
+        targetOutcomeRef
+      ].join("/"),
+      actionKind: "invoke_graph_function" as const,
+      graphFunctionRef: graphTrackTarget.graphFunctionRef,
+      graphVectorRef: graphTrackTarget.graphVectorRef,
+      publishedTraversalTargetRef: graphTrackTarget.publishedTraversalTargetRef,
+      targetOutcomeRef: graphTrackTarget.targetOutcomeRef,
+      inputAssetRefs: Object.freeze([]),
+      expectedOutputAssetRefs: Object.freeze(
+        uniqueSorted([
+          ...materializationAction.outputAssetTypes.map(assetTypeRefFor),
+          targetOutcomeRef,
+          graphTrackTarget.targetOutcomeRef
+        ])
+      ),
+      requiredAuthorityRefs: uniqueSorted([
+        materializationAction.publishedActionRef,
+        graphTrackTarget.publishedTraversalTargetRef
+      ]),
+      eligibleReasonRefs: uniqueSorted([
+        "evaluate_next_downstream_requirement_transformation_set",
+        `graph_track_function:${graphTrackTarget.graphFunctionName}`,
+        `graph_track_vector:${graphTrackTarget.graphVectorName}`,
+        `graph_track_target:${graphTrackTarget.publishedTraversalTargetRef}`,
+        `graph_track_requested_target:${graphTrackTarget.requestedTargetAssetType}`,
+        `graph_track_selected_target:${graphTrackTarget.targetAssetType}`,
+        ...(scopeModuleName === null
+          ? []
+          : [`feature_scope_deferred_module:${scopeModuleName}`]),
+        ...(scopeScheduleRef === null
+          ? []
+          : [`selected_schedule_ref:${scopeScheduleRef}`]),
+        ...materializationAction.reasonRefs,
+        ...downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
+        ...downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
       ])
-    ),
-    requiredAuthorityRefs: uniqueSorted([
-      materializationAction.publishedActionRef,
-      ...(graphTrackTarget === null
-        ? []
-        : [graphTrackTarget.publishedTraversalTargetRef])
-    ]),
-    eligibleReasonRefs: uniqueSorted([
-      "evaluate_next_downstream_requirement_transformation_set",
-      ...(graphTrackTarget === null
-        ? ["graph_track_target_unresolved_for_product_materialization_action"]
-        : [
-            `graph_track_function:${graphTrackTarget.graphFunctionName}`,
-            `graph_track_vector:${graphTrackTarget.graphVectorName}`,
-            `graph_track_target:${graphTrackTarget.publishedTraversalTargetRef}`
-          ]),
-      ...(scopeModuleName === null
-        ? []
-        : [`feature_scope_deferred_module:${scopeModuleName}`]),
-      ...(scopeScheduleRef === null
-        ? []
-        : [`selected_schedule_ref:${scopeScheduleRef}`]),
-      ...materializationAction.reasonRefs,
-      ...downstreamPressureRefs.map((ref) => `downstream_pressure:${ref}`),
-      ...downstreamTargetBindingRefs.map((ref) => `target_binding:${ref}`)
-    ])
+    })
   });
+}
+
+export function deriveSdlcPostProductMaterializationActionInput(input: {
+  readonly module: Module;
+  readonly runRef: string;
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
+  readonly scopeModuleName?: string | null | undefined;
+  readonly scopeScheduleRef?: string | null | undefined;
+}): OddSdlcEvaluateNextActionInput | null {
+  const resolution = deriveSdlcPostProductMaterializationActionResolution(input);
+  return resolution.status === "selected" ? resolution.action : null;
 }
 
 function postProductMaterializationCandidateFor(input: {
@@ -2434,17 +2816,20 @@ function postProductMaterializationCandidateFor(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
   readonly scopeModuleName?: string | null | undefined;
   readonly scopeScheduleRef?: string | null | undefined;
 }): OddSdlcEvaluateNextActionInput | null {
-  return deriveSdlcPostProductMaterializationActionInput({
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
     module: input.module,
     runRef: manifestRefSegment(input.state.manifest),
     downstreamPressureRefs: input.downstreamPressureRefs,
     downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+    admittedAssetTypes: input.admittedAssetTypes,
     scopeModuleName: input.scopeModuleName,
     scopeScheduleRef: input.scopeScheduleRef
   });
+  return resolution.status === "selected" ? resolution.action : null;
 }
 
 function deferredProductMaterializationModuleFor(
@@ -2490,6 +2875,7 @@ function postActionCandidates(input: {
   readonly nextVectorIndex: number | null;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
 }) {
   const nextDeferredModule =
     input.closureDecisionDisposition === "close"
@@ -2510,6 +2896,7 @@ function postActionCandidates(input: {
           )
         ]),
         downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+        admittedAssetTypes: input.admittedAssetTypes,
         scopeModuleName: nextDeferredModule,
         scopeScheduleRef
       });
@@ -2528,7 +2915,8 @@ function postActionCandidates(input: {
         module: input.module,
         state: input.state,
         downstreamPressureRefs: input.downstreamPressureRefs,
-        downstreamTargetBindingRefs: input.downstreamTargetBindingRefs
+        downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+        admittedAssetTypes: input.admittedAssetTypes
       });
     return Object.freeze(
       productMaterializationCandidate === null
@@ -2582,11 +2970,52 @@ function postActionCandidates(input: {
   return Object.freeze([]);
 }
 
+function blockingReasonRefsFromCarriers(input: {
+  readonly runRef: string;
+  readonly scope: string;
+  readonly carriers: readonly SdlcBlockingReason[];
+}): readonly string[] {
+  return uniqueSorted(
+    input.carriers.flatMap((reason, index) => [
+      `blocking-reason://odd-sdlc/${input.runRef}/${input.scope}/${String(index)}/${reason.code}`,
+      ...reason.evidenceRefs
+    ])
+  );
+}
+
+function postProductMaterializationGraphTrackBlockingReasons(input: {
+  readonly module: Module;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly downstreamPressureRefs: readonly string[];
+  readonly downstreamTargetBindingRefs: readonly string[];
+  readonly admittedAssetTypes: readonly string[];
+}): readonly SdlcBlockingReason[] {
+  if (
+    input.state.status !== "worker_invoked" ||
+    input.state.postflight?.status !== "passed" ||
+    input.downstreamPressureRefs.length === 0 ||
+    input.downstreamTargetBindingRefs.length === 0
+  ) {
+    return Object.freeze([]);
+  }
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
+    module: input.module,
+    runRef: manifestRefSegment(input.state.manifest),
+    downstreamPressureRefs: input.downstreamPressureRefs,
+    downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
+    admittedAssetTypes: input.admittedAssetTypes
+  });
+  return resolution.status === "blocked"
+    ? Object.freeze([resolution.blockingReason])
+    : Object.freeze([]);
+}
+
 function deriveInstalledTraversalConsequence(input: {
   readonly basis: ExecutionBasis;
   readonly start: SdlcPublicStartOutcome;
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly replayEvents: readonly RuntimeEvent[];
+  readonly admittedAssetEvents?: readonly RuntimeEvent[];
   readonly emittedEvents: readonly RuntimeEvent[];
   readonly nextVectorIndex: number | null;
 }): SdlcInstalledOperatorTraversalConsequence {
@@ -2597,6 +3026,12 @@ function deriveInstalledTraversalConsequence(input: {
   const module = constructSdlcGtlModule();
   const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
   const runRef = manifestRefSegment(input.state.manifest);
+  const admittedAssetTypes = admittedAssetTypesForState({
+    module,
+    state: input.state,
+    replayEvents: input.admittedAssetEvents ?? input.replayEvents,
+    emittedEvents: input.emittedEvents
+  });
   const worksiteEvidence = constructSdlcWorksiteEvidence({
     evidenceBundleRef: `evidence://odd-sdlc/${runRef}/worksite`,
     intentRef: constructionIntent.intentRef,
@@ -2622,6 +3057,34 @@ function deriveInstalledTraversalConsequence(input: {
     module,
     state: input.state
   });
+  const inheritedPressure = inheritedMaterializationPressure({
+    selectedActionRef: constructionIntent.selectedActionRef,
+    basisRefs: constructionIntent.basisRefs,
+    admittedAssetTypes
+  });
+  const downstreamPressureRefs = uniqueSorted([
+    ...fulfillmentProjection.downstreamPressureRefs,
+    ...inheritedPressure.downstreamPressureRefs
+  ]);
+  const downstreamTargetBindingRefs = uniqueSorted([
+    ...fulfillmentProjection.downstreamTargetBindingRefs,
+    ...inheritedPressure.downstreamTargetBindingRefs
+  ]);
+  const postActionBlockingReasonCarriers =
+    fulfillmentProjection.nonConvergedReasonRefs.length === 0
+      ? postProductMaterializationGraphTrackBlockingReasons({
+          module,
+          state: input.state,
+          downstreamPressureRefs,
+          downstreamTargetBindingRefs,
+          admittedAssetTypes
+        })
+      : Object.freeze([]);
+  const postActionBlockingReasonRefs = blockingReasonRefsFromCarriers({
+    runRef,
+    scope: "post-action",
+    carriers: postActionBlockingReasonCarriers
+  });
   const retryReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "same_edge_retry"
@@ -2638,7 +3101,7 @@ function deriveInstalledTraversalConsequence(input: {
     ledgerRef: `ledger://odd-sdlc/${runRef}/edge-fulfillment`,
     ledgerVersionRef: `ledger-version://odd-sdlc/${runRef}/edge-fulfillment/1`,
     edgeRef:
-      `edge://odd-sdlc/${input.basis.graphFunction.id}/${input.state.manifest.vectorIndex}`,
+      `edge://odd-sdlc/${graphFunctionRefForBasis({ basis: input.basis })}/${input.state.manifest.vectorIndex}`,
     attemptRef: `attempt://odd-sdlc/${runRef}/${input.state.manifest.vectorIndex}`,
     targetBindingRefs: input.start.executionContract.nextActionProjection.targetBindingRefs,
     evidenceBundleRefs: Object.freeze([worksiteEvidence.evidenceBundleRef]),
@@ -2650,14 +3113,15 @@ function deriveInstalledTraversalConsequence(input: {
     admissionRefs: evidenceRefs,
     downstreamTransformationSetRefs:
       fulfillmentProjection.downstreamTransformationSetRefs,
-    downstreamPressureRefs: fulfillmentProjection.downstreamPressureRefs,
-    downstreamTargetBindingRefs:
-      fulfillmentProjection.downstreamTargetBindingRefs,
+    downstreamPressureRefs,
+    downstreamTargetBindingRefs,
     counts: fulfillmentProjection.counts,
     assessmentCount: fulfillmentProjection.assessmentCount,
     admitted: true,
     targetCertificationPassed: input.state.postflight?.status === "passed",
-    fdRecheckPassed: input.state.status !== "worker_report_rejected",
+    fdRecheckPassed:
+      input.state.status !== "worker_report_rejected" &&
+      postActionBlockingReasonCarriers.length === 0,
     predecessorRefs: Object.freeze([
       constructionIntent.intentRef,
       worksiteEvidence.evidenceBundleRef,
@@ -2676,7 +3140,8 @@ function deriveInstalledTraversalConsequence(input: {
     repriceReasonRefs,
     blockReasonRefs: uniqueSorted([
       ...blockReasonRefsForState(input.state),
-      ...fulfillmentProjection.nonConvergedReasonRefs
+      ...fulfillmentProjection.nonConvergedReasonRefs,
+      ...postActionBlockingReasonRefs
     ])
   });
   const candidates = postActionCandidates({
@@ -2686,7 +3151,8 @@ function deriveInstalledTraversalConsequence(input: {
     closureDecisionDisposition: closureDecision.disposition,
     nextVectorIndex: input.nextVectorIndex,
     downstreamPressureRefs: ledger.downstreamPressureRefs,
-    downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs
+    downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs,
+    admittedAssetTypes
   });
   const pressureRef =
     `pressure://odd-sdlc/post-action/${runRef}/${closureDecision.disposition}`;
@@ -2706,7 +3172,9 @@ function deriveInstalledTraversalConsequence(input: {
           ]),
           actionCatalogRefs: Object.freeze([
             `catalog://odd-sdlc/post-action/${runRef}/empty`
-          ])
+          ]),
+          nextGraphFunctionRef: null,
+          nextGraphVectorRef: null
         })
       : (() => {
           const projectionScopeSegment = candidateProjectionScopeSegment(candidates);
@@ -3049,6 +3517,7 @@ export async function executeInstalledOperatorStart(input: {
   readonly start: SdlcPublicStartOutcome;
   readonly workerTransport: string | null;
   readonly replayEvents: readonly RuntimeEvent[];
+  readonly eventGraphEvents?: readonly RuntimeEvent[];
   readonly retryContextOverride?: SdlcWorkerRetryContext | undefined;
   readonly requireInstalledTopology?: boolean;
 }): Promise<SdlcInstalledOperatorStartOutcome> {
@@ -3093,8 +3562,52 @@ export async function executeInstalledOperatorStart(input: {
         ]),
         nextLawfulAction: "run_install_or_repair_installed_topology"
       });
-    }
   }
+}
+
+function compactRuntimeEventArchivePayload(
+  events: readonly RuntimeEvent[]
+): Record<string, unknown> {
+  const projectedEvents = events.map((event, index) => {
+    const record = event as unknown as Record<string, unknown>;
+    const projected: Record<string, unknown> = {
+      index,
+      kind: event.kind
+    };
+    for (const key of [
+      "eventRef",
+      "eventId",
+      "basisRef",
+      "decisionRef",
+      "resultRef",
+      "frameId",
+      "vectorIndex",
+      "edgeName",
+      "graphFunctionName",
+      "targetAssetType",
+      "status",
+      "reason"
+    ]) {
+      const value = record[key];
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean" ||
+        value === null
+      ) {
+        projected[key] = value;
+      }
+    }
+    return Object.freeze(projected);
+  });
+  return Object.freeze({
+    kind: "sdlc_runtime_event_archive_projection",
+    archiveVersion: "ts-runtime-events-projection-v1",
+    eventCount: events.length,
+    eventKinds: Object.freeze(events.map((event) => event.kind)),
+    events: Object.freeze(projectedEvents)
+  });
+}
   if (input.start.executionContract === null) {
     return terminalOutcome({
       workspaceRoot: input.workspaceRoot,
@@ -3449,7 +3962,10 @@ export async function executeInstalledOperatorStart(input: {
                 failureClass: "runtime_failure",
                 detail: failurePostflight.blockingReasons.join(",")
               }),
-          evidenceRefs: failurePostflight.evidenceRefs,
+          evidenceRefs: uniqueSorted([
+            ...failurePostflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
           reason: failurePostflight.blockingReasons.join(",")
         });
       }
@@ -3515,7 +4031,7 @@ export async function executeInstalledOperatorStart(input: {
             blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
             currentEdge: pluginInput.edge
           };
-          publishDispatchState(current);
+          const consequence = publishDispatchState(current);
           return constructFpDispatchOutcome({
             status: "blocked",
             resultRef: gapDossier.currentGapDossierRef,
@@ -3523,7 +4039,10 @@ export async function executeInstalledOperatorStart(input: {
               failureClass: "payload_contract_failure",
               detail: rejectionPostflight.blockingReasons.join(",")
             }),
-            evidenceRefs: rejectionPostflight.evidenceRefs,
+            evidenceRefs: uniqueSorted([
+              ...rejectionPostflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
             reason: rejectionPostflight.blockingReasons.join(",")
           });
         }
@@ -3580,7 +4099,7 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: postflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
-        publishDispatchState(current);
+        const consequence = publishDispatchState(current);
         return constructFpDispatchOutcome({
           status: "dispatched",
           resultRef: gapDossier.currentGapDossierRef,
@@ -3594,7 +4113,10 @@ export async function executeInstalledOperatorStart(input: {
             blockingReasons: postflight.blockingReasons,
             evidenceRefs: postflight.evidenceRefs
           }),
-          evidenceRefs: postflight.evidenceRefs,
+          evidenceRefs: uniqueSorted([
+            ...postflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
           reason: postflight.blockingReasons.join(",")
         });
       }
@@ -3619,6 +4141,14 @@ export async function executeInstalledOperatorStart(input: {
           archiveRoot: manifest.archiveRoot,
           relativePath: "assurance_postflight.json",
           payload: assuranceGate.blockingPostflight
+        });
+        writeFpEvaluateResult({
+          manifest,
+          report: workerReport,
+          postflight: assuranceGate.blockingPostflight,
+          postflightRef: pathToFileURL(
+            join(manifest.archiveRoot, "assurance_postflight.json")
+          ).href
         });
         const gapDossier = constructPostflightGapDossier({
           manifest,
@@ -3666,7 +4196,10 @@ export async function executeInstalledOperatorStart(input: {
             blockingReasons: assuranceGate.blockingPostflight.blockingReasons,
             evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs
           }),
-          evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs,
+          evidenceRefs: uniqueSorted([
+            ...assuranceGate.blockingPostflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
           reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
         });
       }
@@ -3723,6 +4256,19 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: hookBlockingReasonCarriers,
           evidenceRefs: Object.freeze([...(hookOutcome.postflight?.evidenceRefs ?? [])])
         });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "hook_postflight.json",
+          payload: hookPostflight
+        });
+        writeFpEvaluateResult({
+          manifest,
+          report: workerReport,
+          postflight: hookPostflight,
+          postflightRef: pathToFileURL(
+            join(manifest.archiveRoot, "hook_postflight.json")
+          ).href
+        });
         const gapDossier = constructPostflightGapDossier({
           manifest,
           postflight: hookPostflight
@@ -3741,7 +4287,7 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasonCarriers: hookPostflight.blockingReasonCarriers,
           currentEdge: pluginInput.edge
         };
-        publishDispatchState(current);
+        const consequence = publishDispatchState(current);
         return constructFpDispatchOutcome({
           status: "dispatched",
           resultRef: gapDossier.currentGapDossierRef,
@@ -3755,7 +4301,10 @@ export async function executeInstalledOperatorStart(input: {
             blockingReasons: hookPostflight.blockingReasons,
             evidenceRefs: hookPostflight.evidenceRefs
           }),
-          evidenceRefs: hookPostflight.evidenceRefs,
+          evidenceRefs: uniqueSorted([
+            ...hookPostflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
           reason: hookPostflight.blockingReasons.join(",")
         });
       }
@@ -3772,7 +4321,21 @@ export async function executeInstalledOperatorStart(input: {
         blockingReasonCarriers: Object.freeze([]),
         currentEdge: null
       };
-      publishDispatchState(current);
+      const consequence = publishDispatchState(current);
+      if (consequence.edgeClosureDecision.disposition === "block") {
+        return constructFpDispatchOutcome({
+          status: "blocked",
+          resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+          attachedResultArtifact: null,
+          evidenceRefs: uniqueSorted([
+            ...postflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
+          reason:
+            consequence.edgeClosureDecision.reasonRefs.join(",") ||
+            "post_action_blocked"
+        });
+      }
       return constructFpDispatchOutcome({
         status: "dispatched",
         resultRef: dispatchResultRef(manifest),
@@ -3786,7 +4349,10 @@ export async function executeInstalledOperatorStart(input: {
           blockingReasons: Object.freeze([]),
           evidenceRefs: postflight.evidenceRefs
         }),
-        evidenceRefs: postflight.evidenceRefs
+        evidenceRefs: uniqueSorted([
+          ...postflight.evidenceRefs,
+          consequence.nextActionProjection.nextActionProjectionRef
+        ])
       });
     }
   });
@@ -3851,6 +4417,7 @@ export async function executeInstalledOperatorStart(input: {
     start: input.start,
     state: completedDispatchState,
     replayEvents: input.replayEvents,
+    admittedAssetEvents: input.eventGraphEvents ?? input.replayEvents,
     emittedEvents: emitted,
     nextVectorIndex: engineResult.projection.nextVectorIndex
   });
@@ -3860,12 +4427,16 @@ export async function executeInstalledOperatorStart(input: {
   });
   const terminal =
     engineResult.transition.kind === "terminal" ? engineResult.transition : null;
+  const closedWithNextTraversal =
+    traversalConsequence.edgeClosureDecision.disposition === "close" &&
+    traversalConsequence.nextActionProjection.choosesNextTraversal;
   const status =
     completedDispatchState.status === "worker_invoked" &&
     terminal?.terminalKind === "converged"
       ? "converged"
       : completedDispatchState.status === "worker_invoked" &&
-          terminal?.terminalKind === "gap_stop"
+          terminal?.terminalKind === "gap_stop" &&
+          !closedWithNextTraversal
         ? "blocked"
         : completedDispatchState.status;
   const blockingReason =
@@ -3903,7 +4474,7 @@ export async function executeInstalledOperatorStart(input: {
   writeOperatorArchiveFile({
     archiveRoot: completedDispatchState.manifest.archiveRoot,
     relativePath: "runtime_events.json",
-    payload: emitted
+    payload: compactRuntimeEventArchivePayload(emitted)
   });
   writeRunArchive({ manifest: completedDispatchState.manifest, outcome });
   if (completedDispatchState.status === "worker_invoked") {
@@ -3942,17 +4513,20 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   readonly start: SdlcPublicStartOutcome;
   readonly workerTransport: string | null;
   readonly replayEvents: readonly RuntimeEvent[];
+  readonly eventGraphEvents?: readonly RuntimeEvent[];
   readonly requestedUntil: string;
   readonly requireInstalledTopology?: boolean;
   readonly refreshReplayState: () => Promise<{
     readonly start: SdlcPublicStartOutcome;
     readonly replayEvents: readonly RuntimeEvent[];
+    readonly eventGraphEvents?: readonly RuntimeEvent[];
   }>;
 }): Promise<SdlcInstalledOperatorStartOutcome> {
   const attempts: SdlcInstalledOperatorStartLoopAttempt[] = [];
   let latest: SdlcInstalledOperatorStartOutcome | null = null;
   let start = input.start;
   let replayEvents = input.replayEvents;
+  let eventGraphEvents = input.eventGraphEvents ?? input.replayEvents;
   let retryGuardExhausted = false;
   let exhaustedDisposition: SdlcInstalledReentryDisposition | null = null;
   let retryContextOverride: SdlcWorkerRetryContext | undefined;
@@ -3974,6 +4548,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
       start,
       workerTransport: input.workerTransport,
       replayEvents,
+      eventGraphEvents,
       ...(retryContextOverride === undefined ? {} : { retryContextOverride }),
       ...(input.requireInstalledTopology === undefined
         ? {}
@@ -4012,6 +4587,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     const refreshed = await input.refreshReplayState();
     start = refreshed.start;
     replayEvents = refreshed.replayEvents;
+    eventGraphEvents = refreshed.eventGraphEvents ?? refreshed.replayEvents;
   }
   if (latest === null) {
     return executeInstalledOperatorStart({
@@ -4022,6 +4598,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
       start,
       workerTransport: input.workerTransport,
       replayEvents,
+      eventGraphEvents,
       ...(input.requireInstalledTopology === undefined
         ? {}
         : { requireInstalledTopology: input.requireInstalledTopology })

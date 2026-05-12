@@ -234,6 +234,126 @@ function workspaceWithRustExpectedFilesAuthority() {
   return root;
 }
 
+function workspaceWithSingularDeclaredProductFileAuthority() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-single-file-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: hello_world_javascript_t143",
+      "active_tenant: hello_world_javascript",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    test_runner: node"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Tenant And Realization",
+      "",
+      "- **Selected output root**: `build_tenants/hello_world_javascript`.",
+      "- **Declared product file**: `build_tenants/hello_world_javascript/src/hello.js`.",
+      "- **Execution command**: `node build_tenants/hello_world_javascript/src/hello.js`.",
+      "- **Exact expected stdout**: `Hello, world!`.",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/01-product-identity.md"),
+    "# Product Identity\n\nREQ-JS-HELLO-WORLD-001: Print Hello, world! from the JavaScript product.\n",
+    "utf8"
+  );
+  return root;
+}
+
+function workspaceWithProseDeclaredProductFileSection() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-section-file-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: hello_world_javascript_t143_section",
+      "active_tenant: hello_world_javascript",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    test_runner: node"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Declared Product Files",
+      "",
+      "- `build_tenants/hello_world_javascript/src/hello.js` — the single declared",
+      "  product source file.",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/01-product-identity.md"),
+    "# Product Identity\n\nREQ-JS-HELLO-WORLD-001: Print Hello, world! from the JavaScript product.\n",
+    "utf8"
+  );
+  return root;
+}
+
+function workspaceWithDeclaredSourceFileAuthority() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-source-file-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: hello_world_javascript_t143_source",
+      "active_tenant: hello_world_javascript",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    test_runner: node"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "## Identity",
+      "",
+      "- selected output root: `build_tenants/hello_world_javascript`",
+      "- declared source file: `build_tenants/hello_world_javascript/src/hello.js`",
+      "- execution command: `node build_tenants/hello_world_javascript/src/hello.js`",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/01-product-identity.md"),
+    "# Product Identity\n\nREQ-JS-HELLO-WORLD-001: Print Hello, world! from the JavaScript product.\n",
+    "utf8"
+  );
+  return root;
+}
+
 function writeJsonExpectedFiles(workspaceRoot, expectedFiles) {
   writeFileSync(
     path.join(workspaceRoot, ".ai-workspace/context/expected_files.json"),
@@ -547,6 +667,79 @@ test("T-143 derives Rust targets from Expected Files shorthand authority", () =>
       (target) => target.path === "build_tenants/hello_world_rust/src/main.rs"
     )?.requiredRole,
     "source"
+  );
+});
+
+test("T-143 derives singular declared product file field authority", () => {
+  const manifest = materializationManifest(
+    workspaceWithSingularDeclaredProductFileAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  const prompt = promptForHandoff(manifest);
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    reconciliation.productAuthorityTargets
+  );
+  assert.equal(
+    reconciliation.productAuthorityTargetContracts.find(
+      (target) =>
+        target.path === "build_tenants/hello_world_javascript/src/hello.js"
+    )?.requiredRole,
+    "source"
+  );
+  assert.match(
+    prompt,
+    /Declared product file targets: build_tenants\/hello_world_javascript\/src\/hello\.js/u
+  );
+  assert.doesNotMatch(prompt, /Declared product file targets: none/u);
+});
+
+test("T-143 declared product files section ignores prose after code-span target", () => {
+  const manifest = materializationManifest(
+    workspaceWithProseDeclaredProductFileSection(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    reconciliation.productAuthorityTargets
+  );
+  assert.equal(
+    reconciliation.productAuthorityTargets.some((target) =>
+      target.includes("single declared")
+    ),
+    false
+  );
+});
+
+test("T-143 derives declared source file field authority", () => {
+  const manifest = materializationManifest(
+    workspaceWithDeclaredSourceFileAuthority(),
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert.equal(reconciliation.status, "passed");
+  assert.deepEqual(reconciliation.productAuthorityTargets, [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
+  assert.deepEqual(
+    invocationPackage.outputContract.declaredProductFileTargets,
+    reconciliation.productAuthorityTargets
   );
 });
 
@@ -866,6 +1059,7 @@ test("T-143 Rust product materialization admits runner-prefixed execution eviden
       manifest,
       "Cargo.toml",
       [
+        "# Implements: REQ-RUST-HELLO-WORLD-001",
         "[package]",
         "name = \"hello_world_rust\"",
         "version = \"0.1.0\"",
@@ -876,7 +1070,7 @@ test("T-143 Rust product materialization admits runner-prefixed execution eviden
     writeMaterializedProductFile(
       manifest,
       "src/main.rs",
-      "fn main() {\n    println!(\"Hello, world!\");\n}",
+      "// Implements: REQ-RUST-HELLO-WORLD-001\nfn main() {\n    println!(\"Hello, world!\");\n}",
       "source"
     )
   ];

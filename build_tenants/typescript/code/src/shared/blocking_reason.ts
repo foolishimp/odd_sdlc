@@ -16,6 +16,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "adr_output_required_field_missing",
   "adr_output_status_invalid",
   "worker_report_unresolved_reasons_present",
+  "worker_authority_read_outside_workspace",
   "unexpected_product_materialization_for_surface_edge",
   "materialized_product_file_is_output_artifact",
   "materialized_product_files_missing",
@@ -23,6 +24,13 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "context_expected_files_not_materialization_authority",
   "materialized_product_file_unbound_to_declared_target",
   "materialized_product_role_policy_mismatch",
+  "materialized_product_role_policy_ref_mismatch",
+  "materialized_product_replay_role_policy_missing",
+  "materialized_product_requirement_lineage_missing",
+  "materialized_product_manifest_replay_kind_mismatch",
+  "materialized_product_manifest_replay_target_mismatch",
+  "materialized_product_manifest_replay_empty",
+  "materialized_product_manifest_replay_parse_failed",
   "materialized_product_file_outside_tenant_root",
   "materialized_product_relative_path_absolute",
   "materialized_product_relative_path_mismatch",
@@ -61,6 +69,12 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "installed_topology_invalid",
   "target_unavailable",
   "stale_query_domain",
+  "next_action_projection_graph_vector_missing",
+  "legacy_graph_function_boundary_ref",
+  "unknown_graph_function_boundary_ref",
+  "legacy_graph_vector_boundary_ref",
+  "unknown_graph_vector_boundary_ref",
+  "post_materialization_graph_track_unresolved",
   "project_conformance_blocked",
   "unsupported_fd_transition",
   "project_conformance_gaps",
@@ -126,6 +140,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "adr_output_required_field_missing",
   "adr_output_status_invalid",
   "worker_report_admission_failed",
+  "worker_authority_read_outside_workspace",
   "test_execution_lane_mismatch",
   "test_execution_command_mismatch",
   "test_execution_evidence_invalid",
@@ -190,6 +205,22 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Worker output violated the declared handoff contract."
     });
   }
+  if (
+    code === "materialized_product_manifest_replay_kind_mismatch" ||
+    code === "materialized_product_manifest_replay_target_mismatch" ||
+    code === "materialized_product_manifest_replay_empty" ||
+    code === "materialized_product_manifest_replay_parse_failed" ||
+    code === "materialized_product_replay_role_policy_missing"
+  ) {
+    return Object.freeze({
+      reasonClass:
+        code === "materialized_product_manifest_replay_empty"
+          ? "missing_evidence"
+          : "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Product materialization replay evidence could not be admitted."
+    });
+  }
   if (code.startsWith("materialized_product_")) {
     return Object.freeze({
       reasonClass: code.includes("missing") || code.includes("empty")
@@ -243,6 +274,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "The worker report could not be admitted as a closed carrier."
     });
   }
+  if (code === "worker_authority_read_outside_workspace") {
+    return Object.freeze({
+      reasonClass: "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Worker consumed readable state outside the active workspace authority boundary."
+    });
+  }
   if (
     code === "obligation_unassessed" ||
     code === "obligation_status_unassessed" ||
@@ -290,7 +329,16 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Project or install topology is not ready for downstream traversal."
     });
   }
-  if (code === "target_unavailable" || code === "stale_query_domain") {
+  if (
+    code === "target_unavailable" ||
+    code === "stale_query_domain" ||
+    code === "next_action_projection_graph_vector_missing" ||
+    code === "legacy_graph_function_boundary_ref" ||
+    code === "unknown_graph_function_boundary_ref" ||
+    code === "legacy_graph_vector_boundary_ref" ||
+    code === "unknown_graph_vector_boundary_ref" ||
+    code === "post_materialization_graph_track_unresolved"
+  ) {
     return Object.freeze({
       reasonClass: "target_resolution",
       lawfulReentryPoint: "fix_target_or_run_gaps",

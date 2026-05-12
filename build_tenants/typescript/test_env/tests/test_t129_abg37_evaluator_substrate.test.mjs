@@ -342,13 +342,13 @@ function publicGapsMultiCandidateBasis() {
     "release_depth_surface"
   );
   const alphaVector = publicGapVector(
-    "vector:t129/public-gaps/alpha",
+    "derive_alpha_surface",
     "derive_alpha_surface",
     inputA,
     alpha
   );
   const releaseVector = publicGapVector(
-    "vector:t129/public-gaps/release-depth",
+    "derive_release_depth_surface",
     "derive_release_depth_surface",
     inputB,
     release
@@ -464,13 +464,13 @@ function publicGapsLexicalTrapBasis() {
     "alpha_surface"
   );
   const zetaVector = publicGapVector(
-    "vector:t129/public-gaps/default/zeta",
+    "derive_zeta_surface",
     "derive_zeta_surface",
     inputA,
     zeta
   );
   const alphaVector = publicGapVector(
-    "vector:t129/public-gaps/default/alpha",
+    "derive_alpha_surface",
     "derive_alpha_surface",
     inputB,
     alpha
@@ -690,11 +690,11 @@ test("T-129 public gap dossier follows graph order by default when no priority a
   assert.equal(dossier.localRankingAuthority, false);
   assert.equal(
     dossier.bestGraphVectorRef,
-    "vector:t129/public-gaps/default/zeta"
+    "derive_zeta_surface"
   );
-  assert.notEqual(dossier.bestGraphVectorRef, "vector:t129/public-gaps/default/alpha");
+  assert.notEqual(dossier.bestGraphVectorRef, "derive_alpha_surface");
   assert.deepEqual(dossier.nextLawfulActions, [
-    "construction-action:graph-function:t129/public-gaps/default-follow:vector:t129/public-gaps/default/zeta"
+    "construction-action:t129_public_gaps_default_follow:derive_zeta_surface"
   ]);
   assert(
     dossier.rankingReasonRefs.some((ref) =>
@@ -721,7 +721,7 @@ test("T-129 public gap dossier ranks competing graph actions through the ABG eva
         weight: 30,
         appliesToActionKinds: Object.freeze(["continue_graph_call"]),
         appliesToOutcomeRefs: Object.freeze([
-          "outcome://odd-sdlc/graph-function:t129/public-gaps/multi-candidate/node:t129/public-gaps/release-depth"
+          "outcome://odd-sdlc/t129_public_gaps_multi_candidate/node:t129/public-gaps/release-depth"
         ]),
         sourcePolicyRef: "policy://odd-sdlc/t129/public-gaps/release-first",
         strategyLabel: "public_gap_release_depth_first"
@@ -761,11 +761,11 @@ test("T-129 public gap dossier ranks competing graph actions through the ABG eva
   );
   assert.equal(
     dossier.bestGraphVectorRef,
-    "vector:t129/public-gaps/release-depth"
+    "derive_release_depth_surface"
   );
-  assert.notEqual(dossier.bestGraphVectorRef, "vector:t129/public-gaps/alpha");
+  assert.notEqual(dossier.bestGraphVectorRef, "derive_alpha_surface");
   assert.deepEqual(dossier.nextLawfulActions, [
-    "construction-action:graph-function:t129/public-gaps/multi-candidate:vector:t129/public-gaps/release-depth"
+    "construction-action:t129_public_gaps_multi_candidate:derive_release_depth_surface"
   ]);
   assert(
     dossier.rankingReasonRefs.includes(

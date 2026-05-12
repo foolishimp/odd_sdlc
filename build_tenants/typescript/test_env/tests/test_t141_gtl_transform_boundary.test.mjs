@@ -222,7 +222,7 @@ test("T-141 requirement obligations can carry downstream without blocking the re
         evidenceRefs: ["file:///workspace/specification/requirements/01-t141.md"],
         carryDirection: "downstream_transformation_set",
         downstreamGraphFunctionRefs: [
-          `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+          FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
         ],
         targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"]
       }
@@ -415,8 +415,8 @@ test("T-141 evaluate_next selects materialization action from carried requiremen
       {
         actionRef: "construction-action://t141/materialize-declared-product",
         actionKind: "invoke_graph_function",
-        graphFunctionRef: materializeGraphFunction.id,
-        graphVectorRef: null,
+        graphFunctionRef: materializeGraphFunction.name,
+        graphVectorRef: "vector:odd_sdlc:Fg_materialize_declared_product_asset",
         publishedTraversalTargetRef:
           `published-action://odd-sdlc/graph-function/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`,
         targetOutcomeRef,
@@ -432,7 +432,7 @@ test("T-141 evaluate_next selects materialization action from carried requiremen
       {
         actionRef: "construction-action://t141/broad-bootstrap-fallback",
         actionKind: "invoke_graph_function",
-        graphFunctionRef: "graph-function:odd_sdlc:bootstrap_release_self_test",
+        graphFunctionRef: "bootstrap_release_self_test",
         graphVectorRef: null,
         publishedTraversalTargetRef:
           "published-action://odd-sdlc/graph-function/bootstrap_release_self_test",
@@ -464,7 +464,7 @@ test("T-141 evaluate_next selects materialization action from carried requiremen
   });
 
   assert.equal(nextActionProjection.choosesNextTraversal, true);
-  assert.equal(nextActionProjection.nextGraphFunctionRef, materializeGraphFunction.id);
+  assert.equal(nextActionProjection.nextGraphFunctionRef, materializeGraphFunction.name);
   assert.match(
     nextActionProjection.selectedActionRef ?? "",
     /materialize-declared-product/u
@@ -487,7 +487,7 @@ test("T-141 materialization candidate is derived from the published graph catalo
   assert.equal(action.status, "eligible");
   assert.equal(
     action.graphFunctionRef,
-    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   assert.deepEqual(action.outputAssetTypes, ["component_code_surface"]);
   assert.deepEqual(action.targetBindingRefs, [
@@ -567,7 +567,7 @@ test("T-141 target binding reuses the existing target-obligation surface for pro
   );
 });
 
-test("T-141 installed runner closes authority induction and selects product materialization", async () => {
+test("T-141 installed runner closes authority induction and selects next materialization prerequisite", async () => {
   const workspaceRoot = writeRequirementWorkspace();
   const workerScript = writeAuthorityConformanceWorkerScript(workspaceRoot);
   const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
@@ -617,11 +617,11 @@ test("T-141 installed runner closes authority induction and selects product mate
   );
   assert.equal(
     outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
-    "derive_component_code_surface"
+    "derive_feature_decomp_surface"
   );
   assert.match(
     outcome.traversalConsequence.nextActionProjection.nextGraphVectorRef ?? "",
-    /derive_component_code_surface/u
+    /derive_feature_decomp_surface/u
   );
   assert.match(
     outcome.traversalConsequence.nextActionProjection.selectedActionRef ?? "",

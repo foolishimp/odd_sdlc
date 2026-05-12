@@ -11,6 +11,8 @@ import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 import {
   admitSdlcProjectConstraints,
   constructSdlcGtlModule,
+  deriveSdlcPostProductMaterializationActionInput,
+  deriveSdlcPostProductMaterializationActionResolution,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
   executeInstalledOperatorStart,
@@ -30,7 +32,7 @@ function graphTrackRefs(graphFunctionName) {
   assert(vector);
   return Object.freeze({
     graphFunctionRef: graphFunction.name,
-    graphVectorRef: vector.id
+    graphVectorRef: vector.name
   });
 }
 
@@ -290,7 +292,8 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
   const runtimeEvents = JSON.parse(
     readFileSync(path.join(outcome.archiveRoot, "runtime_events.json"), "utf8")
   );
-  const closedInvocation = runtimeEvents
+  assert.equal(runtimeEvents.kind, "sdlc_runtime_event_archive_projection");
+  const closedInvocation = runtimeEvents.events
     .filter((event) => event.kind === "actor_invocation_closed")
     .at(-1);
   assert(closedInvocation);
@@ -327,9 +330,11 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
 
   const stale = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
   assert.equal(stale.status, "ok");
-  assert.notEqual(
-    stale.payload.start.executionContract?.targetGraphFunction,
-    "Fg_materialize_declared_product_asset"
+  assert.equal(stale.payload.blockingReason, "next_action_projection_graph_vector_missing");
+  assert(
+    stale.payload.blockingReasonCarriers.some(
+      (reason) => reason.code === "next_action_projection_graph_vector_missing"
+    )
   );
 
   const componentCode = graphTrackRefs("derive_component_code_surface");
@@ -352,13 +357,282 @@ test("T-158 replayed Eval_Action must carry graph-vector track authority", () =>
   assert.equal(replayed.payload.projection.currentEdge, "derive_component_code_surface");
 });
 
+test("T-158 replayed Eval_Action boundary refs fail as typed diagnostics", () => {
+  const valid = graphTrackRefs("derive_component_code_surface");
+  const cases = [
+    {
+      name: "legacy-function",
+      code: "legacy_graph_function_boundary_ref",
+      nextGraphFunctionRef: `graph-function:${valid.graphFunctionRef}`,
+      nextGraphVectorRef: valid.graphVectorRef
+    },
+    {
+      name: "unknown-function",
+      code: "unknown_graph_function_boundary_ref",
+      nextGraphFunctionRef: "missing_graph_function",
+      nextGraphVectorRef: valid.graphVectorRef
+    },
+    {
+      name: "legacy-vector",
+      code: "legacy_graph_vector_boundary_ref",
+      nextGraphFunctionRef: valid.graphFunctionRef,
+      nextGraphVectorRef: `graph-vector:${valid.graphVectorRef}`
+    },
+    {
+      name: "unknown-vector",
+      code: "unknown_graph_vector_boundary_ref",
+      nextGraphFunctionRef: valid.graphFunctionRef,
+      nextGraphVectorRef: "missing_graph_vector"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = makeWorkspace();
+    writePostCloseNextActionArchive(workspace, {
+      name: `20260512T000200000Z_pid158_${testCase.name}`,
+      nextGraphFunctionRef: testCase.nextGraphFunctionRef,
+      nextGraphVectorRef: testCase.nextGraphVectorRef
+    });
+
+    const result = invokeOddSdlcSpecMethodCommandSync(["gaps", "--workspace", workspace]);
+
+    assert.equal(result.status, "ok");
+    assert.equal(result.payload.blockingReason, testCase.code);
+    assert(
+      result.payload.blockingReasonCarriers.some(
+        (reason) => reason.code === testCase.code
+      ),
+      JSON.stringify(result.payload, null, 2)
+    );
+  }
+});
+
+test("T-158 product materialization Eval_Action fails closed on unresolved graph track", () => {
+  const module = constructSdlcGtlModule();
+  const withoutComponentCodeTrack = {
+    ...module,
+    graphFunctions: Object.freeze(
+      module.graphFunctions.filter(
+        (graphFunction) => graphFunction.name !== "derive_component_code_surface"
+      )
+    )
+  };
+
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
+    module: withoutComponentCodeTrack,
+    runRef: "run://t158/unresolved-track",
+    downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
+    admittedAssetTypes: [
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
+      "implementation_stack_profile"
+    ],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ]
+  });
+
+  assert.equal(resolution.status, "blocked");
+  assert.equal(
+    resolution.blockingReason.code,
+    "post_materialization_graph_track_unresolved"
+  );
+  assert.match(
+    resolution.blockingReason.detail,
+    /graph_track_target_unresolved_for_product_materialization_action/u
+  );
+  assert.equal(
+    deriveSdlcPostProductMaterializationActionInput({
+      module: withoutComponentCodeTrack,
+      runRef: "run://t158/unresolved-track",
+      downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
+      admittedAssetTypes: [
+        "implementation_component_topology_surface",
+        "component_realization_schedule_surface",
+        "implementation_stack_profile"
+      ],
+      downstreamTargetBindingRefs: [
+        "target-binding://odd-sdlc/component_code_surface"
+      ]
+    }),
+    null
+  );
+});
+
+test("T-158 product materialization Eval_Action walks graph prerequisites before terminal code", () => {
+  const module = constructSdlcGtlModule();
+  const featureDecomp = graphTrackRefs("derive_feature_decomp_surface");
+
+  const action = deriveSdlcPostProductMaterializationActionInput({
+    module,
+    runRef: "run://t158/prerequisite-track",
+    downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ],
+    admittedAssetTypes: [
+      "project_bootstrap_surface",
+      "intent_surface",
+      "product_surface",
+      "goal_surface",
+      "requirement_surface",
+      "project_authority_conformance_projection",
+      "project_authority_next_action_projection"
+    ]
+  });
+
+  assert(action);
+  assert.equal(action.graphFunctionRef, featureDecomp.graphFunctionRef);
+  assert.equal(action.graphVectorRef, featureDecomp.graphVectorRef);
+  assert(
+    action.eligibleReasonRefs.includes(
+      "graph_track_requested_target:component_code_surface"
+    )
+  );
+  assert(
+    action.eligibleReasonRefs.includes(
+      "graph_track_selected_target:feature_decomp_surface"
+    )
+  );
+});
+
+test("T-158 product materialization Eval_Action stops when requested target is admitted", () => {
+  const module = constructSdlcGtlModule();
+
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
+    module,
+    runRef: "run://t158/satisfied-target",
+    downstreamPressureRefs: [
+      "construction-action://odd-sdlc/post-action/Fg_materialize_declared_product_asset/post_downstream_product_materialization/target-outcome://odd-sdlc/post-action/Fg_materialize_declared_product_asset/component_code_surface/run"
+    ],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ],
+    admittedAssetTypes: [
+      "project_bootstrap_surface",
+      "intent_surface",
+      "product_surface",
+      "goal_surface",
+      "requirement_surface",
+      "project_authority_conformance_projection",
+      "project_authority_next_action_projection",
+      "feature_decomp_surface",
+      "design_surface",
+      "scenario_surface",
+      "implementation_design_surface",
+      "implementation_stack_profile",
+      "implementation_module_surface",
+      "aggregate_domain_model_surface",
+      "implementation_component_topology_surface",
+      "aggregate_sunny_day_sequence_surface",
+      "component_realization_schedule_surface",
+      "component_code_surface"
+    ]
+  });
+
+  assert.equal(resolution.status, "no_pressure");
+  assert.equal(
+    deriveSdlcPostProductMaterializationActionInput({
+      module,
+      runRef: "run://t158/satisfied-target",
+      downstreamPressureRefs: [
+        "construction-action://odd-sdlc/post-action/Fg_materialize_declared_product_asset/post_downstream_product_materialization/target-outcome://odd-sdlc/post-action/Fg_materialize_declared_product_asset/component_code_surface/run"
+      ],
+      downstreamTargetBindingRefs: [
+        "target-binding://odd-sdlc/component_code_surface"
+      ],
+      admittedAssetTypes: ["component_code_surface"]
+    }),
+    null
+  );
+});
+
+test("T-158 product materialization Eval_Action fails closed on ambiguous graph track", () => {
+  const module = constructSdlcGtlModule();
+  const componentCode = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "derive_component_code_surface"
+  );
+  assert(componentCode);
+  const duplicateComponentCode = Object.freeze({
+    ...componentCode,
+    id: "graph-function:odd_sdlc:t158_duplicate_component_code_surface",
+    name: "t158_duplicate_component_code_surface"
+  });
+  const ambiguousModule = {
+    ...module,
+    graphFunctions: Object.freeze([...module.graphFunctions, duplicateComponentCode])
+  };
+
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
+    module: ambiguousModule,
+    runRef: "run://t158/ambiguous-track",
+    downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
+    admittedAssetTypes: [
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
+      "implementation_stack_profile"
+    ],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ]
+  });
+
+  assert.equal(resolution.status, "blocked");
+  assert.equal(
+    resolution.blockingReason.code,
+    "post_materialization_graph_track_unresolved"
+  );
+  assert.match(
+    resolution.blockingReason.detail,
+    /graph_track_target_ambiguous_for_product_materialization_action/u
+  );
+});
+
+test("T-158 product materialization graph track treats untagged peers as ambiguous", () => {
+  const module = constructSdlcGtlModule();
+  const componentCode = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "derive_component_code_surface"
+  );
+  assert(componentCode);
+  const untaggedPeer = Object.freeze({
+    ...componentCode,
+    id: "graph-function:odd_sdlc:t158_untagged_peer_component_code_surface",
+    name: "t158_untagged_peer_component_code_surface",
+    tags: Object.freeze([])
+  });
+  const ambiguousModule = {
+    ...module,
+    graphFunctions: Object.freeze([...module.graphFunctions, untaggedPeer])
+  };
+
+  const resolution = deriveSdlcPostProductMaterializationActionResolution({
+    module: ambiguousModule,
+    runRef: "run://t158/untagged-peer-track",
+    downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
+    admittedAssetTypes: [
+      "implementation_component_topology_surface",
+      "component_realization_schedule_surface",
+      "implementation_stack_profile"
+    ],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ]
+  });
+
+  assert.equal(resolution.status, "blocked");
+  assert.match(
+    resolution.blockingReason.detail,
+    /graph_track_target_ambiguous_for_product_materialization_action/u
+  );
+});
+
 test("T-158 installed operator admits non-close consequence before dispatch return", () => {
   const source = readFileSync(
     new URL("../../code/src/operator/installed_operator.ts", import.meta.url),
     "utf8"
   );
   const publishMarkers =
-    source.match(/(?:const consequence = )?publishDispatchState\(current\);/gu) ?? [];
+    source.match(/const consequence = publishDispatchState\(current\);/gu) ?? [];
   assert.equal(publishMarkers.length, 6);
 
   for (const branchStatus of [
@@ -371,11 +645,17 @@ test("T-158 installed operator admits non-close consequence before dispatch retu
     const branchIndex = source.indexOf(branchStatus);
     assert.notEqual(branchIndex, -1, branchStatus);
     const publishIndex = source.indexOf(
-      "publishDispatchState(current);",
+      "const consequence = publishDispatchState(current);",
       branchIndex
     );
     const returnIndex = source.indexOf("return constructFpDispatchOutcome", branchIndex);
     assert(publishIndex > branchIndex, branchStatus);
     assert(returnIndex > publishIndex, branchStatus);
+    const branchBody = source.slice(publishIndex, returnIndex + 800);
+    assert.match(
+      branchBody,
+      /consequence\.nextActionProjection\.nextActionProjectionRef/u,
+      branchStatus
+    );
   }
 });

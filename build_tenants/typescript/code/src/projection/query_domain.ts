@@ -25,6 +25,10 @@ import {
   FG_CONFORM_PROJECT,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
+  sdlcGraphFunctionBoundaryRef,
+  sdlcGraphVectorBoundaryRef,
+  sdlcPublishedTraversalTargetRef,
+  sdlcTargetOutcomeRef,
   type SdlcGraphFunctionCatalog
 } from "../graph/index.js";
 import {
@@ -58,7 +62,7 @@ export interface SdlcGraphFunctionSurface {
 
 export interface SdlcStartTargetSurface {
   readonly name: string;
-  readonly graphFunctionId: string;
+  readonly graphFunctionRef: string;
   readonly jobName: string;
 }
 
@@ -377,7 +381,7 @@ function startTargets(input: {
         targets.push(
           Object.freeze({
             name: graphFunction.name,
-            graphFunctionId: graphFunction.id,
+            graphFunctionRef: sdlcGraphFunctionBoundaryRef(graphFunction),
             jobName: job.name
           })
         );
@@ -1349,27 +1353,34 @@ function evaluateSdlcNextAction(
     throw new TypeError("SdlcGapDossier evaluator requires a published graph vector");
   }
   const closedVectorIndexSet = new Set(input.closedVectorIndexes);
+  const graphFunctionRef = sdlcGraphFunctionBoundaryRef(input.basis.graphFunction);
+  const vectorRef = sdlcGraphVectorBoundaryRef(vector);
   const candidateVectors = input.basis.graph.vectors
     .map((candidate, index) => Object.freeze({ candidate, index }))
     .filter(({ index }) => !closedVectorIndexSet.has(index));
   const targetOutcomeRefs = Object.freeze(
     candidateVectors.map(
       ({ candidate }) =>
-        `outcome://odd-sdlc/${input.basis.graphFunction.id}/${candidate.target.id}`
+        sdlcTargetOutcomeRef({
+          graphFunctionRef,
+          targetNodeRef: candidate.target.id
+        })
     )
   );
-  const currentTargetOutcomeRef =
-    `outcome://odd-sdlc/${input.basis.graphFunction.id}/${vector.target.id}`;
+  const currentTargetOutcomeRef = sdlcTargetOutcomeRef({
+    graphFunctionRef,
+    targetNodeRef: vector.target.id
+  });
   const effectivePriorityScheme =
     priorityScheme ??
     constructConstructionPriorityScheme({
       schemeRef:
-        `${input.domainDefaults.defaultGapPrioritySchemeRef}/${input.basis.graphFunction.id}/${vector.id}`,
+        `${input.domainDefaults.defaultGapPrioritySchemeRef}/${graphFunctionRef}/${vectorRef}`,
       sourcePolicyRef: input.domainDefaults.defaultGapPriorityPolicyRef,
       rules: Object.freeze([
         constructConstructionPriorityRule({
           priorityRuleRef:
-            `${input.domainDefaults.defaultGapPriorityPolicyRef}/rule/${input.basis.graphFunction.id}/${vector.id}`,
+            `${input.domainDefaults.defaultGapPriorityPolicyRef}/rule/${graphFunctionRef}/${vectorRef}`,
           axis: "gap_repair",
           weight: 100,
           appliesToActionKinds: Object.freeze(["continue_graph_call"]),
@@ -1385,12 +1396,12 @@ function evaluateSdlcNextAction(
     nextActionBasisKind: "initial_selection",
     intentEventRefs: input.intentEventRefs,
     productAssetModelRef: input.productAssetModelRef,
-    episodeId: `construction-episode://odd-sdlc/gaps/${input.basis.graphFunction.id}`,
-    observationId: `construction-observation://odd-sdlc/gaps/${input.basis.graphFunction.id}/${input.vectorIndex}/${input.events.length}`,
+    episodeId: `construction-episode://odd-sdlc/gaps/${graphFunctionRef}`,
+    observationId: `construction-observation://odd-sdlc/gaps/${graphFunctionRef}/${input.vectorIndex}/${input.events.length}`,
     priorityScheme: effectivePriorityScheme,
     pressures: Object.freeze([
       {
-        pressureRef: `pressure://odd-sdlc/gap/${input.basis.graphFunction.id}/${vector.id}`,
+        pressureRef: `pressure://odd-sdlc/gap/${graphFunctionRef}/${vectorRef}`,
         pressureKind: "gap_row",
         sourceRef: `sdlc-gap-dossier://odd-sdlc/${input.triageInput}`,
         affectedAssetRefs: Object.freeze(
@@ -1403,14 +1414,19 @@ function evaluateSdlcNextAction(
     ]),
     actions: Object.freeze(
       candidateVectors.map(({ candidate }) => {
-        const targetOutcomeRef =
-          `outcome://odd-sdlc/${input.basis.graphFunction.id}/${candidate.target.id}`;
-        const publishedTraversalTargetRef =
-          `published-traversal-target://odd-sdlc/${input.basis.graphFunction.id}/${candidate.id}`;
+        const graphVectorRef = sdlcGraphVectorBoundaryRef(candidate);
+        const targetOutcomeRef = sdlcTargetOutcomeRef({
+          graphFunctionRef,
+          targetNodeRef: candidate.target.id
+        });
+        const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+          graphFunctionRef,
+          graphVectorRef
+        });
         return {
           actionKind: "continue_graph_call" as const,
-          graphFunctionRef: input.basis.graphFunction.id,
-          graphVectorRef: candidate.id,
+          graphFunctionRef,
+          graphVectorRef,
           publishedTraversalTargetRef,
           targetOutcomeRef,
           inputAssetRefs: Object.freeze(candidate.source.map((node) => node.id)),

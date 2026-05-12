@@ -46,8 +46,10 @@ import {
   canonicalSdlcPriorGapReasonCode,
   legacyBlockingReasonCode,
   makeSdlcBlockingReason,
+  SDLC_BLOCKING_REASON_CODES,
   sdlcBlockingReasonFromLegacy,
-  type SdlcBlockingReason
+  type SdlcBlockingReason,
+  type SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
 import {
   deriveSdlcFeatureScope,
@@ -65,6 +67,7 @@ import {
   type SdlcConformProjectProfile
 } from "../workspace/index.js";
 import {
+  isPlaceholderRequirementMarker,
   localRequirementMarker,
   requirementAuthorityIdentityForMarker
 } from "../workspace/source_input.js";
@@ -99,6 +102,7 @@ import type {
   SdlcWorkerExecutionShardEvidence,
   SdlcWorkerObligationAssessment,
   SdlcWorkerRetryContext,
+  SdlcWorkerResultMaterializationDiagnostic,
   SdlcWorkerResultReport
 } from "./carriers.js";
 
@@ -125,6 +129,7 @@ const REPORT_FIELDS = Object.freeze([
   "summary",
   "unresolvedReasons",
   "materializedFiles",
+  "materializationDiagnostics",
   "executionEvidence",
   "executionEvidenceErrors",
   "obligationAssessments",
@@ -216,7 +221,7 @@ const POSTFLIGHT_GAP_ACTIONS = Object.freeze([
 ] as const);
 
 const REQUIREMENT_MARKER_EXPRESSION =
-  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
+  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
 const LOCAL_REQUIREMENT_HEADING_EXPRESSION =
   /^[ \t]{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
 const MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS = 80;
@@ -635,15 +640,17 @@ function targetsFromProductAuthoritySection(input: {
       fenced = !fenced;
       continue;
     }
+    let addedCodeSpan = false;
     for (const match of line.matchAll(/`([^`]+)`/gu)) {
       const codeSpan = match[1];
       if (codeSpan !== undefined) {
         addTarget(codeSpan);
+        addedCodeSpan = true;
       }
     }
     if (!fenced) {
       const bullet = /^\s*[-*]\s+(.+)$/u.exec(line);
-      if (bullet !== null) {
+      if (bullet !== null && !addedCodeSpan) {
         const bulletTarget = bullet[1];
         if (bulletTarget !== undefined) {
           addTarget(bulletTarget);
@@ -652,6 +659,69 @@ function targetsFromProductAuthoritySection(input: {
       continue;
     }
     addTarget(line);
+  }
+  return Object.freeze(
+    [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+  );
+}
+
+function targetsFromProductAuthorityFields(input: {
+  readonly markdown: string;
+  readonly selectedOutputRoot: string;
+}): readonly DeclaredProductTargetSeed[] {
+  const targets = new Map<string, DeclaredProductTargetSeed>();
+  const addTarget = (candidate: string): void => {
+    let addedCodeSpan = false;
+    for (const match of candidate.matchAll(/`([^`]+)`/gu)) {
+      const codeSpan = match[1];
+      if (codeSpan === undefined) {
+        continue;
+      }
+      const normalized = normalizeDeclaredProductFileTarget({
+        value: codeSpan,
+        selectedOutputRoot: input.selectedOutputRoot
+      });
+      if (
+        normalized !== null &&
+        normalized.path !== input.selectedOutputRoot
+      ) {
+        targets.set(normalized.path, normalized);
+        addedCodeSpan = true;
+      }
+    }
+    if (addedCodeSpan) {
+      return;
+    }
+    const normalized = normalizeDeclaredProductFileTarget({
+      value: candidate,
+      selectedOutputRoot: input.selectedOutputRoot
+    });
+    if (
+      normalized !== null &&
+      normalized.path !== input.selectedOutputRoot
+    ) {
+      targets.set(normalized.path, normalized);
+    }
+  };
+  const fieldPattern =
+    /^(?:(?:declared|expected)\s+)?(?:(?:product|source|test)\s+)?files?$/iu;
+  for (const line of input.markdown.split(/\r?\n/u)) {
+    const cells = markdownTableCells(line);
+    if (cells !== null && cells.length >= 2) {
+      const field = cells[0]?.replace(/[*_`]/gu, "").trim() ?? "";
+      if (fieldPattern.test(field)) {
+        addTarget(cells.slice(1).join(" "));
+      }
+      continue;
+    }
+    const fieldMatch =
+      /^\s*(?:[-*]\s*)?(?:\*\*)?((?:(?:declared|expected)\s+)?(?:(?:product|source|test)\s+)?files?)(?:\*\*)?\s*:\s*(.+?)\s*$/iu.exec(
+        line
+      );
+    if (fieldMatch === null) {
+      continue;
+    }
+    addTarget(fieldMatch[2] ?? "");
   }
   return Object.freeze(
     [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
@@ -808,6 +878,10 @@ function productAuthorityTargetsFor(
     sourceRef,
     manifest,
     seeds: [
+      ...targetsFromProductAuthorityFields({
+        markdown: product,
+        selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+      }),
       ...sections.flatMap((body) =>
         targetsFromProductAuthoritySection({
           body,
@@ -1444,12 +1518,25 @@ function markdownFilesIn(workspaceRoot: string, relativeDir: string): readonly s
   if (!existsSync(absoluteDir) || !statSync(absoluteDir).isDirectory()) {
     return Object.freeze([]);
   }
-  return Object.freeze(
-    readdirSync(absoluteDir)
-      .filter((fileName) => fileName.endsWith(".md"))
-      .map((fileName) => `${relativeDir}/${fileName}`)
-      .sort()
-  );
+  const collect = (currentRelativeDir: string, currentAbsoluteDir: string): string[] =>
+    readdirSync(currentAbsoluteDir).flatMap((entryName) => {
+      const entryPath = join(currentAbsoluteDir, entryName);
+      const entryRelativePath = `${currentRelativeDir}/${entryName}`;
+      let entryStat: ReturnType<typeof statSync>;
+      try {
+        entryStat = statSync(entryPath);
+      } catch {
+        return [];
+      }
+      if (entryStat.isDirectory()) {
+        return collect(entryRelativePath, entryPath);
+      }
+      if (entryStat.isFile() && entryName.endsWith(".md")) {
+        return [entryRelativePath];
+      }
+      return [];
+    });
+  return Object.freeze(collect(relativeDir, absoluteDir).sort());
 }
 
 function readableFileRef(ref: string): { readonly ref: string; readonly filePath: string; readonly content: string } | null {
@@ -1472,11 +1559,28 @@ function importedSourceRefsFromLedger(ref: string): readonly string[] {
   if (source === null) {
     return Object.freeze([]);
   }
+  const ledgerSuffix = "/specification/requirements/00-imported-sources.md";
+  const normalizedLedgerPath = source.filePath.split(path.sep).join("/");
+  const workspaceRoot = normalizedLedgerPath.endsWith(ledgerSuffix)
+    ? source.filePath.slice(0, source.filePath.length - ledgerSuffix.length)
+    : null;
   const refs: string[] = [];
   for (const line of source.content.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith("- file://")) {
       refs.push(trimmed.slice(2).trim());
+      continue;
+    }
+    if (workspaceRoot !== null && trimmed.startsWith("- workspace://")) {
+      const relativeRef = trimmed
+        .slice("- workspace://".length)
+        .trim()
+        .replace(/^`|`$/gu, "")
+        .replace(/^\/+/u, "");
+      const absoluteRefPath = join(workspaceRoot, relativeRef);
+      if (existsSync(absoluteRefPath) && statSync(absoluteRefPath).isFile()) {
+        refs.push(pathToFileURL(absoluteRefPath).href);
+      }
     }
   }
   return uniqueSorted(refs);
@@ -1637,6 +1741,20 @@ function titleForAuthorityFile(content: string, filePath: string): string {
   return path.basename(filePath);
 }
 
+function tenantLocalSdlcSurfaceAssetTypeForAuthorityPath(
+  filePath: string
+): string | null {
+  const normalized = filePath.split(path.sep).join("/");
+  for (const [assetType, relativePath] of Object.entries(
+    TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
+  )) {
+    if (normalized.endsWith(`/${relativePath}`)) {
+      return assetType;
+    }
+  }
+  return null;
+}
+
 function authorityIndexFor(
   authorityRefs: readonly string[]
 ): readonly SdlcAuthorityIndexEntry[] {
@@ -1647,6 +1765,8 @@ function authorityIndexFor(
         return [];
       }
       const category = authorityCategoryFor(source.filePath);
+      const surfaceAssetType =
+        tenantLocalSdlcSurfaceAssetTypeForAuthorityPath(source.filePath);
       const digest = sha256Text(source.content);
       const key = `${category}:${path.basename(source.filePath)}`;
       return [
@@ -1657,7 +1777,9 @@ function authorityIndexFor(
           category,
           title: titleForAuthorityFile(source.content, source.filePath),
           digest,
-          tags: Object.freeze([category])
+          tags: Object.freeze(
+            surfaceAssetType === null ? [category] : [category, surfaceAssetType]
+          )
         })
       ];
     })
@@ -1735,9 +1857,14 @@ function retrievalHintsFor(input: {
       const obligationIds = input.obligations
         .filter((obligation) => obligation.evidenceRefs.includes(entry.ref))
         .map((obligation) => obligation.obligationId);
-      const trancheMatch = input.trancheKeys.some((key) =>
-        key.includes(entry.category)
-      );
+      const trancheMatch = input.trancheKeys.some((key) => {
+        const categoryMatch = key === entry.category || key.startsWith(`${entry.category}:`);
+        const keySegments = key.split(":").filter((segment) => segment.length > 0);
+        const assetTagMatch = entry.tags
+          .filter((tag) => tag !== entry.category)
+          .some((tag) => keySegments.includes(tag));
+        return categoryMatch || assetTagMatch;
+      });
       return Object.freeze({
         kind: "sdlc_retrieval_hint" as const,
         key: entry.key,
@@ -1813,6 +1940,9 @@ function requirementObligations(input: {
     readonly sourceDigest: string;
     readonly snippet: string;
   }): void => {
+    if (isPlaceholderRequirementMarker(input.marker)) {
+      return;
+    }
     const identity = requirementAuthorityIdentityForMarker({
       marker: input.marker,
       projectSlug,
@@ -1855,6 +1985,9 @@ function requirementObligations(input: {
     const digest = sha256Text(source.content);
     for (const match of source.content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
       const marker = match[0] ?? "";
+      if (isPlaceholderRequirementMarker(marker)) {
+        continue;
+      }
       const snippet = requirementMarkerSnippet({
         content: source.content,
         offset: match.index ?? 0,
@@ -2565,9 +2698,10 @@ function inlineObligationsForPrompt(
   const structural = manifest.traversalObligationContext.obligations.filter(
     (obligation) => obligation.obligationKind !== "requirement"
   );
-  const requirementSlice = manifest.traversalObligationContext.obligations
-    .filter((obligation) => obligation.obligationKind === "requirement")
-    .slice(0, 12);
+  const requirementSlice = canonicalRequirementTraceObligationsForPrompt(manifest).slice(
+    0,
+    12
+  );
   return Object.freeze([...structural, ...requirementSlice]);
 }
 
@@ -2575,8 +2709,7 @@ function requirementTraceObligationIdsForPrompt(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
   return Object.freeze(
-    manifest.traversalObligationContext.obligations
-      .filter((obligation) => obligation.obligationKind === "requirement")
+    canonicalRequirementTraceObligationsForPrompt(manifest)
       .slice(0, MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS)
       .map((obligation) => obligation.obligationId)
   );
@@ -2587,9 +2720,8 @@ function omittedRequirementTraceObligationCount(
 ): number {
   return Math.max(
     0,
-    manifest.traversalObligationContext.obligations.filter(
-      (obligation) => obligation.obligationKind === "requirement"
-    ).length - MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS
+    canonicalRequirementTraceObligationsForPrompt(manifest).length -
+      MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS
   );
 }
 
@@ -2597,8 +2729,18 @@ function compactRetrievalHints(
   manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
   hints: readonly SdlcRetrievalHint[]
 ): readonly SdlcRetrievalHint[] {
+  const rankedHints = hints
+    .map((hint, index) => ({ hint, index }))
+    .sort((left, right) => {
+      const leftTargeted =
+        left.hint.reason === "targeted_authority_for_current_traversal" ? 1 : 0;
+      const rightTargeted =
+        right.hint.reason === "targeted_authority_for_current_traversal" ? 1 : 0;
+      return rightTargeted - leftTargeted || left.index - right.index;
+    })
+    .map((entry) => entry.hint);
   return Object.freeze(
-    hints.slice(0, 12).map((hint) =>
+    rankedHints.slice(0, 12).map((hint) =>
       Object.freeze({
         kind: "sdlc_retrieval_hint" as const,
         key: hint.key,
@@ -3272,27 +3414,31 @@ function transformAxiomsForWorker(): readonly string[] {
     "F_P.transform only: produce bounded candidate transform evidence.",
     "Do not write ledgers, runtime events, closure decisions, evaluator projections, or framework result carriers.",
     "Use worker_brief, worker_invocation_package, traversal_intent_package, and explicitly referenced manifest fields as authority.",
+    "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_invocation_package is the closed schema authority for this traversal.",
+    "Read boundary: use only relative paths under the current workspace; do not glob, read, cite, or copy sibling sandboxes, historical test_runs, home memory, or absolute paths outside the active workspace.",
     "Do not use PTY transcripts, runtime logs, or worker archives as product authority unless a package ref names them.",
     "Start the output artifact with ## Execution Plan naming read authority, bounded steps, and first materialization target.",
-    "When requirementTraceObligationIds is non-empty, include ## Requirement Trace Register with each listed exact id and use traversal_intent_package for the complete set."
+    "When requirementTraceObligationIds is non-empty, include ## Requirement Trace Register with those exact ids. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
   ]);
 }
 
 function compactComponentDepthDirective(
   manifest: SdlcWorkerHandoffManifest
 ): string | null {
+  const componentRealizationRowsDirective =
+    "Emit component_depth_register.componentRealizationRows with kind=sdlc_component_realization_row, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs; order rows by dependency reason and keep progress component-addressable.";
   switch (manifest.targetAssetType) {
     case "implementation_component_topology_surface":
-      return "Emit component_depth_register.componentTopologyRows with componentId, moduleName, relativePath, publicBoundary, concernRole, sourceAssetRefs, and requirementIds.";
+      return "Emit component_depth_register.componentTopologyRows with kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs. concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other; use io_adapter for entry scripts that adapt a process/stdout boundary. publicBoundary must be a string; for an entry script with no exported API, use a non-empty entrypoint string such as node-entry-script:<relativePath>, never [] or null.";
     case "component_realization_schedule_surface":
-      return "Emit component_depth_register.componentRealizationRows ordered by dependency reason; keep progress component-addressable.";
+      return componentRealizationRowsDirective;
     case "component_code_surface":
       if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
       }
-      return "Emit component_depth_register.componentRealizationRows and preserve declared component boundaries from topology/schedule authority.";
+      return `${componentRealizationRowsDirective} Preserve declared component boundaries from topology/schedule authority.`;
     case "component_realization_qualification_surface":
-      return "Emit component_depth_register realization qualification with realized, missing, collapsed, and affected requirement ids.";
+      return `${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
     case "test_component_topology_surface":
       return "Emit component_depth_register.testComponentTopologyRows with testClassId, relativePath, testcaseIds, componentIds, requirementIds, test kind, and shard.";
     case "component_test_surface":
@@ -3313,11 +3459,33 @@ function compactDesignDepthDirective(
 ): string | null {
   switch (manifest.targetAssetType) {
     case "implementation_module_surface":
-      return "Emit design_depth_register module schema and state fragments; mark stateless/stateful entities explicitly.";
+      return [
+        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"implementation_module_surface\"`.",
+        "Use these exact top-level fields: `moduleSchemaFragments` (non-empty), `moduleStateDiagramFragments` (non-empty), `aggregateDomainModel:null`, `aggregateSunnyDaySequence:null`, and `designCompletenessVerdict:null`.",
+        "Keep the carrier proportional to immediate implementation structure: identify only the modules, implementation entities, and operations needed to materialize the declared product surface from current source assets.",
+        "Do not flatten requirement obligations, runtime execution proof, process archives, test assertions, downstream evidence, or audit lineage into separate module entities unless the source design explicitly declares them as implementation modules or product data.",
+        "For a single-file or script product, one moduleSchemaFragments row, one primary source/program entity, one materialization/invocation operation when needed, and one stateless moduleStateDiagramFragments row are sufficient; do not create one entity or stateless diagram row per requirement.",
+        "Use only canonical schema kinds: `sdlc_module_schema_fragment`, `sdlc_domain_entity`, `sdlc_domain_attribute`, `sdlc_domain_operation`, `sdlc_module_state_diagram_fragment`, `sdlc_entity_state_transition`.",
+        "Use exact nested field names: `moduleSchemaFragments[].moduleName`, `entities[].entityId`, `entities[].moduleName`, `entities[].ownership`, `attributes[].attributeId`, `attributes[].valueType`, `attributes[].cardinality`, `attributes[].invariantRefs`, `operations[].operationId`, `operations[].inputEntityIds`, `operations[].outputEntityIds`, and `operations[].requiredAttributeIds`.",
+        "Each `moduleSchemaFragments` item must be an object, not a string or index row: {\"kind\":\"sdlc_module_schema_fragment\",\"moduleName\":\"<module>\",\"entities\":[{\"kind\":\"sdlc_domain_entity\",\"entityId\":\"<entity>\",\"moduleName\":\"<module>\",\"ownership\":\"owned|referenced\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"<attribute>\",\"name\":\"<name>\",\"valueType\":\"<type>\",\"cardinality\":\"one|optional|many\",\"invariantRefs\":[\"<requirement-or-invariant-ref>\"]}],\"invariants\":[],\"sourceAssetRefs\":[\"workspace://...\"]}],\"operations\":[{\"kind\":\"sdlc_domain_operation\",\"operationId\":\"<operation>\",\"moduleName\":\"<module>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"requiredAttributeIds\":[\"<attribute>\"]}],\"requirementIds\":[\"<requirement-id>\"],\"sourceAssetRefs\":[\"workspace://...\"]}.",
+        "For stateless implementation, emit the smallest non-empty `moduleStateDiagramFragments` set: {\"kind\":\"sdlc_module_state_diagram_fragment\",\"moduleName\":\"<module>\",\"entityId\":\"<primary-entity>\",\"stateless\":true,\"states\":[],\"transitions\":[],\"requirementIds\":[\"<requirement-id>\"],\"sourceAssetRefs\":[\"workspace://...\"]}."
+      ].join(" ");
     case "aggregate_domain_model_surface":
-      return "Emit design_depth_register aggregateDomainModel plus entity, attribute, and flow completeness verdicts.";
+      return [
+        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"aggregate_domain_model_surface\"`.",
+        "Use exact top-level fields: `moduleSchemaFragments:[]`, `moduleStateDiagramFragments:[]`, non-null `aggregateDomainModel`, `aggregateSunnyDaySequence:null`, and non-null `designCompletenessVerdict`.",
+        "Use this aggregate model object shape: {\"kind\":\"sdlc_aggregate_domain_model\",\"modelVersion\":\"ts-design-depth-v1\",\"entities\":[{\"kind\":\"sdlc_aggregate_domain_entity\",\"entityId\":\"<entity>\",\"ownerModuleName\":\"<module>\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"<attribute>\",\"name\":\"<name>\",\"valueType\":\"<type>\",\"cardinality\":\"one|optional|many\",\"invariantRefs\":[\"<requirement-or-invariant-ref>\"]}],\"sourceModuleNames\":[\"<module>\"]}],\"operations\":[{\"kind\":\"sdlc_domain_operation\",\"operationId\":\"<operation>\",\"moduleName\":\"<module>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"requiredAttributeIds\":[\"<attribute>\"]}],\"crossModuleReferences\":[],\"evidenceRefs\":[\"workspace://...\"]}.",
+        "Use this completeness verdict shape with axes `entity`, `attribute`, and `flow`: {\"kind\":\"sdlc_design_completeness_verdict\",\"verdictVersion\":\"ts-design-depth-v1\",\"entity\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"entity\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]},\"attribute\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"attribute\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]},\"flow\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"flow\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]}}.",
+        "For `aggregate_domain_model_surface`, mark the flow axis `satisfied` when the aggregate model declares the in-scope operations; do not mark flow partial solely because `aggregateSunnyDaySequence` is null or because sunny-day sequence projection is owned by downstream `derive_aggregate_sunny_day_sequence_surface`."
+      ].join(" ");
     case "aggregate_sunny_day_sequence_surface":
-      return "Emit design_depth_register aggregateSunnyDaySequence backed by published operations/entities and completeness verdicts.";
+      return [
+        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"aggregate_sunny_day_sequence_surface\"`.",
+        "Use exact top-level fields: `moduleSchemaFragments:[]`, `moduleStateDiagramFragments:[]`, non-null `aggregateDomainModel`, non-null `aggregateSunnyDaySequence`, and non-null `designCompletenessVerdict`.",
+        "Use canonical `aggregateDomainModel` shape with `kind:\"sdlc_aggregate_domain_model\"`, `modelVersion:\"ts-design-depth-v1\"`, `entities`, `operations`, `crossModuleReferences`, and `evidenceRefs`.",
+        "Use this sunny-day sequence object shape: {\"kind\":\"sdlc_aggregate_sunny_day_sequence\",\"sequenceVersion\":\"ts-design-depth-v1\",\"steps\":[{\"kind\":\"sdlc_sunny_day_sequence_step\",\"stepId\":\"<step>\",\"moduleName\":\"<module>\",\"operationId\":\"<operation>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"stateTransitionIds\":[]}],\"evidenceRefs\":[\"workspace://...\"]}.",
+        "Use `designCompletenessVerdict` with `kind:\"sdlc_design_completeness_verdict\"`, `verdictVersion:\"ts-design-depth-v1\"`, and `entity`, `attribute`, `flow` axis verdicts."
+      ].join(" ");
     default:
       return null;
   }
@@ -3359,8 +3527,15 @@ function retryDefectDirectivesForWorker(
 ): readonly string[] {
   const reasons = manifest.retryContext.priorGapDossiers.flatMap((dossier) =>
     dossier.reasons.map((reason) => {
-      const detail = reason.blockingReason.detail ?? reason.reason;
-      return `${reason.blockingReason.lawfulReentryPoint}: ${reason.blockingReason.message} (${detail})`;
+      const detail = workerFacingDiagnosticText(
+        manifest,
+        reason.blockingReason.detail ?? reason.reason
+      );
+      const message = workerFacingDiagnosticText(
+        manifest,
+        reason.blockingReason.message
+      );
+      return `${reason.blockingReason.lawfulReentryPoint}: ${message} (${detail})`;
     })
   );
   if (reasons.length === 0) {
@@ -3468,7 +3643,9 @@ function outcomeDirectivesForWorker(
       `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
       `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`,
       "Do not create or modify product files outside the declared product file targets and allowed shared build roots for this edge.",
-      "Apply requirementTraceObligationIds as the inline requirement transformation slice and traversal_intent_package as the complete transformation set for product files."
+      "Apply requirementTraceObligationIds as the complete product-file requirement tag set for this edge. Do not expand product file tags from traversal_intent_package; it is audit context for the broader graph.",
+      "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file and list the cited obligation ids on materializedFiles[].requirementTraceObligationIds.",
+      "For source files, put the requirement tags at the top of the file using valid native comment syntax, one exact id per line, for example `// requirement:<canonical-id>`; do not rely on the report alone for product-file lineage."
     );
     if (
       productMaterializationAuthority.status === "missing" ||
@@ -3729,6 +3906,39 @@ function workerFacingPath(
   return filePath;
 }
 
+function workerFacingDiagnosticPath(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  rawPath: string
+): string {
+  const relativePath = workerFacingPath(manifest, rawPath);
+  if (relativePath !== rawPath) {
+    return relativePath;
+  }
+  return `[outside-workspace-path:${path.basename(rawPath)}]`;
+}
+
+function workerFacingDiagnosticText(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  text: string
+): string {
+  return text
+    .replace(/file:\/\/\/[^\s;),"]+/gu, (candidate) => {
+      try {
+        const filePath = fileURLToPath(candidate);
+        const relativePath = workerFacingPath(manifest, filePath);
+        if (relativePath !== filePath) {
+          return `workspace://${relativePath}`;
+        }
+        return `[outside-workspace-file:${path.basename(filePath)}]`;
+      } catch {
+        return "[outside-workspace-file]";
+      }
+    })
+    .replace(/\/[A-Za-z0-9._~!$&'*+=:@%/-]+/gu, (candidate) =>
+      workerFacingDiagnosticPath(manifest, candidate)
+    );
+}
+
 function workerFacingRef(
   manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
   ref: string
@@ -3839,6 +4049,11 @@ function workerFacingRetryRepairInstructions(
     instructions.map((instruction) =>
       Object.freeze({
         ...instruction,
+        reason: workerFacingDiagnosticText(manifest, instruction.reason),
+        blockingReasonDetail: workerFacingDiagnosticText(
+          manifest,
+          instruction.blockingReasonDetail
+        ),
         gapDossierRef: workerFacingRef(manifest, instruction.gapDossierRef),
         rejectedArtifactRefs: workerFacingRefs(
           manifest,
@@ -3905,6 +4120,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     "Terse axioms:",
     "- Apply workerInvocationPackage.transformAxioms as the single axiom authority.",
+    "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
     "- Do not add local axiom variants from this launch frame.",
     "",
     "Outcome directives:",
@@ -4029,6 +4245,32 @@ function parseArray<T>(
   );
 }
 
+function admitWorkerResultMaterializationDiagnostic(
+  input: unknown,
+  label: string
+): SdlcWorkerResultMaterializationDiagnostic {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "code",
+    "detail",
+    "evidenceRefs"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_worker_result_materialization_diagnostic") {
+    throw new TypeError(`${label}.kind: unexpected materialization diagnostic kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_result_materialization_diagnostic" as const,
+    code: parseEnumValue(
+      record["code"],
+      `${label}.code`,
+      SDLC_BLOCKING_REASON_CODES
+    ),
+    detail: parseNonEmptyString(record["detail"], `${label}.detail`),
+    evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`)
+  });
+}
+
 function admitMaterializedProductFile(
   input: unknown,
   label: string
@@ -4039,13 +4281,66 @@ function admitMaterializedProductFile(
     "relativePath",
     "absolutePath",
     "digest",
-    "byteCount"
+    "byteCount",
+    "materializationSource",
+    "sourceManifestRef",
+    "sourceHandoffManifestRef",
+    "sourceAttemptRef",
+    "overwritesMaterializationRef",
+    "rolePolicyRef",
+    "requirementTraceObligationIds"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
   if (kind !== "sdlc_materialized_product_file") {
     throw new TypeError(`${label}.kind: unexpected materialized file kind`);
   }
-  return Object.freeze({
+  const materializationSource =
+    record["materializationSource"] === undefined
+      ? "current_attempt"
+      : parseEnumValue(
+          record["materializationSource"],
+          `${label}.materializationSource`,
+          ["current_attempt", "replay"] as const
+        );
+  const sourceManifestRef =
+    record["sourceManifestRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(record["sourceManifestRef"], `${label}.sourceManifestRef`);
+  const sourceHandoffManifestRef =
+    record["sourceHandoffManifestRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(
+          record["sourceHandoffManifestRef"],
+          `${label}.sourceHandoffManifestRef`
+        );
+  const sourceAttemptRef =
+    record["sourceAttemptRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(record["sourceAttemptRef"], `${label}.sourceAttemptRef`);
+  const overwritesMaterializationRef =
+    record["overwritesMaterializationRef"] === undefined
+      ? undefined
+      : parseNonEmptyString(
+          record["overwritesMaterializationRef"],
+          `${label}.overwritesMaterializationRef`
+        );
+  if (
+    materializationSource === "replay" &&
+    (sourceManifestRef === undefined ||
+      sourceHandoffManifestRef === undefined ||
+      sourceAttemptRef === undefined)
+  ) {
+    throw new TypeError(`${label}: replayed materialized files require source lineage refs`);
+  }
+  if (
+    materializationSource === "replay" &&
+    overwritesMaterializationRef !== undefined
+  ) {
+    throw new TypeError(
+      `${label}.overwritesMaterializationRef: replayed files cannot overwrite predecessor materialization`
+    );
+  }
+  const base = {
     kind: "sdlc_materialized_product_file",
     role: parseEnumValue(
       record["role"],
@@ -4057,7 +4352,42 @@ function admitMaterializedProductFile(
       parseNonEmptyString(record["absolutePath"], `${label}.absolutePath`)
     ),
     digest: parseNonEmptyString(record["digest"], `${label}.digest`),
-    byteCount: parseNonNegativeInteger(record["byteCount"], `${label}.byteCount`)
+    byteCount: parseNonNegativeInteger(record["byteCount"], `${label}.byteCount`),
+    ...(record["rolePolicyRef"] === undefined
+      ? {}
+      : {
+          rolePolicyRef: parseNonEmptyString(
+            record["rolePolicyRef"],
+            `${label}.rolePolicyRef`
+          )
+        }),
+    ...(record["requirementTraceObligationIds"] === undefined
+      ? {}
+      : {
+          requirementTraceObligationIds: parseStringList(
+            record["requirementTraceObligationIds"],
+            `${label}.requirementTraceObligationIds`
+          )
+        })
+  } as const;
+  if (materializationSource === "replay") {
+    return Object.freeze({
+      ...base,
+      materializationSource,
+      sourceManifestRef: sourceManifestRef as string,
+      sourceHandoffManifestRef: sourceHandoffManifestRef as string,
+      sourceAttemptRef: sourceAttemptRef as string
+    });
+  }
+  return Object.freeze({
+    ...base,
+    materializationSource,
+    ...(sourceManifestRef === undefined ? {} : { sourceManifestRef }),
+    ...(sourceHandoffManifestRef === undefined ? {} : { sourceHandoffManifestRef }),
+    ...(sourceAttemptRef === undefined ? {} : { sourceAttemptRef }),
+    ...(overwritesMaterializationRef === undefined
+      ? {}
+      : { overwritesMaterializationRef })
   });
 }
 
@@ -4293,6 +4623,11 @@ export function admitWorkerResultReport(
       "SdlcWorkerResultReport.materializedFiles",
       admitMaterializedProductFile
     ),
+    materializationDiagnostics: parseArray(
+      record["materializationDiagnostics"] ?? [],
+      "SdlcWorkerResultReport.materializationDiagnostics",
+      admitWorkerResultMaterializationDiagnostic
+    ),
     executionEvidence,
     executionEvidenceErrors: parseStringList(
       record["executionEvidenceErrors"] ?? [],
@@ -4326,6 +4661,242 @@ function pathIsInside(child: string, parent: string): boolean {
   return (
     relativePath.length === 0 ||
     (!relativePath.startsWith("..") && !isAbsolute(relativePath))
+  );
+}
+
+const WORKER_AUTHORITY_READ_LOG_FILES = Object.freeze([
+  "worker_stdout.log",
+  "worker_process_events.jsonl"
+] as const);
+
+const WORKER_AUTHORITY_PATH_KEYS = new Set([
+  "command",
+  "cwd",
+  "directory",
+  "filepath",
+  "filenames",
+  "glob",
+  "path",
+  "paths",
+  "pattern",
+  "root",
+  "workspaceroot"
+]);
+
+const WORKER_AUTHORITY_RUNTIME_METADATA_PATH_KEYS = new Set([
+  "persistedoutputpath"
+]);
+
+interface WorkerAuthorityBoundaryViolation {
+  readonly sourceFile: string;
+  readonly fieldPath: string;
+  readonly path: string;
+}
+
+function normalizedAuthorityPathKey(input: string): string {
+  return input.replace(/[-_]/gu, "").toLowerCase();
+}
+
+function workerAuthorityPathKeyCarriesFilesystemRef(input: string): boolean {
+  const normalized = normalizedAuthorityPathKey(input);
+  if (WORKER_AUTHORITY_RUNTIME_METADATA_PATH_KEYS.has(normalized)) {
+    return false;
+  }
+  return (
+    WORKER_AUTHORITY_PATH_KEYS.has(normalized) ||
+    normalized.endsWith("path") ||
+    normalized.endsWith("paths")
+  );
+}
+
+function trimmedFilesystemPathCandidate(input: string): string {
+  return input.replace(/[),.;\]}]+$/u, "");
+}
+
+function candidateFilesystemPathsFromWorkerField(input: string): readonly string[] {
+  const candidates = new Set<string>();
+  const trimmed = trimmedFilesystemPathCandidate(input.trim());
+  if (trimmed.startsWith("file://")) {
+    try {
+      candidates.add(resolve(fileURLToPath(trimmed)));
+    } catch {
+      // Ignore malformed file refs; postflight has separate admission checks.
+    }
+  }
+  if (isAbsolute(trimmed)) {
+    candidates.add(resolve(trimmed));
+  }
+  const fileUrlExpression = /file:\/\/[^\s"'`<>)]*/gu;
+  for (const match of input.matchAll(fileUrlExpression)) {
+    const candidate = trimmedFilesystemPathCandidate(match[0] ?? "");
+    try {
+      candidates.add(resolve(fileURLToPath(candidate)));
+    } catch {
+      // Ignore malformed file refs; postflight has separate admission checks.
+    }
+  }
+  const absolutePathExpression =
+    /(?:^|[\s"'`([{,=])((?:\/Users|\/private|\/tmp|\/var|\/opt|\/Volumes|\/home)\/[^\s"'`<>)]*)/gu;
+  for (const match of input.matchAll(absolutePathExpression)) {
+    const candidate = trimmedFilesystemPathCandidate(match[1] ?? "");
+    if (isAbsolute(candidate)) {
+      candidates.add(resolve(candidate));
+    }
+  }
+  return Object.freeze([...candidates]);
+}
+
+function collectWorkerAuthorityPathViolations(input: {
+  readonly value: unknown;
+  readonly sourceFile: string;
+  readonly fieldPath: string;
+  readonly workspaceRoot: string;
+  readonly pathKeyContext: boolean;
+  readonly violations: WorkerAuthorityBoundaryViolation[];
+}): void {
+  if (typeof input.value === "string") {
+    if (!input.pathKeyContext) {
+      return;
+    }
+    for (const candidate of candidateFilesystemPathsFromWorkerField(input.value)) {
+      if (!pathIsInside(candidate, input.workspaceRoot)) {
+        input.violations.push(
+          Object.freeze({
+            sourceFile: input.sourceFile,
+            fieldPath: input.fieldPath,
+            path: candidate
+          })
+        );
+      }
+    }
+    return;
+  }
+  if (Array.isArray(input.value)) {
+    input.value.forEach((item, index) =>
+      collectWorkerAuthorityPathViolations({
+        value: item,
+        sourceFile: input.sourceFile,
+        fieldPath: `${input.fieldPath}[${index}]`,
+        workspaceRoot: input.workspaceRoot,
+        pathKeyContext: input.pathKeyContext,
+        violations: input.violations
+      })
+    );
+    return;
+  }
+  const record = objectRecord(input.value);
+  if (record === null) {
+    return;
+  }
+  for (const [key, value] of Object.entries(record)) {
+    collectWorkerAuthorityPathViolations({
+      value,
+      sourceFile: input.sourceFile,
+      fieldPath: `${input.fieldPath}.${key}`,
+      workspaceRoot: input.workspaceRoot,
+      pathKeyContext:
+        input.pathKeyContext ||
+        workerAuthorityPathKeyCarriesFilesystemRef(key),
+      violations: input.violations
+    });
+  }
+}
+
+function workerAuthorityPayloadsFromEvent(input: unknown): readonly {
+  readonly fieldPath: string;
+  readonly value: unknown;
+}[] {
+  const record = objectRecord(input);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  const payloads: { fieldPath: string; value: unknown }[] = [];
+  if (record["tool_use_result"] !== undefined) {
+    payloads.push({
+      fieldPath: "tool_use_result",
+      value: record["tool_use_result"]
+    });
+  }
+  if (record["input"] !== undefined && record["type"] === "tool_use") {
+    payloads.push({
+      fieldPath: "input",
+      value: record["input"]
+    });
+  }
+  const message = objectRecord(record["message"]);
+  const content = Array.isArray(message?.["content"])
+    ? message["content"]
+    : [];
+  content.forEach((item, index) => {
+    const itemRecord = objectRecord(item);
+    if (itemRecord?.["type"] === "tool_use" && itemRecord["input"] !== undefined) {
+      payloads.push({
+        fieldPath: `message.content[${index}].input`,
+        value: itemRecord["input"]
+      });
+    }
+  });
+  return Object.freeze(payloads);
+}
+
+function evaluateWorkerAuthorityReadBoundary(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly blockingReasonCarriers: SdlcBlockingReason[];
+}): void {
+  const workspaceRoot = resolve(input.manifest.workspaceRoot);
+  const violationsByKey = new Map<string, WorkerAuthorityBoundaryViolation>();
+  const evidenceRefs = new Set<string>();
+  for (const fileName of WORKER_AUTHORITY_READ_LOG_FILES) {
+    const logFile = join(input.manifest.archiveRoot, fileName);
+    if (!existsSync(logFile) || !statSync(logFile).isFile()) {
+      continue;
+    }
+    evidenceRefs.add(pathToFileURL(logFile).href);
+    const lines = readFileSync(logFile, "utf8").split(/\r?\n/u);
+    lines.forEach((line, lineIndex) => {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        return;
+      }
+      const parsed = parseJsonCandidate(trimmed);
+      if (!parsed.ok) {
+        return;
+      }
+      for (const payload of workerAuthorityPayloadsFromEvent(parsed.value)) {
+        const violations: WorkerAuthorityBoundaryViolation[] = [];
+        collectWorkerAuthorityPathViolations({
+          value: payload.value,
+          sourceFile: logFile,
+          fieldPath: `${fileName}:${lineIndex + 1}.${payload.fieldPath}`,
+          workspaceRoot,
+          pathKeyContext: false,
+          violations
+        });
+        for (const violation of violations) {
+          violationsByKey.set(
+            `${violation.sourceFile}\n${violation.fieldPath}\n${violation.path}`,
+            violation
+          );
+        }
+      }
+    });
+  }
+  const violations = [...violationsByKey.values()];
+  if (violations.length === 0) {
+    return;
+  }
+  const displayed = violations
+    .slice(0, 5)
+    .map((violation) => `${violation.fieldPath}=${violation.path}`);
+  const omitted = violations.length - displayed.length;
+  input.blockingReasonCarriers.push(
+    makeSdlcBlockingReason({
+      code: "worker_authority_read_outside_workspace",
+      detail: omitted > 0
+        ? `${displayed.join("; ")}; omitted=${omitted}`
+        : displayed.join("; "),
+      evidenceRefs: Object.freeze([...evidenceRefs])
+    })
   );
 }
 
@@ -4783,7 +5354,8 @@ function materializedFileFromObservedFile(input: {
     relativePath: input.file.relativePath,
     absolutePath: input.file.absolutePath,
     digest: input.file.digest,
-    byteCount: input.file.byteCount
+    byteCount: input.file.byteCount,
+    materializationSource: "current_attempt" as const
   });
 }
 
@@ -4804,15 +5376,201 @@ function targetContractForMaterializedFile(input: {
   );
 }
 
-export function observeProductMaterializationDelta(input: {
+function materializedFileLineageRef(input: {
+  readonly manifestRef: string;
+  readonly relativePath: string;
+  readonly digest: string;
+}): string {
+  return [
+    "materialized-product-file://odd-sdlc",
+    encodeURIComponent(input.manifestRef),
+    encodeURIComponent(input.relativePath),
+    encodeURIComponent(input.digest)
+  ].join("/");
+}
+
+function handoffManifestRefForArchiveRoot(archiveRoot: string): string {
+  return pathToFileURL(join(archiveRoot, "handoff_manifest.json")).href;
+}
+
+function attemptRefForArchiveRoot(archiveRoot: string): string {
+  return pathToFileURL(archiveRoot).href;
+}
+
+function rolePolicyRefForMaterializedRole(
+  role: SdlcMaterializedProductFileRole
+): string {
+  if (role === "source") {
+    return "target-role-policy://odd-sdlc/product-source-tree";
+  }
+  if (role === "test") {
+    return "target-role-policy://odd-sdlc/product-test-tree";
+  }
+  if (role === "build_config") {
+    return "target-role-policy://odd-sdlc/reported-build-config";
+  }
+  if (role === "design") {
+    return "target-role-policy://odd-sdlc/product-design-surface";
+  }
+  if (role === "documentation") {
+    return "target-role-policy://odd-sdlc/product-documentation";
+  }
+  return "target-role-policy://odd-sdlc/reported-other";
+}
+
+function fileWithMaterializationProvenance(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly materializationSource: "current_attempt" | "replay";
+  readonly sourceManifestRef: string;
+  readonly sourceHandoffManifestRef: string;
+  readonly sourceAttemptRef: string;
+  readonly overwritesMaterializationRef?: string | null | undefined;
+}): SdlcMaterializedProductFile {
+  const targetContract = targetContractForMaterializedFile({
+    manifest: input.manifest,
+    relativePath: input.file.relativePath
+  });
+  const rolePolicyRef =
+    input.materializationSource === "replay"
+      ? input.file.rolePolicyRef
+      : input.file.rolePolicyRef ??
+        targetContract?.policyRef ??
+        rolePolicyRefForMaterializedRole(input.file.role);
+  return Object.freeze({
+    ...input.file,
+    materializationSource: input.materializationSource,
+    sourceManifestRef: input.sourceManifestRef,
+    sourceHandoffManifestRef: input.sourceHandoffManifestRef,
+    sourceAttemptRef: input.sourceAttemptRef,
+    ...(input.overwritesMaterializationRef === null ||
+    input.overwritesMaterializationRef === undefined
+      ? {}
+      : { overwritesMaterializationRef: input.overwritesMaterializationRef }),
+    ...(rolePolicyRef === undefined ? {} : { rolePolicyRef })
+  });
+}
+
+function currentAttemptMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly overwritesMaterializationRef?: string | null | undefined;
+}): SdlcMaterializedProductFile {
+  return fileWithMaterializationProvenance({
+    manifest: input.manifest,
+    file: input.file,
+    materializationSource: "current_attempt",
+    sourceManifestRef: pathToFileURL(
+      input.manifest.productMaterialization.manifestFile
+    ).href,
+    sourceHandoffManifestRef: handoffManifestRefForArchiveRoot(input.manifest.archiveRoot),
+    sourceAttemptRef: attemptRefForArchiveRoot(input.manifest.archiveRoot),
+    overwritesMaterializationRef: input.overwritesMaterializationRef
+  });
+}
+
+function replayMaterializedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly sourceManifestRef: string;
+  readonly sourceHandoffManifestRef: string;
+  readonly sourceAttemptRef: string;
+}): SdlcMaterializedProductFile {
+  return fileWithMaterializationProvenance({
+    manifest: input.manifest,
+    file: input.file,
+    materializationSource: "replay",
+    sourceManifestRef: input.sourceManifestRef,
+    sourceHandoffManifestRef: input.sourceHandoffManifestRef,
+    sourceAttemptRef: input.sourceAttemptRef
+  });
+}
+
+type PriorAdmittedObservedMaterializedFileLookup =
+  | {
+      readonly kind: "file";
+      readonly file: SdlcMaterializedProductFile;
+    }
+  | {
+      readonly kind: "diagnostic";
+      readonly diagnostics: readonly SdlcWorkerResultMaterializationDiagnostic[];
+    }
+  | {
+      readonly kind: "none";
+    };
+
+interface ProductMaterializationObservationDelta {
+  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+  readonly diagnostics: readonly SdlcWorkerResultMaterializationDiagnostic[];
+}
+
+function priorAdmittedMaterializedFileForObservedFile(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcObservedProductFileSnapshot;
+}): PriorAdmittedObservedMaterializedFileLookup {
+  for (const archiveRoot of productMaterializationReplayArchives(input.manifest)) {
+    if (
+      !priorHandoffManifestMatchesCurrent({
+        archiveRoot,
+        currentManifest: input.manifest
+      })
+    ) {
+      continue;
+    }
+    const replayManifest = readProductMaterializationReplayManifest({
+      archiveRoot,
+      currentManifest: input.manifest
+    });
+    if (replayManifest.kind === "diagnostic") {
+      return Object.freeze({
+        kind: "diagnostic" as const,
+        diagnostics: Object.freeze([
+          Object.freeze({
+            kind: "sdlc_worker_result_materialization_diagnostic" as const,
+            code: replayManifest.code,
+            detail: replayManifest.detail,
+            evidenceRefs: replayManifest.evidenceRefs
+          })
+        ])
+      });
+    }
+    if (replayManifest.kind !== "manifest") {
+      continue;
+    }
+    const matched = replayManifest.files.find(
+      (candidate) =>
+        candidate.relativePath === input.file.relativePath &&
+        candidate.digest === input.file.digest
+    );
+    if (matched !== undefined) {
+      return Object.freeze({
+        kind: "file" as const,
+        file: replayMaterializedFile({
+          manifest: input.manifest,
+          file: matched,
+          sourceManifestRef: pathToFileURL(replayManifest.manifestFile).href,
+          sourceHandoffManifestRef: handoffManifestRefForArchiveRoot(archiveRoot),
+          sourceAttemptRef: attemptRefForArchiveRoot(archiveRoot)
+        })
+      });
+    }
+  }
+  return Object.freeze({ kind: "none" as const });
+}
+
+function observeProductMaterializationDeltaWithDiagnostics(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly before: SdlcProductMaterializationSnapshot;
-}): readonly SdlcMaterializedProductFile[] {
+}): ProductMaterializationObservationDelta {
   const after = snapshotProductMaterializationRoot(
     input.manifest.productMaterialization
   );
   const beforeByPath = snapshotByRelativePath(input.before);
   const observedByPath = new Map<string, SdlcMaterializedProductFile>();
+  const diagnosticsByKey = new Map<
+    string,
+    SdlcWorkerResultMaterializationDiagnostic
+  >();
   for (const file of after.files) {
     if (resolve(file.absolutePath) === resolve(input.manifest.outputFile)) {
       continue;
@@ -4824,6 +5582,30 @@ export function observeProductMaterializationDelta(input: {
       continue;
     }
     const changed = beforeByPath.get(file.relativePath)?.digest !== file.digest;
+    if (!changed && input.manifest.productMaterialization.required) {
+      const priorAdmitted = priorAdmittedMaterializedFileForObservedFile({
+        manifest: input.manifest,
+        file
+      });
+      if (
+        priorAdmitted.kind === "file" &&
+        input.manifest.productMaterialization.requiredRoles.includes(
+          priorAdmitted.file.role
+        )
+      ) {
+        observedByPath.set(file.relativePath, priorAdmitted.file);
+        continue;
+      }
+      if (priorAdmitted.kind === "diagnostic") {
+        for (const diagnostic of priorAdmitted.diagnostics) {
+          diagnosticsByKey.set(
+            `${diagnostic.code}\n${diagnostic.detail}\n${diagnostic.evidenceRefs.join("\n")}`,
+            diagnostic
+          );
+        }
+        continue;
+      }
+    }
     const satisfiesRequiredRole = observedFileSatisfiesRequiredRole({
       manifest: input.manifest,
       file
@@ -4844,11 +5626,21 @@ export function observeProductMaterializationDelta(input: {
       observedByPath.set(file.relativePath, materialized);
     }
   }
-  return Object.freeze(
-    [...observedByPath.values()].sort((left, right) =>
-      left.relativePath.localeCompare(right.relativePath)
-    )
-  );
+  return Object.freeze({
+    materializedFiles: Object.freeze(
+      [...observedByPath.values()].sort((left, right) =>
+        left.relativePath.localeCompare(right.relativePath)
+      )
+    ),
+    diagnostics: Object.freeze([...diagnosticsByKey.values()])
+  });
+}
+
+export function observeProductMaterializationDelta(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly before: SdlcProductMaterializationSnapshot;
+}): readonly SdlcMaterializedProductFile[] {
+  return observeProductMaterializationDeltaWithDiagnostics(input).materializedFiles;
 }
 
 function ensureObservedTransformOutput(input: {
@@ -5078,6 +5870,119 @@ function displayIdForRequirementObligation(
   return null;
 }
 
+function requirementLineageAuthorityRank(obligation: SdlcTraversalObligation): number {
+  const refs = obligation.payload.sourceRefs;
+  if (
+    refs.some(
+      (ref) =>
+        ref.includes("/specification/requirements/") &&
+        !ref.endsWith("/specification/requirements/README.md") &&
+        !ref.endsWith("/specification/requirements/00-imported-sources.md")
+    )
+  ) {
+    return 0;
+  }
+  if (
+    refs.some(
+      (ref) =>
+        ref.endsWith("/specification/REQUIREMENTS.md") ||
+        ref.endsWith("/specification/mapper_requirements.md")
+    )
+  ) {
+    return 1;
+  }
+  if (
+    refs.some((ref) =>
+      ref.endsWith("/specification/requirements/00-imported-sources.md")
+    )
+  ) {
+    return 2;
+  }
+  if (refs.some((ref) => ref.endsWith("/README.md"))) {
+    return 4;
+  }
+  return 3;
+}
+
+function canonicalRequirementTraceObligationsForPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcTraversalObligation[] {
+  const byDisplayId = new Map<string, SdlcTraversalObligation>();
+  for (const obligation of manifest.traversalObligationContext.obligations) {
+    if (obligation.obligationKind !== "requirement") {
+      continue;
+    }
+    const displayId =
+      displayIdForRequirementObligation(obligation) ?? obligation.obligationId;
+    const existing = byDisplayId.get(displayId);
+    if (
+      existing === undefined ||
+      requirementLineageAuthorityRank(obligation) <
+        requirementLineageAuthorityRank(existing) ||
+      (requirementLineageAuthorityRank(obligation) ===
+        requirementLineageAuthorityRank(existing) &&
+        obligation.obligationId.localeCompare(existing.obligationId) < 0)
+    ) {
+      byDisplayId.set(displayId, obligation);
+    }
+  }
+  return Object.freeze([...byDisplayId.values()]);
+}
+
+function canonicalRequirementLineageMap(
+  manifest: SdlcWorkerHandoffManifest
+): ReadonlyMap<string, string> {
+  const canonicalByDisplayId = new Map<string, string>();
+  for (const obligation of canonicalRequirementTraceObligationsForPrompt(manifest)) {
+    const displayId =
+      displayIdForRequirementObligation(obligation) ?? obligation.obligationId;
+    canonicalByDisplayId.set(displayId, obligation.obligationId);
+  }
+  const byObligationId = new Map<string, string>();
+  for (const obligation of manifest.traversalObligationContext.obligations) {
+    if (obligation.obligationKind !== "requirement") {
+      continue;
+    }
+    const displayId =
+      displayIdForRequirementObligation(obligation) ?? obligation.obligationId;
+    const canonicalId = canonicalByDisplayId.get(displayId);
+    if (canonicalId !== undefined) {
+      byObligationId.set(obligation.obligationId, canonicalId);
+    }
+  }
+  return byObligationId;
+}
+
+function equivalentRequirementLineageIdsByCanonical(
+  manifest: SdlcWorkerHandoffManifest
+): ReadonlyMap<string, readonly string[]> {
+  const canonicalByObligationId = canonicalRequirementLineageMap(manifest);
+  const byCanonical = new Map<string, Set<string>>();
+  for (const [obligationId, canonicalId] of canonicalByObligationId.entries()) {
+    const existing = byCanonical.get(canonicalId) ?? new Set<string>();
+    existing.add(obligationId);
+    byCanonical.set(canonicalId, existing);
+  }
+  return new Map(
+    [...byCanonical.entries()].map(([canonicalId, equivalentIds]) => [
+      canonicalId,
+      uniqueSorted([...equivalentIds])
+    ])
+  );
+}
+
+function canonicalizeRequirementLineageIds(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly obligationIds: readonly string[];
+}): readonly string[] {
+  const canonicalByObligationId = canonicalRequirementLineageMap(input.manifest);
+  return uniqueSorted(
+    input.obligationIds.map(
+      (obligationId) => canonicalByObligationId.get(obligationId) ?? obligationId
+    )
+  );
+}
+
 function observedRequirementIds(input: {
   readonly outputFile: string;
   readonly materializedFiles: readonly SdlcMaterializedProductFile[];
@@ -5093,10 +5998,194 @@ function observedRequirementIds(input: {
     }
     const content = readFileSync(filePath, "utf8");
     for (const marker of content.match(REQUIREMENT_MARKER_EXPRESSION) ?? []) {
+      if (isPlaceholderRequirementMarker(marker)) {
+        continue;
+      }
       ids.add(normalizeRequirementId(marker));
     }
   }
   return ids;
+}
+
+function observedRequirementEvidenceContents(input: {
+  readonly outputFile: string;
+  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+}): readonly { readonly ref: string; readonly content: string }[] {
+  const candidatePaths = uniqueSorted([
+    input.outputFile,
+    ...input.materializedFiles.map((file) => file.absolutePath)
+  ]);
+  return Object.freeze(
+    candidatePaths.flatMap((filePath) => {
+      if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+        return [];
+      }
+      return [
+        Object.freeze({
+          ref: pathToFileURL(filePath).href,
+          content: readFileSync(filePath, "utf8")
+        })
+      ];
+    })
+  );
+}
+
+function evidenceRefsCarryingRequirement(input: {
+  readonly evidenceContents: readonly {
+    readonly ref: string;
+    readonly content: string;
+  }[];
+  readonly obligationId: string;
+  readonly displayId: string | null;
+}): readonly string[] {
+  return uniqueSorted(
+    input.evidenceContents.flatMap((entry) =>
+      contentCarriesRequirementObligation({
+        content: entry.content,
+        obligationId: input.obligationId,
+        displayId: input.displayId
+      })
+        ? [entry.ref]
+        : []
+    )
+  );
+}
+
+function requirementDisplayIdByObligationId(
+  manifest: SdlcWorkerHandoffManifest
+): ReadonlyMap<string, string> {
+  const byObligationId = new Map<string, string>();
+  for (const obligation of manifest.traversalObligationContext.obligations) {
+    if (obligation.obligationKind !== "requirement") {
+      continue;
+    }
+    const displayId = displayIdForRequirementObligation(obligation);
+    if (displayId !== null) {
+      byObligationId.set(obligation.obligationId, displayId);
+    }
+  }
+  return byObligationId;
+}
+
+function contentCarriesRequirementObligation(input: {
+  readonly content: string;
+  readonly obligationId: string;
+  readonly displayId: string | null;
+}): boolean {
+  if (input.content.includes(input.obligationId)) {
+    return true;
+  }
+  if (input.obligationId.startsWith("requirement:")) {
+    const authorityRef = input.obligationId.slice("requirement:".length);
+    if (authorityRef.length > 0 && input.content.includes(authorityRef)) {
+      return true;
+    }
+  }
+  if (input.displayId === null) {
+    return false;
+  }
+  const normalizedDisplayId = normalizeRequirementId(input.displayId);
+  return (input.content.match(REQUIREMENT_MARKER_EXPRESSION) ?? []).some((marker) => {
+    if (isPlaceholderRequirementMarker(marker)) {
+      return false;
+    }
+    return normalizeRequirementId(marker) === normalizedDisplayId;
+  });
+}
+
+function materializedFileRequirementLineage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): ReadonlyMap<string, readonly string[]> {
+  if (!productMaterializationRequirementLineageRequired(input.manifest)) {
+    return new Map();
+  }
+  const lineageByPath = new Map<string, Set<string>>();
+  const canonicalByObligationId = canonicalRequirementLineageMap(input.manifest);
+  const fileRefByPath = new Map(
+    input.report.materializedFiles.map((file) => [
+      resolve(file.absolutePath),
+      pathToFileURL(resolve(file.absolutePath)).href
+    ])
+  );
+  for (const file of input.report.materializedFiles) {
+    if (file.requirementTraceObligationIds !== undefined) {
+      const existing = lineageByPath.get(resolve(file.absolutePath)) ?? new Set<string>();
+      for (const requirementId of file.requirementTraceObligationIds) {
+        existing.add(canonicalByObligationId.get(requirementId) ?? requirementId);
+      }
+      lineageByPath.set(resolve(file.absolutePath), existing);
+    }
+  }
+  for (const assessment of input.report.obligationAssessments) {
+    if (
+      !assessment.obligationId.startsWith("requirement:") ||
+      assessment.fulfillmentStatus !== "fulfilled"
+    ) {
+      continue;
+    }
+    const evidenceRefs = new Set(assessment.evidenceRefs);
+    for (const [absolutePath, fileRef] of fileRefByPath.entries()) {
+      if (!evidenceRefs.has(fileRef)) {
+        continue;
+      }
+      const existing = lineageByPath.get(absolutePath) ?? new Set<string>();
+      existing.add(
+        canonicalByObligationId.get(assessment.obligationId) ??
+          assessment.obligationId
+      );
+      lineageByPath.set(absolutePath, existing);
+    }
+  }
+  return new Map(
+    [...lineageByPath.entries()].map(([absolutePath, ids]) => [
+      absolutePath,
+      uniqueSorted([...ids])
+    ])
+  );
+}
+
+function productMaterializationRequirementLineageRequired(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return (
+    manifest.productMaterialization.required &&
+    requirementTraceObligationIdsForPrompt(manifest).length > 0 &&
+    (manifest.targetAssetType === "component_code_surface" ||
+      manifest.targetAssetType === "component_test_surface" ||
+      manifest.targetAssetType === "test_module_surface" ||
+      manifest.targetAssetType === "code_surface")
+  );
+}
+
+function workerReportWithMaterializedRequirementLineage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): SdlcWorkerResultReport {
+  const lineageByPath = materializedFileRequirementLineage(input);
+  if (lineageByPath.size === 0) {
+    return input.report;
+  }
+  return Object.freeze({
+    ...input.report,
+    materializedFiles: Object.freeze(
+      input.report.materializedFiles.map((file) => {
+        const requirementTraceObligationIds = lineageByPath.get(
+          resolve(file.absolutePath)
+        );
+        if (
+          requirementTraceObligationIds === undefined ||
+          requirementTraceObligationIds.length === 0
+        ) {
+          return file;
+        }
+        return Object.freeze({
+          ...file,
+          requirementTraceObligationIds
+        });
+      })
+    )
+  });
 }
 
 function postTransformObligationAssessments(input: {
@@ -5112,13 +6201,20 @@ function postTransformObligationAssessments(input: {
     outputFile: input.manifest.outputFile,
     materializedFiles: input.materializedFiles
   });
+  const observedRequirementContents = observedRequirementEvidenceContents({
+    outputFile: input.manifest.outputFile,
+    materializedFiles: input.materializedFiles
+  });
   const assessments = input.manifest.traversalObligationContext.obligations.map((obligation) => {
       const requirementId = requirementIdForObligation(obligation.obligationId);
     if (requirementId !== null) {
         const displayId = displayIdForRequirementObligation(obligation);
-        const observed =
-          observedRequirements.has(requirementId) ||
-          (displayId !== null && observedRequirements.has(displayId));
+        const evidenceRefs = evidenceRefsCarryingRequirement({
+          evidenceContents: observedRequirementContents,
+          obligationId: obligation.obligationId,
+          displayId
+        });
+        const observed = evidenceRefs.length > 0;
         const recordsRequirementSurfaceOnly =
           input.manifest.targetAssetType === "requirement_surface";
         const fulfillmentStatus =
@@ -5131,7 +6227,7 @@ function postTransformObligationAssessments(input: {
           kind: "sdlc_worker_obligation_assessment" as const,
           obligationId: obligation.obligationId,
           fulfillmentStatus,
-          evidenceRefs: baseEvidenceRefs,
+          evidenceRefs: observed ? evidenceRefs : obligation.evidenceRefs,
           blockingReasons:
             fulfillmentStatus === "fulfilled"
               ? Object.freeze([])
@@ -5188,21 +6284,35 @@ function postTransformObligationAssessments(input: {
       });
     });
   if (input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
-    const existingRequirementIds = new Set(
-      assessments
-        .map((assessment) => requirementIdForObligation(assessment.obligationId))
-        .filter((requirementId): requirementId is string => requirementId !== null)
-    );
+    const existingRequirementIds = new Set<string>();
+    for (const obligation of input.manifest.traversalObligationContext.obligations) {
+      const requirementId = requirementIdForObligation(obligation.obligationId);
+      if (requirementId !== null) {
+        existingRequirementIds.add(requirementId);
+      }
+      const displayId =
+        obligation.obligationKind === "requirement"
+          ? displayIdForRequirementObligation(obligation)
+          : null;
+      if (displayId !== null) {
+        existingRequirementIds.add(displayId);
+      }
+    }
     for (const requirementId of [...observedRequirements].sort()) {
       if (existingRequirementIds.has(requirementId)) {
         continue;
       }
+      const evidenceRefs = evidenceRefsCarryingRequirement({
+        evidenceContents: observedRequirementContents,
+        obligationId: `requirement:${requirementId}`,
+        displayId: requirementId
+      });
       assessments.push(
         Object.freeze({
           kind: "sdlc_worker_obligation_assessment" as const,
           obligationId: `requirement:${requirementId}`,
           fulfillmentStatus: "fulfilled" as const,
-          evidenceRefs: baseEvidenceRefs,
+          evidenceRefs: evidenceRefs.length > 0 ? evidenceRefs : [outputRef],
           blockingReasons: Object.freeze([])
         })
       );
@@ -5215,7 +6325,9 @@ export function buildPostTransformWorkerResultReport(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly before: SdlcProductMaterializationSnapshot;
 }): SdlcWorkerResultReport {
-  const materializedFiles = observeProductMaterializationDelta(input);
+  const materializationObservation =
+    observeProductMaterializationDeltaWithDiagnostics(input);
+  const materializedFiles = materializationObservation.materializedFiles;
   ensureObservedTransformOutput({
     manifest: input.manifest,
     materializedFiles
@@ -5238,6 +6350,7 @@ export function buildPostTransformWorkerResultReport(input: {
     summary: "framework-generated post-transform report from observed artifacts",
     unresolvedReasons: Object.freeze([]),
     materializedFiles,
+    materializationDiagnostics: materializationObservation.diagnostics,
     executionEvidence: extractedExecutionEvidence.executionEvidence,
     executionEvidenceErrors: extractedExecutionEvidence.errors,
     obligationAssessments: postTransformObligationAssessments({
@@ -5339,8 +6452,14 @@ function priorMaterializationContractMatchesCurrent(input: {
         ),
         current.declaredModuleNames
       ) &&
-      prior["buildExecutionContract"] === current.buildExecutionContract &&
-      prior["testExecutionContract"] === current.testExecutionContract &&
+      parseNonEmptyString(
+        prior["buildExecutionContract"],
+        "productMaterializationReplay.contract.buildExecutionContract"
+      ) === current.buildExecutionContract &&
+      parseNonEmptyString(
+        prior["testExecutionContract"],
+        "productMaterializationReplay.contract.testExecutionContract"
+      ) === current.testExecutionContract &&
       sameSortedStrings(
         parseStringList(
           prior["requiredRoles"],
@@ -5445,24 +6564,43 @@ function productMaterializationReplayArchives(
   );
 }
 
+type ProductMaterializationReplayManifestRead =
+  | {
+      readonly kind: "manifest";
+      readonly manifestFile: string;
+      readonly files: readonly SdlcMaterializedProductFile[];
+    }
+  | {
+      readonly kind: "absent";
+    }
+  | {
+      readonly kind: "diagnostic";
+      readonly code: SdlcBlockingReasonCode;
+      readonly detail: string;
+      readonly evidenceRefs: readonly string[];
+    };
+
 function readProductMaterializationReplayManifest(input: {
   readonly archiveRoot: string;
   readonly currentManifest: SdlcWorkerHandoffManifest;
-}): {
-  readonly manifestFile: string;
-  readonly files: readonly SdlcMaterializedProductFile[];
-} | null {
+}): ProductMaterializationReplayManifestRead {
   const manifestFile = join(input.archiveRoot, "product_materialization_manifest.json");
   if (!existsSync(manifestFile) || !statSync(manifestFile).isFile()) {
-    return null;
+    return Object.freeze({ kind: "absent" as const });
   }
+  const manifestRef = pathToFileURL(manifestFile).href;
   try {
     const manifest = parseOpenRecord(
       JSON.parse(readFileSync(manifestFile, "utf8")),
       "productMaterializationReplay.manifest"
     );
     if (manifest["kind"] !== "sdlc_product_materialization_manifest") {
-      return null;
+      return Object.freeze({
+        kind: "diagnostic" as const,
+        code: "materialized_product_manifest_replay_kind_mismatch",
+        detail: "product materialization replay manifest has an unexpected kind",
+        evidenceRefs: Object.freeze([manifestRef])
+      });
     }
     if (
       !priorMaterializationContractMatchesCurrent({
@@ -5470,7 +6608,12 @@ function readProductMaterializationReplayManifest(input: {
         currentContract: input.currentManifest.productMaterialization
       })
     ) {
-      return null;
+      return Object.freeze({
+        kind: "diagnostic" as const,
+        code: "materialized_product_manifest_replay_target_mismatch",
+        detail: "product materialization replay contract does not match the current materialization contract",
+        evidenceRefs: Object.freeze([manifestRef])
+      });
     }
     const files = parseArray(
       manifest["files"],
@@ -5478,18 +6621,30 @@ function readProductMaterializationReplayManifest(input: {
       admitMaterializedProductFile
     );
     if (files.length === 0) {
-      return null;
+      return Object.freeze({
+        kind: "diagnostic" as const,
+        code: "materialized_product_manifest_replay_empty",
+        detail: "product materialization replay manifest has no admitted file rows",
+        evidenceRefs: Object.freeze([manifestRef])
+      });
     }
     return Object.freeze({
+      kind: "manifest" as const,
       manifestFile,
       files
     });
-  } catch {
-    return null;
+  } catch (error) {
+    return Object.freeze({
+      kind: "diagnostic" as const,
+      code: "materialized_product_manifest_replay_parse_failed",
+      detail: error instanceof Error ? error.message : "failed to parse replay manifest",
+      evidenceRefs: Object.freeze([manifestRef])
+    });
   }
 }
 
 function mergeMaterializedProductFiles(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
   readonly replayedFiles: readonly SdlcMaterializedProductFile[];
   readonly currentFiles: readonly SdlcMaterializedProductFile[];
 }): readonly SdlcMaterializedProductFile[] {
@@ -5498,7 +6653,23 @@ function mergeMaterializedProductFiles(input: {
     byAbsolutePath.set(resolve(file.absolutePath), file);
   }
   for (const file of input.currentFiles) {
-    byAbsolutePath.set(resolve(file.absolutePath), file);
+    const replayed = byAbsolutePath.get(resolve(file.absolutePath));
+    const replayedRef =
+      replayed?.sourceManifestRef === undefined
+        ? null
+        : materializedFileLineageRef({
+            manifestRef: replayed.sourceManifestRef,
+            relativePath: replayed.relativePath,
+            digest: replayed.digest
+          });
+    byAbsolutePath.set(
+      resolve(file.absolutePath),
+      currentAttemptMaterializedFile({
+        manifest: input.manifest,
+        file,
+        overwritesMaterializationRef: replayedRef
+      })
+    );
   }
   return Object.freeze(
     [...byAbsolutePath.values()].sort((left, right) => {
@@ -5516,6 +6687,11 @@ function resolveProductMaterializationReplay(input: {
   readonly report: SdlcWorkerResultReport;
 }): {
   readonly report: SdlcWorkerResultReport;
+  readonly diagnostics: readonly {
+    readonly code: SdlcBlockingReasonCode;
+    readonly detail: string;
+    readonly evidenceRefs: readonly string[];
+  }[];
   readonly replay: {
     readonly currentAttemptMaterializedFileCount: number;
     readonly replayedMaterializedFileCount: number;
@@ -5523,11 +6699,32 @@ function resolveProductMaterializationReplay(input: {
     readonly lineageRefs: readonly string[];
   } | null;
 } {
+  const reportWithLineage = workerReportWithMaterializedRequirementLineage(input);
+  const currentFiles = reportWithLineage.materializedFiles.map((file) =>
+    file.materializationSource === "replay"
+      ? file
+      : currentAttemptMaterializedFile({
+          manifest: input.manifest,
+          file
+        })
+  );
   if (!materializationReplayIsNeeded(input)) {
-    return Object.freeze({ report: input.report, replay: null });
+    return Object.freeze({
+      report: Object.freeze({
+        ...reportWithLineage,
+        materializedFiles: Object.freeze(currentFiles)
+      }),
+      diagnostics: Object.freeze([]),
+      replay: null
+    });
   }
   const replayedFiles: SdlcMaterializedProductFile[] = [];
   const lineageRefs: string[] = [];
+  const diagnostics: {
+    code: SdlcBlockingReasonCode;
+    detail: string;
+    evidenceRefs: readonly string[];
+  }[] = [];
   for (const archiveRoot of productMaterializationReplayArchives(input.manifest)) {
     if (
       !priorHandoffManifestMatchesCurrent({
@@ -5541,28 +6738,59 @@ function resolveProductMaterializationReplay(input: {
       archiveRoot,
       currentManifest: input.manifest
     });
-    if (replayManifest === null) {
+    if (replayManifest.kind === "absent") {
       continue;
     }
-    replayedFiles.push(...replayManifest.files);
-    lineageRefs.push(pathToFileURL(replayManifest.manifestFile).href);
-    lineageRefs.push(pathToFileURL(join(archiveRoot, "handoff_manifest.json")).href);
+    if (replayManifest.kind === "diagnostic") {
+      diagnostics.push({
+        code: replayManifest.code,
+        detail: replayManifest.detail,
+        evidenceRefs: replayManifest.evidenceRefs
+      });
+      continue;
+    }
+    const manifestRef = pathToFileURL(replayManifest.manifestFile).href;
+    const handoffManifestRef = handoffManifestRefForArchiveRoot(archiveRoot);
+    const attemptRef = attemptRefForArchiveRoot(archiveRoot);
+    replayedFiles.push(
+      ...replayManifest.files.map((file) =>
+        replayMaterializedFile({
+          manifest: input.manifest,
+          file,
+          sourceManifestRef: manifestRef,
+          sourceHandoffManifestRef: handoffManifestRef,
+          sourceAttemptRef: attemptRef
+        })
+      )
+    );
+    lineageRefs.push(manifestRef);
+    lineageRefs.push(handoffManifestRef);
   }
   if (replayedFiles.length === 0) {
-    return Object.freeze({ report: input.report, replay: null });
+    return Object.freeze({
+      report: Object.freeze({
+        ...reportWithLineage,
+        materializedFiles: Object.freeze(currentFiles)
+      }),
+      diagnostics: Object.freeze(diagnostics),
+      replay: null
+    });
   }
   const materializedFiles = mergeMaterializedProductFiles({
+    manifest: input.manifest,
     replayedFiles,
-    currentFiles: input.report.materializedFiles
+    currentFiles
   });
   const report = Object.freeze({
-    ...input.report,
+    ...reportWithLineage,
     materializedFiles
   });
   return Object.freeze({
     report,
+    diagnostics: Object.freeze(diagnostics),
     replay: Object.freeze({
-      currentAttemptMaterializedFileCount: input.report.materializedFiles.length,
+      currentAttemptMaterializedFileCount:
+        reportWithLineage.materializedFiles.length,
       replayedMaterializedFileCount: replayedFiles.length,
       effectiveMaterializedFileCount: materializedFiles.length,
       lineageRefs: Object.freeze(uniqueSorted(lineageRefs))
@@ -5619,6 +6847,12 @@ function evidenceCandidatesForReport(input: {
     (assessment) => assessment.fulfillmentStatus === "unassessed"
   ).length;
   const assessmentEvidenceRefs = reportEvidenceRefs(input);
+  const carriedRequirementAssessments = assessments.filter(
+    (assessment) =>
+      assessment.obligationId.startsWith("requirement:") &&
+      (assessment.fulfillmentStatus === "fulfilled" ||
+        assessment.fulfillmentStatus === "partial")
+  );
   const candidates = [
     {
       candidateRef: `target_asset:${input.manifest.targetAssetType}`,
@@ -5643,6 +6877,22 @@ function evidenceCandidatesForReport(input: {
       deferred: unassessedCount > 0
     }
   ];
+  if (
+    input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+    carriedRequirementAssessments.length > 0
+  ) {
+    candidates.push({
+      candidateRef: "carried_asset:requirement_surface",
+      authorityRef: "asset-type://requirement_surface",
+      evidenceRefs: assessmentEvidenceRefs,
+      payloadClass: "sdlc_transform_carried_asset",
+      contractRef: "contract://odd_sdlc/fp-transform-carried-requirement-surface",
+      complete: outputArtifactAdmitted,
+      shallow: !outputArtifactAdmitted,
+      contradictsAuthority: false,
+      deferred: false
+    });
+  }
   return Object.freeze(candidates);
 }
 
@@ -5746,6 +6996,16 @@ function evaluateMaterializedProductFiles(input: {
     }
   }
   const tenantRoot = resolve(contract.tenantRoot);
+  const requirementDisplayIds =
+    requirementDisplayIdByObligationId(input.manifest);
+  const equivalentRequirementIdsByCanonical =
+    equivalentRequirementLineageIdsByCanonical(input.manifest);
+  const requirementLineageRequired =
+    productMaterializationRequirementLineageRequired(input.manifest);
+  const currentRequirementLineageIds = new Set(
+    requirementTraceObligationIdsForPrompt(input.manifest)
+  );
+  const carriedCurrentRequirementLineageIds = new Set<string>();
   for (const file of input.report.materializedFiles) {
     const absolutePath = resolve(file.absolutePath);
     const fileEvidenceRef = pathToFileURL(absolutePath).href;
@@ -5768,11 +7028,36 @@ function evaluateMaterializedProductFiles(input: {
         })
       );
     }
+    if (
+      file.materializationSource === "replay" &&
+      file.rolePolicyRef === undefined
+    ) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_replay_role_policy_missing",
+          detail: file.relativePath,
+          evidenceRefs: [fileEvidenceRef, ...(file.sourceManifestRef === undefined ? [] : [file.sourceManifestRef])]
+        })
+      );
+    }
     if (targetContract !== null && file.role !== targetContract.requiredRole) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "materialized_product_role_policy_mismatch",
           detail: `${file.relativePath}: ${file.role} != ${targetContract.requiredRole}`,
+          evidenceRefs: [fileEvidenceRef, targetContract.sourceRef]
+        })
+      );
+    }
+    if (
+      targetContract !== null &&
+      file.rolePolicyRef !== undefined &&
+      file.rolePolicyRef !== targetContract.policyRef
+    ) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_role_policy_ref_mismatch",
+          detail: `${file.relativePath}: ${file.rolePolicyRef} != ${targetContract.policyRef}`,
           evidenceRefs: [fileEvidenceRef, targetContract.sourceRef]
         })
       );
@@ -5839,6 +7124,58 @@ function evaluateMaterializedProductFiles(input: {
         })
       );
     }
+    const requirementTraceObligationIds = canonicalizeRequirementLineageIds({
+      manifest: input.manifest,
+      obligationIds: file.requirementTraceObligationIds ?? []
+    });
+    for (const obligationId of requirementTraceObligationIds) {
+      if (currentRequirementLineageIds.has(obligationId)) {
+        carriedCurrentRequirementLineageIds.add(obligationId);
+      }
+    }
+    const unrelatedRequirementLineage = requirementTraceObligationIds.filter(
+      (obligationId) => !currentRequirementLineageIds.has(obligationId)
+    );
+    const missingRequirementLineage =
+      requirementLineageRequired && requirementTraceObligationIds.length === 0
+        ? ["requirementTraceObligationIds"]
+        : requirementLineageRequired && unrelatedRequirementLineage.length > 0
+          ? unrelatedRequirementLineage.map(
+              (obligationId) => `unrelated:${obligationId}`
+            )
+	        : requirementLineageRequired
+	          ? requirementTraceObligationIds.filter(
+	              (obligationId) =>
+	                !(
+	                  equivalentRequirementIdsByCanonical
+	                    .get(obligationId)
+	                    ?.some((equivalentId) =>
+	                      contentCarriesRequirementObligation({
+	                        content,
+	                        obligationId: equivalentId,
+	                        displayId:
+	                          requirementDisplayIds.get(equivalentId) ??
+	                          requirementDisplayIds.get(obligationId) ??
+	                          null
+	                      })
+	                    ) ??
+	                  contentCarriesRequirementObligation({
+	                    content,
+	                    obligationId,
+	                    displayId: requirementDisplayIds.get(obligationId) ?? null
+	                  })
+	                )
+	            )
+	          : [];
+    if (missingRequirementLineage.length > 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_requirement_lineage_missing",
+          detail: `${file.relativePath}: ${missingRequirementLineage.join(", ")}`,
+          evidenceRefs: [fileEvidenceRef]
+        })
+      );
+    }
     if (Buffer.byteLength(content, "utf8") !== file.byteCount) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
@@ -5852,6 +7189,22 @@ function evaluateMaterializedProductFiles(input: {
         makeSdlcBlockingReason({
           code: "materialized_product_digest_mismatch",
           evidenceRefs: [fileEvidenceRef]
+        })
+      );
+    }
+  }
+  if (requirementLineageRequired) {
+    const missingCurrentRequirementLineage = [...currentRequirementLineageIds].filter(
+      (obligationId) => !carriedCurrentRequirementLineageIds.has(obligationId)
+    );
+    if (missingCurrentRequirementLineage.length > 0) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_requirement_lineage_missing",
+          detail: `current_requirements: ${missingCurrentRequirementLineage.join(", ")}`,
+          evidenceRefs: [
+            pathToFileURL(resolve(input.manifest.productMaterialization.tenantRoot)).href
+          ]
         })
       );
     }
@@ -6405,8 +7758,36 @@ export function evaluateWorkerResultPostflight(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
 }): SdlcPostflightResult {
-  const report = workerResultReportWithReplayedProductMaterialization(input);
+  const replayResolution = resolveProductMaterializationReplay(input);
+  const report = replayResolution.report;
   const blockingReasonCarriers: SdlcBlockingReason[] = [];
+  const materializationDiagnostics = Array.isArray(
+    report.materializationDiagnostics
+  )
+    ? report.materializationDiagnostics
+    : [];
+  for (const diagnostic of materializationDiagnostics) {
+    blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: diagnostic.code,
+        detail: diagnostic.detail,
+        evidenceRefs: diagnostic.evidenceRefs
+      })
+    );
+  }
+  for (const diagnostic of replayResolution.diagnostics) {
+    blockingReasonCarriers.push(
+      makeSdlcBlockingReason({
+        code: diagnostic.code,
+        detail: diagnostic.detail,
+        evidenceRefs: diagnostic.evidenceRefs
+      })
+    );
+  }
+  evaluateWorkerAuthorityReadBoundary({
+    manifest: input.manifest,
+    blockingReasonCarriers
+  });
   const outputFile = resolve(report.outputFile);
   const outputEvidenceRef = pathToFileURL(outputFile).href;
   if (outputFile !== resolve(input.manifest.outputFile)) {
@@ -6540,7 +7921,17 @@ export function constructFpEvaluateResult(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly postflight: SdlcPostflightResult;
+  readonly postflightRef?: string | undefined;
 }): SdlcFpEvaluateResult {
+  const counts = obligationAssessmentCounts(input.report);
+  const hasOpenObligations =
+    counts.partial > 0 || counts.blocked > 0 || counts.unassessed > 0;
+  const status =
+    input.postflight.status === "blocked"
+      ? "blocked"
+      : hasOpenObligations
+        ? "admitted_with_open_obligations"
+        : "passed";
   return Object.freeze({
     kind: "sdlc_fp_evaluate_result" as const,
     stage: "F_P.evaluate" as const,
@@ -6549,11 +7940,14 @@ export function constructFpEvaluateResult(input: {
       input.manifest.fpTransformRequest === null
         ? null
         : pathToFileURL(input.manifest.fpTransformResultFile).href,
-    postflightRef: pathToFileURL(join(input.manifest.archiveRoot, "postflight.json")).href,
-    status: input.postflight.status,
+    postflightRef:
+      input.postflightRef ??
+      pathToFileURL(join(input.manifest.archiveRoot, "postflight.json")).href,
+    status,
+    postflightStatus: input.postflight.status,
     blockingReasons: input.postflight.blockingReasons,
     evidenceRefs: input.postflight.evidenceRefs,
-    obligationAssessmentCounts: obligationAssessmentCounts(input.report),
+    obligationAssessmentCounts: counts,
     executionEvidenceStatus: input.report.executionEvidence?.status ?? null
   });
 }
@@ -6562,6 +7956,7 @@ export function writeFpEvaluateResult(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly postflight: SdlcPostflightResult;
+  readonly postflightRef?: string | undefined;
 }): SdlcFpEvaluateResult {
   const result = constructFpEvaluateResult(input);
   writeFileSync(

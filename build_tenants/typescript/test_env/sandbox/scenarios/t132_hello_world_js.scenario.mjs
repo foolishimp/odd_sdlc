@@ -48,7 +48,7 @@ export const t132HelloWorldJsScenario = Object.freeze({
 
 export function t132HelloWorldJsLiveScenario({
   worker,
-  maxAdvances = 6,
+  maxAdvances = 16,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
@@ -62,6 +62,20 @@ export function t132HelloWorldJsLiveScenario({
       ...t132HelloWorldJsScenario.expectations,
       workspaceFiles: [
         "build_tenants/hello_world_javascript/src/hello.js"
+      ],
+      handoffEdgeSequencePrefix: [
+        "Fg_conform_project_authority",
+        "derive_feature_decomp_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_implementation_design_surface",
+        "select_implementation_stack_profile",
+        "derive_implementation_module_surface",
+        "derive_aggregate_domain_model_surface",
+        "derive_implementation_component_topology_surface",
+        "derive_aggregate_sunny_day_sequence_surface",
+        "derive_component_realization_schedule_surface",
+        "derive_component_code_surface"
       ],
       processChecks: [
         {

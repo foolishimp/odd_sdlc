@@ -41,6 +41,7 @@ import {
   admitSdlcRuntimeLayout,
   standardSdlcRuntimeLayout
 } from "./runtime_layout.js";
+import { isPlaceholderRequirementMarker } from "./source_input.js";
 
 const PROJECT_CONSTRAINTS_RELATIVE_PATH =
   ".ai-workspace/context/project_constraints.yml" as const;
@@ -98,7 +99,7 @@ const IMPORT_SOURCE_IGNORED_DIRS = Object.freeze([
   "node_modules"
 ] as const);
 const REQUIREMENT_MARKER_EXPRESSION =
-  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
+  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
 const DEFAULT_AMBIGUITY_RISK_APPETITE = "medium" as const;
 const UNDECLARED_EXECUTION_CONTRACT = "undeclared" as const;
 const SOURCE_EXTENSIONS = Object.freeze([
@@ -1087,10 +1088,10 @@ function requirementMarkersFromImportedSources(input: {
     if (existsSync(absolutePath) && statSync(absolutePath).isFile()) {
       const content = readFileSync(absolutePath, "utf8");
       for (const match of content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
-        const marker = match[0];
-        if (marker !== undefined) {
-          markers.push(marker);
-        }
+      const marker = match[0];
+      if (marker !== undefined && !isPlaceholderRequirementMarker(marker)) {
+        markers.push(marker);
+      }
       }
     }
   }
@@ -1160,7 +1161,10 @@ function importedRequirementFamilyContents(input: {
     const sourceRef = pathToFileURL(absolutePath).href;
     for (const match of content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
       const marker = match[0];
-      if (marker === undefined) {
+      if (
+        marker === undefined ||
+        isPlaceholderRequirementMarker(marker)
+      ) {
         continue;
       }
       const snippet = lineSnippetForOffset(content, match.index ?? 0);

@@ -124,6 +124,92 @@ function manifestWithDeclaredProductFileTargets() {
   });
 }
 
+function manifestForImplementationModuleSurface() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  const contract = hookContractByEdgeName("derive_implementation_module_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_implementation_module_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t118-implementation-module-design-depth"
+  });
+}
+
+function manifestForImplementationModuleSurfaceWithNestedPredecessors() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  mkdirSync(path.join(workspaceRoot, "build_tenants/scala_spark/design/adrs"), {
+    recursive: true
+  });
+  for (let index = 1; index <= 20; index += 1) {
+    writeFileSync(
+      path.join(
+        workspaceRoot,
+        `build_tenants/scala_spark/design/00-distractor-${String(index).padStart(2, "0")}.md`
+      ),
+      `# Distractor ${index}\n\nThis file must not displace targeted predecessors from the compact handoff.\n`,
+      "utf8"
+    );
+  }
+  writeFileSync(
+    path.join(
+      workspaceRoot,
+      "build_tenants/scala_spark/design/adrs/ADR-001-design-surface.md"
+    ),
+    "# Design Surface\n\nThis upstream design surface must not be targeted by implementation_design_surface substring matching.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(
+      workspaceRoot,
+      "build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
+    ),
+    "# Implementation Design Surface\n\nThe module surface must derive from this admitted predecessor.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspaceRoot, "build_tenants/scala_spark/design/implementation_stack_profile.md"),
+    "# Implementation Stack Profile\n\nUse Scala and sbt for the tenant implementation.\n",
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_implementation_module_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_implementation_module_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t118-implementation-module-nested-predecessor-hints"
+  });
+}
+
+function manifestForAggregateDomainModelSurface() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  const contract = hookContractByEdgeName("derive_aggregate_domain_model_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_aggregate_domain_model_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t118-aggregate-domain-model-design-depth"
+  });
+}
+
+function manifestForAggregateSunnyDaySequenceSurface() {
+  const workspaceRoot = workspaceWithLargeRequirementSurface();
+  const contract = hookContractByEdgeName("derive_aggregate_sunny_day_sequence_surface");
+  return deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_aggregate_sunny_day_sequence_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t118-aggregate-sunny-day-sequence-design-depth"
+  });
+}
+
 function manifestForDeclaredProductMaterialization() {
   const workspaceRoot = workspaceWithLargeRequirementSurface();
   writeDeclaredProductFileTargetSurface(workspaceRoot);
@@ -170,6 +256,7 @@ test("T-118 writes a compact worker invocation package while preserving the full
   assert.equal(invocationPackage.traversalIntentPackagePath.endsWith("traversal_intent_package.json"), true);
   assert(invocationPackage.transformAxioms.length >= 5);
   assert(invocationPackage.transformAxioms.some((axiom) => axiom.includes("F_P.transform only")));
+  assert(invocationPackage.transformAxioms.some((axiom) => axiom.includes("Read boundary:")));
   assert(invocationPackage.outcomeDirectives.length > 0);
   assert(invocationPackage.outcomeDirectives.some((directive) => directive.includes("Outcome:")));
   assert.equal(
@@ -199,7 +286,7 @@ test("T-118 writes a compact worker invocation package while preserving the full
     12
   );
   assert.equal(invocationPackage.requirementTraceObligationIds.length, 80);
-  assert.equal(invocationPackage.omittedRequirementTraceObligationCount, 240);
+  assert.equal(invocationPackage.omittedRequirementTraceObligationCount, 80);
   assert(invocationPackage.omittedObligationCount > 100);
   assert.equal(workerBrief.kind, "sdlc_worker_brief");
   assert.equal(
@@ -224,6 +311,9 @@ test("T-118 prompt points workers to the compact package before the forensic man
   const manifest = manifestForLargeSurface();
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
 
   assert(Buffer.byteLength(prompt, "utf8") < 3 * 1024);
   assert.doesNotMatch(prompt, new RegExp(manifest.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
@@ -236,10 +326,26 @@ test("T-118 prompt points workers to the compact package before the forensic man
     prompt,
     /Apply workerInvocationPackage\.transformAxioms as the single axiom authority/u
   );
+  assert.match(prompt, /Read boundary: stay under the current workspace/u);
+  assert(
+    [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].some(
+      (entry) => entry.includes("closed schema authority")
+    )
+  );
   assert.doesNotMatch(prompt, /This invocation is F_P\.transform only/u);
   assert.match(prompt, /outcomeDirectives/u);
   assert.doesNotMatch(prompt, /Read the full handoff manifest before writing output/u);
   assert.match(prompt, /Use workerInvocationPackage\.requirementTraceObligationIds/u);
+  assert(
+    [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].some(
+      (entry) => entry.includes("audit context")
+    )
+  );
+  assert.doesNotMatch(prompt, /complete transformation set for product files/u);
+  assert.doesNotMatch(
+    [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].join("\n"),
+    /complete transformation set for product files/u
+  );
   assert.doesNotMatch(prompt, /Compact worker invocation package:/u);
   assert.doesNotMatch(prompt, /Legacy compact prompt pressure projection:/u);
   assert.doesNotMatch(prompt, /"kind": "sdlc_worker_invocation_package"/u);
@@ -271,8 +377,144 @@ test("T-002 worker package and prompt carry declared product file targets", () =
     outcomeDirectives,
     /Declared product file targets are the exact product surface/u
   );
+  assert.match(outcomeDirectives, /one exact id per line/u);
+  assert.match(outcomeDirectives, /do not rely on the report alone/u);
   assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
   assert.doesNotMatch(prompt, /README\.md/u);
+});
+
+test("T-118 design-depth prompt carries canonical carrier kind names", () => {
+  const manifest = manifestForImplementationModuleSurface();
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const prompt = readFileSync(files.promptPath, "utf8");
+  const outcomeDirectives = invocationPackage.outcomeDirectives.join("\n");
+
+  assert.match(outcomeDirectives, /json design_depth_register/u);
+  assert.match(outcomeDirectives, /sdlc_design_depth_register/u);
+  assert.match(outcomeDirectives, /ts-design-depth-v1/u);
+  assert.match(outcomeDirectives, /targetAssetType:"implementation_module_surface"/u);
+  assert.match(outcomeDirectives, /moduleSchemaFragments` \(non-empty\)/u);
+  assert.match(outcomeDirectives, /moduleStateDiagramFragments` \(non-empty\)/u);
+  assert.match(outcomeDirectives, /aggregateDomainModel:null/u);
+  assert.match(outcomeDirectives, /aggregateSunnyDaySequence:null/u);
+  assert.match(outcomeDirectives, /designCompletenessVerdict:null/u);
+  assert.match(outcomeDirectives, /Keep the carrier proportional to immediate implementation structure/u);
+  assert.match(outcomeDirectives, /Do not flatten requirement obligations/u);
+  assert.match(outcomeDirectives, /For a single-file or script product/u);
+  assert.match(outcomeDirectives, /do not create one entity or stateless diagram row per requirement/u);
+  assert.match(outcomeDirectives, /sdlc_module_schema_fragment/u);
+  assert.match(outcomeDirectives, /sdlc_domain_entity/u);
+  assert.match(outcomeDirectives, /sdlc_domain_attribute/u);
+  assert.match(outcomeDirectives, /sdlc_domain_operation/u);
+  assert.match(outcomeDirectives, /sdlc_module_state_diagram_fragment/u);
+  assert.match(outcomeDirectives, /sdlc_entity_state_transition/u);
+  assert.match(outcomeDirectives, /entities\[\]\.entityId/u);
+  assert.match(outcomeDirectives, /attributes\[\]\.attributeId/u);
+  assert.match(outcomeDirectives, /attributes\[\]\.valueType/u);
+  assert.match(outcomeDirectives, /operations\[\]\.operationId/u);
+  assert.match(outcomeDirectives, /Each `moduleSchemaFragments` item must be an object/u);
+  assert.match(outcomeDirectives, /\{"kind":"sdlc_module_schema_fragment","moduleName":"<module>"/u);
+  assert.match(outcomeDirectives, /"ownership":"owned\|referenced"/u);
+  assert.match(outcomeDirectives, /"cardinality":"one\|optional\|many"/u);
+  assert.match(outcomeDirectives, /smallest non-empty `moduleStateDiagramFragments` set/u);
+  assert.match(outcomeDirectives, /\{"kind":"sdlc_module_state_diagram_fragment","moduleName":"<module>"/u);
+  assert.match(outcomeDirectives, /"states":\[\]/u);
+  assert.match(outcomeDirectives, /"transitions":\[\]/u);
+  assert.doesNotMatch(outcomeDirectives, /design_depth_module_schema_fragment/u);
+  assert.match(prompt, /sdlc_design_depth_register/u);
+  assert.match(prompt, /moduleSchemaFragments/u);
+  assert.match(prompt, /moduleStateDiagramFragments/u);
+  assert.match(prompt, /sdlc_module_schema_fragment/u);
+});
+
+test("T-118 module handoff carries nested predecessor authority as targeted retrieval hints", () => {
+  const manifest = manifestForImplementationModuleSurfaceWithNestedPredecessors();
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const implementationDesignRef =
+    "workspace://build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md";
+  const stackProfileRef =
+    "workspace://build_tenants/scala_spark/design/implementation_stack_profile.md";
+  const designAuthority = manifest.traversalObligationContext.authorityIndex.find(
+    (entry) =>
+      entry.ref.endsWith(
+        "/build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
+      )
+  );
+  const stackAuthority = manifest.traversalObligationContext.authorityIndex.find(
+    (entry) =>
+      entry.ref.endsWith(
+        "/build_tenants/scala_spark/design/implementation_stack_profile.md"
+      )
+  );
+  const designSurfaceHint = manifest.traversalObligationContext.retrievalHints.find(
+    (hint) =>
+      hint.ref.endsWith(
+        "/build_tenants/scala_spark/design/adrs/ADR-001-design-surface.md"
+      )
+  );
+  const designHint = invocationPackage.retrievalHints.find(
+    (hint) => hint.ref === implementationDesignRef
+  );
+  const stackHint = invocationPackage.retrievalHints.find(
+    (hint) => hint.ref === stackProfileRef
+  );
+
+  assert(designAuthority);
+  assert(designAuthority.tags.includes("implementation_design_surface"));
+  assert(stackAuthority);
+  assert(stackAuthority.tags.includes("implementation_stack_profile"));
+  assert(designSurfaceHint);
+  assert.equal(designSurfaceHint.reason, "available_authority_by_reference");
+  assert(designHint);
+  assert.equal(designHint.reason, "targeted_authority_for_current_traversal");
+  assert(stackHint);
+  assert.equal(stackHint.reason, "targeted_authority_for_current_traversal");
+  assert(invocationPackage.retrievalHints.length <= 12);
+});
+
+test("T-118 aggregate design-depth prompts carry closed carrier object shapes", () => {
+  const domainModelFiles = writeHandoffFiles(manifestForAggregateDomainModelSurface());
+  const sunnyDayFiles = writeHandoffFiles(manifestForAggregateSunnyDaySequenceSurface());
+  const domainModelPackage = JSON.parse(
+    readFileSync(domainModelFiles.invocationPackagePath, "utf8")
+  );
+  const sunnyDayPackage = JSON.parse(
+    readFileSync(sunnyDayFiles.invocationPackagePath, "utf8")
+  );
+  const domainModelDirectives = domainModelPackage.outcomeDirectives.join("\n");
+  const sunnyDayDirectives = sunnyDayPackage.outcomeDirectives.join("\n");
+
+  assert.match(domainModelDirectives, /targetAssetType:"aggregate_domain_model_surface"/u);
+  assert.match(domainModelDirectives, /moduleSchemaFragments:\[\]/u);
+  assert.match(domainModelDirectives, /moduleStateDiagramFragments:\[\]/u);
+  assert.match(domainModelDirectives, /aggregateSunnyDaySequence:null/u);
+  assert.match(domainModelDirectives, /\{"kind":"sdlc_aggregate_domain_model","modelVersion":"ts-design-depth-v1"/u);
+  assert.match(domainModelDirectives, /"kind":"sdlc_aggregate_domain_entity"/u);
+  assert.match(domainModelDirectives, /"ownerModuleName":"<module>"/u);
+  assert.match(domainModelDirectives, /"kind":"sdlc_design_completeness_verdict"/u);
+  assert.match(domainModelDirectives, /"axis":"entity"/u);
+  assert.match(domainModelDirectives, /"axis":"attribute"/u);
+  assert.match(domainModelDirectives, /"axis":"flow"/u);
+  assert.match(
+    domainModelDirectives,
+    /do not mark flow partial solely because `aggregateSunnyDaySequence` is null/u
+  );
+
+  assert.match(sunnyDayDirectives, /targetAssetType:"aggregate_sunny_day_sequence_surface"/u);
+  assert.match(sunnyDayDirectives, /moduleSchemaFragments:\[\]/u);
+  assert.match(sunnyDayDirectives, /moduleStateDiagramFragments:\[\]/u);
+  assert.match(sunnyDayDirectives, /non-null `aggregateDomainModel`/u);
+  assert.match(sunnyDayDirectives, /non-null `aggregateSunnyDaySequence`/u);
+  assert.match(sunnyDayDirectives, /\{"kind":"sdlc_aggregate_sunny_day_sequence","sequenceVersion":"ts-design-depth-v1"/u);
+  assert.match(sunnyDayDirectives, /"kind":"sdlc_sunny_day_sequence_step"/u);
+  assert.match(sunnyDayDirectives, /stateTransitionIds/u);
+  assert.match(sunnyDayDirectives, /sdlc_design_completeness_verdict/u);
 });
 
 test("T-157 product materialization prompt carries first-pass execution closure law", () => {

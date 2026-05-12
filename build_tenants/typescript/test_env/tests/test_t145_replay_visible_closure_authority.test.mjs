@@ -175,7 +175,7 @@ test("T-145 archive-only terminal closure cannot converge public gaps", () => {
   assert.equal(result.payload.dossier.edge, FG_MATERIALIZE_DECLARED_PRODUCT_ASSET);
   assert.equal(
     result.payload.dossier.bestGraphFunctionRef,
-    `graph-function:odd_sdlc:${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`
+    FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   assert.equal(
     result.payload.dossier.rankingReasonRefs.some((ref) =>

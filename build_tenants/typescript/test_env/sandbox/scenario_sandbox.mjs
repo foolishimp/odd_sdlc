@@ -13,7 +13,14 @@
 // A scenario descriptor is data. New app-building sandboxes plug in by
 // authoring a descriptor and a fixture directory; no harness changes required.
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,6 +99,72 @@ function isStopStatus(status, stopStatuses) {
 function workspaceFilesExist(workspace, files) {
   if (!Array.isArray(files) || files.length === 0) return false;
   return files.every((rel) => existsSync(path.join(workspace, rel)));
+}
+
+function archiveClosedCleanly(archiveRoot) {
+  if (typeof archiveRoot !== "string" || archiveRoot.length === 0) {
+    return false;
+  }
+  try {
+    const closure = JSON.parse(
+      readFileSync(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
+    );
+    const fpEvaluate = JSON.parse(
+      readFileSync(path.join(archiveRoot, "fp_evaluate_result.json"), "utf8")
+    );
+    return (
+      closure?.disposition === "close" &&
+      fpEvaluate?.status === "passed" &&
+      fpEvaluate?.postflightStatus === "passed"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function scenarioWorkspaceFileStopSatisfied(input) {
+  return (
+    workspaceFilesExist(input.workspace, input.files) &&
+    archiveClosedCleanly(input.archiveRoot)
+  );
+}
+
+function observedHandoffEdgeSequence(workspace) {
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  if (!existsSync(runsRoot)) return [];
+  return readdirSync(runsRoot)
+    .map((entry) => path.join(runsRoot, entry))
+    .filter((entry) => {
+      try {
+        return statSync(entry).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort()
+    .flatMap((archiveRoot) => {
+      const manifestPath = path.join(archiveRoot, "handoff_manifest.json");
+      if (!existsSync(manifestPath)) return [];
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+        return typeof manifest.edgeName === "string" ? [manifest.edgeName] : [];
+      } catch {
+        return [];
+      }
+    });
+}
+
+function compressConsecutiveValues(values) {
+  const compressed = [];
+  for (const value of values) {
+    if (compressed[compressed.length - 1] !== value) {
+      compressed.push(value);
+    }
+  }
+  return compressed;
 }
 
 export async function runScenarioSandbox(scenario, options = {}) {
@@ -188,7 +261,11 @@ export async function runScenarioSandbox(scenario, options = {}) {
     }
     if (
       scenario.stopAfterWorkspaceFilesExist === true &&
-      workspaceFilesExist(workspace, scenario.expectations?.workspaceFiles)
+      scenarioWorkspaceFileStopSatisfied({
+        workspace,
+        files: scenario.expectations?.workspaceFiles,
+        archiveRoot: start?.payload?.archiveRoot
+      })
     ) {
       break;
     }
@@ -271,6 +348,24 @@ export function assertScenarioExpectations(result, scenario) {
         throw new Error(`${scenario.scenarioId}: expected workspace file ${rel} missing`);
       }
     }
+  }
+  if (Array.isArray(expectations.handoffEdgeSequencePrefix)) {
+    const observed = compressConsecutiveValues(
+      observedHandoffEdgeSequence(result.workspace)
+    );
+    const expected = expectations.handoffEdgeSequencePrefix;
+    if (observed.length < expected.length) {
+      throw new Error(
+        `${scenario.scenarioId}: strict handoff edge sequence too short — expected prefix ${expected.join(" -> ")}, saw ${observed.join(" -> ")}`
+      );
+    }
+    expected.forEach((edge, index) => {
+      if (observed[index] !== edge) {
+        throw new Error(
+          `${scenario.scenarioId}: strict handoff edge sequence mismatch at ${index} — expected ${edge}, saw ${observed[index]}; observed=${observed.join(" -> ")}`
+        );
+      }
+    });
   }
   if (Array.isArray(expectations.processChecks)) {
     for (const check of expectations.processChecks) {

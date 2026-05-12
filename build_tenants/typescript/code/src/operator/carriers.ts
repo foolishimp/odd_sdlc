@@ -21,7 +21,10 @@ import type {
   SdlcHookTurnOutcome
 } from "../hooks/index.js";
 import type { SdlcPublicStartOutcome } from "../start/index.js";
-import type { SdlcBlockingReason } from "../shared/blocking_reason.js";
+import type {
+  SdlcBlockingReason,
+  SdlcBlockingReasonCode
+} from "../shared/blocking_reason.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import type {
   SdlcConstructionIntent,
@@ -254,14 +257,38 @@ export interface SdlcExecutionShard {
   readonly retryPolicy: "same_shard_then_triage";
 }
 
-export interface SdlcMaterializedProductFile {
+export interface SdlcBaseMaterializedProductFile {
   readonly kind: "sdlc_materialized_product_file";
   readonly role: SdlcMaterializedProductFileRole;
   readonly relativePath: string;
   readonly absolutePath: string;
   readonly digest: string;
   readonly byteCount: number;
+  readonly requirementTraceObligationIds?: readonly string[] | undefined;
 }
+
+export interface SdlcCurrentAttemptMaterializedProductFile
+  extends SdlcBaseMaterializedProductFile {
+  readonly materializationSource: "current_attempt";
+  readonly sourceManifestRef?: string | undefined;
+  readonly sourceHandoffManifestRef?: string | undefined;
+  readonly sourceAttemptRef?: string | undefined;
+  readonly overwritesMaterializationRef?: string | undefined;
+  readonly rolePolicyRef?: string | undefined;
+}
+
+export interface SdlcReplayedMaterializedProductFile
+  extends SdlcBaseMaterializedProductFile {
+  readonly materializationSource: "replay";
+  readonly sourceManifestRef: string;
+  readonly sourceHandoffManifestRef: string;
+  readonly sourceAttemptRef: string;
+  readonly rolePolicyRef?: string | undefined;
+}
+
+export type SdlcMaterializedProductFile =
+  | SdlcCurrentAttemptMaterializedProductFile
+  | SdlcReplayedMaterializedProductFile;
 
 export const SDLC_COMPONENT_CONCERN_ROLES = Object.freeze([
   "parser",
@@ -1116,6 +1143,7 @@ export interface SdlcWorkerResultReport {
   readonly summary: string;
   readonly unresolvedReasons: readonly string[];
   readonly materializedFiles: readonly SdlcMaterializedProductFile[];
+  readonly materializationDiagnostics: readonly SdlcWorkerResultMaterializationDiagnostic[];
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
   readonly executionEvidenceErrors: readonly string[];
   readonly obligationAssessments: readonly SdlcWorkerObligationAssessment[];
@@ -1123,6 +1151,13 @@ export interface SdlcWorkerResultReport {
   readonly fpTransformResultRef: string | null;
   readonly fpTransformStatus: FpTransformResult["status"] | null;
   readonly fpEvaluateResultRef: string | null;
+}
+
+export interface SdlcWorkerResultMaterializationDiagnostic {
+  readonly kind: "sdlc_worker_result_materialization_diagnostic";
+  readonly code: SdlcBlockingReasonCode;
+  readonly detail: string;
+  readonly evidenceRefs: readonly string[];
 }
 
 export interface SdlcPostflightResult {
@@ -1139,7 +1174,10 @@ export interface SdlcFpEvaluateResult {
   readonly reportRef: string;
   readonly transformResultRef: string | null;
   readonly postflightRef: string;
-  readonly status: SdlcPostflightResult["status"];
+  readonly status:
+    | SdlcPostflightResult["status"]
+    | "admitted_with_open_obligations";
+  readonly postflightStatus: SdlcPostflightResult["status"];
   readonly blockingReasons: readonly string[];
   readonly evidenceRefs: readonly string[];
   readonly obligationAssessmentCounts: {

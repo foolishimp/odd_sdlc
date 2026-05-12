@@ -55,7 +55,7 @@ export const helloWorldRustMinimumInductionScenario = Object.freeze({
 
 export function helloWorldRustMinimumInductionLiveScenario({
   worker,
-  maxAdvances = 6,
+  maxAdvances = 16,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {

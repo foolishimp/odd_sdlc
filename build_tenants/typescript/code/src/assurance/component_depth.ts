@@ -97,14 +97,44 @@ function pathSetForRole(input: {
   );
 }
 
+function normalizePortablePath(value: string): string {
+  return value.split(/[\\/]+/u).filter((part) => part.length > 0).join("/");
+}
+
+function tenantRelativeProductPath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): string {
+  const normalized = normalizePortablePath(input.relativePath);
+  const selectedOutputRoot = normalizePortablePath(
+    input.manifest.productMaterialization.selectedOutputRoot
+  );
+  if (normalized === selectedOutputRoot) {
+    return "";
+  }
+  if (normalized.startsWith(`${selectedOutputRoot}/`)) {
+    return normalized.slice(selectedOutputRoot.length + 1);
+  }
+  return normalized;
+}
+
 function materializedPathSet(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
 }): ReadonlySet<string> {
-  return new Set(
-    input.report.materializedFiles
-      .filter((file) => file.byteCount > 0)
-      .map((file) => file.relativePath)
+  const selectedOutputRoot = normalizePortablePath(
+    input.manifest.productMaterialization.selectedOutputRoot
   );
+  const paths = new Set<string>();
+  for (const file of input.report.materializedFiles) {
+    if (file.byteCount <= 0) {
+      continue;
+    }
+    const tenantRelativePath = normalizePortablePath(file.relativePath);
+    paths.add(tenantRelativePath);
+    paths.add(`${selectedOutputRoot}/${tenantRelativePath}`);
+  }
+  return paths;
 }
 
 function existingProductFileForRelativePath(input: {
@@ -112,7 +142,11 @@ function existingProductFileForRelativePath(input: {
   readonly relativePath: string;
 }): boolean {
   const tenantRoot = resolve(input.manifest.productMaterialization.tenantRoot);
-  const absolutePath = resolve(tenantRoot, input.relativePath);
+  const tenantRelativePath = tenantRelativeProductPath(input);
+  if (tenantRelativePath.length === 0) {
+    return false;
+  }
+  const absolutePath = resolve(tenantRoot, tenantRelativePath);
   const relativeToRoot = relative(tenantRoot, absolutePath);
   if (
     relativeToRoot === "" ||
@@ -262,14 +296,17 @@ function componentRealizationReasons(input: {
   readonly report: SdlcWorkerResultReport;
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
-  const materializedPaths = materializedPathSet({ report: input.report });
+  const materializedPaths = materializedPathSet({
+    manifest: input.manifest,
+    report: input.report
+  });
   const duplicatePaths = duplicateValues(input.rows.map((row) => row.relativePath));
   return Object.freeze([
     ...componentRealizationMetadataReasons(input),
     ...input.rows
       .filter(
         (row) =>
-          !materializedPaths.has(row.relativePath) &&
+          !materializedPaths.has(normalizePortablePath(row.relativePath)) &&
           !existingProductFileForRelativePath({
             manifest: input.manifest,
             relativePath: row.relativePath

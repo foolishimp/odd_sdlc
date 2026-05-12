@@ -26,7 +26,11 @@ import {
   deriveSdlcTargetObligationBinding,
   type SdlcQueryDomainProjection
 } from "../projection/index.js";
-import { FG_CONFORM_PROJECT } from "../graph/index.js";
+import {
+  FG_CONFORM_PROJECT,
+  sdlcGraphFunctionBoundaryRef,
+  sdlcPublishedActionRef
+} from "../graph/index.js";
 import {
   deriveOddSdlcEvaluateNextReport,
   type OddSdlcEvaluateNextActionInput
@@ -212,7 +216,7 @@ export function projectSdlcWorkerAttachment(input: {
 
 interface PublicStartActionCandidate {
   readonly graphFunctionName: string;
-  readonly graphFunctionId: string;
+  readonly graphFunctionRef: string;
   readonly actionRef: string;
   readonly targetOutcomeRef: string;
 }
@@ -246,9 +250,10 @@ function candidateForGraphFunction(input: {
     return null;
   }
   const safeName = input.graphFunctionName.replaceAll("/", "_");
+  const graphFunctionRef = sdlcGraphFunctionBoundaryRef(graphFunction);
   return Object.freeze({
     graphFunctionName: input.graphFunctionName,
-    graphFunctionId: graphFunction.id,
+    graphFunctionRef,
     actionRef:
       `construction-action://odd-sdlc/public-start/${safeName}`,
     targetOutcomeRef:
@@ -363,19 +368,20 @@ function evaluateInitialPublicStartAction(input: {
   );
   const actions: readonly OddSdlcEvaluateNextActionInput[] = Object.freeze(
     candidates.map((candidate) =>
-      Object.freeze({
-        actionRef: candidate.actionRef,
-        actionKind: "invoke_graph_function" as const,
-        graphFunctionRef: candidate.graphFunctionId,
-        graphVectorRef: null,
-        publishedTraversalTargetRef:
-          `published-action://odd-sdlc/graph-function/${candidate.graphFunctionName}`,
-        targetOutcomeRef: candidate.targetOutcomeRef,
-        inputAssetRefs: Object.freeze([]),
-        expectedOutputAssetRefs: Object.freeze([candidate.targetOutcomeRef]),
-        requiredAuthorityRefs: Object.freeze([
-          `published-action://odd-sdlc/graph-function/${candidate.graphFunctionName}`
-        ]),
+        Object.freeze({
+          actionRef: candidate.actionRef,
+          actionKind: "invoke_graph_function" as const,
+          graphFunctionRef: candidate.graphFunctionRef,
+          graphVectorRef: null,
+          publishedTraversalTargetRef: sdlcPublishedActionRef({
+            graphFunctionRef: candidate.graphFunctionRef
+          }),
+          targetOutcomeRef: candidate.targetOutcomeRef,
+          inputAssetRefs: Object.freeze([]),
+          expectedOutputAssetRefs: Object.freeze([candidate.targetOutcomeRef]),
+          requiredAuthorityRefs: Object.freeze([
+            sdlcPublishedActionRef({ graphFunctionRef: candidate.graphFunctionRef })
+          ]),
         eligibleReasonRefs: Object.freeze([
           "public_start_evaluate_next_initial_selection"
         ])
@@ -514,7 +520,8 @@ function evaluateInitialPublicStartAction(input: {
     ]),
     actionCatalogRefs: evaluator.actionCatalogRefs,
     selectedActionRef,
-    nextGraphFunctionRef: selectedCandidate.graphFunctionId,
+    nextGraphFunctionRef: selectedCandidate.graphFunctionRef,
+    // Null means no automatic graph-track replay; current Eval_Action chooses the edge.
     nextGraphVectorRef: input.request.replayNextGraphVectorRef ?? null
   });
   const constructionIntent = constructSdlcConstructionIntent({

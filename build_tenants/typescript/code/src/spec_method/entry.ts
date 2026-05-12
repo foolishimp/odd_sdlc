@@ -11,7 +11,8 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   constructConstructionPriorityRule,
-  constructConstructionPriorityScheme
+  constructConstructionPriorityScheme,
+  materializeGraphFunction
 } from "@abiogenesis/typescript-tenant";
 import type {
   ConstructionPriorityScheme,
@@ -19,10 +20,17 @@ import type {
   RuntimeEvent
 } from "@abiogenesis/typescript-tenant";
 import {
+  admitSdlcGraphFunctionBoundaryRef,
+  admitSdlcGraphVectorBoundaryRef,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
   FG_CONFORM_PROJECT
 } from "../graph/index.js";
+import { SdlcGraphBoundaryRefError } from "../graph/index.js";
+import {
+  makeSdlcBlockingReason,
+  type SdlcBlockingReason
+} from "../shared/blocking_reason.js";
 import { installOddSdlcTypescript } from "../install/index.js";
 import {
   constructSdlcRequirementFulfillmentArchiveRehydration,
@@ -131,6 +139,15 @@ export interface OddSdlcSpecMethodResult {
   readonly status: "ok" | "error";
   readonly exitCode: 0 | 2;
   readonly payload: unknown;
+}
+
+interface OddSdlcSpecMethodBlockingPayload {
+  readonly kind: "sdlc_spec_method_blocking_result";
+  readonly status: "blocked";
+  readonly blockingReason: SdlcBlockingReason["code"];
+  readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
+  readonly evidenceRefs: readonly string[];
+  readonly detail: string;
 }
 
 interface SpecMethodOptionReadModel {
@@ -714,24 +731,62 @@ interface SelectedNextGraphFunctionFromArchive {
   readonly closureDecisionRef: string;
 }
 
+interface SelectedNextGraphFunctionArchiveDiagnostic {
+  readonly kind: "diagnostic";
+  readonly code: SdlcBlockingReason["code"];
+  readonly detail: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+type SelectedNextGraphFunctionFromArchiveResult =
+  | SelectedNextGraphFunctionFromArchive
+  | SelectedNextGraphFunctionArchiveDiagnostic
+  | null;
+
+function isSelectedNextGraphFunctionArchiveDiagnostic(
+  input: SelectedNextGraphFunctionFromArchiveResult
+): input is SelectedNextGraphFunctionArchiveDiagnostic {
+  return input !== null && "kind" in input && input.kind === "diagnostic";
+}
+
+function specMethodBlockingPayload(
+  diagnostic: SelectedNextGraphFunctionArchiveDiagnostic
+): OddSdlcSpecMethodBlockingPayload {
+  const blockingReason = makeSdlcBlockingReason({
+    code: diagnostic.code,
+    detail: diagnostic.detail,
+    evidenceRefs: diagnostic.evidenceRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_spec_method_blocking_result" as const,
+    status: "blocked" as const,
+    blockingReason: diagnostic.code,
+    blockingReasonCarriers: Object.freeze([blockingReason]),
+    evidenceRefs: diagnostic.evidenceRefs,
+    detail: diagnostic.detail
+  });
+}
+
+function isSpecMethodBlockingPayload(
+  input: unknown
+): input is OddSdlcSpecMethodBlockingPayload {
+  return isRecord(input) && input["kind"] === "sdlc_spec_method_blocking_result";
+}
+
 function selectedNextGraphFunctionFromArchive(input: {
   readonly context: SpecMethodWorkspaceContext;
   readonly module: ReturnType<typeof constructSdlcGtlModule>;
-}): SelectedNextGraphFunctionFromArchive | null {
-  const graphFunctionNameByRef = new Map(
-    input.module.graphFunctions.flatMap((graphFunction) => [
-      [graphFunction.id, graphFunction.name],
-      [graphFunction.name, graphFunction.name]
-    ])
+}): SelectedNextGraphFunctionFromArchiveResult {
+  const publishedGraphFunctionRefs = Object.freeze(
+    input.module.graphFunctions.map((graphFunction) => graphFunction.name)
   );
   for (const archiveRoot of operatorRunArchiveRootsNewestFirst(input.context)) {
     const decision = edgeClosureDecisionFromArchive(archiveRoot);
     if (decision?.disposition !== "close") {
       continue;
     }
-    const record = jsonRecordFromFile(
-      path.join(archiveRoot, "sdlc_next_action_projection.json")
-    );
+    const projectionPath = path.join(archiveRoot, "sdlc_next_action_projection.json");
+    const record = jsonRecordFromFile(projectionPath);
     if (
       record?.["kind"] !== "sdlc_next_action_projection"
     ) {
@@ -754,23 +809,70 @@ function selectedNextGraphFunctionFromArchive(input: {
     const selectedActionRef = stringField(record, "selectedActionRef");
     if (
       nextGraphFunctionRef === null ||
-      nextGraphVectorRef === null ||
       nextActionProjectionRef === null ||
       selectedActionRef === null
     ) {
       return null;
     }
-    const direct = graphFunctionNameByRef.get(nextGraphFunctionRef);
-    if (direct !== undefined) {
+    if (nextGraphVectorRef === null) {
       return Object.freeze({
-        graphFunctionName: direct,
-        nextActionProjectionRef,
-        selectedActionRef,
-        nextGraphVectorRef,
-        closureDecisionRef: decision.decisionRef
+        kind: "diagnostic" as const,
+        code: "next_action_projection_graph_vector_missing" as const,
+        detail: "choosesNextTraversal=true requires nextGraphVectorRef",
+        evidenceRefs: Object.freeze([pathToFileURL(projectionPath).href])
       });
     }
-    return null;
+    let graphFunctionName: string;
+    try {
+      graphFunctionName = admitSdlcGraphFunctionBoundaryRef({
+        value: nextGraphFunctionRef,
+        publishedGraphFunctionRefs,
+        label: "sdlc_next_action_projection.nextGraphFunctionRef"
+      });
+    } catch (error) {
+      if (error instanceof SdlcGraphBoundaryRefError) {
+        return Object.freeze({
+          kind: "diagnostic" as const,
+          code: error.code,
+          detail: error.message,
+          evidenceRefs: Object.freeze([pathToFileURL(projectionPath).href])
+        });
+      }
+      throw error;
+    }
+    const graphFunction = input.module.graphFunctions.find(
+      (candidate) => candidate.name === graphFunctionName
+    );
+    if (graphFunction === undefined) {
+      return null;
+    }
+    let graphVectorRef: string;
+    try {
+      graphVectorRef = admitSdlcGraphVectorBoundaryRef({
+        value: nextGraphVectorRef,
+        publishedGraphVectorRefs: materializeGraphFunction(graphFunction).vectors.map(
+          (vector) => vector.name
+        ),
+        label: "sdlc_next_action_projection.nextGraphVectorRef"
+      });
+    } catch (error) {
+      if (error instanceof SdlcGraphBoundaryRefError) {
+        return Object.freeze({
+          kind: "diagnostic" as const,
+          code: error.code,
+          detail: error.message,
+          evidenceRefs: Object.freeze([pathToFileURL(projectionPath).href])
+        });
+      }
+      throw error;
+    }
+    return Object.freeze({
+      graphFunctionName,
+      nextActionProjectionRef,
+      selectedActionRef,
+      nextGraphVectorRef: graphVectorRef,
+      closureDecisionRef: decision.decisionRef
+    });
   }
   return null;
 }
@@ -1074,7 +1176,7 @@ function hasReplayForBasis(
 function startOutcomeForObservedReplay(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly events: readonly RuntimeEvent[];
-}): ReturnType<typeof publicStartOnce> {
+}): ReturnType<typeof publicStartOnce> | OddSdlcSpecMethodBlockingPayload {
   const context = workspaceContext({
     workspaceRoot: input.request.workspaceRoot,
     outputWorkspaceRoot: input.request.outputWorkspaceRoot
@@ -1084,6 +1186,9 @@ function startOutcomeForObservedReplay(input: {
     context,
     module
   });
+  if (isSelectedNextGraphFunctionArchiveDiagnostic(selectedNextGraphFunction)) {
+    return specMethodBlockingPayload(selectedNextGraphFunction);
+  }
   if (
     selectedNextGraphFunction !== null &&
     (input.request.target.kind === "next" ||
@@ -1232,6 +1337,9 @@ async function installedStartPayloadFor(
     request,
     events: runtimeEvents
   });
+  if (isSpecMethodBlockingPayload(start)) {
+    return start;
+  }
   const deterministicTransition =
     start.kind === "sdlc_public_start_projected" &&
     start.transition.kind === "fd_advance";
@@ -1247,6 +1355,7 @@ async function installedStartPayloadFor(
       start.executionContract === null
         ? Object.freeze([])
         : replayEventsForBasis(start.executionContract.basis, runtimeEvents),
+    eventGraphEvents: runtimeEvents,
     requestedUntil: request.until,
     requireInstalledTopology: true,
     refreshReplayState: async () => {
@@ -1255,15 +1364,23 @@ async function installedStartPayloadFor(
         request,
         events: refreshedEvents
       });
+      if (isSpecMethodBlockingPayload(refreshedStart)) {
+        return Object.freeze({
+          start,
+          replayEvents: Object.freeze([] as RuntimeEvent[]),
+          eventGraphEvents: refreshedEvents
+        });
+      }
       return Object.freeze({
         start: refreshedStart,
         replayEvents:
           refreshedStart.executionContract === null
             ? Object.freeze([])
             : replayEventsForBasis(
-                refreshedStart.executionContract.basis,
-                refreshedEvents
-              )
+              refreshedStart.executionContract.basis,
+              refreshedEvents
+            ),
+        eventGraphEvents: refreshedEvents
       });
     }
   });
@@ -1281,6 +1398,18 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
     request,
     events: allEvents
   });
+  if (isSpecMethodBlockingPayload(start)) {
+    return Object.freeze({
+      start,
+      projection: null,
+      dossier: null,
+      requirementFulfillment: null,
+      homeostaticTriage: null,
+      blockingReason: start.blockingReason,
+      blockingReasonCarriers: start.blockingReasonCarriers,
+      evidenceRefs: start.evidenceRefs
+    });
+  }
   if (start.executionContract === null) {
     return Object.freeze({
       start,
@@ -1454,6 +1583,234 @@ function childRecord(
   return isRecord(value) ? value : null;
 }
 
+const MAX_CLI_JSON_EVIDENCE_REFS = 25;
+const MAX_CLI_JSON_REASON_CARRIERS = 50;
+
+function compactArrayValue(
+  value: unknown,
+  maxEntries: number,
+  omittedLabel: string
+): unknown {
+  if (!Array.isArray(value) || value.length <= maxEntries) {
+    return value;
+  }
+  return Object.freeze([
+    ...value.slice(0, maxEntries),
+    `${omittedLabel}:${value.length - maxEntries}`
+  ]);
+}
+
+function compactEvidenceRefs(value: unknown): unknown {
+  return compactArrayValue(
+    value,
+    MAX_CLI_JSON_EVIDENCE_REFS,
+    "sdlc_cli_json_omitted_evidence_ref_count"
+  );
+}
+
+function omittedBlockingReasonCarrier(
+  omittedLabel: string,
+  omittedCount: number
+): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    kind: "sdlc_blocking_reason",
+    code: "unknown_blocking_reason",
+    reasonClass: "unknown",
+    lawfulReentryPoint: "inspect_worker_archive",
+    message: "CLI JSON omitted additional carriers; inspect the operator archive.",
+    detail: `${omittedLabel}:${omittedCount}`,
+    evidenceRefs: Object.freeze([])
+  });
+}
+
+function compactBlockingReasonCarrierArray(
+  value: unknown,
+  omittedLabel: string
+): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  const entries = value
+    .slice(0, MAX_CLI_JSON_REASON_CARRIERS)
+    .map(compactBlockingReasonCarrier);
+  if (value.length > MAX_CLI_JSON_REASON_CARRIERS) {
+    entries.push(omittedBlockingReasonCarrier(
+      omittedLabel,
+      value.length - MAX_CLI_JSON_REASON_CARRIERS
+    ));
+  }
+  return Object.freeze(entries);
+}
+
+function compactGapReasonArray(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  const entries = value
+    .slice(0, MAX_CLI_JSON_REASON_CARRIERS)
+    .map(compactGapReason);
+  if (value.length > MAX_CLI_JSON_REASON_CARRIERS) {
+    const omitted = omittedBlockingReasonCarrier(
+      "gap_dossier_reason_count",
+      value.length - MAX_CLI_JSON_REASON_CARRIERS
+    );
+    entries.push(Object.freeze({
+      kind: "sdlc_postflight_gap_reason",
+      reason: stringField(omitted, "detail") ?? "gap_dossier_reason_count",
+      reasonClass: "unknown",
+      blockingReason: omitted
+    }));
+  }
+  return Object.freeze(entries);
+}
+
+function compactBlockingReasonCarrier(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    evidenceRefs: compactEvidenceRefs(value["evidenceRefs"])
+  });
+}
+
+function compactGapReason(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    evidenceRefs: compactEvidenceRefs(value["evidenceRefs"]),
+    blockingReason: compactBlockingReasonCarrier(value["blockingReason"])
+  });
+}
+
+function compactGapDossier(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    evidenceRefs: compactEvidenceRefs(value["evidenceRefs"]),
+    reasons: compactGapReasonArray(value["reasons"])
+  });
+}
+
+function compactPostflight(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    evidenceRefs: compactEvidenceRefs(value["evidenceRefs"]),
+    blockingReasonCarriers: compactBlockingReasonCarrierArray(
+      value["blockingReasonCarriers"],
+      "postflight_blocking_reason_carrier_count"
+    )
+  });
+}
+
+function compactSummary(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    blockingReasons: compactBlockingReasonCarrierArray(
+      value["blockingReasons"],
+      "summary_blocking_reason_carrier_count"
+    )
+  });
+}
+
+function compactInlineArchiveCarrier(value: unknown, archiveRef: string | null): unknown {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  return Object.freeze({
+    kind: "sdlc_cli_compacted_inline_payload",
+    originalKind: isRecord(value) ? stringField(value, "kind") : null,
+    archiveRef,
+    reason: "large_inline_carrier_available_in_operator_archive"
+  });
+}
+
+function compactRetryContext(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    priorGapDossiers: Array.isArray(value["priorGapDossiers"])
+      ? Object.freeze(value["priorGapDossiers"].map(compactGapDossier))
+      : value["priorGapDossiers"]
+  });
+}
+
+function compactManifest(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    fpTransformRequest: compactInlineArchiveCarrier(
+      value["fpTransformRequest"],
+      stringField(value, "fpTransformRequestFile")
+    ),
+    retryContext: compactRetryContext(value["retryContext"])
+  });
+}
+
+function compactInstalledStartJsonPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) {
+    return payload;
+  }
+  if (stringField(payload, "kind") !== "sdlc_installed_operator_start_outcome") {
+    return payload;
+  }
+  const summary = childRecord(payload, "summary");
+  const archiveRoot =
+    stringField(payload, "archiveRoot") ??
+    (summary === null ? null : stringField(summary, "archiveRoot"));
+  const archiveRootPath = archiveRoot === null ? null : archiveRoot.replace(/\/+$/u, "");
+  const archiveFileRef = (relativePath: string): string | null =>
+    archiveRootPath === null
+      ? null
+      : pathToFileURL(path.join(archiveRootPath, relativePath)).href;
+  const sourceOutcomeRef = archiveFileRef("run.json");
+  return Object.freeze({
+    kind: "sdlc_installed_operator_start_cli_projection" as const,
+    sourceOutcomeKind: "sdlc_installed_operator_start_outcome" as const,
+    sourceOutcomeRef,
+    archiveRoot,
+    compacted: true,
+    omittedCarrierRefs: Object.freeze(
+      [
+        archiveFileRef("handoff_manifest.json"),
+        archiveFileRef("worker_result_report.json"),
+        archiveFileRef("postflight.json"),
+        archiveFileRef("gap_dossier.json"),
+        archiveFileRef("sdlc_edge_fulfillment_ledger.json"),
+        archiveFileRef("sdlc_edge_closure_decision.json"),
+        archiveFileRef("sdlc_next_action_projection.json")
+      ].filter((ref): ref is string => ref !== null)
+    ),
+    status: stringField(payload, "status"),
+    summary: compactSummary(payload["summary"]),
+    manifest: compactManifest(payload["manifest"]),
+    postflight: compactPostflight(payload["postflight"]),
+    gapDossier: compactGapDossier(payload["gapDossier"]),
+    traversalConsequence: payload["traversalConsequence"] ?? null,
+    emittedRuntimeEventKinds: payload["emittedRuntimeEventKinds"] ?? Object.freeze([])
+  });
+}
+
+function jsonPayloadForResult(result: OddSdlcSpecMethodResult): unknown {
+  return result.command === "start"
+    ? compactInstalledStartJsonPayload(result.payload)
+    : result.payload;
+}
+
 function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {
   if (result.command !== "gaps" || !isRecord(result.payload)) {
     return null;
@@ -1561,5 +1918,12 @@ export function serializeOddSdlcSpecMethodResult(result: OddSdlcSpecMethodResult
       return `${compact}\n`;
     }
   }
-  return `${JSON.stringify(result, null, 2)}\n`;
+  return `${JSON.stringify(
+    {
+      ...result,
+      payload: jsonPayloadForResult(result)
+    },
+    null,
+    2
+  )}\n`;
 }

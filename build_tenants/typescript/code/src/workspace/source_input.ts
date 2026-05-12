@@ -101,6 +101,31 @@ export function normalizeSdlcRequirementDisplayId(rawId: string): string {
   return normalized;
 }
 
+const PLACEHOLDER_REQUIREMENT_ID_SEGMENT_EXPRESSION =
+  /^(?:N{2,}|X{2,}|Y{2,}|Z{2,}|TBD|TODO|PLACEHOLDER)$/u;
+
+export function isPlaceholderRequirementMarker(marker: string): boolean {
+  let requirementId = marker;
+  if (marker.startsWith(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX)) {
+    const encodedRequirementId = marker
+      .slice(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX.length)
+      .split("/")[0];
+    if (encodedRequirementId === undefined || encodedRequirementId.length === 0) {
+      return false;
+    }
+    try {
+      requirementId = decodeURIComponent(encodedRequirementId);
+    } catch {
+      return false;
+    }
+  }
+  const normalized = normalizeSdlcRequirementDisplayId(requirementId);
+  const parts = normalized.split("-");
+  return parts
+    .slice(1)
+    .some((part) => PLACEHOLDER_REQUIREMENT_ID_SEGMENT_EXPRESSION.test(part));
+}
+
 export function localRequirementSlug(title: string): string {
   const slug = title
     .trim()
@@ -168,6 +193,9 @@ export function requirementAuthorityIdentityForMarker(input: {
   readonly sourceUri: string;
   readonly sourceDigest: string;
 }): SdlcRequirementAuthorityIdentity | null {
+  if (isPlaceholderRequirementMarker(input.marker)) {
+    return null;
+  }
   if (input.marker.startsWith(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX)) {
     const [encodedRequirementId, encodedHeadingSlug] = input.marker
       .slice(SDLC_LOCAL_REQUIREMENT_MARKER_PREFIX.length)
@@ -235,7 +263,7 @@ function detectLocalRequirementMarkers(content: string): readonly string[] {
   const explicitRequirementHeading =
     /^\s{0,3}(?:#{1,6}\s+|[-*]\s+)?(R-\d{1,4})(?:\s*[:.-]\s*|\s+)([^\n]+?)\s*$/gimu;
   const canonicalRequirementMarker =
-    /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/gu;
+    /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/gu;
   const explicitMarkers = [...content.matchAll(explicitRequirementHeading)].map(
     (match) =>
       localRequirementMarker({
@@ -262,11 +290,13 @@ function detectAuthorityMarkers(
   content: string,
   role: SdlcSourceInputRole
 ): readonly string[] {
-  const markerExpression = /\b(?:INT-\d{3}|RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
+  const markerExpression = /\b(?:INT-\d{3}|RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
   const transformRefExpression =
     /\b(?:transform-obligation|requirement-transform|requirement-lineage):\/\/[^\s\])}>,]+/g;
   const projectExpression = /^\*\*Project\*\*:\s*(.+?)\s*$/gm;
-  const markers = [...content.matchAll(markerExpression)].map((match) => match[0]);
+  const markers = [...content.matchAll(markerExpression)]
+    .map((match) => match[0])
+    .filter((marker) => !isPlaceholderRequirementMarker(marker));
   const transformRefs = [...content.matchAll(transformRefExpression)].map(
     (match) => match[0]
   );
