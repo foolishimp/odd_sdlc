@@ -1,6 +1,6 @@
 # Edge Gain And Closure Contract Requirements
 
-**Family**: REQ-F-ODDSDLC-063..067
+**Family**: REQ-F-ODDSDLC-063..068
 **Status**: Active
 **Category**: Governance, Capability, Verification
 **Carries Forward From**:
@@ -39,10 +39,11 @@ Every close-capable typed vector traversal shall declare the computation that
 turns admitted evidence into edge gain, residual pressure, and closure state.
 
 **Acceptance Criteria**:
-- AC-1: the contract row declares edge identity, source asset set, target asset
-  type, target outcome, transformation category, authority basis, obligation
-  derivation, evidence policy, metric function, threshold policy, ledger inputs,
-  closure function, residual-pressure function, composition role, and proof lane
+- AC-1: the contract row declares edge identity, source asset set, source asset
+  policy, target asset type, target outcome, transformation category,
+  authority basis, obligation derivation, evidence policy, metric function,
+  threshold policy, ledger inputs, closure function, residual-pressure function,
+  composition role, and proof lane
 - AC-2: the gain function consumes admitted evidence and ledger rows, not
   worker percent-complete, worker prose, artifact existence, manifest shape,
   route completion, or postflight success alone
@@ -54,6 +55,9 @@ turns admitted evidence into edge gain, residual pressure, and closure state.
 - AC-5: deterministic optimizations may support admission, validation,
   folding, routing, or deterministic edge execution only when the edge contract
   declares their authority
+- AC-6: source-set matching is declared by the contract row or by a distinct
+  overlay-specific contract row; runtime adapters may not relax source meaning
+  through an omitted imperative check
 
 ### REQ-F-ODDSDLC-065 — compound traversal closure preserves intermediate pressure
 
@@ -90,6 +94,9 @@ and replay.
   residual pressure as read models without becoming closure authority
 - AC-5: replay reuses prior evidence only when workspace, graph vector, target
   binding, evidence policy, contract digest, and predecessor refs match
+- AC-6: handoff construction enforces the source and target boundary policy
+  declared by the selected edge contract and records any non-strict source-set
+  policy as contract truth
 
 ### REQ-F-ODDSDLC-067 — T-164 proof covers a three-edge assurance chain
 
@@ -107,3 +114,22 @@ sandbox proof over at least one three-edge SDLC chain.
   surface as operator-facing installs
 - AC-5: live proof, when enabled, archives handoff, ledger, closure,
   next-action, and assurance evidence for each edge
+
+### REQ-F-ODDSDLC-068 — edge assurance design closure is method-auditable
+
+The edge assurance boundary shall be design-method complete before its generic
+close fold becomes runtime authority.
+
+**Acceptance Criteria**:
+- AC-1: the active TypeScript design module carries a complete structural
+  carrier diagram for the edge assurance contract boundary
+- AC-2: the design records the recurrence/commonization decision between ABG
+  substrate edge assurance carriers and odd_sdlc SDLC-domain edge assurance
+  carriers
+- AC-3: the design and kernel name the ODD constructive function they own or
+  consume; the generic gain/close kernel is `evaluate_action`
+- AC-4: before the generic close fold becomes the installed close authority, an
+  execution-authority audit proves that exactly one carrier path selects the
+  close disposition for an affected traversal
+- AC-5: deterministic and live proof files trace to the active requirement
+  family that owns the behavior being proven

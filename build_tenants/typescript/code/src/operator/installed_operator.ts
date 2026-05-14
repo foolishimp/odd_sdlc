@@ -15,6 +15,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import {
   admitGraphSpanAssessment,
   constructEnginePluginContract,
+  constructGraphReentryAppliedEvent,
+  constructGraphReentryPlannedEvent,
   constructGraphSpanAssessedEvent,
   constructGraphSpanEvaluationScheduledEvent,
   constructGraphSpanFoldbackEvaluatedEvent,
@@ -24,6 +26,8 @@ import {
   constructVectorEvaluatedEvent,
   foldGraphSpanAssessments,
   deriveAdvancementTransition,
+  deriveGraphReentryFrontierProjection,
+  deriveGraphReentryPlan,
   deriveIterationAdvanceDecision,
   deriveRuntimeAggregateProjection,
   deriveRuntimeLivenessObserverProjection,
@@ -141,6 +145,7 @@ import {
 } from "./traversal_consequence.js";
 import {
   admitSdlcEdgeEvidence,
+  deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
   digestSdlcEdgeGainClosureContract,
@@ -276,6 +281,12 @@ function installedStartLoopAttemptFor(input: {
 function installedStartHasEvaluateNextTraversalTruth(
   outcome: SdlcInstalledOperatorStartOutcome
 ): boolean {
+  if (
+    outcome.status === "worker_failed" &&
+    outcome.gapDossier?.retryEligible === false
+  ) {
+    return false;
+  }
   return outcome.traversalConsequence?.nextActionProjection.choosesNextTraversal === true;
 }
 
@@ -740,14 +751,17 @@ function vectorRangeInclusive(start: number, end: number): readonly number[] {
   return Object.freeze(indexes);
 }
 
-function graphSpanRefForRepairReentry(input: {
+function graphSpanRefForOperatorReentry(input: {
   readonly basis: ExecutionBasis;
   readonly sourceVectorIndex: number;
   readonly terminalVectorIndex: number;
+  readonly scope: string;
 }) {
   return Object.freeze({
     kind: "graph_span_ref" as const,
-    spanId: `graph-span:odd-sdlc-repair:${input.basis.id}:${input.sourceVectorIndex}->${input.terminalVectorIndex}`,
+    spanId:
+      `graph-span:odd-sdlc-${input.scope}:${input.basis.id}:` +
+      `${input.sourceVectorIndex}->${input.terminalVectorIndex}`,
     basisId: input.basis.id,
     graphFunctionId: input.basis.graphFunction.id,
     sourceVectorIndex: input.sourceVectorIndex,
@@ -769,10 +783,49 @@ function graphSpanRefForRepairReentry(input: {
   });
 }
 
+function graphReentryPlanRuntimeEventsForSpanEvents(input: {
+  readonly basis: ExecutionBasis;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly emittedEvents: readonly RuntimeEvent[];
+  readonly spanEvents: readonly RuntimeEvent[];
+  readonly causationEventRefs: readonly string[];
+}): readonly RuntimeEvent[] {
+  const events = Object.freeze([
+    ...input.replayEvents,
+    ...input.emittedEvents,
+    ...input.spanEvents
+  ]);
+  const frontier = deriveGraphReentryFrontierProjection({
+    basis: input.basis,
+    events
+  });
+  const plan = deriveGraphReentryPlan({
+    basis: input.basis,
+    runtimeProjection: deriveRuntimeAggregateProjection(input.basis, events),
+    frontier
+  });
+  if (plan === null) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([
+    constructGraphReentryPlannedEvent({
+      basis: input.basis,
+      plan,
+      causationEventRefs: input.causationEventRefs
+    }),
+    constructGraphReentryAppliedEvent({
+      basis: input.basis,
+      plan,
+      causationEventRefs: Object.freeze([plan.planRef])
+    })
+  ]);
+}
+
 function repairReentryGraphSpanRuntimeEvents(input: {
   readonly basis: ExecutionBasis;
   readonly outcome: SdlcAbgOwnedFpDispatchState;
   readonly replayEvents: readonly RuntimeEvent[];
+  readonly emittedEvents: readonly RuntimeEvent[];
 }): readonly RuntimeEvent[] {
   const dossier = input.outcome.gapDossier;
   if (
@@ -819,10 +872,11 @@ function repairReentryGraphSpanRuntimeEvents(input: {
   const generation =
     input.replayEvents.filter((event) => event.kind === "graph_span_foldback_evaluated")
       .length + 1;
-  const span = graphSpanRefForRepairReentry({
+  const span = graphSpanRefForOperatorReentry({
     basis: input.basis,
     sourceVectorIndex: targetVectorIndex,
-    terminalVectorIndex
+    terminalVectorIndex,
+    scope: "repair"
   });
   const schedule = Object.freeze({
     kind: "graph_span_evaluation_schedule" as const,
@@ -890,7 +944,7 @@ function repairReentryGraphSpanRuntimeEvents(input: {
     assessments: Object.freeze([assessment]),
     generation
   });
-  return Object.freeze([
+  const spanEvents = Object.freeze([
     constructGraphSpanEvaluationScheduledEvent({
       basis: input.basis,
       schedule,
@@ -905,6 +959,144 @@ function repairReentryGraphSpanRuntimeEvents(input: {
       basis: input.basis,
       foldback,
       causationEventRefs: Object.freeze([assessment.assessmentId])
+    })
+  ]);
+  return Object.freeze([
+    ...spanEvents,
+    ...graphReentryPlanRuntimeEventsForSpanEvents({
+      basis: input.basis,
+      replayEvents: input.replayEvents,
+      emittedEvents: input.emittedEvents,
+      spanEvents,
+      causationEventRefs: evidenceRefs
+    })
+  ]);
+}
+
+function postActionReentryGraphSpanRuntimeEvents(input: {
+  readonly basis: ExecutionBasis;
+  readonly consequence: SdlcInstalledOperatorTraversalConsequence;
+  readonly currentVectorIndex: number;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly emittedEvents: readonly RuntimeEvent[];
+}): readonly RuntimeEvent[] {
+  const closure = input.consequence.edgeClosureDecision;
+  const nextAction = input.consequence.nextActionProjection;
+  if (
+    !["retry", "repair", "re-enter"].includes(closure.disposition) ||
+    !nextAction.choosesNextTraversal ||
+    nextAction.nextGraphVectorRef === null
+  ) {
+    return Object.freeze([]);
+  }
+  const targetVectorIndex = vectorIndexByEdgeName({
+    basis: input.basis,
+    edgeName: nextAction.nextGraphVectorRef
+  });
+  if (targetVectorIndex === null || targetVectorIndex > input.currentVectorIndex) {
+    return Object.freeze([]);
+  }
+  const generation =
+    [...input.replayEvents, ...input.emittedEvents].filter(
+      (event) => event.kind === "graph_span_foldback_evaluated"
+    ).length + 1;
+  const span = graphSpanRefForOperatorReentry({
+    basis: input.basis,
+    sourceVectorIndex: targetVectorIndex,
+    terminalVectorIndex: input.currentVectorIndex,
+    scope: "post-action"
+  });
+  const evidenceRefs = uniqueSorted([
+    closure.decisionRef,
+    nextAction.nextActionProjectionRef,
+    ...closure.reasonRefs,
+    ...nextAction.gapPressureRefs
+  ]);
+  const schedule = Object.freeze({
+    kind: "graph_span_evaluation_schedule" as const,
+    scheduleRef: `graph-span-schedule:odd-sdlc-post-action:${JSON.stringify({
+      basisId: input.basis.id,
+      targetVectorIndex,
+      terminalVectorIndex: input.currentVectorIndex,
+      closureDecisionRef: closure.decisionRef,
+      generation
+    })}`,
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    terminalVectorIndex: input.currentVectorIndex,
+    spanRefs: Object.freeze([span]),
+    generation
+  });
+  const obligationRef =
+    evidenceRefs[0] ?? `post-action-reentry:${closure.disposition}`;
+  const assessment = admitGraphSpanAssessment({
+    basis: input.basis,
+    span,
+    assessmentId: `graph-span-assessment:odd-sdlc-post-action:${JSON.stringify({
+      basisId: input.basis.id,
+      targetVectorIndex,
+      terminalVectorIndex: input.currentVectorIndex,
+      disposition: closure.disposition,
+      generation
+    })}`,
+    attemptIndex: 0,
+    assessmentRegime: "F_P",
+    obligationRows: Object.freeze([
+      Object.freeze({
+        obligationId: `post-action-reentry:${closure.disposition}:${obligationRef}`,
+        sourceAuthorityRef: closure.decisionRef,
+        status: "semantic_gap" as const,
+        terminalEvidenceRefs: Object.freeze([]),
+        carryObservations: Object.freeze([
+          Object.freeze({
+            fromVectorIndex: targetVectorIndex,
+            toVectorIndex: input.currentVectorIndex,
+            status: "dropped" as const,
+            evidenceRefs
+          })
+        ]),
+        detail:
+          `${closure.disposition} closure selected ${nextAction.nextGraphVectorRef}`
+      })
+    ]),
+    constitutionalReentry: null,
+    evidenceRefs,
+    edgeFoldbackRefs: Object.freeze([]),
+    detail: "odd_sdlc post-action closure requires graph reentry",
+    generation
+  });
+  const foldback = foldGraphSpanAssessments({
+    basis: input.basis,
+    terminalVectorIndex: input.currentVectorIndex,
+    schedule,
+    assessments: Object.freeze([assessment]),
+    generation
+  });
+  const spanEvents = Object.freeze([
+    constructGraphSpanEvaluationScheduledEvent({
+      basis: input.basis,
+      schedule,
+      causationEventRefs: Object.freeze([closure.decisionRef])
+    }),
+    constructGraphSpanAssessedEvent({
+      basis: input.basis,
+      assessment,
+      causationEventRefs: evidenceRefs
+    }),
+    constructGraphSpanFoldbackEvaluatedEvent({
+      basis: input.basis,
+      foldback,
+      causationEventRefs: Object.freeze([assessment.assessmentId])
+    })
+  ]);
+  return Object.freeze([
+    ...spanEvents,
+    ...graphReentryPlanRuntimeEventsForSpanEvents({
+      basis: input.basis,
+      replayEvents: input.replayEvents,
+      emittedEvents: input.emittedEvents,
+      spanEvents,
+      causationEventRefs: evidenceRefs
     })
   ]);
 }
@@ -986,8 +1178,8 @@ function environmentPolicyForTransport(
   return Object.freeze({ prefixes: Object.freeze([]) });
 }
 
-const DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 10;
-const DEFAULT_WORKER_TIMEOUT_MS = 1000 * 60 * 30;
+const DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 30;
+const DEFAULT_WORKER_TIMEOUT_MS = 1000 * 60 * 60 * 12;
 const DEFAULT_WORKER_HEARTBEAT_MS = 1000 * 30;
 const DEFAULT_WORKER_TERMINATION_GRACE_MS = 1000 * 10;
 
@@ -3094,10 +3286,16 @@ function postProductMaterializationGraphTrackBlockingReasons(input: {
 
 function edgeAssuranceEvidenceCandidatesFor(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly obligationIds: readonly string[];
 }): readonly SdlcEdgeEvidenceCandidate[] {
+  const closureObligationIds = new Set(input.obligationIds);
   return Object.freeze(
     (input.state.workerReport?.obligationAssessments ?? Object.freeze([]))
-      .filter((assessment) => assessment.fulfillmentStatus === "fulfilled")
+      .filter(
+        (assessment) =>
+          assessment.fulfillmentStatus === "fulfilled" &&
+          closureObligationIds.has(assessment.obligationId)
+      )
       .flatMap((assessment) =>
         assessment.evidenceRefs.map((evidenceRef) =>
           Object.freeze({
@@ -3239,14 +3437,15 @@ function deriveInstalledTraversalConsequence(input: {
   });
   const edgeAssuranceObligations = deriveSdlcEdgeObligations({
     contract: edgeAssuranceContract,
-    obligationRefs: input.state.manifest.traversalObligationContext.obligations.map(
-      (obligation) => obligation.obligationId
-    )
+    obligationRefs: fulfillmentProjection.edgeLocalObligationIds
   });
   const edgeEvidenceAdmission = admitSdlcEdgeEvidence({
     contract: edgeAssuranceContract,
     obligations: edgeAssuranceObligations,
-    candidates: edgeAssuranceEvidenceCandidatesFor({ state: input.state })
+    candidates: edgeAssuranceEvidenceCandidatesFor({
+      state: input.state,
+      obligationIds: fulfillmentProjection.edgeLocalObligationIds
+    })
   });
   const edgeGain = measureSdlcEdgeGain({
     contract: edgeAssuranceContract,
@@ -3259,6 +3458,10 @@ function deriveInstalledTraversalConsequence(input: {
     })
   });
   const edgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
+  const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: edgeGain,
+    residualPressure: edgeResidualPressure
+  });
   const retryReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "same_edge_retry"
@@ -3320,6 +3523,7 @@ function deriveInstalledTraversalConsequence(input: {
     decisionRef: closureDecisionRef,
     ledger,
     edgeClosureFunctionRef: edgeAssuranceContract.closureFunctionRef,
+    edgeAssuranceCloseDecision,
     currentEdgeLawful:
       input.state.status !== "worker_report_rejected" &&
       repriceReasonRefs.length === 0,
@@ -3831,36 +4035,105 @@ export async function executeInstalledOperatorStart(input: {
   }
 }
 
+type RuntimeEventArchiveScalar = string | number | boolean | null;
+
+function compactRuntimeEventScalar(
+  value: unknown
+): RuntimeEventArchiveScalar | undefined {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function runtimeEventArchiveScalar(
+  event: RuntimeEvent,
+  key: string
+): RuntimeEventArchiveScalar | undefined {
+  switch (key) {
+    case "eventRef":
+      return "eventRef" in event
+        ? compactRuntimeEventScalar(event.eventRef)
+        : undefined;
+    case "eventId":
+      return "eventId" in event
+        ? compactRuntimeEventScalar(event.eventId)
+        : undefined;
+    case "basisRef":
+      return "basisRef" in event
+        ? compactRuntimeEventScalar(event.basisRef)
+        : undefined;
+    case "decisionRef":
+      return "decisionRef" in event
+        ? compactRuntimeEventScalar(event.decisionRef)
+        : undefined;
+    case "resultRef":
+      return "resultRef" in event
+        ? compactRuntimeEventScalar(event.resultRef)
+        : undefined;
+    case "frameId":
+      return "frameId" in event
+        ? compactRuntimeEventScalar(event.frameId)
+        : undefined;
+    case "vectorIndex":
+      return "vectorIndex" in event
+        ? compactRuntimeEventScalar(event.vectorIndex)
+        : undefined;
+    case "edgeName":
+      return "edgeName" in event
+        ? compactRuntimeEventScalar(event.edgeName)
+        : undefined;
+    case "graphFunctionName":
+      return "graphFunctionName" in event
+        ? compactRuntimeEventScalar(event.graphFunctionName)
+        : undefined;
+    case "targetAssetType":
+      return "targetAssetType" in event
+        ? compactRuntimeEventScalar(event.targetAssetType)
+        : undefined;
+    case "status":
+      return "status" in event
+        ? compactRuntimeEventScalar(event.status)
+        : undefined;
+    case "reason":
+      return "reason" in event
+        ? compactRuntimeEventScalar(event.reason)
+        : undefined;
+    default:
+      return undefined;
+  }
+}
+
 function compactRuntimeEventArchivePayload(
   events: readonly RuntimeEvent[]
 ): Record<string, unknown> {
+  const projectedKeys = [
+    "eventRef",
+    "eventId",
+    "basisRef",
+    "decisionRef",
+    "resultRef",
+    "frameId",
+    "vectorIndex",
+    "edgeName",
+    "graphFunctionName",
+    "targetAssetType",
+    "status",
+    "reason"
+  ];
   const projectedEvents = events.map((event, index) => {
-    const record = event as unknown as Record<string, unknown>;
     const projected: Record<string, unknown> = {
       index,
       kind: event.kind
     };
-    for (const key of [
-      "eventRef",
-      "eventId",
-      "basisRef",
-      "decisionRef",
-      "resultRef",
-      "frameId",
-      "vectorIndex",
-      "edgeName",
-      "graphFunctionName",
-      "targetAssetType",
-      "status",
-      "reason"
-    ]) {
-      const value = record[key];
-      if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean" ||
-        value === null
-      ) {
+    for (const key of projectedKeys) {
+      const value = runtimeEventArchiveScalar(event, key);
+      if (value !== undefined) {
         projected[key] = value;
       }
     }
@@ -4670,13 +4943,10 @@ function compactRuntimeEventArchivePayload(
     ...repairReentryGraphSpanRuntimeEvents({
       basis,
       outcome: completedDispatchState,
-      replayEvents: input.replayEvents
+      replayEvents: input.replayEvents,
+      emittedEvents: emitted
     })
   );
-  await appendOddSdlcRuntimeEvents({
-    workspaceRoot: input.workspaceRoot,
-    events: emitted
-  });
   const nextVector =
     engineResult.projection.nextVectorIndex === null
       ? null
@@ -4690,18 +4960,33 @@ function compactRuntimeEventArchivePayload(
     emittedEvents: emitted,
     nextVectorIndex: engineResult.projection.nextVectorIndex
   });
+  emitted.push(
+    ...postActionReentryGraphSpanRuntimeEvents({
+      basis,
+      consequence: traversalConsequence,
+      currentVectorIndex: completedDispatchState.manifest.vectorIndex,
+      replayEvents: input.replayEvents,
+      emittedEvents: emitted
+    })
+  );
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot: input.workspaceRoot,
+    events: emitted
+  });
   writeTraversalConsequenceArchive({
     manifest: completedDispatchState.manifest,
     consequence: traversalConsequence
   });
   const terminal =
     engineResult.transition.kind === "terminal" ? engineResult.transition : null;
+  const closureDisposition = traversalConsequence.edgeClosureDecision.disposition;
   const closedWithNextTraversal =
-    traversalConsequence.edgeClosureDecision.disposition === "close" &&
+    closureDisposition === "close" &&
     traversalConsequence.nextActionProjection.choosesNextTraversal;
   const status =
     completedDispatchState.status === "worker_invoked" &&
-    terminal?.terminalKind === "converged"
+    terminal?.terminalKind === "converged" &&
+    closureDisposition === "close"
       ? "converged"
       : completedDispatchState.status === "worker_invoked" &&
           terminal?.terminalKind === "gap_stop" &&
@@ -4737,7 +5022,7 @@ function compactRuntimeEventArchivePayload(
       status === "converged"
         ? null
         : completedDispatchState.status === "worker_invoked"
-        ? nextVector
+        ? nextVector ?? traversalConsequence.nextActionProjection.nextGraphVectorRef
         : completedDispatchState.currentEdge
   });
   writeOperatorArchiveFile({

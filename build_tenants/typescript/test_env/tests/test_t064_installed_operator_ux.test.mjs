@@ -1119,10 +1119,61 @@ test("T-106 installed operator uses admitted conformed profile after workspace d
   assert.notEqual(result.status, "worker_failed");
   assert.notEqual(result.manifest, null);
   assert.equal(result.manifest.conformedProject.activeTenant, "typescript");
+  assert.notEqual(result.traversalConsequence, null);
   assert.equal(
     result.manifest.productMaterialization.tenantRoot.endsWith(
       "build_tenants/typescript"
     ),
     true
+  );
+  const archiveRoot = result.manifest.archiveRoot;
+  const consequence = result.traversalConsequence;
+  const archivedEdgeGain = JSON.parse(
+    readFileSync(path.join(archiveRoot, "sdlc_edge_gain.json"), "utf8")
+  );
+  const archivedResidualPressure = JSON.parse(
+    readFileSync(
+      path.join(archiveRoot, "sdlc_edge_residual_pressure.json"),
+      "utf8"
+    )
+  );
+  const archivedLedger = JSON.parse(
+    readFileSync(path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"), "utf8")
+  );
+  const archivedClosureDecision = JSON.parse(
+    readFileSync(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
+  );
+  const archivedNextAction = JSON.parse(
+    readFileSync(path.join(archiveRoot, "sdlc_next_action_projection.json"), "utf8")
+  );
+
+  assert.equal(archivedEdgeGain.gainRef, consequence.edgeGain.gainRef);
+  assert.equal(archivedEdgeGain.contractRef, archivedLedger.edgeAssuranceContractRef);
+  assert.equal(
+    archivedEdgeGain.contractDigest,
+    archivedLedger.edgeAssuranceContractDigest
+  );
+  assert.equal(archivedResidualPressure.contractRef, archivedEdgeGain.contractRef);
+  assert.equal(
+    archivedResidualPressure.contractDigest,
+    archivedEdgeGain.contractDigest
+  );
+  assert.deepStrictEqual(
+    archivedLedger.edgeResidualPressureRefs,
+    archivedResidualPressure.requiredPressureRefs
+  );
+  assert.equal(archivedClosureDecision.edgeGainRef, archivedEdgeGain.gainRef);
+  assert.equal(
+    archivedClosureDecision.edgeAssuranceDecisionRef,
+    consequence.edgeClosureDecision.edgeAssuranceDecisionRef
+  );
+  assert.equal(
+    archivedNextAction.edgeAssuranceContractRef,
+    archivedLedger.edgeAssuranceContractRef
+  );
+  assert.equal(archivedNextAction.edgeGainRef, archivedEdgeGain.gainRef);
+  assert.deepStrictEqual(
+    archivedNextAction.edgeResidualPressureRefs,
+    archivedResidualPressure.requiredPressureRefs
   );
 });

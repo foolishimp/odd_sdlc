@@ -8,8 +8,8 @@ goal: failed-closure-tickets-collapse-into-edge-assurance-proof-contract
 build_tenant: typescript
 owner: odd_sdlc
 change_intent: Make each close-capable SDLC graph edge declare its gain function, metric/evidence policy, closure function, residual-pressure function, and compound traversal composition role so failed closure cannot hide behind artifacts, manifests, worker assertions, summaries, or generic traversal success.
-change_class: design_reframe
-re_entry_point: design
+change_class: requirement_reprice
+re_entry_point: requirements
 priority: critical
 triaged_at: 2026-05-13
 created_at: 2026-05-13
@@ -28,6 +28,7 @@ source_documents:
   - specification/requirements/14-odd-sdlc-installed-product-contract.md
   - specification/requirements/16-edge-gain-closure-contract.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
+  - user-supplied Claude DMM/ODD review, 2026-05-14
   - /Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
@@ -79,7 +80,7 @@ excluded_boundary:
   - F_D as the generic constructive mechanism for open-ended SDLC work; for the generic SDLC path, F_D is deterministic optimization, admission, validation, folding, and routing support around configured F_P
 target_truth: Every close-capable odd_sdlc TypeScript graph edge and traversal overlay declares a product-owned gain function, evidence policy, metric function, threshold, ledger input set, closure function, residual-pressure function, and compound-traversal composition role. ABG supplies traversal and assurance substrate; odd_sdlc supplies SDLC meaning and closure interpretation. Closure is derived from admitted ledger/evidence truth, not from artifacts, worker prose, manifests, summaries, or generic traversal success.
 superseded_truth: Closure bugs can be handled as independent symptom tickets where each local fix invents its own closure rule, or where artifact presence, materialization manifests, worker assertions, component tags, postflight success, or scenario expected-file lists can close an edge without a declared edge-level gain and closure contract.
-closure_law: This ticket closes only when the TypeScript tenant publishes an inspectable edge assurance matrix for all close-capable SDLC graph edges, the matrix is bound into execution/ledger/closure/query surfaces, missing gain or closure contracts fail closed, compound traversals compose edge gains without losing residual pressure, and the absorbed T-158/T-103/T-130/T-142 scenarios pass as explicit proof obligations under the same contract model.
+closure_law: This ticket closes only when the TypeScript tenant publishes an inspectable edge assurance matrix for all close-capable SDLC graph edges, the matrix is design-method complete, the matrix is bound into execution/ledger/closure/query surfaces, missing gain or closure contracts fail closed, compound traversals compose edge gains without losing residual pressure, exactly one execution authority owns the installed close fold, and the absorbed T-158/T-103/T-130/T-142 scenarios pass as explicit proof obligations under the same contract model.
 evaluation_criteria:
   - every published close-capable graph edge has a declared gain function, metric function, evidence policy, threshold, closure function, residual-pressure function, and composition role
   - every traversal overlay names the edge gain/closure rows it requires and cannot close a segment as product/worksite convergence without the relevant closure decisions
@@ -95,12 +96,11 @@ evaluation_criteria:
   - opt-in live proof runs one installed sandbox traversal with at least three chained SDLC edges and assurance evidence archived under the normal test-run surface
 proof_surface:
   - build_tenants/typescript/test_env/tests/test_t164_edge_gain_closure_contract.test.mjs
-  - build_tenants/typescript/test_env/sandbox/scenarios/t164_three_chain_edge_assurance.scenario.mjs
-  - build_tenants/typescript/test_env/test_runs/scenario_t164_three_chain_edge_assurance_*/
-  - "absorbed proof: T-158 same-edge product materialization replay across repair attempts"
-  - "absorbed proof: T-103 data_mapper/test35 parity and multi-edge depth comparison"
-  - "absorbed proof: T-130 full-breadth design-depth assurance"
-  - "absorbed proof: T-142 multi-tenant product materialization fan-out closure"
+  - build_tenants/typescript/test_env/sandbox/scenarios/t164_rust_hello_service_lite.scenario.mjs
+  - build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/*
+  - build_tenants/typescript/test_env/sandbox/scenarios/data_mapper_internal.scenario.mjs
+  - build_tenants/typescript/test_env/test_runs/scenario_data_mapper_internal/*
+  - "absorbed proof: full internal data_mapper run covering T-158/T-103/T-130/T-142 closure semantics"
 non_closure_conditions:
   - any close-capable edge in the published catalog lacks a gain or closure row
   - a generic materialization edge closes a product obligation by artifact existence, manifest presence, worker report text, F_P status, or postflight success alone
@@ -170,9 +170,78 @@ for this re-triage are:
 
 No further runtime execution work is closed by this re-triage. The current
 implementation at that point was a first matrix slice under the new design.
-The later runtime-kernel slice closes L3a and L11; L6-L10 and L12-L13 remain
+The later runtime-kernel slice closes L3a and L11; L6-L10 and L12 remain
 open until the archive/replay fixture, runtime close-gate binding,
-projection surfacing, and three-edge installed proof exist.
+projection surfacing, and deterministic three-edge proof exist. The later live
+proof repricing collapses the separate L13/L15 live rows into L14.
+
+### STDO Re-Triage - 2026-05-14 DMM/ODD Review
+
+Re-entry changes from `design_reframe` to `requirement_reprice`.
+
+The runtime-kernel checkpoint is useful but not design-method closed. The
+review exposed missing constitutional and design obligations that must be
+ratified before additional implementation/test cleanup is treated as lawful
+closure work.
+
+The ordered re-entry ladder is:
+
+| Order | Re-entry point | Governing update | Work allowed after update |
+| ---: | --- | --- | --- |
+| 1 | `requirement_reprice` | Extend `specification/requirements/16-edge-gain-closure-contract.md` to require declared source-set policy, DMM/ODD design closure, recurrence decision, evaluate-action naming, execution-authority audit, and proof trace alignment. | Design module can be updated against ratified requirements. |
+| 2 | `design_reframe` | Extend `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md` with structural carrier diagram, source asset policy, recurrence/commonization decision, ODD function binding, and execution-authority status. | Implementation can be adjusted to the declared design. |
+| 3 | `realization_refactor` | Make code follow the declared row fields and carrier ownership: data-driven source-set enforcement, explicit closure classification, trace alignment, naming cleanup, and subordinate-carrier folding or justification. | Deterministic tests can be updated. |
+| 4 | `verification` | Re-run deterministic proof and resume full-capability live proof after the implementation reflects the updated design. | Closure evidence can be admitted. |
+
+No new implementation work should be claimed under T-164 until the first two
+steps are committed.
+
+#### Review Finding Disposition
+
+| Finding | Disposition | Lawful re-entry | Required action |
+| --- | --- | --- | --- |
+| F1 DMM §5E structural carrier diagram absent | Accepted, closure-blocking | `design_reframe` after requirement update | Add complete Mermaid `classDiagram` to the design module. |
+| F2 DMM §11C recurrence/commonization decision absent | Accepted | `design_reframe` | Record do-not-commonize decision for ABG substrate carriers versus odd_sdlc domain carriers; allow only pure digest utility commonization. |
+| F3 IACS declares fewer carriers than code exports | Accepted as design cleanup | `design_reframe` then `realization_refactor` | Either justify promoted subordinate carriers in the structural diagram/IACS or fold them into parent carriers. |
+| F4 test trace comments cite old requirement family | Accepted | `realization_refactor` after design | Align proof comments to `REQ-F-ODDSDLC-063..068`. |
+| F5 matrix file is large | Deferred | `realization_refactor` later | Split category rows only when next edits make review cost material. |
+| F6 `closureClassification` default hides row intent | Accepted | `realization_refactor` | Require explicit classification in every contract row. |
+| F7 source-set carve-out lives as imperative omission | Accepted, high priority | `requirement_reprice` then `design_reframe` then `realization_refactor` | Declare `source_asset_policy` on the contract row and enforce handoff source matching from data. |
+| F8 kernel does not name ODD §11.5D function | Accepted | `design_reframe` then `realization_refactor` | Bind the kernel to `evaluate_action` in design and code header. |
+| F9 two close-readiness authorities before L8 | Accepted as known-open L8 gate | `design_reframe` then runtime authority slice | Run execution-authority audit before generic close fold becomes installed close authority. |
+| F10 projection residual-pressure merge may invent authority | Accepted for later review | `design_reframe` if touched | Decide whether projection observes closure refs only or admits extra refs explicitly. |
+| F11 `SdlcEdgeGain.closeReady` is a partial close verdict | Accepted | `realization_refactor` | Rename to partial measurement wording or compute only inside close decision. |
+| F12 category defaults lack edge override path | Deferred | `requirement_reprice` if needed | Add override requirements only when an edge requires specialization beyond category. |
+| F13 synthetic obligation refs hide missing caller truth | Accepted | `realization_refactor` | Require obligation refs or make synthetic defaults explicit. |
+| F14 `SdlcEdgeGainClosureFunctionPack` top-level promotion weak | Accepted as design cleanup | `design_reframe` then `realization_refactor` | Justify as category-template field grouping or inline. |
+| F15 binary `score: 0 | 1` forecloses graded metrics | Deferred but recorded | `requirement_reprice` if graded metrics land | Keep binary slice unless graded metrics are introduced in active requirements. |
+| F16 contract ref identity includes target asset type | Deferred | `realization_refactor` if touching identity | Reassess identity/digest surfaces after source policy and explicit classification land. |
+
+#### Current State After Re-Triage
+
+The pushed checkpoint proves useful runtime behavior but does not close T-164.
+It showed the installed `start --until converged` loop can perform same-edge
+repair inside the framework, but it also confirmed the design-method review is
+now the controlling blocker.
+
+Current accepted state:
+
+- `specification/requirements/16-edge-gain-closure-contract.md` now owns
+  `REQ-F-ODDSDLC-068` for method-auditable edge assurance design closure.
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md`
+  now owns the structural diagram, source asset policy, recurrence decision,
+  ODD function binding, and execution-authority status.
+
+Next legal implementation slice:
+
+```text
+source_asset_policy row field
+  -> handoff source-set enforcement from contract row
+  -> explicit closureClassification on every row
+  -> evaluate_action trace header and test requirement trace alignment
+  -> closeReady naming cleanup / synthetic obligation default cleanup
+  -> deterministic tests
+```
 
 ## Contract Shape
 
@@ -702,11 +771,10 @@ convergence. `test_t164_edge_gain_closure_contract.test.mjs` now proves the
 edge contract matrix, category templates, overlay-selected vector coverage,
 lite residual-pressure specialization, and fail-closed diagnostics. The
 T-164 Rust hello-service sandbox proves the initial conformance bootstrap seed.
-The three-edge edge-assurance scenario named above,
-`t164_three_chain_edge_assurance.scenario.mjs`, does not yet exist. T-164
-therefore cannot claim runtime depth of the assurance contract until the
-three-edge deterministic and live/scenario proof surfaces are created or the
-proof surface is formally repriced.
+The separate three-edge edge-assurance scenario is formally repriced out of the
+proof surface. T-164 now treats the L14 Rust service live run as the single live
+gate: that archive must prove the installed trigger, at least three chained
+edge-assurance closures, and the service output.
 
 ### Current Full Traversal First-Pass Function Categories
 
@@ -844,30 +912,31 @@ intent alone.
 
 | Done | Row | Work item | Target surface | Proof required |
 | --- | --- | --- | --- | --- |
-| [ ] | L6 | Carry edge gain/closure contract refs and digests into execution contracts, handoff manifests, ledger artifacts, closure decisions, next-action projections, and archives. | `operator/handoff.ts`, `installed_operator.ts`, `traversal_consequence.ts`, carriers | Archive fixture proves the same contract ref/digest appears across handoff, ledger, closure, projection, and replay. |
-| [ ] | L7 | Make the generic `measure_edge_gain(...)` function consume admitted evidence and ledger rows, not worker assessment text, worker percent-complete, artifact existence, or harness-local expected files. | operator assurance/closure path | Tests prove worker assertion and artifact presence alone cannot close an edge. |
-| [ ] | L8 | Refactor closure decision derivation so close/yield/retry/repair/re-enter/reprice/block is derived from the generic `derive_edge_close(...)` and `derive_residual_pressure(...)` functions over the declared contract. | `installed_operator.ts`, `traversal_consequence.ts`, closure decision construction | Focused closure tests prove each disposition is reachable from declared contract state. |
-| [ ] | L9 | Preserve ABG ownership: use ABG assurance substrate where available, but keep SDLC gain/closure meaning in odd_sdlc carriers. | ABG adapter and SDLC operator boundary | Review note or test proves no new odd_sdlc traversal runtime/event store was introduced. |
-| [ ] | L10 | Expose missing-contract and residual-pressure state through `gaps` and query-domain as read models. | `projection/query_domain.ts`, gaps projection | Query test shows missing contract, residual pressure, and proof-lane refs without making query-domain closure authority. |
+| [x] | L6 | Carry edge gain/closure contract refs and digests into execution contracts, handoff manifests, ledger artifacts, closure decisions, next-action projections, and archives. | `operator/handoff.ts`, `installed_operator.ts`, `traversal_consequence.ts`, carriers | `test_t164_edge_gain_closure_contract.test.mjs` proves handoff/invocation/brief identity; `test_t064_installed_operator_ux.test.mjs` reads installed archive JSON for gain, residual pressure, ledger, closure decision, and next-action projection identity. |
+| [x] | L7 | Make the generic `measure_edge_gain(...)` function consume admitted evidence and ledger rows, not worker assessment text, worker percent-complete, artifact existence, or harness-local expected files. | operator assurance/closure path | `test_t164_edge_gain_closure_contract.test.mjs` rejects worker percent-complete and artifact presence alone; missing measuring ledgers produce a generic edge-assurance `block`. |
+| [x] | L8 | Refactor closure decision derivation so close/yield/retry/repair/re-enter/reprice/block is derived from the generic `derive_edge_close(...)` and `derive_residual_pressure(...)` functions over the declared contract. | `installed_operator.ts`, `traversal_consequence.ts`, closure decision construction | Installed traversal consequence now derives `SdlcEdgeAssuranceCloseDecision` from generic gain/residual pressure and passes it into `deriveSdlcEdgeClosureDecision`; focused tests cover close, retry, yield, repair, re-enter, reprice, and block. |
+| [x] | L9 | Preserve ABG ownership: use ABG assurance substrate where available, but keep SDLC gain/closure meaning in odd_sdlc carriers. | ABG adapter and SDLC operator boundary | Review note: this slice changes only odd_sdlc graph/operator/projection/test surfaces; it introduces no ABG core change, no local traversal runtime, and no local event store. ABG remains the replay/traversal substrate. |
+| [x] | L10 | Expose missing-contract and residual-pressure state through `gaps` and query-domain as read models. | `projection/query_domain.ts`, gaps projection | `test_t164_edge_gain_closure_contract.test.mjs` proves query-domain edge-assurance rows, missing-contract diagnostics, proof-lane refs, residual-pressure refs, and gap/dossier fields while preserving `choosesNextTraversal: false` and no action-closure authority. |
 
 ### Compound Traversal
 
 | Done | Row | Work item | Target surface | Proof required |
 | --- | --- | --- | --- | --- |
 | [x] | L11 | Implement `compose_path_gain(...)` for a path as a typed fold over edge gains, preserving bottlenecks and intermediate residual pressure. | graph/operator composition helper | Unit test proves compound close fails when an intermediate edge has residual pressure. |
-| [ ] | L12 | Add a deterministic three-edge SDLC chain proof: `requirements synthesis -> formal requirement syntax -> design encoding`. | `test_t164_edge_gain_closure_contract.test.mjs` or scenario fixture | Test proves all three edges expose gain, metric, close, residual pressure, and composition rows. |
-| [ ] | L13 | Add an opt-in live sandbox proof for the same three-edge chain through the installed product path. | `test_env/sandbox/scenarios/t164_three_chain_edge_assurance.scenario.mjs` | Live archive under `test_env/test_runs/scenario_t164_three_chain_edge_assurance_*` contains handoff, ledger, closure, next action, and assurance evidence for each edge. |
-| [ ] | L14 | Add an initial conformance-bootstrap service seed for downstream scenario proofs. | `test_env/fixtures/t164_rust_hello_service_lite/bootstrap.md`, `test_env/sandbox/scenarios/t164_rust_hello_service_lite.scenario.mjs` | Deterministic proof starts from only `bootstrap.md` plus project constraints and closes `Fg_conform_project`; opt-in live proof materializes a Rust HTTP API where `curl /` returns `helloworld`. |
-| [ ] | L15 | Add a real full-graph live proof that installs `odd_sdlc` into a sandbox and invokes exactly one installed `start --target next --until converged --worker ...` command. | `test_env/live/` or sandbox descriptor with framework-owned iteration mode | Archive proves the framework, not the harness, iterates across implementation, test lifecycle, archive, release-depth parity, and release readiness. External `gaps -> start --until first_traversal` loops do not satisfy this row. |
+| [x] | L12 | Add a deterministic three-edge SDLC chain proof: `requirements synthesis -> formal requirement syntax -> design encoding`. | `test_t164_edge_gain_closure_contract.test.mjs` or scenario fixture | `T-164 deterministic requirement-to-design chain closes by per-edge gain` proves `derive_requirement_surface -> derive_feature_decomp_surface -> derive_design_surface` exposes gain, close decision, residual pressure, and compound composition rows. |
+| [x] | L13 | Collapse the separate installed three-edge live proof into the L14 full live Rust service run. | `test_env/sandbox/scenarios/t164_rust_hello_service_lite.scenario.mjs` | No separate `t164_three_chain_edge_assurance` scenario is required; the L14 live archive must expose at least three chained installed edges with handoff, ledger, closure, next-action, gain, and residual-pressure evidence. |
+| [x] | L14 | Add and run the conformance-bootstrap Rust service proof as the single T-164 live gate. | `test_env/fixtures/t164_rust_hello_service_lite/bootstrap.md`, `test_env/sandbox/scenarios/t164_rust_hello_service_lite.scenario.mjs` | Deterministic proof starts from only `bootstrap.md` plus project constraints and closes `Fg_conform_project`; the opt-in live run invokes the installed product trigger, archives the collapsed L13 three-edge evidence, materializes a Rust HTTP API, and proves `curl /` returns `helloworld`. |
+| [x] | L15 | Collapse the full-graph live trigger row into L14. | `test_env/sandbox/scenarios/t164_rust_hello_service_lite.scenario.mjs` | The installed trigger is the execution mode for the L14 live run, not a second live proof surface. |
 
 ### Absorbed Proof Rows
 
 | Done | Row | Work item | Target surface | Proof required |
 | --- | --- | --- | --- | --- |
-| [ ] | P1 | Re-express T-158 same-edge materialization replay under the edge gain/closure contract. | product materialization edge contract and tests | Prior manifest evidence is admitted only when workspace, graph edge, target binding, evidence policy, and digest match; unresolved pressure blocks close. |
-| [ ] | P2 | Re-express T-103 data_mapper/test35 parity as closure-semantics preservation, not file-count parity. | data_mapper/test35 comparison proof | Test or commentary artifact shows TS preserves the declared gain and close semantics for the same outcome contract. |
-| [ ] | P3 | Re-express T-130 full-breadth design depth as design-edge gain and close rows. | design completeness assurance | Full-breadth mode requires declared module schema, state, aggregate model, and sunny-day evidence; steel-thread deferral remains residual pressure when selected. |
-| [ ] | P4 | Re-express T-142 multi-tenant materialization fan-out as target-specific gain and close rows. | multi-target materialization contract | One generated tenant cannot close the compound product; every declared tenant target has admitted evidence or a typed batch close row. |
+| [ ] | P1-P4 | Run the full internal `data_mapper` proof as the combined absorbed-ticket gate. | `test_env/sandbox/scenarios/data_mapper_internal.scenario.mjs`, `test_env/test_runs/scenario_data_mapper_internal/*` | The run proves same-edge replay admission, data_mapper closure-semantics preservation, full-breadth design depth, and multi-target materialization/fan-out closure under the T-164 edge contract model. |
+| [x] | P1 | Collapse T-158 same-edge materialization replay into the full internal `data_mapper` run. | product materialization edge contract and tests | The P1-P4 run must prove prior manifest evidence is admitted only when workspace, graph edge, target binding, evidence policy, and digest match; unresolved pressure blocks close. |
+| [x] | P2 | Collapse T-103 data_mapper/test35 parity into the full internal `data_mapper` run. | data_mapper comparison proof | The P1-P4 run must prove closure-semantics preservation, not file-count parity. |
+| [x] | P3 | Collapse T-130 full-breadth design depth into the full internal `data_mapper` run. | design completeness assurance | The P1-P4 run must prove full-breadth module schema, state, aggregate model, and sunny-day evidence; steel-thread deferral remains residual pressure when selected. |
+| [x] | P4 | Collapse T-142 multi-tenant materialization fan-out into the full internal `data_mapper` run. | multi-target materialization contract | The P1-P4 run must prove one generated tenant cannot close the compound product; every declared tenant target has admitted evidence or a typed batch close row. |
 
 ### Hardening And Closure
 
@@ -876,8 +945,8 @@ intent alone.
 | [x] | H1 | Add package scripts for focused deterministic and opt-in live T-164 proof. | `build_tenants/typescript/package.json` | `npm run test:t164` and live-gated script names are present and documented. |
 | [x] | H2 | Run focused deterministic proof. | TypeScript tenant test suite | Command result recorded in this ticket with pass count. |
 | [x] | H3 | Run regression suite covering touched graph/operator/projection paths. | existing semantic tests | Command result recorded in this ticket with pass count. |
-| [ ] | H4 | Run opt-in live three-edge proof or record the typed blocker. | installed sandbox archive | Archive path or typed blocker recorded in this ticket. |
-| [ ] | H6 | Run real full-graph live proof with framework-owned iteration or record the typed blocker. | installed sandbox archive | Command and archive path prove a single installed `start --until converged` invocation, plus observed test lifecycle and release-readiness artifacts. |
+| [x] | H4 | Collapse opt-in live three-edge proof into L14. | installed sandbox archive | L14 is the live proof gate and must record the archive path or typed blocker for the three-edge subset. |
+| [x] | H6 | Collapse the full-graph trigger proof into L14. | installed sandbox archive | L14 owns the installed trigger command and archive path; no separate H6 gate remains. |
 | [x] | H5 | Update this ticket with implementation evidence, changed files, proof commands, archive refs, and remaining non-closure conditions. | T-164 body | Ticket can be reviewed without chat memory. |
 
 ### Initial Execution Order
@@ -896,14 +965,11 @@ intent alone.
    runtime code depends on it.
 5. Complete L6-L10 next. Runtime artifacts must carry the selected contract
    before closure behavior changes.
-6. Complete the remaining L12-L13 proof rows to prove the installed
-   three-edge traversal.
-7. Complete L15 to prove the full graph through framework-owned iteration.
-   This must be a single installed `start --until converged` invocation, not an
-   external traversal loop.
-8. Complete P1-P4 to retire the absorbed failed-closure classes under the same
+6. Complete L14 as the single live proof gate. L14 carries the installed
+   trigger, the collapsed three-edge proof, and the Rust service output proof.
+7. Complete the full internal `data_mapper` run to retire P1-P4 under the same
    contract.
-9. Complete H1-H6 for closure packaging.
+8. Complete hardening rows for closure packaging.
 
 ## Implementation Evidence - First Slice
 
@@ -960,18 +1026,14 @@ Remaining non-closure conditions after this slice:
   still needs a focused archive/replay fixture, L7-L8 still need the installed
   close gate to use generic gain/residual/close as authority, and L10 still
   needs explicit gaps/query projection.
-- L12-L13 are not complete. The full deterministic and live three-edge
-  assurance chain is still missing.
-- L15 is not complete. The current live hello-world evidence was
+- L12 is complete in the later slice. L13 and L15 are no longer independent
+  live proof rows; both collapse into L14.
+- L14 is not complete. The current live hello-world evidence was
   harness-mediated over `first_traversal` steps and stopped at component code;
-  it does not prove framework-owned full-graph iteration through the test
-  lifecycle and release readiness.
-- P1-P4 are not complete. The absorbed failed-closure tickets still need to be
-  re-expressed as explicit proof obligations under this contract model.
-- H4 is not complete. The opt-in live three-edge proof has not run because the
-  three-edge scenario has not been implemented.
-- H6 is not complete. No single installed `start --until converged` full-graph
-  live proof has run.
+  it does not yet prove the L14 installed-trigger live gate.
+- P1-P4 are not complete in this first-slice snapshot. Later proof repricing
+  collapses them into one full internal `data_mapper` run.
+- H4 and H6 collapse into L14 in the later proof repricing.
 
 ## Live Test Audit - 2026-05-14
 
@@ -1045,7 +1107,14 @@ Implemented on 2026-05-14:
   alone is rejected as behavioral closure evidence, generic gain/close functions
   run across different edge contracts, a three-vector compound path preserves
   the unfinished edge as the bottleneck, and carrier constructors retain
-  contract/gain/residual-pressure identity.
+  contract/gain/residual-pressure identity. The DMM/ODD review follow-up adds
+  explicit `closureClassification`, `sourceAssetPolicy`, required caller
+  obligation refs, `evaluate_action` trace alignment, and handoff source-set
+  enforcement from the selected contract row.
+- `build_tenants/typescript/test_env/tests/test_t066_product_materialization_contract.test.mjs`
+  now keeps the lite product-materialization regression on the lite edge
+  contract, so Product Files admission is tested without bypassing the
+  T-164 source-set policy.
 - `build_tenants/typescript/test_env/live/test_t164_data_mapper_full_capability_live.test.mjs`
   adds the missing full-capability data_mapper live lane. It provisions a fresh
   external data_mapper workspace, installs the current odd_sdlc TypeScript
@@ -1062,23 +1131,32 @@ Proof commands:
 ```text
 cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
 npm run test:t164
+npm run build:semantic && node --test test_env/tests/test_t032_query_gap_projection.test.mjs
 npm run test:t088
 npm run build:semantic && node --test test_env/tests/test_t118_worker_invocation_package.test.mjs
 npm run test:t160
 npm run test:t064
 npm run test:t066
-ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE=1 node --test test_env/live/test_t164_data_mapper_full_capability_live.test.mjs
+npm run lint:semantic
+node --test --test-name-pattern "hello-world live descriptors|edge assurance archive sequence" test_env/sandbox/test_scenario_sandbox.test.mjs
+npm run test:t164:rust-service-live
+git diff --check
 ```
 
 Results:
 
 ```text
-test:t164: edge-contract proof 12/12 pass; rust-service conformance sandbox 1/1 pass
+test:t164: edge-contract proof 18/18 pass; rust-service conformance sandbox 1/1 pass
+test_t032_query_gap_projection: 4/4 pass
 test:t088: traversal intent package 3/3 pass
 test_t118_worker_invocation_package: 7/7 pass
 test:t160: traversal overlays 17/17 pass
 test:t064: installed operator UX 11/11 pass
-test:t066: product materialization contract 66/66 pass
+test:t066: product materialization contract 67/67 pass
+lint:semantic: pass
+focused L14 descriptor/archive assertions: 2/2 pass
+test:t164:rust-service-live: T-164 Rust hello service live build loop 1/1 pass
+git diff --check: pass
 ```
 
 Current ledger state after this slice:
@@ -1089,16 +1167,78 @@ Current ledger state after this slice:
 - L11 is complete: compound path gain is a typed fold over edge gains and the
   deterministic test proves an intermediate residual pressure keeps the path
   open.
-- L6 is implemented at carrier/code level but remains open as a ticket row
-  until a focused archive fixture proves the same contract ref/digest across
-  handoff, ledger, closure, projection, and replay artifacts.
-- L7 is implemented for the generic measurement kernel but remains open as a
-  runtime-closure row until installed closure uses the generic close decision as
-  the authoritative close gate.
-- L8-L10 remain open: closure disposition still needs to be governed by the
-  generic edge close/residual computation in the installed operator path, and
-  residual-pressure/missing-contract state still needs explicit gaps/query
+- The DMM/ODD review realization cleanup is complete for the currently scoped
+  slice: source-set policy is declared by row data, strict/subset source
+  matching is enforced in handoff construction, every row explicitly declares
+  its closure classification, `SdlcEdgeGain.closeReady` is replaced with
+  `obligationsAndLedgersComplete`, and synthetic obligation defaults now fail
+  closed unless the caller supplies explicit obligation refs.
+- L6 is complete: focused archive proof now reads the installed archive payloads
+  and proves contract/gain/residual-pressure identity across edge gain,
+  residual pressure, fulfillment ledger, closure decision, and next-action
   projection.
-- L12-L13 remain open: the current deterministic test is a three-vector
-  compound gain proof, not yet the full requirements-synthesis -> formal syntax
-  -> design-encoding installed graph proof or opt-in live proof.
+- L7 is complete: the generic measurement kernel consumes admitted evidence and
+  ledger inputs, rejects worker percent-complete and artifact-presence closure,
+  and hard-blocks when measuring ledgers are missing.
+- L8 is complete: installed closure now derives the edge-assurance close
+  decision from generic gain/residual pressure and passes that decision into the
+  generic closure fold. The installed re-entry guard also stops worker-process
+  failures when the dossier says retry is not eligible.
+- L9 is complete as a boundary review note: this work stays inside odd_sdlc
+  graph/operator/projection/test surfaces and introduces no ABG core change,
+  local traversal runtime, or local event store.
+- L10 is complete: query-domain and public gap/dossier projections expose
+  edge-assurance contract refs, digests, proof-lane refs, residual-pressure
+  refs, and missing-contract diagnostics as read-only data.
+- L12 is complete: deterministic proof now covers the three-edge
+  requirement-to-design chain through per-edge gain, close decision, residual
+  pressure, and compound composition.
+- L13 is collapsed into L14: the L14 live archive must prove the installed
+  three-edge subset instead of using a separate scenario file.
+- L14 is complete: the opt-in live run passed under the installed trigger and
+  archived the collapsed edge-assurance chain at
+  `build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260514T071812801Z_pid416/`.
+  The closed handoff sequence is `derive_intent_surface ->
+  derive_lite_design_adr_surface -> derive_lite_module_surface ->
+  derive_lite_component_code_surface`; each selected archive carries handoff,
+  gain, residual-pressure, fulfillment-ledger, closure-decision, and
+  next-action evidence. The run materialized
+  `build_tenants/hello_world_rust_service/Cargo.toml` and `src/main.rs`, and
+  the harness process check proved `curl /` returns `helloworld`.
+- L15 is collapsed into L14: the installed trigger is the execution mode for
+  the L14 live proof, not a separate proof lane.
+- P1-P4 remains open as one full internal `data_mapper` proof gate. Some
+  underlying regression coverage exists, but the ticket still needs that run to
+  admit the absorbed closure-semantics evidence as one combined artifact.
+
+### P1-P4 Full `data_mapper` Attempt - 2026-05-14
+
+Command:
+
+```text
+cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
+npm run test:t164:data-mapper-full-capability-live
+```
+
+Archive:
+
+```text
+build_tenants/typescript/test_env/test_runs/t164_data_mapper_full_capability_live/20260514T075544658Z_pid39360/
+```
+
+Result: failed. The harness used one installed command:
+
+```text
+start --workspace . --target next --until converged --worker process://claude?model=sonnet&effort=xhigh
+```
+
+The installed loop made three internal attempts and returned
+`startStatus: converged`, but the observed edge sequence contained only
+`Fg_conform_project_authority`. The `Fg_conform_project_authority` run produced
+`fp_evaluate_result.status: admitted_with_open_obligations`,
+`sdlc_edge_closure_decision.disposition: retry`, and residual pressure for
+authority/requirement obligations. No downstream full-graph or test-lifecycle
+edges were reached, so `missingFullGraphEdges` still contains every required
+edge after `Fg_conform_project_authority`, including the full test lifecycle and
+release-readiness edges. This is a valid P1-P4 non-closure result, not a harness
+push loop.

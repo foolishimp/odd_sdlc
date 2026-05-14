@@ -55,6 +55,50 @@ export const SDLC_UAT_TEST_CASES_OVERLAY_REF =
 export const SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF =
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF;
 
+function isSdlcTraversalOverlayRef(value: string): value is SdlcTraversalOverlayRef {
+  return value.startsWith("overlay://odd-sdlc/") && value.length > "overlay://odd-sdlc/".length;
+}
+
+function isSdlcOverlayPolicyRef(value: string): value is SdlcOverlayPolicyRef {
+  return value.startsWith("policy://odd-sdlc/overlay/") &&
+    value.length > "policy://odd-sdlc/overlay/".length;
+}
+
+function isSdlcOverlayBindingRef(value: string): value is SdlcOverlayBindingRef {
+  return value.startsWith("overlay-binding://odd-sdlc/") &&
+    value.length > "overlay-binding://odd-sdlc/".length;
+}
+
+function admitSdlcTraversalOverlayRef(
+  value: string,
+  label: string
+): SdlcTraversalOverlayRef {
+  if (!isSdlcTraversalOverlayRef(value)) {
+    throw new TypeError(`${label}: expected overlay://odd-sdlc/... ref`);
+  }
+  return value;
+}
+
+function admitSdlcOverlayPolicyRef(
+  value: string,
+  label: string
+): SdlcOverlayPolicyRef {
+  if (!isSdlcOverlayPolicyRef(value)) {
+    throw new TypeError(`${label}: expected policy://odd-sdlc/overlay/... ref`);
+  }
+  return value;
+}
+
+function admitSdlcOverlayBindingRef(
+  value: string,
+  label: string
+): SdlcOverlayBindingRef {
+  if (!isSdlcOverlayBindingRef(value)) {
+    throw new TypeError(`${label}: expected overlay-binding://odd-sdlc/... ref`);
+  }
+  return value;
+}
+
 export interface SdlcTraversalOverlayTermination {
   readonly policyRef: SdlcOverlayPolicyRef;
   readonly terminalAssetTypes: readonly string[];
@@ -230,7 +274,10 @@ function publishedGraphVectorRefs(module: Module): readonly string[] {
 }
 
 function policyRef(overlayRef: SdlcTraversalOverlayRef, policy: string): SdlcOverlayPolicyRef {
-  return `${overlayRef.replace("overlay://odd-sdlc/", "policy://odd-sdlc/overlay/")}/${policy}` as SdlcOverlayPolicyRef;
+  return admitSdlcOverlayPolicyRef(
+    `${overlayRef.replace("overlay://odd-sdlc/", "policy://odd-sdlc/overlay/")}/${policy}`,
+    "overlay.policyRef"
+  );
 }
 
 function pressureRef(overlayRef: SdlcTraversalOverlayRef, pressure: string): string {
@@ -582,9 +629,10 @@ export function constructSdlcTraversalOverlayCatalog(input: {
 
 function normalizeOverlayRef(value: string): SdlcTraversalOverlayRef {
   const raw = parseNonEmptyString(value, "overlayRef");
-  return raw.startsWith("overlay://odd-sdlc/")
-    ? raw as SdlcTraversalOverlayRef
-    : `overlay://odd-sdlc/${raw}` as SdlcTraversalOverlayRef;
+  return admitSdlcTraversalOverlayRef(
+    raw.startsWith("overlay://odd-sdlc/") ? raw : `overlay://odd-sdlc/${raw}`,
+    "overlayRef"
+  );
 }
 
 export function resolveSdlcTraversalOverlay(input: {
@@ -602,17 +650,21 @@ export function sdlcTraversalOverlayForGraphFunction(input: {
   readonly catalog: SdlcTraversalOverlayCatalog;
   readonly graphFunctionRef: string;
 }): SdlcTraversalOverlay {
-  return input.catalog.overlays.find((overlay) =>
-    overlay.graphFunctionRefs.includes(input.graphFunctionRef)
+  const overlay = input.catalog.overlays.find((candidate) =>
+    candidate.graphFunctionRefs.includes(input.graphFunctionRef)
   ) ?? input.catalog.overlays.find(
-    (overlay) => overlay.overlayRef === SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF
-  ) ?? input.catalog.overlays[0]!;
+    (candidate) => candidate.overlayRef === SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF
+  ) ?? input.catalog.overlays[0];
+  if (overlay === undefined) {
+    throw new TypeError("SdlcTraversalOverlayCatalog requires at least one overlay");
+  }
+  return overlay;
 }
 
 export function publicSdlcOverlayStartTargets(input: {
   readonly module: Module;
   readonly catalog: SdlcTraversalOverlayCatalog;
-  readonly projectConformanceStatus?: "blocked" | string | null;
+  readonly projectConformanceStatus?: string | null;
 }): readonly SdlcOverlayStartTarget[] {
   const byName = graphFunctionByName(input.module);
   const rows = new Map<string, SdlcOverlayStartTarget>();
@@ -737,7 +789,10 @@ export function constructSdlcOverlayBinding(input: {
   );
   return Object.freeze({
     kind: "sdlc_overlay_binding" as const,
-    bindingRef: `overlay-binding://odd-sdlc/${basis}` as SdlcOverlayBindingRef,
+    bindingRef: admitSdlcOverlayBindingRef(
+      `overlay-binding://odd-sdlc/${basis}`,
+      "overlayBinding.bindingRef"
+    ),
     overlayRef: input.overlay.overlayRef,
     graphCatalogDigestRef: input.catalog.graphCatalogDigestRef,
     workspaceBasis: Object.freeze({

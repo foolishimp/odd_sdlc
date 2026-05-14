@@ -3861,7 +3861,7 @@ test("T-160 product materialization authority admits plain Product Files section
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const contract = hookContractByEdgeName("derive_lite_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
     graphFunctionName: "lite_design_module_implementation",

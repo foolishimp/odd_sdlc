@@ -1582,6 +1582,48 @@ function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
 }
 
+function assertEdgeAssuranceSourceAssetPolicy(input: {
+  readonly edgeName: string;
+  readonly sourceAssetPolicy: "strict" | "subset_allowed";
+  readonly edgeSourceAssetTypes: readonly string[];
+  readonly hookSourceAssetTypes: readonly string[];
+}): void {
+  const edgeSources = uniqueSorted(input.edgeSourceAssetTypes);
+  const hookSources = uniqueSorted(input.hookSourceAssetTypes);
+  const hookSourceSet = new Set(hookSources);
+  const strictMatch =
+    edgeSources.length === hookSources.length &&
+    edgeSources.every((sourceAssetType) => hookSourceSet.has(sourceAssetType));
+  if (input.sourceAssetPolicy === "strict") {
+    if (!strictMatch) {
+      throw new TypeError(
+        [
+          "edge assurance contract source set does not match hook contract",
+          input.edgeName,
+          input.sourceAssetPolicy,
+          edgeSources.join(","),
+          hookSources.join(",")
+        ].join(":")
+      );
+    }
+    return;
+  }
+  const edgeSourcesCovered = edgeSources.every((sourceAssetType) =>
+    hookSourceSet.has(sourceAssetType)
+  );
+  if (!edgeSourcesCovered) {
+    throw new TypeError(
+      [
+        "edge assurance contract source set is not covered by hook contract",
+        input.edgeName,
+        input.sourceAssetPolicy,
+        edgeSources.join(","),
+        hookSources.join(",")
+      ].join(":")
+    );
+  }
+}
+
 function coverageRefAliases(ref: string): readonly string[] {
   const aliases = new Set<string>([ref]);
   try {
@@ -2688,6 +2730,12 @@ export function deriveWorkerHandoffManifest(input: {
       ].join(":")
     );
   }
+  assertEdgeAssuranceSourceAssetPolicy({
+    edgeName: input.edgeName,
+    sourceAssetPolicy: edgeAssuranceContract.sourceAssetPolicy,
+    edgeSourceAssetTypes: edgeAssuranceContract.sourceAssetTypes,
+    hookSourceAssetTypes: input.contract.sourceAssetTypes
+  });
   const edgeAssuranceContractRef =
     sdlcEdgeAssuranceContractRef(edgeAssuranceContract);
   const edgeAssuranceContractDigest =
@@ -4553,14 +4601,6 @@ function admitMaterializedProductFile(
         );
   if (
     materializationSource === "replay" &&
-    (sourceManifestRef === undefined ||
-      sourceHandoffManifestRef === undefined ||
-      sourceAttemptRef === undefined)
-  ) {
-    throw new TypeError(`${label}: replayed materialized files require source lineage refs`);
-  }
-  if (
-    materializationSource === "replay" &&
     overwritesMaterializationRef !== undefined
   ) {
     throw new TypeError(
@@ -4596,14 +4636,32 @@ function admitMaterializedProductFile(
             `${label}.requirementTraceObligationIds`
           )
         })
-  } as const;
+  } satisfies Pick<
+    SdlcMaterializedProductFile,
+    | "kind"
+    | "role"
+    | "relativePath"
+    | "absolutePath"
+    | "digest"
+    | "byteCount"
+  > & {
+    readonly rolePolicyRef?: string;
+    readonly requirementTraceObligationIds?: readonly string[];
+  };
   if (materializationSource === "replay") {
+    if (
+      sourceManifestRef === undefined ||
+      sourceHandoffManifestRef === undefined ||
+      sourceAttemptRef === undefined
+    ) {
+      throw new TypeError(`${label}: replayed materialized files require source lineage refs`);
+    }
     return Object.freeze({
       ...base,
       materializationSource,
-      sourceManifestRef: sourceManifestRef as string,
-      sourceHandoffManifestRef: sourceHandoffManifestRef as string,
-      sourceAttemptRef: sourceAttemptRef as string
+      sourceManifestRef,
+      sourceHandoffManifestRef,
+      sourceAttemptRef
     });
   }
   return Object.freeze({
@@ -6664,11 +6722,15 @@ function transformReasonForReport(report: SdlcWorkerResultReport): string | null
     : "transform output artifact missing or digest mismatch";
 }
 
+function isOpenRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
 function parseOpenRecord(input: unknown, label: string): Record<string, unknown> {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+  if (!isOpenRecord(input)) {
     throw new TypeError(`${label}: expected object`);
   }
-  return input as Record<string, unknown>;
+  return input;
 }
 
 function sameSortedStrings(
@@ -8070,11 +8132,7 @@ export function evaluateWorkerResultPostflight(input: {
   const replayResolution = resolveProductMaterializationReplay(input);
   const report = replayResolution.report;
   const blockingReasonCarriers: SdlcBlockingReason[] = [];
-  const materializationDiagnostics = Array.isArray(
-    report.materializationDiagnostics
-  )
-    ? report.materializationDiagnostics
-    : [];
+  const materializationDiagnostics = report.materializationDiagnostics;
   for (const diagnostic of materializationDiagnostics) {
     blockingReasonCarriers.push(
       makeSdlcBlockingReason({

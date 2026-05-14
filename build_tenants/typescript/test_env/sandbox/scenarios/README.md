@@ -24,6 +24,9 @@ A scenario descriptor declares:
     product materialization evidence in the operator-run ledger history
   - `handoffEdgeSequencePrefix` — expected handoff edge sequence prefix,
     ignoring consecutive same-edge retries
+  - `edgeAssuranceArchiveSequencePrefix` — expected handoff edge sequence
+    prefix whose selected close archive must carry handoff, gain, residual
+    pressure, fulfillment ledger, closure decision, and next-action evidence
   - `processChecks` — commands to run inside the workspace after traversal;
     checks may assert exact stdout or selected JSON stdout fields through
     `stdoutJson.hasKeys`, `stdoutJson.equals`, `stdoutJson.arrayIncludes`, or

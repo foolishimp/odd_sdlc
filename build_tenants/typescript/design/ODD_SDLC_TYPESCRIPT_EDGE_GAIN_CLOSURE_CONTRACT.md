@@ -3,7 +3,7 @@
 **Status**: Active design for T-164
 **Date**: 2026-05-14
 **Owner Ticket**: `.ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md`
-**Implements**: REQ-F-GFUNC-006, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064, REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-067
+**Implements**: REQ-F-GFUNC-006, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064, REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-067, REQ-F-ODDSDLC-068
 **Derives From**: `specification/PRODUCT.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/14-odd-sdlc-installed-product-contract.md`, `specification/requirements/16-edge-gain-closure-contract.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`, `ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md`
 
 ## STDO Re-Triage
@@ -65,6 +65,195 @@ adapters only admit facts, archive facts, and publish read models.
 Subordinate payloads, manifests, archive files, and projections may serialize
 these carriers. They do not become parallel authority.
 
+## Structural Carrier Diagram
+
+This is the DMM structural carrier asset for the active edge assurance contract
+boundary. It distinguishes prime carriers from subordinate payloads and keeps
+ABG traversal authority outside the SDLC-domain close fold.
+
+```mermaid
+classDiagram
+  class SdlcEdgeGainClosureCategoryTemplate {
+    +kind
+    +category
+    +functionPack
+    +defaultLedgerInputKinds
+    +defaultThresholdPolicyRef
+    +deterministicOptimizationRefs
+  }
+
+  class SdlcEdgeGainClosureFunctionPack {
+    +deriveObligationsRef
+    +admitEvidenceRef
+    +measureGainRef
+    +closeEdgeRef
+    +deriveResidualPressureRef
+    +composePathGainRef
+  }
+
+  class SdlcEdgeGainClosureContract {
+    +edgeRef
+    +category
+    +closureClassification
+    +sourceAssetTypes
+    +sourceAssetPolicy
+    +targetAssetType
+    +targetOutcomeRef
+    +authorityBasisRefs
+    +obligationDerivationRef
+    +evidencePolicyRef
+    +metricFunctionRef
+    +thresholdPolicyRef
+    +ledgerInputKinds
+    +closureFunctionRef
+    +residualPressureFunctionRef
+    +compositionRole
+    +proofLaneRefs
+  }
+
+  class SdlcEdgeAssuranceMatrix {
+    +contracts
+    +classificationRows
+    +diagnostics
+  }
+
+  class SdlcEdgeDerivedObligation {
+    +obligationRef
+    +sourceRef
+    +required
+    +thresholdRef
+  }
+
+  class SdlcEdgeEvidenceAdmission {
+    +contractRef
+    +contractDigest
+    +admittedEvidence
+    +rejectedEvidence
+  }
+
+  class SdlcAdmittedEdgeEvidence {
+    +evidenceRef
+    +sourceKind
+    +obligationRefs
+    +evidencePolicyRef
+  }
+
+  class SdlcRejectedEdgeEvidence {
+    +evidenceRef
+    +sourceKind
+    +reasonRef
+    +detail
+  }
+
+  class SdlcEdgeLedgerInputRef {
+    +ledgerInputKind
+    +ledgerRef
+  }
+
+  class SdlcEdgeGain {
+    +gainRef
+    +contractRef
+    +contractDigest
+    +edgeRef
+    +obligationGains
+    +expectedCount
+    +fulfilledCount
+    +missingCount
+    +requiredLedgerInputKinds
+    +admittedLedgerRefs
+    +missingLedgerInputKinds
+    +evidenceRefs
+    +residualPressureRefs
+    +obligationsAndLedgersComplete
+  }
+
+  class SdlcEdgeObligationGain {
+    +obligationRef
+    +thresholdRef
+    +required
+    +score
+    +thresholdMet
+    +evidenceRefs
+    +residualPressureRefs
+  }
+
+  class SdlcEdgeResidualPressure {
+    +pressureRef
+    +contractRef
+    +contractDigest
+    +edgeRef
+    +requiredPressureRefs
+    +informationalPressureRefs
+    +clear
+  }
+
+  class SdlcEdgeAssuranceCloseDecision {
+    +decisionRef
+    +contractRef
+    +contractDigest
+    +edgeRef
+    +disposition
+    +gainRef
+    +residualPressureRef
+    +basisRefs
+    +reasonRefs
+  }
+
+  class SdlcCompoundTraversalGain {
+    +pathRef
+    +edgeGainRefs
+    +closedEdgeRefs
+    +openEdgeRefs
+    +bottleneckEdgeRefs
+    +residualPressureRefs
+    +closeReady
+  }
+
+  class SdlcInstalledOperatorAdapter {
+    +writes archives
+    +publishes projections
+    +does not own close semantics
+  }
+
+  class AbgTraversalSubstrate {
+    +graph calls
+    +frames
+    +events
+    +continuations
+    +does not own SDLC meaning
+  }
+
+  SdlcEdgeGainClosureCategoryTemplate *-- SdlcEdgeGainClosureFunctionPack
+  SdlcEdgeGainClosureContract --> SdlcEdgeGainClosureCategoryTemplate
+  SdlcEdgeAssuranceMatrix *-- SdlcEdgeGainClosureContract
+  SdlcEdgeGainClosureContract --> SdlcEdgeDerivedObligation
+  SdlcEdgeGainClosureContract --> SdlcEdgeEvidenceAdmission
+  SdlcEdgeEvidenceAdmission *-- SdlcAdmittedEdgeEvidence
+  SdlcEdgeEvidenceAdmission *-- SdlcRejectedEdgeEvidence
+  SdlcEdgeEvidenceAdmission --> SdlcEdgeLedgerInputRef
+  SdlcEdgeGain *-- SdlcEdgeObligationGain
+  SdlcEdgeGain --> SdlcEdgeEvidenceAdmission
+  SdlcEdgeResidualPressure --> SdlcEdgeGain
+  SdlcEdgeAssuranceCloseDecision --> SdlcEdgeGain
+  SdlcEdgeAssuranceCloseDecision --> SdlcEdgeResidualPressure
+  SdlcCompoundTraversalGain *-- SdlcEdgeGain
+  SdlcInstalledOperatorAdapter --> SdlcEdgeAssuranceCloseDecision
+  SdlcInstalledOperatorAdapter --> AbgTraversalSubstrate
+```
+
+`SdlcEdgeDerivedObligation`, `SdlcEdgeEvidenceAdmission`,
+`SdlcRejectedEdgeEvidence`, `SdlcEdgeLedgerInputRef`, and
+`SdlcEdgeObligationGain` are currently public because runtime handoff,
+admission, ledger, and test code construct or inspect them directly. If the
+next implementation slice proves any of them are only local field groupings,
+they should be folded into their parent carrier rather than kept as promoted
+top-level authority.
+
+`SdlcEdgeGainClosureFunctionPack` is a category-template field grouping. It is
+not independent edge authority. It may remain named for readability while the
+category-template surface stabilizes, but it does not become a second IACS
+prime carrier unless another module consumes or versions it independently.
+
 ## Functional Boundary
 
 The assurance contract is realized as pure or nearly-pure transforms below the
@@ -119,6 +308,7 @@ edge_ref
 closure_classification
 edge_category
 source_asset_types
+source_asset_policy
 target_asset_type
 target_outcome_ref
 authority_basis_refs
@@ -138,6 +328,65 @@ residual_pressure_refs
 Rows that are `library_only`, `projection_only`, or `no_close` still publish
 classification and source/target boundaries so the graph catalog has no
 unclassified escape hatch.
+
+`source_asset_policy` declares how a handoff source-set is compared with the
+selected contract row. The default policy is `strict`: the selected source
+asset set must match the graph-vector contract. A shortened overlay or lite
+vector may use `subset_allowed` only when the matrix row declares that policy
+or when a separate overlay-specific row declares the narrowed source set. The
+handoff adapter must enforce this from the row; it may not relax source meaning
+by omitting a source-set check in imperative code.
+
+## ODD Function Binding
+
+The generic gain/close kernel implements the ODD constructive function
+`evaluate_action`.
+
+| ODD function | This module's binding |
+| --- | --- |
+| `synthesize_model` | Outside this module. F_P workers and upstream graph functions synthesize candidate surfaces. |
+| `eval_gap` | Outside this module except for residual-pressure read models. Query and gaps projections render admitted pressure. |
+| `evaluate_next` | Outside this module. ABG and installed operator continuation select the next graph movement from admitted closure facts. |
+| `evaluate_action` | `deriveSdlcEdgeObligations -> admitSdlcEdgeEvidence -> measureSdlcEdgeGain -> deriveSdlcEdgeResidualPressure -> deriveSdlcEdgeAssuranceCloseDecision`, parameterized by the selected contract row and admitted evidence. |
+
+This design module therefore owns SDLC-domain action evaluation, not traversal
+substrate continuation.
+
+## Recurrence And Commonization Decision
+
+The edge assurance carrier pattern recurs in ABG and in `odd_sdlc`.
+
+ABG owns substrate-level edge assurance: graph-call facts, hook action typing,
+continuation, event provenance, replay-visible runtime evidence, and generic
+runtime admission. `odd_sdlc` owns SDLC-domain edge assurance: requirement,
+design, implementation, test, release, and operational closure meaning.
+
+The recurrence is intentional and should not be commonized as one carrier
+family. A shared carrier would either leak SDLC product semantics into ABG or
+erase product-owned meaning from SDLC closure. The acceptable commonization is
+limited to pure mechanics that have no domain meaning, such as stable JSON
+canonicalization and digest construction.
+
+## Execution Authority Status
+
+Current implementation status is transitional.
+
+The generic gain/residual-pressure kernel is recorded in runtime carriers, but
+the installed close disposition still uses the legacy closure decision fold.
+That is acceptable only before the next runtime authority slice. Before the
+generic kernel becomes authoritative for installed close, the implementation
+must run an execution-authority audit proving exactly one path chooses the
+close disposition for an affected traversal.
+
+Landing condition for that slice:
+
+```text
+one selected edge contract
+  -> one admitted evidence set
+  -> one gain/residual-pressure computation
+  -> one authoritative close disposition
+  -> downstream projections only observe that decision
+```
 
 ## Category Templates
 

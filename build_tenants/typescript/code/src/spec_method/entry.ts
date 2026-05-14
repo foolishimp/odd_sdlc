@@ -111,6 +111,25 @@ export type OddSdlcSpecMethodCommand = (typeof ODD_SDLC_SPEC_METHOD_COMMAND_VALU
 const ODD_SDLC_SPEC_METHOD_COMMAND_SET: ReadonlySet<string> = new Set(
   ODD_SDLC_SPEC_METHOD_COMMAND_VALUES
 );
+const EMPTY_RUNTIME_EVENTS: readonly RuntimeEvent[] = Object.freeze([]);
+const SDLC_FD_RUN_ANALYSIS_PROFILE_VALUE_SET: ReadonlySet<string> = new Set(
+  SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES
+);
+const SDLC_FD_RUN_ANALYSIS_FORMAT_VALUE_SET: ReadonlySet<string> = new Set(
+  SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES
+);
+
+function isSdlcFdRunAnalysisProfile(
+  value: string
+): value is SdlcFdRunAnalysisProfile {
+  return SDLC_FD_RUN_ANALYSIS_PROFILE_VALUE_SET.has(value);
+}
+
+function isSdlcFdRunAnalysisFormat(
+  value: string
+): value is SdlcFdRunAnalysisFormat {
+  return SDLC_FD_RUN_ANALYSIS_FORMAT_VALUE_SET.has(value);
+}
 
 export interface OddSdlcSpecMethodTraversalRequest {
   readonly kind: "odd_sdlc_spec_method_request";
@@ -479,21 +498,21 @@ function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOp
       index += 1;
     } else if (token === "--profile") {
       const value = requireOptionValue(argv, index, "--profile");
-      if (!SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes(value as SdlcFdRunAnalysisProfile)) {
+      if (!isSdlcFdRunAnalysisProfile(value)) {
         throw new TypeError(
           `--profile expected one of ${SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.join(", ")}`
         );
       }
-      profile = value as SdlcFdRunAnalysisProfile;
+      profile = value;
       index += 1;
     } else if (token === "--format") {
       const value = requireOptionValue(argv, index, "--format");
-      if (!SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES.includes(value as SdlcFdRunAnalysisFormat)) {
+      if (!isSdlcFdRunAnalysisFormat(value)) {
         throw new TypeError(
           `--format expected one of ${SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES.join(", ")}`
         );
       }
-      format = value as SdlcFdRunAnalysisFormat;
+      format = value;
       index += 1;
     } else if (token === "--output") {
       outputPath = requireOptionValue(argv, index, "--output");
@@ -942,17 +961,11 @@ function selectedNextGraphFunctionFromArchive(input: {
     const closureOverlayBindingRef =
       closureRecord === null
         ? null
-        : stringField(
-            closureRecord as Readonly<Record<string, unknown>>,
-            "overlayBindingRef"
-          );
+        : stringField(closureRecord, "overlayBindingRef");
     const ledgerOverlayBindingRef =
       ledgerRecord === null
         ? null
-        : stringField(
-            ledgerRecord as Readonly<Record<string, unknown>>,
-            "overlayBindingRef"
-          );
+        : stringField(ledgerRecord, "overlayBindingRef");
     const expectedOverlayBindingRef = closureOverlayBindingRef ?? ledgerOverlayBindingRef;
     if (
       overlayBindingRef !== null &&
@@ -1593,7 +1606,7 @@ async function installedStartPayloadFor(
       if (isSpecMethodBlockingPayload(refreshedStart)) {
         return Object.freeze({
           start,
-          replayEvents: Object.freeze([] as RuntimeEvent[]),
+          replayEvents: EMPTY_RUNTIME_EVENTS,
           eventGraphEvents: refreshedEvents
         });
       }
@@ -1862,6 +1875,10 @@ function isRecord(input: unknown): input is Readonly<Record<string, unknown>> {
   return typeof input === "object" && input !== null && !Array.isArray(input);
 }
 
+function isUnknownArray(input: unknown): input is readonly unknown[] {
+  return Array.isArray(input);
+}
+
 function stringField(
   record: Readonly<Record<string, unknown>>,
   key: string
@@ -1920,7 +1937,7 @@ function compactArrayValue(
   maxEntries: number,
   omittedLabel: string
 ): unknown {
-  if (!Array.isArray(value) || value.length <= maxEntries) {
+  if (!isUnknownArray(value) || value.length <= maxEntries) {
     return value;
   }
   return Object.freeze([

@@ -24,14 +24,20 @@ import {
   constructSdlcGraphFunctionCatalog,
   constructSdlcTraversalOverlayCatalog,
   constructSdlcGtlModule,
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   publicSdlcOverlayStartTargets,
   sdlcGraphFunctionBoundaryRef,
   sdlcGraphVectorBoundaryRef,
   sdlcPublishedTraversalTargetRef,
   sdlcTargetOutcomeRef,
+  type SdlcEdgeGainClosureContract,
   type SdlcGraphFunctionCatalog,
   type SdlcTraversalOverlayCatalog
 } from "../graph/index.js";
+import {
+  digestSdlcEdgeGainClosureContract,
+  sdlcEdgeAssuranceContractRef
+} from "../operator/edge_gain_closure.js";
 import {
   deriveOddSdlcEvaluateNextReport,
   type OddSdlcEvaluateNextReport
@@ -215,6 +221,46 @@ export interface SdlcDomainDefaultsCarrier {
   readonly sourceRefs: readonly string[];
 }
 
+export type SdlcEdgeAssuranceReadModelDiagnosticCode =
+  | "missing_edge_gain_closure_contract"
+  | "unregistered_edge_gain_closure_contract";
+
+export interface SdlcEdgeAssuranceReadModelDiagnostic {
+  readonly kind: "sdlc_edge_assurance_read_model_diagnostic";
+  readonly code: SdlcEdgeAssuranceReadModelDiagnosticCode;
+  readonly edgeRef: string;
+  readonly detail: string;
+}
+
+export interface SdlcEdgeAssuranceReadModelRow {
+  readonly kind: "sdlc_edge_assurance_read_model_row";
+  readonly readOnly: true;
+  readonly choosesNextTraversal: false;
+  readonly edgeRef: string;
+  readonly closureClassification: SdlcEdgeGainClosureContract["closureClassification"];
+  readonly edgeAssuranceContractRef: string;
+  readonly edgeAssuranceContractDigest: string;
+  readonly sourceAssetPolicy: SdlcEdgeGainClosureContract["sourceAssetPolicy"];
+  readonly sourceAssetTypes: readonly string[];
+  readonly targetAssetType: string;
+  readonly proofLaneRefs: readonly string[];
+  readonly residualPressureRefs: readonly string[];
+}
+
+export interface SdlcEdgeAssuranceReadModel {
+  readonly kind: "sdlc_edge_assurance_read_model";
+  readonly readOnly: true;
+  readonly choosesNextTraversal: false;
+  readonly actionClosureEvaluationFunction: "evaluate_action";
+  readonly rows: readonly SdlcEdgeAssuranceReadModelRow[];
+  readonly diagnostics: readonly SdlcEdgeAssuranceReadModelDiagnostic[];
+  readonly missingContractRefs: readonly string[];
+  readonly unregisteredContractRefs: readonly string[];
+  readonly proofLaneRefs: readonly string[];
+  readonly residualPressureRefs: readonly string[];
+  readonly emittedRuntimeEventKinds: readonly [];
+}
+
 const ODD_SDLC_DOMAIN_DEFAULTS_VERSION = "ts-domain-defaults-v1" as const;
 const ODD_SDLC_DOMAIN_DEFAULTS_REF =
   `domain-defaults://odd-sdlc/${ODD_SDLC_DOMAIN_DEFAULTS_VERSION}`;
@@ -285,6 +331,7 @@ export interface SdlcQueryDomainProjection {
   readonly startTargets: readonly SdlcStartTargetSurface[];
   readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
   readonly targetBindings: readonly SdlcTargetObligationBinding[];
+  readonly edgeAssurance: SdlcEdgeAssuranceReadModel;
   readonly requirementFulfillment: SdlcRequirementFulfillmentPublicProjection;
   readonly currentDossierRefs: readonly string[];
   readonly projectConformance: SdlcConformProjectReport | null;
@@ -303,6 +350,11 @@ export interface SdlcGapProjection {
   readonly graphFunctionName: string;
   readonly status: SdlcGapStatus;
   readonly currentEdge: string | null;
+  readonly edgeAssuranceContractRef: string | null;
+  readonly edgeAssuranceContractDigest: string | null;
+  readonly edgeAssuranceProofLaneRefs: readonly string[];
+  readonly edgeAssuranceResidualPressureRefs: readonly string[];
+  readonly edgeAssuranceDiagnostics: readonly SdlcEdgeAssuranceReadModelDiagnostic[];
   readonly nextVectorIndex: number | null;
   readonly closedVectorIndexes: readonly number[];
 }
@@ -318,6 +370,11 @@ export interface SdlcGapDossier {
   readonly localRankingAuthority: false;
   readonly edge: string | null;
   readonly status: SdlcGapStatus;
+  readonly edgeAssuranceContractRef: string | null;
+  readonly edgeAssuranceContractDigest: string | null;
+  readonly edgeAssuranceProofLaneRefs: readonly string[];
+  readonly edgeAssuranceResidualPressureRefs: readonly string[];
+  readonly edgeAssuranceDiagnostics: readonly SdlcEdgeAssuranceReadModelDiagnostic[];
   readonly evidenceRefs: readonly string[];
   readonly triageInput: string;
   readonly nextActionBasisKind: "initial_selection";
@@ -359,6 +416,128 @@ function graphFunctionSurface(module: Module): readonly SdlcGraphFunctionSurface
       });
     })
   );
+}
+
+function publishedGraphVectorRefsForModule(module: Module): readonly string[] {
+  return sortedStrings([
+    ...new Set(
+      module.graphFunctions.flatMap((graphFunction) =>
+        materializeGraphFunction(graphFunction).vectors.map((vector) => vector.name)
+      )
+    )
+  ]);
+}
+
+function edgeAssuranceRowFromContract(
+  contract: SdlcEdgeGainClosureContract
+): SdlcEdgeAssuranceReadModelRow {
+  return Object.freeze({
+    kind: "sdlc_edge_assurance_read_model_row" as const,
+    readOnly: true as const,
+    choosesNextTraversal: false as const,
+    edgeRef: contract.edgeRef,
+    closureClassification: contract.closureClassification,
+    edgeAssuranceContractRef: sdlcEdgeAssuranceContractRef(contract),
+    edgeAssuranceContractDigest: digestSdlcEdgeGainClosureContract(contract),
+    sourceAssetPolicy: contract.sourceAssetPolicy,
+    sourceAssetTypes: contract.sourceAssetTypes,
+    targetAssetType: contract.targetAssetType,
+    proofLaneRefs: contract.proofLaneRefs,
+    residualPressureRefs: contract.residualPressureRefs
+  });
+}
+
+export function projectSdlcEdgeAssuranceReadModel(input: {
+  readonly module: Module;
+  readonly contracts?: readonly SdlcEdgeGainClosureContract[];
+}): SdlcEdgeAssuranceReadModel {
+  const contracts = input.contracts ?? SDLC_EDGE_GAIN_CLOSURE_CONTRACTS;
+  const publishedGraphVectorRefs = publishedGraphVectorRefsForModule(input.module);
+  const publishedGraphVectorRefSet = new Set(publishedGraphVectorRefs);
+  const contractByEdgeRef = new Map<string, SdlcEdgeGainClosureContract>();
+  for (const contract of contracts) {
+    if (!contractByEdgeRef.has(contract.edgeRef)) {
+      contractByEdgeRef.set(contract.edgeRef, contract);
+    }
+  }
+  const rows = Object.freeze(
+    publishedGraphVectorRefs
+      .map((edgeRef) => contractByEdgeRef.get(edgeRef))
+      .filter(
+        (contract): contract is SdlcEdgeGainClosureContract =>
+          contract !== undefined
+      )
+      .map(edgeAssuranceRowFromContract)
+  );
+  const missingContractRefs = publishedGraphVectorRefs.filter(
+    (edgeRef) => !contractByEdgeRef.has(edgeRef)
+  );
+  const unregisteredContractRefs = sortedStrings([
+    ...new Set(
+      contracts
+        .map((contract) => contract.edgeRef)
+        .filter((edgeRef) => !publishedGraphVectorRefSet.has(edgeRef))
+    )
+  ]);
+  const diagnostics = Object.freeze([
+    ...missingContractRefs.map((edgeRef) =>
+      Object.freeze({
+        kind: "sdlc_edge_assurance_read_model_diagnostic" as const,
+        code: "missing_edge_gain_closure_contract" as const,
+        edgeRef,
+        detail: `${edgeRef}: published graph vector has no edge gain/closure contract row`
+      })
+    ),
+    ...unregisteredContractRefs.map((edgeRef) =>
+      Object.freeze({
+        kind: "sdlc_edge_assurance_read_model_diagnostic" as const,
+        code: "unregistered_edge_gain_closure_contract" as const,
+        edgeRef,
+        detail: `${edgeRef}: edge gain/closure contract row has no published graph vector`
+      })
+    )
+  ]);
+  return Object.freeze({
+    kind: "sdlc_edge_assurance_read_model" as const,
+    readOnly: true as const,
+    choosesNextTraversal: false as const,
+    actionClosureEvaluationFunction: "evaluate_action" as const,
+    rows,
+    diagnostics,
+    missingContractRefs: Object.freeze(missingContractRefs),
+    unregisteredContractRefs,
+    proofLaneRefs: sortedStrings([
+      ...new Set(rows.flatMap((row) => row.proofLaneRefs))
+    ]),
+    residualPressureRefs: sortedStrings([
+      ...new Set(rows.flatMap((row) => row.residualPressureRefs))
+    ]),
+    emittedRuntimeEventKinds: Object.freeze([] as const)
+  });
+}
+
+function edgeAssuranceReadModelForEdge(input: {
+  readonly readModel: SdlcEdgeAssuranceReadModel;
+  readonly edgeRef: string | null;
+}): {
+  readonly row: SdlcEdgeAssuranceReadModelRow | null;
+  readonly diagnostics: readonly SdlcEdgeAssuranceReadModelDiagnostic[];
+} {
+  if (input.edgeRef === null) {
+    return Object.freeze({
+      row: null,
+      diagnostics: Object.freeze([] as const)
+    });
+  }
+  return Object.freeze({
+    row:
+      input.readModel.rows.find((row) => row.edgeRef === input.edgeRef) ?? null,
+    diagnostics: Object.freeze(
+      input.readModel.diagnostics.filter(
+        (diagnostic) => diagnostic.edgeRef === input.edgeRef
+      )
+    )
+  });
 }
 
 function startTargets(input: {
@@ -1145,14 +1324,17 @@ export function projectSdlcQueryDomain(input: {
   readonly projectConformance?: SdlcConformProjectReport | null;
 }): SdlcQueryDomainProjection {
   const catalog = constructSdlcGraphFunctionCatalog();
+  assertModuleMatchesCatalog({ module: input.module, catalog });
   const traversalOverlays = constructSdlcTraversalOverlayCatalog({
     module: input.module,
     graphCatalog: catalog
   });
-  assertModuleMatchesCatalog({ module: input.module, catalog });
   const graphFunctionSurfaces = graphFunctionSurface(input.module);
   const assetOwnershipRows = assetOwnership(catalog);
   const domainDefaults = constructSdlcDomainDefaultsCarrier();
+  const edgeAssurance = projectSdlcEdgeAssuranceReadModel({
+    module: input.module
+  });
   const requirementFulfillment = projectSdlcRequirementFulfillmentForIngress(
     input.ingressReport
   );
@@ -1188,6 +1370,7 @@ export function projectSdlcQueryDomain(input: {
         })
       )
     ),
+    edgeAssurance,
     requirementFulfillment,
     currentDossierRefs: Object.freeze([...(input.currentDossierRefs ?? [])]),
     projectConformance: input.projectConformance ?? null
@@ -1217,6 +1400,13 @@ export function evalSdlcGapFromReplay(input: {
     projection.nextVectorIndex === null
       ? undefined
       : input.basis.graph.vectors[projection.nextVectorIndex];
+  const currentEdge = currentVector?.name ?? null;
+  const edgeAssurance = edgeAssuranceReadModelForEdge({
+    readModel: projectSdlcEdgeAssuranceReadModel({
+      module: constructSdlcGtlModule()
+    }),
+    edgeRef: currentEdge
+  });
   return Object.freeze({
     kind: "sdlc_gap_projection",
     readOnly: true,
@@ -1232,7 +1422,16 @@ export function evalSdlcGapFromReplay(input: {
       closedVectorIndexes: projection.closedVectorIndexes,
       nextVectorIndex: projection.nextVectorIndex
     }),
-    currentEdge: currentVector?.name ?? null,
+    currentEdge,
+    edgeAssuranceContractRef:
+      edgeAssurance.row?.edgeAssuranceContractRef ?? null,
+    edgeAssuranceContractDigest:
+      edgeAssurance.row?.edgeAssuranceContractDigest ?? null,
+    edgeAssuranceProofLaneRefs:
+      edgeAssurance.row?.proofLaneRefs ?? Object.freeze([] as const),
+    edgeAssuranceResidualPressureRefs:
+      edgeAssurance.row?.residualPressureRefs ?? Object.freeze([] as const),
+    edgeAssuranceDiagnostics: edgeAssurance.diagnostics,
     nextVectorIndex: projection.nextVectorIndex,
     closedVectorIndexes: projection.closedVectorIndexes
   });
@@ -1288,6 +1487,11 @@ export function deriveSdlcGapDossier(input: {
     localRankingAuthority: false,
     edge: gaps.currentEdge,
     status: gaps.status,
+    edgeAssuranceContractRef: gaps.edgeAssuranceContractRef,
+    edgeAssuranceContractDigest: gaps.edgeAssuranceContractDigest,
+    edgeAssuranceProofLaneRefs: gaps.edgeAssuranceProofLaneRefs,
+    edgeAssuranceResidualPressureRefs: gaps.edgeAssuranceResidualPressureRefs,
+    edgeAssuranceDiagnostics: gaps.edgeAssuranceDiagnostics,
     evidenceRefs: Object.freeze([...input.evidenceRefs, ...defaultParticipationRefs]),
     triageInput: input.triageInput,
     nextActionBasisKind: "initial_selection",

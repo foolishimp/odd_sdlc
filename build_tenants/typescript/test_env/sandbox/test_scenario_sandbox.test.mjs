@@ -80,6 +80,49 @@ function assertNoMindforgePrebuiltImplementation(scenario) {
   }
 }
 
+function writeJson(filePath, payload) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, JSON.stringify(payload), "utf8");
+}
+
+function writeEdgeAssuranceArchive(runRoot, edgeName, suffix = "") {
+  const contractRef = `contract:${edgeName}`;
+  const contractDigest = `digest:${edgeName}`;
+  const gainRef = `gain:${edgeName}${suffix}`;
+  const residualPressureRefs = [`pressure:${edgeName}${suffix}`];
+  writeJson(path.join(runRoot, "handoff_manifest.json"), {
+    edgeName,
+    edgeAssuranceContractRef: contractRef,
+    edgeAssuranceContractDigest: contractDigest
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_gain.json"), {
+    gainRef,
+    contractRef,
+    contractDigest
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_residual_pressure.json"), {
+    contractRef,
+    contractDigest,
+    requiredPressureRefs: residualPressureRefs
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_fulfillment_ledger.json"), {
+    edgeAssuranceContractRef: contractRef,
+    edgeAssuranceContractDigest: contractDigest,
+    edgeGainRef: gainRef,
+    edgeResidualPressureRefs: residualPressureRefs
+  });
+  writeJson(path.join(runRoot, "sdlc_edge_closure_decision.json"), {
+    disposition: "close",
+    edgeGainRef: gainRef,
+    edgeAssuranceDecisionRef: `decision:${edgeName}${suffix}`
+  });
+  writeJson(path.join(runRoot, "sdlc_next_action_projection.json"), {
+    edgeAssuranceContractRef: contractRef,
+    edgeGainRef: gainRef,
+    edgeResidualPressureRefs: residualPressureRefs
+  });
+}
+
 test("scenario sandbox: data_mapper internal induction", async () => {
   const result = await runScenarioSandbox(dataMapperInternalScenario);
   assertWorkspaceWasInstalled(result);
@@ -189,7 +232,11 @@ test("scenario sandbox: hello-world live descriptors allow full graph walk", () 
   assert(rustServiceLive.maxAdvances >= 16);
   assert.deepEqual(
     rustServiceLive.expectations.handoffEdgeSequencePrefix[0],
-    "bootstrap_requirements"
+    "derive_intent_surface"
+  );
+  assert.deepEqual(
+    rustServiceLive.expectations.edgeAssuranceArchiveSequencePrefix,
+    rustServiceLive.expectations.handoffEdgeSequencePrefix
   );
   assert.deepEqual(
     rustServiceLive.expectations.processChecks[0].stdout,
@@ -267,6 +314,82 @@ test("scenario sandbox: handoff sequence assertion tolerates same-edge retries",
         }
       }
     )
+  );
+});
+
+test("scenario sandbox: edge assurance archive sequence requires closed carriers", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-edge-archive-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  [
+    ["20260512T000000000Z_pid1", "first_edge"],
+    ["20260512T000001000Z_pid1", "retry_edge"],
+    ["20260512T000002000Z_pid1", "retry_edge"],
+    ["20260512T000003000Z_pid1", "next_edge"]
+  ].forEach(([runId, edgeName]) => {
+    writeEdgeAssuranceArchive(path.join(runsRoot, runId), edgeName, runId);
+  });
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        scenarioId: "edge-assurance-archive-regression",
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: "edge-assurance-archive-regression",
+        expectations: {
+          edgeAssuranceArchiveSequencePrefix: [
+            "first_edge",
+            "retry_edge",
+            "next_edge"
+          ]
+        }
+      }
+    )
+  );
+
+  writeJson(
+    path.join(runsRoot, "20260512T000003000Z_pid1", "sdlc_edge_closure_decision.json"),
+    {
+      disposition: "retry",
+      edgeGainRef: "gain:next_edge20260512T000003000Z_pid1",
+      edgeAssuranceDecisionRef: "decision:next_edge20260512T000003000Z_pid1"
+    }
+  );
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          scenarioId: "edge-assurance-archive-negative-regression",
+          workspace,
+          advances: [
+            {
+              gaps: { payload: {} },
+              start: { payload: {} }
+            }
+          ]
+        },
+        {
+          scenarioId: "edge-assurance-archive-negative-regression",
+          expectations: {
+            edgeAssuranceArchiveSequencePrefix: [
+              "first_edge",
+              "retry_edge",
+              "next_edge"
+            ]
+          }
+        }
+      ),
+    /closure disposition retry, expected close/
   );
 });
 

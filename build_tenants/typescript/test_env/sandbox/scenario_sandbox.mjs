@@ -55,6 +55,15 @@ const MULTI_ADVANCE_STOP_STATUSES = Object.freeze([
   "yielded"
 ]);
 
+const EDGE_ASSURANCE_ARCHIVE_ARTIFACTS = Object.freeze([
+  "handoff_manifest.json",
+  "sdlc_edge_gain.json",
+  "sdlc_edge_residual_pressure.json",
+  "sdlc_edge_fulfillment_ledger.json",
+  "sdlc_edge_closure_decision.json",
+  "sdlc_next_action_projection.json"
+]);
+
 export function mintRunId() {
   return `${new Date()
     .toISOString()
@@ -126,6 +135,17 @@ function readJsonFile(filePath) {
   }
 }
 
+function readRequiredJsonFile(filePath, label) {
+  if (!existsSync(filePath)) {
+    throw new Error(`${label} missing at ${filePath}`);
+  }
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON at ${filePath}: ${error.message}`);
+  }
+}
+
 function archiveClosedCleanly(archiveRoot) {
   if (typeof archiveRoot !== "string" || archiveRoot.length === 0) {
     return false;
@@ -180,6 +200,23 @@ function observedHandoffEdgeSequence(workspace) {
         return [];
       }
     });
+}
+
+function handoffArchiveGroups(workspace) {
+  const groups = [];
+  for (const archiveRoot of operatorRunRoots(workspace)) {
+    const manifest = readJsonFile(path.join(archiveRoot, "handoff_manifest.json"));
+    const edgeName = typeof manifest?.edgeName === "string" ? manifest.edgeName : null;
+    if (edgeName === null) continue;
+    const record = { archiveRoot, edgeName };
+    const last = groups.at(-1);
+    if (last?.edgeName === edgeName) {
+      last.records.push(record);
+    } else {
+      groups.push({ edgeName, records: [record] });
+    }
+  }
+  return groups;
 }
 
 function latestOperatorRunRoot(workspace) {
@@ -262,6 +299,188 @@ function materializedWorkspaceFiles(workspace) {
     }
   }
   return observed;
+}
+
+function archiveHasArtifacts(archiveRoot, artifacts) {
+  return artifacts.every((rel) => existsSync(path.join(archiveRoot, rel)));
+}
+
+function selectedEdgeAssuranceArchive(records) {
+  const complete = records.filter((record) =>
+    archiveHasArtifacts(record.archiveRoot, EDGE_ASSURANCE_ARCHIVE_ARTIFACTS)
+  );
+  const closed = complete.filter((record) => {
+    const closure = readJsonFile(
+      path.join(record.archiveRoot, "sdlc_edge_closure_decision.json")
+    );
+    return closure?.disposition === "close";
+  });
+  return closed.at(-1) ?? complete.at(-1) ?? records.at(-1) ?? null;
+}
+
+function assertNonEmptyString(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function assertArrayEquals(observed, expected, label) {
+  if (!Array.isArray(observed) || !Array.isArray(expected)) {
+    throw new Error(`${label} must compare arrays`);
+  }
+  if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+    throw new Error(
+      `${label} mismatch — expected ${JSON.stringify(expected)}, saw ${JSON.stringify(observed)}`
+    );
+  }
+}
+
+function assertEdgeAssuranceArchive(scenarioId, edgeName, archiveRoot) {
+  for (const rel of EDGE_ASSURANCE_ARCHIVE_ARTIFACTS) {
+    const abs = path.join(archiveRoot, rel);
+    if (!existsSync(abs)) {
+      throw new Error(
+        `${scenarioId}: edge ${edgeName} assurance archive missing ${rel} at ${archiveRoot}`
+      );
+    }
+  }
+
+  const manifest = readRequiredJsonFile(
+    path.join(archiveRoot, "handoff_manifest.json"),
+    `${scenarioId}: edge ${edgeName} handoff manifest`
+  );
+  const gain = readRequiredJsonFile(
+    path.join(archiveRoot, "sdlc_edge_gain.json"),
+    `${scenarioId}: edge ${edgeName} gain`
+  );
+  const residualPressure = readRequiredJsonFile(
+    path.join(archiveRoot, "sdlc_edge_residual_pressure.json"),
+    `${scenarioId}: edge ${edgeName} residual pressure`
+  );
+  const ledger = readRequiredJsonFile(
+    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"),
+    `${scenarioId}: edge ${edgeName} fulfillment ledger`
+  );
+  const closureDecision = readRequiredJsonFile(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json"),
+    `${scenarioId}: edge ${edgeName} closure decision`
+  );
+  const nextAction = readRequiredJsonFile(
+    path.join(archiveRoot, "sdlc_next_action_projection.json"),
+    `${scenarioId}: edge ${edgeName} next action projection`
+  );
+
+  if (manifest.edgeName !== edgeName) {
+    throw new Error(
+      `${scenarioId}: edge assurance archive ${archiveRoot} has manifest edge ${manifest.edgeName}, expected ${edgeName}`
+    );
+  }
+  const contractRef = assertNonEmptyString(
+    gain.contractRef,
+    `${scenarioId}: edge ${edgeName} gain.contractRef`
+  );
+  const contractDigest = assertNonEmptyString(
+    gain.contractDigest,
+    `${scenarioId}: edge ${edgeName} gain.contractDigest`
+  );
+  const edgeGainRef = assertNonEmptyString(
+    gain.gainRef,
+    `${scenarioId}: edge ${edgeName} gain.gainRef`
+  );
+  if (manifest.edgeAssuranceContractRef !== contractRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} manifest contract ref ${manifest.edgeAssuranceContractRef}, expected ${contractRef}`
+    );
+  }
+  if (manifest.edgeAssuranceContractDigest !== contractDigest) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} manifest contract digest ${manifest.edgeAssuranceContractDigest}, expected ${contractDigest}`
+    );
+  }
+  if (residualPressure.contractRef !== contractRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} residual pressure contract ref ${residualPressure.contractRef}, expected ${contractRef}`
+    );
+  }
+  if (residualPressure.contractDigest !== contractDigest) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} residual pressure contract digest ${residualPressure.contractDigest}, expected ${contractDigest}`
+    );
+  }
+  if (ledger.edgeAssuranceContractRef !== contractRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} ledger contract ref ${ledger.edgeAssuranceContractRef}, expected ${contractRef}`
+    );
+  }
+  if (ledger.edgeAssuranceContractDigest !== contractDigest) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} ledger contract digest ${ledger.edgeAssuranceContractDigest}, expected ${contractDigest}`
+    );
+  }
+  if (ledger.edgeGainRef !== edgeGainRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} ledger gain ref ${ledger.edgeGainRef}, expected ${edgeGainRef}`
+    );
+  }
+  assertArrayEquals(
+    ledger.edgeResidualPressureRefs,
+    residualPressure.requiredPressureRefs,
+    `${scenarioId}: edge ${edgeName} ledger residual pressure refs`
+  );
+  if (closureDecision.disposition !== "close") {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} closure disposition ${closureDecision.disposition}, expected close`
+    );
+  }
+  if (closureDecision.edgeGainRef !== edgeGainRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} closure gain ref ${closureDecision.edgeGainRef}, expected ${edgeGainRef}`
+    );
+  }
+  assertNonEmptyString(
+    closureDecision.edgeAssuranceDecisionRef,
+    `${scenarioId}: edge ${edgeName} closure edgeAssuranceDecisionRef`
+  );
+  if (nextAction.edgeAssuranceContractRef !== contractRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} next action contract ref ${nextAction.edgeAssuranceContractRef}, expected ${contractRef}`
+    );
+  }
+  if (nextAction.edgeGainRef !== edgeGainRef) {
+    throw new Error(
+      `${scenarioId}: edge ${edgeName} next action gain ref ${nextAction.edgeGainRef}, expected ${edgeGainRef}`
+    );
+  }
+  assertArrayEquals(
+    nextAction.edgeResidualPressureRefs,
+    residualPressure.requiredPressureRefs,
+    `${scenarioId}: edge ${edgeName} next action residual pressure refs`
+  );
+}
+
+function assertEdgeAssuranceArchiveSequencePrefix(result, expected) {
+  const groups = handoffArchiveGroups(result.workspace);
+  if (groups.length < expected.length) {
+    throw new Error(
+      `${result.scenarioId}: edge assurance archive sequence too short — expected prefix ${expected.join(" -> ")}, saw ${groups.map((group) => group.edgeName).join(" -> ")}`
+    );
+  }
+  expected.forEach((edgeName, index) => {
+    const group = groups[index];
+    if (group?.edgeName !== edgeName) {
+      throw new Error(
+        `${result.scenarioId}: edge assurance archive sequence mismatch at ${index} — expected ${edgeName}, saw ${group?.edgeName}; observed=${groups.map((entry) => entry.edgeName).join(" -> ")}`
+      );
+    }
+    const selected = selectedEdgeAssuranceArchive(group.records);
+    if (selected === null) {
+      throw new Error(
+        `${result.scenarioId}: edge ${edgeName} has no operator archive record`
+      );
+    }
+    assertEdgeAssuranceArchive(result.scenarioId, edgeName, selected.archiveRoot);
+  });
 }
 
 function assertProcessStdoutJson(input) {
@@ -589,6 +808,12 @@ export function assertScenarioExpectations(result, scenario) {
         );
       }
     });
+  }
+  if (Array.isArray(expectations.edgeAssuranceArchiveSequencePrefix)) {
+    assertEdgeAssuranceArchiveSequencePrefix(
+      result,
+      expectations.edgeAssuranceArchiveSequencePrefix
+    );
   }
   if (Array.isArray(expectations.processChecks)) {
     for (const check of expectations.processChecks) {

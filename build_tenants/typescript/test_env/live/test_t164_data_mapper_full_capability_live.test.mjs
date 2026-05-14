@@ -40,6 +40,20 @@ const COMMAND_TIMEOUT_MS = Number.parseInt(
     `${1000 * 60 * 60 * 12}`,
   10
 );
+const WORKER_TIMEOUT_MS = Number.parseInt(
+  process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_TIMEOUT_MS"] ??
+    process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] ??
+    `${COMMAND_TIMEOUT_MS}`,
+  10
+);
+const WORKER_INACTIVITY_TIMEOUT_MS = Number.parseInt(
+  process.env[
+    "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_INACTIVITY_TIMEOUT_MS"
+  ] ??
+    process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] ??
+    `${1000 * 60 * 30}`,
+  10
+);
 
 const REQUIRED_FULL_GRAPH_EDGES = Object.freeze([
   "Fg_conform_project_authority",
@@ -142,7 +156,11 @@ function runCommand(input) {
       ...process.env,
       ODD_SDLC_TS_OUTPUT: "json",
       ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
-      ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal"
+      ABG_TS_AGENT_EXECUTOR_PROFILE: "pty-terminal",
+      ODD_SDLC_WORKER_TIMEOUT_MS: String(WORKER_TIMEOUT_MS),
+      ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: String(
+        WORKER_INACTIVITY_TIMEOUT_MS
+      )
     },
     maxBuffer: 1024 * 1024 * 100,
     timeout: COMMAND_TIMEOUT_MS
@@ -277,6 +295,8 @@ test(
       templateRoot: DATA_MAPPER_TEMPLATE_ROOT,
       workerTransport: WORKER_TRANSPORT,
       commandTimeoutMs: COMMAND_TIMEOUT_MS,
+      workerTimeoutMs: WORKER_TIMEOUT_MS,
+      workerInactivityTimeoutMs: WORKER_INACTIVITY_TIMEOUT_MS,
       requiredEdges: REQUIRED_FULL_GRAPH_EDGES
     };
     writeJson(path.join(archiveRoot, "run_summary.json"), summary);

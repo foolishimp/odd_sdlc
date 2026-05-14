@@ -3,7 +3,7 @@ id: T-163
 title: MindForge AI assistant sandbox scenario family for governed specification variation and iteration
 type: feature
 ticket_category: scenario_proof
-status: active
+status: backlog
 goal: demonstrate-mindforge-governance-through-installed-odd-sdlc-sandbox-iteration
 build_tenant: typescript
 owner: odd_sdlc
@@ -13,7 +13,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-12
 created_at: 2026-05-12
-updated_at: 2026-05-13
+updated_at: 2026-05-14
 activated_at: 2026-05-12
 implementation_status: clean_default_overlay_live_proof_completed_validation_pending
 governance_scope: STDO Method
@@ -39,8 +39,8 @@ source_documents:
 related_tickets:
   - .ai-workspace/tickets/completed/T-156-parameterised-scenario-sandbox-harness.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
-  - .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
-  - .ai-workspace/tickets/completed/T-131-create-guided-odd-chat-live-build-lane.md
+  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/backlog/T-131-create-guided-odd-chat-live-build-lane.md
   - .ai-workspace/tickets/completed/T-132-create-hello-world-single-tenant-live-proof-lane.md
   - .ai-workspace/tickets/completed/T-133-create-minimum-overhead-rust-hello-world-live-lane.md
 affected_boundary:
@@ -737,9 +737,8 @@ Observed generated output comparison:
 
 Closure note:
 
-The implementation is a closure candidate pending review. The ticket now lives
-under `.ai-workspace/tickets/active/` so its `status: active` frontmatter and
-ticket lane agree.
+The implementation is a closure candidate pending review. As of 2026-05-14,
+the ticket is parked in backlog so active execution focus can move elsewhere.
 
 ## Review Repair - 2026-05-13
 

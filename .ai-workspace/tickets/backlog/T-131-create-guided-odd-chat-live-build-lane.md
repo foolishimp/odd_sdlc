@@ -3,7 +3,7 @@ id: T-131
 title: Create guided odd_chat CLI live build lane over deployed ODD/GTL/ABG domains
 type: feature
 ticket_category: live_proof_lane
-status: active
+status: backlog
 review_status: corrected_to_bootstrap_only_live_build_candidate_pending_opt_in_execution
 goal: typescript-rc-guided-live-proof
 build_tenant: typescript
@@ -19,7 +19,7 @@ affected_boundary:
 priority: high
 triaged_at: 2026-05-09
 created_at: 2026-05-09
-updated_at: 2026-05-09
+updated_at: 2026-05-14
 completed_at: null
 governance_scope: STDO Method
 dependencies:

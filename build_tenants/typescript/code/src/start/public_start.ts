@@ -297,6 +297,11 @@ function stringField(
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function isSdlcTraversalOverlayRef(value: string): value is SdlcTraversalOverlayRef {
+  return value.startsWith("overlay://odd-sdlc/") &&
+    value.length > "overlay://odd-sdlc/".length;
+}
+
 function uniqueStrings(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)]);
 }
@@ -405,9 +410,8 @@ function priorOverlayTruthRefs(input: {
         stringField(projection, "overlayRef");
       if (
         overlayRef === null ||
-        !predecessorOverlayRefs.has(
-          overlayRef as SdlcTraversalOverlay["overlayRef"]
-        )
+        !isSdlcTraversalOverlayRef(overlayRef) ||
+        !predecessorOverlayRefs.has(overlayRef)
       ) {
         continue;
       }

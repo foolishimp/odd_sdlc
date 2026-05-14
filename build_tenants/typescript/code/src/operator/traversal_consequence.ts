@@ -1,6 +1,8 @@
 // Implements: T-136
 // Implements: T-138
 
+import type { SdlcEdgeAssuranceCloseDecision } from "./edge_gain_closure.js";
+
 export type SdlcEdgeClosureDisposition =
   | "close"
   | "yield"
@@ -154,6 +156,7 @@ export interface SdlcEdgeClosureDecision {
   readonly edgeAssuranceContractDigest: string | null;
   readonly edgeGainRef: string | null;
   readonly edgeClosureFunctionRef: string | null;
+  readonly edgeAssuranceDecisionRef?: string | null;
   readonly edgeResidualPressureRefs: readonly string[];
   readonly disposition: SdlcEdgeClosureDisposition;
   readonly basisRefs: readonly string[];
@@ -810,6 +813,7 @@ export function deriveSdlcEdgeClosureDecision(input: {
   readonly decisionRef: string;
   readonly ledger: SdlcEdgeFulfillmentLedger;
   readonly edgeClosureFunctionRef?: string | null;
+  readonly edgeAssuranceCloseDecision?: SdlcEdgeAssuranceCloseDecision | null;
   readonly currentEdgeLawful: boolean;
   readonly retryReasonRefs?: readonly string[];
   readonly repairReasonRefs?: readonly string[];
@@ -837,28 +841,62 @@ export function deriveSdlcEdgeClosureDecision(input: {
       ledgerLivenessProjectionRefs: input.ledger.livenessProjectionRefs
     });
   }
+  const edgeAssuranceCloseDecision = input.edgeAssuranceCloseDecision ?? null;
+  if (edgeAssuranceCloseDecision !== null) {
+    if (
+      input.ledger.edgeAssuranceContractRef !== null &&
+      edgeAssuranceCloseDecision.contractRef !== input.ledger.edgeAssuranceContractRef
+    ) {
+      throw new TypeError("edge assurance close decision contract ref drift");
+    }
+    if (
+      input.ledger.edgeAssuranceContractDigest !== null &&
+      edgeAssuranceCloseDecision.contractDigest !==
+        input.ledger.edgeAssuranceContractDigest
+    ) {
+      throw new TypeError("edge assurance close decision contract digest drift");
+    }
+    if (
+      input.ledger.edgeGainRef !== null &&
+      edgeAssuranceCloseDecision.gainRef !== input.ledger.edgeGainRef
+    ) {
+      throw new TypeError("edge assurance close decision gain ref drift");
+    }
+  }
   const candidates = new Set<SdlcEdgeClosureDisposition>(["block"]);
-  if (input.ledger.edgeConverged) {
+  if (edgeAssuranceCloseDecision === null) {
+    if (input.ledger.edgeConverged) {
+      candidates.add("close");
+    }
+  } else if (
+    edgeAssuranceCloseDecision.disposition === "close" &&
+    input.ledger.edgeConverged
+  ) {
     candidates.add("close");
-  }
-  if (yieldResumeBasis !== null) {
-    candidates.add("yield");
-  }
-  if ((input.repriceReasonRefs ?? []).length > 0) {
-    candidates.add("reprice");
-  }
-  if ((input.repairReasonRefs ?? []).length > 0) {
-    candidates.add("repair");
-  }
-  if ((input.reenterReasonRefs ?? []).length > 0) {
-    candidates.add("re-enter");
-  }
-  if ((input.retryReasonRefs ?? []).length > 0) {
+  } else if (edgeAssuranceCloseDecision.disposition === "retry") {
     candidates.add("retry");
+  }
+  if (edgeAssuranceCloseDecision?.disposition !== "block") {
+    if (yieldResumeBasis !== null) {
+      candidates.add("yield");
+    }
+    if ((input.repriceReasonRefs ?? []).length > 0) {
+      candidates.add("reprice");
+    }
+    if ((input.repairReasonRefs ?? []).length > 0) {
+      candidates.add("repair");
+    }
+    if ((input.reenterReasonRefs ?? []).length > 0) {
+      candidates.add("re-enter");
+    }
+    if ((input.retryReasonRefs ?? []).length > 0) {
+      candidates.add("retry");
+    }
   }
   const policy = input.closurePolicy ?? SDLC_DEFAULT_EDGE_CLOSURE_POLICY;
   const disposition = dispositionFromPolicy({ policy, candidates });
   const reasonRefs = uniqueSorted([
+    ...(edgeAssuranceCloseDecision?.reasonRefs ?? []),
     ...(input.retryReasonRefs ?? []),
     ...(input.repairReasonRefs ?? []),
     ...(input.reenterReasonRefs ?? []),
@@ -900,6 +938,7 @@ export function deriveSdlcEdgeClosureDecision(input: {
             input.edgeClosureFunctionRef,
             "edgeClosureFunctionRef"
           ),
+    edgeAssuranceDecisionRef: edgeAssuranceCloseDecision?.decisionRef ?? null,
     edgeResidualPressureRefs: input.ledger.edgeResidualPressureRefs,
     disposition,
     basisRefs: uniqueSorted([
@@ -917,6 +956,13 @@ export function deriveSdlcEdgeClosureDecision(input: {
       input.edgeClosureFunctionRef === null
         ? []
         : [input.edgeClosureFunctionRef]),
+      ...(edgeAssuranceCloseDecision === null
+        ? []
+        : [
+            edgeAssuranceCloseDecision.decisionRef,
+            ...edgeAssuranceCloseDecision.basisRefs,
+            edgeAssuranceCloseDecision.residualPressureRef
+          ]),
       ...input.ledger.edgeResidualPressureRefs,
       ...(normalizedYieldResumeBasis === null
         ? []
@@ -952,6 +998,12 @@ export function deriveSdlcEdgeClosureDecision(input: {
         ? []
         : [input.ledger.edgeAssuranceContractDigest]),
       ...(input.ledger.edgeGainRef === null ? [] : [input.ledger.edgeGainRef]),
+      ...(edgeAssuranceCloseDecision === null
+        ? []
+        : [
+            edgeAssuranceCloseDecision.decisionRef,
+            edgeAssuranceCloseDecision.residualPressureRef
+          ]),
       ...input.ledger.edgeResidualPressureRefs
     ])
   });

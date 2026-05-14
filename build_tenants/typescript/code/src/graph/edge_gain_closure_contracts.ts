@@ -1,6 +1,9 @@
 // Implements: REQ-F-ODDSDLC-013
 // Implements: REQ-F-ODDSDLC-014
 // Implements: REQ-F-ODDSDLC-015
+// Implements: REQ-F-ODDSDLC-063
+// Implements: REQ-F-ODDSDLC-064
+// Implements: REQ-F-ODDSDLC-068
 // Investigates: T-164
 
 import {
@@ -47,6 +50,8 @@ export type SdlcEdgeClosureClassification =
   | "projection_only"
   | "no_close";
 
+export type SdlcEdgeSourceAssetPolicy = "strict" | "subset_allowed";
+
 export type SdlcEdgeCompositionRole =
   | "prerequisite"
   | "intermediate"
@@ -80,6 +85,7 @@ export interface SdlcEdgeGainClosureContract {
   readonly edgeRef: string;
   readonly category: SdlcEdgeGainClosureCategory;
   readonly closureClassification: SdlcEdgeClosureClassification;
+  readonly sourceAssetPolicy: SdlcEdgeSourceAssetPolicy;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
   readonly targetOutcomeRef: string;
@@ -271,10 +277,11 @@ function templateFor(
 function contract(input: {
   readonly edgeRef: string;
   readonly category: SdlcEdgeGainClosureCategory;
+  readonly closureClassification: SdlcEdgeClosureClassification;
+  readonly sourceAssetPolicy?: SdlcEdgeSourceAssetPolicy;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
   readonly compositionRole: SdlcEdgeCompositionRole;
-  readonly closureClassification?: SdlcEdgeClosureClassification;
   readonly authorityBasisRefs: readonly string[];
   readonly proofLaneRefs: readonly string[];
   readonly residualPressureRefs: readonly string[];
@@ -284,7 +291,8 @@ function contract(input: {
     kind: "sdlc_edge_gain_closure_contract" as const,
     edgeRef: input.edgeRef,
     category: input.category,
-    closureClassification: input.closureClassification ?? "close_capable",
+    closureClassification: input.closureClassification,
+    sourceAssetPolicy: input.sourceAssetPolicy ?? "strict",
     sourceAssetTypes: Object.freeze([...input.sourceAssetTypes]),
     targetAssetType: input.targetAssetType,
     targetOutcomeRef: `outcome://odd-sdlc/${input.edgeRef}/${input.targetAssetType}`,
@@ -365,6 +373,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_INGRESS_PROJECT,
     category: "project_ingress",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "ingress_source_set",
       "project_type_surface",
@@ -379,6 +388,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_CONFORM_PROJECT,
     category: "conformance",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "ingress_source_set",
       "source_input_ledger",
@@ -394,6 +404,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_CONFORM_PROJECT_AUTHORITY,
     category: "authority_synthesis",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "conform_project_profile",
       "selected_tenant_surface",
@@ -411,6 +422,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
     category: "implementation_encoding",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "project_authority_conformance_projection",
       "requirement_surface",
@@ -551,6 +563,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_intent_surface",
     category: "authority_synthesis",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["input_set"],
     targetAssetType: "intent_surface",
     compositionRole: "prerequisite",
@@ -561,6 +574,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_product_surface",
     category: "authority_synthesis",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["input_set", "intent_surface"],
     targetAssetType: "product_surface",
     compositionRole: "prerequisite",
@@ -571,6 +585,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_goal_surface",
     category: "authority_synthesis",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["input_set", "intent_surface", "product_surface"],
     targetAssetType: "goal_surface",
     compositionRole: "prerequisite",
@@ -581,6 +596,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_requirement_surface",
     category: "authority_synthesis",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "input_set",
       "intent_surface",
@@ -596,6 +612,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_feature_decomp_surface",
     category: "solution_formalisation",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["requirement_surface"],
     targetAssetType: "feature_decomp_surface",
     compositionRole: "intermediate",
@@ -606,6 +623,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_uat_testcases_surface",
     category: "testcase_synthesis_and_authority",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["requirement_surface", "implementation_design_surface"],
     targetAssetType: "uat_testcases_surface",
     compositionRole: "proof",
@@ -616,6 +634,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_design_surface",
     category: "solution_formalisation",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["requirement_surface", "feature_decomp_surface"],
     targetAssetType: "design_surface",
     compositionRole: "intermediate",
@@ -626,6 +645,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_scenario_surface",
     category: "solution_formalisation",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["requirement_surface", "design_surface"],
     targetAssetType: "scenario_surface",
     compositionRole: "intermediate",
@@ -636,6 +656,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_implementation_design_surface",
     category: "solution_formalisation",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["design_surface", "scenario_surface"],
     targetAssetType: "implementation_design_surface",
     compositionRole: "intermediate",
@@ -646,6 +667,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "select_implementation_stack_profile",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["implementation_design_surface"],
     targetAssetType: "implementation_stack_profile",
     compositionRole: "intermediate",
@@ -656,6 +678,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_implementation_module_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_design_surface",
       "implementation_stack_profile"
@@ -669,6 +692,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_aggregate_domain_model_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["implementation_module_surface"],
     targetAssetType: "aggregate_domain_model_surface",
     compositionRole: "intermediate",
@@ -679,6 +703,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_implementation_component_topology_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_design_surface",
       "implementation_module_surface",
@@ -694,6 +719,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_aggregate_sunny_day_sequence_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_module_surface",
       "aggregate_domain_model_surface",
@@ -708,6 +734,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_component_realization_schedule_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_component_topology_surface",
       "implementation_module_surface",
@@ -724,6 +751,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_component_code_surface",
     category: "implementation_encoding",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_component_topology_surface",
       "component_realization_schedule_surface",
@@ -738,6 +766,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "qualify_component_realization_surface",
     category: "implementation_qualification",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_component_topology_surface",
       "component_code_surface"
@@ -751,6 +780,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_realization_schedule_surface",
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_design_surface",
       "implementation_module_surface",
@@ -769,6 +799,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_code_surface",
     category: "implementation_encoding",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_module_surface",
       "implementation_stack_profile",
@@ -786,6 +817,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_design_surface",
     category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["design_surface", "scenario_surface"],
     targetAssetType: "test_design_surface",
     compositionRole: "intermediate",
@@ -796,6 +828,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "select_test_stack_profile",
     category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["test_design_surface"],
     targetAssetType: "test_stack_profile",
     compositionRole: "intermediate",
@@ -806,6 +839,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_module_surface",
     category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["test_design_surface", "test_stack_profile"],
     targetAssetType: "test_module_surface",
     compositionRole: "intermediate",
@@ -816,6 +850,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_component_topology_surface",
     category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_design_surface",
       "test_module_surface",
@@ -830,6 +865,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_component_test_surface",
     category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_component_topology_surface",
       "component_code_surface",
@@ -844,6 +880,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_schedule_surface",
     category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_design_surface",
       "test_module_surface",
@@ -862,6 +899,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "prepare_test_execution_surface",
     category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["test_schedule_surface"],
     targetAssetType: "test_execution_surface",
     compositionRole: "intermediate",
@@ -872,6 +910,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_execution_result_surface",
     category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["test_execution_surface", "test_schedule_surface"],
     targetAssetType: "test_execution_result_surface",
     compositionRole: "intermediate",
@@ -882,6 +921,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "qualify_component_test_execution_surface",
     category: "test_encoding_and_execution",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_execution_result_surface",
       "test_component_topology_surface",
@@ -896,6 +936,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_component_repair_schedule_surface",
     category: "repair_archive_release_qualification",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "component_test_qualification_surface",
       "test_execution_result_surface",
@@ -910,6 +951,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_test_run_archive_surface",
     category: "repair_archive_release_qualification",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_module_surface",
       "test_stack_profile",
@@ -927,6 +969,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "qualify_testcase_authority",
     category: "testcase_synthesis_and_authority",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["uat_testcases_surface", "scenario_surface"],
     targetAssetType: "testcase_authority_surface",
     compositionRole: "proof",
@@ -937,6 +980,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_release_depth_parity_surface",
     category: "repair_archive_release_qualification",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "implementation_component_topology_surface",
       "component_realization_qualification_surface",
@@ -953,6 +997,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "prepare_release_surface",
     category: "repair_archive_release_qualification",
+    closureClassification: "close_capable",
     sourceAssetTypes: [
       "requirement_surface",
       "design_surface",
@@ -972,6 +1017,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "prepare_build_execution_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["release_surface"],
     targetAssetType: "build_execution_surface",
     compositionRole: "operational",
@@ -982,6 +1028,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_build_execution_result_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["build_execution_surface"],
     targetAssetType: "build_execution_result_surface",
     compositionRole: "operational",
@@ -992,6 +1039,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "prepare_deployment_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["release_surface"],
     targetAssetType: "deployment_surface",
     compositionRole: "operational",
@@ -1002,6 +1050,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_deployment_result_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["deployment_surface"],
     targetAssetType: "deployment_result_surface",
     compositionRole: "operational",
@@ -1012,6 +1061,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_deployed_environment_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["deployment_result_surface"],
     targetAssetType: "deployed_environment_surface",
     compositionRole: "operational",
@@ -1022,6 +1072,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_runtime_observation_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["deployment_result_surface", "test_run_archive_surface"],
     targetAssetType: "runtime_observation_surface",
     compositionRole: "operational",
@@ -1032,6 +1083,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: "derive_retrofit_plan_surface",
     category: "operational_transition_and_return",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["runtime_observation_surface", "release_surface"],
     targetAssetType: "retrofit_plan_surface",
     compositionRole: "terminal",
@@ -1042,6 +1094,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
     category: "solution_formalisation",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["input_set"],
     targetAssetType: "implementation_design_surface",
     compositionRole: "intermediate",
@@ -1052,6 +1105,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_DERIVE_LITE_MODULE_SURFACE,
     category: "implementation_formalisation_and_planning",
+    closureClassification: "close_capable",
     sourceAssetTypes: ["implementation_design_surface"],
     targetAssetType: "implementation_module_surface",
     compositionRole: "intermediate",
@@ -1062,6 +1116,8 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
   contract({
     edgeRef: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
     category: "implementation_encoding",
+    closureClassification: "close_capable",
+    sourceAssetPolicy: "subset_allowed",
     sourceAssetTypes: [
       "implementation_design_surface",
       "implementation_module_surface"
@@ -1169,8 +1225,11 @@ export function indexSdlcEdgeGainClosureContracts(input: {
 function assertUnambiguousSdlcEdgeGainClosureContract(
   contractRow: SdlcEdgeGainClosureContract
 ): void {
-  const requiredStrings = [
+  const requiredStrings: readonly unknown[] = [
     contractRow.edgeRef,
+    contractRow.category,
+    contractRow.closureClassification,
+    contractRow.sourceAssetPolicy,
     contractRow.targetAssetType,
     contractRow.targetOutcomeRef,
     contractRow.obligationDerivationRef,
@@ -1189,12 +1248,34 @@ function assertUnambiguousSdlcEdgeGainClosureContract(
     contractRow.residualPressureRefs
   ];
   if (
-    requiredStrings.some((value) => value.trim().length === 0) ||
+    requiredStrings.some(
+      (value) => typeof value !== "string" || value.trim().length === 0
+    ) ||
     requiredCollections.some((values) => values.length === 0)
   ) {
     throw new SdlcEdgeGainClosureContractError({
       code: "ambiguous_edge_gain_closure_contract",
       message: `${contractRow.edgeRef || "<missing-edge-ref>"}: contract row does not fully declare edge identity, authority, evidence, metric, closure, proof, and residual-pressure fields`
+    });
+  }
+  if (
+    contractRow.closureClassification !== "close_capable" &&
+    contractRow.closureClassification !== "library_only" &&
+    contractRow.closureClassification !== "projection_only" &&
+    contractRow.closureClassification !== "no_close"
+  ) {
+    throw new SdlcEdgeGainClosureContractError({
+      code: "ambiguous_edge_gain_closure_contract",
+      message: `${contractRow.edgeRef}: contract row declares an unsupported closure classification: ${contractRow.closureClassification}`
+    });
+  }
+  if (
+    contractRow.sourceAssetPolicy !== "strict" &&
+    contractRow.sourceAssetPolicy !== "subset_allowed"
+  ) {
+    throw new SdlcEdgeGainClosureContractError({
+      code: "ambiguous_edge_gain_closure_contract",
+      message: `${contractRow.edgeRef}: contract row declares an unsupported source asset policy: ${contractRow.sourceAssetPolicy}`
     });
   }
 }

@@ -76,7 +76,13 @@ export function t164RustHelloServiceLiteLiveScenario({
         "build_tenants/hello_world_rust_service/src/main.rs"
       ],
       handoffEdgeSequencePrefix: [
-        "bootstrap_requirements",
+        "derive_intent_surface",
+        "derive_lite_design_adr_surface",
+        "derive_lite_module_surface",
+        "derive_lite_component_code_surface"
+      ],
+      edgeAssuranceArchiveSequencePrefix: [
+        "derive_intent_surface",
         "derive_lite_design_adr_surface",
         "derive_lite_module_surface",
         "derive_lite_component_code_surface"

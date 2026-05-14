@@ -3,7 +3,7 @@ id: T-162
 title: First-class ticket workflow for governed specification change, review resolution, and bug repair
 type: feature
 ticket_category: implementation_migration
-status: backlog
+status: active
 goal: ticket-workflow-is-the-controlled-entrypoint-for-substantive-change
 build_tenant: typescript
 owner: odd_sdlc
@@ -13,7 +13,8 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-12
 created_at: 2026-05-12
-updated_at: 2026-05-12
+updated_at: 2026-05-14
+activated_at: 2026-05-14
 governance_scope: STDO Method
 migration_strategy: inside_out_ticket_workflow_authority
 library_usage: extend
@@ -42,8 +43,12 @@ related_tickets:
   - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
   - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
+  - .ai-workspace/tickets/backlog/T-165-define-optimising-overlay-for-landscape-conditioned-fd-specialization.md
+  - .ai-workspace/tickets/backlog/T-166-define-adaptable-consensus-graph-function-for-submitter-reviewer-rounds.md
+  - .ai-workspace/tickets/backlog/T-167-define-review-graph-function-for-multi-reviewer-ticket-generation.md
 affected_boundary:
   - build_tenants/typescript/code/src/tickets/   # new ticket workflow module if needed
+  - build_tenants/typescript/code/src/review/    # reviewer profile and review panel binding module if needed
   - build_tenants/typescript/code/src/graph/catalog.ts
   - build_tenants/typescript/code/src/spec_method/entry.ts
   - build_tenants/typescript/code/src/projection/query_domain.ts
@@ -62,18 +67,23 @@ excluded_boundary:
   - allowing backlog tickets to execute as admitted active work without promotion/admission
   - adding a second runtime, backlog database, or non-markdown ticket truth store
   - weakening ABG ownership of event, frame, continuation, projection, or replay truth
-target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, execute, review, and close work from ticket authority while preserving comments as evidence/publication only.
+target_truth: Tickets under .ai-workspace/tickets are the first-class durable work authority for substantive odd_sdlc change. The installed TypeScript operator can inspect, validate, admit, start, select configured reviewers, execute, review, and close work from ticket authority while preserving comments as evidence/publication only.
 superseded_truth: Substantive specification edits, code review fixes, selective implementation choices, and bug repairs may be driven directly from prompt text, chat memory, comment files, or review notes without first admitting a ticket-shaped execution contract.
-closure_law: This ticket closes only when the TypeScript tenant exposes a ticket workflow projection, validates TICKET_METHOD-required fields, admits active tickets into execution contracts, routes asset:ticket/<id> start through admitted ticket authority, records review/bug/spec-change decisions inside the ticket workflow, and proves that comments or raw prompts cannot become closure authority.
+closure_law: This ticket closes only when the TypeScript tenant exposes a ticket workflow projection, validates TICKET_METHOD-required fields, admits active tickets into execution contracts, routes asset:ticket/<id> start through admitted ticket authority, selects configured reviewer profiles or review panels before review execution, records review/bug/spec-change decisions inside the ticket workflow, and proves that comments or raw prompts cannot become closure authority.
 evaluation_criteria:
   - ticket projection reports backlog, active, completed, malformed, blocked, and stale-ticket states from markdown files
   - execution starts only from active admitted ticket authority or an explicitly admitted draft ticket contract
+  - review-capable tickets select reviewers from configured reviewer profiles rather than from current chat identity, hardcoded agent names, or prompt prose
+  - reviewer profile, panel binding, config digest, invocation ref, and output contract are preserved in ticket projection and admitted execution contract
   - code review findings have explicit accepted, rejected, deferred, or split-ticket rulings before implementation
   - bug repair tickets carry first-missing-layer triage before code change
   - specification-change tickets cite the target specification surface and lawful re-entry point before edit
   - ledgers, handoffs, events, archives, and closure projections carry the ticket/execution-contract refs used for the run
 non_closure_conditions:
   - an operator can still implement review feedback from a comment without accepted/rejected/deferred rulings in a ticket
+  - reviewer choice is inferred from current operator identity, chat context, environment defaults, or hardcoded `claude`/`codex` branches instead of a configured reviewer profile
+  - Claude, Codex, or any other reviewer output is accepted without a registered profile, invocation ref, config digest, and declared output/evidence contract
+  - reviewer configuration exists only in prompt text, comments, or local convention and is not visible from the ticket workflow projection
   - a bug can still be repaired as `realization_refactor` when requirement or design authority is missing
   - a specification file can be edited from prompt intent without a ticket naming change class, re-entry point, target truth, and source documents
   - `asset:ticket/<id>` can execute backlog, malformed, missing, or unadmitted tickets
@@ -131,6 +141,9 @@ The main failure modes are:
 - `asset:ticket/<id>` exists as an operator concept, but ticket validation,
   admission, review selection, execution-contract derivation, and closure proof
   are not yet one first-class workflow.
+- reviewer choice can still be carried in prompt text such as "ask Claude" or
+  "ask Codex" without a durable reviewer profile, capability declaration,
+  output schema, invocation record, or evidence contract.
 
 ## Current Code Structure Pass
 
@@ -204,6 +217,41 @@ These subordinate rows should not become peer carriers unless implementation
 review proves independent identity. The identity-bearing unit is still the
 ticket and its admitted execution contract.
 
+Reviewer selection is part of the ticket workflow, not a separate authority
+surface. Concrete reviewers such as Claude and Codex are configured profiles
+that may be selected for a ticket, review, or consensus round. Their output is
+evidence and work-routing input until the ticket workflow admits the resulting
+decision rows.
+
+Reviewer configuration carriers:
+
+```text
+SdlcReviewerProfile
+  stable reviewer_id, display label, reviewer kind, supported roles, capability
+  tags, transport contract ref, prompt/policy ref, output schema, evidence
+  contract, scope limits, exclusion rules, availability state
+
+SdlcReviewPanelBinding
+  ticket id, subject refs, reviewer profile ids, role assignments,
+  required/optional flags, reduction or quorum policy, conflict policy,
+  fallback policy, proof expectation
+
+SdlcReviewerInvocationRef
+  reviewer profile id, profile config digest, transport binding, run/evidence
+  refs, output digest, exit status, projection timestamp
+```
+
+Example profile ids are allowed to be short in operator UX:
+
+```text
+codex  -> reviewer://odd-sdlc/codex
+claude -> reviewer://odd-sdlc/claude
+```
+
+The profile registry defines what those names mean. The ticket workflow must not
+special-case Claude or Codex in control flow, infer the reviewer from the
+current chat agent, or accept unregistered reviewer output as governed review.
+
 ## Workflow Axioms
 
 1. A substantive change must enter through a ticket or through a drafted
@@ -222,6 +270,11 @@ ticket and its admitted execution contract.
    not come from a comment, green test alone, branch state, or event presence.
 8. Query-domain and dashboard views are projections. They must fail closed when
    ticket authority is malformed or stale.
+9. Reviewer selection is explicit ticket workflow configuration. It does not
+   come from the current operator, the current chat, or ambient environment
+   defaults.
+10. Reviewer output is evidence until reduced into decision rows and admitted by
+   the ticket workflow.
 
 ## Operator UX
 
@@ -233,6 +286,8 @@ odd-sdlc-ts tickets --workspace .
 odd-sdlc-ts ticket-intake --workspace . --from-comment <path> --kind review
 odd-sdlc-ts ticket-intake --workspace . --kind bug --evidence <path>
 odd-sdlc-ts ticket-admit --workspace . --ticket T-162
+odd-sdlc-ts reviewers --workspace .
+odd-sdlc-ts ticket-review --workspace . --ticket T-162 --reviewers codex,claude
 odd-sdlc-ts start --workspace . --target asset:ticket/T-162 --until blocked
 ```
 
@@ -247,6 +302,10 @@ Minimum UX contract:
 - malformed tickets produce typed blocking reasons instead of being silently
   skipped.
 - review findings display their rulings before work begins.
+- review-capable tickets display configured reviewer profiles, selected review
+  panel, unavailable reviewers, and profile/config digest before review begins.
+- unknown or unavailable reviewers block the review act, not the ticket status
+  projection as a whole.
 - bugs display first-missing-layer triage before work begins.
 - spec enhancements display their target specification surfaces before edits.
 
@@ -263,9 +322,14 @@ flowchart TD
     F --> G{Admissible?}
     G -- no --> H[Publish ticket workflow blocking reason]
     G -- yes --> I[Admit SdlcTicketExecutionContract]
-    I --> J{Work class}
+    I --> I2{Reviewer panel required?}
+    I2 -- yes --> I3[Select configured reviewer profiles]
+    I3 --> I4{Profiles valid and available?}
+    I4 -- no --> H
+    I4 -- yes --> J{Work class}
+    I2 -- no --> J
     J --> K[Spec change row]
-    J --> L[Review decision rows]
+    J --> L[Review decision rows with reviewer invocation refs]
     J --> M[Bug triage row]
     J --> N[Implementation row]
     K --> O[Run graph work under ticket contract]
@@ -308,12 +372,17 @@ Inside-out sequencing is required.
 - [ ] define ticket workflow validation over `.ai-workspace/tickets/{backlog,active,completed}` with TICKET_METHOD-required fields
 - [ ] define `SdlcTicketWorkflowProjection` as a read-only query-domain surface
 - [ ] define `SdlcTicketExecutionContract` as the admitted run-scoped contract derived from a ticket or drafted ticket-shaped contract
+- [ ] define a reviewer profile registry/projection for configured reviewers such as `codex` and `claude`
+- [ ] define `SdlcReviewPanelBinding` so each review-capable ticket can select required and optional reviewers, roles, reduction policy, and fallback policy
+- [ ] validate reviewer profiles before review or consensus execution; unknown, unavailable, or schema-incompatible reviewers must block the review act with typed reasons
 - [ ] extend graph catalog with explicit ticket workflow functions only where graph publication is needed; do not hide constructive carriers inside CLI code
 - [ ] publish ticket workflow state through `query-domain` or a dedicated command that uses the same projection authority
 - [ ] reject missing, malformed, backlog, stale, or unadmitted `asset:ticket/<id>` handles at public start
 - [ ] admit active valid tickets into execution contracts before traversal
 - [ ] carry ticket id, ticket digest, execution contract ref, and ruling refs into handoff manifests
+- [ ] carry reviewer profile ids, profile config digests, panel binding refs, and reviewer invocation refs into handoff manifests
 - [ ] carry ticket/execution-contract refs into `SdlcEdgeFulfillmentLedger`, closure decision, eval output, archive, and next-action projection
+- [ ] carry reviewer invocation refs into review decision rows, ledgers, archives, and next-action projection
 - [ ] add review decision rows with `accepted`, `rejected`, `deferred`, and `split_ticket` rulings
 - [ ] make selective implementation consume only accepted review decision rows
 - [ ] add bug triage rows with expected/actual/reproduction/evidence and first-missing-layer fields
@@ -323,6 +392,7 @@ Inside-out sequencing is required.
 - [ ] update compact CLI output so blocked ticket workflow states are visible to a cold session
 - [ ] add fixtures for valid active ticket, malformed ticket, backlog ticket, review-resolution ticket, spec-change ticket, and bug-repair ticket
 - [ ] add deterministic tests for projection, admission, start rejection, review selection, bug triage, and spec-change authority
+- [ ] add deterministic tests for configured `codex` and `claude` reviewer selection, unknown-reviewer rejection, unavailable-reviewer blocking, and reviewer output schema rejection
 - [ ] add one scenario proof that starts from a review comment, records rulings in a ticket, implements only accepted findings, and leaves deferred findings visible
 
 ## Migration Checklist
@@ -353,6 +423,8 @@ New truth path:
 - ticket markdown remains durable authority;
 - ticket workflow projection renders current ticket state;
 - ticket execution contract admits the run basis;
+- review panel binding selects configured reviewers and records reviewer
+  invocation provenance;
 - start/handoff/ledger/eval/archive/closure all carry the admitted ticket basis.
 
 ## Acceptance Criteria
@@ -391,6 +463,14 @@ New truth path:
 - AC-12: completed-ticket closure proof cites the admitted ticket execution
   contract, governing requirement/design/source surfaces, and durable proof
   artifacts rather than a summary comment alone.
+- AC-13: review-capable tickets can select configured reviewer profiles such as
+  `codex` and `claude`; unknown, unavailable, or schema-incompatible reviewer
+  selections produce typed blocking reasons before review execution.
+- AC-14: review decision rows preserve reviewer profile id, profile config
+  digest, panel binding ref, invocation ref, output digest, and evidence refs.
+- AC-15: Claude, Codex, human, or service reviewer output cannot change ticket
+  status, authorize implementation, or satisfy closure until admitted by the
+  ticket workflow.
 
 ## Required Proof
 
@@ -410,6 +490,13 @@ shapes:
   - accepted review findings are executable;
   - rejected/deferred findings remain visible and are not implemented;
   - split findings create or reference durable follow-up tickets.
+- `test_t162_reviewer_profile_selection.test.mjs`
+  - configured `codex` and `claude` reviewer profiles can be selected by short
+    operator names and resolved to stable profile ids;
+  - unknown and unavailable reviewer profiles block review execution with typed
+    reasons;
+  - reviewer output without a matching profile digest, invocation ref, and output
+    schema is rejected as governed review evidence.
 - `test_t162_bug_and_spec_reentry.test.mjs`
   - bug repair rejects illegal `realization_refactor` when requirement/design
     authority is missing;
@@ -438,6 +525,9 @@ This design matches `specification/PRODUCT.md`.
 - The reusable review/consensus host-binding pattern already exists in product
   law. Review findings under this ticket become governed decision rows before
   implementation, not free-form agent discretion.
+- Reviewer configuration composes with that pattern: Claude, Codex, humans, or
+  services are selectable profiles bound into Review or Consensus rounds, not
+  hardcoded sovereign evaluators.
 
 This design does not require an ABG change. ABG remains the runtime substrate.
 `odd_sdlc` needs to bind ticket authority into its domain execution contracts,

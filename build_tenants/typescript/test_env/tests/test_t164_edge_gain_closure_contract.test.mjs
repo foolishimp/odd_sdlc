@@ -1,6 +1,9 @@
-// Validates: REQ-F-ODDSDLC-013
-// Validates: REQ-F-ODDSDLC-014
-// Validates: REQ-F-ODDSDLC-015
+// Validates: REQ-F-ODDSDLC-063
+// Validates: REQ-F-ODDSDLC-064
+// Validates: REQ-F-ODDSDLC-065
+// Validates: REQ-F-ODDSDLC-066
+// Validates: REQ-F-ODDSDLC-067
+// Validates: REQ-F-ODDSDLC-068
 // Investigates: T-164
 
 import test from "node:test";
@@ -8,9 +11,16 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
+import {
+  admitExecutionBasis,
+  admitResolvedPolicyIdentity,
+  admitResolvedRuntimeIdentity,
+  admitStartIntent,
+  materializeGraphFunction
+} from "@abiogenesis/typescript-tenant";
 
 import {
+  admitSdlcProjectConstraints,
   admitSdlcEdgeEvidence,
   assertSdlcEdgeGainClosureContractsRegistered,
   assertSdlcOverlayEdgeGainClosureContracts,
@@ -22,17 +32,23 @@ import {
   constructSdlcTraversalOverlayCatalog,
   constructWorkerBrief,
   constructWorkerInvocationPackage,
+  deriveSdlcGapDossier,
   deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcEdgeObligations,
   deriveSdlcEdgeResidualPressure,
+  deriveSdlcWorkspaceIngressReport,
   deriveWorkerHandoffManifest,
   digestSdlcEdgeGainClosureContract,
+  evalSdlcGapFromReplay,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   hookContractByEdgeName,
   indexSdlcEdgeGainClosureContracts,
   materializeSdlcProjectConformance,
   measureSdlcEdgeGain,
+  projectSdlcEdgeAssuranceReadModel,
+  projectSdlcQueryDomain,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
@@ -100,6 +116,50 @@ function measuredGain(edgeRef, closeReady) {
     admittedEvidence: admission.admittedEvidence,
     ledgerInputs: allLedgerInputsFor(contract)
   });
+}
+
+function edgeAssuranceClosureContext(edgeRef, closeReady) {
+  const gain = measuredGain(edgeRef, closeReady);
+  const residualPressure = deriveSdlcEdgeResidualPressure(gain);
+  const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain,
+    residualPressure
+  });
+  const ledger = constructSdlcEdgeFulfillmentLedger({
+    ledgerRef: `ledger://odd-sdlc/t164/${edgeRef}/edge-fulfillment`,
+    ledgerVersionRef: `ledger-version://odd-sdlc/t164/${edgeRef}/edge-fulfillment/1`,
+    edgeAssuranceContractRef: gain.contractRef,
+    edgeAssuranceContractDigest: gain.contractDigest,
+    edgeGainRef: gain.gainRef,
+    edgeResidualPressureRefs: residualPressure.requiredPressureRefs,
+    edgeRef: `edge://odd-sdlc/t164/${edgeRef}`,
+    attemptRef: `attempt://odd-sdlc/t164/${edgeRef}/1`,
+    targetBindingRefs: [`target-binding://odd-sdlc/t164/${edgeRef}`],
+    evidenceBundleRefs: [`evidence://odd-sdlc/t164/${edgeRef}`],
+    counts: closeReady
+      ? {
+          expected: 1,
+          fulfilled: 1,
+          partial: 0,
+          blocked: 0,
+          unfulfilled: 0,
+          missing: 0,
+          extra: 0
+        }
+      : {
+          expected: 1,
+          fulfilled: 0,
+          partial: 0,
+          blocked: 1,
+          unfulfilled: 0,
+          missing: 0,
+          extra: 0
+        },
+    admitted: true,
+    targetCertificationPassed: true,
+    fdRecheckPassed: true
+  });
+  return { gain, residualPressure, edgeAssuranceCloseDecision, ledger };
 }
 
 function materializedVectorsForOverlay(module, overlay) {
@@ -180,6 +240,55 @@ function makeWorkspace() {
   return root;
 }
 
+function moduleBasis(handle = "bootstrap_release_self_test") {
+  const module = constructSdlcGtlModule();
+  return admitExecutionBasis({
+    startIntent: admitStartIntent({
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/t164",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle
+      },
+      until: "converged"
+    }),
+    module,
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/typescript",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/typescript",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t164/F_P",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t164",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t164",
+    workKey: "wk://odd-sdlc/t164",
+    frameId: null,
+    frameLineageId: null
+  });
+}
+
+function ingressReport() {
+  return deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: "file:///workspace/t164",
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t164",
+      activeTenant: "typescript",
+      selectedOutputRoot: "build_tenants/typescript",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: ["edge-gain-closure-contracts"]
+    }),
+    sourceInputs: []
+  });
+}
+
 test("T-164 current-full overlay vectors all have gain and closure contract rows", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
@@ -196,6 +305,7 @@ test("T-164 current-full overlay vectors all have gain and closure contract rows
     const contract = byEdge.get(graphVectorRef);
     assert(contract, graphVectorRef);
     assert.equal(contract.closureClassification, "close_capable");
+    assert.equal(contract.sourceAssetPolicy, "strict");
     assert.equal(contract.ledgerInputKinds.includes("sdlc_edge_fulfillment_ledger"), true);
     assert.equal(contract.ledgerInputKinds.includes("sdlc_edge_closure_decision"), true);
     assert.match(
@@ -242,6 +352,7 @@ test("T-164 published graph vector inventory is fully classified", () => {
   });
 
   const classificationCounts = {};
+  const sourcePolicyCounts = {};
   for (const graphVectorRef of publishedGraphVectorRefs) {
     const contract = byEdge.get(graphVectorRef);
     const vector = materializedVectors.get(graphVectorRef);
@@ -255,6 +366,8 @@ test("T-164 published graph vector inventory is fully classified", () => {
     assert.equal(contract.targetAssetType, vector.target.name, graphVectorRef);
     classificationCounts[contract.closureClassification] =
       (classificationCounts[contract.closureClassification] ?? 0) + 1;
+    sourcePolicyCounts[contract.sourceAssetPolicy] =
+      (sourcePolicyCounts[contract.sourceAssetPolicy] ?? 0) + 1;
   }
 
   assert.deepStrictEqual(classificationCounts, {
@@ -262,6 +375,79 @@ test("T-164 published graph vector inventory is fully classified", () => {
     library_only: 9,
     projection_only: 6
   });
+  assert.deepStrictEqual(sourcePolicyCounts, {
+    strict: 61,
+    subset_allowed: 1
+  });
+});
+
+test("T-164 query domain and gaps expose edge assurance as a read-only view", () => {
+  const module = constructSdlcGtlModule();
+  const queryDomain = projectSdlcQueryDomain({
+    module,
+    ingressReport: ingressReport()
+  });
+  const intentContract = contractByEdge("derive_intent_surface");
+  const intentContractRef = sdlcEdgeAssuranceContractRef(intentContract);
+  const intentContractDigest = digestSdlcEdgeGainClosureContract(intentContract);
+  const intentRow = queryDomain.edgeAssurance.rows.find(
+    (row) => row.edgeRef === intentContract.edgeRef
+  );
+  assert(intentRow);
+
+  assert.equal(queryDomain.edgeAssurance.readOnly, true);
+  assert.equal(queryDomain.edgeAssurance.choosesNextTraversal, false);
+  assert.equal(
+    queryDomain.edgeAssurance.actionClosureEvaluationFunction,
+    "evaluate_action"
+  );
+  assert.equal(queryDomain.edgeAssurance.rows.length, 62);
+  assert.deepStrictEqual(queryDomain.edgeAssurance.diagnostics, []);
+  assert.equal(intentRow.edgeAssuranceContractRef, intentContractRef);
+  assert.equal(intentRow.edgeAssuranceContractDigest, intentContractDigest);
+  assert.equal(intentRow.closureClassification, "close_capable");
+  assert(intentRow.proofLaneRefs.length > 0);
+  assert(intentRow.residualPressureRefs.length > 0);
+
+  const missingIntentModel = projectSdlcEdgeAssuranceReadModel({
+    module,
+    contracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.filter(
+      (contract) => contract.edgeRef !== intentContract.edgeRef
+    )
+  });
+  assert.deepStrictEqual(missingIntentModel.missingContractRefs, [
+    "derive_intent_surface"
+  ]);
+  assert.equal(
+    missingIntentModel.diagnostics[0]?.code,
+    "missing_edge_gain_closure_contract"
+  );
+
+  const basis = moduleBasis();
+  const gap = evalSdlcGapFromReplay({ basis, events: [] });
+  const dossier = deriveSdlcGapDossier({
+    basis,
+    events: [],
+    triageInput: "t164-edge-assurance-read-model",
+    evidenceRefs: ["evidence://odd-sdlc/t164/query-gap"]
+  });
+
+  assert.equal(gap.currentEdge, "derive_intent_surface");
+  assert.equal(gap.evaluatesActionClosure, false);
+  assert.equal(gap.edgeAssuranceContractRef, intentContractRef);
+  assert.equal(gap.edgeAssuranceContractDigest, intentContractDigest);
+  assert.deepStrictEqual(gap.edgeAssuranceDiagnostics, []);
+  assert.deepStrictEqual(gap.edgeAssuranceProofLaneRefs, intentRow.proofLaneRefs);
+  assert.deepStrictEqual(
+    gap.edgeAssuranceResidualPressureRefs,
+    intentRow.residualPressureRefs
+  );
+  assert.equal(dossier.actionClosureEvaluationFunction, null);
+  assert.equal(dossier.edgeAssuranceContractRef, gap.edgeAssuranceContractRef);
+  assert.deepStrictEqual(
+    dossier.edgeAssuranceResidualPressureRefs,
+    gap.edgeAssuranceResidualPressureRefs
+  );
 });
 
 test("T-164 contract rows match current-full materialized graph vector boundaries", () => {
@@ -326,6 +512,7 @@ test("T-164 lite direct implementation vector has a specialized residual-pressur
   assert(contract);
   assert.equal(contract.category, "implementation_encoding");
   assert.equal(contract.compositionRole, "terminal");
+  assert.equal(contract.sourceAssetPolicy, "subset_allowed");
   assert(
     contract.residualPressureRefs.includes(
       "pressure://odd-sdlc/current-full-traversal-refinement"
@@ -359,6 +546,22 @@ test("T-164 matrix validation fails closed for missing duplicate ambiguous and u
     () =>
       indexSdlcEdgeGainClosureContracts({
         contracts: [{ ...contract, sourceAssetTypes: [] }]
+      }),
+    (error) => error?.code === "ambiguous_edge_gain_closure_contract"
+  );
+
+  assert.throws(
+    () =>
+      indexSdlcEdgeGainClosureContracts({
+        contracts: [{ ...contract, closureClassification: "" }]
+      }),
+    (error) => error?.code === "ambiguous_edge_gain_closure_contract"
+  );
+
+  assert.throws(
+    () =>
+      indexSdlcEdgeGainClosureContracts({
+        contracts: [{ ...contract, sourceAssetPolicy: "implicit" }]
       }),
     (error) => error?.code === "ambiguous_edge_gain_closure_contract"
   );
@@ -454,7 +657,7 @@ test("T-164 edge gain is measured by admitted obligation evidence not worker per
   assert.equal(gain.expectedCount, 2);
   assert.equal(gain.fulfilledCount, 1);
   assert.equal(gain.missingCount, 1);
-  assert.equal(gain.closeReady, false);
+  assert.equal(gain.obligationsAndLedgersComplete, false);
   assert.equal(residual.clear, false);
   assert.equal(decision.disposition, "retry");
 
@@ -495,6 +698,18 @@ test("T-164 edge gain is measured by admitted obligation evidence not worker per
   assert.equal(closeDecision.disposition, "close");
 });
 
+test("T-164 obligation derivation fails closed when traversal obligations are absent", () => {
+  const contract = contractByEdge("derive_requirement_surface");
+  assert.throws(
+    () =>
+      deriveSdlcEdgeObligations({
+        contract,
+        obligationRefs: []
+      }),
+    /edge obligation derivation requires explicit obligation refs/
+  );
+});
+
 test("T-164 artifact presence alone is rejected as behavioral closure evidence", () => {
   const contract = contractByEdge("derive_component_code_surface");
   const obligationRef = "BehavioralFulfillment(component-code)";
@@ -527,7 +742,7 @@ test("T-164 artifact presence alone is rejected as behavioral closure evidence",
     admission.rejectedEvidence[0].reasonRef,
     /artifact_presence_without_behavioral_fulfillment/
   );
-  assert.equal(gain.closeReady, false);
+  assert.equal(gain.obligationsAndLedgersComplete, false);
 });
 
 test("T-164 compound traversal gain exposes the open edge in a three-vector chain", () => {
@@ -545,6 +760,293 @@ test("T-164 compound traversal gain exposes the open edge in a three-vector chai
   assert.deepStrictEqual(chain.openEdgeRefs, ["derive_requirement_surface"]);
   assert.deepStrictEqual(chain.bottleneckEdgeRefs, ["derive_requirement_surface"]);
   assert(chain.residualPressureRefs.length > 0);
+});
+
+test("T-164 deterministic requirement-to-design chain closes by per-edge gain", () => {
+  const edgeRefs = [
+    "derive_requirement_surface",
+    "derive_feature_decomp_surface",
+    "derive_design_surface"
+  ];
+  const gains = edgeRefs.map((edgeRef) => measuredGain(edgeRef, true));
+  const decisions = gains.map((gain) =>
+    deriveSdlcEdgeAssuranceCloseDecision({
+      gain,
+      residualPressure: deriveSdlcEdgeResidualPressure(gain)
+    })
+  );
+  const chain = composeSdlcPathGain({
+    pathRef: "path://odd-sdlc/t164/requirement-formalisation-design",
+    edgeGains: gains
+  });
+
+  assert.deepStrictEqual(
+    edgeRefs.map((edgeRef) => contractByEdge(edgeRef).category),
+    [
+      "authority_synthesis",
+      "solution_formalisation",
+      "solution_formalisation"
+    ]
+  );
+  assert.deepStrictEqual(
+    gains.map((gain) => gain.obligationsAndLedgersComplete),
+    [true, true, true]
+  );
+  assert.deepStrictEqual(
+    decisions.map((decision) => decision.disposition),
+    ["close", "close", "close"]
+  );
+  assert.equal(chain.closeReady, true);
+  assert.deepStrictEqual(chain.closedEdgeRefs, [...edgeRefs].sort());
+  assert.deepStrictEqual(chain.openEdgeRefs, []);
+  assert.deepStrictEqual(chain.bottleneckEdgeRefs, []);
+  assert.deepStrictEqual(chain.residualPressureRefs, []);
+});
+
+test("T-164 edge assurance measures edge-local obligations, not downstream carried requirements", () => {
+  const contract = contractByEdge("Fg_conform_project_authority");
+  const edgeLocalIds = [
+    "target_asset:project_bootstrap_surface",
+    "evaluator:bootstrap-specification-postflight-consistency"
+  ];
+  const downstreamRequirementIds = [
+    "requirement:workspace.mapper_requirements.req_dq_004",
+    "requirement:workspace.stage_15_trv_requirements.req_trv_005_a"
+  ];
+  const fulfillment = deriveSdlcEdgeFulfillmentCountsFromAssessments({
+    declaredObligationIds: [...edgeLocalIds, ...downstreamRequirementIds],
+    assessments: [
+      ...edgeLocalIds.map((obligationId) => ({
+        obligationId,
+        fulfillmentStatus: "fulfilled",
+        evidenceRefs: ["file:///workspace/.ai-workspace/context/project_bootstrap.md"]
+      })),
+      ...downstreamRequirementIds.map((obligationId) => ({
+        obligationId,
+        fulfillmentStatus: "partial",
+        evidenceRefs: [`source://${obligationId}`],
+        carryDirection: "downstream_transformation_set",
+        downstreamGraphFunctionRefs: ["Fg_materialize_declared_product_asset"],
+        targetBindingRefs: ["target-binding://odd-sdlc/component_code_surface"]
+      }))
+    ]
+  });
+  const obligations = deriveSdlcEdgeObligations({
+    contract,
+    obligationRefs: fulfillment.edgeLocalObligationIds
+  });
+  const admission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: edgeLocalIds.map((obligationId) => ({
+      kind: "sdlc_edge_evidence_candidate",
+      evidenceRef: `evidence://${encodeURIComponent(obligationId)}`,
+      sourceKind: "worker_assessment",
+      obligationRefs: [obligationId],
+      supportsBehavioralFulfillment: true
+    }))
+  });
+  const gain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: admission.admittedEvidence,
+    ledgerInputs: allLedgerInputsFor(contract)
+  });
+  const residual = deriveSdlcEdgeResidualPressure(gain);
+  const decision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain,
+    residualPressure: residual
+  });
+
+  assert.deepStrictEqual(fulfillment.edgeLocalObligationIds, [...edgeLocalIds].sort());
+  assert.equal(fulfillment.downstreamTransformationSetRefs.length, 2);
+  assert.equal(fulfillment.counts.expected, 2);
+  assert.equal(fulfillment.counts.fulfilled, 2);
+  assert.equal(gain.expectedCount, 2);
+  assert.equal(gain.missingCount, 0);
+  assert.equal(residual.clear, true);
+  assert.equal(decision.disposition, "close");
+});
+
+test("T-164 generic edge assurance blocks when measuring ledgers are missing", () => {
+  const contract = contractByEdge("derive_design_surface");
+  const obligationRef = "DesignFormalisation(REQ-T164)";
+  const obligations = deriveSdlcEdgeObligations({
+    contract,
+    obligationRefs: [obligationRef]
+  });
+  const admission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t164/design/formalisation",
+        sourceKind: "runtime_event",
+        obligationRefs: [obligationRef],
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const gain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: admission.admittedEvidence,
+    ledgerInputs: []
+  });
+  const residualPressure = deriveSdlcEdgeResidualPressure(gain);
+  const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain,
+    residualPressure
+  });
+
+  assert.deepStrictEqual(
+    gain.missingLedgerInputKinds,
+    [...contract.ledgerInputKinds].sort()
+  );
+  assert.equal(edgeAssuranceCloseDecision.disposition, "block");
+  assert(
+    edgeAssuranceCloseDecision.reasonRefs.some((ref) =>
+      ref.includes("missing-ledger-input")
+    )
+  );
+});
+
+test("T-164 installed closure dispositions are governed by edge assurance close state", () => {
+  const closed = edgeAssuranceClosureContext("derive_intent_surface", true);
+  const closeDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/close",
+    ledger: closed.ledger,
+    edgeClosureFunctionRef: closed.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: closed.edgeAssuranceCloseDecision,
+    currentEdgeLawful: true
+  });
+  assert.equal(closed.edgeAssuranceCloseDecision.disposition, "close");
+  assert.equal(closeDecision.disposition, "close");
+  assert.equal(
+    closeDecision.edgeAssuranceDecisionRef,
+    closed.edgeAssuranceCloseDecision.decisionRef
+  );
+
+  const open = edgeAssuranceClosureContext("derive_requirement_surface", false);
+  assert.equal(open.edgeAssuranceCloseDecision.disposition, "retry");
+
+  const retryDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/retry",
+    ledger: open.ledger,
+    edgeClosureFunctionRef: open.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: open.edgeAssuranceCloseDecision,
+    currentEdgeLawful: true
+  });
+  assert.equal(retryDecision.disposition, "retry");
+
+  const yieldDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/yield",
+    ledger: open.ledger,
+    edgeClosureFunctionRef: open.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: open.edgeAssuranceCloseDecision,
+    currentEdgeLawful: true,
+    yieldResumeBasis: {
+      yieldKind: "budget_checkpoint_with_admitted_progress",
+      resumeBasisRef: "resume-basis://odd-sdlc/t164/yield",
+      currentEdgeRef: open.ledger.edgeRef,
+      admittedProgressRefs: ["progress://odd-sdlc/t164/materialized-partial"],
+      livenessProjectionRef: null,
+      resumePolicyRef: "resume-policy://odd-sdlc/t164/same-edge"
+    }
+  });
+  assert.equal(yieldDecision.disposition, "yield");
+
+  const repairDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/repair",
+    ledger: open.ledger,
+    edgeClosureFunctionRef: open.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: open.edgeAssuranceCloseDecision,
+    currentEdgeLawful: true,
+    repairReasonRefs: ["repair://odd-sdlc/t164/worker-output"]
+  });
+  assert.equal(repairDecision.disposition, "repair");
+
+  const reenterDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/re-enter",
+    ledger: open.ledger,
+    edgeClosureFunctionRef: open.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: open.edgeAssuranceCloseDecision,
+    currentEdgeLawful: true,
+    reenterReasonRefs: ["reenter://odd-sdlc/t164/graph-span"]
+  });
+  assert.equal(reenterDecision.disposition, "re-enter");
+
+  const repriceDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/reprice",
+    ledger: open.ledger,
+    edgeClosureFunctionRef: open.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: open.edgeAssuranceCloseDecision,
+    currentEdgeLawful: false,
+    repriceReasonRefs: ["reprice://odd-sdlc/t164/requirement"]
+  });
+  assert.equal(repriceDecision.disposition, "reprice");
+
+  const blockedContract = contractByEdge("derive_design_surface");
+  const blockedObligations = deriveSdlcEdgeObligations({
+    contract: blockedContract,
+    obligationRefs: ["DesignFormalisation(REQ-T164)"]
+  });
+  const blockedAdmission = admitSdlcEdgeEvidence({
+    contract: blockedContract,
+    obligations: blockedObligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://odd-sdlc/t164/design",
+        sourceKind: "runtime_event",
+        obligationRefs: ["DesignFormalisation(REQ-T164)"],
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const blockedGain = measureSdlcEdgeGain({
+    contract: blockedContract,
+    obligations: blockedObligations,
+    admittedEvidence: blockedAdmission.admittedEvidence,
+    ledgerInputs: []
+  });
+  const blockedResidualPressure = deriveSdlcEdgeResidualPressure(blockedGain);
+  const blockedEdgeDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: blockedGain,
+    residualPressure: blockedResidualPressure
+  });
+  const blockedLedger = constructSdlcEdgeFulfillmentLedger({
+    ledgerRef: "ledger://odd-sdlc/t164/block/edge-fulfillment",
+    ledgerVersionRef: "ledger-version://odd-sdlc/t164/block/edge-fulfillment/1",
+    edgeAssuranceContractRef: blockedGain.contractRef,
+    edgeAssuranceContractDigest: blockedGain.contractDigest,
+    edgeGainRef: blockedGain.gainRef,
+    edgeResidualPressureRefs: blockedResidualPressure.requiredPressureRefs,
+    edgeRef: "edge://odd-sdlc/t164/block",
+    attemptRef: "attempt://odd-sdlc/t164/block/1",
+    targetBindingRefs: ["target-binding://odd-sdlc/t164/block"],
+    evidenceBundleRefs: ["evidence://odd-sdlc/t164/block"],
+    counts: {
+      expected: 1,
+      fulfilled: 1,
+      partial: 0,
+      blocked: 0,
+      unfulfilled: 0,
+      missing: 0,
+      extra: 0
+    }
+  });
+  const blockDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/block",
+    ledger: blockedLedger,
+    edgeClosureFunctionRef: blockedGain.closureFunctionRef,
+    edgeAssuranceCloseDecision: blockedEdgeDecision,
+    currentEdgeLawful: true,
+    repairReasonRefs: ["repair://odd-sdlc/t164/ignored-by-hard-block"]
+  });
+  assert.equal(blockedEdgeDecision.disposition, "block");
+  assert.equal(blockDecision.disposition, "block");
 });
 
 test("T-164 consequence carriers retain gain close and residual pressure identity", () => {
@@ -645,4 +1147,54 @@ test("T-164 handoff invocation and brief carry the edge assurance contract", () 
   assert.equal(invocationPackage.edgeAssuranceContractRef, contractRef);
   assert.equal(brief.edgeAssuranceContractRef, contractRef);
   assert.equal(brief.edgeAssuranceContractDigest, contractDigest);
+});
+
+test("T-164 handoff source-set assurance is declared by the edge contract row", () => {
+  const strictWorkspace = makeWorkspace();
+  const strictHookContract = hookContractByEdgeName("derive_code_surface");
+  assert.equal(contractByEdge(strictHookContract.edgeName).sourceAssetPolicy, "strict");
+
+  assert.throws(
+    () =>
+      deriveWorkerHandoffManifest({
+        workspaceRoot: strictWorkspace,
+        graphFunctionName: "bootstrap_release_self_test",
+        edgeName: strictHookContract.edgeName,
+        vectorIndex: 12,
+        contract: {
+          ...strictHookContract,
+          sourceAssetTypes: [
+            ...strictHookContract.sourceAssetTypes,
+            "legacy_worker_context_surface"
+          ]
+        },
+        runId: "t164-strict-source-policy"
+      }),
+    /edge assurance contract source set does not match hook contract/
+  );
+
+  const subsetWorkspace = makeWorkspace();
+  const subsetHookContract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  const subsetEdgeContract = contractByEdge(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  assert.equal(subsetEdgeContract.sourceAssetPolicy, "subset_allowed");
+
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: subsetWorkspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: subsetHookContract.edgeName,
+    vectorIndex: 2,
+    contract: {
+      ...subsetHookContract,
+      sourceAssetTypes: [
+        ...subsetHookContract.sourceAssetTypes,
+        "legacy_worker_context_surface"
+      ]
+    },
+    runId: "t164-subset-source-policy"
+  });
+
+  assert.equal(
+    manifest.edgeAssuranceContractRef,
+    sdlcEdgeAssuranceContractRef(subsetEdgeContract)
+  );
 });

@@ -2,6 +2,8 @@
 // Implements: REQ-F-ODDSDLC-064
 // Implements: REQ-F-ODDSDLC-065
 // Implements: REQ-F-ODDSDLC-066
+// Implements: REQ-F-ODDSDLC-068
+// Owns: evaluate_action per ODD_METHOD 11.5D
 // Investigates: T-164
 
 import { createHash } from "node:crypto";
@@ -98,7 +100,7 @@ export interface SdlcEdgeGain {
   readonly missingLedgerInputKinds: readonly string[];
   readonly evidenceRefs: readonly string[];
   readonly residualPressureRefs: readonly string[];
-  readonly closeReady: boolean;
+  readonly obligationsAndLedgersComplete: boolean;
 }
 
 export interface SdlcEdgeResidualPressure {
@@ -202,18 +204,14 @@ export function resolveSdlcEdgeGainClosureContract(
 
 export function deriveSdlcEdgeObligations(input: {
   readonly contract: SdlcEdgeGainClosureContract;
-  readonly obligationRefs?: readonly string[];
+  readonly obligationRefs: readonly string[];
 }): readonly SdlcEdgeDerivedObligation[] {
-  const supplied = uniqueSorted(input.obligationRefs ?? []);
-  const refs =
-    supplied.length > 0
-      ? supplied
-      : uniqueSorted([
-          `target-outcome:${input.contract.targetOutcomeRef}`,
-          ...input.contract.authorityBasisRefs.map(
-            (ref) => `authority-basis:${ref}`
-          )
-        ]);
+  const refs = uniqueSorted(input.obligationRefs);
+  if (refs.length === 0) {
+    throw new TypeError(
+      `${input.contract.edgeRef}: edge obligation derivation requires explicit obligation refs`
+    );
+  }
   return Object.freeze(
     refs.map((ref) =>
       Object.freeze({
@@ -388,7 +386,8 @@ export function measureSdlcEdgeGain(input: {
       input.admittedEvidence.map((evidence) => evidence.evidenceRef)
     ),
     residualPressureRefs,
-    closeReady: missingCount === 0 && missingLedgerInputKinds.length === 0
+    obligationsAndLedgersComplete:
+      missingCount === 0 && missingLedgerInputKinds.length === 0
   });
 }
 
@@ -415,7 +414,14 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
   readonly gain: SdlcEdgeGain;
   readonly residualPressure: SdlcEdgeResidualPressure;
 }): SdlcEdgeAssuranceCloseDecision {
-  const closeReady = input.gain.closeReady && input.residualPressure.clear;
+  const closeReady =
+    input.gain.obligationsAndLedgersComplete && input.residualPressure.clear;
+  const disposition =
+    input.gain.missingLedgerInputKinds.length > 0
+      ? "block"
+      : closeReady
+        ? "close"
+        : "retry";
   return Object.freeze({
     kind: "sdlc_edge_assurance_close_decision" as const,
     decisionRef: edgeScopedRef({
@@ -426,7 +432,7 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
     contractRef: input.gain.contractRef,
     contractDigest: input.gain.contractDigest,
     edgeRef: input.gain.edgeRef,
-    disposition: closeReady ? "close" : "retry",
+    disposition,
     gainRef: input.gain.gainRef,
     residualPressureRef: input.residualPressure.pressureRef,
     basisRefs: uniqueSorted([
@@ -449,7 +455,7 @@ export function composeSdlcPathGain(input: {
     throw new TypeError("compound path gain requires at least one edge gain");
   }
   const openEdgeRefs = input.edgeGains
-    .filter((gain) => !gain.closeReady)
+    .filter((gain) => !edgeGainCloses(gain))
     .map((gain) => gain.edgeRef);
   return Object.freeze({
     kind: "sdlc_compound_traversal_gain" as const,
@@ -457,7 +463,7 @@ export function composeSdlcPathGain(input: {
     edgeGainRefs: uniqueSorted(input.edgeGains.map((gain) => gain.gainRef)),
     closedEdgeRefs: uniqueSorted(
       input.edgeGains
-        .filter((gain) => gain.closeReady)
+        .filter((gain) => edgeGainCloses(gain))
         .map((gain) => gain.edgeRef)
     ),
     openEdgeRefs: uniqueSorted(openEdgeRefs),
@@ -467,4 +473,10 @@ export function composeSdlcPathGain(input: {
     ),
     closeReady: openEdgeRefs.length === 0
   });
+}
+
+function edgeGainCloses(gain: SdlcEdgeGain): boolean {
+  return (
+    gain.obligationsAndLedgersComplete && gain.residualPressureRefs.length === 0
+  );
 }
