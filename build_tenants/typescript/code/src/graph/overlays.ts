@@ -1,0 +1,832 @@
+import { createHash } from "node:crypto";
+import {
+  materializeGraphFunction,
+  type GraphFunction,
+  type Module
+} from "@abiogenesis/typescript-tenant";
+import { parseNonEmptyString } from "../shared/validation.js";
+import {
+  BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+  FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_MODULE_SURFACE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  OPERATIONAL_FUNCTION_CATALOG,
+  FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+  FG_UAT_TEST_CASES_EXECUTIVE,
+  type SdlcGraphFunctionCatalog
+} from "./catalog.js";
+import {
+  FG_CONFORM_PROJECT,
+  FG_CONFORM_PROJECT_AUTHORITY
+} from "./library.js";
+import {
+  sdlcGraphFunctionBoundaryRef,
+  sdlcGraphVectorBoundaryRef
+} from "./boundary_refs.js";
+import {
+  assertSdlcEdgeGainClosureMatrix,
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
+} from "./edge_gain_closure_contracts.js";
+
+export type SdlcTraversalOverlayRef = `overlay://odd-sdlc/${string}`;
+export type SdlcOverlayBindingRef = `overlay-binding://odd-sdlc/${string}`;
+export type SdlcOverlayPolicyRef = `policy://odd-sdlc/overlay/${string}`;
+export type SdlcGraphCatalogDigestRef = `graph-catalog-digest://odd-sdlc/${string}`;
+export type SdlcOverlayComputeRegime = "f_p" | "f_d" | "f_h";
+export type SdlcOverlayStopDisposition =
+  | "overlay_segment_complete"
+  | "product_converged"
+  | "blocked";
+export type SdlcOverlayAssetBindingMode = "material" | "planned_from_template";
+
+export const SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF =
+  "overlay://odd-sdlc/current-full-traversal" as const;
+export const SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF =
+  "overlay://odd-sdlc/lite-design-module-implementation" as const;
+export const SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF =
+  "overlay://odd-sdlc/solution-architecture" as const;
+export const SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF =
+  "overlay://odd-sdlc/bootstrap-requirements" as const;
+export const SDLC_UAT_TEST_CASES_OVERLAY_REF =
+  "overlay://odd-sdlc/uat-test-cases" as const;
+
+export const SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF =
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF;
+
+export interface SdlcTraversalOverlayTermination {
+  readonly policyRef: SdlcOverlayPolicyRef;
+  readonly terminalAssetTypes: readonly string[];
+  readonly terminalGraphFunctionRefs: readonly string[];
+  readonly lawfulStopDispositions: readonly SdlcOverlayStopDisposition[];
+  readonly requiresEvalAdmission: boolean;
+  readonly remainingGraphPressureRefs: readonly string[];
+  readonly remainingRequirementPressureRefs: readonly string[];
+  readonly remainingAssetPressureRefs: readonly string[];
+  readonly nextEligibleOverlayRefs: readonly SdlcTraversalOverlayRef[];
+}
+
+export interface SdlcOverlayAssetTemplate {
+  readonly kind: "sdlc_overlay_asset_template";
+  readonly assetType: string;
+  readonly defaultPath: string;
+  readonly producerGraphFunctionRef: string;
+  readonly terminalRole: "terminal_asset" | "supporting_asset";
+  readonly templateRef: string;
+}
+
+export interface SdlcOverlayAssetBinding {
+  readonly kind: "sdlc_overlay_asset_binding";
+  readonly bindingRef: string;
+  readonly assetType: string;
+  readonly mode: SdlcOverlayAssetBindingMode;
+  readonly assetRef: string;
+  readonly relativePath: string;
+  readonly producerGraphFunctionRef: string;
+  readonly terminalRole: "terminal_asset" | "supporting_asset";
+  readonly templateRef: string | null;
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcOverlayLedgerRequirement {
+  readonly edgeRef: string;
+  readonly computeRegime: SdlcOverlayComputeRegime;
+  readonly requiredLedgerKinds: readonly string[];
+  readonly closureRequiresLedger: boolean;
+}
+
+export interface SdlcTraversalOverlay {
+  readonly kind: "sdlc_traversal_overlay";
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly aliases: readonly SdlcTraversalOverlayRef[];
+  readonly name: string;
+  readonly intent: string;
+  readonly graphFunctionRefs: readonly string[];
+  readonly graphVectorRefs: readonly string[];
+  readonly graphCatalogDigestRef: SdlcGraphCatalogDigestRef;
+  readonly publicStartTargets: readonly string[];
+  readonly defaultStartTarget: string;
+  readonly policies: {
+    readonly workspaceObservationPolicyRef: SdlcOverlayPolicyRef;
+    readonly evalPolicyRef: SdlcOverlayPolicyRef;
+    readonly refinementPolicyRef: SdlcOverlayPolicyRef;
+    readonly traversalStrategyPlanRef: SdlcOverlayPolicyRef | null;
+  };
+  readonly termination: SdlcTraversalOverlayTermination;
+  readonly assetTemplates: readonly SdlcOverlayAssetTemplate[];
+  readonly requiredLedgersByEdge: readonly SdlcOverlayLedgerRequirement[];
+  readonly predecessorOverlayRefs: readonly SdlcTraversalOverlayRef[];
+}
+
+export interface SdlcTraversalOverlayCatalog {
+  readonly kind: "sdlc_traversal_overlay_catalog";
+  readonly catalogRef: "overlay-catalog://odd-sdlc/ts-v1";
+  readonly catalogDigestRef: SdlcGraphCatalogDigestRef;
+  readonly graphCatalogDigestRef: SdlcGraphCatalogDigestRef;
+  readonly overlays: readonly SdlcTraversalOverlay[];
+}
+
+export interface SdlcOverlayBinding {
+  readonly kind: "sdlc_overlay_binding";
+  readonly bindingRef: SdlcOverlayBindingRef;
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly graphCatalogDigestRef: SdlcGraphCatalogDigestRef;
+  readonly workspaceBasis: {
+    readonly workspaceRootUri: string;
+    readonly workspaceIdentityRef: string;
+    readonly preActionWorkspaceObservationRef: string;
+    readonly preActionWorkspaceFingerprintRef: string;
+    readonly postActionWorkspaceObservationRef: string | null;
+    readonly postActionWorkspaceFingerprintRef: string | null;
+    readonly workspaceDeltaRef: string | null;
+  };
+  readonly selection: {
+    readonly selectedGraphFunctionRef: string;
+    readonly selectedGraphVectorRef: string | null;
+    readonly selectedStartTargetRef: string;
+    readonly requestedBy: "public_start" | "archive_replay" | "operator_resume";
+  };
+  readonly assetBindings: readonly SdlcOverlayAssetBinding[];
+  readonly priorLedgerRefs: readonly string[];
+  readonly priorEventRefs: readonly string[];
+  readonly remainingGraphPressureRefs: readonly string[];
+  readonly remainingRequirementPressureRefs: readonly string[];
+  readonly remainingAssetPressureRefs: readonly string[];
+  readonly nextEligibleOverlayRefs: readonly SdlcTraversalOverlayRef[];
+  readonly freshnessPolicyRef: SdlcOverlayPolicyRef;
+  readonly predecessorRefs: readonly string[];
+}
+
+export interface SdlcOverlayStartTarget {
+  readonly name: string;
+  readonly graphFunctionRef: string;
+  readonly jobName: string;
+  readonly overlayRefs: readonly SdlcTraversalOverlayRef[];
+  readonly defaultForOverlayRefs: readonly SdlcTraversalOverlayRef[];
+}
+
+interface OverlayDefinition {
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly aliases?: readonly SdlcTraversalOverlayRef[];
+  readonly name: string;
+  readonly intent: string;
+  readonly graphFunctionNames: readonly string[];
+  readonly publicStartTargets: readonly string[];
+  readonly defaultStartTarget: string;
+  readonly terminalAssetTypes: readonly string[];
+  readonly terminalGraphFunctionNames: readonly string[];
+  readonly lawfulStopDispositions: readonly SdlcOverlayStopDisposition[];
+  readonly assetTemplates: readonly {
+    readonly assetType: string;
+    readonly defaultPath: string;
+    readonly producerGraphFunctionName: string;
+    readonly terminalRole: "terminal_asset" | "supporting_asset";
+  }[];
+  readonly predecessorOverlayRefs?: readonly SdlcTraversalOverlayRef[];
+  readonly nextEligibleOverlayRefs?: readonly SdlcTraversalOverlayRef[];
+}
+
+function sha256Text(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function graphFunctionByName(module: Module): ReadonlyMap<string, GraphFunction> {
+  return new Map(
+    module.graphFunctions.map((graphFunction) => [graphFunction.name, graphFunction])
+  );
+}
+
+function graphCatalogDigestRef(module: Module): SdlcGraphCatalogDigestRef {
+  const digest = sha256Text(
+    JSON.stringify(
+      module.graphFunctions
+        .map((graphFunction) => {
+          const graph = materializeGraphFunction(graphFunction);
+          return {
+            name: graphFunction.name,
+            vectors: graph.vectors.map((vector) => ({
+              name: vector.name,
+              source: vector.source.map((node) => node.name),
+              target: vector.target.name
+            }))
+          };
+        })
+        .sort((left, right) => left.name.localeCompare(right.name))
+    )
+  );
+  return `graph-catalog-digest://odd-sdlc/${digest.slice("sha256:".length)}`;
+}
+
+function publishedGraphVectorRefs(module: Module): readonly string[] {
+  const refs = new Set<string>();
+  for (const graphFunction of module.graphFunctions) {
+    const graph = materializeGraphFunction(graphFunction);
+    for (const vector of graph.vectors) {
+      refs.add(sdlcGraphVectorBoundaryRef(vector));
+    }
+  }
+  return Object.freeze([...refs]);
+}
+
+function policyRef(overlayRef: SdlcTraversalOverlayRef, policy: string): SdlcOverlayPolicyRef {
+  return `${overlayRef.replace("overlay://odd-sdlc/", "policy://odd-sdlc/overlay/")}/${policy}` as SdlcOverlayPolicyRef;
+}
+
+function pressureRef(overlayRef: SdlcTraversalOverlayRef, pressure: string): string {
+  return `${overlayRef}/remaining-pressure/${pressure}`;
+}
+
+function templateRef(input: {
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly assetType: string;
+}): string {
+  return `${input.overlayRef}/asset-template/${encodeURIComponent(input.assetType)}`;
+}
+
+function catalogFunctionNames(
+  entries: readonly { readonly name: string }[]
+): readonly string[] {
+  return Object.freeze(entries.map((entry) => entry.name));
+}
+
+function uniqueNames(names: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const name of names) {
+    if (!seen.has(name)) {
+      seen.add(name);
+      unique.push(name);
+    }
+  }
+  return Object.freeze(unique);
+}
+
+function overlayDefinitions(): readonly OverlayDefinition[] {
+  const currentFullGraphFunctionNames = uniqueNames([
+    FG_CONFORM_PROJECT,
+    FG_CONFORM_PROJECT_AUTHORITY,
+    "bootstrap_release_self_test",
+    "release_operational_cycle",
+    ...catalogFunctionNames(BOOTSTRAP_RELEASE_FUNCTION_CATALOG),
+    ...catalogFunctionNames(OPERATIONAL_FUNCTION_CATALOG)
+  ]);
+  const liteGraphFunctionNames = Object.freeze([
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+    FG_DERIVE_LITE_MODULE_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  ]);
+  return [
+    {
+      overlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+      aliases: Object.freeze([
+        "overlay://odd-sdlc/bootstrap-heavy",
+        "overlay://odd-sdlc/operational-cycle"
+      ] as const),
+      name: "current_full_traversal",
+      intent: "Compatibility baseline over the current full traversal path.",
+      graphFunctionNames: currentFullGraphFunctionNames,
+      publicStartTargets: Object.freeze([
+        FG_CONFORM_PROJECT_AUTHORITY,
+        "bootstrap_release_self_test",
+        "release_operational_cycle"
+      ]),
+      defaultStartTarget: FG_CONFORM_PROJECT_AUTHORITY,
+      terminalAssetTypes: Object.freeze(["release_surface", "retrofit_plan_surface"]),
+      terminalGraphFunctionNames: Object.freeze([
+        "bootstrap_release_self_test",
+        "release_operational_cycle"
+      ]),
+      lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "release_surface",
+          defaultPath: "release/release_surface.md",
+          producerGraphFunctionName: "bootstrap_release_self_test",
+          terminalRole: "terminal_asset"
+        },
+        {
+          assetType: "retrofit_plan_surface",
+          defaultPath: "runtime/retrofit_plan_surface.md",
+          producerGraphFunctionName: "release_operational_cycle",
+          terminalRole: "terminal_asset"
+        }
+      ])
+    },
+    {
+      overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+      name: "lite_design_module_implementation",
+      intent: "Small software-change traversal from implementation design through module authority to product materialization.",
+      graphFunctionNames: liteGraphFunctionNames,
+      publicStartTargets: Object.freeze([
+        FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+      ]),
+      defaultStartTarget: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+      terminalAssetTypes: Object.freeze(["component_code_surface"]),
+      terminalGraphFunctionNames: Object.freeze([
+        FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+      ]),
+      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "component_code_surface",
+          defaultPath: "build_tenants/hello_world_javascript/src/hello.js",
+          producerGraphFunctionName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+          terminalRole: "terminal_asset"
+        }
+      ]),
+      predecessorOverlayRefs: Object.freeze([
+        SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
+        SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF
+      ]),
+      nextEligibleOverlayRefs: Object.freeze([SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF])
+    },
+    {
+      overlayRef: SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
+      name: "solution_architecture",
+      intent: "Requirements-to-detailed-design traversal that stops before implementation materialization.",
+      graphFunctionNames: Object.freeze([FG_SOLUTION_ARCHITECTURE_EXECUTIVE]),
+      publicStartTargets: Object.freeze([FG_SOLUTION_ARCHITECTURE_EXECUTIVE]),
+      defaultStartTarget: FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+      terminalAssetTypes: Object.freeze(["implementation_design_surface"]),
+      terminalGraphFunctionNames: Object.freeze([FG_SOLUTION_ARCHITECTURE_EXECUTIVE]),
+      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "implementation_design_surface",
+          defaultPath: "design/implementation_design_surface.md",
+          producerGraphFunctionName: FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+          terminalRole: "terminal_asset"
+        }
+      ]),
+      predecessorOverlayRefs: Object.freeze([SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF]),
+      nextEligibleOverlayRefs: Object.freeze([
+        SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+        SDLC_UAT_TEST_CASES_OVERLAY_REF,
+        SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+      ])
+    },
+    {
+      overlayRef: SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
+      name: "bootstrap_requirements",
+      intent: "Bootstrap traversal from initial unstructured input to admitted requirements authority.",
+      graphFunctionNames: Object.freeze([
+        FG_CONFORM_PROJECT,
+        FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE
+      ]),
+      publicStartTargets: Object.freeze([FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE]),
+      defaultStartTarget: FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+      terminalAssetTypes: Object.freeze(["requirement_surface"]),
+      terminalGraphFunctionNames: Object.freeze([FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE]),
+      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "requirement_surface",
+          defaultPath: "specification/requirements/",
+          producerGraphFunctionName: FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+          terminalRole: "terminal_asset"
+        }
+      ]),
+      nextEligibleOverlayRefs: Object.freeze([
+        SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
+        SDLC_UAT_TEST_CASES_OVERLAY_REF,
+        SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+      ])
+    },
+    {
+      overlayRef: SDLC_UAT_TEST_CASES_OVERLAY_REF,
+      name: "uat_test_cases",
+      intent: "UAT test-case traversal over requirements and admitted solution architecture authority.",
+      graphFunctionNames: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
+      publicStartTargets: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
+      defaultStartTarget: FG_UAT_TEST_CASES_EXECUTIVE,
+      terminalAssetTypes: Object.freeze(["uat_testcases_surface"]),
+      terminalGraphFunctionNames: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
+      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "uat_testcases_surface",
+          defaultPath: "design/uat_testcases_surface.md",
+          producerGraphFunctionName: FG_UAT_TEST_CASES_EXECUTIVE,
+          terminalRole: "terminal_asset"
+        }
+      ]),
+      predecessorOverlayRefs: Object.freeze([
+        SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
+        SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF
+      ]),
+      nextEligibleOverlayRefs: Object.freeze([SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF])
+    }
+  ] as const satisfies readonly OverlayDefinition[];
+}
+
+function graphFunctionRefsFor(input: {
+  readonly byName: ReadonlyMap<string, GraphFunction>;
+  readonly names: readonly string[];
+  readonly overlayRef: SdlcTraversalOverlayRef;
+}): readonly string[] {
+  return Object.freeze(
+    input.names.map((name) => {
+      const graphFunction = input.byName.get(name);
+      if (graphFunction === undefined) {
+        throw new TypeError(`${input.overlayRef}: unpublished graph function ${name}`);
+      }
+      return sdlcGraphFunctionBoundaryRef(graphFunction);
+    })
+  );
+}
+
+function graphVectorRefsFor(input: {
+  readonly byName: ReadonlyMap<string, GraphFunction>;
+  readonly names: readonly string[];
+  readonly overlayRef: SdlcTraversalOverlayRef;
+}): readonly string[] {
+  return Object.freeze(
+    input.names.flatMap((name) => {
+      const graphFunction = input.byName.get(name);
+      if (graphFunction === undefined) {
+        throw new TypeError(`${input.overlayRef}: unpublished graph function ${name}`);
+      }
+      return materializeGraphFunction(graphFunction).vectors.map((vector) =>
+        sdlcGraphVectorBoundaryRef(vector)
+      );
+    })
+  );
+}
+
+function overlayFromDefinition(input: {
+  readonly definition: OverlayDefinition;
+  readonly byName: ReadonlyMap<string, GraphFunction>;
+  readonly digestRef: SdlcGraphCatalogDigestRef;
+}): SdlcTraversalOverlay {
+  const graphFunctionRefs = graphFunctionRefsFor({
+    byName: input.byName,
+    names: input.definition.graphFunctionNames,
+    overlayRef: input.definition.overlayRef
+  });
+  const terminalGraphFunctionRefs = graphFunctionRefsFor({
+    byName: input.byName,
+    names: input.definition.terminalGraphFunctionNames,
+    overlayRef: input.definition.overlayRef
+  });
+  const graphVectorRefs = graphVectorRefsFor({
+    byName: input.byName,
+    names: input.definition.graphFunctionNames,
+    overlayRef: input.definition.overlayRef
+  });
+  const assetTemplates = Object.freeze(
+    input.definition.assetTemplates.map((template) => {
+      const producer = input.byName.get(template.producerGraphFunctionName);
+      if (producer === undefined) {
+        throw new TypeError(
+          `${input.definition.overlayRef}: unpublished asset template producer ${template.producerGraphFunctionName}`
+        );
+      }
+      return Object.freeze({
+        kind: "sdlc_overlay_asset_template" as const,
+        assetType: template.assetType,
+        defaultPath: template.defaultPath,
+        producerGraphFunctionRef: sdlcGraphFunctionBoundaryRef(producer),
+        terminalRole: template.terminalRole,
+        templateRef: templateRef({
+          overlayRef: input.definition.overlayRef,
+          assetType: template.assetType
+        })
+      });
+    })
+  );
+  return Object.freeze({
+    kind: "sdlc_traversal_overlay" as const,
+    overlayRef: input.definition.overlayRef,
+    aliases: Object.freeze([...(input.definition.aliases ?? [])]),
+    name: input.definition.name,
+    intent: input.definition.intent,
+    graphFunctionRefs,
+    graphVectorRefs,
+    graphCatalogDigestRef: input.digestRef,
+    publicStartTargets: Object.freeze([...input.definition.publicStartTargets]),
+    defaultStartTarget: input.definition.defaultStartTarget,
+    policies: Object.freeze({
+      workspaceObservationPolicyRef: policyRef(input.definition.overlayRef, "workspace-observation"),
+      evalPolicyRef: policyRef(input.definition.overlayRef, "eval"),
+      refinementPolicyRef: policyRef(input.definition.overlayRef, "refinement"),
+      traversalStrategyPlanRef: policyRef(input.definition.overlayRef, "traversal-strategy")
+    }),
+    termination: Object.freeze({
+      policyRef: policyRef(input.definition.overlayRef, "termination"),
+      terminalAssetTypes: Object.freeze([...input.definition.terminalAssetTypes]),
+      terminalGraphFunctionRefs,
+      lawfulStopDispositions: Object.freeze([
+        ...input.definition.lawfulStopDispositions
+      ]),
+      requiresEvalAdmission: true,
+      remainingGraphPressureRefs: Object.freeze([
+        pressureRef(input.definition.overlayRef, "graph")
+      ]),
+      remainingRequirementPressureRefs: Object.freeze([
+        pressureRef(input.definition.overlayRef, "requirements")
+      ]),
+      remainingAssetPressureRefs: Object.freeze([
+        pressureRef(input.definition.overlayRef, "assets")
+      ]),
+      nextEligibleOverlayRefs: Object.freeze([
+        ...(input.definition.nextEligibleOverlayRefs ?? [])
+      ])
+    }),
+    assetTemplates,
+    requiredLedgersByEdge: Object.freeze(
+      graphVectorRefs.map((edgeRef) =>
+        Object.freeze({
+          edgeRef,
+          computeRegime: "f_p" as const,
+          requiredLedgerKinds: Object.freeze([
+            "sdlc_edge_fulfillment_ledger",
+            "sdlc_edge_closure_decision"
+          ]),
+          closureRequiresLedger: true
+        })
+      )
+    ),
+    predecessorOverlayRefs: Object.freeze([
+      ...(input.definition.predecessorOverlayRefs ?? [])
+    ])
+  });
+}
+
+export function constructSdlcTraversalOverlayCatalog(input: {
+  readonly module: Module;
+  readonly graphCatalog?: SdlcGraphFunctionCatalog;
+}): SdlcTraversalOverlayCatalog {
+  void input.graphCatalog;
+  const byName = graphFunctionByName(input.module);
+  const digestRef = graphCatalogDigestRef(input.module);
+  const overlays = Object.freeze(
+    overlayDefinitions().map((definition) =>
+      overlayFromDefinition({ definition, byName, digestRef })
+    )
+  );
+  assertSdlcEdgeGainClosureMatrix({
+    overlays,
+    publishedGraphVectorRefs: publishedGraphVectorRefs(input.module),
+    contracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
+  });
+  return Object.freeze({
+    kind: "sdlc_traversal_overlay_catalog" as const,
+    catalogRef: "overlay-catalog://odd-sdlc/ts-v1" as const,
+    catalogDigestRef: digestRef,
+    graphCatalogDigestRef: digestRef,
+    overlays
+  });
+}
+
+function normalizeOverlayRef(value: string): SdlcTraversalOverlayRef {
+  const raw = parseNonEmptyString(value, "overlayRef");
+  return raw.startsWith("overlay://odd-sdlc/")
+    ? raw as SdlcTraversalOverlayRef
+    : `overlay://odd-sdlc/${raw}` as SdlcTraversalOverlayRef;
+}
+
+export function resolveSdlcTraversalOverlay(input: {
+  readonly catalog: SdlcTraversalOverlayCatalog;
+  readonly overlayRef: string;
+}): SdlcTraversalOverlay | null {
+  const overlayRef = normalizeOverlayRef(input.overlayRef);
+  return input.catalog.overlays.find(
+    (overlay) =>
+      overlay.overlayRef === overlayRef || overlay.aliases.includes(overlayRef)
+  ) ?? null;
+}
+
+export function sdlcTraversalOverlayForGraphFunction(input: {
+  readonly catalog: SdlcTraversalOverlayCatalog;
+  readonly graphFunctionRef: string;
+}): SdlcTraversalOverlay {
+  return input.catalog.overlays.find((overlay) =>
+    overlay.graphFunctionRefs.includes(input.graphFunctionRef)
+  ) ?? input.catalog.overlays.find(
+    (overlay) => overlay.overlayRef === SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF
+  ) ?? input.catalog.overlays[0]!;
+}
+
+export function publicSdlcOverlayStartTargets(input: {
+  readonly module: Module;
+  readonly catalog: SdlcTraversalOverlayCatalog;
+  readonly projectConformanceStatus?: "blocked" | string | null;
+}): readonly SdlcOverlayStartTarget[] {
+  const byName = graphFunctionByName(input.module);
+  const rows = new Map<string, SdlcOverlayStartTarget>();
+  for (const overlay of input.catalog.overlays) {
+    for (const target of overlay.publicStartTargets) {
+      const graphFunction = byName.get(target);
+      if (graphFunction === undefined) {
+        throw new TypeError(`${overlay.overlayRef}: unpublished start target ${target}`);
+      }
+      const existing = rows.get(target);
+      const row = Object.freeze({
+        name: target,
+        graphFunctionRef: sdlcGraphFunctionBoundaryRef(graphFunction),
+        jobName: `${target}_job`,
+        overlayRefs: Object.freeze([
+          ...(existing?.overlayRefs ?? []),
+          overlay.overlayRef
+        ]),
+        defaultForOverlayRefs: Object.freeze([
+          ...(existing?.defaultForOverlayRefs ?? []),
+          ...(overlay.defaultStartTarget === target ? [overlay.overlayRef] : [])
+        ])
+      });
+      rows.set(target, row);
+    }
+  }
+  if (input.projectConformanceStatus === "blocked") {
+    const conform = byName.get(FG_CONFORM_PROJECT);
+    if (conform === undefined) {
+      return Object.freeze([]);
+    }
+    const conformRef = sdlcGraphFunctionBoundaryRef(conform);
+    const conformanceOverlayRefs = Object.freeze(
+      input.catalog.overlays
+        .filter((overlay) => overlay.graphFunctionRefs.includes(conformRef))
+        .map((overlay) => overlay.overlayRef)
+    );
+    const overlayRefs = conformanceOverlayRefs.length > 0
+      ? conformanceOverlayRefs
+      : Object.freeze([SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF]);
+    return Object.freeze([
+      {
+        name: FG_CONFORM_PROJECT,
+        graphFunctionRef: conformRef,
+        jobName: `${FG_CONFORM_PROJECT}_job`,
+        overlayRefs,
+        defaultForOverlayRefs: overlayRefs
+      }
+    ]);
+  }
+  return Object.freeze([...rows.values()]);
+}
+
+export function constructSdlcOverlayBinding(input: {
+  readonly catalog: SdlcTraversalOverlayCatalog;
+  readonly overlay: SdlcTraversalOverlay;
+  readonly workspaceRootUri: string;
+  readonly workspaceIdentityRef: string;
+  readonly preActionWorkspaceObservationRef: string;
+  readonly preActionWorkspaceFingerprintRef: string;
+  readonly selectedGraphFunctionRef: string;
+  readonly selectedGraphVectorRef?: string | null;
+  readonly selectedStartTargetRef: string;
+  readonly requestedBy: SdlcOverlayBinding["selection"]["requestedBy"];
+  readonly materialAssetRefs?: readonly {
+    readonly assetType: string;
+    readonly assetRef: string;
+    readonly relativePath: string;
+    readonly evidenceRefs?: readonly string[];
+  }[];
+  readonly priorLedgerRefs?: readonly string[];
+  readonly priorEventRefs?: readonly string[];
+}): SdlcOverlayBinding {
+  const basis = [
+    input.overlay.overlayRef,
+    input.workspaceRootUri,
+    input.workspaceIdentityRef,
+    input.preActionWorkspaceObservationRef,
+    input.selectedGraphFunctionRef,
+    input.selectedStartTargetRef,
+    input.catalog.graphCatalogDigestRef
+  ].map(encodeURIComponent).join("/");
+  const priorLedgerRefs = Object.freeze([...(input.priorLedgerRefs ?? [])]);
+  const priorEventRefs = Object.freeze([...(input.priorEventRefs ?? [])]);
+  const templateTypes = new Set(input.overlay.assetTemplates.map((template) => template.assetType));
+  for (const asset of input.materialAssetRefs ?? []) {
+    if (!templateTypes.has(asset.assetType)) {
+      throw new TypeError(
+        `${input.overlay.overlayRef}: material asset ${asset.assetType} is not declared by the selected overlay template`
+      );
+    }
+  }
+  const materialByType = new Map(
+    (input.materialAssetRefs ?? []).map((asset) => [asset.assetType, asset])
+  );
+  const assetBindings = Object.freeze(
+    input.overlay.assetTemplates.map((template) => {
+      const material = materialByType.get(template.assetType) ?? null;
+      const mode =
+        material === null ? "planned_from_template" as const : "material" as const;
+      const relativePath =
+        material === null
+          ? template.defaultPath
+          : parseNonEmptyString(material.relativePath, `${template.assetType}.relativePath`);
+      const assetRef =
+        material === null
+          ? `${input.overlay.overlayRef}/planned-asset/${encodeURIComponent(template.assetType)}`
+          : parseNonEmptyString(material.assetRef, `${template.assetType}.assetRef`);
+      return Object.freeze({
+        kind: "sdlc_overlay_asset_binding" as const,
+        bindingRef: `${input.overlay.overlayRef}/asset-binding/${encodeURIComponent(template.assetType)}`,
+        assetType: template.assetType,
+        mode,
+        assetRef,
+        relativePath,
+        producerGraphFunctionRef: template.producerGraphFunctionRef,
+        terminalRole: template.terminalRole,
+        templateRef: mode === "planned_from_template" ? template.templateRef : null,
+        evidenceRefs: Object.freeze([...(material?.evidenceRefs ?? [])])
+      });
+    })
+  );
+  return Object.freeze({
+    kind: "sdlc_overlay_binding" as const,
+    bindingRef: `overlay-binding://odd-sdlc/${basis}` as SdlcOverlayBindingRef,
+    overlayRef: input.overlay.overlayRef,
+    graphCatalogDigestRef: input.catalog.graphCatalogDigestRef,
+    workspaceBasis: Object.freeze({
+      workspaceRootUri: parseNonEmptyString(input.workspaceRootUri, "workspaceRootUri"),
+      workspaceIdentityRef: parseNonEmptyString(input.workspaceIdentityRef, "workspaceIdentityRef"),
+      preActionWorkspaceObservationRef: parseNonEmptyString(
+        input.preActionWorkspaceObservationRef,
+        "preActionWorkspaceObservationRef"
+      ),
+      preActionWorkspaceFingerprintRef: parseNonEmptyString(
+        input.preActionWorkspaceFingerprintRef,
+        "preActionWorkspaceFingerprintRef"
+      ),
+      postActionWorkspaceObservationRef: null,
+      postActionWorkspaceFingerprintRef: null,
+      workspaceDeltaRef: null
+    }),
+    selection: Object.freeze({
+      selectedGraphFunctionRef: parseNonEmptyString(
+        input.selectedGraphFunctionRef,
+        "selectedGraphFunctionRef"
+      ),
+      selectedGraphVectorRef: input.selectedGraphVectorRef ?? null,
+      selectedStartTargetRef: parseNonEmptyString(
+        input.selectedStartTargetRef,
+        "selectedStartTargetRef"
+      ),
+      requestedBy: input.requestedBy
+    }),
+    assetBindings,
+    priorLedgerRefs,
+    priorEventRefs,
+    remainingGraphPressureRefs: input.overlay.termination.remainingGraphPressureRefs,
+    remainingRequirementPressureRefs:
+      input.overlay.termination.remainingRequirementPressureRefs,
+    remainingAssetPressureRefs: input.overlay.termination.remainingAssetPressureRefs,
+    nextEligibleOverlayRefs: input.overlay.termination.nextEligibleOverlayRefs,
+    freshnessPolicyRef: input.overlay.policies.workspaceObservationPolicyRef,
+    predecessorRefs: Object.freeze([
+      input.overlay.overlayRef,
+      input.catalog.catalogDigestRef,
+      input.catalog.graphCatalogDigestRef,
+      input.workspaceIdentityRef,
+      input.preActionWorkspaceObservationRef,
+      input.preActionWorkspaceFingerprintRef,
+      input.selectedGraphFunctionRef,
+      input.selectedStartTargetRef,
+      ...assetBindings.map((binding) => binding.bindingRef),
+      ...priorLedgerRefs,
+      ...priorEventRefs
+    ])
+  });
+}
+
+function uniqueOverlayBindingRefs(values: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(values)]);
+}
+
+export function withSdlcOverlayBindingPostActionEvidence(input: {
+  readonly binding: SdlcOverlayBinding;
+  readonly postActionWorkspaceObservationRef: string;
+  readonly postActionWorkspaceFingerprintRef: string;
+  readonly workspaceDeltaRef: string;
+}): SdlcOverlayBinding {
+  const postActionWorkspaceObservationRef = parseNonEmptyString(
+    input.postActionWorkspaceObservationRef,
+    "postActionWorkspaceObservationRef"
+  );
+  const postActionWorkspaceFingerprintRef = parseNonEmptyString(
+    input.postActionWorkspaceFingerprintRef,
+    "postActionWorkspaceFingerprintRef"
+  );
+  const workspaceDeltaRef = parseNonEmptyString(
+    input.workspaceDeltaRef,
+    "workspaceDeltaRef"
+  );
+  return Object.freeze({
+    ...input.binding,
+    workspaceBasis: Object.freeze({
+      ...input.binding.workspaceBasis,
+      postActionWorkspaceObservationRef,
+      postActionWorkspaceFingerprintRef,
+      workspaceDeltaRef
+    }),
+    predecessorRefs: uniqueOverlayBindingRefs([
+      ...input.binding.predecessorRefs,
+      postActionWorkspaceObservationRef,
+      postActionWorkspaceFingerprintRef,
+      workspaceDeltaRef
+    ])
+  });
+}

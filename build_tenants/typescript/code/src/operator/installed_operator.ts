@@ -4,6 +4,10 @@
 // Implements: REQ-F-ODDSDLC-054
 // Implements: REQ-F-ODDSDLC-055
 // Implements: REQ-F-ODDSDLC-056
+// Implements: REQ-F-ODDSDLC-063
+// Implements: REQ-F-ODDSDLC-064
+// Implements: REQ-F-ODDSDLC-065
+// Implements: REQ-F-ODDSDLC-066
 
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -45,11 +49,13 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   constructSdlcGtlModule,
+  constructSdlcTraversalOverlayCatalog,
   sdlcGraphFunctionBoundaryRef,
   sdlcGraphVectorBoundaryRef,
   sdlcPublishedActionRef,
   sdlcPublishedTraversalTargetRef,
-  sdlcTargetOutcomeRef
+  sdlcTargetOutcomeRef,
+  withSdlcOverlayBindingPostActionEvidence
 } from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
@@ -125,12 +131,25 @@ import {
 import {
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcNextActionProjection,
+  constructSdlcOverlaySegmentCompletion,
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   type SdlcEdgeFulfillmentAssessmentStatus,
-  type SdlcEdgeFulfillmentCountProjection
+  type SdlcEdgeFulfillmentCountProjection,
+  type SdlcYieldResumeBasis
 } from "./traversal_consequence.js";
+import {
+  admitSdlcEdgeEvidence,
+  deriveSdlcEdgeObligations,
+  deriveSdlcEdgeResidualPressure,
+  digestSdlcEdgeGainClosureContract,
+  measureSdlcEdgeGain,
+  resolveSdlcEdgeGainClosureContract,
+  sdlcEdgeAssuranceContractRef,
+  type SdlcEdgeEvidenceCandidate,
+  type SdlcEdgeLedgerInputRef
+} from "./edge_gain_closure.js";
 import {
   canonicalSdlcPriorGapReasonCode,
   legacyBlockingReasonCode,
@@ -144,6 +163,7 @@ import {
 
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
+export const MAX_INSTALLED_CONVERGENCE_ATTEMPTS = 200;
 const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 5;
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
@@ -257,6 +277,37 @@ function installedStartHasEvaluateNextTraversalTruth(
   outcome: SdlcInstalledOperatorStartOutcome
 ): boolean {
   return outcome.traversalConsequence?.nextActionProjection.choosesNextTraversal === true;
+}
+
+function installedStartRequestsDownstreamGraph(
+  outcome: SdlcInstalledOperatorStartOutcome
+): boolean {
+  return (
+    outcome.status === "converged" &&
+    outcome.summary.nextLawfulAction === "rerun_start_for_downstream_graph"
+  );
+}
+
+export function installedStartRequestsYieldResume(
+  outcome: Pick<SdlcInstalledOperatorStartOutcome, "traversalConsequence">
+): boolean {
+  const closureDecision = outcome.traversalConsequence?.edgeClosureDecision ?? null;
+  return (
+    closureDecision?.disposition === "yield" &&
+    closureDecision.yieldResumeBasis !== null
+  );
+}
+
+export function installedStartShouldContinueForRequestedUntil(input: {
+  readonly requestedUntil: string;
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
+}): boolean {
+  return (
+    installedStartHasEvaluateNextTraversalTruth(input.outcome) ||
+    (input.requestedUntil === "converged" &&
+      (installedStartRequestsDownstreamGraph(input.outcome) ||
+        installedStartRequestsYieldResume(input.outcome)))
+  );
 }
 
 export function installedReentryDispositionForOutcome(
@@ -419,20 +470,17 @@ function installedStartWithLoop(input: {
   readonly requestedUntil: string;
   readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly attempts: readonly SdlcInstalledOperatorStartLoopAttempt[];
+  readonly maxAttempts: number;
   readonly retryGuardExhausted: boolean;
   readonly exhaustedDisposition: SdlcInstalledReentryDisposition | null;
 }): SdlcInstalledOperatorStartOutcome {
   if (input.attempts.length <= 1) {
     return input.outcome;
   }
-  const disposition =
-    input.exhaustedDisposition ??
-    installedReentryDispositionForOutcome(input.outcome) ??
-    "other";
   const loop: SdlcInstalledOperatorStartLoop = Object.freeze({
     kind: "sdlc_installed_operator_start_loop",
     requestedUntil: input.requestedUntil,
-    maxAttempts: installedReentryAttemptLimit(disposition),
+    maxAttempts: input.maxAttempts,
     attemptCount: input.attempts.length,
     terminalReason: terminalReasonForInstalledStartLoop({
       requestedUntil: input.requestedUntil,
@@ -465,7 +513,7 @@ function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
 }
 
-function compactPriorGapDossiers(
+export function compactSdlcPriorGapDossiersForRetryContext(
   dossiers: readonly SdlcPostflightGapDossier[]
 ): readonly SdlcPostflightGapDossier[] {
   if (dossiers.length <= 1) {
@@ -477,28 +525,26 @@ function compactPriorGapDossiers(
     return Object.freeze([]);
   }
   const latestReasonByCode = new Map<string, SdlcPostflightGapReason>();
-  for (const dossier of dossiers) {
-    for (const reason of dossier.reasons) {
-      const canonicalReason = canonicalSdlcPriorGapReasonCode(reason.reason);
-      latestReasonByCode.set(
-        canonicalReason,
-        Object.freeze({
-          ...reason,
-          reason: canonicalReason,
-          blockingReason: makeSdlcBlockingReason({
-            code: reason.blockingReason.code,
-            detail:
-              reason.blockingReason.code === "assurance_ledger_reason"
-                ? canonicalReason
-                : reason.blockingReason.detail,
-            reasonClass: reason.blockingReason.reasonClass,
-            lawfulReentryPoint: reason.blockingReason.lawfulReentryPoint,
-            message: reason.blockingReason.message,
-            evidenceRefs: [dossier.currentGapDossierRef]
-          })
+  for (const reason of latest.reasons) {
+    const canonicalReason = canonicalSdlcPriorGapReasonCode(reason.reason);
+    latestReasonByCode.set(
+      canonicalReason,
+      Object.freeze({
+        ...reason,
+        reason: canonicalReason,
+        blockingReason: makeSdlcBlockingReason({
+          code: reason.blockingReason.code,
+          detail:
+            reason.blockingReason.code === "assurance_ledger_reason"
+              ? canonicalReason
+              : reason.blockingReason.detail,
+          reasonClass: reason.blockingReason.reasonClass,
+          lawfulReentryPoint: reason.blockingReason.lawfulReentryPoint,
+          message: reason.blockingReason.message,
+          evidenceRefs: [latest.currentGapDossierRef]
         })
-      );
-    }
+      })
+    );
   }
   const compact: SdlcPostflightGapDossier = Object.freeze({
     kind: latest.kind,
@@ -542,7 +588,7 @@ function retryContextFromRetryAttemptRefs(
   return Object.freeze({
     kind: "sdlc_worker_retry_context",
     retryAttemptRefs,
-    priorGapDossiers: compactPriorGapDossiers(
+    priorGapDossiers: compactSdlcPriorGapDossiersForRetryContext(
       retryAttemptRefs
         .map((ref) => readPostflightGapDossierRef(ref.priorAuthorityRef))
         .filter((dossier): dossier is SdlcPostflightGapDossier => dossier !== null)
@@ -2236,7 +2282,8 @@ function graphTrackCandidatesForTarget(input: {
     input.module.graphFunctions.flatMap((graphFunction) => {
       if (
         graphFunction.name.startsWith("Fg_") ||
-        graphFunction.tags.includes("executive")
+        graphFunction.tags.includes("executive") ||
+        graphFunction.tags.includes("overlay_only_leaf")
       ) {
         return [];
       }
@@ -2616,6 +2663,41 @@ function blockReasonRefsForState(
     ...(state.gapDossier === null ? [] : [state.gapDossier.currentGapDossierRef]),
     ...state.blockingReasonCarriers.flatMap((reason) => reason.evidenceRefs)
   ]);
+}
+
+export function deriveSdlcProductLineageYieldResumeBasis(input: {
+  readonly runRef: string;
+  readonly edgeRef: string;
+  readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
+  readonly productEvidenceRefs: readonly string[];
+  readonly livenessProjectionRefs: readonly string[];
+}): Omit<SdlcYieldResumeBasis, "kind"> | null {
+  const lineageReasons = input.blockingReasonCarriers.filter(
+    (reason) => reason.code === "materialized_product_requirement_lineage_missing"
+  );
+  if (lineageReasons.length === 0) {
+    return null;
+  }
+  const competingSameEdgeReasons = input.blockingReasonCarriers.filter(
+    (reason) =>
+      reason.lawfulReentryPoint === "same_edge_retry" &&
+      reason.code !== "materialized_product_requirement_lineage_missing"
+  );
+  if (competingSameEdgeReasons.length > 0) {
+    return null;
+  }
+  if (input.productEvidenceRefs.length === 0) {
+    return null;
+  }
+  return Object.freeze({
+    yieldKind: "partial_product_evidence_admitted_current_edge_should_resume",
+    resumeBasisRef: `resume-basis://odd-sdlc/${input.runRef}/materialized-product-lineage`,
+    currentEdgeRef: input.edgeRef,
+    admittedProgressRefs: input.productEvidenceRefs,
+    livenessProjectionRef: input.livenessProjectionRefs[0] ?? null,
+    resumePolicyRef:
+      "resume-policy://odd-sdlc/materialized-product-lineage/operator-iterate"
+  });
 }
 
 function postActionCandidateFor(input: {
@@ -3010,6 +3092,50 @@ function postProductMaterializationGraphTrackBlockingReasons(input: {
     : Object.freeze([]);
 }
 
+function edgeAssuranceEvidenceCandidatesFor(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+}): readonly SdlcEdgeEvidenceCandidate[] {
+  return Object.freeze(
+    (input.state.workerReport?.obligationAssessments ?? Object.freeze([]))
+      .filter((assessment) => assessment.fulfillmentStatus === "fulfilled")
+      .flatMap((assessment) =>
+        assessment.evidenceRefs.map((evidenceRef) =>
+          Object.freeze({
+            kind: "sdlc_edge_evidence_candidate" as const,
+            evidenceRef,
+            sourceKind: "worker_assessment" as const,
+            obligationRefs: Object.freeze([assessment.obligationId]),
+            supportsBehavioralFulfillment: true
+          })
+        )
+      )
+  );
+}
+
+function plannedEdgeAssuranceLedgerInputs(input: {
+  readonly ledgerRef: string;
+  readonly closureDecisionRef: string;
+  readonly nextActionProjectionRef: string;
+}): readonly SdlcEdgeLedgerInputRef[] {
+  return Object.freeze([
+    Object.freeze({
+      kind: "sdlc_edge_ledger_input_ref" as const,
+      ledgerInputKind: "sdlc_edge_fulfillment_ledger",
+      ledgerRef: input.ledgerRef
+    }),
+    Object.freeze({
+      kind: "sdlc_edge_ledger_input_ref" as const,
+      ledgerInputKind: "sdlc_edge_closure_decision",
+      ledgerRef: input.closureDecisionRef
+    }),
+    Object.freeze({
+      kind: "sdlc_edge_ledger_input_ref" as const,
+      ledgerInputKind: "sdlc_next_action_projection",
+      ledgerRef: input.nextActionProjectionRef
+    })
+  ]);
+}
+
 function deriveInstalledTraversalConsequence(input: {
   readonly basis: ExecutionBasis;
   readonly start: SdlcPublicStartOutcome;
@@ -3026,6 +3152,32 @@ function deriveInstalledTraversalConsequence(input: {
   const module = constructSdlcGtlModule();
   const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
   const runRef = manifestRefSegment(input.state.manifest);
+  const ledgerRef = `ledger://odd-sdlc/${runRef}/edge-fulfillment`;
+  const closureDecisionRef =
+    `closure-decision://odd-sdlc/${runRef}/edge-fulfillment/1`;
+  const plannedNextActionProjectionRef =
+    `next-action://odd-sdlc/${runRef}/edge-assurance/planned`;
+  const edgeRef =
+    `edge://odd-sdlc/${graphFunctionRefForBasis({ basis: input.basis })}/${input.state.manifest.vectorIndex}`;
+  const edgeAssuranceContract = resolveSdlcEdgeGainClosureContract(
+    input.state.manifest.edgeName
+  );
+  const resolvedEdgeAssuranceContractRef =
+    sdlcEdgeAssuranceContractRef(edgeAssuranceContract);
+  const resolvedEdgeAssuranceContractDigest =
+    digestSdlcEdgeGainClosureContract(edgeAssuranceContract);
+  const edgeAssuranceContractRef =
+    input.state.manifest.edgeAssuranceContractRef ??
+    resolvedEdgeAssuranceContractRef;
+  const edgeAssuranceContractDigest =
+    input.state.manifest.edgeAssuranceContractDigest ??
+    resolvedEdgeAssuranceContractDigest;
+  if (
+    edgeAssuranceContractRef !== resolvedEdgeAssuranceContractRef ||
+    edgeAssuranceContractDigest !== resolvedEdgeAssuranceContractDigest
+  ) {
+    throw new TypeError("installed traversal consequence edge assurance contract drift");
+  }
   const admittedAssetTypes = admittedAssetTypesForState({
     module,
     state: input.state,
@@ -3085,6 +3237,28 @@ function deriveInstalledTraversalConsequence(input: {
     scope: "post-action",
     carriers: postActionBlockingReasonCarriers
   });
+  const edgeAssuranceObligations = deriveSdlcEdgeObligations({
+    contract: edgeAssuranceContract,
+    obligationRefs: input.state.manifest.traversalObligationContext.obligations.map(
+      (obligation) => obligation.obligationId
+    )
+  });
+  const edgeEvidenceAdmission = admitSdlcEdgeEvidence({
+    contract: edgeAssuranceContract,
+    obligations: edgeAssuranceObligations,
+    candidates: edgeAssuranceEvidenceCandidatesFor({ state: input.state })
+  });
+  const edgeGain = measureSdlcEdgeGain({
+    contract: edgeAssuranceContract,
+    obligations: edgeAssuranceObligations,
+    admittedEvidence: edgeEvidenceAdmission.admittedEvidence,
+    ledgerInputs: plannedEdgeAssuranceLedgerInputs({
+      ledgerRef,
+      closureDecisionRef,
+      nextActionProjectionRef: plannedNextActionProjectionRef
+    })
+  });
+  const edgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
   const retryReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "same_edge_retry"
@@ -3098,10 +3272,17 @@ function deriveInstalledTraversalConsequence(input: {
     lawfulReentryPoint: "reprice_requirement_or_design"
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
-    ledgerRef: `ledger://odd-sdlc/${runRef}/edge-fulfillment`,
+    ledgerRef,
     ledgerVersionRef: `ledger-version://odd-sdlc/${runRef}/edge-fulfillment/1`,
-    edgeRef:
-      `edge://odd-sdlc/${graphFunctionRefForBasis({ basis: input.basis })}/${input.state.manifest.vectorIndex}`,
+    overlayRef: input.start.executionContract.overlayRef,
+    overlayBindingRef: input.start.executionContract.overlayBindingRef,
+    graphCatalogDigestRef:
+      input.start.executionContract.overlayBinding.graphCatalogDigestRef,
+    edgeAssuranceContractRef,
+    edgeAssuranceContractDigest,
+    edgeGainRef: edgeGain.gainRef,
+    edgeResidualPressureRefs: edgeResidualPressure.requiredPressureRefs,
+    edgeRef,
     attemptRef: `attempt://odd-sdlc/${runRef}/${input.state.manifest.vectorIndex}`,
     targetBindingRefs: input.start.executionContract.nextActionProjection.targetBindingRefs,
     evidenceBundleRefs: Object.freeze([worksiteEvidence.evidenceBundleRef]),
@@ -3128,22 +3309,68 @@ function deriveInstalledTraversalConsequence(input: {
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
+  const yieldResumeBasis = deriveSdlcProductLineageYieldResumeBasis({
+    runRef,
+    edgeRef: ledger.edgeRef,
+    blockingReasonCarriers: input.state.blockingReasonCarriers,
+    productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
+    livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
+  });
   const closureDecision = deriveSdlcEdgeClosureDecision({
-    decisionRef:
-      `closure-decision://odd-sdlc/${runRef}/edge-fulfillment/1`,
+    decisionRef: closureDecisionRef,
     ledger,
+    edgeClosureFunctionRef: edgeAssuranceContract.closureFunctionRef,
     currentEdgeLawful:
       input.state.status !== "worker_report_rejected" &&
       repriceReasonRefs.length === 0,
     retryReasonRefs,
     repairReasonRefs,
     repriceReasonRefs,
+    yieldResumeBasis,
     blockReasonRefs: uniqueSorted([
       ...blockReasonRefsForState(input.state),
       ...fulfillmentProjection.nonConvergedReasonRefs,
       ...postActionBlockingReasonRefs
     ])
   });
+  const overlayCatalog = constructSdlcTraversalOverlayCatalog({ module });
+  const activeOverlay = overlayCatalog.overlays.find(
+    (overlay) => overlay.overlayRef === input.start.executionContract?.overlayRef
+  ) ?? null;
+  const overlaySegmentCompletion =
+    closureDecision.disposition === "close" &&
+    input.nextVectorIndex === null &&
+    activeOverlay !== null
+      ? (() => {
+          const productConverged =
+            activeOverlay.termination.lawfulStopDispositions.includes(
+              "product_converged"
+            ) &&
+            activeOverlay.termination.nextEligibleOverlayRefs.length === 0;
+          return constructSdlcOverlaySegmentCompletion({
+            completionRef: `overlay-segment-completion://odd-sdlc/${runRef}`,
+            closureDecision,
+            stopDisposition: productConverged
+              ? "product_converged"
+              : "overlay_segment_complete",
+            terminalAssetTypes: activeOverlay.termination.terminalAssetTypes,
+            terminalGraphFunctionRefs:
+              activeOverlay.termination.terminalGraphFunctionRefs,
+            remainingGraphPressureRefs: productConverged
+              ? Object.freeze([])
+              : activeOverlay.termination.remainingGraphPressureRefs,
+            remainingRequirementPressureRefs: productConverged
+              ? Object.freeze([])
+              : activeOverlay.termination.remainingRequirementPressureRefs,
+            remainingAssetPressureRefs: productConverged
+              ? Object.freeze([])
+              : activeOverlay.termination.remainingAssetPressureRefs,
+            nextEligibleOverlayRefs: productConverged
+              ? Object.freeze([])
+              : activeOverlay.termination.nextEligibleOverlayRefs
+          });
+        })()
+      : null;
   const candidates = postActionCandidates({
     basis: input.basis,
     module,
@@ -3173,6 +3400,7 @@ function deriveInstalledTraversalConsequence(input: {
           actionCatalogRefs: Object.freeze([
             `catalog://odd-sdlc/post-action/${runRef}/empty`
           ]),
+          overlaySegmentCompletion,
           nextGraphFunctionRef: null,
           nextGraphVectorRef: null
         })
@@ -3219,17 +3447,29 @@ function deriveInstalledTraversalConsequence(input: {
               evaluator.priorityProjection.prioritySchemeRef
             ]),
             actionCatalogRefs: evaluator.actionCatalogRefs,
+            overlaySegmentCompletion,
             selectedActionRef: evaluator.selectedPriorityRow?.actionRef ?? null,
             nextGraphFunctionRef: evaluator.bestGraphFunctionRef,
             nextGraphVectorRef: evaluator.bestGraphVectorRef
           });
         })();
+  const postActionOverlayBinding = withSdlcOverlayBindingPostActionEvidence({
+    binding: input.start.executionContract.overlayBinding,
+    postActionWorkspaceObservationRef: nextActionProjection.observationRef,
+    postActionWorkspaceFingerprintRef:
+      `workspace-fingerprint://odd-sdlc/post-action/${runRef}`,
+    workspaceDeltaRef: `workspace-delta://odd-sdlc/${runRef}`
+  });
   return Object.freeze({
     kind: "sdlc_installed_operator_traversal_consequence" as const,
     constructionIntent,
     worksiteEvidence,
+    edgeGain,
+    edgeResidualPressure,
     edgeFulfillmentLedger: ledger,
     edgeClosureDecision: closureDecision,
+    overlaySegmentCompletion,
+    postActionOverlayBinding,
     nextActionProjection
   });
 }
@@ -3248,6 +3488,20 @@ function writeTraversalConsequenceArchive(input: {
     relativePath: "sdlc_worksite_evidence.json",
     payload: input.consequence.worksiteEvidence
   });
+  if (input.consequence.edgeGain !== undefined) {
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "sdlc_edge_gain.json",
+      payload: input.consequence.edgeGain
+    });
+  }
+  if (input.consequence.edgeResidualPressure !== undefined) {
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "sdlc_edge_residual_pressure.json",
+      payload: input.consequence.edgeResidualPressure
+    });
+  }
   writeOperatorArchiveFile({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_edge_fulfillment_ledger.json",
@@ -3257,6 +3511,18 @@ function writeTraversalConsequenceArchive(input: {
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_edge_closure_decision.json",
     payload: input.consequence.edgeClosureDecision
+  });
+  if (input.consequence.overlaySegmentCompletion !== null) {
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "sdlc_overlay_segment_completion.json",
+      payload: input.consequence.overlaySegmentCompletion
+    });
+  }
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_overlay_binding_post_action.json",
+    payload: input.consequence.postActionOverlayBinding
   });
   writeOperatorArchiveFile({
     archiveRoot: input.manifest.archiveRoot,
@@ -3888,6 +4154,9 @@ function compactRuntimeEventArchivePayload(
       });
       const manifest = deriveWorkerHandoffManifest({
         workspaceRoot: input.workspaceRoot,
+        overlayRef: executionContract.overlayRef,
+        overlayBindingRef: executionContract.overlayBindingRef,
+        graphCatalogDigestRef: executionContract.overlayBinding.graphCatalogDigestRef,
         graphFunctionName: executionContract.targetGraphFunction,
         edgeName: pluginInput.edge,
         vectorIndex: pluginInput.vectorIndex,
@@ -4535,9 +4804,13 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     yield: 0,
     other: 0
   };
+  const maxLoopAttempts =
+    input.requestedUntil === "converged"
+      ? MAX_INSTALLED_CONVERGENCE_ATTEMPTS
+      : MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
   for (
     let attemptIndex = 0;
-    attemptIndex < MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS;
+    attemptIndex < maxLoopAttempts;
     attemptIndex += 1
   ) {
     latest = await executeInstalledOperatorStart({
@@ -4566,24 +4839,45 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     ) {
       break;
     }
-    if (!installedStartHasEvaluateNextTraversalTruth(latest)) {
-      break;
-    }
-    const reentryDisposition =
-      installedReentryDispositionForOutcome(latest) ?? "other";
-    reentryDispositionCounts[reentryDisposition] += 1;
     if (
-      reentryDispositionCounts[reentryDisposition] >=
-      installedReentryAttemptLimit(reentryDisposition)
+      !installedStartShouldContinueForRequestedUntil({
+        requestedUntil: input.requestedUntil,
+        outcome: latest
+      })
     ) {
-      retryGuardExhausted = true;
-      exhaustedDisposition = reentryDisposition;
       break;
     }
-    retryContextOverride = deriveSdlcWorkerRetryContextFromTraversalConsequence({
-      outcome: latest,
-      attemptIndex: attemptIndex + 1
-    }).retryContext ?? undefined;
+    const shouldContinueEvaluateNext =
+      installedStartHasEvaluateNextTraversalTruth(latest);
+    const closureDisposition =
+      latest.traversalConsequence?.edgeClosureDecision.disposition ?? null;
+    const countsAgainstReentryGuard =
+      closureDisposition !== null && closureDisposition !== "close";
+    if (countsAgainstReentryGuard) {
+      const reentryDisposition =
+        installedReentryDispositionForOutcome(latest) ?? "other";
+      reentryDispositionCounts[reentryDisposition] += 1;
+      if (
+        reentryDispositionCounts[reentryDisposition] >=
+        installedReentryAttemptLimit(reentryDisposition)
+      ) {
+        retryGuardExhausted = true;
+        exhaustedDisposition = reentryDisposition;
+        break;
+      }
+    }
+    if (attemptIndex + 1 >= maxLoopAttempts) {
+      retryGuardExhausted = true;
+      exhaustedDisposition = "other";
+      break;
+    }
+    retryContextOverride =
+      countsAgainstReentryGuard && shouldContinueEvaluateNext
+        ? deriveSdlcWorkerRetryContextFromTraversalConsequence({
+            outcome: latest,
+            attemptIndex: attemptIndex + 1
+          }).retryContext ?? undefined
+        : undefined;
     const refreshed = await input.refreshReplayState();
     start = refreshed.start;
     replayEvents = refreshed.replayEvents;
@@ -4608,6 +4902,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     requestedUntil: input.requestedUntil,
     outcome: latest,
     attempts,
+    maxAttempts: maxLoopAttempts,
     retryGuardExhausted,
     exhaustedDisposition
   });

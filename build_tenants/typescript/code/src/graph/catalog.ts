@@ -14,6 +14,7 @@ import {
 export interface SdlcFunctionCatalogEntry {
   readonly kind: "sdlc_function_catalog_entry";
   readonly catalogRole: "product_specialization";
+  readonly graphTrackPublication: "default" | "overlay_only";
   readonly name: string;
   readonly intent: string;
   readonly inputs: readonly string[];
@@ -40,15 +41,55 @@ export interface SdlcGraphFunctionCatalog {
   readonly executives: readonly SdlcExecutiveProgramEntry[];
 }
 
+export const FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE =
+  "bootstrap_requirements" as const;
+export const FG_SOLUTION_ARCHITECTURE_EXECUTIVE =
+  "solution_architecture" as const;
+export const FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE =
+  "lite_design_module_implementation" as const;
+export const FG_UAT_TEST_CASES_EXECUTIVE = "uat_test_cases" as const;
+export const FG_DERIVE_LITE_DESIGN_ADR_SURFACE =
+  "derive_lite_design_adr_surface" as const;
+export const FG_DERIVE_LITE_MODULE_SURFACE =
+  "derive_lite_module_surface" as const;
+export const FG_DERIVE_LITE_COMPONENT_CODE_SURFACE =
+  "derive_lite_component_code_surface" as const;
+
+export const BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS = Object.freeze([
+  "derive_intent_surface",
+  "derive_product_surface",
+  "derive_goal_surface",
+  "derive_requirement_surface"
+] as const);
+
+export const SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS = Object.freeze([
+  "derive_feature_decomp_surface",
+  "derive_design_surface",
+  "derive_scenario_surface",
+  "derive_implementation_design_surface"
+] as const);
+
+export const LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS = Object.freeze([
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_MODULE_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+] as const);
+
+export const UAT_TEST_CASES_EXECUTIVE_STEPS = Object.freeze([
+  "derive_uat_testcases_surface"
+] as const);
+
 function entry(input: {
   readonly name: string;
   readonly intent: string;
   readonly inputs: readonly string[];
   readonly outputs: readonly string[];
+  readonly graphTrackPublication?: "default" | "overlay_only";
 }): SdlcFunctionCatalogEntry {
   return Object.freeze({
     kind: "sdlc_function_catalog_entry",
     catalogRole: "product_specialization",
+    graphTrackPublication: input.graphTrackPublication ?? "default",
     name: input.name,
     intent: input.intent,
     inputs: Object.freeze([...input.inputs]),
@@ -96,8 +137,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_uat_testcases_surface",
-    intent: "Derive operator UAT testcase structure from requirements.",
-    inputs: ["requirement_surface"],
+    intent: "Derive operator UAT testcase structure from requirements and admitted solution architecture authority.",
+    inputs: ["requirement_surface", "implementation_design_surface"],
     outputs: ["uat_testcases_surface"]
   }),
   entry({
@@ -431,8 +472,36 @@ export const TRIAGE_FUNCTION_CATALOG = Object.freeze([
   })
 ]);
 
+export const LITE_FUNCTION_CATALOG = Object.freeze([
+  entry({
+    name: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+    intent: "Derive a compact design/ADR authority surface for a bounded implementation slice without expanding the full solution architecture graph.",
+    inputs: ["input_set"],
+    outputs: ["implementation_design_surface"],
+    graphTrackPublication: "overlay_only"
+  }),
+  entry({
+    name: FG_DERIVE_LITE_MODULE_SURFACE,
+    intent: "Derive compact module authority from the lite design/ADR surface for immediate implementation.",
+    inputs: ["implementation_design_surface"],
+    outputs: ["implementation_module_surface"],
+    graphTrackPublication: "overlay_only"
+  }),
+  entry({
+    name: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    intent: "Materialize a bounded component implementation from lite design/ADR and module authority without expanding through full topology, stack profile, or realization scheduling.",
+    inputs: [
+      "implementation_design_surface",
+      "implementation_module_surface"
+    ],
+    outputs: ["component_code_surface"],
+    graphTrackPublication: "overlay_only"
+  })
+]);
+
 export const SDLC_FUNCTION_CATALOG = Object.freeze([
   ...BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+  ...LITE_FUNCTION_CATALOG,
   ...OPERATIONAL_FUNCTION_CATALOG,
   ...TRIAGE_FUNCTION_CATALOG
 ]);

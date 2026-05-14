@@ -33,3 +33,6 @@ as the governing method reference when writing or revising these files.
 - `15-odd-sdlc-scheduling-phase.md` defines the graph-owned schedule/work-plan,
   tranche, dependency-graph, and indexed-pressure surfaces that constrain
   realization edges before materialization.
+- `16-edge-gain-closure-contract.md` defines the product-owned gain, evidence,
+  metric, close, residual-pressure, and composition contract for every
+  published typed vector traversal.

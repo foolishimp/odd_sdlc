@@ -19,18 +19,29 @@ import {
 } from "@abiogenesis/typescript-tenant";
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+  BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
+  FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+  FG_UAT_TEST_CASES_EXECUTIVE,
+  LITE_FUNCTION_CATALOG,
+  LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
   SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
   SDLC_FUNCTION_CATALOG,
+  SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
   TRIAGE_FUNCTION_CATALOG,
+  UAT_TEST_CASES_EXECUTIVE_STEPS,
   type SdlcExecutiveProgramEntry,
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
 import type { SdlcReusableGraphFunctionCatalogEntry } from "./library.js";
 import {
+  activeOddSdlcTraversalStrategyPlan,
   defaultSdlcTraversalScopeRefsForName,
   defaultSdlcTraversalStrategyForName,
+  type OddSdlcTraversalStrategyPlanConfig,
   type OddSdlcDefaultTraversalStrategy
 } from "../shared/traversal_strategy_plan.js";
 
@@ -149,9 +160,13 @@ function enforcementPrimitivesForStrategy(
 }
 
 function traversalModulationDeclaration(
-  name: string
+  name: string,
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
 ): SerializedAttrEntry {
-  const strategy = defaultSdlcTraversalStrategyForName(name);
+  const strategy = defaultSdlcTraversalStrategyForName(
+    name,
+    traversalStrategyPlan
+  );
   return attr(
     "abg.traversal_strategy",
     hookRefValue(`strategy://odd_sdlc/${name}/${strategy}`, [
@@ -163,7 +178,9 @@ function traversalModulationDeclaration(
       ),
       attr(
         "obligation_schedule_refs",
-        stringListValue(defaultSdlcTraversalScopeRefsForName(name))
+        stringListValue(
+          defaultSdlcTraversalScopeRefsForName(name, traversalStrategyPlan)
+        )
       )
     ])
   );
@@ -187,6 +204,15 @@ function graphFunctionDeclarations(): SerializedAttrs {
   ]);
 }
 
+function publishedLeafTagsForEntry(
+  entry: SdlcFunctionCatalogEntry
+): readonly string[] {
+  if (entry.graphTrackPublication === "overlay_only") {
+    return Object.freeze(["odd_sdlc", "overlay_only_leaf"]);
+  }
+  return Object.freeze(["odd_sdlc", "published_leaf"]);
+}
+
 function reusableGraphFunctionDeclarations(
   entry: SdlcReusableGraphFunctionCatalogEntry
 ): SerializedAttrs {
@@ -208,12 +234,16 @@ function reusableGraphFunctionDeclarations(
   ]);
 }
 
-function vectorDeclarations(entry: SdlcFunctionCatalogEntry): SerializedAttrs {
+function vectorDeclarations(
+  entry: SdlcFunctionCatalogEntry,
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
+): SerializedAttrs {
   return attrs([
-    traversalModulationDeclaration(entry.name),
+    traversalModulationDeclaration(entry.name, traversalStrategyPlan),
     attr("intent", scalarValue(entry.intent)),
     attr("backing_graph_function", scalarValue(entry.backingGraphFunction)),
     attr("catalog_role", scalarValue(entry.catalogRole)),
+    attr("graph_track_publication", scalarValue(entry.graphTrackPublication)),
     attr("specializes_graph_function", scalarValue(entry.specializesGraphFunction)),
     attr("transform_contract_ref", scalarValue(entry.transformContractRef)),
     attr("evaluation_contract_ref", scalarValue(entry.evaluationContractRef)),
@@ -232,10 +262,11 @@ function vectorDeclarations(entry: SdlcFunctionCatalogEntry): SerializedAttrs {
 }
 
 function reusableVectorDeclarations(
-  entry: SdlcReusableGraphFunctionCatalogEntry
+  entry: SdlcReusableGraphFunctionCatalogEntry,
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
 ): SerializedAttrs {
   return attrs([
-    traversalModulationDeclaration(entry.name),
+    traversalModulationDeclaration(entry.name, traversalStrategyPlan),
     attr("intent", scalarValue(entry.intent)),
     attr("catalog_role", scalarValue(entry.graphFunctionRole)),
     attr("stable_outer_contract", scalarValue(entry.stableOuterContract)),
@@ -245,9 +276,13 @@ function reusableVectorDeclarations(
   ]);
 }
 
-function graphFunctionForEntry(entry: SdlcFunctionCatalogEntry): GraphFunction {
+function graphFunctionForEntry(
+  entry: SdlcFunctionCatalogEntry,
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
+): GraphFunction {
   const sourceNodes = entry.inputs.map(nodeFor);
   const target = nodeFor(firstOutput(entry));
+  const graphFunctionTags = publishedLeafTagsForEntry(entry);
   const graph = edge(sourceNodes, target, {
     id: `vector:odd_sdlc:${entry.name}`,
     name: entry.name,
@@ -256,14 +291,14 @@ function graphFunctionForEntry(entry: SdlcFunctionCatalogEntry): GraphFunction {
     contexts: [],
     rule: null,
     allowsSubwork: false,
-    declarations: vectorDeclarations(entry),
+    declarations: vectorDeclarations(entry, traversalStrategyPlan),
     tags: ["odd_sdlc", "leaf_graph_function"]
   });
 
   const graphFunction = graphFunctionForVector(firstVector(graph, entry.name), {
     name: entry.backingGraphFunction,
     declarations: graphFunctionDeclarations(),
-    tags: ["odd_sdlc", "published_leaf"]
+    tags: graphFunctionTags
   });
   return admitGraphFunction({
     name: graphFunction.name,
@@ -279,7 +314,8 @@ function graphFunctionForEntry(entry: SdlcFunctionCatalogEntry): GraphFunction {
 }
 
 function reusableGraphFunctionForEntry(
-  entry: SdlcReusableGraphFunctionCatalogEntry
+  entry: SdlcReusableGraphFunctionCatalogEntry,
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
 ): GraphFunction {
   const sourceNodes = entry.inputs.map(nodeFor);
   const outputNodes = entry.outputs.map(nodeFor);
@@ -307,7 +343,7 @@ function reusableGraphFunctionForEntry(
     contexts: [],
     rule: null,
     allowsSubwork: false,
-    declarations: reusableVectorDeclarations(entry),
+    declarations: reusableVectorDeclarations(entry, traversalStrategyPlan),
     tags: ["odd_sdlc", "reusable_graph_function"]
   });
   const vector = firstVector(primaryGraph, entry.name);
@@ -345,9 +381,12 @@ function reusableGraphFunctionForEntry(
 }
 
 function leafFunctions(
-  entries: readonly SdlcFunctionCatalogEntry[]
+  entries: readonly SdlcFunctionCatalogEntry[],
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
 ): readonly GraphFunction[] {
-  return Object.freeze(entries.map(graphFunctionForEntry));
+  return Object.freeze(
+    entries.map((entry) => graphFunctionForEntry(entry, traversalStrategyPlan))
+  );
 }
 
 function uniqueNodes(nodes: readonly Node[]): readonly Node[] {
@@ -444,6 +483,25 @@ function functionNames(functions: readonly GraphFunction[]): readonly string[] {
   return Object.freeze(functions.map((graphFunction) => graphFunction.name));
 }
 
+function functionsByNames(
+  functions: readonly GraphFunction[],
+  names: readonly string[],
+  executiveName: string
+): readonly GraphFunction[] {
+  const byName = new Map(
+    functions.map((graphFunction) => [graphFunction.name, graphFunction])
+  );
+  return Object.freeze(
+    names.map((name) => {
+      const graphFunction = byName.get(name);
+      if (graphFunction === undefined) {
+        throw new TypeError(`${executiveName}: missing step graph function ${name}`);
+      }
+      return graphFunction;
+    })
+  );
+}
+
 function jobFor(graphFunction: GraphFunction) {
   return Object.freeze({
     id: `job:odd_sdlc:${graphFunction.name}`,
@@ -460,8 +518,15 @@ function jobFor(graphFunction: GraphFunction) {
 }
 
 export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
-  const bootstrapFunctions = leafFunctions(BOOTSTRAP_RELEASE_FUNCTION_CATALOG);
-  const operationalFunctions = leafFunctions(OPERATIONAL_FUNCTION_CATALOG);
+  const traversalStrategyPlan = activeOddSdlcTraversalStrategyPlan();
+  const bootstrapFunctions = leafFunctions(
+    BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
+  const operationalFunctions = leafFunctions(
+    OPERATIONAL_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
   return Object.freeze({
     kind: "sdlc_graph_function_catalog",
     libraryFunctions: SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
@@ -478,18 +543,62 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
         intent: "Operational continuation executive from release through runtime return and retrofit planning.",
         steps: functionNames(operationalFunctions),
         outputs: ["retrofit_plan_surface"]
+      }),
+      executiveEntry({
+        name: FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+        intent: "Bounded bootstrap traversal from source input through admitted requirements authority.",
+        steps: BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
+        outputs: ["requirement_surface"]
+      }),
+      executiveEntry({
+        name: FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+        intent: "Bounded solution architecture traversal from requirements to implementation design authority.",
+        steps: SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
+        outputs: ["implementation_design_surface"]
+      }),
+      executiveEntry({
+        name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+        intent: "Lite traversal from implementation design through module authority to component implementation.",
+        steps: LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
+        outputs: ["component_code_surface"]
+      }),
+      executiveEntry({
+        name: FG_UAT_TEST_CASES_EXECUTIVE,
+        intent: "Bounded UAT test-case traversal from requirements to UAT testcase authority.",
+        steps: UAT_TEST_CASES_EXECUTIVE_STEPS,
+        outputs: ["uat_testcases_surface"]
       })
     ])
   });
 }
 
-export function constructSdlcGtlModule(): Module {
+export function constructSdlcGtlModule(input: {
+  readonly traversalStrategyPlan?: OddSdlcTraversalStrategyPlanConfig | undefined;
+} = {}): Module {
+  const traversalStrategyPlan =
+    input.traversalStrategyPlan ?? activeOddSdlcTraversalStrategyPlan();
   const libraryFunctions = Object.freeze(
-    SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.map(reusableGraphFunctionForEntry)
+    SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.map((entry) =>
+      reusableGraphFunctionForEntry(entry, traversalStrategyPlan)
+    )
   );
-  const bootstrapFunctions = leafFunctions(BOOTSTRAP_RELEASE_FUNCTION_CATALOG);
-  const operationalFunctions = leafFunctions(OPERATIONAL_FUNCTION_CATALOG);
-  const triageFunctions = leafFunctions(TRIAGE_FUNCTION_CATALOG);
+  const bootstrapFunctions = leafFunctions(
+    BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
+  const liteFunctions = leafFunctions(
+    LITE_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
+  const operationalFunctions = leafFunctions(
+    OPERATIONAL_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
+  const triageFunctions = leafFunctions(
+    TRIAGE_FUNCTION_CATALOG,
+    traversalStrategyPlan
+  );
+  const liteExecutiveFunctions = liteFunctions;
   const bootstrapExecutive = constructExecutive({
     name: "bootstrap_release_self_test",
     intent: "Top-level bootstrap-to-release executive over the retained proving subset.",
@@ -502,11 +611,56 @@ export function constructSdlcGtlModule(): Module {
     functions: operationalFunctions,
     outputs: ["retrofit_plan_surface"]
   });
+  const bootstrapRequirementsExecutive = constructExecutive({
+    name: FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+    intent: "Bounded bootstrap traversal from source input through admitted requirements authority.",
+    functions: functionsByNames(
+      bootstrapFunctions,
+      BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
+      FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE
+    ),
+    outputs: ["requirement_surface"]
+  });
+  const solutionArchitectureExecutive = constructExecutive({
+    name: FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+    intent: "Bounded solution architecture traversal from requirements to implementation design authority.",
+    functions: functionsByNames(
+      bootstrapFunctions,
+      SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
+      FG_SOLUTION_ARCHITECTURE_EXECUTIVE
+    ),
+    outputs: ["implementation_design_surface"]
+  });
+  const liteDesignModuleImplementationExecutive = constructExecutive({
+    name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    intent: "Lite traversal from implementation design through module authority to component implementation.",
+    functions: functionsByNames(
+      liteExecutiveFunctions,
+      LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
+      FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+    ),
+    outputs: ["component_code_surface"]
+  });
+  const uatTestCasesExecutive = constructExecutive({
+    name: FG_UAT_TEST_CASES_EXECUTIVE,
+    intent: "Bounded UAT test-case traversal from requirements to UAT testcase authority.",
+    functions: functionsByNames(
+      bootstrapFunctions,
+      UAT_TEST_CASES_EXECUTIVE_STEPS,
+      FG_UAT_TEST_CASES_EXECUTIVE
+    ),
+    outputs: ["uat_testcases_surface"]
+  });
   const graphFunctions = Object.freeze([
     ...libraryFunctions,
     bootstrapExecutive,
     operationalExecutive,
+    bootstrapRequirementsExecutive,
+    solutionArchitectureExecutive,
+    liteDesignModuleImplementationExecutive,
+    uatTestCasesExecutive,
     ...bootstrapFunctions,
+    ...liteFunctions,
     ...operationalFunctions,
     ...triageFunctions
   ]);
@@ -524,6 +678,7 @@ export function constructSdlcGtlModule(): Module {
     imports: [],
     metadata: attrs([
       attr("domain_package", scalarValue("odd_sdlc")),
+      attr("traversal_strategy_plan_ref", scalarValue(traversalStrategyPlan.planRef)),
       attr(
         "reusable_graph_function_catalog_size",
         scalarValue(String(SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG.length))

@@ -7,7 +7,7 @@ status: backlog
 goal: deterministic-read-only-runtime-analysis-without-new-closure-authority
 build_tenant: typescript
 owner: odd_sdlc
-change_intent: Add a deterministic read-only F_D analysis command over existing workspaces and run archives that emits current-state telemetry, gap analysis, and diagnostics for performance, bloat, retry, and runtime-shape triage without advancing traversal or creating closure authority.
+change_intent: Add a deterministic read-only F_D analysis command over existing workspaces and run archives that emits current-state telemetry, runtime artifact gaps, and diagnostics for performance, bloat, retry, and runtime-shape triage without advancing traversal or creating closure authority.
 change_class: design_reframe
 re_entry_point: design
 priority: high
@@ -27,9 +27,10 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
   - .ai-workspace/comments/codex/20260512T054127Z_POST_t132_live_performance_bloat_telemetry.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-158-replay-product-materialization-manifest-across-repair-attempts.md
-  - .ai-workspace/tickets/active/T-159-product-assets-carry-requirement-lineage.md
-  - .ai-workspace/tickets/backlog/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
+  - .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
+  - .ai-workspace/tickets/completed/T-158-replay-product-materialization-manifest-across-repair-attempts.md
+  - .ai-workspace/tickets/completed/T-159-product-assets-carry-requirement-lineage.md
+  - .ai-workspace/tickets/completed/T-160-first-class-traversal-overlays-for-guided-graph-passes.md
   - .ai-workspace/tickets/completed/T-132-create-hello-world-single-tenant-live-proof-lane.md
   - .ai-workspace/tickets/completed/T-133-create-minimum-overhead-rust-hello-world-live-lane.md
   - .ai-workspace/tickets/completed/T-139-consolidate-public-gaps-as-read-only-evaluator-view.md
@@ -40,14 +41,24 @@ evidence_archives:
   clean_t132_js_live: build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260512T050346719Z_pid65805
   retry_heavy_t132_js_live: build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260512T034912177Z_pid64074
   aborted_t132_bloat_observation: build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260512T044815391Z_pid44464
+  fresh_t133_rust_live: build_tenants/typescript/test_env/test_runs/scenario_t133_hello_world_rust_live/20260512T055755078Z_pid33268
+  data_mapper_scale_sandbox: build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260511T172019616Z_pid87986
+  data_mapper_repair_timeout: build_tenants/typescript/test_env/test_runs/full_external_data_mapper_sandbox/20260511T112004427Z_pid37576
 affected_boundary:
-  - build_tenants/typescript/code/src/spec_method/entry.ts
-  - build_tenants/typescript/code/src/operator/carriers.ts
+  - build_tenants/typescript/code/src/analysis/   # new pure read-model module
+  - build_tenants/typescript/code/src/spec_method/entry.ts   # CLI dispatch only
+  - build_tenants/typescript/code/src/shared/blocking_reason.ts   # diagnostic code registration only
+  - build_tenants/typescript/test_env/tests/
+restricted_boundary:
+  # Touching any of these from T-161 requires an explicit execution-authority
+  # audit in the review-resolution comment before the change lands. The linter
+  # is a read-model over their outputs; it must not modify their behavior.
   - build_tenants/typescript/code/src/operator/handoff.ts
   - build_tenants/typescript/code/src/operator/installed_operator.ts
+  - build_tenants/typescript/code/src/operator/carriers.ts
+  - build_tenants/typescript/code/src/operator/traversal_consequence.ts
   - build_tenants/typescript/code/src/projection/query_domain.ts
-  - build_tenants/typescript/code/src/shared/blocking_reason.ts
-  - build_tenants/typescript/test_env/tests/
+  - build_tenants/typescript/code/src/start/public_start.ts
 excluded_boundary:
   - traversal advancement
   - worker invocation
@@ -66,6 +77,11 @@ non_closure_conditions:
   - analyzer reports prompt volume only as prompt markdown bytes, excluding invocation, handoff, traversal, stdout, and event carriers
   - analyzer cannot distinguish no retry, retry, repair, block, and aborted-run shapes
   - analyzer cannot flag requirement/product-lineage fanout and bloat slope anomalies
+  - analyzer publishes a `gapAnalysis` field that competes with public `gaps` requirement-fulfillment authority
+  - analyzer treats `run_performance_summary.json` or `edge_performance_summary.json` as authority without structurally comparing them to raw runtime carriers
+  - analyzer modifies any file listed in `restricted_boundary` without an explicit execution-authority audit
+  - analyzer emits non-`info` severity from unratified threshold-policy refs
+  - analyzer cannot answer "what is running now, is it productive, and where is it stuck" for a long-running graph
 ---
 
 # T-161: Read-Only F_D Run Analysis Linter
@@ -187,9 +203,52 @@ For each operator run:
 - product-lineage count;
 - prompt/context byte counts.
 
-### 3. Gap Analysis
+### 3. Active-Run Liveness
 
-Report missing or incomplete runtime structure:
+For a long-running graph the operator needs to answer three questions at any
+moment: what is running now, is it productive, and where is it stuck. The
+analyzer must publish this section even when the run is already complete (in
+which case the fields describe the last-active edge before the run ended).
+
+Required fields:
+
+- `activeOperatorRunRef` — the most recent operator-run directory.
+- `activeEdgeRef` — graph function / vector / target asset type for the
+  in-flight or last edge.
+- `actorInvocationRef` — current or last `actor_invocation_started` event ref.
+- `workerProcessRef` — `worker_process_started.json` ref when present.
+- `workerPid` — best-effort process id (from worker_process_started or
+  filename suffix); reported with `processAliveCheckedAt` and
+  `processAlive: true | false | unknown`.
+- `lastEventAt` — most recent `runtime_events.json` / `worker_process_events.jsonl`
+  entry timestamp.
+- `lastStdoutAt` — most recent stdout write mtime.
+- `lastHeartbeatAt` — most recent `actor_process_heartbeat` event timestamp.
+- `heartbeatAgeMs` — now minus `lastHeartbeatAt`.
+- `maxNoOutputGapMs` — longest observed gap between consecutive stdout or
+  event entries within the active edge.
+- `archiveGrowthBytesPerMinute` — rolling growth of the active operator-run
+  directory across the last several samples.
+- `productiveSignal` — one of `progressing`, `stalled_with_io`,
+  `stalled_no_io`, `completed`, `aborted_or_killed`, `unknown`. The classifier
+  is structural: `stalled_no_io` requires `heartbeatAgeMs > threshold` and
+  zero stdout/event growth in the same window; `progressing` requires any
+  measurable stdout or event delta plus a recent heartbeat.
+- `lastBlockingReason` — typed blocking reason from the last admitted
+  postflight / assurance if the run has produced one.
+
+The classifier is F_D and structural; it must not call `productive` based on
+elapsed time alone. The thresholds backing `stalled_*` classification ride
+through the same profile/threshold policy refs as the slope analysis (see
+Profiles section).
+
+### 4. Runtime Artifact Gaps
+
+Report missing or incomplete runtime structure. This section is **runtime
+artifact gaps** only — it does **not** carry product-requirement fulfillment
+state. Public requirement-fulfillment state lives behind the `gaps` command
+and the requirement closure register; this section reports only the shape of
+the admitted runtime carriers.
 
 - missing `worker_run.json`;
 - missing `worker_invocation_package.json`;
@@ -207,7 +266,7 @@ Report missing or incomplete runtime structure:
 - no final closure decision;
 - archive sequence gaps.
 
-### 4. Diagnostics
+### 5. Diagnostics
 
 Emit typed diagnostics with severity:
 
@@ -226,12 +285,17 @@ Emit typed diagnostics with severity:
 - `edge_sequence_incomplete`;
 - `phase_timing_unavailable`;
 - `aborted_run_observed`;
-- `unattributed_time_high`.
+- `unattributed_time_high`;
+- `active_run_stalled_no_io`;
+- `active_run_stalled_with_io`;
+- `worker_heartbeat_age_high`;
+- `archive_growth_zero_during_active_edge`;
+- `summary_source_drift`.
 
 Diagnostics are read-only findings. They may fail the linter command under a
 strict profile, but they do not alter closure or traversal state.
 
-### 5. Bloat And Slope Analysis
+### 6. Bloat And Slope Analysis
 
 Compute normalized ratios:
 
@@ -257,7 +321,7 @@ The analyzer should flag potential superlinear growth. It should distinguish
 legitimate design traceability tables from product-file lineage, where the
 expected count is the current canonical requirement obligations for that file.
 
-### 6. Retry Forensics
+### 7. Retry Forensics
 
 Every retry or repair must get a compact forensic row:
 
@@ -291,6 +355,25 @@ Profiles are optional rule bundles. First candidates:
 - `hello_world`: strict low-complexity baseline.
 - `data_mapper`: scale baseline focused on slope, not absolute time.
 - `generic`: structural lint only.
+
+### Profile And Threshold Policy Refs
+
+Every profile must declare:
+
+- `profilePolicyRef` — typed ref to the profile's structural rule set
+  (e.g. `policy://odd-sdlc/analysis/profile/hello_world/v1`).
+- `thresholdPolicyRef` — typed ref to the numeric thresholds the profile uses
+  for slope, bloat, heartbeat age, and stall classification.
+- `policyStatus` — `ratified` or `informational`. Unratified thresholds
+  produce diagnostics with severity `info` only; they do **not** fail a
+  strict lint until promoted.
+
+The thresholds themselves are not embedded inline in `odd_sdlc` core. They
+live behind the policy ref so a project or tenant can override them through
+its own admitted policy without forking the analyzer. Until those policy
+carriers are ratified, the analyzer ships with default `informational`
+thresholds and any "high" / "suspicious" diagnostic in this section is
+explicitly advisory.
 
 `hello_world` profile should check:
 
@@ -326,16 +409,26 @@ Candidate top-level shape:
   "version": 1,
   "inspectedRoot": "...",
   "profile": "hello_world",
+  "profilePolicyRef": "policy://odd-sdlc/analysis/profile/hello_world/v1",
+  "thresholdPolicyRef": "policy://odd-sdlc/analysis/threshold/hello_world/v1",
+  "policyStatus": "informational",
   "readOnly": true,
   "currentStateTelemetrySummary": {},
   "edgeTraversal": [],
-  "gapAnalysis": [],
+  "activeRunLiveness": {},
+  "runtimeArtifactGaps": [],
   "diagnostics": [],
   "bloatAndSlopeAnalysis": {},
   "retryForensics": [],
   "evidenceIndex": []
 }
 ```
+
+Field-naming note: this section is **`runtimeArtifactGaps`**, not
+`gapAnalysis`. The unqualified term *gap* is reserved for the public `gaps`
+view over product requirement fulfillment. The analyzer reports structural
+gaps in admitted runtime carriers; it does not publish a competing
+requirements-fulfillment surface.
 
 Markdown output should render the same sections as tables for operator review.
 
@@ -383,9 +476,11 @@ Markdown output should render the same sections as tables for operator review.
    It reports an incomplete run without treating it as closure failure or
    closure success.
 
-4. JSON output includes current-state telemetry summary, edge traversal, gap
-   analysis, diagnostics, bloat/slope analysis, retry forensics, and evidence
-   index sections.
+4. JSON output includes current-state telemetry summary, edge traversal,
+   active-run liveness, runtime artifact gaps, diagnostics, bloat/slope
+   analysis, retry forensics, summary drift, and evidence index sections.
+   The output must not publish a `gapAnalysis` field; runtime carrier gaps
+   live under `runtimeArtifactGaps`.
 
 5. Markdown output renders those same sections in operator-readable form.
 
@@ -403,6 +498,43 @@ Markdown output should render the same sections as tables for operator review.
 
 10. The analyzer is not consumed by start/dispatch/closure code as routing or
     closure authority.
+
+11. The analyzer can be invoked against a live, mid-run workspace whose latest
+    operator-run has no `run.json`. The `activeRunLiveness` section reports
+    `activeEdgeRef`, `workerPid`, `processAlive`, `lastEventAt`,
+    `heartbeatAgeMs`, `maxNoOutputGapMs`, and `archiveGrowthBytesPerMinute`,
+    and classifies the run as `progressing`, `stalled_with_io`,
+    `stalled_no_io`, `aborted_or_killed`, or `completed`. The classifier
+    relies only on file mtime, event timestamps, and PID liveness.
+
+12. Unit tests cover the active-run liveness classifier on at least four
+    fixtures: a progressing in-flight run, a stalled_no_io case, a clean
+    completed run, and a killed/aborted run. Stalled and aborted cases must
+    not be classified as completed.
+
+13. When the inspected archive contains a `run_performance_summary.json` or
+    `edge_performance_summary.json`, the analyzer recomputes the equivalent
+    field from raw carriers and asserts equality within tolerance. A
+    deliberate per-field tampering test produces `summary_source_drift` and
+    causes the recomputed value to win.
+
+14. The analyzer runs against the fresh T-133 Rust live archive and the
+    `full_external_data_mapper_sandbox` archives recorded in
+    `evidence_archives`. It reports the data_mapper run's repair/timeout
+    shape as retry/repair diagnostics with wasted worker seconds and
+    `aborted_run_observed` where applicable, and reports the Rust run
+    alongside T-132 to demonstrate the clean baseline holds across two
+    languages.
+
+15. Implementation lands without modifying any file listed in
+    `restricted_boundary` above. If during implementation a restricted file
+    must change, the change is captured in a separate ticket or a
+    review-resolution comment that explicitly audits the execution-authority
+    impact before the change merges.
+
+16. Profile thresholds emit `info` severity diagnostics only while their
+    backing `thresholdPolicyRef` is unratified. A strict-profile failure
+    (non-zero exit) requires ratified thresholds.
 
 ## Non-Goals
 
@@ -439,5 +571,44 @@ The first slice can reconstruct from current files:
 - `product_materialization_manifest.json`
 
 Later live runs may emit direct `run_performance_summary.json` and
-`edge_performance_summary.json` artifacts. The analyzer should prefer those when
-present but remain able to analyze older archives by reconstruction.
+`edge_performance_summary.json` artifacts. When those summary files are
+present the analyzer **must structurally compare them against the raw
+runtime/consequence/event carriers** before treating them as the analysis
+source. Specifically:
+
+- For every numeric field on the summary (worker elapsed, postflight status,
+  blocking reasons, retry counts, byte totals), the analyzer recomputes the
+  same field from the raw carriers and asserts equality within a documented
+  tolerance.
+- On mismatch, emit `summary_source_drift` with the field name, summary
+  value, recomputed value, and the raw carrier ref that produced the
+  recomputed value. The summary is treated as `untrusted` for that field;
+  the recomputed value wins.
+- If the summary is structurally valid and all spot-checked fields agree,
+  the analyzer may quote the summary's pre-computed phase timers for
+  fields it cannot recompute from raw carriers, and must note in the
+  output which fields came from the summary vs the raw carriers.
+
+A summary file must never become a *second* truth surface. It is a
+performance/audit convenience over the same admitted runtime carriers.
+
+## Review Resolution 2026-05-12
+
+Codex/Claude review verdict: "T-161 is the right design move. F_D, read-only,
+explicitly non-authoritative — fits W/L/E/Ev direction and the product rule
+that visible state is a projection, not runtime truth. Tighten a few points
+before implementation."
+
+Findings folded back into this ticket:
+
+| Severity | Finding | Resolution |
+| --- | --- | --- |
+| High | Missing active-run liveness as a first-class section. | New §"Active-Run Liveness" output section with `activeEdgeRef`, `workerPid`, `processAlive`, `actorInvocationRef`, `lastEventAt`, `lastStdoutAt`, `lastHeartbeatAt`, `heartbeatAgeMs`, `maxNoOutputGapMs`, `archiveGrowthBytesPerMinute`, `productiveSignal`. New diagnostic codes `active_run_stalled_no_io`, `active_run_stalled_with_io`, `worker_heartbeat_age_high`, `archive_growth_zero_during_active_edge`. New AC-11 and AC-12. |
+| Medium | Later summary files could become a rival truth surface. | Implementation Notes now require structural recomputation against raw carriers and an explicit `summary_source_drift` diagnostic; recomputed value wins. New AC-13 and a new non-closure condition. |
+| Medium | `gapAnalysis` competes with public `gaps`. | Section renamed to **Runtime Artifact Gaps**; JSON field renamed to `runtimeArtifactGaps`; explicit boundary note that requirement-fulfillment state lives behind `gaps` only. New non-closure condition forbidding the old name. |
+| Medium | Profile thresholds need governed policy refs. | New §"Profile And Threshold Policy Refs" requiring `profilePolicyRef`, `thresholdPolicyRef`, `policyStatus`; unratified thresholds are `info`-only. JSON output carries the three fields. New AC-16 and a new non-closure condition. |
+| Medium | `affected_boundary` broader than read-only design. | Frontmatter `affected_boundary` narrowed to a new `code/src/analysis/` module, `spec_method/entry.ts` CLI dispatch, `shared/blocking_reason.ts` for code registration, and the test tree. New `restricted_boundary` lists `handoff.ts`, `installed_operator.ts`, `operator/carriers.ts`, `traversal_consequence.ts`, `query_domain.ts`, `public_start.ts` — touching any of them from T-161 requires an explicit execution-authority audit. New AC-15 and a new non-closure condition. |
+| Low | Evidence set should include T-133 and a data_mapper archive. | `evidence_archives` adds `fresh_t133_rust_live` (`20260512T055755078Z_pid33268`), `data_mapper_scale_sandbox` (`20260511T172019616Z_pid87986`), `data_mapper_repair_timeout` (`20260511T112004427Z_pid37576`). New AC-14 covers them. |
+
+The review verdict is recorded as agreement; the ticket remains `status: backlog`
+pending implementation under the tightened constraints above.

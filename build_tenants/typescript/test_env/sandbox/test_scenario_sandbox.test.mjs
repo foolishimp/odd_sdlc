@@ -16,6 +16,7 @@ import path from "node:path";
 import {
   assertScenarioExpectations,
   runScenarioSandbox,
+  scenarioStartTargetForStep,
   scenarioWorkspaceFileStopSatisfied
 } from "./scenario_sandbox.mjs";
 import { dataMapperInternalScenario } from "./scenarios/data_mapper_internal.scenario.mjs";
@@ -35,6 +36,25 @@ import {
   t133HelloWorldRustLiveScenario,
   t133HelloWorldRustScenario
 } from "./scenarios/t133_hello_world_rust.scenario.mjs";
+import {
+  t160HelloWorldJsLiteLiveScenario,
+  t160HelloWorldJsLiteScenario,
+  t160HelloWorldJsOverlayScenarios
+} from "./scenarios/t160_hello_world_js_lite.scenario.mjs";
+import {
+  t160HelloWorldRustLiteLiveScenario,
+  t160HelloWorldRustLiteScenario
+} from "./scenarios/t160_hello_world_rust_lite.scenario.mjs";
+import {
+  t164RustHelloServiceLiteLiveScenario,
+  t164RustHelloServiceLiteScenario
+} from "./scenarios/t164_rust_hello_service_lite.scenario.mjs";
+import {
+  mindforgeAiAssistantBaselineScenario,
+  mindforgeAiAssistantLiveScenario,
+  mindforgeAiAssistantScenarioFamily,
+  mindforgeAiAssistantVariantScenarios
+} from "./scenarios/mindforge_ai_assistant.scenario.mjs";
 
 function assertWorkspaceWasInstalled(result) {
   if (!existsSync(result.workspace) || !statSync(result.workspace).isDirectory()) {
@@ -42,6 +62,21 @@ function assertWorkspaceWasInstalled(result) {
   }
   if (result.install.kind !== "installed") {
     throw new Error(`install did not complete: ${JSON.stringify(result.install)}`);
+  }
+}
+
+function assertNoMindforgePrebuiltImplementation(scenario) {
+  const forbidden = [
+    "build_tenants/mindforge_ai_assistant/package.json",
+    "build_tenants/mindforge_ai_assistant/src/index.js",
+    "build_tenants/mindforge_ai_assistant/examples/use_case.json"
+  ];
+  for (const rel of forbidden) {
+    assert.equal(
+      existsSync(path.join(scenario.fixture.root, rel)),
+      false,
+      `${scenario.scenarioId} fixture includes generated product output ${rel}`
+    );
   }
 }
 
@@ -75,6 +110,54 @@ test("scenario sandbox: T-133 Rust hello-world bootstrap induction", async () =>
   assertScenarioExpectations(result, t133HelloWorldRustScenario);
 });
 
+test("scenario sandbox: T-160 JavaScript hello-world lite traversal", async () => {
+  const result = await runScenarioSandbox(t160HelloWorldJsLiteScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t160HelloWorldJsLiteScenario);
+});
+
+test("scenario sandbox: T-160 Rust hello-world lite traversal", async () => {
+  const result = await runScenarioSandbox(t160HelloWorldRustLiteScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t160HelloWorldRustLiteScenario);
+});
+
+test("scenario sandbox: T-164 Rust hello service conformance bootstrap", async () => {
+  const result = await runScenarioSandbox(t164RustHelloServiceLiteScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t164RustHelloServiceLiteScenario);
+});
+
+for (const scenario of t160HelloWorldJsOverlayScenarios) {
+  test(`scenario sandbox: T-160 JavaScript hello-world overlay matrix ${scenario.startTarget}`, async () => {
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  });
+}
+
+test("scenario sandbox: T-163 MindForge fixtures contain no prebuilt implementation output", () => {
+  for (const scenario of mindforgeAiAssistantScenarioFamily) {
+    assertNoMindforgePrebuiltImplementation(scenario);
+  }
+});
+
+test("scenario sandbox: T-163 MindForge baseline induction", async () => {
+  assertNoMindforgePrebuiltImplementation(mindforgeAiAssistantBaselineScenario);
+  const result = await runScenarioSandbox(mindforgeAiAssistantBaselineScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, mindforgeAiAssistantBaselineScenario);
+});
+
+for (const scenario of mindforgeAiAssistantVariantScenarios) {
+  test(`scenario sandbox: T-163 MindForge variant induction ${scenario.scenarioId}`, async () => {
+    assertNoMindforgePrebuiltImplementation(scenario);
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  });
+}
+
 test("scenario sandbox: hello-world live descriptors allow full graph walk", () => {
   const worker = "process://claude";
   assert(
@@ -87,6 +170,61 @@ test("scenario sandbox: hello-world live descriptors allow full graph walk", () 
     ["derive_component_code_surface"]
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
+  const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
+  assert.deepEqual(jsLite.startTarget, "overlay:lite-design-module-implementation");
+  assert(jsLite.maxAdvances <= 4);
+  const rustServiceLive = t164RustHelloServiceLiteLiveScenario({ worker });
+  assert.deepEqual(
+    scenarioStartTargetForStep(rustServiceLive, 0),
+    "overlay:bootstrap-requirements"
+  );
+  assert.deepEqual(
+    scenarioStartTargetForStep(rustServiceLive, 1),
+    "overlay:bootstrap-requirements"
+  );
+  assert.deepEqual(
+    scenarioStartTargetForStep(rustServiceLive, 2),
+    "overlay:lite-design-module-implementation"
+  );
+  assert(rustServiceLive.maxAdvances >= 16);
+  assert.deepEqual(
+    rustServiceLive.expectations.handoffEdgeSequencePrefix[0],
+    "bootstrap_requirements"
+  );
+  assert.deepEqual(
+    rustServiceLive.expectations.processChecks[0].stdout,
+    "helloworld"
+  );
+  const mindforgeLive = mindforgeAiAssistantLiveScenario({
+    worker,
+    variant: "third_party_model_variant"
+  });
+  assert.deepEqual(mindforgeLive.startTarget, "overlay:lite-design-module-implementation");
+  assert(mindforgeLive.maxAdvances <= 3);
+  assert.deepEqual(
+    mindforgeLive.expectations.handoffEdgeSequencePrefix,
+    [
+      "derive_lite_design_adr_surface",
+      "derive_lite_module_surface",
+      "derive_lite_component_code_surface"
+    ]
+  );
+  assert.deepEqual(
+    mindforgeLive.expectations.processChecks[0].stdoutJson.equals.controlPath,
+    mindforgeLive.expectedGovernanceOutput.controlPath
+  );
+  assert.deepEqual(
+    mindforgeLive.expectations.processChecks[0].stdoutJson.equals.recertification,
+    mindforgeLive.expectedGovernanceOutput.recertification
+  );
+  assert.deepEqual(
+    mindforgeLive.expectations.processChecks[0].stdoutJson.arrayMembers.monitoring,
+    mindforgeLive.expectedGovernanceOutput.monitoring
+  );
+  assert.notDeepEqual(
+    mindforgeAiAssistantBaselineScenario.expectedGovernanceOutput,
+    mindforgeLive.expectedGovernanceOutput
+  );
 });
 
 test("scenario sandbox: handoff sequence assertion tolerates same-edge retries", () => {
@@ -179,6 +317,136 @@ test("scenario sandbox: workspace file stop requires clean closure", () => {
   );
 });
 
+test("scenario sandbox: workspace file evidence can span repair attempts", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-file-evidence-"));
+  mkdirSync(path.join(workspace, "build_tenants/app/src"), { recursive: true });
+  mkdirSync(path.join(workspace, "build_tenants/app/examples"), { recursive: true });
+  writeFileSync(path.join(workspace, "build_tenants/app/package.json"), "{}", "utf8");
+  writeFileSync(path.join(workspace, "build_tenants/app/src/index.js"), "", "utf8");
+  writeFileSync(path.join(workspace, "build_tenants/app/examples/use_case.json"), "{}", "utf8");
+
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const firstRun = path.join(runsRoot, "20260512T000000000Z_pid1");
+  const secondRun = path.join(runsRoot, "20260512T000001000Z_pid1");
+  mkdirSync(firstRun, { recursive: true });
+  mkdirSync(secondRun, { recursive: true });
+  writeFileSync(
+    path.join(firstRun, "product_materialization_manifest.json"),
+    JSON.stringify({
+      contract: { selectedOutputRoot: "build_tenants/app" },
+      files: [
+        { relativePath: "package.json" },
+        { relativePath: "examples/use_case.json" }
+      ]
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(secondRun, "product_materialization_manifest.json"),
+    JSON.stringify({
+      contract: { selectedOutputRoot: "build_tenants/app" },
+      files: [{ relativePath: "src/index.js" }]
+    }),
+    "utf8"
+  );
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: "materialization-evidence-regression",
+        expectations: {
+          workspaceFiles: [
+            "build_tenants/app/package.json",
+            "build_tenants/app/src/index.js",
+            "build_tenants/app/examples/use_case.json"
+          ],
+          materializationEvidenceWorkspaceFiles: [
+            "build_tenants/app/package.json",
+            "build_tenants/app/src/index.js",
+            "build_tenants/app/examples/use_case.json"
+          ]
+        }
+      }
+    )
+  );
+
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          workspace,
+          advances: [
+            {
+              gaps: { payload: {} },
+              start: { payload: {} }
+            }
+          ]
+        },
+        {
+          scenarioId: "materialization-evidence-negative-regression",
+          expectations: {
+            workspaceFiles: ["build_tenants/app/src/index.js"],
+            materializationEvidenceWorkspaceFiles: [
+              "build_tenants/app/src/missing-ledgered-file.js"
+            ]
+          }
+        }
+      ),
+    /has no materialization ledger evidence/
+  );
+});
+
+test("scenario sandbox: process checks can assert JSON stdout fields", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-process-json-"));
+  writeFileSync(
+    path.join(workspace, "emit-json.mjs"),
+    "console.log(JSON.stringify({status:'ok', monitoring:['model_change']}));\n",
+    "utf8"
+  );
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: "process-json-regression",
+        expectations: {
+          processChecks: [
+            {
+              command: "node",
+              args: ["emit-json.mjs"],
+              stdoutJson: {
+                hasKeys: ["status", "monitoring"],
+                equals: { status: "ok" },
+                arrayMembers: { monitoring: ["model_change"] }
+              }
+            }
+          ]
+        }
+      }
+    )
+  );
+});
+
 const T131_LIVE_ENABLED = process.env["ODD_SDLC_TS_T131_ODD_CHAT_SCENARIO_LIVE"] === "1";
 const T131_LIVE_WORKER =
   process.env["ODD_SDLC_TS_T131_ODD_CHAT_SCENARIO_WORKER"] ?? "process://claude";
@@ -266,6 +534,122 @@ test(
     const scenario = t133HelloWorldRustLiveScenario({
       worker: T133_LIVE_WORKER,
       maxAdvances: T133_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T160_LITE_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_JS_LITE_SCENARIO_LIVE"] === "1";
+const T160_LITE_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_JS_LITE_SCENARIO_WORKER"] ??
+  "process://claude";
+const T160_LITE_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_JS_LITE_SCENARIO_MAX_ADVANCES"] ?? "4",
+  10
+);
+
+test(
+  "scenario sandbox: T-160 JavaScript hello-world lite live build loop (opt-in)",
+  {
+    skip: T160_LITE_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T160_HELLO_WORLD_JS_LITE_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t160HelloWorldJsLiteLiveScenario({
+      worker: T160_LITE_LIVE_WORKER,
+      maxAdvances: T160_LITE_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T160_RUST_LITE_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_RUST_LITE_SCENARIO_LIVE"] === "1";
+const T160_RUST_LITE_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_RUST_LITE_SCENARIO_WORKER"] ??
+  "process://claude";
+const T160_RUST_LITE_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T160_HELLO_WORLD_RUST_LITE_SCENARIO_MAX_ADVANCES"] ?? "4",
+  10
+);
+
+test(
+  "scenario sandbox: T-160 Rust hello-world lite live build loop (opt-in)",
+  {
+    skip: T160_RUST_LITE_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T160_HELLO_WORLD_RUST_LITE_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t160HelloWorldRustLiteLiveScenario({
+      worker: T160_RUST_LITE_LIVE_WORKER,
+      maxAdvances: T160_RUST_LITE_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T164_RUST_SERVICE_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_LIVE"] === "1";
+const T164_RUST_SERVICE_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_WORKER"] ??
+  "process://claude";
+const T164_RUST_SERVICE_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_MAX_ADVANCES"] ?? "16",
+  10
+);
+
+test(
+  "scenario sandbox: T-164 Rust hello service live build loop (opt-in)",
+  {
+    skip: T164_RUST_SERVICE_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T164_RUST_HELLO_SERVICE_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t164RustHelloServiceLiteLiveScenario({
+      worker: T164_RUST_SERVICE_LIVE_WORKER,
+      maxAdvances: T164_RUST_SERVICE_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const MINDFORGE_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_MINDFORGE_AI_ASSISTANT_SCENARIO_LIVE"] === "1";
+const MINDFORGE_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_MINDFORGE_AI_ASSISTANT_SCENARIO_WORKER"] ??
+  "process://claude";
+const MINDFORGE_LIVE_VARIANT =
+  process.env["ODD_SDLC_TS_MINDFORGE_AI_ASSISTANT_SCENARIO_VARIANT"] ??
+  "third_party_model_variant";
+const MINDFORGE_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_MINDFORGE_AI_ASSISTANT_SCENARIO_MAX_ADVANCES"] ?? "3",
+  10
+);
+
+test(
+  "scenario sandbox: T-163 MindForge AI assistant live build loop (opt-in)",
+  {
+    skip: MINDFORGE_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_MINDFORGE_AI_ASSISTANT_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = mindforgeAiAssistantLiveScenario({
+      worker: MINDFORGE_LIVE_WORKER,
+      variant: MINDFORGE_LIVE_VARIANT,
+      maxAdvances: MINDFORGE_LIVE_MAX_ADVANCES
     });
     const result = await runScenarioSandbox(scenario);
     assertWorkspaceWasInstalled(result);

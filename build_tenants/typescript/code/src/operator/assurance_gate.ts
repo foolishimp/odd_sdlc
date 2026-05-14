@@ -215,7 +215,12 @@ function deriveDeclaredObligationAssuranceLedger(input: {
   const blocked = input.report.obligationAssessments.filter(
     (assessment) =>
       obligationIds.has(assessment.obligationId) &&
-      assessment.fulfillmentStatus === "blocked"
+      assessment.fulfillmentStatus === "blocked" &&
+      !carriesDownstreamRequirementTransformationSet({
+        manifest: input.manifest,
+        postflight: input.postflight,
+        assessment
+      })
   );
   const open = input.report.obligationAssessments.filter(
     (assessment) =>

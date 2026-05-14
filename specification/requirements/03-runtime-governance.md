@@ -33,16 +33,26 @@ does not own a second imperative runtime after ABG dispatch.
   behavior without replacing substrate execution ownership
 - AC-3: no product-local post-dispatch shadow runtime remains as a stable model
 
-### REQ-F-RUNTIME-003 — The default constructive stance favors F_P
+### REQ-F-RUNTIME-003 — The generic constructive stance favors F_P
 
-The default constructive regime favors `F_P`, with `F_D` used for cheap
-trustworthy checks and `F_H` used for governance escalation.
+The default constructive regime for the generic SDLC product path is `F_P`.
+`F_D` is an optimization, admission, validation, folding, and routing regime
+around configured `F_P` work, not a generic substitute for open-ended
+constructive traversal. Optimized domains may rely on `F_D` for performance and
+cost reasons when their product-owned contract declares deterministic authority
+and deterministic closure law. `F_H` is used for governance escalation.
 
 **Acceptance Criteria**:
 - AC-1: `F_D` is used where the check is cheap, reliable, and structurally
   meaningful
 - AC-2: ambiguous or constructive work escalates to `F_P` by default
 - AC-3: policy or risk boundaries may escalate work to `F_H`
+- AC-4: a generic constructive SDLC edge that expects `F_P` cannot close from
+  `F_D` success alone unless its product contract explicitly declares the edge
+  as deterministic, projection-only, or no-close
+- AC-5: an optimized domain may choose an `F_D`-heavy path only through an
+  explicit product-owned deterministic contract rather than by silently treating
+  generic `F_P` gates as deterministic
 
 ### REQ-F-RUNTIME-004 — Runtime topology is GTL/ABG-native and project-owned
 

@@ -105,6 +105,9 @@ by configured `F_P` under an explicit output contract.
 - AC-5: prompt construction favors compact current-state summaries plus stable
   references and digests for large prior surfaces, so intermediate ledgers
   distribute LLM compute while preserving the full obligation chain
+- AC-6: current generic constructive gates expect configured `F_P`; missing
+  `F_P` construction is non-close pressure unless the edge is explicitly
+  declared deterministic, projection-only, or no-close
 
 ### REQ-F-ODDSDLC-015 — layered F_D governs universal, specialized, postflight, and operational truth
 
@@ -123,6 +126,12 @@ by configured `F_P` under an explicit output contract.
   assessments, requirement closure registers, prior gap ledgers, and
   materialized evidence into explicit close, retry, blocked, or reprice truth
   before an edge can converge
+- AC-6: for the generic SDLC product path, `F_D` optimizes, admits, validates,
+  folds, and routes around admitted `F_P` work; it does not replace configured
+  `F_P` as the constructive regime for open-ended traversal
+- AC-7: optimized domains may use `F_D` for performance and cost only when the
+  domain declares deterministic authority, deterministic transform law, and
+  deterministic closure evidence as product-owned contract truth
 
 ### REQ-F-ODDSDLC-016 — runtime-returned evidence is a first-class governed domain input
 

@@ -5,6 +5,8 @@
 // Implements: REQ-F-ODDSDLC-055
 // Implements: REQ-F-ODDSDLC-059
 // Implements: REQ-F-ODDSDLC-060
+// Implements: REQ-F-ODDSDLC-063
+// Implements: REQ-F-ODDSDLC-065
 
 import type {
   FpTransformRequest,
@@ -26,13 +28,19 @@ import type {
   SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
+import type { SdlcOverlayBinding } from "../graph/index.js";
 import type {
   SdlcConstructionIntent,
   SdlcEdgeClosureDecision,
   SdlcEdgeFulfillmentLedger,
   SdlcNextActionProjection,
+  SdlcOverlaySegmentCompletion,
   SdlcWorksiteEvidence
 } from "./traversal_consequence.js";
+import type {
+  SdlcEdgeGain,
+  SdlcEdgeResidualPressure
+} from "./edge_gain_closure.js";
 
 export type SdlcInstalledOperatorStatus =
   | "blocked"
@@ -90,8 +98,12 @@ export interface SdlcInstalledOperatorTraversalConsequence {
   readonly kind: "sdlc_installed_operator_traversal_consequence";
   readonly constructionIntent: SdlcConstructionIntent;
   readonly worksiteEvidence: SdlcWorksiteEvidence;
+  readonly edgeGain?: SdlcEdgeGain;
+  readonly edgeResidualPressure?: SdlcEdgeResidualPressure;
   readonly edgeFulfillmentLedger: SdlcEdgeFulfillmentLedger;
   readonly edgeClosureDecision: SdlcEdgeClosureDecision;
+  readonly overlaySegmentCompletion: SdlcOverlaySegmentCompletion | null;
+  readonly postActionOverlayBinding: SdlcOverlayBinding;
   readonly nextActionProjection: SdlcNextActionProjection;
 }
 
@@ -770,6 +782,8 @@ export interface SdlcRetrievalHint {
 
 export interface SdlcTraversalObligationContext {
   readonly kind: "sdlc_traversal_obligation_context";
+  readonly edgeAssuranceContractRef?: string;
+  readonly edgeAssuranceContractDigest?: string;
   readonly requiredSourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
   readonly obligations: readonly SdlcTraversalObligation[];
@@ -904,6 +918,11 @@ export interface SdlcWorkerRetryContext {
 export interface SdlcTraversalIntentPackage {
   readonly kind: "sdlc_traversal_intent_package";
   readonly packageVersion: "ts-intent-v1";
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
+  readonly graphCatalogDigestRef: string | null;
+  readonly edgeAssuranceContractRef?: string;
+  readonly edgeAssuranceContractDigest?: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1016,7 +1035,10 @@ export interface SdlcProductMaterializationAuthorityTarget {
   readonly targetKind: "file" | "directory";
   readonly requiredRole: SdlcMaterializedProductFileRole;
   readonly policyRef: string;
-  readonly source: "context_expected_files" | "product_authority";
+  readonly source:
+    | "context_expected_files"
+    | "product_authority"
+    | "requirement_authority";
   readonly sourceRef: string;
 }
 
@@ -1025,9 +1047,11 @@ export interface SdlcProductMaterializationAuthorityReconciliation {
   readonly status: "not_required" | "passed" | "missing" | "ambiguous";
   readonly selectedOutputRoot: string;
   readonly contextExpectedFileTargets: readonly string[];
+  readonly requirementAuthorityTargets: readonly string[];
   readonly productAuthorityTargets: readonly string[];
   readonly declaredProductFileTargets: readonly string[];
   readonly contextExpectedTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly requirementAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly productAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly declaredProductTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly sourceRefs: readonly string[];
@@ -1037,6 +1061,8 @@ export interface SdlcProductMaterializationAuthorityReconciliation {
 export interface SdlcWorkerInvocationPackage {
   readonly kind: "sdlc_worker_invocation_package";
   readonly packageVersion: "ts-invocation-v1";
+  readonly edgeAssuranceContractRef?: string;
+  readonly edgeAssuranceContractDigest?: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1076,6 +1102,8 @@ export interface SdlcWorkerInvocationPackage {
 export interface SdlcWorkerBrief {
   readonly kind: "sdlc_worker_brief";
   readonly briefVersion: "ts-worker-brief-v1";
+  readonly edgeAssuranceContractRef?: string;
+  readonly edgeAssuranceContractDigest?: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1107,6 +1135,11 @@ export interface SdlcWorkerBrief {
 export interface SdlcWorkerHandoffManifest {
   readonly kind: "sdlc_worker_handoff_manifest";
   readonly contractVersion: "ts-operator-v1";
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
+  readonly graphCatalogDigestRef: string | null;
+  readonly edgeAssuranceContractRef?: string;
+  readonly edgeAssuranceContractDigest?: string;
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
   readonly graphFunctionName: string;

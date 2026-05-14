@@ -79,3 +79,24 @@ contract and the published higher-order policy/binding surface.
 - AC-4: reusable higher-order graph-function plugins and host-specific bindings
   are distinguished explicitly in the catalog and design surfaces rather than
   being conflated into one product-local capability name
+
+### REQ-F-GFUNC-006 — Graph overlays compose typed vector traversal contracts
+
+`odd_sdlc` graph overlays are workspace-bound product roadmaps over GTL graph
+functions and typed vector traversals. They select and compose graph-function
+fragments, but they do not own a second closure law.
+
+**Acceptance Criteria**:
+- AC-1: a graph overlay declares its start surface, target outcome, selected
+  graph functions, selected typed vector traversals, stop policy, and proof
+  lane
+- AC-2: every selected typed vector traversal resolves to a published GTL
+  graph vector and to an `odd_sdlc` edge assurance contract row
+- AC-3: overlay completion is computed from required vector-level closure
+  decisions and residual-pressure state rather than from route completion or
+  artifact presence alone
+- AC-4: a graph function remains the callable GTL carrier; a graph overlay is
+  the product route/profile over those carriers
+- AC-5: overlay-specific optimization is declared through selected graph
+  functions, deterministic support functions, capability assets, and edge
+  assurance contracts rather than through hidden controller logic

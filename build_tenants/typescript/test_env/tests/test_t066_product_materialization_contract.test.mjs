@@ -24,13 +24,16 @@ import { fileURLToPath } from "node:url";
 import {
   admitSdlcProjectConstraints,
   buildPostTransformWorkerResultReport,
+  constructWorkerInvocationPackage,
   constructPostflightGapDossier,
   constructFpEvaluateResult,
   constructSdlcGtlModule,
   constructorResultFromWorkerOutput,
+  declaredProductFileTargets,
   deriveComponentDepthAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
   deriveSdlcOperatorAssuranceGate,
+  deriveSdlcProductLineageYieldResumeBasis,
   deriveSdlcWorkspaceIngressReport,
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
@@ -44,6 +47,7 @@ import {
   hookContractByEdgeName,
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
+  makeSdlcBlockingReason,
   evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
@@ -854,6 +858,55 @@ test("T-158 postflight blocks worker reads outside active workspace", () => {
   assert.match(authorityReason ?? "", /scenario_surface\.md/u);
 });
 
+test("T-158 worker read-boundary ignores regex pattern strings that begin with slash", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_scenario_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "derive_scenario_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t158-worker-read-boundary-regex-pattern"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "scenario_surface");
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "scenario surface",
+    materializedFiles: []
+  });
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_stdout.log"),
+    JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [
+          {
+            type: "tool_use",
+            id: "toolu_boundary_grep",
+            name: "Grep",
+            input: {
+              pattern: "/ requirement:.*req_trv_005_a",
+              path: path.join(workspace, "build_tenants/scala_spark")
+            }
+          }
+        ]
+      }
+    }) + "\n",
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const authorityReason = postflight.blockingReasons.find((reason) =>
+    reason.startsWith("worker_authority_read_outside_workspace:")
+  );
+
+  assert.equal(authorityReason, undefined);
+});
+
 test("T-159 worker read-boundary ignores executor persisted output metadata", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("derive_scenario_surface");
@@ -1318,6 +1371,82 @@ test("T-159 product materialization canonicalizes duplicate requirement authorit
   );
 });
 
+test("T-164 post-transform closes duplicate requirement aliases from canonical trace", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "bootstrap.md"),
+    [
+      "# Bootstrap",
+      "",
+      "### REQ-T066-001 Source Contract",
+      "",
+      "The generated source shall satisfy the same logical requirement."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/requirements/00-imported-sources.md"),
+    [
+      "# Imported Sources",
+      "",
+      "## Source Refs",
+      "",
+      "- workspace://bootstrap.md",
+      "",
+      "## Imported Requirement Markers",
+      "",
+      "- REQ-T066-001"
+    ].join("\n"),
+    "utf8"
+  );
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-post-transform-duplicate-requirement-alias"
+  });
+  const files = writeHandoffFiles(manifest);
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeOutputSurface(manifest, "component_code_surface");
+  const productFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/Main.scala"
+  );
+  const source = [
+    ...invocationPackage.requirementTraceObligationIds.map((id) => `// ${id}`),
+    "package generated",
+    "object Main"
+  ].join("\n");
+  mkdirSync(dirname(productFile), { recursive: true });
+  writeFileSync(productFile, `${source}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const requirementAssessments = report.obligationAssessments.filter((assessment) =>
+    assessment.obligationId.startsWith("requirement:")
+  );
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(requirementAssessments.length > invocationPackage.requirementTraceObligationIds.length, true);
+  assert.equal(
+    requirementAssessments.every(
+      (assessment) => assessment.fulfillmentStatus === "fulfilled"
+    ),
+    true,
+    JSON.stringify(requirementAssessments, null, 2)
+  );
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
 test("T-159 placeholder requirement markers are not promoted into product lineage obligations", () => {
   const workspace = makeWorkspace();
   const placeholderContent = [
@@ -1444,6 +1573,49 @@ test("T-159 conformance assessments do not add raw display-id duplicates", () =>
     assessedRequirementIds.some((id) => id.endsWith(".stage_01_fixture.req_t066_001")),
     assessedRequirementIds.join("\n")
   );
+});
+
+test("T-159 authority conformance carries unobserved requirements instead of retrying same edge", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName(FG_CONFORM_PROJECT_AUTHORITY);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: FG_CONFORM_PROJECT_AUTHORITY,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    projectConstraints: constraints,
+    runId: "t159-conformance-carries-requirements"
+  });
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+  writeOutputSurface(manifest, "Project Authority");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const requirementAssessment = report.obligationAssessments.find((assessment) =>
+    assessment.obligationId.endsWith(".stage_01_fixture.req_t066_001")
+  );
+  assert(requirementAssessment);
+  assert.equal(requirementAssessment.fulfillmentStatus, "partial");
+  assert(
+    requirementAssessment.blockingReasons.some((reason) =>
+      reason.startsWith("requirement_carried_for_downstream_closure:")
+    ),
+    JSON.stringify(requirementAssessment.blockingReasons)
+  );
+
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "passed");
+
+  const gate = deriveSdlcOperatorAssuranceGate({ manifest, report, postflight });
+  assert.equal(gate.satisfaction.status, "close_allowed");
+  assert.equal(gate.blockingPostflight, null);
+
+  const evaluation = constructFpEvaluateResult({ manifest, report, postflight });
+  assert.equal(evaluation.postflightStatus, "passed");
+  assert.equal(evaluation.status, "admitted_with_open_obligations");
+  assert.equal(evaluation.obligationAssessmentCounts.blocked, 0);
+  assert.equal(evaluation.obligationAssessmentCounts.partial > 0, true);
 });
 
 test("T-159 workspace imported-source refs expand before downstream traversal", () => {
@@ -2152,6 +2324,540 @@ test("T-158 product materialization repair replays prior same-edge manifest", ()
   assert.equal(
     replayedManifest.replay.lineageRefs.includes(
       `file://${firstManifest.productMaterialization.manifestFile}`
+    ),
+    true
+  );
+});
+
+test("T-158 replay completeness follows declared product targets, not role-only presence", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust",
+      "- selected output root: build_tenants/hello_world_rust",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust/Cargo.toml`",
+      "- `build_tenants/hello_world_rust/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t158_rust_declared_target_replay",
+      "active_tenant: hello_world_rust",
+      "selected_output_root: build_tenants/hello_world_rust",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust:",
+      "    output_dir: build_tenants/hello_world_rust",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T010000000Z_pid158"
+  });
+  writeHandoffFiles(firstManifest);
+  assert.deepStrictEqual(declaredProductFileTargets(firstManifest), [
+    "build_tenants/hello_world_rust/Cargo.toml",
+    "build_tenants/hello_world_rust/src/main.rs"
+  ]);
+  assert.deepStrictEqual(firstManifest.productMaterialization.requiredRoles, [
+    "source"
+  ]);
+
+  const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
+  const requirementIds = requirementObligationIds(firstManifest);
+  assert(requirementIds.length > 0);
+  const cargoPath = path.join(firstManifest.productMaterialization.tenantRoot, "Cargo.toml");
+  const sourcePath = path.join(firstManifest.productMaterialization.tenantRoot, "src/main.rs");
+  const cargoContent = [
+    ...requirementIds.slice(0, 3).map((id) => `# ${id}`),
+    "",
+    "[package]",
+    'name = "hello_world_rust"',
+    'version = "0.1.0"',
+    'edition = "2021"'
+  ].join("\n");
+  const sourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("Hello, world!");',
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(cargoPath), { recursive: true });
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+  writeReport({
+    manifest: firstManifest,
+    digest: firstOutput.digest,
+    summary: "initial Rust product materialization",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "build_config",
+        relativePath: "Cargo.toml",
+        absolutePath: cargoPath,
+        digest: sha256Text(`${cargoContent}\n`),
+        byteCount: Buffer.byteLength(`${cargoContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds.slice(0, 3)
+      },
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/main.rs",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${sourceContent}\n`),
+        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: firstManifest,
+    report: readWorkerResultReport(firstManifest)
+  });
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T010100000Z_pid158"
+  });
+  writeHandoffFiles(repairManifest);
+  const repairOutput = writeOutputSurface(
+    repairManifest,
+    "component_code_surface_trace_repair"
+  );
+  const repairedSourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("Hello, world!");',
+    "}"
+  ].join("\n");
+  writeFileSync(sourcePath, `${repairedSourceContent}\n`, "utf8");
+  writeReport({
+    manifest: repairManifest,
+    digest: repairOutput.digest,
+    summary: "repair reports only the source role",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/main.rs",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${repairedSourceContent}\n`),
+        byteCount: Buffer.byteLength(`${repairedSourceContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds
+      }
+    ]
+  });
+
+  const repairReport = readWorkerResultReport(repairManifest);
+  const postflight = evaluateWorkerResultPostflight({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  writeProductMaterializationManifest({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  const replayedManifest = JSON.parse(
+    readFileSync(repairManifest.productMaterialization.manifestFile, "utf8")
+  );
+
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+  assert.deepStrictEqual(
+    replayedManifest.files.map((file) => file.relativePath),
+    ["Cargo.toml", "src/main.rs"]
+  );
+  const replayedCargo = replayedManifest.files.find(
+    (file) => file.relativePath === "Cargo.toml"
+  );
+  const currentSource = replayedManifest.files.find(
+    (file) => file.relativePath === "src/main.rs"
+  );
+  assert.equal(replayedCargo.materializationSource, "replay");
+  assert.equal(replayedCargo.role, "build_config");
+  assert.equal(currentSource.materializationSource, "current_attempt");
+  assert.equal(currentSource.role, "source");
+});
+
+test("T-164 replay empty predecessor is superseded by later admitted product rows", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust_service",
+      "- selected output root: build_tenants/hello_world_rust_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust_service/Cargo.toml`",
+      "- `build_tenants/hello_world_rust_service/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t164_rust_service_replay",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+
+  const emptyManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260513T000100000Z_pid164"
+  });
+  writeHandoffFiles(emptyManifest);
+  const emptyOutput = writeOutputSurface(
+    emptyManifest,
+    "component_code_surface_empty_attempt"
+  );
+  writeReport({
+    manifest: emptyManifest,
+    digest: emptyOutput.digest,
+    summary: "failed materialization attempt with no product rows",
+    materializedFiles: []
+  });
+  writeProductMaterializationManifest({
+    manifest: emptyManifest,
+    report: readWorkerResultReport(emptyManifest)
+  });
+
+  const validManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260513T000200000Z_pid164"
+  });
+  writeHandoffFiles(validManifest);
+  const validOutput = writeOutputSurface(validManifest, "component_code_surface");
+  const requirementIds = requirementObligationIds(validManifest);
+  const cargoPath = path.join(
+    validManifest.productMaterialization.tenantRoot,
+    "Cargo.toml"
+  );
+  const sourcePath = path.join(
+    validManifest.productMaterialization.tenantRoot,
+    "src/main.rs"
+  );
+  const cargoContent = [
+    ...requirementIds.slice(0, 2).map((id) => `# ${id}`),
+    "",
+    "[package]",
+    'name = "hello_world_rust_service"',
+    'version = "0.1.0"',
+    'edition = "2021"'
+  ].join("\n");
+  const sourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("helloworld");',
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(cargoPath), { recursive: true });
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+  writeReport({
+    manifest: validManifest,
+    digest: validOutput.digest,
+    summary: "valid Rust service product materialization",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "build_config",
+        relativePath: "Cargo.toml",
+        absolutePath: cargoPath,
+        digest: sha256Text(`${cargoContent}\n`),
+        byteCount: Buffer.byteLength(`${cargoContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds.slice(0, 2)
+      },
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/main.rs",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${sourceContent}\n`),
+        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: validManifest,
+    report: readWorkerResultReport(validManifest)
+  });
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260513T000300000Z_pid164"
+  });
+  writeHandoffFiles(repairManifest);
+  const repairOutput = writeOutputSurface(
+    repairManifest,
+    "component_code_surface_trace_repair"
+  );
+  writeReport({
+    manifest: repairManifest,
+    digest: repairOutput.digest,
+    summary: "trace-only repair after valid materialization",
+    materializedFiles: []
+  });
+
+  const repairReport = readWorkerResultReport(repairManifest);
+  const postflight = evaluateWorkerResultPostflight({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  writeProductMaterializationManifest({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  const replayedManifest = JSON.parse(
+    readFileSync(repairManifest.productMaterialization.manifestFile, "utf8")
+  );
+
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+  assert.equal(
+    postflight.blockingReasons.includes("materialized_product_manifest_replay_empty"),
+    false
+  );
+  assert.deepStrictEqual(
+    replayedManifest.files.map((file) => file.relativePath),
+    ["Cargo.toml", "src/main.rs"]
+  );
+  assert.equal(replayedManifest.files[0].materializationSource, "replay");
+  assert.equal(replayedManifest.files[1].materializationSource, "replay");
+});
+
+test("T-158 product materialization target contracts prefer requirement authority", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/requirements/01-fixture.md"),
+    [
+      "# HWRUSTMIN Requirements",
+      "",
+      "### REQ-HWRUSTMIN-003 Product Files",
+      "",
+      "The later product materialization writes `build_tenants/hello_world_rust/Cargo.toml`",
+      "and `build_tenants/hello_world_rust/src/main.rs`."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust",
+      "- selected output root: build_tenants/hello_world_rust",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust/Cargo.toml`",
+      "- `build_tenants/hello_world_rust/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t158_requirement_target_authority",
+      "active_tenant: hello_world_rust",
+      "selected_output_root: build_tenants/hello_world_rust",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust:",
+      "    output_dir: build_tenants/hello_world_rust",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t158-requirement-target-authority"
+  });
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert.deepEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/hello_world_rust/Cargo.toml",
+    "build_tenants/hello_world_rust/src/main.rs"
+  ]);
+  assert.deepEqual(
+    invocationPackage.productMaterializationAuthority.requirementAuthorityTargets,
+    invocationPackage.productMaterializationAuthority.declaredProductFileTargets
+  );
+  assert.equal(
+    invocationPackage.productMaterializationAuthority.declaredProductTargetContracts.every(
+      (target) => target.source === "requirement_authority"
+    ),
+    true
+  );
+  assert.deepEqual(invocationPackage.outputContract.requiredRoles, [
+    "source",
+    "build_config"
+  ]);
+});
+
+test("T-158 product materialization reports stale product targets but follows requirements", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/requirements/01-fixture.md"),
+    [
+      "# HWRUSTMIN Requirements",
+      "",
+      "### REQ-HWRUSTMIN-003 Product Files",
+      "",
+      "The later product materialization writes `build_tenants/hello_world_rust/Cargo.toml`",
+      "and `build_tenants/hello_world_rust/src/main.rs`."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust",
+      "- selected output root: build_tenants/hello_world_rust",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t158_requirement_product_target_mismatch",
+      "active_tenant: hello_world_rust",
+      "selected_output_root: build_tenants/hello_world_rust",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust:",
+      "    output_dir: build_tenants/hello_world_rust",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t158-requirement-product-target-mismatch"
+  });
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert.equal(
+    invocationPackage.productMaterializationAuthority.status,
+    "passed"
+  );
+  assert.equal(
+    invocationPackage.productMaterializationAuthority.reasonRefs.includes(
+      "requirement_product_target_mismatch"
+    ),
+    true
+  );
+  assert.deepEqual(
+    invocationPackage.productMaterializationAuthority.declaredProductFileTargets,
+    [
+      "build_tenants/hello_world_rust/Cargo.toml",
+      "build_tenants/hello_world_rust/src/main.rs"
+    ]
+  );
+  assert.equal(
+    invocationPackage.productMaterializationAuthority.declaredProductTargetContracts.every(
+      (target) => target.source === "requirement_authority"
     ),
     true
   );
@@ -3116,6 +3822,59 @@ test("T-159 component-depth assurance admits workspace-relative declared product
     JSON.stringify(ledger.reasons, null, 2)
   );
   assert.equal(ledger.verdict, "satisfied");
+});
+
+test("T-160 product materialization authority admits plain Product Files section", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "- active tenant: hello_world_javascript",
+      "- selected output root: build_tenants/hello_world_javascript",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_javascript/src/hello.js` is generated by traversal."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t160_product_files_heading",
+      "active_tenant: hello_world_javascript",
+      "selected_output_root: build_tenants/hello_world_javascript",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node",
+      "    module_structure:",
+      "      - hello_world_javascript"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: "derive_lite_component_code_surface",
+    vectorIndex: 2,
+    contract,
+    projectConstraints: constraints,
+    runId: "t160-product-files-heading"
+  });
+
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/hello_world_javascript/src/hello.js"
+  ]);
 });
 
 test("T-102 post-transform observation admits existing discoverable test files", () => {
@@ -4762,6 +5521,70 @@ test("B-080 silent execution-result recovery carries shard identity", async () =
   }
 });
 
+test("T-159 component-depth prompts pin the top-level register envelope on first attempt", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const cases = [
+    {
+      edgeName: "derive_implementation_component_topology_surface",
+      targetAssetType: "implementation_component_topology_surface",
+      rowDirective: /component_depth_register\.componentTopologyRows/u
+    },
+    {
+      edgeName: "derive_component_realization_schedule_surface",
+      targetAssetType: "component_realization_schedule_surface",
+      rowDirective: /component_depth_register\.componentRealizationRows/u,
+      extraDirectives: []
+    },
+    {
+      edgeName: "derive_component_code_surface",
+      targetAssetType: "component_code_surface",
+      rowDirective: /component_depth_register\.componentRealizationRows/u,
+      extraDirectives: [
+        /source target set from admitted component topology\/schedule authority/u,
+        /Build config files alone never satisfy required role source/u
+      ]
+    }
+  ];
+
+  for (const promptCase of cases) {
+    const contract = hookContractByEdgeName(promptCase.edgeName);
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot: workspace,
+      graphFunctionName: promptCase.edgeName,
+      edgeName: contract.edgeName,
+      vectorIndex: 0,
+      contract,
+      projectConstraints: constraints,
+      runId: `t159-component-depth-envelope-${promptCase.targetAssetType}`
+    });
+    const handoffFiles = writeHandoffFiles(manifest);
+    const prompt = readFileSync(handoffFiles.promptPath, "utf8");
+    const invocationPackage = JSON.parse(
+      readFileSync(handoffFiles.invocationPackagePath, "utf8")
+    );
+    const envelopePattern = new RegExp(
+      `Emit a fenced \`json component_depth_register\` carrier with ` +
+        `\`kind:"sdlc_component_depth_register"\`, ` +
+        `\`registerVersion:"ts-component-depth-v1"\`, and ` +
+        `\`targetAssetType:"${promptCase.targetAssetType}"\`\\.`,
+      "u"
+    );
+
+    assert.match(prompt, envelopePattern);
+    assert.match(prompt, promptCase.rowDirective);
+    for (const extraDirective of promptCase.extraDirectives ?? []) {
+      assert.match(prompt, extraDirective);
+    }
+    assert.equal(
+      invocationPackage.outcomeDirectives.some((directive) =>
+        envelopePattern.test(directive)
+      ),
+      true
+    );
+  }
+});
+
 test("T-100 component-test postflight admits materialized tests before execution discoverability proof", () => {
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
@@ -5016,6 +5839,53 @@ test("T-066 installed operator rejects product edge when traversal obligations a
       reason.reason.startsWith("obligation_unassessed:")
     ),
     true
+  );
+});
+
+test("T-159 lineage-only product materialization miss yields for operator iteration", () => {
+  const lineageReason = makeSdlcBlockingReason({
+    code: "materialized_product_requirement_lineage_missing",
+    detail: "src/main.rs: requirementTraceObligationIds",
+    evidenceRefs: ["file:///workspace/build_tenants/hello_world_rust/src/main.rs"]
+  });
+  const yieldResumeBasis = deriveSdlcProductLineageYieldResumeBasis({
+    runRef: "file%3A%2F%2F%2Fworkspace%2F.ai-workspace%2Fruntime%2Frun-1",
+    edgeRef: "edge://odd-sdlc/derive_component_code_surface/0",
+    blockingReasonCarriers: [lineageReason],
+    productEvidenceRefs: [
+      "file:///workspace/build_tenants/hello_world_rust/src/main.rs"
+    ],
+    livenessProjectionRefs: ["liveness://odd-sdlc/run-1"]
+  });
+
+  assert(yieldResumeBasis);
+  assert.equal(
+    yieldResumeBasis.yieldKind,
+    "partial_product_evidence_admitted_current_edge_should_resume"
+  );
+  assert.equal(
+    yieldResumeBasis.resumePolicyRef,
+    "resume-policy://odd-sdlc/materialized-product-lineage/operator-iterate"
+  );
+  assert.deepStrictEqual(yieldResumeBasis.admittedProgressRefs, [
+    "file:///workspace/build_tenants/hello_world_rust/src/main.rs"
+  ]);
+
+  const competingRetryReason = makeSdlcBlockingReason({
+    code: "test_execution_not_succeeded",
+    evidenceRefs: ["file:///workspace/.ai-workspace/runtime/run-1/postflight.json"]
+  });
+  assert.equal(
+    deriveSdlcProductLineageYieldResumeBasis({
+      runRef: "file%3A%2F%2F%2Fworkspace%2F.ai-workspace%2Fruntime%2Frun-1",
+      edgeRef: "edge://odd-sdlc/derive_component_code_surface/0",
+      blockingReasonCarriers: [lineageReason, competingRetryReason],
+      productEvidenceRefs: [
+        "file:///workspace/build_tenants/hello_world_rust/src/main.rs"
+      ],
+      livenessProjectionRefs: ["liveness://odd-sdlc/run-1"]
+    }),
+    null
   );
 });
 

@@ -3,7 +3,7 @@ id: T-103
 title: Evaluate historical data_mapper depth and Python parity beyond bounded RC
 type: feature
 ticket_category: build_wave_followup
-status: backlog
+status: completed
 goal: future-historical-parity-and-depth
 change_intent: Preserve the deferred scope removed from T-041 by evaluating whether odd_sdlc.TS should later prove historical Python multi-edge data_mapper depth, governed parity comparison, and any wider full-replacement claim.
 change_class: product_reprice
@@ -12,10 +12,13 @@ affected_boundary: historical data_mapper comparator, multi-edge productive deep
 priority: medium
 triaged_at: 2026-04-30
 created_at: 2026-04-30
-updated_at: 2026-04-30
+updated_at: 2026-05-13
+completed_at: 2026-05-13
 dependencies:
   - T-041 active
 governance_scope: STDO Method
+closure_resolution: closed_as_absorbed_proof_obligation
+consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 intake_source: T-041 closure bar was narrowed to successful bounded live data_mapper build; the displaced future scope needs durable authority rather than informal memory.
 target_truth: If the product later wants to claim historical Python parity or multi-edge data_mapper depth beyond bounded RC, that claim must be evaluated in its own ticket with explicit product authority, evidence bars, and closure law.
 closure_law: this ticket closes only when the product either reprices away the wider parity/depth claim or proves it through explicit multi-edge evidence and governed comparison artifacts.
@@ -35,6 +38,23 @@ non_closure_conditions:
 ---
 
 ## Note
+
+Closed as a standalone future-scope ticket on 2026-05-13.
+
+The historical data_mapper/test35 parity question is now a proof obligation
+inside T-164. The product question is not just whether TypeScript can produce a
+similar set of files. It is whether the TypeScript edge/path contract preserves
+the same gain and close semantics for the same declared outcome:
+
+```text
+requirement_surface obligations
++ behavioral realization evidence
++ declared test evidence
++ admitted ledger closure
+```
+
+T-164 carries this as the data_mapper/test35 parity proof row. No historical
+parity closure is claimed by closing this ticket.
 
 This ticket preserves the wider scope that used to live in T-041 before the
 bounded-RC closure bar was narrowed to a successful live data_mapper build.

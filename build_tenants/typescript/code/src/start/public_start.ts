@@ -2,6 +2,9 @@
 // Implements: REQ-F-ODDSDLC-021
 // Implements: REQ-F-ODDSDLC-029
 
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   admitExecutionBasis,
   admitResolvedPolicyIdentity,
@@ -27,9 +30,17 @@ import {
   type SdlcQueryDomainProjection
 } from "../projection/index.js";
 import {
+  constructSdlcOverlayBinding,
+  constructSdlcTraversalOverlayCatalog,
   FG_CONFORM_PROJECT,
+  publicSdlcOverlayStartTargets,
+  resolveSdlcTraversalOverlay,
   sdlcGraphFunctionBoundaryRef,
-  sdlcPublishedActionRef
+  sdlcPublishedActionRef,
+  sdlcTraversalOverlayForGraphFunction,
+  type SdlcOverlayBinding,
+  type SdlcTraversalOverlay,
+  type SdlcTraversalOverlayRef
 } from "../graph/index.js";
 import {
   deriveOddSdlcEvaluateNextReport,
@@ -47,7 +58,8 @@ import { publicStartTargetPolicyFor } from "./policy.js";
 export const SDLC_PUBLIC_START_TARGET_KIND_VALUES = Object.freeze([
   "next",
   "graph_function",
-  "asset"
+  "asset",
+  "overlay"
 ] as const);
 
 export type SdlcPublicStartTargetKind =
@@ -76,6 +88,8 @@ export interface SdlcPublicStartRequest {
   readonly replaySelectedActionRef?: string | null;
   readonly replayNextGraphVectorRef?: string | null;
   readonly replayClosureDecisionRef?: string | null;
+  readonly replayOverlayRef?: string | null;
+  readonly replayOverlayBindingRef?: string | null;
 }
 
 export interface SdlcWorkerAttachment {
@@ -88,6 +102,9 @@ export interface SdlcWorkerAttachment {
 export interface SdlcExecutionContract {
   readonly kind: "sdlc_execution_contract";
   readonly targetGraphFunction: string;
+  readonly overlayRef: string;
+  readonly overlayBindingRef: string;
+  readonly overlayBinding: SdlcOverlayBinding;
   readonly requestedUntil: SdlcPublicStartUntil;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly basis: ExecutionBasis;
@@ -130,7 +147,9 @@ export function admitSdlcPublicStartRequest(
     "replayNextActionProjectionRef",
     "replaySelectedActionRef",
     "replayNextGraphVectorRef",
-    "replayClosureDecisionRef"
+    "replayClosureDecisionRef",
+    "replayOverlayRef",
+    "replayOverlayBindingRef"
   ]);
   const target = parseClosedRecord(record["target"], `${label}.target`, [
     "kind",
@@ -191,6 +210,22 @@ export function admitSdlcPublicStartRequest(
         : parseNonEmptyString(
             record["replayClosureDecisionRef"],
             `${label}.replayClosureDecisionRef`
+          ),
+    replayOverlayRef:
+      record["replayOverlayRef"] === undefined ||
+      record["replayOverlayRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayOverlayRef"],
+            `${label}.replayOverlayRef`
+          ),
+    replayOverlayBindingRef:
+      record["replayOverlayBindingRef"] === undefined ||
+      record["replayOverlayBindingRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayOverlayBindingRef"],
+            `${label}.replayOverlayBindingRef`
           )
   });
 }
@@ -224,8 +259,176 @@ interface PublicStartActionCandidate {
 interface PublicStartEvaluation {
   readonly targetGraphFunction: string | null;
   readonly blockingReason: "target_unavailable" | "stale_query_domain" | null;
+  readonly overlayBinding: SdlcOverlayBinding | null;
   readonly nextActionProjection: SdlcNextActionProjection | null;
   readonly constructionIntent: SdlcConstructionIntent | null;
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function statSafe(target: string) {
+  try {
+    return statSync(target);
+  } catch {
+    return null;
+  }
+}
+
+function jsonRecordFromFile(filePath: string): Readonly<Record<string, unknown>> | null {
+  const stats = statSafe(filePath);
+  if (stats === null || !stats.isFile()) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringField(
+  record: Readonly<Record<string, unknown>> | null,
+  field: string
+): string | null {
+  const value = record?.[field];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(values)]);
+}
+
+function workspaceRootsForMaterialObservation(
+  request: SdlcPublicStartRequest
+): readonly string[] {
+  return uniqueStrings([
+    ...(request.outputWorkspaceRoot === null ||
+    request.outputWorkspaceRoot === undefined
+      ? []
+      : [request.outputWorkspaceRoot]),
+    request.workspaceRoot
+  ]);
+}
+
+function observedOverlayMaterialAssetRefs(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly overlay: SdlcTraversalOverlay;
+  readonly observationRef: string;
+}): readonly {
+  readonly assetType: string;
+  readonly assetRef: string;
+  readonly relativePath: string;
+  readonly evidenceRefs: readonly string[];
+}[] {
+  const observed: {
+    readonly assetType: string;
+    readonly assetRef: string;
+    readonly relativePath: string;
+    readonly evidenceRefs: readonly string[];
+  }[] = [];
+  for (const template of input.overlay.assetTemplates) {
+    for (const root of workspaceRootsForMaterialObservation(input.request)) {
+      const absolutePath = path.resolve(root, template.defaultPath);
+      const stats = statSafe(absolutePath);
+      if (stats === null || (!stats.isFile() && !stats.isDirectory())) {
+        continue;
+      }
+      const assetRef = pathToFileURL(absolutePath).href;
+      observed.push(Object.freeze({
+        assetType: template.assetType,
+        assetRef,
+        relativePath: template.defaultPath,
+        evidenceRefs: Object.freeze([
+          input.observationRef,
+          assetRef
+        ])
+      }));
+      break;
+    }
+  }
+  return Object.freeze(observed);
+}
+
+function operatorRunRootsNewestFirst(workspaceRoot: string): readonly string[] {
+  const root = path.join(
+    workspaceRoot,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  if (!existsSync(root) || statSafe(root)?.isDirectory() !== true) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    readdirSync(root)
+      .map((entry) => path.join(root, entry))
+      .filter((entryPath) => statSafe(entryPath)?.isDirectory() === true)
+      .sort((left, right) =>
+        (statSafe(right)?.mtimeMs ?? 0) - (statSafe(left)?.mtimeMs ?? 0)
+      )
+  );
+}
+
+function priorOverlayTruthRefs(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly overlay: SdlcTraversalOverlay;
+}): {
+  readonly priorLedgerRefs: readonly string[];
+  readonly priorEventRefs: readonly string[];
+} {
+  if (input.overlay.predecessorOverlayRefs.length === 0) {
+    return Object.freeze({
+      priorLedgerRefs: Object.freeze([]),
+      priorEventRefs: Object.freeze([])
+    });
+  }
+  const predecessorOverlayRefs = new Set<SdlcTraversalOverlayRef>(
+    input.overlay.predecessorOverlayRefs
+  );
+  const ledgerRefs: string[] = [];
+  const eventRefs: string[] = [];
+  for (const root of workspaceRootsForMaterialObservation(input.request)) {
+    for (const archiveRoot of operatorRunRootsNewestFirst(root)) {
+      const ledger = jsonRecordFromFile(
+        path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
+      );
+      const closure = jsonRecordFromFile(
+        path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+      );
+      const projection = jsonRecordFromFile(
+        path.join(archiveRoot, "sdlc_next_action_projection.json")
+      );
+      const overlayRef =
+        stringField(ledger, "overlayRef") ??
+        stringField(closure, "overlayRef") ??
+        stringField(projection, "overlayRef");
+      if (
+        overlayRef === null ||
+        !predecessorOverlayRefs.has(
+          overlayRef as SdlcTraversalOverlay["overlayRef"]
+        )
+      ) {
+        continue;
+      }
+      if (stringField(closure, "disposition") !== "close") {
+        continue;
+      }
+      const ledgerRef =
+        stringField(ledger, "ledgerVersionRef") ?? stringField(ledger, "ledgerRef");
+      if (ledgerRef !== null) {
+        ledgerRefs.push(ledgerRef);
+      }
+      const runtimeEventArchive = path.join(archiveRoot, "runtime_events.json");
+      if (statSafe(runtimeEventArchive)?.isFile() === true) {
+        eventRefs.push(pathToFileURL(runtimeEventArchive).href);
+      }
+    }
+  }
+  return Object.freeze({
+    priorLedgerRefs: uniqueStrings(ledgerRefs),
+    priorEventRefs: uniqueStrings(eventRefs)
+  });
 }
 
 function graphFunctionByName(
@@ -277,19 +480,52 @@ function publicStartProductModelRef(request: SdlcPublicStartRequest): string {
   ].join("/");
 }
 
+function workspaceIdentityRefFor(request: SdlcPublicStartRequest): string {
+  return [
+    "workspace://odd-sdlc/public-start",
+    encodeURIComponent(request.workspaceRoot)
+  ].join("/");
+}
+
+function workspaceFingerprintRefFor(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly observationRef: string;
+}): string {
+  return [
+    "workspace-fingerprint://odd-sdlc/public-start",
+    encodeURIComponent(input.request.workspaceRoot),
+    encodeURIComponent(input.observationRef)
+  ].join("/");
+}
+
 function evaluateInitialPublicStartAction(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly queryDomain: SdlcQueryDomainProjection;
 }): PublicStartEvaluation {
   const targetPolicy = publicStartTargetPolicyFor(input.request.target.kind);
+  let overlayCatalog: ReturnType<typeof constructSdlcTraversalOverlayCatalog> | null = null;
+  const getOverlayCatalog = (): ReturnType<typeof constructSdlcTraversalOverlayCatalog> => {
+    if (overlayCatalog === null) {
+      overlayCatalog = constructSdlcTraversalOverlayCatalog({
+        module: input.module
+      });
+    }
+    return overlayCatalog;
+  };
   let candidates: readonly PublicStartActionCandidate[];
   let blockingReason: "target_unavailable" | "stale_query_domain" | null = null;
   let preferredTargetOutcomeRef: string | null = null;
+  let requestedOverlay: SdlcTraversalOverlay | null = null;
   const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
   if (targetPolicy.resolver === "published_start_targets") {
+    const startTargets = publicSdlcOverlayStartTargets({
+      module: input.module,
+      catalog: getOverlayCatalog(),
+      projectConformanceStatus: input.queryDomain.projectConformance?.status ?? null
+    });
     candidates = Object.freeze(
-      input.queryDomain.startTargets
+      startTargets
         .map((target) =>
           candidateForGraphFunction({
             module: input.module,
@@ -304,7 +540,7 @@ function evaluateInitialPublicStartAction(input: {
         )
     );
     blockingReason =
-      input.queryDomain.startTargets.length === 0 ? "target_unavailable" : null;
+      startTargets.length === 0 ? "target_unavailable" : null;
     preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
   } else if (targetPolicy.resolver === "named_graph_function") {
     const published = input.queryDomain.graphFunctions.some(
@@ -319,12 +555,49 @@ function evaluateInitialPublicStartAction(input: {
       return Object.freeze({
         targetGraphFunction: input.request.target.handle,
         blockingReason: "stale_query_domain",
+        overlayBinding: null,
         nextActionProjection: null,
         constructionIntent: null
       });
     }
     candidates = Object.freeze(candidate === null ? [] : [candidate]);
     blockingReason = candidate === null ? "target_unavailable" : null;
+  } else if (targetPolicy.resolver === "overlay_catalog_binding") {
+    requestedOverlay = resolveSdlcTraversalOverlay({
+      catalog: getOverlayCatalog(),
+      overlayRef: input.request.target.handle
+    });
+    if (requestedOverlay === null) {
+      return Object.freeze({
+        targetGraphFunction: null,
+        blockingReason: "target_unavailable",
+        overlayBinding: null,
+        nextActionProjection: null,
+        constructionIntent: null
+      });
+    }
+    let selectedGraphFunctionName = requestedOverlay.defaultStartTarget;
+    if (input.queryDomain.projectConformance?.status === "blocked") {
+      const conformGraphFunction = graphFunctionByName(input.module, FG_CONFORM_PROJECT);
+      const conformGraphFunctionRef =
+        conformGraphFunction === null
+          ? null
+          : sdlcGraphFunctionBoundaryRef(conformGraphFunction);
+      if (
+        conformGraphFunctionRef !== null &&
+        requestedOverlay.graphFunctionRefs.includes(conformGraphFunctionRef)
+      ) {
+        selectedGraphFunctionName = FG_CONFORM_PROJECT;
+      }
+    }
+    const candidate = candidateForGraphFunction({
+      module: input.module,
+      graphFunctionName: selectedGraphFunctionName,
+      sourceRef
+    });
+    candidates = Object.freeze(candidate === null ? [] : [candidate]);
+    blockingReason = candidate === null ? "stale_query_domain" : null;
+    preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
   } else {
     const binding = deriveSdlcTargetObligationBinding({
       queryDomain: input.queryDomain,
@@ -359,6 +632,7 @@ function evaluateInitialPublicStartAction(input: {
     return Object.freeze({
       targetGraphFunction: null,
       blockingReason: blockingReason ?? "target_unavailable",
+      overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null
     });
@@ -480,12 +754,82 @@ function evaluateInitialPublicStartAction(input: {
     return Object.freeze({
       targetGraphFunction: null,
       blockingReason: blockingReason ?? "target_unavailable",
+      overlayBinding: null,
       nextActionProjection: null,
       constructionIntent: null
     });
   }
   const selectedActionRef =
     input.request.replaySelectedActionRef ?? selected.actionRef;
+  const replayOverlay =
+    input.request.replayOverlayRef === null ||
+    input.request.replayOverlayRef === undefined
+      ? null
+      : resolveSdlcTraversalOverlay({
+          catalog: getOverlayCatalog(),
+          overlayRef: input.request.replayOverlayRef
+        });
+  const selectedOverlay = requestedOverlay ?? replayOverlay ??
+    sdlcTraversalOverlayForGraphFunction({
+      catalog: getOverlayCatalog(),
+      graphFunctionRef: selectedCandidate.graphFunctionRef
+    });
+  if (
+    (requestedOverlay !== null || replayOverlay !== null) &&
+    !selectedOverlay.graphFunctionRefs.includes(selectedCandidate.graphFunctionRef)
+  ) {
+    return Object.freeze({
+      targetGraphFunction: selectedCandidate.graphFunctionName,
+      blockingReason: "stale_query_domain",
+      overlayBinding: null,
+      nextActionProjection: null,
+      constructionIntent: null
+    });
+  }
+  const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
+  const priorTruthRefs = priorOverlayTruthRefs({
+    request: input.request,
+    overlay: selectedOverlay
+  });
+  const overlayBinding = constructSdlcOverlayBinding({
+    catalog: getOverlayCatalog(),
+    overlay: selectedOverlay,
+    workspaceRootUri: pathToFileURL(input.request.workspaceRoot).href,
+    workspaceIdentityRef: workspaceIdentityRefFor(input.request),
+    preActionWorkspaceObservationRef: evaluator.observation.observationId,
+    preActionWorkspaceFingerprintRef: workspaceFingerprintRefFor({
+      request: input.request,
+      observationRef: evaluator.observation.observationId
+    }),
+    selectedGraphFunctionRef: selectedCandidate.graphFunctionRef,
+    selectedGraphVectorRef,
+    selectedStartTargetRef: selectedCandidate.graphFunctionName,
+    requestedBy:
+      input.request.replayNextActionProjectionRef === null ||
+      input.request.replayNextActionProjectionRef === undefined
+        ? "public_start"
+        : "archive_replay",
+    materialAssetRefs: observedOverlayMaterialAssetRefs({
+      request: input.request,
+      overlay: selectedOverlay,
+      observationRef: evaluator.observation.observationId
+    }),
+    priorLedgerRefs: priorTruthRefs.priorLedgerRefs,
+    priorEventRefs: priorTruthRefs.priorEventRefs
+  });
+  if (
+    input.request.replayOverlayBindingRef !== null &&
+    input.request.replayOverlayBindingRef !== undefined &&
+    input.request.replayOverlayBindingRef !== overlayBinding.bindingRef
+  ) {
+    return Object.freeze({
+      targetGraphFunction: selectedCandidate.graphFunctionName,
+      blockingReason: "stale_query_domain",
+      overlayBinding: null,
+      nextActionProjection: null,
+      constructionIntent: null
+    });
+  }
   const replayClosureDecision =
     input.request.replayClosureDecisionRef === undefined ||
     input.request.replayClosureDecisionRef === null
@@ -497,6 +841,14 @@ function evaluateInitialPublicStartAction(input: {
           ledgerVersionRef:
             `ledger-version://odd-sdlc/public-start/replay/${encodeURIComponent(input.request.replayClosureDecisionRef)}`,
           disposition: "close" as const,
+          overlayRef: overlayBinding.overlayRef,
+          overlayBindingRef: overlayBinding.bindingRef,
+          graphCatalogDigestRef: overlayBinding.graphCatalogDigestRef,
+          edgeAssuranceContractRef: null,
+          edgeAssuranceContractDigest: null,
+          edgeGainRef: null,
+          edgeClosureFunctionRef: null,
+          edgeResidualPressureRefs: Object.freeze([]),
           basisRefs: Object.freeze([input.request.replayClosureDecisionRef]),
           reasonRefs: Object.freeze([]),
           yieldResumeBasis: null,
@@ -519,10 +871,13 @@ function evaluateInitialPublicStartAction(input: {
       evaluator.priorityProjection.prioritySchemeRef
     ]),
     actionCatalogRefs: evaluator.actionCatalogRefs,
+    overlayRef: overlayBinding.overlayRef,
+    overlayBindingRef: overlayBinding.bindingRef,
+    graphCatalogDigestRef: overlayBinding.graphCatalogDigestRef,
     selectedActionRef,
     nextGraphFunctionRef: selectedCandidate.graphFunctionRef,
     // Null means no automatic graph-track replay; current Eval_Action chooses the edge.
-    nextGraphVectorRef: input.request.replayNextGraphVectorRef ?? null
+    nextGraphVectorRef: selectedGraphVectorRef
   });
   const constructionIntent = constructSdlcConstructionIntent({
     intentRef:
@@ -532,12 +887,19 @@ function evaluateInitialPublicStartAction(input: {
     selectedPriorityRowRef: selected.rankInputRef,
     nextActionProjectionRef: nextActionProjection.nextActionProjectionRef,
     selectedActionRef,
-    basisRefs: nextActionProjection.predecessorRefs,
-    predecessorRefs: Object.freeze([nextActionProjection.nextActionProjectionRef])
+    basisRefs: Object.freeze([
+      overlayBinding.bindingRef,
+      ...nextActionProjection.predecessorRefs
+    ]),
+    predecessorRefs: Object.freeze([
+      overlayBinding.bindingRef,
+      nextActionProjection.nextActionProjectionRef
+    ])
   });
   return Object.freeze({
     targetGraphFunction: selectedCandidate.graphFunctionName,
     blockingReason,
+    overlayBinding,
     nextActionProjection,
     constructionIntent
   });
@@ -547,6 +909,7 @@ function constructExecutionContract(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly targetGraphFunction: string;
+  readonly overlayBinding: SdlcOverlayBinding;
   readonly conformedProject: SdlcConformProjectProfile;
   readonly workerAttachment: SdlcWorkerAttachment;
   readonly nextActionProjection: SdlcNextActionProjection;
@@ -604,11 +967,14 @@ function constructExecutionContract(input: {
     runId: "run://odd-sdlc/public-start",
     workKey: "wk://odd-sdlc/public-start",
     frameId: null,
-    frameLineageId: input.nextActionProjection.nextActionProjectionRef
+    frameLineageId: input.overlayBinding.bindingRef
   });
   return Object.freeze({
     kind: "sdlc_execution_contract",
     targetGraphFunction: input.targetGraphFunction,
+    overlayRef: input.overlayBinding.overlayRef,
+    overlayBindingRef: input.overlayBinding.bindingRef,
+    overlayBinding: input.overlayBinding,
     requestedUntil: input.request.until,
     conformedProject: input.conformedProject,
     basis,
@@ -650,6 +1016,7 @@ export function publicStartOnce(input: {
   });
   if (
     targetResolution.targetGraphFunction === null ||
+    targetResolution.overlayBinding === null ||
     targetResolution.nextActionProjection === null ||
     targetResolution.constructionIntent === null
   ) {
@@ -689,6 +1056,7 @@ export function publicStartOnce(input: {
     request: input.request,
     module: input.module,
     targetGraphFunction: targetResolution.targetGraphFunction,
+    overlayBinding: targetResolution.overlayBinding,
     conformedProject: input.conformedProject,
     workerAttachment: input.workerAttachment,
     nextActionProjection: targetResolution.nextActionProjection,
@@ -696,7 +1064,8 @@ export function publicStartOnce(input: {
   });
   if (
     input.request.defaultRegime === "F_P" &&
-    input.workerAttachment.status === "unattached"
+    input.workerAttachment.status === "unattached" &&
+    targetResolution.targetGraphFunction !== FG_CONFORM_PROJECT
   ) {
     return Object.freeze({
       kind: "sdlc_public_start_blocked",

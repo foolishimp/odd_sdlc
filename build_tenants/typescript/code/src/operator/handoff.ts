@@ -5,6 +5,8 @@
 // Implements: REQ-F-ODDSDLC-059
 // Implements: REQ-F-ODDSDLC-060
 // Implements: REQ-F-ODDSDLC-061
+// Implements: REQ-F-ODDSDLC-063
+// Implements: REQ-F-ODDSDLC-064
 
 import { createHash } from "node:crypto";
 import {
@@ -30,6 +32,9 @@ import {
   type SdlcWorkOperation
 } from "../hooks/index.js";
 import {
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_MODULE_SURFACE,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
 } from "../graph/index.js";
@@ -55,6 +60,11 @@ import {
   deriveSdlcFeatureScope,
   sdlcTraversalObligationInFeatureScope
 } from "./feature_scope.js";
+import {
+  digestSdlcEdgeGainClosureContract,
+  resolveSdlcEdgeGainClosureContract,
+  sdlcEdgeAssuranceContractRef
+} from "./edge_gain_closure.js";
 import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
 import { deriveSdlcTraversalStrategyDecision } from "./traversal_strategy.js";
 import {
@@ -865,7 +875,7 @@ function productAuthorityTargetsFor(
   const product = readFileSync(productPath, "utf8");
   const sections = markdownSectionBodies({
     markdown: product,
-    titlePattern: /^(?:(?:declared|expected)\s+product\s+files|(?:declared|expected)\s+files)$/iu
+    titlePattern: /^(?:(?:(?:declared|expected)\s+)?product\s+files|(?:declared|expected)\s+files)$/iu
   });
   const declaredModuleSections = markdownSectionBodies({
     markdown: product,
@@ -900,6 +910,82 @@ function productAuthorityTargetsFor(
   return Object.freeze({
     targets,
     sourceRefs: Object.freeze([sourceRef])
+  });
+}
+
+function requirementAuthorityFiles(root: string): readonly string[] {
+  if (!existsSync(root)) {
+    return Object.freeze([]);
+  }
+  const files: string[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolutePath);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".md")) {
+        continue;
+      }
+      const relativePath = relative(root, absolutePath).split(path.sep).join("/");
+      if (
+        relativePath === "README.md" ||
+        relativePath === "00-imported-sources.md"
+      ) {
+        continue;
+      }
+      files.push(absolutePath);
+    }
+  };
+  visit(root);
+  return Object.freeze(files.sort());
+}
+
+function requirementAuthorityTargetsFor(
+  manifest: SdlcWorkerHandoffManifest
+): {
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly sourceRefs: readonly string[];
+} {
+  const requirementRoot = join(manifest.workspaceRoot, "specification/requirements");
+  const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
+  const sourceRefs = new Set<string>();
+  for (const requirementPath of requirementAuthorityFiles(requirementRoot)) {
+    const markdown = readFileSync(requirementPath, "utf8");
+    const sections = markdownSectionBodies({
+      markdown,
+      titlePattern: /\b(?:declared\s+|expected\s+)?product\s+files?\b/iu
+    });
+    if (sections.length === 0) {
+      continue;
+    }
+    const sourceRef = pathToFileURL(requirementPath).href;
+    const contracts = targetContractsFromSeeds({
+      source: "requirement_authority",
+      sourceRef,
+      manifest,
+      seeds: sections.flatMap((body) =>
+        targetsFromProductAuthoritySection({
+          body,
+          selectedOutputRoot:
+            manifest.productMaterialization.selectedOutputRoot
+        })
+      )
+    });
+    if (contracts.length === 0) {
+      continue;
+    }
+    sourceRefs.add(sourceRef);
+    for (const contract of contracts) {
+      targets.set(contract.path, contract);
+    }
+  }
+  return Object.freeze({
+    targets: Object.freeze(
+      [...targets.values()].sort((left, right) => left.path.localeCompare(right.path))
+    ),
+    sourceRefs: Object.freeze([...sourceRefs].sort())
   });
 }
 
@@ -1173,9 +1259,20 @@ function scopeProductMaterializationAuthorityTargets(input: {
   ) {
     return input.targets;
   }
+  const includedAllDeclaredModules =
+    input.manifest.productMaterialization.declaredModuleNames.length > 0 &&
+    input.manifest.productMaterialization.declaredModuleNames.every((moduleName) =>
+      input.manifest.featureScope.includedModuleNames.includes(moduleName)
+    );
   return Object.freeze(
     input.targets.filter(
       (target) =>
+        (includedAllDeclaredModules &&
+          targetRelativeToSelectedOutputRoot({
+            targetPath: target.path,
+            selectedOutputRoot:
+              input.manifest.productMaterialization.selectedOutputRoot
+          }) !== "") ||
         productAuthorityTargetIsSharedForFeatureScope({
           target,
           selectedOutputRoot:
@@ -1205,25 +1302,37 @@ export function reconcileSdlcProductMaterializationAuthority(
   manifest: SdlcWorkerHandoffManifest
 ): SdlcProductMaterializationAuthorityReconciliation {
   const context = contextExpectedFileTargetsFor(manifest);
+  const requirement = requirementAuthorityTargetsFor(manifest);
   const product = productAuthorityTargetsFor(manifest);
   const contextTargets = scopeProductMaterializationAuthorityTargets({
     manifest,
     targets: context.targets
+  });
+  const requirementTargets = scopeProductMaterializationAuthorityTargets({
+    manifest,
+    targets: requirement.targets
   });
   const productTargets = scopeProductMaterializationAuthorityTargets({
     manifest,
     targets: product.targets
   });
   const contextTargetPaths = uniqueSorted(contextTargets.map((target) => target.path));
+  const requirementTargetPaths = uniqueSorted(
+    requirementTargets.map((target) => target.path)
+  );
   const productTargetPaths = uniqueSorted(productTargets.map((target) => target.path));
-  const declaredProductTargetContracts = productTargets;
-  const declaredProductFileTargets = productTargetPaths;
+  const declaredProductTargetContracts =
+    requirementTargets.length > 0 ? requirementTargets : productTargets;
+  const declaredProductFileTargets = uniqueSorted(
+    declaredProductTargetContracts.map((target) => target.path)
+  );
   const reasonRefs = new Set<string>(context.reasonRefs);
   if (contextTargetPaths.length > 0) {
     reasonRefs.add("context_expected_files_observation_only");
   }
   if (
     contextTargets.length !== context.targets.length ||
+    requirementTargets.length !== requirement.targets.length ||
     productTargets.length !== product.targets.length
   ) {
     reasonRefs.add(
@@ -1231,11 +1340,22 @@ export function reconcileSdlcProductMaterializationAuthority(
     );
   }
   if (
-    contextTargetPaths.length > 0 &&
+    requirementTargetPaths.length > 0 &&
     productTargetPaths.length > 0 &&
-    !sameTargetSet(contextTargetPaths, productTargetPaths)
+    !sameTargetSet(requirementTargetPaths, productTargetPaths)
   ) {
-    reasonRefs.add("product_context_target_mismatch");
+    reasonRefs.add("requirement_product_target_mismatch");
+  }
+  if (
+    contextTargetPaths.length > 0 &&
+    declaredProductFileTargets.length > 0 &&
+    !sameTargetSet(contextTargetPaths, declaredProductFileTargets)
+  ) {
+    reasonRefs.add(
+      requirementTargetPaths.length > 0
+        ? "declared_context_target_mismatch"
+        : "product_context_target_mismatch"
+    );
   }
   if (
     manifest.productMaterialization.required &&
@@ -1252,12 +1372,18 @@ export function reconcileSdlcProductMaterializationAuthority(
         : "missing",
     selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot,
     contextExpectedFileTargets: contextTargetPaths,
+    requirementAuthorityTargets: requirementTargetPaths,
     productAuthorityTargets: productTargetPaths,
     declaredProductFileTargets,
     contextExpectedTargetContracts: contextTargets,
+    requirementAuthorityTargetContracts: requirementTargets,
     productAuthorityTargetContracts: productTargets,
     declaredProductTargetContracts,
-    sourceRefs: uniqueSorted([...context.sourceRefs, ...product.sourceRefs]),
+    sourceRefs: uniqueSorted([
+      ...context.sourceRefs,
+      ...requirement.sourceRefs,
+      ...product.sourceRefs
+    ]),
     reasonRefs: Object.freeze([...reasonRefs].sort())
   });
 }
@@ -1267,6 +1393,21 @@ export function declaredProductFileTargets(
 ): readonly string[] {
   return reconcileSdlcProductMaterializationAuthority(manifest)
     .declaredProductFileTargets;
+}
+
+function effectiveProductMaterializationRequiredRoles(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcMaterializedProductFileRole[] {
+  const roles = new Set<SdlcMaterializedProductFileRole>(
+    manifest.productMaterialization.requiredRoles
+  );
+  for (const target of reconcileSdlcProductMaterializationAuthority(manifest)
+    .declaredProductTargetContracts) {
+    roles.add(target.requiredRole);
+  }
+  return Object.freeze(
+    MATERIALIZED_PRODUCT_FILE_ROLES.filter((role) => roles.has(role))
+  );
 }
 
 function featureScopeNarrowsMaterialization(
@@ -2216,6 +2357,8 @@ function priorWorkerResultReportRefsForSourceAsset(input: {
 function deriveTraversalObligationContext(input: {
   readonly workspaceRoot: string;
   readonly contract: SdlcHookContract;
+  readonly edgeAssuranceContractRef: string;
+  readonly edgeAssuranceContractDigest: string;
   readonly materialization: SdlcProductMaterializationContract;
   readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly retryContext: SdlcWorkerRetryContext;
@@ -2329,6 +2472,8 @@ function deriveTraversalObligationContext(input: {
   });
   return Object.freeze({
     kind: "sdlc_traversal_obligation_context" as const,
+    edgeAssuranceContractRef: input.edgeAssuranceContractRef,
+    edgeAssuranceContractDigest: input.edgeAssuranceContractDigest,
     requiredSourceAssetTypes: Object.freeze([...input.contract.sourceAssetTypes]),
     targetAssetType: input.contract.targetAssetType,
     obligations: scopedObligations,
@@ -2357,6 +2502,11 @@ function emptyRetryContext(): SdlcWorkerRetryContext {
 }
 
 function constructTraversalIntentPackage(input: {
+  readonly overlayRef?: string | null | undefined;
+  readonly overlayBindingRef?: string | null | undefined;
+  readonly graphCatalogDigestRef?: string | null | undefined;
+  readonly edgeAssuranceContractRef: string;
+  readonly edgeAssuranceContractDigest: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -2374,6 +2524,11 @@ function constructTraversalIntentPackage(input: {
   const base = Object.freeze({
     kind: "sdlc_traversal_intent_package" as const,
     packageVersion: "ts-intent-v1" as const,
+    overlayRef: input.overlayRef ?? null,
+    overlayBindingRef: input.overlayBindingRef ?? null,
+    graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    edgeAssuranceContractRef: input.edgeAssuranceContractRef,
+    edgeAssuranceContractDigest: input.edgeAssuranceContractDigest,
     graphFunctionName: input.graphFunctionName,
     edgeName: input.edgeName,
     vectorIndex: input.vectorIndex,
@@ -2417,6 +2572,11 @@ export function assertTraversalIntentPackagePressure(
     pkg.graphFunctionName !== manifest.graphFunctionName ||
     pkg.edgeName !== manifest.edgeName ||
     pkg.vectorIndex !== manifest.vectorIndex ||
+    pkg.overlayRef !== manifest.overlayRef ||
+    pkg.overlayBindingRef !== manifest.overlayBindingRef ||
+    pkg.graphCatalogDigestRef !== manifest.graphCatalogDigestRef ||
+    pkg.edgeAssuranceContractRef !== manifest.edgeAssuranceContractRef ||
+    pkg.edgeAssuranceContractDigest !== manifest.edgeAssuranceContractDigest ||
     pkg.targetAssetType !== manifest.targetAssetType ||
     pkg.outputFile !== manifest.outputFile ||
     pkg.reportFile !== manifest.reportFile
@@ -2477,6 +2637,9 @@ export function assertTraversalIntentPackagePressure(
 
 export function deriveWorkerHandoffManifest(input: {
   readonly workspaceRoot: string;
+  readonly overlayRef?: string | null | undefined;
+  readonly overlayBindingRef?: string | null | undefined;
+  readonly graphCatalogDigestRef?: string | null | undefined;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -2514,6 +2677,21 @@ export function deriveWorkerHandoffManifest(input: {
     conformedProject,
     projectConstraints: input.projectConstraints
   });
+  const edgeAssuranceContract = resolveSdlcEdgeGainClosureContract(input.edgeName);
+  if (edgeAssuranceContract.targetAssetType !== input.contract.targetAssetType) {
+    throw new TypeError(
+      [
+        "edge assurance contract target does not match hook contract",
+        input.edgeName,
+        edgeAssuranceContract.targetAssetType,
+        input.contract.targetAssetType
+      ].join(":")
+    );
+  }
+  const edgeAssuranceContractRef =
+    sdlcEdgeAssuranceContractRef(edgeAssuranceContract);
+  const edgeAssuranceContractDigest =
+    digestSdlcEdgeGainClosureContract(edgeAssuranceContract);
   const retryContext = input.retryContext ?? emptyRetryContext();
   const methodRefs = Object.freeze([
     "workspace://.abiogenesis/docs/standards/SPEC_METHOD.md",
@@ -2583,11 +2761,18 @@ export function deriveWorkerHandoffManifest(input: {
   const traversalObligationContext = deriveTraversalObligationContext({
     workspaceRoot: input.workspaceRoot,
     contract: input.contract,
+    edgeAssuranceContractRef,
+    edgeAssuranceContractDigest,
     materialization,
     featureScope,
     retryContext
   });
   const traversalIntentPackage = constructTraversalIntentPackage({
+    overlayRef: input.overlayRef ?? null,
+    overlayBindingRef: input.overlayBindingRef ?? null,
+    graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    edgeAssuranceContractRef,
+    edgeAssuranceContractDigest,
     graphFunctionName: input.graphFunctionName,
     edgeName: input.edgeName,
     vectorIndex: input.vectorIndex,
@@ -2605,6 +2790,11 @@ export function deriveWorkerHandoffManifest(input: {
   const manifest = Object.freeze({
     kind: "sdlc_worker_handoff_manifest",
     contractVersion: "ts-operator-v1",
+    overlayRef: input.overlayRef ?? null,
+    overlayBindingRef: input.overlayBindingRef ?? null,
+    graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
+    edgeAssuranceContractRef,
+    edgeAssuranceContractDigest,
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
     graphFunctionName: input.graphFunctionName,
@@ -2778,11 +2968,14 @@ function retryRepairScopeForReason(
 function componentDepthFieldSetForTarget(
   targetAssetType: string
 ): readonly string[] {
+  const envelope = [
+    "kind=sdlc_component_depth_register",
+    "registerVersion=ts-component-depth-v1",
+    `targetAssetType=${targetAssetType}`
+  ];
   if (targetAssetType === "implementation_component_topology_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "componentTopologyRows[].kind",
       "componentTopologyRows[].componentId",
       "componentTopologyRows[].moduleName",
@@ -2799,9 +2992,7 @@ function componentDepthFieldSetForTarget(
     targetAssetType === "component_realization_qualification_surface"
   ) {
     return Object.freeze([
-      "kind=sdlc_component_depth_register",
-      "registerVersion=ts-component-depth-v1",
-      `targetAssetType=${targetAssetType}`,
+      ...envelope,
       "componentRealizationRows[].kind=sdlc_component_realization_row",
       "componentRealizationRows[].componentId",
       "componentRealizationRows[].moduleName",
@@ -2813,9 +3004,7 @@ function componentDepthFieldSetForTarget(
   }
   if (targetAssetType === "test_component_topology_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "testComponentTopologyRows[].kind",
       "testComponentTopologyRows[].testClassId",
       "testComponentTopologyRows[].relativePath",
@@ -2827,9 +3016,7 @@ function componentDepthFieldSetForTarget(
   }
   if (targetAssetType === "component_test_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "componentTestRows[].kind",
       "componentTestRows[].testClassId",
       "componentTestRows[].relativePath",
@@ -2841,9 +3028,7 @@ function componentDepthFieldSetForTarget(
   }
   if (targetAssetType === "component_test_qualification_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "componentTestQualificationRows[].kind",
       "componentTestQualificationRows[].testClassId",
       "componentTestQualificationRows[].testcaseIds",
@@ -2855,9 +3040,7 @@ function componentDepthFieldSetForTarget(
   }
   if (targetAssetType === "component_repair_schedule_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "componentRepairSchedule.kind",
       "componentRepairSchedule.registerVersion",
       "componentRepairSchedule.scheduleStatus",
@@ -2879,15 +3062,13 @@ function componentDepthFieldSetForTarget(
   }
   if (targetAssetType === "release_depth_parity_surface") {
     return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
+      ...envelope,
       "releaseDepthParity.kind",
       "releaseDepthParity.status",
       "releaseDepthParity.evidenceRefs"
     ]);
   }
-  return Object.freeze(["kind", "registerVersion", "targetAssetType"]);
+  return Object.freeze(envelope);
 }
 
 function designDepthFieldSetForTarget(targetAssetType: string): readonly string[] {
@@ -3425,30 +3606,35 @@ function transformAxiomsForWorker(): readonly string[] {
 function compactComponentDepthDirective(
   manifest: SdlcWorkerHandoffManifest
 ): string | null {
+  const envelopeDirective =
+    `Emit a fenced \`json component_depth_register\` carrier with ` +
+    `\`kind:"sdlc_component_depth_register"\`, ` +
+    `\`registerVersion:"ts-component-depth-v1"\`, and ` +
+    `\`targetAssetType:"${manifest.targetAssetType}"\`.`;
   const componentRealizationRowsDirective =
     "Emit component_depth_register.componentRealizationRows with kind=sdlc_component_realization_row, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs; order rows by dependency reason and keep progress component-addressable.";
   switch (manifest.targetAssetType) {
     case "implementation_component_topology_surface":
-      return "Emit component_depth_register.componentTopologyRows with kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs. concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other; use io_adapter for entry scripts that adapt a process/stdout boundary. publicBoundary must be a string; for an entry script with no exported API, use a non-empty entrypoint string such as node-entry-script:<relativePath>, never [] or null.";
+      return `${envelopeDirective} Emit component_depth_register.componentTopologyRows with kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs. concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other; use io_adapter for entry scripts that adapt a process/stdout boundary. publicBoundary must be a string; for an entry script with no exported API, use a non-empty entrypoint string such as node-entry-script:<relativePath>, never [] or null.`;
     case "component_realization_schedule_surface":
-      return componentRealizationRowsDirective;
+      return `${envelopeDirective} ${componentRealizationRowsDirective}`;
     case "component_code_surface":
       if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
       }
-      return `${componentRealizationRowsDirective} Preserve declared component boundaries from topology/schedule authority.`;
+      return `${envelopeDirective} ${componentRealizationRowsDirective} Preserve declared component boundaries from topology/schedule authority.`;
     case "component_realization_qualification_surface":
-      return `${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
+      return `${envelopeDirective} ${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
     case "test_component_topology_surface":
-      return "Emit component_depth_register.testComponentTopologyRows with testClassId, relativePath, testcaseIds, componentIds, requirementIds, test kind, and shard.";
+      return `${envelopeDirective} Emit component_depth_register.testComponentTopologyRows with testClassId, relativePath, testcaseIds, componentIds, requirementIds, test kind, and shard.`;
     case "component_test_surface":
-      return "Emit component_depth_register with componentTestRows and preserve testClassId/testcase allocation from topology authority.";
+      return `${envelopeDirective} Emit component_depth_register with componentTestRows and preserve testClassId/testcase allocation from topology authority.`;
     case "component_test_qualification_surface":
-      return "Emit component_depth_register.componentTestQualificationRows; failed rows must carry componentExecutionFailureRegister evidence.";
+      return `${envelopeDirective} Emit component_depth_register.componentTestQualificationRows; failed rows must carry componentExecutionFailureRegister evidence.`;
     case "component_repair_schedule_surface":
-      return "Emit component_depth_register.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.";
+      return `${envelopeDirective} Emit component_depth_register.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.`;
     case "release_depth_parity_surface":
-      return "Emit component_depth_register.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.";
+      return `${envelopeDirective} Emit component_depth_register.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.`;
     default:
       return null;
   }
@@ -3600,6 +3786,20 @@ function outcomeDirectivesForWorker(
         "Cite Fg_conform_project_authority as Derived From for created/updated authority surfaces."
       );
     }
+    if (manifest.edgeName === FG_DERIVE_LITE_DESIGN_ADR_SURFACE) {
+      directives.push(
+        "This is the lite design/ADR edge.",
+        "Produce a compact implementation design/ADR from current workspace authority; do not expand feature decomposition, full solution architecture, component topology, realization scheduling, release, test execution, or operational-cycle surfaces.",
+        "Keep the design proportional to the bounded product: decision, module boundary, product file target, execution command, and requirement lineage are sufficient when the product is a single script."
+      );
+    }
+    if (manifest.edgeName === FG_DERIVE_LITE_MODULE_SURFACE) {
+      directives.push(
+        "This is the lite module-authority edge.",
+        "Produce only the implementation module authority needed by the lite implementation edge.",
+        "Do not introduce aggregate domain models, component topology, stack profiles, realization schedules, or one module/entity row per requirement unless the design artifact explicitly requires it."
+      );
+    }
     if (manifest.targetAssetType === "code_surface") {
       directives.push(
         "For code_surface, produce a compatibility rollup over admitted component_code_surface and component_realization_qualification_surface evidence."
@@ -3624,7 +3824,7 @@ function outcomeDirectivesForWorker(
       scopedMaterialization
         ? `Deferred modules are lineage only for this edge; do not create or modify their files: ${listForPrompt(manifest.featureScope.deferredModuleNames)}.`
         : "Deferred modules: none.",
-      `Required roles: ${listForPrompt(manifest.productMaterialization.requiredRoles)}.`,
+      `Required roles: ${listForPrompt(effectiveProductMaterializationRequiredRoles(manifest))}.`,
       `Build/test contracts: ${manifest.productMaterialization.buildExecutionContract} / ${manifest.productMaterialization.testExecutionContract}.`,
       productFileTargets.length === 0
         ? "Declared product file targets: none."
@@ -3664,8 +3864,19 @@ function outcomeDirectivesForWorker(
       directives.push(
         manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
           ? "For declared product materialization, materialize product files under the declared product file targets. The output artifact is the traversal summary carrier, not a substitute for source/build files. Use minimal source structure only when no topology authority is present."
+          : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+          ? "For lite component_code_surface, materialize only the bounded implementation files declared by the lite design/module authority. Do not expand into full component inventory, topology, realization schedule, release, or test-execution surfaces."
           : "For component_code_surface, materialize implementation files for each declared component and record Component Realization Register evidence."
       );
+      if (
+        manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
+        manifest.edgeName !== FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+      ) {
+        directives.push(
+          "When declared product file targets are empty, derive the product source target set from admitted component topology/schedule authority: read component_realization_schedule_surface and materialize source files at component_depth_register.componentRealizationRows[].relativePath.",
+          "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization."
+        );
+      }
     }
     if (manifest.targetAssetType === "component_test_surface") {
       directives.push(
@@ -3710,6 +3921,12 @@ export function constructWorkerInvocationPackage(input: {
   const base = Object.freeze({
     kind: "sdlc_worker_invocation_package" as const,
     packageVersion: "ts-invocation-v1" as const,
+    ...(input.manifest.edgeAssuranceContractRef === undefined
+      ? {}
+      : { edgeAssuranceContractRef: input.manifest.edgeAssuranceContractRef }),
+    ...(input.manifest.edgeAssuranceContractDigest === undefined
+      ? {}
+      : { edgeAssuranceContractDigest: input.manifest.edgeAssuranceContractDigest }),
     graphFunctionName: input.manifest.graphFunctionName,
     edgeName: input.manifest.edgeName,
     vectorIndex: input.manifest.vectorIndex,
@@ -3754,7 +3971,7 @@ export function constructWorkerInvocationPackage(input: {
         input.manifest,
         productMaterializationAuthority.declaredProductTargetContracts
       ),
-      requiredRoles: input.manifest.productMaterialization.requiredRoles,
+      requiredRoles: effectiveProductMaterializationRequiredRoles(input.manifest),
       buildExecutionContract:
         input.manifest.productMaterialization.buildExecutionContract,
       testExecutionContract:
@@ -3843,6 +4060,12 @@ export function constructWorkerBrief(input: {
   return Object.freeze({
     kind: "sdlc_worker_brief" as const,
     briefVersion: "ts-worker-brief-v1" as const,
+    ...(input.manifest.edgeAssuranceContractRef === undefined
+      ? {}
+      : { edgeAssuranceContractRef: input.manifest.edgeAssuranceContractRef }),
+    ...(input.manifest.edgeAssuranceContractDigest === undefined
+      ? {}
+      : { edgeAssuranceContractDigest: input.manifest.edgeAssuranceContractDigest }),
     graphFunctionName: input.manifest.graphFunctionName,
     edgeName: input.manifest.edgeName,
     vectorIndex: input.manifest.vectorIndex,
@@ -4008,6 +4231,10 @@ function workerFacingProductMaterializationAuthority(
     contextExpectedTargetContracts: workerFacingTargetContracts(
       manifest,
       reconciliation.contextExpectedTargetContracts
+    ),
+    requirementAuthorityTargetContracts: workerFacingTargetContracts(
+      manifest,
+      reconciliation.requirementAuthorityTargetContracts
     ),
     productAuthorityTargetContracts: workerFacingTargetContracts(
       manifest,
@@ -4713,6 +4940,12 @@ function trimmedFilesystemPathCandidate(input: string): string {
   return input.replace(/[),.;\]}]+$/u, "");
 }
 
+function looksLikeAnchoredFilesystemPath(input: string): boolean {
+  return /^(?:\/Users|\/private|\/tmp|\/var|\/opt|\/Volumes|\/home)(?:\/|$)/u.test(
+    input
+  );
+}
+
 function candidateFilesystemPathsFromWorkerField(input: string): readonly string[] {
   const candidates = new Set<string>();
   const trimmed = trimmedFilesystemPathCandidate(input.trim());
@@ -4723,7 +4956,7 @@ function candidateFilesystemPathsFromWorkerField(input: string): readonly string
       // Ignore malformed file refs; postflight has separate admission checks.
     }
   }
-  if (isAbsolute(trimmed)) {
+  if (isAbsolute(trimmed) && looksLikeAnchoredFilesystemPath(trimmed)) {
     candidates.add(resolve(trimmed));
   }
   const fileUrlExpression = /file:\/\/[^\s"'`<>)]*/gu;
@@ -5277,7 +5510,7 @@ function observedFileSatisfiesRequiredRole(input: {
   if (role === null) {
     return false;
   }
-  if (!input.manifest.productMaterialization.requiredRoles.includes(role)) {
+  if (!effectiveProductMaterializationRequiredRoles(input.manifest).includes(role)) {
     return false;
   }
   if (role === "source" || role === "test" || role === "design") {
@@ -5589,7 +5822,7 @@ function observeProductMaterializationDeltaWithDiagnostics(input: {
       });
       if (
         priorAdmitted.kind === "file" &&
-        input.manifest.productMaterialization.requiredRoles.includes(
+        effectiveProductMaterializationRequiredRoles(input.manifest).includes(
           priorAdmitted.file.role
         )
       ) {
@@ -5619,7 +5852,7 @@ function observeProductMaterializationDeltaWithDiagnostics(input: {
     });
     if (
       changed ||
-      input.manifest.productMaterialization.requiredRoles.includes(
+      effectiveProductMaterializationRequiredRoles(input.manifest).includes(
         materialized.role
       )
     ) {
@@ -6037,14 +6270,21 @@ function evidenceRefsCarryingRequirement(input: {
   }[];
   readonly obligationId: string;
   readonly displayId: string | null;
+  readonly equivalentObligationIds?: readonly string[] | undefined;
 }): readonly string[] {
+  const equivalentObligationIds = input.equivalentObligationIds ?? [];
   return uniqueSorted(
     input.evidenceContents.flatMap((entry) =>
-      contentCarriesRequirementObligation({
-        content: entry.content,
-        obligationId: input.obligationId,
-        displayId: input.displayId
-      })
+      [
+        input.obligationId,
+        ...equivalentObligationIds.filter((id) => id !== input.obligationId)
+      ].some((obligationId) =>
+        contentCarriesRequirementObligation({
+          content: entry.content,
+          obligationId,
+          displayId: input.displayId
+        })
+      )
         ? [entry.ref]
         : []
     )
@@ -6205,24 +6445,39 @@ function postTransformObligationAssessments(input: {
     outputFile: input.manifest.outputFile,
     materializedFiles: input.materializedFiles
   });
+  const canonicalByObligationId = canonicalRequirementLineageMap(input.manifest);
+  const equivalentIdsByCanonical =
+    equivalentRequirementLineageIdsByCanonical(input.manifest);
   const assessments = input.manifest.traversalObligationContext.obligations.map((obligation) => {
       const requirementId = requirementIdForObligation(obligation.obligationId);
     if (requirementId !== null) {
         const displayId = displayIdForRequirementObligation(obligation);
+        const canonicalRequirementId =
+          canonicalByObligationId.get(obligation.obligationId) ??
+          obligation.obligationId;
         const evidenceRefs = evidenceRefsCarryingRequirement({
           evidenceContents: observedRequirementContents,
           obligationId: obligation.obligationId,
-          displayId
+          displayId,
+          equivalentObligationIds:
+            equivalentIdsByCanonical.get(canonicalRequirementId) ??
+            Object.freeze([canonicalRequirementId])
         });
         const observed = evidenceRefs.length > 0;
         const recordsRequirementSurfaceOnly =
           input.manifest.targetAssetType === "requirement_surface";
+        const carriesAuthorityRequirementForward =
+          input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+          !input.manifest.productMaterialization.required &&
+          !recordsRequirementSurfaceOnly;
         const fulfillmentStatus =
           observed && recordsRequirementSurfaceOnly
             ? "partial"
             : observed
               ? "fulfilled"
-              : "blocked";
+              : carriesAuthorityRequirementForward
+                ? "partial"
+                : "blocked";
         return Object.freeze({
           kind: "sdlc_worker_obligation_assessment" as const,
           obligationId: obligation.obligationId,
@@ -6232,7 +6487,9 @@ function postTransformObligationAssessments(input: {
             fulfillmentStatus === "fulfilled"
               ? Object.freeze([])
               : Object.freeze([
-                  observed
+                  carriesAuthorityRequirementForward
+                    ? `requirement_carried_for_downstream_closure:${requirementId}`
+                    : observed
                     ? `requirement_recorded_for_future_closure:${requirementId}`
                     : `requirement_trace_not_observed:${requirementId}`
                 ])
@@ -6511,11 +6768,39 @@ function materializationReplayIsNeeded(input: {
   const productFiles = input.report.materializedFiles.filter(
     (file) => resolve(file.absolutePath) !== resolve(input.manifest.outputFile)
   );
+  const authority = reconcileSdlcProductMaterializationAuthority(input.manifest);
+  if (authority.declaredProductTargetContracts.length > 0) {
+    return authority.declaredProductTargetContracts.some(
+      (target) =>
+        !productFiles.some((file) =>
+          materializedProductFileSatisfiesDeclaredTarget({
+            manifest: input.manifest,
+            file,
+            target
+          })
+        )
+    );
+  }
   return (
     productFiles.length === 0 ||
     contract.requiredRoles.some(
       (requiredRole) => !productFiles.some((file) => file.role === requiredRole)
     )
+  );
+}
+
+function materializedProductFileSatisfiesDeclaredTarget(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+  readonly target: SdlcProductMaterializationAuthorityTarget;
+}): boolean {
+  return (
+    input.file.role === input.target.requiredRole &&
+    productAuthorityTargetCoversRelativePath({
+      manifest: input.manifest,
+      target: input.target,
+      normalizedRelativePath: input.file.relativePath.split(path.sep).join("/")
+    })
   );
 }
 
@@ -6781,13 +7066,18 @@ function resolveProductMaterializationReplay(input: {
     replayedFiles,
     currentFiles
   });
+  const supersededDiagnostics = new Set<SdlcBlockingReasonCode>([
+    "materialized_product_manifest_replay_empty"
+  ]);
   const report = Object.freeze({
     ...reportWithLineage,
     materializedFiles
   });
   return Object.freeze({
     report,
-    diagnostics: Object.freeze(diagnostics),
+    diagnostics: Object.freeze(
+      diagnostics.filter((diagnostic) => !supersededDiagnostics.has(diagnostic.code))
+    ),
     replay: Object.freeze({
       currentAttemptMaterializedFileCount:
         reportWithLineage.materializedFiles.length,
@@ -6984,13 +7274,32 @@ function evaluateMaterializedProductFiles(input: {
       })
     );
   }
-  for (const requiredRole of contract.requiredRoles) {
+  for (const requiredRole of effectiveProductMaterializationRequiredRoles(input.manifest)) {
     if (!reportedProductFiles.some((file) => file.role === requiredRole)) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "materialized_product_role_missing",
           detail: requiredRole,
           evidenceRefs: [pathToFileURL(contract.tenantRoot).href]
+        })
+      );
+    }
+  }
+  for (const target of materializationAuthority.declaredProductTargetContracts) {
+    if (
+      !reportedProductFiles.some((file) =>
+        materializedProductFileSatisfiesDeclaredTarget({
+          manifest: input.manifest,
+          file,
+          target
+        })
+      )
+    ) {
+      input.blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "materialized_product_files_missing",
+          detail: `declared_target:${target.path}`,
+          evidenceRefs: [target.sourceRef]
         })
       );
     }

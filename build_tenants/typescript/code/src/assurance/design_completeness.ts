@@ -569,14 +569,11 @@ function sunnyDaySequenceReasons(input: {
   const model = input.model;
   const entityMatchesModel = (candidate: {
     readonly entityId: string;
-    readonly moduleName?: string | undefined;
   }): boolean =>
     model.entities.some((entity) =>
       entityIdsMatch({
         leftEntityId: entity.entityId,
-        leftModuleName: entity.ownerModuleName,
-        rightEntityId: candidate.entityId,
-        rightModuleName: candidate.moduleName
+        rightEntityId: candidate.entityId
       })
     );
   const scopedSteps = input.sequence.steps.filter((step) =>
@@ -606,8 +603,7 @@ function sunnyDaySequenceReasons(input: {
       [...step.inputEntityIds, ...step.outputEntityIds]
         .filter((entityId) =>
           !entityMatchesModel({
-            entityId,
-            moduleName: step.moduleName
+            entityId
           })
         )
         .map((entityId) =>

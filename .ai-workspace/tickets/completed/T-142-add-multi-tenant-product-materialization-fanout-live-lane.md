@@ -3,8 +3,8 @@ id: T-142
 title: Add multi-tenant product materialization fan-out live lane
 type: feature
 ticket_category: backlog
-status: backlog
-review_status: not_started
+status: completed
+review_status: consolidated_into_T-164_edge_gain_closure_contract
 goal: typescript-rc-bounded-live-proof
 build_tenant: typescript
 owner: odd_sdlc
@@ -21,9 +21,11 @@ affected_boundary:
 priority: medium
 triaged_at: 2026-05-10
 created_at: 2026-05-10
-updated_at: 2026-05-10
-completed_at: null
+updated_at: 2026-05-13
+completed_at: 2026-05-13
 governance_scope: STDO Method
+closure_resolution: closed_as_absorbed_proof_obligation
+consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 dependencies:
   - T-132 single-tenant hello-world live lane proves the current selected-output-root materialization loop.
   - T-141 restores requirement-to-product materialization as a GTL transform boundary.
@@ -47,6 +49,25 @@ non_closure_conditions:
 ---
 
 # T-142: Multi-Tenant Product Materialization Fan-Out
+
+## Closure Consolidation - 2026-05-13
+
+This ticket is closed as a standalone backlog feature and carried by T-164.
+
+The multi-tenant fan-out bug is a specific failed-closure class: one generated
+tenant or one selected output root must not close a compound product obligation
+whose target outcome names multiple tenant bindings.
+
+T-164 now carries this as the multi-tenant materialization proof row:
+
+- the edge contract must distinguish single-target materialization from
+  multi-target fan-out or typed batch materialization;
+- each tenant target must have admitted evidence, or a typed batch close row
+  must cover every target;
+- remaining tenant targets must stay visible as residual pressure;
+- harness-local expected-file arrays must not become closure truth.
+
+Closing this ticket does not claim multi-tenant fan-out has been implemented.
 
 ## Triage
 

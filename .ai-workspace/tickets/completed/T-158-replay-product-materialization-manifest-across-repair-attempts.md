@@ -3,8 +3,8 @@ id: T-158
 title: Replay product materialization manifest across repair attempts
 type: defect
 ticket_category: runtime_closure_recovery
-status: active
-review_status: deterministic_closure_passed_live_hello_passed_data_mapper_pending
+status: completed
+review_status: consolidated_into_T-164_edge_gain_closure_contract
 goal: post-t157-live-data-mapper-closure-hardening
 build_tenant: typescript
 owner: odd_sdlc
@@ -14,8 +14,12 @@ re_entry_point: realization
 priority: critical
 triaged_at: 2026-05-11
 created_at: 2026-05-11
+updated_at: 2026-05-13
 implemented_at: 2026-05-11
+completed_at: 2026-05-13
 governance_scope: STDO Method
+closure_resolution: closed_as_absorbed_proof_obligation
+consolidated_into: .ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
 source_documents:
   - specification/GOALS.md
   - specification/PRODUCT.md
@@ -64,6 +68,34 @@ implementation_refs:
 ---
 
 # T-158: Replay Product Materialization Manifest Across Repair Attempts
+
+## Closure Consolidation - 2026-05-13
+
+This ticket is closed as a standalone active defect and carried by T-164.
+
+The contained deterministic repair remains useful evidence, but the remaining
+live `data_mapper` closure question is not local to product-materialization
+manifest replay alone. It is a proof obligation for the generic per-edge gain
+and closure contract:
+
+```text
+same-edge repair replay is lawful only when the edge gain function admits the
+predecessor materialization evidence and the close function proves no required
+product-materialization pressure remains.
+```
+
+T-164 now owns the remaining proof:
+
+- predecessor evidence must match workspace, graph edge, target binding,
+  evidence policy, and contract digest;
+- replayed materialization evidence must still be measured through admitted
+  ledger rows;
+- the edge must not close if any required product-materialization pressure
+  remains;
+- live `data_mapper` closure or typed non-close evidence is evaluated under the
+  T-164 matrix, not this standalone ticket.
+
+No standalone product closure is claimed here.
 
 ## Implementation Update: 2026-05-11
 

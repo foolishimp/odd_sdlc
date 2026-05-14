@@ -13,6 +13,8 @@ import {
   deriveSdlcConformProjectProfileFromWorkspace,
   deriveSdlcWorkspaceIngressReport,
   executeInstalledOperatorStartWithReentry,
+  installedStartRequestsYieldResume,
+  installedStartShouldContinueForRequestedUntil,
   materializeSdlcProjectConformance,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
@@ -93,6 +95,44 @@ function makeStart(workspaceRoot) {
     conformedProject,
     workerAttachment: projectSdlcWorkerAttachment({
       transportContract: "process://node"
+    })
+  });
+  assert.equal(start.kind, "sdlc_public_start_projected");
+  return start;
+}
+
+function makeConformStart(workspaceRoot) {
+  const module = constructSdlcGtlModule();
+  const ingressReport = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: `file://${workspaceRoot}`,
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t151",
+      activeTenant: "scala_spark",
+      selectedOutputRoot: "build_tenants/scala_spark",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: []
+    }),
+    sourceInputs: []
+  });
+  const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject =
+    deriveSdlcConformProjectProfileFromWorkspace(workspaceRoot);
+  const start = publicStartOnce({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot,
+      target: {
+        kind: "graph_function",
+        handle: "Fg_conform_project"
+      },
+      until: "converged",
+      defaultRegime: "F_D"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: null
     })
   });
   assert.equal(start.kind, "sdlc_public_start_projected");
@@ -227,6 +267,88 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   assert.equal(
     existsSync(path.join(outcome.archiveRoot, "sdlc_next_action_projection.json")),
     true
+  );
+});
+
+test("T-164 converged start follows deterministic conformance to downstream graph work", async () => {
+  const workspace = makeWorkspace();
+  const start = makeConformStart(workspace);
+  let refreshCalls = 0;
+
+  const outcome = await executeInstalledOperatorStartWithReentry({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: null,
+    replayEvents: [],
+    requestedUntil: "converged",
+    refreshReplayState: async () => {
+      refreshCalls += 1;
+      return {
+        start: {
+          kind: "sdlc_public_start_blocked",
+          status: "blocked",
+          blockingReason: "test_downstream_probe",
+          stopPredicate: "gap_stop",
+          executionContract: null,
+          emittedRuntimeEventKinds: []
+        },
+        replayEvents: [],
+        eventGraphEvents: []
+      };
+    }
+  });
+
+  assert.equal(refreshCalls, 1);
+  assert.equal(outcome.status, "blocked");
+  assert.equal("loop" in outcome, true);
+  assert.equal(outcome.loop.attemptCount, 2);
+  assert.equal(outcome.loop.attempts[0].status, "converged");
+  assert.equal(
+    outcome.loop.attempts[0].nextLawfulAction,
+    "rerun_start_for_downstream_graph"
+  );
+});
+
+test("T-164 converged start treats yield resume basis as same-edge continuation", () => {
+  const yieldOutcome = {
+    status: "postflight_failed",
+    summary: {
+      nextLawfulAction: "disposition://yield"
+    },
+    traversalConsequence: {
+      edgeClosureDecision: {
+        disposition: "yield",
+        yieldResumeBasis: {
+          resumeBasisRef: "resume-basis://t151/yield",
+          currentEdgeRef: "edge://t151/current",
+          admittedProgressRefs: ["file://t151/progress.scala"],
+          livenessProjectionRef: "liveness://t151/current",
+          resumePolicyRef: "resume-policy://t151/operator-iterate"
+        }
+      },
+      nextActionProjection: {
+        choosesNextTraversal: false,
+        selectedActionRef: null,
+        nextGraphFunctionRef: null,
+        nextGraphVectorRef: null
+      }
+    }
+  };
+
+  assert.equal(installedStartRequestsYieldResume(yieldOutcome), true);
+  assert.equal(
+    installedStartShouldContinueForRequestedUntil({
+      requestedUntil: "converged",
+      outcome: yieldOutcome
+    }),
+    true
+  );
+  assert.equal(
+    installedStartShouldContinueForRequestedUntil({
+      requestedUntil: "first_traversal",
+      outcome: yieldOutcome
+    }),
+    false
   );
 });
 

@@ -78,16 +78,32 @@ export function copyFixture(fixtureRoot, targetRoot) {
   return targetRoot;
 }
 
-function buildStartArgs(workspace, scenario) {
+export function scenarioStartTargetForStep(scenario, step) {
+  if (Array.isArray(scenario.startTargetSequence) && step < scenario.startTargetSequence.length) {
+    return scenario.startTargetSequence[step];
+  }
+  return scenario.startTarget;
+}
+
+export function scenarioStartUntilForStep(scenario, step) {
+  if (Array.isArray(scenario.startUntilSequence) && step < scenario.startUntilSequence.length) {
+    return scenario.startUntilSequence[step];
+  }
+  return scenario.startUntil;
+}
+
+function buildStartArgs(workspace, scenario, step) {
   const args = ["start", "--workspace", workspace];
   if (scenario.liveWorker !== undefined && scenario.liveWorker !== null) {
     args.push("--worker", scenario.liveWorker);
   }
-  if (scenario.startTarget !== undefined) {
-    args.push("--target", scenario.startTarget);
+  const startTarget = scenarioStartTargetForStep(scenario, step);
+  if (typeof startTarget === "string" && startTarget.length > 0) {
+    args.push("--target", startTarget);
   }
-  if (scenario.startUntil !== undefined) {
-    args.push("--until", scenario.startUntil);
+  const startUntil = scenarioStartUntilForStep(scenario, step);
+  if (typeof startUntil === "string" && startUntil.length > 0) {
+    args.push("--until", startUntil);
   }
   return args;
 }
@@ -101,25 +117,30 @@ function workspaceFilesExist(workspace, files) {
   return files.every((rel) => existsSync(path.join(workspace, rel)));
 }
 
+function readJsonFile(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function archiveClosedCleanly(archiveRoot) {
   if (typeof archiveRoot !== "string" || archiveRoot.length === 0) {
     return false;
   }
-  try {
-    const closure = JSON.parse(
-      readFileSync(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
-    );
-    const fpEvaluate = JSON.parse(
-      readFileSync(path.join(archiveRoot, "fp_evaluate_result.json"), "utf8")
-    );
-    return (
-      closure?.disposition === "close" &&
-      fpEvaluate?.status === "passed" &&
-      fpEvaluate?.postflightStatus === "passed"
-    );
-  } catch {
-    return false;
-  }
+  const closure = readJsonFile(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+  );
+  const fpEvaluate = readJsonFile(
+    path.join(archiveRoot, "fp_evaluate_result.json")
+  );
+  return (
+    closure?.disposition === "close" &&
+    fpEvaluate?.status === "passed" &&
+    fpEvaluate?.postflightStatus === "passed"
+  );
 }
 
 export function scenarioWorkspaceFileStopSatisfied(input) {
@@ -129,7 +150,7 @@ export function scenarioWorkspaceFileStopSatisfied(input) {
   );
 }
 
-function observedHandoffEdgeSequence(workspace) {
+function operatorRunRoots(workspace) {
   const runsRoot = path.join(
     workspace,
     ".ai-workspace/runtime/odd_sdlc/operator-runs"
@@ -144,7 +165,11 @@ function observedHandoffEdgeSequence(workspace) {
         return false;
       }
     })
-    .sort()
+    .sort();
+}
+
+function observedHandoffEdgeSequence(workspace) {
+  return operatorRunRoots(workspace)
     .flatMap((archiveRoot) => {
       const manifestPath = path.join(archiveRoot, "handoff_manifest.json");
       if (!existsSync(manifestPath)) return [];
@@ -157,6 +182,11 @@ function observedHandoffEdgeSequence(workspace) {
     });
 }
 
+function latestOperatorRunRoot(workspace) {
+  const entries = operatorRunRoots(workspace);
+  return entries.at(-1) ?? null;
+}
+
 function compressConsecutiveValues(values) {
   const compressed = [];
   for (const value of values) {
@@ -165,6 +195,170 @@ function compressConsecutiveValues(values) {
     }
   }
   return compressed;
+}
+
+function workspaceRelativePath(workspace, candidate) {
+  if (typeof candidate !== "string" || candidate.length === 0) return null;
+  let absolutePath = candidate;
+  if (candidate.startsWith("file://")) {
+    try {
+      absolutePath = fileURLToPath(candidate);
+    } catch {
+      return null;
+    }
+  }
+  if (!path.isAbsolute(absolutePath)) return null;
+  const rel = path.relative(workspace, absolutePath);
+  if (rel.length === 0 || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return null;
+  }
+  return rel.split(path.sep).join("/");
+}
+
+function materializedWorkspaceFilesFromArchive(workspace, archiveRoot) {
+  const observed = new Set();
+  const manifest = readJsonFile(
+    path.join(archiveRoot, "product_materialization_manifest.json")
+  );
+  const selectedOutputRoot = manifest?.contract?.selectedOutputRoot;
+  if (Array.isArray(manifest?.files)) {
+    for (const file of manifest.files) {
+      const fromAbsolute = workspaceRelativePath(workspace, file?.absolutePath);
+      if (fromAbsolute !== null) {
+        observed.add(fromAbsolute);
+        continue;
+      }
+      if (
+        typeof selectedOutputRoot === "string" &&
+        typeof file?.relativePath === "string"
+      ) {
+        observed.add(
+          path.posix.join(selectedOutputRoot, file.relativePath)
+        );
+      }
+    }
+  }
+
+  const ledger = readJsonFile(
+    path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json")
+  );
+  if (Array.isArray(ledger?.materializationRefs)) {
+    for (const ref of ledger.materializationRefs) {
+      const rel = workspaceRelativePath(workspace, ref);
+      if (rel !== null) observed.add(rel);
+    }
+  }
+  return observed;
+}
+
+function materializedWorkspaceFiles(workspace) {
+  const observed = new Set();
+  for (const archiveRoot of operatorRunRoots(workspace)) {
+    for (const rel of materializedWorkspaceFilesFromArchive(
+      workspace,
+      archiveRoot
+    )) {
+      observed.add(rel);
+    }
+  }
+  return observed;
+}
+
+function assertProcessStdoutJson(input) {
+  const expectation = input.check.stdoutJson;
+  if (expectation === undefined || expectation === null) return;
+  let parsed;
+  try {
+    parsed = JSON.parse(input.stdout);
+  } catch (error) {
+    throw new Error(
+      `${input.scenarioId}: process check ${input.command} stdout was not JSON: ${error.message}`
+    );
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      `${input.scenarioId}: process check ${input.command} stdout JSON must be an object`
+    );
+  }
+  if (Array.isArray(expectation.hasKeys)) {
+    for (const key of expectation.hasKeys) {
+      if (typeof key !== "string" || !Object.hasOwn(parsed, key)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON missing key ${key}`
+        );
+      }
+    }
+  }
+  if (expectation.equals !== null && typeof expectation.equals === "object") {
+    for (const [key, expected] of Object.entries(expectation.equals)) {
+      const observed = parsed[key];
+      if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} ${JSON.stringify(observed)}, expected ${JSON.stringify(expected)}`
+        );
+      }
+    }
+  }
+  if (
+    expectation.arrayIncludes !== null &&
+    typeof expectation.arrayIncludes === "object"
+  ) {
+    for (const [key, expectedValues] of Object.entries(expectation.arrayIncludes)) {
+      const observed = parsed[key];
+      if (!Array.isArray(observed) || !Array.isArray(expectedValues)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} must be an array`
+        );
+      }
+      for (const expected of expectedValues) {
+        if (!observed.includes(expected)) {
+          throw new Error(
+            `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} missing ${JSON.stringify(expected)}`
+          );
+        }
+      }
+    }
+  }
+  if (
+    expectation.arrayEquals !== null &&
+    typeof expectation.arrayEquals === "object"
+  ) {
+    for (const [key, expectedValues] of Object.entries(expectation.arrayEquals)) {
+      const observed = parsed[key];
+      if (!Array.isArray(observed) || !Array.isArray(expectedValues)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} must be an array`
+        );
+      }
+      if (JSON.stringify(observed) !== JSON.stringify(expectedValues)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} ${JSON.stringify(observed)}, expected ${JSON.stringify(expectedValues)}`
+        );
+      }
+    }
+  }
+  if (
+    expectation.arrayMembers !== null &&
+    typeof expectation.arrayMembers === "object"
+  ) {
+    for (const [key, expectedValues] of Object.entries(expectation.arrayMembers)) {
+      const observed = parsed[key];
+      if (!Array.isArray(observed) || !Array.isArray(expectedValues)) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} must be an array`
+        );
+      }
+      const missing = expectedValues.filter(
+        (expected) => !observed.includes(expected)
+      );
+      const extra = observed.filter((value) => !expectedValues.includes(value));
+      if (missing.length > 0 || extra.length > 0) {
+        throw new Error(
+          `${input.scenarioId}: process check ${input.command} stdout JSON field ${key} members ${JSON.stringify(observed)}, expected ${JSON.stringify(expectedValues)}`
+        );
+      }
+    }
+  }
 }
 
 export async function runScenarioSandbox(scenario, options = {}) {
@@ -249,7 +443,7 @@ export async function runScenarioSandbox(scenario, options = {}) {
     } else {
       consecutiveSameEdgeAfterConverge = 0;
     }
-    const start = await invokeOddSdlcSpecMethodCommand(buildStartArgs(workspace, scenario));
+    const start = await invokeOddSdlcSpecMethodCommand(buildStartArgs(workspace, scenario, step));
     advances.push({ step, gaps, start });
     lastStatus = start?.payload?.status ?? null;
     lastGapsEdge = currentGapsEdge;
@@ -304,6 +498,9 @@ export function assertScenarioExpectations(result, scenario) {
   }
   const firstGapsPayload = firstAdvance.gaps?.payload;
   const firstStartPayload = firstAdvance.start?.payload;
+  const firstStartExecutionContract =
+    firstStartPayload?.executionContract ??
+    firstStartPayload?.start?.executionContract;
 
   if (expectations.firstEdge !== undefined) {
     const target = firstGapsPayload?.start?.executionContract?.targetGraphFunction;
@@ -318,6 +515,22 @@ export function assertScenarioExpectations(result, scenario) {
     if (status !== expectations.firstStartStatus) {
       throw new Error(
         `${scenario.scenarioId}: first start status mismatch — expected ${expectations.firstStartStatus}, saw ${status}`
+      );
+    }
+  }
+  if (expectations.firstStartTargetGraphFunction !== undefined) {
+    const target = firstStartExecutionContract?.targetGraphFunction;
+    if (target !== expectations.firstStartTargetGraphFunction) {
+      throw new Error(
+        `${scenario.scenarioId}: first start target mismatch — expected ${expectations.firstStartTargetGraphFunction}, saw ${target}`
+      );
+    }
+  }
+  if (expectations.firstStartOverlayRef !== undefined) {
+    const overlayRef = firstStartExecutionContract?.overlayRef;
+    if (overlayRef !== expectations.firstStartOverlayRef) {
+      throw new Error(
+        `${scenario.scenarioId}: first start overlay mismatch — expected ${expectations.firstStartOverlayRef}, saw ${overlayRef}`
       );
     }
   }
@@ -346,6 +559,16 @@ export function assertScenarioExpectations(result, scenario) {
       const abs = path.join(result.workspace, rel);
       if (!existsSync(abs)) {
         throw new Error(`${scenario.scenarioId}: expected workspace file ${rel} missing`);
+      }
+    }
+  }
+  if (Array.isArray(expectations.materializationEvidenceWorkspaceFiles)) {
+    const observed = materializedWorkspaceFiles(result.workspace);
+    for (const rel of expectations.materializationEvidenceWorkspaceFiles) {
+      if (!observed.has(rel)) {
+        throw new Error(
+          `${scenario.scenarioId}: expected workspace file ${rel} has no materialization ledger evidence`
+        );
       }
     }
   }
@@ -402,6 +625,12 @@ export function assertScenarioExpectations(result, scenario) {
           );
         }
       }
+      assertProcessStdoutJson({
+        scenarioId: scenario.scenarioId,
+        command,
+        check,
+        stdout: executed.stdout.trim()
+      });
     }
   }
   if (expectations.terminalStatus !== undefined) {
@@ -420,6 +649,18 @@ export function assertScenarioExpectations(result, scenario) {
       const abs = path.join(archiveRoot, rel);
       if (!existsSync(abs)) {
         throw new Error(`${scenario.scenarioId}: expected archive artifact ${rel} missing`);
+      }
+    }
+  }
+  if (Array.isArray(expectations.latestArchiveArtifacts)) {
+    const archiveRoot = latestOperatorRunRoot(result.workspace);
+    if (archiveRoot === null) {
+      throw new Error(`${scenario.scenarioId}: no operator archive root observed`);
+    }
+    for (const rel of expectations.latestArchiveArtifacts) {
+      const abs = path.join(archiveRoot, rel);
+      if (!existsSync(abs)) {
+        throw new Error(`${scenario.scenarioId}: expected latest archive artifact ${rel} missing`);
       }
     }
   }

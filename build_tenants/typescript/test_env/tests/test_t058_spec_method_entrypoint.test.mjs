@@ -161,7 +161,13 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
       {
         kind: "sdlc_edge_closure_decision",
         decisionRef,
-        disposition: "close"
+        disposition: "close",
+        ...(input.overlayRef === undefined
+          ? {}
+          : { overlayRef: input.overlayRef }),
+        ...(input.admittedOverlayBindingRef === undefined
+          ? {}
+          : { overlayBindingRef: input.admittedOverlayBindingRef })
       },
       null,
       2
@@ -175,6 +181,12 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
         kind: "sdlc_edge_fulfillment_ledger",
         ledgerRef: `ledger://t058/${input.name ?? "post-close"}`,
         ledgerVersionRef: `ledger-version://t058/${input.name ?? "post-close"}/1`,
+        ...(input.overlayRef === undefined
+          ? {}
+          : { overlayRef: input.overlayRef }),
+        ...(input.admittedOverlayBindingRef === undefined
+          ? {}
+          : { overlayBindingRef: input.admittedOverlayBindingRef }),
         counts: {
           expected: 1,
           fulfilled: 1,
@@ -206,7 +218,13 @@ function writePostCloseNextActionArchive(workspace, input = {}) {
           "construction-priority-projection://t058/post-close/materialize",
         nextGraphFunctionRef: effectiveNextGraphFunctionRef,
         nextGraphVectorRef: effectiveNextGraphVectorRef,
-        predecessorRefs: input.predecessorRefs ?? [decisionRef]
+        predecessorRefs: input.predecessorRefs ?? [decisionRef],
+        ...(input.overlayRef === undefined
+          ? {}
+          : { overlayRef: input.overlayRef }),
+        ...(input.overlayBindingRef === undefined
+          ? {}
+          : { overlayBindingRef: input.overlayBindingRef })
       },
       null,
       2
@@ -255,6 +273,88 @@ test("T-058 vector-backed post-close next action becomes the next start target",
   assert.equal(
     result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
     graphTrackRefs("derive_component_code_surface").graphVectorRef
+  );
+});
+
+test("T-158 archived next traversal does not compare predecessor overlay binding to the next edge binding", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: "Fg_conform_project_authority",
+    nextGraphFunctionRef: "derive_feature_decomp_surface",
+    nextGraphVectorRef: "derive_feature_decomp_surface",
+    overlayRef: "overlay://odd-sdlc/current-full-traversal",
+    overlayBindingRef: "overlay-binding://odd-sdlc/predecessor-edge-binding"
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    "derive_feature_decomp_surface"
+  );
+  assert.equal(result.payload.start.executionContract.requestedUntil, "blocked");
+  assert.equal(
+    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    "derive_feature_decomp_surface"
+  );
+  assert.notEqual(
+    result.payload.start.executionContract.overlayBindingRef,
+    "overlay-binding://odd-sdlc/predecessor-edge-binding"
+  );
+});
+
+test("T-160 archived next traversal rejects inconsistent predecessor overlay binding", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: "Fg_conform_project_authority",
+    nextGraphFunctionRef: "derive_feature_decomp_surface",
+    nextGraphVectorRef: "derive_feature_decomp_surface",
+    overlayRef: "overlay://odd-sdlc/current-full-traversal",
+    admittedOverlayBindingRef: "overlay-binding://odd-sdlc/admitted",
+    overlayBindingRef: "overlay-binding://odd-sdlc/projection-drift"
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.payload.blockingReason, "stale_query_domain");
+  assert.match(
+    result.payload.start.detail,
+    /overlayBindingRef does not match its admitted closure\/ledger binding/
+  );
+});
+
+test("T-158 explicit graph-function target is not overridden by another archived next action", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: "derive_component_code_surface"
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:bootstrap_release_self_test"
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    "bootstrap_release_self_test"
+  );
+  assert.notEqual(
+    result.payload.start.executionContract.targetGraphFunction,
+    "derive_component_code_surface"
   );
 });
 

@@ -5,9 +5,12 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
+  constructSdlcGtlModule,
   constructSdlcHookContractCatalog,
   deriveSdlcTraversalStrategyDecision,
   deriveWorkerHandoffManifest,
@@ -204,6 +207,15 @@ function manifestFor(
   });
 }
 
+function traversalStrategyRefForVector(vector) {
+  const declaration = vector.declarations.entries.find(
+    (entry) => entry.key === "abg.traversal_strategy"
+  );
+  assert(declaration, `${vector.name}: missing traversal strategy declaration`);
+  assert.equal(declaration.value.kind, "hook_ref");
+  return declaration.value.value.ref;
+}
+
 test("T-123 fallback plan derives one strategy decision for every catalog edge", () => {
   for (const contract of constructSdlcHookContractCatalog()) {
     const decision = deriveSdlcTraversalStrategyDecision({
@@ -230,6 +242,74 @@ test("T-123 graph vectors and operator handoff consume one shared strategy plan"
   assert(!graphModule.includes("FULL_BREADTH_TRAVERSAL_NAMES"));
   assert.match(graphModule, /defaultSdlcTraversalStrategyForName/u);
   assert.match(sharedPlan, /ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN/u);
+});
+
+test("T-123 steel-thread-after-requirements is a GTL strategy profile", () => {
+  const module = constructSdlcGtlModule({
+    traversalStrategyPlan:
+      ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN
+  });
+  const bootstrap = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === "bootstrap_release_self_test"
+  );
+  assert(bootstrap);
+  const graph = materializeGraphFunction(bootstrap);
+  const strategyByVector = new Map(
+    graph.vectors.map((vector) => [
+      vector.name,
+      traversalStrategyRefForVector(vector)
+    ])
+  );
+
+  for (const edgeName of [
+    "derive_intent_surface",
+    "derive_product_surface",
+    "derive_goal_surface",
+    "derive_requirement_surface"
+  ]) {
+    assert.equal(
+      strategyByVector.get(edgeName),
+      `strategy://odd_sdlc/${edgeName}/full_breadth`
+    );
+  }
+  for (const edgeName of [
+    "derive_feature_decomp_surface",
+    "derive_design_surface",
+    "derive_implementation_design_surface",
+    "derive_component_code_surface"
+  ]) {
+    assert.equal(
+      strategyByVector.get(edgeName),
+      `strategy://odd_sdlc/${edgeName}/steel_thread`
+    );
+  }
+
+  const materializer = module.graphFunctions.find(
+    (graphFunction) => graphFunction.name === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  );
+  assert(materializer);
+  const materializerVector = materializeGraphFunction(materializer).vectors[0];
+  assert(materializerVector);
+  assert.equal(
+    traversalStrategyRefForVector(materializerVector),
+    `strategy://odd_sdlc/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}/steel_thread`
+  );
+
+  const requirementDecision = deriveSdlcTraversalStrategyDecision({
+    edgeName: "derive_requirement_surface",
+    targetAssetType: "requirement_surface",
+    fallbackPlan:
+      ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN
+  });
+  assert.equal(requirementDecision.selectedStrategy, "full_breadth");
+
+  const designDecision = deriveSdlcTraversalStrategyDecision({
+    edgeName: "derive_design_surface",
+    targetAssetType: "design_surface",
+    fallbackPlan:
+      ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN
+  });
+  assert.equal(designDecision.selectedStrategy, "steel_thread");
 });
 
 test("T-123 induction and requirement edges remain full-breadth", () => {

@@ -21,6 +21,7 @@ import {
   deriveSdlcConformProjectReportFromWorkspace,
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveWorkerHandoffManifest,
+  declaredProductFileTargets,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
@@ -196,6 +197,83 @@ build_tenants:
     constraintsText,
     /  product_materialization_root_policy: selected_output_root\n/
   );
+});
+
+test("T-164 conformance preserves bootstrap product targets for lite materialization", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-conform-"));
+  mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t164 rust service",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "bootstrap.md"),
+    [
+      "# Bootstrap",
+      "",
+      "## Product Definition",
+      "",
+      "The product shall provide `build_tenants/hello_world_rust_service/Cargo.toml`.",
+      "The product shall provide `build_tenants/hello_world_rust_service/src/main.rs`.",
+      "",
+      "## Requirements",
+      "",
+      "### REQ-T164-RUST-SVC-001 Cargo Manifest",
+      "",
+      "The product shall provide one Cargo manifest at",
+      "`build_tenants/hello_world_rust_service/Cargo.toml`.",
+      "",
+      "### REQ-T164-RUST-SVC-002 Rust Executable Source",
+      "",
+      "The product shall provide one Rust executable source file at",
+      "`build_tenants/hello_world_rust_service/src/main.rs`."
+    ].join("\n"),
+    "utf8"
+  );
+
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+
+  const product = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
+  const requirements = readFileSync(
+    path.join(workspace, "specification/requirements/01-t164-requirements.md"),
+    "utf8"
+  );
+  assert.match(product, /Build Tool: cargo/);
+  assert.match(product, /`build_tenants\/hello_world_rust_service\/Cargo\.toml`/);
+  assert.match(product, /`build_tenants\/hello_world_rust_service\/src\/main\.rs`/);
+  assert.match(requirements, /The product shall provide one Cargo manifest/);
+  assert.match(requirements, /The product shall provide one Rust executable source file/);
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_lite_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: contract.edgeName,
+    vectorIndex: 2,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-conformed-product-targets"
+  });
+
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/hello_world_rust_service/Cargo.toml",
+    "build_tenants/hello_world_rust_service/src/main.rs"
+  ]);
 });
 
 test("T-068 infers execution contracts from selected tenant truth without workload-specific code", () => {

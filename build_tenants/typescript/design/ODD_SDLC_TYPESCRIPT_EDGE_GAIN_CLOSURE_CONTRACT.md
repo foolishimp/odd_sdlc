@@ -1,0 +1,239 @@
+# ODD SDLC TypeScript Edge Gain And Closure Contract
+
+**Status**: Active design for T-164
+**Date**: 2026-05-14
+**Owner Ticket**: `.ai-workspace/tickets/active/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md`
+**Implements**: REQ-F-GFUNC-006, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064, REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-067
+**Derives From**: `specification/PRODUCT.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/14-odd-sdlc-installed-product-contract.md`, `specification/requirements/16-edge-gain-closure-contract.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`, `ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md`
+
+## STDO Re-Triage
+
+T-164 is a design reframe before it is a runtime refactor.
+
+The current code already has graph functions, overlays, handoff manifests,
+fulfillment ledgers, closure decisions, query projections, and installed
+sandbox proof. The missing layer is the declared edge-level computation:
+
+```text
+contract row
+  -> admitted evidence
+  -> ledger measurements
+  -> gain
+  -> residual pressure
+  -> close decision
+  -> compound traversal fold
+```
+
+This belongs in TypeScript tenant design because `odd_sdlc` owns SDLC domain
+meaning. ABG owns traversal substrate truth, graph-call frames, events,
+continuation, replay, and raw runtime projection. `odd_sdlc` must not create a
+second runtime loop to compensate for missing edge semantics.
+
+## Design Claim
+
+Every published typed graph vector has one assurance classification. Every
+close-capable vector has one product-owned edge assurance contract. A graph
+overlay is valid only when every selected vector resolves to a matrix row.
+
+The contract row is the parameter surface for generic functional kernels:
+
+```text
+derive_edge_obligations(contract, authority_context)
+admit_edge_evidence(contract, candidate_outputs, runtime_events, ledgers)
+measure_edge_gain(contract, admitted_evidence, ledger_rows)
+derive_edge_residual_pressure(contract, gain)
+derive_edge_close(contract, gain, residual_pressure)
+compose_path_gain(edge_gains)
+```
+
+The row declares meaning. The generic kernels execute the meaning. Runtime
+adapters only admit facts, archive facts, and publish read models.
+
+## Irreducible Carrier Set
+
+| Carrier | Owns | Does Not Own |
+| --- | --- | --- |
+| `SdlcEdgeGainClosureCategoryTemplate` | Default function-pack refs, ledger input defaults, deterministic optimization refs for a category such as conformance, synthesis, formalisation, encoding, qualification, projection, or assurance measurement. | Edge-specific authority, thresholds, proof lanes, runtime evidence, or closure decisions. |
+| `SdlcEdgeGainClosureContract` | One typed vector's edge identity, category, closure classification, source/target asset types, authority basis, evidence policy, metric, threshold, ledger inputs, closure function, residual-pressure function, composition role, proof lanes, and deterministic support refs. | Runtime loop ownership, worker strategy, or hidden next-action selection. |
+| `SdlcEdgeAssuranceMatrix` | The indexed registry of all published vector classifications and close-capable contracts. | A second graph catalog or overlay executor. |
+| `SdlcAdmittedEdgeEvidence` | Evidence admitted under one contract digest: product files, reports, execution results, ledger refs, worker assessments, replay evidence, and rejected evidence diagnostics. | Raw worker prose or unvalidated artifact existence. |
+| `SdlcEdgeGain` | Per-obligation measurements, fulfilled/expected counts, evidence refs, bottleneck refs, and metric diagnostics. | Scalar percent-complete authority. |
+| `SdlcEdgeResidualPressure` | Missing, partial, blocked, deferred, replay, reprice, or carried-forward pressure derived from gain. | Route-level narrative summary. |
+| `SdlcEdgeAssuranceCloseDecision` | Close, yield, retry, repair, re-enter, reprice, or block decision derived from the contract, gain, and residual pressure. | ABG vector advancement or event truth. |
+| `SdlcCompoundTraversalGain` | Typed fold over edge gains and residual pressure for a graph function or overlay route. | A route-completion shortcut that hides intermediate pressure. |
+
+Subordinate payloads, manifests, archive files, and projections may serialize
+these carriers. They do not become parallel authority.
+
+## Functional Boundary
+
+The assurance contract is realized as pure or nearly-pure transforms below the
+graph program:
+
+```text
+resolve contract row
+  -> load authority basis
+  -> derive obligations
+  -> run declared transform mechanism
+  -> admit evidence
+  -> measure gain
+  -> derive residual pressure
+  -> derive close disposition
+  -> project next action
+  -> compose route gain when applicable
+```
+
+The transform mechanism may be configured `F_P`, deterministic `F_D`, or
+human-governed `F_H` depending on the edge contract. For the generic SDLC path,
+configured `F_P` remains the constructive default. `F_D` is optimization,
+admission, validation, folding, routing, and deterministic support unless the
+edge contract declares deterministic authority.
+
+## Module Boundaries
+
+| Module | Classification | Owns | Does Not Own |
+| --- | --- | --- | --- |
+| `graph/edge_gain_closure_contracts.ts` | Declarative matrix module | category templates, vector classifications, contract rows, validation diagnostics, source/target parity checks | runtime evidence, closure execution, graph traversal |
+| `graph/overlays.ts` | Overlay selection module | overlay membership and validation that selected vectors have contract rows | independent closure law |
+| `operator/edge_gain_closure.ts` | Semantic kernel module | pure derive/admit/measure/residual/close/compose functions over admitted carriers | process execution, filesystem mutation, ABG continuation |
+| `operator/handoff.ts` | Handoff carrier module | selected contract refs/digests in worker manifests and obligation context | prompt-only authority |
+| `operator/assurance_gate.ts` | Evidence admission module | conversion from postflight, worker reports, execution evidence, and ledgers into admitted evidence and gain inputs | graph-vector selection or next-action routing |
+| `operator/traversal_consequence.ts` | Consequence module | edge gain, residual pressure, and closure decision records in the consequence chain | local retry loop |
+| `operator/installed_operator.ts` | Adapter module | installed command binding, archive writing, ABG-compatible result publication | semantic closure beyond the admitted consequence |
+| `projection/query_domain.ts` | Read-model module | query/gaps projection of contract identity, missing contracts, residual pressure, proof lanes | closure authority |
+
+This follows Design Module Method:
+
+- one authoritative carrier family at the edge assurance boundary
+- raw runtime and worker payloads admitted once before semantic kernels consume
+  them
+- pure transforms for gain, close, residual pressure, and path composition
+- side effects isolated to installed operator and archive adapters
+
+## Contract Row Shape
+
+Each close-capable row has this shape:
+
+```text
+edge_ref
+closure_classification
+edge_category
+source_asset_types
+target_asset_type
+target_outcome_ref
+authority_basis_refs
+obligation_derivation_ref
+evidence_policy_ref
+metric_function_ref
+threshold_policy_ref
+ledger_input_kinds
+closure_function_ref
+residual_pressure_function_ref
+composition_role
+proof_lane_refs
+deterministic_optimization_refs
+residual_pressure_refs
+```
+
+Rows that are `library_only`, `projection_only`, or `no_close` still publish
+classification and source/target boundaries so the graph catalog has no
+unclassified escape hatch.
+
+## Category Templates
+
+Categories provide reusable defaults. They are not loose labels.
+
+| Category | Default gain question | Default close question |
+| --- | --- | --- |
+| `conformance` | Did broad workspace input become a canonical project profile without losing topology or capability pressure? | Is the canonical structure present, typed, and usable by downstream edges, with nonconformance preserved? |
+| `authority_synthesis` | Did source authority become traceable intent, product, goals, requirements, or bootstrap surfaces? | Are required authority points represented or explicitly carried as residual pressure? |
+| `solution_formalisation` | Did synthesized requirements become typed design/formal surfaces that constrain implementation? | Are design obligations parseable, traceable, and sufficiently disambiguated for downstream work? |
+| `implementation_formalisation_and_planning` | Did design authority become module, topology, stack, schedule, or sequence authority? | Is implementation planning complete enough for bounded code construction, with gaps carried? |
+| `implementation_encoding` | Did implementation authority become executable or durable product artifacts? | Does admitted behavioral/product evidence satisfy declared obligations without required residual pressure? |
+| `implementation_qualification` | Did implementation evidence qualify against topology and declared component obligations? | Does qualification prove the component edge rather than only file presence? |
+| `test_formalisation_and_planning` | Did test authority become executable test design, module, topology, stack, or schedule surfaces? | Is test structure bound to declared testcase and implementation authority? |
+| `test_encoding_and_execution` | Did tests materialize and execute under declared contracts? | Are execution results admitted, passing where required, and linked to test topology? |
+| `repair_archive_release_qualification` | Did repair, archive, release-depth, and release surfaces prove readiness? | Are repair pressure, archive evidence, parity, and release authority closed or explicitly blocking? |
+| `operational_transition_and_return` | Did release state move through build, deploy, runtime observation, and retrofit return with admitted evidence? | Are side effects returned as governed evidence rather than assumed complete? |
+| `assurance_measurement` | Did a ledger function measure one assurance dimension from admitted inputs? | Does the ledger row publish a valid measuring result without becoming constructive authority? |
+| `governance_projection` | Did gap or triage truth become an operator read model? | Projection closes only read-model consistency, not product work. |
+
+## Closure Laws
+
+The edge close predicate is:
+
+```text
+close(edge) iff
+  every required obligation meets its declared threshold
+  and required evidence is admitted under the edge evidence policy
+  and required diagnostics are clear
+  and no required residual pressure remains
+```
+
+The missing computation is never:
+
+```text
+requirement tag + worker percent complete >= 100
+```
+
+Requirement tags identify authority. Worker assessments may become evidence.
+The missing computation is the declared derivation from authority to
+obligations, admission of evidence against those obligations, metric evaluation,
+residual-pressure derivation, and closure decision.
+
+The compound close predicate is:
+
+```text
+close(path) iff
+  every required intermediate edge closes
+  and the terminal edge closes
+  and no required residual pressure remains anywhere in the path fold
+```
+
+## Runtime Carriage
+
+The selected contract ref and digest must be carried through:
+
+- worker handoff manifest
+- traversal obligation context
+- admitted evidence rows
+- assurance or fulfillment ledgers
+- closure decision
+- next-action projection
+- query/gaps read models
+- archive evidence
+- replay predecessor refs
+
+Replay may reuse predecessor evidence only when workspace, graph vector, target
+binding, evidence policy, contract digest, and predecessor lineage match.
+
+## Failure Modes
+
+The matrix and runtime fail closed for:
+
+- missing contract row for a selected close-capable edge
+- duplicate row for the same vector
+- ambiguous row with missing required identity, authority, evidence, metric,
+  proof, or residual-pressure fields
+- row for an unpublished graph vector
+- admitted evidence that does not match the selected contract digest
+- worker assertion, artifact existence, manifest shape, or postflight success
+  presented as closure without the edge close function
+- compound traversal attempting to drop intermediate residual pressure
+
+## Proof Plan
+
+T-164 closes in stages:
+
+1. Matrix proof: every published vector is classified and overlay-selected
+   vectors resolve to contract rows.
+2. Runtime carriage proof: contract refs and digests appear consistently across
+   handoff, evidence, ledgers, closure, projection, archive, and replay.
+3. Semantic-kernel proof: the same generic functions drive at least two edge
+   categories without bespoke edge-local closure code.
+4. Compound proof: a three-edge chain preserves intermediate residual pressure
+   and fails close when any required intermediate edge is open.
+5. Installed sandbox proof: the same three-edge assurance chain runs through
+   the installed product archive path.
+6. Absorbed-ticket proof: T-158, T-103, T-130, and T-142 are re-expressed as
+   edge-contract proof obligations rather than isolated closure fixes.

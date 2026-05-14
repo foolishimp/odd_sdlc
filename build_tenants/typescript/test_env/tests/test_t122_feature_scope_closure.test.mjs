@@ -293,6 +293,25 @@ test("T-122 steel-thread scope falls back to full breadth when refs do not bind 
   ]);
 });
 
+test("T-160 steel-thread scope preserves single declared module without full-breadth promotion", () => {
+  const scope = deriveSdlcFeatureScope({
+    targetAssetType: "component_code_surface",
+    selectedStrategy: "steel_thread",
+    strategyDirectiveRef: null,
+    selectedScheduleItemRefs: [
+      "schedule://odd_sdlc/derive_lite_component_code_surface/cdme-compiler"
+    ],
+    requiredProgressArtifactRefs: [],
+    declaredModuleNames: ["hello_world_javascript"],
+    materializedEntityIds: [],
+    materializedOperationIds: []
+  });
+
+  assert.equal(scope.mode, "steel_thread");
+  assert.deepStrictEqual(scope.includedModuleNames, ["hello_world_javascript"]);
+  assert.deepStrictEqual(scope.deferredModuleNames, []);
+});
+
 test("T-122 targeted repair scope falls back to full breadth when refs do not bind a module", () => {
   const scope = deriveSdlcFeatureScope({
     targetAssetType: "component_test_surface",

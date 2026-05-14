@@ -965,7 +965,29 @@ test("T-143 executable product materialization blocks failed execution evidence"
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   const output = writeOutputSurface(manifest);
-  const materializedFiles = [writeMaterializedSourceFile(manifest)];
+  const materializedFiles = [
+    writeMaterializedProductFile(
+      manifest,
+      "build.sbt",
+      "ThisBuild / scalaVersion := \"2.13.12\"",
+      "build_config"
+    ),
+    writeMaterializedProductFile(
+      manifest,
+      "project/build.properties",
+      "sbt.version=1.10.7",
+      "build_config"
+    ),
+    writeMaterializedSourceFile(manifest),
+    writeMaterializedSourceFile(
+      manifest,
+      "cdme-assurance/src/main/scala/com/cdme/assurance/Probe.scala"
+    ),
+    writeMaterializedSourceFile(
+      manifest,
+      "cdme-executor/src/main/scala/com/cdme/executor/Probe.scala"
+    )
+  ];
   const reportRef = writeExecutionLog(
     manifest,
     "sbt-test.log",
@@ -1011,7 +1033,29 @@ test("T-143 executable product materialization closes with successful execution 
     FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
   );
   const output = writeOutputSurface(manifest);
-  const materializedFiles = [writeMaterializedSourceFile(manifest)];
+  const materializedFiles = [
+    writeMaterializedProductFile(
+      manifest,
+      "build.sbt",
+      "ThisBuild / scalaVersion := \"2.13.12\"",
+      "build_config"
+    ),
+    writeMaterializedProductFile(
+      manifest,
+      "project/build.properties",
+      "sbt.version=1.10.7",
+      "build_config"
+    ),
+    writeMaterializedSourceFile(manifest),
+    writeMaterializedSourceFile(
+      manifest,
+      "cdme-assurance/src/main/scala/com/cdme/assurance/Probe.scala"
+    ),
+    writeMaterializedSourceFile(
+      manifest,
+      "cdme-executor/src/main/scala/com/cdme/executor/Probe.scala"
+    )
+  ];
   const reportRef = writeExecutionLog(
     manifest,
     "sbt-test.log",

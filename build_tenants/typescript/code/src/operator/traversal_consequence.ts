@@ -104,6 +104,13 @@ export interface SdlcEdgeFulfillmentLedger {
   readonly kind: "sdlc_edge_fulfillment_ledger";
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
+  readonly graphCatalogDigestRef: string | null;
+  readonly edgeAssuranceContractRef: string | null;
+  readonly edgeAssuranceContractDigest: string | null;
+  readonly edgeGainRef: string | null;
+  readonly edgeResidualPressureRefs: readonly string[];
   readonly edgeRef: string;
   readonly attemptRef: string;
   readonly targetBindingRefs: readonly string[];
@@ -140,6 +147,14 @@ export interface SdlcEdgeClosureDecision {
   readonly decisionRef: string;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
+  readonly graphCatalogDigestRef: string | null;
+  readonly edgeAssuranceContractRef: string | null;
+  readonly edgeAssuranceContractDigest: string | null;
+  readonly edgeGainRef: string | null;
+  readonly edgeClosureFunctionRef: string | null;
+  readonly edgeResidualPressureRefs: readonly string[];
   readonly disposition: SdlcEdgeClosureDisposition;
   readonly basisRefs: readonly string[];
   readonly reasonRefs: readonly string[];
@@ -153,6 +168,30 @@ export interface SdlcEdgeClosurePolicy {
   readonly dispositionPrecedence: readonly SdlcEdgeClosureDisposition[];
 }
 
+export type SdlcOverlaySegmentDisposition =
+  | "overlay_segment_complete"
+  | "product_converged"
+  | "blocked";
+
+export interface SdlcOverlaySegmentCompletion {
+  readonly kind: "sdlc_overlay_segment_completion";
+  readonly completionRef: string;
+  readonly overlayRef: string;
+  readonly overlayBindingRef: string;
+  readonly graphCatalogDigestRef: string | null;
+  readonly closureDecisionRef: string;
+  readonly ledgerRef: string;
+  readonly stopDisposition: SdlcOverlaySegmentDisposition;
+  readonly terminalAssetTypes: readonly string[];
+  readonly terminalGraphFunctionRefs: readonly string[];
+  readonly remainingGraphPressureRefs: readonly string[];
+  readonly remainingRequirementPressureRefs: readonly string[];
+  readonly remainingAssetPressureRefs: readonly string[];
+  readonly nextEligibleOverlayRefs: readonly string[];
+  readonly productConverged: boolean;
+  readonly predecessorRefs: readonly string[];
+}
+
 export interface SdlcNextActionProjection {
   readonly kind: "sdlc_next_action_projection";
   readonly evaluationFunction: "evaluate_next";
@@ -163,6 +202,19 @@ export interface SdlcNextActionProjection {
   readonly gapPressureRefs: readonly string[];
   readonly targetBindingRefs: readonly string[];
   readonly closureDecisionRef: string | null;
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
+  readonly graphCatalogDigestRef: string | null;
+  readonly edgeAssuranceContractRef: string | null;
+  readonly edgeAssuranceContractDigest: string | null;
+  readonly edgeGainRef: string | null;
+  readonly edgeResidualPressureRefs: readonly string[];
+  readonly overlaySegmentCompletionRef: string | null;
+  readonly overlayStopDisposition: SdlcOverlaySegmentDisposition | null;
+  readonly remainingGraphPressureRefs: readonly string[];
+  readonly remainingRequirementPressureRefs: readonly string[];
+  readonly remainingAssetPressureRefs: readonly string[];
+  readonly nextEligibleOverlayRefs: readonly string[];
   readonly observationRef: string;
   readonly policyRefs: readonly string[];
   readonly actionCatalogRefs: readonly string[];
@@ -591,6 +643,13 @@ export function constructSdlcWorksiteEvidence(input: {
 export function constructSdlcEdgeFulfillmentLedger(input: {
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
+  readonly overlayRef?: string | null;
+  readonly overlayBindingRef?: string | null;
+  readonly graphCatalogDigestRef?: string | null;
+  readonly edgeAssuranceContractRef?: string | null;
+  readonly edgeAssuranceContractDigest?: string | null;
+  readonly edgeGainRef?: string | null;
+  readonly edgeResidualPressureRefs?: readonly string[];
   readonly edgeRef: string;
   readonly attemptRef: string;
   readonly targetBindingRefs: readonly string[];
@@ -647,6 +706,42 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       input.ledgerVersionRef,
       "ledgerVersionRef"
     ),
+    overlayRef:
+      input.overlayRef === undefined || input.overlayRef === null
+        ? null
+        : requireNonEmptyString(input.overlayRef, "overlayRef"),
+    overlayBindingRef:
+      input.overlayBindingRef === undefined || input.overlayBindingRef === null
+        ? null
+        : requireNonEmptyString(input.overlayBindingRef, "overlayBindingRef"),
+    graphCatalogDigestRef:
+      input.graphCatalogDigestRef === undefined ||
+      input.graphCatalogDigestRef === null
+        ? null
+        : requireNonEmptyString(input.graphCatalogDigestRef, "graphCatalogDigestRef"),
+    edgeAssuranceContractRef:
+      input.edgeAssuranceContractRef === undefined ||
+      input.edgeAssuranceContractRef === null
+        ? null
+        : requireNonEmptyString(
+            input.edgeAssuranceContractRef,
+            "edgeAssuranceContractRef"
+          ),
+    edgeAssuranceContractDigest:
+      input.edgeAssuranceContractDigest === undefined ||
+      input.edgeAssuranceContractDigest === null
+        ? null
+        : requireNonEmptyString(
+            input.edgeAssuranceContractDigest,
+            "edgeAssuranceContractDigest"
+          ),
+    edgeGainRef:
+      input.edgeGainRef === undefined || input.edgeGainRef === null
+        ? null
+        : requireNonEmptyString(input.edgeGainRef, "edgeGainRef"),
+    edgeResidualPressureRefs: uniqueSorted(
+      input.edgeResidualPressureRefs ?? []
+    ),
     edgeRef: requireNonEmptyString(input.edgeRef, "edgeRef"),
     attemptRef: requireNonEmptyString(input.attemptRef, "attemptRef"),
     targetBindingRefs,
@@ -678,6 +773,28 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       ...downstreamTransformationSetRefs,
       ...downstreamPressureRefs,
       ...evidenceBundleRefs,
+      ...(input.overlayRef === undefined || input.overlayRef === null
+        ? []
+        : [input.overlayRef]),
+      ...(input.overlayBindingRef === undefined || input.overlayBindingRef === null
+        ? []
+        : [input.overlayBindingRef]),
+      ...(input.graphCatalogDigestRef === undefined ||
+      input.graphCatalogDigestRef === null
+        ? []
+        : [input.graphCatalogDigestRef]),
+      ...(input.edgeAssuranceContractRef === undefined ||
+      input.edgeAssuranceContractRef === null
+        ? []
+        : [input.edgeAssuranceContractRef]),
+      ...(input.edgeAssuranceContractDigest === undefined ||
+      input.edgeAssuranceContractDigest === null
+        ? []
+        : [input.edgeAssuranceContractDigest]),
+      ...(input.edgeGainRef === undefined || input.edgeGainRef === null
+        ? []
+        : [input.edgeGainRef]),
+      ...(input.edgeResidualPressureRefs ?? []),
       ...(input.predecessorRefs ?? [])
     ])
   });
@@ -692,6 +809,7 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
 export function deriveSdlcEdgeClosureDecision(input: {
   readonly decisionRef: string;
   readonly ledger: SdlcEdgeFulfillmentLedger;
+  readonly edgeClosureFunctionRef?: string | null;
   readonly currentEdgeLawful: boolean;
   readonly retryReasonRefs?: readonly string[];
   readonly repairReasonRefs?: readonly string[];
@@ -768,11 +886,38 @@ export function deriveSdlcEdgeClosureDecision(input: {
     decisionRef: requireNonEmptyString(input.decisionRef, "decisionRef"),
     ledgerRef: input.ledger.ledgerRef,
     ledgerVersionRef: input.ledger.ledgerVersionRef,
+    overlayRef: input.ledger.overlayRef,
+    overlayBindingRef: input.ledger.overlayBindingRef,
+    graphCatalogDigestRef: input.ledger.graphCatalogDigestRef,
+    edgeAssuranceContractRef: input.ledger.edgeAssuranceContractRef,
+    edgeAssuranceContractDigest: input.ledger.edgeAssuranceContractDigest,
+    edgeGainRef: input.ledger.edgeGainRef,
+    edgeClosureFunctionRef:
+      input.edgeClosureFunctionRef === undefined ||
+      input.edgeClosureFunctionRef === null
+        ? null
+        : requireNonEmptyString(
+            input.edgeClosureFunctionRef,
+            "edgeClosureFunctionRef"
+          ),
+    edgeResidualPressureRefs: input.ledger.edgeResidualPressureRefs,
     disposition,
     basisRefs: uniqueSorted([
       input.ledger.ledgerRef,
       input.ledger.ledgerVersionRef,
       policy.policyRef,
+      ...(input.ledger.edgeAssuranceContractRef === null
+        ? []
+        : [input.ledger.edgeAssuranceContractRef]),
+      ...(input.ledger.edgeAssuranceContractDigest === null
+        ? []
+        : [input.ledger.edgeAssuranceContractDigest]),
+      ...(input.ledger.edgeGainRef === null ? [] : [input.ledger.edgeGainRef]),
+      ...(input.edgeClosureFunctionRef === undefined ||
+      input.edgeClosureFunctionRef === null
+        ? []
+        : [input.edgeClosureFunctionRef]),
+      ...input.ledger.edgeResidualPressureRefs,
       ...(normalizedYieldResumeBasis === null
         ? []
         : [
@@ -792,7 +937,106 @@ export function deriveSdlcEdgeClosureDecision(input: {
     predecessorRefs: uniqueSorted([
       input.ledger.ledgerRef,
       input.ledger.ledgerVersionRef,
-      policy.policyRef
+      policy.policyRef,
+      ...(input.ledger.overlayRef === null ? [] : [input.ledger.overlayRef]),
+      ...(input.ledger.overlayBindingRef === null
+        ? []
+        : [input.ledger.overlayBindingRef]),
+      ...(input.ledger.graphCatalogDigestRef === null
+        ? []
+        : [input.ledger.graphCatalogDigestRef]),
+      ...(input.ledger.edgeAssuranceContractRef === null
+        ? []
+        : [input.ledger.edgeAssuranceContractRef]),
+      ...(input.ledger.edgeAssuranceContractDigest === null
+        ? []
+        : [input.ledger.edgeAssuranceContractDigest]),
+      ...(input.ledger.edgeGainRef === null ? [] : [input.ledger.edgeGainRef]),
+      ...input.ledger.edgeResidualPressureRefs
+    ])
+  });
+}
+
+export function constructSdlcOverlaySegmentCompletion(input: {
+  readonly completionRef: string;
+  readonly closureDecision: SdlcEdgeClosureDecision;
+  readonly stopDisposition: SdlcOverlaySegmentDisposition;
+  readonly terminalAssetTypes: readonly string[];
+  readonly terminalGraphFunctionRefs: readonly string[];
+  readonly remainingGraphPressureRefs?: readonly string[];
+  readonly remainingRequirementPressureRefs?: readonly string[];
+  readonly remainingAssetPressureRefs?: readonly string[];
+  readonly nextEligibleOverlayRefs?: readonly string[];
+  readonly predecessorRefs?: readonly string[];
+}): SdlcOverlaySegmentCompletion {
+  if (input.closureDecision.overlayRef === null) {
+    throw new TypeError("overlay segment completion requires overlayRef");
+  }
+  if (input.closureDecision.overlayBindingRef === null) {
+    throw new TypeError("overlay segment completion requires overlayBindingRef");
+  }
+  if (
+    input.stopDisposition === "overlay_segment_complete" &&
+    input.closureDecision.disposition !== "close"
+  ) {
+    throw new TypeError("overlay segment completion requires a close disposition");
+  }
+  if (
+    input.stopDisposition === "product_converged" &&
+    input.closureDecision.disposition !== "close"
+  ) {
+    throw new TypeError("product convergence requires a close disposition");
+  }
+  const terminalAssetTypes = nonEmptyUniqueSorted(
+    input.terminalAssetTypes,
+    "terminalAssetTypes"
+  );
+  const terminalGraphFunctionRefs = nonEmptyUniqueSorted(
+    input.terminalGraphFunctionRefs,
+    "terminalGraphFunctionRefs"
+  );
+  const remainingGraphPressureRefs = uniqueSorted(input.remainingGraphPressureRefs ?? []);
+  const remainingRequirementPressureRefs = uniqueSorted(
+    input.remainingRequirementPressureRefs ?? []
+  );
+  const remainingAssetPressureRefs = uniqueSorted(input.remainingAssetPressureRefs ?? []);
+  const nextEligibleOverlayRefs = uniqueSorted(input.nextEligibleOverlayRefs ?? []);
+  const productConverged =
+    input.stopDisposition === "product_converged" &&
+    remainingGraphPressureRefs.length === 0 &&
+    remainingRequirementPressureRefs.length === 0 &&
+    remainingAssetPressureRefs.length === 0 &&
+    nextEligibleOverlayRefs.length === 0;
+  return Object.freeze({
+    kind: "sdlc_overlay_segment_completion" as const,
+    completionRef: requireNonEmptyString(input.completionRef, "completionRef"),
+    overlayRef: input.closureDecision.overlayRef,
+    overlayBindingRef: input.closureDecision.overlayBindingRef,
+    graphCatalogDigestRef: input.closureDecision.graphCatalogDigestRef,
+    closureDecisionRef: input.closureDecision.decisionRef,
+    ledgerRef: input.closureDecision.ledgerRef,
+    stopDisposition: input.stopDisposition,
+    terminalAssetTypes,
+    terminalGraphFunctionRefs,
+    remainingGraphPressureRefs,
+    remainingRequirementPressureRefs,
+    remainingAssetPressureRefs,
+    nextEligibleOverlayRefs,
+    productConverged,
+    predecessorRefs: uniqueSorted([
+      input.closureDecision.decisionRef,
+      input.closureDecision.ledgerRef,
+      input.closureDecision.overlayRef,
+      input.closureDecision.overlayBindingRef,
+      ...(input.closureDecision.graphCatalogDigestRef === null
+        ? []
+        : [input.closureDecision.graphCatalogDigestRef]),
+      ...terminalGraphFunctionRefs,
+      ...remainingGraphPressureRefs,
+      ...remainingRequirementPressureRefs,
+      ...remainingAssetPressureRefs,
+      ...nextEligibleOverlayRefs,
+      ...(input.predecessorRefs ?? [])
     ])
   });
 }
@@ -805,6 +1049,14 @@ export function constructSdlcNextActionProjection(input: {
   readonly gapPressureRefs: readonly string[];
   readonly targetBindingRefs: readonly string[];
   readonly closureDecision?: SdlcEdgeClosureDecision | null;
+  readonly overlayRef?: string | null;
+  readonly overlayBindingRef?: string | null;
+  readonly graphCatalogDigestRef?: string | null;
+  readonly edgeAssuranceContractRef?: string | null;
+  readonly edgeAssuranceContractDigest?: string | null;
+  readonly edgeGainRef?: string | null;
+  readonly edgeResidualPressureRefs?: readonly string[];
+  readonly overlaySegmentCompletion?: SdlcOverlaySegmentCompletion | null;
   readonly observationRef: string;
   readonly policyRefs: readonly string[];
   readonly actionCatalogRefs: readonly string[];
@@ -840,6 +1092,42 @@ export function constructSdlcNextActionProjection(input: {
     closureDecision: input.closureDecision ?? null
   });
   const closureDecisionRef = input.closureDecision?.decisionRef ?? null;
+  const overlayRef = input.overlayRef ?? input.closureDecision?.overlayRef ?? null;
+  const overlayBindingRef =
+    input.overlayBindingRef ?? input.closureDecision?.overlayBindingRef ?? null;
+  const graphCatalogDigestRef =
+    input.graphCatalogDigestRef ??
+    input.closureDecision?.graphCatalogDigestRef ??
+    null;
+  const edgeAssuranceContractRef =
+    input.edgeAssuranceContractRef ??
+    input.closureDecision?.edgeAssuranceContractRef ??
+    null;
+  const edgeAssuranceContractDigest =
+    input.edgeAssuranceContractDigest ??
+    input.closureDecision?.edgeAssuranceContractDigest ??
+    null;
+  const edgeGainRef =
+    input.edgeGainRef ?? input.closureDecision?.edgeGainRef ?? null;
+  const edgeResidualPressureRefs = uniqueSorted([
+    ...(input.edgeResidualPressureRefs ?? []),
+    ...(input.closureDecision?.edgeResidualPressureRefs ?? [])
+  ]);
+  const overlaySegmentCompletion = input.overlaySegmentCompletion ?? null;
+  if (overlaySegmentCompletion !== null) {
+    if (overlayRef !== overlaySegmentCompletion.overlayRef) {
+      throw new TypeError("overlay segment completion overlayRef mismatch");
+    }
+    if (overlayBindingRef !== overlaySegmentCompletion.overlayBindingRef) {
+      throw new TypeError("overlay segment completion overlayBindingRef mismatch");
+    }
+    if (
+      closureDecisionRef !== null &&
+      closureDecisionRef !== overlaySegmentCompletion.closureDecisionRef
+    ) {
+      throw new TypeError("overlay segment completion closure decision mismatch");
+    }
+  }
   if (
     (nextActionBasisKind === "post_yield_resume" ||
       nextActionBasisKind === "post_reprice" ||
@@ -863,6 +1151,23 @@ export function constructSdlcNextActionProjection(input: {
     gapPressureRefs,
     targetBindingRefs,
     closureDecisionRef,
+    overlayRef,
+    overlayBindingRef,
+    graphCatalogDigestRef,
+    edgeAssuranceContractRef,
+    edgeAssuranceContractDigest,
+    edgeGainRef,
+    edgeResidualPressureRefs,
+    overlaySegmentCompletionRef: overlaySegmentCompletion?.completionRef ?? null,
+    overlayStopDisposition: overlaySegmentCompletion?.stopDisposition ?? null,
+    remainingGraphPressureRefs:
+      overlaySegmentCompletion?.remainingGraphPressureRefs ?? Object.freeze([]),
+    remainingRequirementPressureRefs:
+      overlaySegmentCompletion?.remainingRequirementPressureRefs ?? Object.freeze([]),
+    remainingAssetPressureRefs:
+      overlaySegmentCompletion?.remainingAssetPressureRefs ?? Object.freeze([]),
+    nextEligibleOverlayRefs:
+      overlaySegmentCompletion?.nextEligibleOverlayRefs ?? Object.freeze([]),
     observationRef: requireNonEmptyString(input.observationRef, "observationRef"),
     policyRefs: uniqueSorted(input.policyRefs),
     actionCatalogRefs: uniqueSorted(input.actionCatalogRefs),
@@ -880,6 +1185,21 @@ export function constructSdlcNextActionProjection(input: {
       ...gapPressureRefs,
       ...targetBindingRefs,
       ...(closureDecisionRef === null ? [] : [closureDecisionRef]),
+      ...(overlayRef === null ? [] : [overlayRef]),
+      ...(overlayBindingRef === null ? [] : [overlayBindingRef]),
+      ...(graphCatalogDigestRef === null ? [] : [graphCatalogDigestRef]),
+      ...(edgeAssuranceContractRef === null ? [] : [edgeAssuranceContractRef]),
+      ...(edgeAssuranceContractDigest === null
+        ? []
+        : [edgeAssuranceContractDigest]),
+      ...(edgeGainRef === null ? [] : [edgeGainRef]),
+      ...edgeResidualPressureRefs,
+      ...(overlaySegmentCompletion === null
+        ? []
+        : [
+            overlaySegmentCompletion.completionRef,
+            ...overlaySegmentCompletion.predecessorRefs
+          ]),
       input.observationRef,
       ...input.policyRefs,
       ...input.actionCatalogRefs

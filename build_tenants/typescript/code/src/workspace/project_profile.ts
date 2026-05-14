@@ -1078,6 +1078,90 @@ function importedSourceRelativePaths(workspaceRoot: string): readonly string[] {
   return Object.freeze([...new Set(paths)].sort());
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function importedSelectedOutputTargetPaths(input: {
+  readonly workspaceRoot: string;
+  readonly relativePaths: readonly string[];
+  readonly selectedOutputRoot: string;
+}): readonly string[] {
+  const selectedOutputRoot = input.selectedOutputRoot.replace(/\\/gu, "/").replace(/\/+$/u, "");
+  const targetPattern = new RegExp(
+    `${escapeRegExp(selectedOutputRoot)}(?:/[A-Za-z0-9._@+=:-]+)+`,
+    "gu"
+  );
+  const targets: string[] = [];
+  for (const relativePath of input.relativePaths) {
+    const absolutePath = path.join(input.workspaceRoot, relativePath);
+    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+      continue;
+    }
+    const content = readFileSync(absolutePath, "utf8").replace(/\\/gu, "/");
+    for (const match of content.matchAll(targetPattern)) {
+      const candidate = match[0]
+        ?.replace(/[),.;:]+$/u, "")
+        .replace(/\/+$/u, "");
+      if (
+        candidate !== undefined &&
+        candidate.length > selectedOutputRoot.length &&
+        candidate !== selectedOutputRoot
+      ) {
+        targets.push(candidate);
+      }
+    }
+  }
+  return Object.freeze([...new Set(targets)].sort());
+}
+
+function importedProductAuthorityContent(input: {
+  readonly sourceWorkspaceRoot: string;
+  readonly relativePaths: readonly string[];
+  readonly profile: SdlcConformProjectProfile;
+}): string {
+  const sourceRefs = input.relativePaths.map((relativePath) =>
+    pathToFileURL(path.join(input.sourceWorkspaceRoot, relativePath)).href
+  );
+  const productFileTargets = importedSelectedOutputTargetPaths({
+    workspaceRoot: input.sourceWorkspaceRoot,
+    relativePaths: input.relativePaths,
+    selectedOutputRoot: input.profile.selectedOutputRoot
+  });
+  return [
+    "# Product",
+    "",
+    "**Status**: Active",
+    "**Derived From**: `Fg_conform_project`",
+    "",
+    `${input.profile.projectSlug} is an imported project inducted into spec_method topology.`,
+    "",
+    "Project-owned `WHAT` lives under `specification/`.",
+    "Project-owned realization `HOW` lives under `build_tenants/`.",
+    "",
+    "## Product Definition",
+    "",
+    `Product name: ${input.profile.projectSlug}`,
+    `Active tenant: ${input.profile.activeTenant}`,
+    `Selected output root: \`${input.profile.selectedOutputRoot}\``,
+    `Build Tool: ${input.profile.tool.length > 0 ? input.profile.tool : "undeclared"}`,
+    input.profile.language.length > 0
+      ? `Language: ${input.profile.language}`
+      : "Language: undeclared",
+    "",
+    "## Product Files",
+    "",
+    ...(productFileTargets.length > 0
+      ? productFileTargets.map((target) => `- \`${target}\``)
+      : ["- none_declared_from_imported_sources"]),
+    "",
+    "## Source Authority Refs",
+    "",
+    ...(sourceRefs.length > 0 ? sourceRefs.map((ref) => `- ${ref}`) : ["- none"]),
+    ""
+  ].join("\n");
+}
+
 function requirementMarkersFromImportedSources(input: {
   readonly workspaceRoot: string;
   readonly relativePaths: readonly string[];
@@ -1126,6 +1210,36 @@ function lineSnippetForOffset(content: string, offset: number): string {
     .slice(0, 320);
 }
 
+function requirementSnippetForOffset(content: string, offset: number): string {
+  const lineStart = content.lastIndexOf("\n", offset) + 1;
+  const nextNewline = content.indexOf("\n", offset);
+  const lineEnd = nextNewline < 0 ? content.length : nextNewline;
+  const line = content.slice(lineStart, lineEnd);
+  const heading = /^(#{1,6})\s+.+$/u.exec(line);
+  if (heading === null) {
+    return lineSnippetForOffset(content, offset);
+  }
+  const depth = heading[1]?.length ?? 6;
+  let sectionEnd = content.length;
+  let cursor = nextNewline < 0 ? content.length : nextNewline + 1;
+  while (cursor < content.length) {
+    const candidateEnd = content.indexOf("\n", cursor);
+    const currentEnd = candidateEnd < 0 ? content.length : candidateEnd;
+    const candidateLine = content.slice(cursor, currentEnd);
+    const candidateHeading = /^(#{1,6})\s+.+$/u.exec(candidateLine);
+    if ((candidateHeading?.[1]?.length ?? Number.POSITIVE_INFINITY) <= depth) {
+      sectionEnd = cursor;
+      break;
+    }
+    cursor = candidateEnd < 0 ? content.length : candidateEnd + 1;
+  }
+  return content
+    .slice(lineStart, sectionEnd)
+    .trim()
+    .replace(/\n{3,}/gu, "\n\n")
+    .slice(0, 2400);
+}
+
 function markerOnlySnippet(snippet: string, marker: string): boolean {
   const normalized = snippet
     .replace(/^#+\s*/u, "")
@@ -1167,7 +1281,7 @@ function importedRequirementFamilyContents(input: {
       ) {
         continue;
       }
-      const snippet = lineSnippetForOffset(content, match.index ?? 0);
+      const snippet = requirementSnippetForOffset(content, match.index ?? 0);
       if (snippet.length === 0 || markerOnlySnippet(snippet, marker)) {
         continue;
       }
@@ -1214,7 +1328,7 @@ function importedRequirementFamilyContents(input: {
           ...uniqueEntries.flatMap((entry) => [
             `## ${entry.requirementId}`,
             "",
-            `- ${entry.snippet}`,
+            entry.snippet,
             "",
             `Source: ${entry.sourceRef}`,
             `Source Digest: ${entry.sourceDigest}`,
@@ -1311,18 +1425,13 @@ export function materializeSdlcProjectConformance(input: {
     ""
   ].join("\n"));
 
-  write(PRODUCT_RELATIVE_PATH, [
-    "# Product",
-    "",
-    "**Status**: Active",
-    "**Derived From**: `Fg_conform_project`",
-    "",
-    `${profile.projectSlug} is an imported project inducted into spec_method topology.`,
-    "",
-    "Project-owned `WHAT` lives under `specification/`.",
-    "Project-owned realization `HOW` lives under `build_tenants/`.",
-    ""
-  ].join("\n"));
+  const importedRelativePaths = importedSourceRelativePaths(sourceWorkspaceRoot);
+
+  write(PRODUCT_RELATIVE_PATH, importedProductAuthorityContent({
+    sourceWorkspaceRoot,
+    relativePaths: importedRelativePaths,
+    profile
+  }));
 
   write(GOALS_RELATIVE_PATH, [
     "# Goals",
@@ -1342,7 +1451,7 @@ export function materializeSdlcProjectConformance(input: {
   }));
   for (const familyFile of importedRequirementFamilyContents({
     workspaceRoot: sourceWorkspaceRoot,
-    relativePaths: importedSourceRelativePaths(sourceWorkspaceRoot)
+    relativePaths: importedRelativePaths
   })) {
     write(familyFile.relativePath, familyFile.content);
   }

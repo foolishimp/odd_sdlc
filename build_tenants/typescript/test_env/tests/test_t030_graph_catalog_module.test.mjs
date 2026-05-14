@@ -24,9 +24,21 @@ import {
 
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
+  BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
+  LITE_FUNCTION_CATALOG,
   SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
+  SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
   TRIAGE_FUNCTION_CATALOG,
+  LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_MODULE_SURFACE,
+  UAT_TEST_CASES_EXECUTIVE_STEPS,
+  FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+  FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+  FG_UAT_TEST_CASES_EXECUTIVE,
   assertSdlcModuleJobsTargetPublishedGraphFunctions,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
@@ -97,6 +109,7 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
   assert.equal(
     catalog.functions.length,
     BOOTSTRAP_RELEASE_FUNCTION_CATALOG.length +
+      LITE_FUNCTION_CATALOG.length +
       OPERATIONAL_FUNCTION_CATALOG.length +
       TRIAGE_FUNCTION_CATALOG.length
   );
@@ -127,7 +140,14 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
   assert(catalog.functions.some((entry) => entry.name === "retire_gap_after_loopback"));
   assert.deepStrictEqual(
     catalog.executives.map((entry) => entry.name),
-    ["bootstrap_release_self_test", "release_operational_cycle"]
+    [
+      "bootstrap_release_self_test",
+      "release_operational_cycle",
+      FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
+      FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+      FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+      FG_UAT_TEST_CASES_EXECUTIVE
+    ]
   );
   assert.deepStrictEqual(
     catalog.executives[0].steps,
@@ -137,6 +157,30 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
     catalog.executives[1].steps,
     OPERATIONAL_FUNCTION_CATALOG.map((entry) => entry.name)
   );
+  assert.deepStrictEqual(
+    catalog.executives[2].steps,
+    [...BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS]
+  );
+  assert.deepStrictEqual(
+    catalog.executives[3].steps,
+    [...SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS]
+  );
+  assert.deepStrictEqual(
+    catalog.executives[4].steps,
+    [...LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS]
+  );
+  assert.deepStrictEqual(
+    catalog.executives[5].steps,
+    [...UAT_TEST_CASES_EXECUTIVE_STEPS]
+  );
+  const uatEntry = catalog.functions.find(
+    (entry) => entry.name === "derive_uat_testcases_surface"
+  );
+  assert(uatEntry);
+  assert.deepStrictEqual(uatEntry.inputs, [
+    "requirement_surface",
+    "implementation_design_surface"
+  ]);
 });
 
 test("T-030 reusable graph functions preserve catalog input and output signatures", () => {
@@ -173,6 +217,22 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   assert(graphFunctionNames.includes(FG_CONFORM_PROJECT_AUTHORITY));
   assert(graphFunctionNames.includes("bootstrap_release_self_test"));
   assert(graphFunctionNames.includes("release_operational_cycle"));
+  assert(graphFunctionNames.includes(FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE));
+  assert(graphFunctionNames.includes(FG_SOLUTION_ARCHITECTURE_EXECUTIVE));
+  assert(graphFunctionNames.includes(FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE));
+  assert(graphFunctionNames.includes(FG_UAT_TEST_CASES_EXECUTIVE));
+  for (const liteGraphFunctionName of [
+    FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+    FG_DERIVE_LITE_MODULE_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  ]) {
+    const liteGraphFunction = module.graphFunctions.find(
+      (graphFunction) => graphFunction.name === liteGraphFunctionName
+    );
+    assert(liteGraphFunction, liteGraphFunctionName);
+    assert(liteGraphFunction.tags.includes("overlay_only_leaf"));
+    assert.equal(liteGraphFunction.tags.includes("published_leaf"), false);
+  }
   assert.equal(module.jobs.length, module.graphFunctions.length);
   assert(module.jobs.some((job) => job.name === `${FG_CONFORM_PROJECT}_job`));
   assert(module.jobs.some((job) => job.name === `${FG_CONFORM_PROJECT_AUTHORITY}_job`));

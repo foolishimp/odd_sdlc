@@ -3,8 +3,8 @@ id: T-159
 title: Product assets carry requirement lineage
 type: defect
 ticket_category: runtime_traceability_closure
-status: active
-review_status: triaged_from_live_hello_world
+status: completed
+review_status: closed_live_hello_world_and_deterministic_regression
 goal: post-t158-product-asset-lineage-hardening
 build_tenant: typescript
 owner: odd_sdlc
@@ -14,6 +14,7 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-05-12
 created_at: 2026-05-12
+completed_at: 2026-05-12
 governance_scope: STDO Method
 source_documents:
   - specification/GOALS.md
@@ -920,3 +921,18 @@ full-breadth graph still spends about 20 minutes and twelve prompted edges to
 produce a one-line program. That is now recorded in the forensic comment as a
 guided-traversal/minimal-proof-lane design issue, not a product-file lineage
 or module-flattening correctness failure.
+
+Deterministic closure verification:
+
+```bash
+npm run test:t066
+```
+
+Observed result on 2026-05-12:
+
+- `build:semantic`: passed
+- `test_t066_product_materialization_contract.test.mjs`: 57/57 passed
+- T-159 lineage regressions passed, including missing lineage, empty row
+  lineage, unrelated requirement lineage, admitted source lineage, duplicate
+  canonicalization, imported-source expansion, and non-flattened product-file
+  lineage.

@@ -7,10 +7,16 @@ import type {
   SdlcWorkerRetryContext
 } from "./carriers.js";
 import {
-  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN
+  activeOddSdlcTraversalStrategyPlan
 } from "../shared/traversal_strategy_plan.js";
 
-export { ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN };
+export {
+  ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN,
+  ODD_SDLC_STEEL_THREAD_AFTER_REQUIREMENTS_TRAVERSAL_STRATEGY_PLAN,
+  ODD_SDLC_TRAVERSAL_STRATEGY_PROFILE_VALUES,
+  activeOddSdlcTraversalStrategyPlan,
+  resolveOddSdlcTraversalStrategyPlan
+} from "../shared/traversal_strategy_plan.js";
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze(
@@ -111,7 +117,7 @@ export function deriveSdlcTraversalStrategyDecision(input: {
   readonly fallbackPlan?: SdlcTraversalStrategyPlan | undefined;
 }): SdlcTraversalStrategyDecision {
   const fallbackPlan =
-    input.fallbackPlan ?? ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN;
+    input.fallbackPlan ?? activeOddSdlcTraversalStrategyPlan();
   const directiveRef = input.strategyDirectiveRef ?? null;
   const abgSelectedStrategy = parseSdlcTraversalStrategyDirective(directiveRef);
   const retryTargetedRepair = retryContextSelectsTargetedRepair({

@@ -5,7 +5,8 @@ import {
   existsSync,
   readdirSync,
   readFileSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -24,14 +25,26 @@ import {
   admitSdlcGraphVectorBoundaryRef,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
-  FG_CONFORM_PROJECT
+  constructSdlcTraversalOverlayCatalog,
+  FG_CONFORM_PROJECT,
+  sdlcGraphFunctionBoundaryRef
 } from "../graph/index.js";
+import { resolveSdlcTraversalOverlay } from "../graph/index.js";
 import { SdlcGraphBoundaryRefError } from "../graph/index.js";
 import {
   makeSdlcBlockingReason,
   type SdlcBlockingReason
 } from "../shared/blocking_reason.js";
 import { installOddSdlcTypescript } from "../install/index.js";
+import {
+  analyzeSdlcFdRunArchive,
+  renderSdlcFdRunAnalysisMarkdown,
+  SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES,
+  SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES,
+  type SdlcFdRunAnalysisFormat,
+  type SdlcFdRunAnalysisProfile,
+  type SdlcFdRunAnalysisResult
+} from "../analysis/index.js";
 import {
   constructSdlcRequirementFulfillmentArchiveRehydration,
   deriveSdlcGapDossier,
@@ -89,7 +102,8 @@ export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "start",
   "install",
   "release-cut",
-  "rc-report"
+  "rc-report",
+  "analyze-run"
 ] as const);
 
 export type OddSdlcSpecMethodCommand = (typeof ODD_SDLC_SPEC_METHOD_COMMAND_VALUES)[number];
@@ -100,7 +114,10 @@ const ODD_SDLC_SPEC_METHOD_COMMAND_SET: ReadonlySet<string> = new Set(
 
 export interface OddSdlcSpecMethodTraversalRequest {
   readonly kind: "odd_sdlc_spec_method_request";
-  readonly command: Exclude<OddSdlcSpecMethodCommand, "install" | "release-cut">;
+  readonly command: Exclude<
+    OddSdlcSpecMethodCommand,
+    "install" | "release-cut" | "analyze-run"
+  >;
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string | null;
   readonly target: {
@@ -128,10 +145,21 @@ export interface OddSdlcSpecMethodReleaseCutRequest {
   readonly packageSourceRoot: string;
 }
 
+export interface OddSdlcSpecMethodAnalyzeRunRequest {
+  readonly kind: "odd_sdlc_spec_method_analyze_run_request";
+  readonly command: "analyze-run";
+  readonly inspectedRoot: string;
+  readonly profile: SdlcFdRunAnalysisProfile;
+  readonly format: SdlcFdRunAnalysisFormat;
+  readonly outputPath: string | null;
+  readonly strict: boolean;
+}
+
 export type OddSdlcSpecMethodRequest =
   | OddSdlcSpecMethodTraversalRequest
   | OddSdlcSpecMethodInstallRequest
-  | OddSdlcSpecMethodReleaseCutRequest;
+  | OddSdlcSpecMethodReleaseCutRequest
+  | OddSdlcSpecMethodAnalyzeRunRequest;
 
 export interface OddSdlcSpecMethodResult {
   readonly kind: "odd_sdlc_spec_method_result";
@@ -169,6 +197,14 @@ interface SpecMethodInstallOptionReadModel {
 interface SpecMethodReleaseCutOptionReadModel {
   readonly archiveRoot: string;
   readonly packageSourceRoot: string;
+}
+
+interface SpecMethodAnalyzeRunOptionReadModel {
+  readonly inspectedRoot: string;
+  readonly profile: SdlcFdRunAnalysisProfile;
+  readonly format: SdlcFdRunAnalysisFormat;
+  readonly outputPath: string | null;
+  readonly strict: boolean;
 }
 
 interface SpecMethodWorkspaceContext {
@@ -331,6 +367,9 @@ function parseOptions(
     } else if (token === "--target") {
       target = requireOptionValue(argv, index, "--target");
       index += 1;
+    } else if (token === "--graph-overlay") {
+      target = `overlay:${requireOptionValue(argv, index, "--graph-overlay")}`;
+      index += 1;
     } else if (token === "--until") {
       until = parseUntil(requireOptionValue(argv, index, "--until"));
       index += 1;
@@ -422,6 +461,63 @@ function parseReleaseCutOptions(argv: readonly string[]): SpecMethodReleaseCutOp
   });
 }
 
+function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOptionReadModel {
+  let inspectedRoot: string | null = null;
+  let profile: SdlcFdRunAnalysisProfile = "generic";
+  let format: SdlcFdRunAnalysisFormat = "json";
+  let outputPath: string | null = null;
+  let strict = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--workspace" || token === "--run-archive" || token === "--operator-run") {
+      if (inspectedRoot !== null) {
+        throw new TypeError(
+          "analyze-run accepts exactly one of --workspace, --run-archive, or --operator-run"
+        );
+      }
+      inspectedRoot = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--profile") {
+      const value = requireOptionValue(argv, index, "--profile");
+      if (!SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.includes(value as SdlcFdRunAnalysisProfile)) {
+        throw new TypeError(
+          `--profile expected one of ${SDLC_FD_RUN_ANALYSIS_PROFILE_VALUES.join(", ")}`
+        );
+      }
+      profile = value as SdlcFdRunAnalysisProfile;
+      index += 1;
+    } else if (token === "--format") {
+      const value = requireOptionValue(argv, index, "--format");
+      if (!SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES.includes(value as SdlcFdRunAnalysisFormat)) {
+        throw new TypeError(
+          `--format expected one of ${SDLC_FD_RUN_ANALYSIS_FORMAT_VALUES.join(", ")}`
+        );
+      }
+      format = value as SdlcFdRunAnalysisFormat;
+      index += 1;
+    } else if (token === "--output") {
+      outputPath = requireOptionValue(argv, index, "--output");
+      index += 1;
+    } else if (token === "--strict") {
+      strict = true;
+    } else {
+      throw new TypeError(`unknown analyze-run option: ${token ?? ""}`);
+    }
+  }
+  if (inspectedRoot === null) {
+    throw new TypeError(
+      "analyze-run requires exactly one of --workspace, --run-archive, or --operator-run"
+    );
+  }
+  return Object.freeze({
+    inspectedRoot,
+    profile,
+    format,
+    outputPath,
+    strict
+  });
+}
+
 function parseTarget(rawTarget: string): OddSdlcSpecMethodTraversalRequest["target"] {
   if (rawTarget === "next") {
     return Object.freeze({ kind: "next", handle: "next" });
@@ -438,7 +534,13 @@ function parseTarget(rawTarget: string): OddSdlcSpecMethodTraversalRequest["targ
       handle: rawTarget.slice("asset:".length)
     });
   }
-  throw new TypeError("--target expected next, graph_function:<handle>, or asset:<handle>");
+  if (rawTarget.startsWith("overlay:")) {
+    return Object.freeze({
+      kind: "overlay",
+      handle: rawTarget.slice("overlay:".length)
+    });
+  }
+  throw new TypeError("--target expected next, graph_function:<handle>, asset:<handle>, or overlay:<handle>");
 }
 
 export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcSpecMethodRequest {
@@ -468,10 +570,26 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       packageSourceRoot: resolve(options.packageSourceRoot)
     });
   }
-  const options = parseOptions(command, argv.slice(1));
+  if (command === "analyze-run") {
+    const options = parseAnalyzeRunOptions(argv.slice(1));
+    return Object.freeze({
+      kind: "odd_sdlc_spec_method_analyze_run_request",
+      command,
+      inspectedRoot: resolve(options.inspectedRoot),
+      profile: options.profile,
+      format: options.format,
+      outputPath: options.outputPath === null ? null : resolve(options.outputPath),
+      strict: options.strict
+    });
+  }
+  const traversalCommand: Exclude<
+    OddSdlcSpecMethodCommand,
+    "install" | "release-cut" | "analyze-run"
+  > = command;
+  const options = parseOptions(traversalCommand, argv.slice(1));
   return Object.freeze({
     kind: "odd_sdlc_spec_method_request",
-    command,
+    command: traversalCommand,
     workspaceRoot: resolve(options.workspaceRoot),
     outputWorkspaceRoot:
       options.outputWorkspaceRoot === null ? null : resolve(options.outputWorkspaceRoot),
@@ -729,6 +847,8 @@ interface SelectedNextGraphFunctionFromArchive {
   readonly selectedActionRef: string;
   readonly nextGraphVectorRef: string;
   readonly closureDecisionRef: string;
+  readonly overlayRef: string | null;
+  readonly overlayBindingRef: string | null;
 }
 
 interface SelectedNextGraphFunctionArchiveDiagnostic {
@@ -781,6 +901,10 @@ function selectedNextGraphFunctionFromArchive(input: {
     input.module.graphFunctions.map((graphFunction) => graphFunction.name)
   );
   for (const archiveRoot of operatorRunArchiveRootsNewestFirst(input.context)) {
+    const closurePath = path.join(archiveRoot, "sdlc_edge_closure_decision.json");
+    const ledgerPath = path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json");
+    const closureRecord = jsonRecordFromFile(closurePath);
+    const ledgerRecord = jsonRecordFromFile(ledgerPath);
     const decision = edgeClosureDecisionFromArchive(archiveRoot);
     if (decision?.disposition !== "close") {
       continue;
@@ -813,6 +937,39 @@ function selectedNextGraphFunctionFromArchive(input: {
       selectedActionRef === null
     ) {
       return null;
+    }
+    const overlayBindingRef = stringField(record, "overlayBindingRef");
+    const closureOverlayBindingRef =
+      closureRecord === null
+        ? null
+        : stringField(
+            closureRecord as Readonly<Record<string, unknown>>,
+            "overlayBindingRef"
+          );
+    const ledgerOverlayBindingRef =
+      ledgerRecord === null
+        ? null
+        : stringField(
+            ledgerRecord as Readonly<Record<string, unknown>>,
+            "overlayBindingRef"
+          );
+    const expectedOverlayBindingRef = closureOverlayBindingRef ?? ledgerOverlayBindingRef;
+    if (
+      overlayBindingRef !== null &&
+      expectedOverlayBindingRef !== null &&
+      overlayBindingRef !== expectedOverlayBindingRef
+    ) {
+      return Object.freeze({
+        kind: "diagnostic" as const,
+        code: "stale_query_domain" as const,
+        detail:
+          "archived next-action projection overlayBindingRef does not match its admitted closure/ledger binding",
+        evidenceRefs: Object.freeze([
+          pathToFileURL(projectionPath).href,
+          pathToFileURL(closurePath).href,
+          pathToFileURL(ledgerPath).href
+        ])
+      });
     }
     if (nextGraphVectorRef === null) {
       return Object.freeze({
@@ -871,7 +1028,9 @@ function selectedNextGraphFunctionFromArchive(input: {
       nextActionProjectionRef,
       selectedActionRef,
       nextGraphVectorRef: graphVectorRef,
-      closureDecisionRef: decision.decisionRef
+      closureDecisionRef: decision.decisionRef,
+      overlayRef: stringField(record, "overlayRef"),
+      overlayBindingRef
     });
   }
   return null;
@@ -1106,13 +1265,32 @@ function defaultRegimeFor(input: {
   readonly queryDomain: ReturnType<typeof projectSdlcQueryDomain>;
 }): "F_D" | "F_P" {
   const firstTarget = input.queryDomain.startTargets[0]?.name ?? null;
-  if (
-    firstTarget === FG_CONFORM_PROJECT &&
-    (input.request.target.kind === "next" ||
+  if (firstTarget === FG_CONFORM_PROJECT) {
+    if (
+      input.request.target.kind === "next" ||
       (input.request.target.kind === "graph_function" &&
-        input.request.target.handle === FG_CONFORM_PROJECT))
-  ) {
-    return "F_D";
+        input.request.target.handle === FG_CONFORM_PROJECT)
+    ) {
+      return "F_D";
+    }
+    if (input.request.target.kind === "overlay") {
+      const module = constructSdlcGtlModule();
+      const conformGraphFunction = module.graphFunctions.find(
+        (graphFunction) => graphFunction.name === FG_CONFORM_PROJECT
+      );
+      const requestedOverlay = resolveSdlcTraversalOverlay({
+        catalog: constructSdlcTraversalOverlayCatalog({ module }),
+        overlayRef: input.request.target.handle
+      });
+      if (
+        conformGraphFunction !== undefined &&
+        requestedOverlay?.graphFunctionRefs.includes(
+          sdlcGraphFunctionBoundaryRef(conformGraphFunction)
+        ) === true
+      ) {
+        return "F_D";
+      }
+    }
   }
   return "F_P";
 }
@@ -1124,6 +1302,8 @@ function startOutcomeFor(
     readonly selectedActionRef: string;
     readonly nextGraphVectorRef: string;
     readonly closureDecisionRef: string;
+    readonly overlayRef: string | null;
+    readonly overlayBindingRef: string | null;
   }
 ): ReturnType<typeof publicStartOnce> {
   const context = workspaceContext({
@@ -1149,7 +1329,12 @@ function startOutcomeFor(
               replayNextAction.nextActionProjectionRef,
             replaySelectedActionRef: replayNextAction.selectedActionRef,
             replayNextGraphVectorRef: replayNextAction.nextGraphVectorRef,
-            replayClosureDecisionRef: replayNextAction.closureDecisionRef
+            replayClosureDecisionRef: replayNextAction.closureDecisionRef,
+            // The archive projection's overlayBindingRef belongs to the
+            // closed predecessor edge. selectedNextGraphFunctionFromArchive()
+            // validates that carrier chain; public start reconstructs the
+            // binding for the next edge instead of comparing across edges.
+            replayOverlayRef: replayNextAction.overlayRef
           })
     },
     module: constructSdlcGtlModule(),
@@ -1173,6 +1358,36 @@ function hasReplayForBasis(
   return events.some((event) => basisIdValue(event) === basis.id);
 }
 
+function selectedArchiveMatchesRequestedStart(input: {
+  readonly request: OddSdlcSpecMethodTraversalRequest;
+  readonly selected: SelectedNextGraphFunctionFromArchive;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}): boolean {
+  if (input.request.target.kind === "next") {
+    return true;
+  }
+  if (
+    input.request.target.kind === "graph_function" &&
+    input.request.target.handle === input.selected.graphFunctionName
+  ) {
+    return true;
+  }
+  if (
+    input.request.target.kind === "overlay" &&
+    input.selected.overlayRef !== null
+  ) {
+    const catalog = constructSdlcTraversalOverlayCatalog({
+      module: input.module
+    });
+    const requestedOverlay = resolveSdlcTraversalOverlay({
+      catalog,
+      overlayRef: input.request.target.handle
+    });
+    return requestedOverlay?.overlayRef === input.selected.overlayRef;
+  }
+  return false;
+}
+
 function startOutcomeForObservedReplay(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly events: readonly RuntimeEvent[];
@@ -1191,23 +1406,34 @@ function startOutcomeForObservedReplay(input: {
   }
   if (
     selectedNextGraphFunction !== null &&
-    (input.request.target.kind === "next" ||
-      (input.request.target.kind === "graph_function" &&
-        input.request.target.handle !== selectedNextGraphFunction.graphFunctionName))
+    selectedArchiveMatchesRequestedStart({
+      request: input.request,
+      selected: selectedNextGraphFunction,
+      module
+    })
   ) {
     const selected = startOutcomeFor({
       ...input.request,
-      target: {
-        kind: "graph_function",
-        handle: selectedNextGraphFunction.graphFunctionName
-      }
+      target:
+        input.request.target.kind === "overlay"
+          ? input.request.target
+          : {
+              kind: "graph_function",
+              handle: selectedNextGraphFunction.graphFunctionName
+            }
     }, {
       nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
       selectedActionRef: selectedNextGraphFunction.selectedActionRef,
       nextGraphVectorRef: selectedNextGraphFunction.nextGraphVectorRef,
-      closureDecisionRef: selectedNextGraphFunction.closureDecisionRef
+      closureDecisionRef: selectedNextGraphFunction.closureDecisionRef,
+      overlayRef: selectedNextGraphFunction.overlayRef,
+      overlayBindingRef: selectedNextGraphFunction.overlayBindingRef
     });
-    if (selected.executionContract !== null) {
+    if (
+      selected.executionContract !== null ||
+      (selected.kind === "sdlc_public_start_blocked" &&
+        selected.blockingReason === "stale_query_domain")
+    ) {
       return selected;
     }
   }
@@ -1456,7 +1682,71 @@ function gapsPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
   });
 }
 
-function commandPayload(request: OddSdlcSpecMethodTraversalRequest): unknown {
+export interface SdlcAnalyzeRunCliEnvelope {
+  readonly kind: "sdlc_analyze_run_cli_envelope";
+  readonly format: SdlcFdRunAnalysisFormat;
+  readonly outputPath: string | null;
+  readonly wroteOutputPath: boolean;
+  readonly renderedBytes: number;
+  readonly strict: boolean;
+  readonly strictFailed: boolean;
+  readonly rendered: string;
+  readonly analysis: SdlcFdRunAnalysisResult;
+}
+
+function analyzeRunPayload(
+  request: OddSdlcSpecMethodAnalyzeRunRequest
+): SdlcAnalyzeRunCliEnvelope {
+  if (request.outputPath !== null) {
+    const normalisedOutput = path.resolve(request.outputPath);
+    const normalisedRoot = path.resolve(request.inspectedRoot);
+    if (
+      normalisedOutput === normalisedRoot ||
+      normalisedOutput.startsWith(`${normalisedRoot}${path.sep}`)
+    ) {
+      throw new TypeError(
+        "analyze-run --output path must live outside the inspected root"
+      );
+    }
+  }
+  const analysis = analyzeSdlcFdRunArchive({
+    inspectedRoot: request.inspectedRoot,
+    profile: request.profile
+  });
+  const rendered =
+    request.format === "markdown"
+      ? renderSdlcFdRunAnalysisMarkdown(analysis)
+      : JSON.stringify(analysis, null, 2);
+  let wroteOutputPath = false;
+  if (request.outputPath !== null) {
+    writeFileSync(request.outputPath, rendered, "utf8");
+    wroteOutputPath = true;
+  }
+  const strictFailed =
+    request.strict &&
+    analysis.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.severity === "error" || diagnostic.severity === "warn"
+    );
+  return Object.freeze({
+    kind: "sdlc_analyze_run_cli_envelope" as const,
+    format: request.format,
+    outputPath: request.outputPath,
+    wroteOutputPath,
+    renderedBytes: Buffer.byteLength(rendered, "utf8"),
+    strict: request.strict,
+    strictFailed,
+    rendered,
+    analysis
+  });
+}
+
+function commandPayload(
+  request: OddSdlcSpecMethodTraversalRequest | OddSdlcSpecMethodAnalyzeRunRequest
+): unknown {
+  if (request.command === "analyze-run") {
+    return analyzeRunPayload(request);
+  }
   if (request.command === "catalog") {
     return constructSdlcGraphFunctionCatalog();
   }
@@ -1492,6 +1782,9 @@ async function commandPayloadAsync(request: OddSdlcSpecMethodRequest): Promise<u
       packageSourceRoot: request.packageSourceRoot
     });
   }
+  if (request.command === "analyze-run") {
+    return analyzeRunPayload(request);
+  }
   if (request.command === "start") {
     return installedStartPayloadFor(request);
   }
@@ -1505,10 +1798,17 @@ export function invokeOddSdlcSpecMethodCommandSync(
   try {
     const request = admitOddSdlcSpecMethodRequest(argv);
     command = request.command;
-    if (request.command === "install" || request.command === "release-cut") {
+    if (
+      request.command === "install" ||
+      request.command === "release-cut"
+    ) {
       throw new TypeError(
         `${request.command} requires invokeOddSdlcSpecMethodCommand`
       );
+    }
+    if (request.command === "analyze-run") {
+      const envelope = analyzeRunPayload(request);
+      return analyzeRunResult(request.command, envelope);
     }
     return ok(request.command, commandPayload(request));
   } catch (error) {
@@ -1523,10 +1823,39 @@ export async function invokeOddSdlcSpecMethodCommand(
   try {
     const request = admitOddSdlcSpecMethodRequest(argv);
     command = request.command;
-    return ok(request.command, await commandPayloadAsync(request));
+    const payload = await commandPayloadAsync(request);
+    if (
+      request.command === "analyze-run" &&
+      isAnalyzeRunCliEnvelope(payload)
+    ) {
+      return analyzeRunResult(request.command, payload);
+    }
+    return ok(request.command, payload);
   } catch (error) {
     return fail(command, error instanceof Error ? error.message : String(error));
   }
+}
+
+function analyzeRunResult(
+  command: OddSdlcSpecMethodCommand,
+  envelope: SdlcAnalyzeRunCliEnvelope
+): OddSdlcSpecMethodResult {
+  return Object.freeze({
+    kind: "odd_sdlc_spec_method_result" as const,
+    command,
+    status: "ok" as const,
+    exitCode: envelope.strictFailed ? (2 as const) : (0 as const),
+    payload: envelope
+  });
+}
+
+function isAnalyzeRunCliEnvelope(value: unknown): value is SdlcAnalyzeRunCliEnvelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Reflect.get(value, "kind") === "sdlc_analyze_run_cli_envelope"
+  );
 }
 
 function isRecord(input: unknown): input is Readonly<Record<string, unknown>> {
@@ -1801,6 +2130,7 @@ function compactInstalledStartJsonPayload(payload: unknown): unknown {
     postflight: compactPostflight(payload["postflight"]),
     gapDossier: compactGapDossier(payload["gapDossier"]),
     traversalConsequence: payload["traversalConsequence"] ?? null,
+    loop: payload["loop"] ?? null,
     emittedRuntimeEventKinds: payload["emittedRuntimeEventKinds"] ?? Object.freeze([])
   });
 }
@@ -1909,6 +2239,13 @@ function compactPublicStartResult(result: OddSdlcSpecMethodResult): string | nul
 }
 
 export function serializeOddSdlcSpecMethodResult(result: OddSdlcSpecMethodResult): string {
+  if (
+    result.command === "analyze-run" &&
+    result.status === "ok" &&
+    isAnalyzeRunCliEnvelope(result.payload)
+  ) {
+    return `${result.payload.rendered}\n`;
+  }
   if (process.env["ODD_SDLC_TS_OUTPUT"] !== "json" && result.status === "ok") {
     const compact =
       compactGapsResult(result) ??

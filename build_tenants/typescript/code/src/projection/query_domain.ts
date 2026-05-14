@@ -21,15 +21,16 @@ import {
   SOFTWARE_DOMAIN_WORK_ACT_TYPES
 } from "../domain/index.js";
 import {
-  FG_CONFORM_PROJECT_AUTHORITY,
-  FG_CONFORM_PROJECT,
   constructSdlcGraphFunctionCatalog,
+  constructSdlcTraversalOverlayCatalog,
   constructSdlcGtlModule,
+  publicSdlcOverlayStartTargets,
   sdlcGraphFunctionBoundaryRef,
   sdlcGraphVectorBoundaryRef,
   sdlcPublishedTraversalTargetRef,
   sdlcTargetOutcomeRef,
-  type SdlcGraphFunctionCatalog
+  type SdlcGraphFunctionCatalog,
+  type SdlcTraversalOverlayCatalog
 } from "../graph/index.js";
 import {
   deriveOddSdlcEvaluateNextReport,
@@ -64,6 +65,8 @@ export interface SdlcStartTargetSurface {
   readonly name: string;
   readonly graphFunctionRef: string;
   readonly jobName: string;
+  readonly overlayRefs: readonly string[];
+  readonly defaultForOverlayRefs: readonly string[];
 }
 
 export interface SdlcAssetOwnershipSurface {
@@ -277,6 +280,7 @@ export interface SdlcQueryDomainProjection {
   readonly libraryFunctions: SdlcGraphFunctionCatalog["libraryFunctions"];
   readonly functions: SdlcGraphFunctionCatalog["functions"];
   readonly programs: SdlcGraphFunctionCatalog["executives"];
+  readonly traversalOverlays: SdlcTraversalOverlayCatalog;
   readonly graphFunctions: readonly SdlcGraphFunctionSurface[];
   readonly startTargets: readonly SdlcStartTargetSurface[];
   readonly assetOwnership: readonly SdlcAssetOwnershipSurface[];
@@ -359,41 +363,14 @@ function graphFunctionSurface(module: Module): readonly SdlcGraphFunctionSurface
 
 function startTargets(input: {
   readonly module: Module;
+  readonly overlayCatalog: SdlcTraversalOverlayCatalog;
   readonly projectConformance?: SdlcConformProjectReport | null;
 }): readonly SdlcStartTargetSurface[] {
-  const publicTargetNames = new Set([
-    FG_CONFORM_PROJECT,
-    FG_CONFORM_PROJECT_AUTHORITY,
-    "bootstrap_release_self_test",
-    "release_operational_cycle"
-  ]);
-  const byId = new Map(
-    input.module.graphFunctions.map((graphFunction) => [graphFunction.id, graphFunction])
-  );
-  const targets: SdlcStartTargetSurface[] = [];
-  for (const job of input.module.jobs) {
-    for (const contract of job.contracts) {
-      const graphFunction = byId.get(contract.targetId);
-      if (graphFunction !== undefined) {
-        if (!publicTargetNames.has(graphFunction.name)) {
-          continue;
-        }
-        targets.push(
-          Object.freeze({
-            name: graphFunction.name,
-            graphFunctionRef: sdlcGraphFunctionBoundaryRef(graphFunction),
-            jobName: job.name
-          })
-        );
-      }
-    }
-  }
-  if (input.projectConformance?.status === "blocked") {
-    return Object.freeze(
-      targets.filter((target) => target.name === FG_CONFORM_PROJECT)
-    );
-  }
-  return Object.freeze(targets.filter((target) => target.name !== FG_CONFORM_PROJECT));
+  return publicSdlcOverlayStartTargets({
+    module: input.module,
+    catalog: input.overlayCatalog,
+    projectConformanceStatus: input.projectConformance?.status ?? null
+  });
 }
 
 function assetOwnership(
@@ -1168,6 +1145,10 @@ export function projectSdlcQueryDomain(input: {
   readonly projectConformance?: SdlcConformProjectReport | null;
 }): SdlcQueryDomainProjection {
   const catalog = constructSdlcGraphFunctionCatalog();
+  const traversalOverlays = constructSdlcTraversalOverlayCatalog({
+    module: input.module,
+    graphCatalog: catalog
+  });
   assertModuleMatchesCatalog({ module: input.module, catalog });
   const graphFunctionSurfaces = graphFunctionSurface(input.module);
   const assetOwnershipRows = assetOwnership(catalog);
@@ -1191,9 +1172,11 @@ export function projectSdlcQueryDomain(input: {
     libraryFunctions: catalog.libraryFunctions,
     functions: catalog.functions,
     programs: catalog.executives,
+    traversalOverlays,
     graphFunctions: graphFunctionSurfaces,
     startTargets: startTargets({
       module: input.module,
+      overlayCatalog: traversalOverlays,
       projectConformance: input.projectConformance ?? null
     }),
     assetOwnership: assetOwnershipRows,

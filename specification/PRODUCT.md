@@ -42,7 +42,9 @@ It gives a project a lawful way to declare:
 - assets addressed by URI
 - asset types with explicit semantic role
 - asset collections and typed asset nodes
-- named functions over asset graphs
+- named functions over graph-overlay asset views
+- workspace-bound graph overlays that declare the full SDLC route from start
+  surface to target outcome over one worksite
 - executive GTL graph functions over the function catalog
 - a governed SDLC worksite lifecycle over request, specification, design,
   implementation, qualification, release, deployment, runtime return, and
@@ -60,6 +62,9 @@ It gives a project a lawful way to declare:
   graph-owned work order rather than a hidden operator checklist
 - dependency-ordered realization and qualification tranches over module,
   source-asset, test, evidence, and obligation ledgers
+- configured `F_P` as the expected constructive regime for the current generic
+  SDLC gates, with `F_D` used as deterministic optimization, admission,
+  validation, folding, and routing support around that generic constructive work
 - indexed authority pressure for prompt-bearing edges so workers receive full
   authority by reference and targeted local obligation slices inline
 - deterministic install-and-normalize behavior over imported or stale workspaces
@@ -171,6 +176,96 @@ translate that precedent into graph functions, typed assets, ABG runtime truth,
 and installed product carriers. It must not copy Python service structure as
 architecture.
 
+## Generic Computation Regime Boundary
+
+The current generic SDLC product gates expect `F_P` for constructive SDLC work.
+
+`F_P` is the regime that interprets open-ended product authority, changes the
+governed workspace, produces candidate assets, and returns worker evidence for
+admission.
+
+For the generic SDLC use case, `F_D` is an optimization around that constructive
+path. It may preflight bindings, reject malformed inputs, validate declared
+capability evidence, admit returned facts, fold ledger rows, compute
+deterministic closure diagnostics, and route next action from admitted truth. It
+is not the generic constructor for open-ended SDLC work and it does not replace
+a configured `F_P` transform where a generic edge gate expects
+product-changing judgment.
+
+Optimized domains may lawfully rely on `F_D` for performance and cost reasons
+when their product-owned contract declares deterministic authority, bounded
+inputs, deterministic transform law, and deterministic closure evidence. That
+is a specialized product optimization. It is not the default generic SDLC
+contract currently being fulfilled.
+
+A generic SDLC edge may be purely deterministic only when its product contract
+declares it as deterministic, projection-only, or no-close. Otherwise, missing
+`F_P` construction is non-close pressure, even when all deterministic checks
+pass.
+
+This boundary prevents `F_D` from becoming a hidden shortcut around the generic
+product definition. Deterministic work can make the generic `F_P` path cheaper,
+narrower, more replayable, and easier to close; it cannot stand in for the
+constructive work that the generic graph edge asks the product to perform.
+
+## SDLC Graph Overlay Boundary
+
+Within `odd_sdlc`, a graph overlay is the product-level roadmap of work over a
+workspace. It binds a start surface, an end surface, intermediate SDLC
+surfaces, typed vector traversals, and the assurance matrix needed to decide
+whether the workspace has moved lawfully from the start state toward the target
+outcome.
+
+A graph overlay is not a rival GTL primitive. It is `odd_sdlc` product
+vocabulary expressed through GTL and ABG surfaces.
+
+It also collapses the older local concepts for roadmap, asset graph, lifecycle
+lane, work vector, graph leaf, and route projection into one consistent SDLC
+ontology. Those concepts may remain as views or roles inside an overlay, but
+they do not define parallel execution, closure, or optimization authority.
+
+| SDLC product term | Role | GTL/ABG binding |
+| --- | --- | --- |
+| Graph overlay | Full workspace-bound roadmap from start surface to target outcome. | Published SDLC product surface over GTL graph, module, jobs, policy, and query projections. |
+| Graph function | Callable fragment of the overlay; may be composed, recursive, higher-order, or reused across overlays. | GTL `GraphFunction`. |
+| Typed vector traversal | One `A -> B` traversal inside the overlay or graph function. | GTL `GraphVector` with SDLC edge assurance declarations. |
+| Node or asset node | Typed SDLC surface such as bootstrap input, requirements, formalization, design, code, tests, release evidence, deployment evidence, or runtime return. | GTL `Node` plus `odd_sdlc` asset binding. |
+
+The overlay axioms are:
+
+1. A graph overlay binds one workspace/worksite route from declared start
+   surface to declared target outcome.
+2. A graph overlay names the nodes, graph functions, typed vector traversals,
+   policies, and query projections needed to explain that route.
+3. A graph function is a callable fragment inside the overlay, not the whole
+   roadmap by itself.
+4. A typed vector traversal owns the edge-local gain, evidence, metric, close,
+   residual-pressure, and continuation computation.
+5. A node or asset node owns surface identity, schema, asset role, markov or
+   acceptance conditions, and local invariants.
+6. Overlay closure is a composition of required vector-level closure decisions
+   plus route-level residual-pressure checks; route completion cannot hide an
+   unclosed edge.
+7. Overlay optimization is legal only by adding declared graph functions,
+   capability assets, or deterministic checks to the relevant vector
+   contracts.
+
+The graph overlay is also the product customization and optimization surface.
+The generic SDLC overlay keeps the product route open-ended and therefore
+expects configured `F_P` for constructive gates. A domain- or
+workspace-optimized overlay may bind stronger deterministic checks, specialized
+graph functions, or stack-specific capability assets where exact predicates
+exist. Examples include compiler checks, linters, schema validators, API
+contract validators, test runners, manifest replay checks, deployment probes,
+and runtime-return validators.
+
+Those optimizations attach to the relevant typed vector traversal as `F_D`
+preflight, postflight, capability, operational, or closure-support functions.
+They do not replace generic `F_P` construction unless the overlay contract
+declares the edge deterministic, projection-only, or no-close. The overlay
+aggregates route-level progress; the edge-local gain and close functions remain
+the decisive computation for each close-capable traversal.
+
 ## Product Terms
 
 ### Outcome-Driven Development
@@ -220,7 +315,30 @@ collection binding.
 
 ### Asset Graph
 
-The dependency topology over typed asset nodes.
+The dependency topology over typed asset nodes as viewed inside a graph
+overlay.
+
+An asset graph is not a separate execution or closure ontology. It is the
+asset-dependency view of the overlay.
+
+### Graph Overlay
+
+A product-level roadmap over one workspace-bound SDLC worksite.
+
+A graph overlay has a declared start surface, target outcome, intermediate
+surfaces, typed vector traversals, assurance matrix, and route-level
+projection.
+
+It is the product surface where `odd_sdlc` customizes or optimizes the generic
+SDLC route for a domain, stack, workspace, or dedicated release.
+
+It is not a separate GTL primitive and it is not a second runtime. It is an
+`odd_sdlc` product construct expressed through GTL graph, graph-function,
+graph-vector, module, job, policy, and ABG projection surfaces.
+
+It is the normalizing ontology for prior local terms such as asset graph, work
+vector, lifecycle lane, graph leaf, and route projection. Those terms are
+permitted only as overlay views, roles, or projections.
 
 ### Asset Binding
 
@@ -339,7 +457,26 @@ carries live requirement truth as separate family files.
 
 ### Graph Function
 
-The executable constructive carrier over declared graph contracts.
+A callable fragment of a graph overlay and the executable constructive carrier
+over declared graph contracts.
+
+In GTL terms, this is a `GraphFunction`. It works like a function: it has a
+declared outer contract, can be composed, can be recursive where declared, and
+can be reused or specialized across overlays.
+
+It is not the whole SDLC roadmap by itself. A graph overlay may use one or many
+graph functions to carry its route.
+
+### Typed Vector Traversal
+
+One edge-local `A -> B` traversal inside a graph overlay or graph function.
+
+This is the attachment point for edge-local gain, evidence admission, metric,
+close, residual-pressure, and continuation functions.
+
+In GTL terms, this is a `GraphVector` with `odd_sdlc` edge assurance
+declarations. The graph overlay may aggregate its closure, but it cannot close
+a route segment by skipping the relevant vector-level closure decisions.
 
 ### Function
 
@@ -589,23 +726,25 @@ mutable odd_sdlc source line:
 5. within the `odd_sdlc` source repository, keep shared bootstrap
    realization law in `build_tenants/common/` until real tenant-local
    divergence appears
-6. publish graph functions and lawful higher-order compositions directly over
-   GTL
-7. execute through ABG without a product-local shadow runtime
-8. prove capability claims through written scenario bundles and installed-dev
+6. publish graph overlays as workspace-bound SDLC roadmaps and optimization
+   surfaces over typed traversals
+7. publish graph functions and lawful higher-order compositions directly over
+   GTL as callable fragments inside those overlays
+8. execute through ABG without a product-local shadow runtime
+9. prove capability claims through written scenario bundles and installed-dev
    qualification
-9. accept a bounded request against a new or existing application and gate it
+10. accept a bounded request against a new or existing application and gate it
    before execution work opens
-10. run the full ODD SDLC from the gated request through release preparation
+11. run the full ODD SDLC from the gated request through release preparation
     and deployment
-11. derive dedicated releases from existing application lines so one operator,
+12. derive dedicated releases from existing application lines so one operator,
     customer, or team can tune the resulting application to local taste
-12. support an enduring orchestration plane that can coordinate named workers,
+13. support an enduring orchestration plane that can coordinate named workers,
     browser observation, and reconnectable sessions over the same GTL/ABG and
     `odd_sdlc` execution law used by direct local CLI execution
-13. bring runtime-returned evidence back into the governed SDLC line as lawful
+14. bring runtime-returned evidence back into the governed SDLC line as lawful
     input to repair, retrofit, repricing, and maintenance-release work
-14. relaunch through the same governed line rather than treating release as the
+15. relaunch through the same governed line rather than treating release as the
     end of the project
 
 ## Current Product Definition
@@ -616,7 +755,9 @@ The current product definition of `odd_sdlc` is:
 - an outcome-driven development product
 - lightweight by design
 - graph-function-first in execution
-- centered on assets, asset types, asset graphs, and named functions
+- centered on graph overlays, assets, asset types, and named functions
+- using graph overlays as the workspace-bound roadmap, route-projection, and
+  optimization surface over typed SDLC traversals
 - beginning from an explicit bootstrap asset set and recursive edge contracts
 - subordinate to GTL and ABG for runtime substrate truth
 - standardized on the `build_tenants/` realization model from bootstrap
@@ -632,13 +773,20 @@ The current product definition of `odd_sdlc` is:
   taking ownership of the source realization root
 - expanding the first-slice asset model toward request, implementation,
   qualification, release, deployment, runtime-return, and maintenance assets
-- moving toward explicit per-edge transform dependency, configured `F_P`, and
-  layered `F_D` as domain law
-- keeping the current bootstrap-to-release toy subgraph as a proving subset
+- requiring explicit per-edge transform dependency and configured `F_P` for
+  generic constructive gates, with layered `F_D` used for deterministic
+  optimization, admission, validation, folding, and routing around admitted
+  `F_P` work; optimized domains may declare `F_D`-heavy paths under their own
+  deterministic product contracts
+- requiring each close-capable typed vector traversal in an overlay to own its
+  gain, evidence, metric, close, residual-pressure, and continuation
+  computation rather than hiding closure in route completion
+- keeping the current bootstrap-to-release overlay subset as a proving subset
   rather than the whole software-domain definition
-- publishing a top-level executive GTL graph function over the current toy subgraph
+- publishing a top-level executive GTL graph function over the current overlay
+  subset
 - publishing bounded operator-invoked span gap analysis so incompleteness can
-  be inspected lawfully across arbitrary graph points and their dependent
+  be inspected lawfully across arbitrary overlay points and their dependent
   realizing structure
 - publishing first-class sandbox preparation, observation, and reset surfaces
   as product behavior rather than leaving them as pytest-only orchestration
@@ -670,7 +818,7 @@ chain over:
 The exact tenant-local file layout, proving paths, and package names for that
 subset are realization `HOW` and belong under `build_tenants/`.
 
-The current top-level executive graph function over that subgraph is:
+The current top-level executive graph function over that overlay subset is:
 
 - `bootstrap_release_self_test`
 
@@ -686,7 +834,8 @@ The current `odd_sdlc` host bindings over that plugin are:
 - `review_comment_consensus_round`
 - `review_comment_by_consensus`
 
-It acts as the current runtime authority above the leaf asset functions:
+It acts as the current callable carrier above the asset-level graph-function
+fragments inside that overlay subset:
 
 - it carries cumulative environment truth from `input_set` through
   `release_surface`
@@ -695,13 +844,14 @@ It acts as the current runtime authority above the leaf asset functions:
 - one explicit job binds to that executive carrier and drives the bounded
   constructor turn for each open call
 - it ingests the resulting F_P assessment back through ABG
-- it stops only when the current toy subgraph converges at `release_surface`
+- it stops only when the current bootstrap-to-release overlay subset converges
+  at `release_surface`
 
 The current product also exposes bounded operator inspection and proving
 surfaces around that carrier:
 
 - bare `odd_sdlc gaps` for the ordinary workspace-scoped operator analysis over
-  the current governed graph state
+  the current governed overlay and graph state
 - `odd_sdlc gaps --format json` for the raw machine-readable dossier carrier
   when scripts or proofs need the underlying register shape
 - the current `gaps` / `query-domain` projection publishes one edge-scoped
@@ -771,7 +921,8 @@ into the generic software-domain package:
 - keep the proven bootstrap-plus-fanout chain as the first bounded proving
   subset while the fuller domain is built out
 
-The current canonical bootstrap-plus-fanout subgraph proven in the toy sandbox is:
+The current canonical bootstrap-plus-fanout overlay subset proven in the toy
+sandbox is:
 
 - `derive_intent_surface`
 - `derive_product_surface`

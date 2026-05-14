@@ -1486,6 +1486,123 @@ test("B-086 design completeness accepts allowed operation/entity aliases and rej
   );
 });
 
+test("B-086 aggregate sunny-day flow accepts graph-wide cross-module entity exchange", () => {
+  const root = workspace();
+  const handoff = manifest(root, "derive_aggregate_sunny_day_sequence_surface");
+  const crossModuleRegister = (inputEntityIds) =>
+    sunnyDayRegister({
+      aggregateDomainModel: {
+        kind: "sdlc_aggregate_domain_model",
+        modelVersion: "ts-design-depth-v1",
+        entities: [
+          {
+            kind: "sdlc_aggregate_domain_entity",
+            entityId: "entity:RunResult",
+            ownerModuleName: "cdme-executor",
+            attributes: [
+              {
+                kind: "sdlc_domain_attribute",
+                attributeId: "attr:RunResult.status",
+                name: "status",
+                valueType: "string",
+                cardinality: "one",
+                invariantRefs: ["REQ-B086-001"]
+              }
+            ],
+            sourceModuleNames: ["cdme-executor"]
+          },
+          {
+            kind: "sdlc_aggregate_domain_entity",
+            entityId: "entity:Ledger",
+            ownerModuleName: "cdme-accounting",
+            attributes: [
+              {
+                kind: "sdlc_domain_attribute",
+                attributeId: "attr:Ledger.recordsIn",
+                name: "recordsIn",
+                valueType: "List<RunResult>",
+                cardinality: "many",
+                invariantRefs: ["REQ-B086-001"]
+              }
+            ],
+            sourceModuleNames: ["cdme-accounting"]
+          }
+        ],
+        operations: [
+          {
+            kind: "sdlc_domain_operation",
+            operationId: "operation:AccountingVerifier.verify",
+            moduleName: "cdme-accounting",
+            inputEntityIds: ["entity:RunResult"],
+            outputEntityIds: ["entity:Ledger"],
+            requiredAttributeIds: [
+              "attr:RunResult.status",
+              "attr:Ledger.recordsIn"
+            ]
+          }
+        ],
+        crossModuleReferences: [],
+        evidenceRefs: ["fixture://b086/cross-module-aggregate"]
+      },
+      aggregateSunnyDaySequence: {
+        kind: "sdlc_aggregate_sunny_day_sequence",
+        sequenceVersion: "ts-design-depth-v1",
+        steps: [
+          {
+            kind: "sdlc_sunny_day_sequence_step",
+            stepId: "step-01-verify-run",
+            moduleName: "cdme-accounting",
+            operationId: "operation:AccountingVerifier.verify",
+            inputEntityIds,
+            outputEntityIds: ["ledger"],
+            stateTransitionIds: []
+          }
+        ],
+        evidenceRefs: ["fixture://b086/cross-module-sequence"]
+      }
+    });
+  const fullBreadthScope = featureScope({
+    mode: "full_breadth",
+    scopeRef:
+      "scope://odd_sdlc/aggregate-sunny-day-sequence-surface/full-breadth",
+    includedModuleNames: ["cdme-executor", "cdme-accounting"],
+    deferredModuleNames: []
+  });
+
+  writeDesignRegister(handoff, crossModuleRegister(["run-result"]));
+  const satisfiedLedger = deriveDesignCompletenessAssuranceLedger({
+    manifest: {
+      targetAssetType: handoff.targetAssetType,
+      featureScope: fullBreadthScope
+    },
+    report: { outputFile: handoff.outputFile }
+  });
+  assert(satisfiedLedger);
+  assert.equal(satisfiedLedger.verdict, "satisfied");
+  assert(
+    !satisfiedLedger.reasons.some((reason) =>
+      reason.code.startsWith("design_flow_entity_missing:")
+    )
+  );
+
+  writeDesignRegister(handoff, crossModuleRegister(["missing-foreign-entity"]));
+  const missingLedger = deriveDesignCompletenessAssuranceLedger({
+    manifest: {
+      targetAssetType: handoff.targetAssetType,
+      featureScope: fullBreadthScope
+    },
+    report: { outputFile: handoff.outputFile }
+  });
+  assert(missingLedger);
+  assert.equal(missingLedger.verdict, "open_gap");
+  assert(
+    missingLedger.reasons.some(
+      (reason) =>
+        reason.code === "design_flow_entity_missing:missing-foreign-entity"
+    )
+  );
+});
+
 test("B-086 worker-authored design completeness partial escalates to F_P instead of F_D failure", () => {
   const root = workspace();
   const handoff = manifest(root, "derive_aggregate_sunny_day_sequence_surface");

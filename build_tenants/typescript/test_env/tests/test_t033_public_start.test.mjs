@@ -83,7 +83,8 @@ test("T-057 public start target resolution policy is declared data", () => {
     [
       ["next", "published_start_targets"],
       ["graph_function", "named_graph_function"],
-      ["asset", "asset_published_action"]
+      ["asset", "asset_published_action"],
+      ["overlay", "overlay_catalog_binding"]
     ]
   );
 });

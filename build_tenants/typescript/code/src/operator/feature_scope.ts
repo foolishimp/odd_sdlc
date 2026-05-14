@@ -243,7 +243,11 @@ export function deriveSdlcFeatureScope(
     declaredModuleNames,
     refs: basisRefs
   });
-  if (includedModuleNames.length === 0) {
+  const effectiveIncludedModuleNames =
+    includedModuleNames.length === 0 && declaredModuleNames.length === 1
+      ? declaredModuleNames
+      : includedModuleNames;
+  if (effectiveIncludedModuleNames.length === 0) {
     return Object.freeze({
       kind: "sdlc_feature_scope" as const,
       scopeVersion: "ts-scope-v1" as const,
@@ -260,11 +264,11 @@ export function deriveSdlcFeatureScope(
     kind: "sdlc_feature_scope" as const,
     scopeVersion: "ts-scope-v1" as const,
     mode,
-    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/${mode.replace("_", "-")}/${includedModuleNames
+    scopeRef: `scope://odd_sdlc/${slugPart(input.targetAssetType)}/${mode.replace("_", "-")}/${effectiveIncludedModuleNames
       .map(slugPart)
       .join("+") || "unscoped"}`,
     basisRefs,
-    includedModuleNames,
+    includedModuleNames: effectiveIncludedModuleNames,
     includedEntityIds: selectedIds({
       ids: input.materializedEntityIds,
       refs: basisRefs
@@ -275,7 +279,7 @@ export function deriveSdlcFeatureScope(
     }),
     deferredModuleNames: uniqueInOrder(
       declaredModuleNames.filter((moduleName) =>
-        !includedModuleNames.includes(moduleName)
+        !effectiveIncludedModuleNames.includes(moduleName)
       )
     )
   });

@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  compactSdlcPriorGapDossiersForRetryContext,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
@@ -85,6 +86,33 @@ function retryDossier() {
     currentGapDossierRef: "file:///tmp/t120/gap_dossier.json",
     retryEligible: true,
     nextLawfulActions: ["retry_same_edge", "repair_worker_output"]
+  };
+}
+
+function retryDossierWithReasons(ref, reasons) {
+  return {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "Fg_conform_project_authority",
+    vectorIndex: 0,
+    targetAssetType: "project_bootstrap_surface",
+    reasons: reasons.map((reason) => ({
+      kind: "sdlc_postflight_gap_reason",
+      reason,
+      reasonClass: "assurance",
+      blockingReason: {
+        ...sdlcBlockingReasonFromLegacy({ reason }),
+        code: "assurance_ledger_reason",
+        detail: reason,
+        lawfulReentryPoint: "repair_worker_output"
+      }
+    })),
+    evidenceRefs: [ref],
+    priorManifestId: `${ref}/handoff_manifest.json`,
+    currentGapDossierRef: ref,
+    retryEligible: true,
+    nextLawfulActions: ["repair_worker_output"]
   };
 }
 
@@ -529,6 +557,31 @@ test("T-120 retry prompt projects exact schema-local carrier repair pressure", (
   );
   assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
   assert.match(prompt, /Worker package fields to apply/u);
+});
+
+test("T-158 retry frontier drops stale blockers repaired by the latest dossier", () => {
+  const first = retryDossierWithReasons("file:///tmp/t120/gap-1.json", [
+    "obligation_assessment_blocked:requirement:workspace.mapper_requirements.req_acc_001",
+    "obligation_assessment_blocked:requirement:workspace.mapper_requirements.req_acc_002"
+  ]);
+  const latest = retryDossierWithReasons("file:///tmp/t120/gap-2.json", [
+    "obligation_assessment_blocked:requirement:workspace.mapper_requirements.req_acc_002"
+  ]);
+
+  const [compact] = compactSdlcPriorGapDossiersForRetryContext([first, latest]);
+
+  assert(compact);
+  assert.equal(compact.currentGapDossierRef, latest.currentGapDossierRef);
+  assert.deepEqual(
+    compact.reasons.map((reason) => reason.reason),
+    [
+      "obligation_assessment_blocked:requirement:workspace.mapper_requirements.req_acc_002"
+    ]
+  );
+  assert.deepEqual(compact.evidenceRefs, [
+    first.currentGapDossierRef,
+    latest.currentGapDossierRef
+  ]);
 });
 
 test("T-120 component carrier retry instructions fail closed if schema fields are omitted", () => {
