@@ -12,9 +12,14 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import {
+  parseComponentRealizationRow,
+  parseComponentTopologyRow
+} from "./component_depth_register.js";
 import type {
   SdlcAggregateDomainEntity,
   SdlcAggregateDomainModel,
+  SdlcAggregateDomainModelRow,
   SdlcAggregateSunnyDaySequence,
   SdlcDesignCompletenessAxisVerdict,
   SdlcDesignCompletenessVerdict,
@@ -24,8 +29,12 @@ import type {
   SdlcDomainEntity,
   SdlcDomainOperation,
   SdlcEntityStateTransition,
+  SdlcFileTargetRow,
+  SdlcImplementationModuleRow,
+  SdlcImplementationStackProfileRow,
   SdlcModuleSchemaFragment,
   SdlcModuleStateDiagramFragment,
+  SdlcSunnyDaySequenceRow,
   SdlcSunnyDaySequenceStep
 } from "./carriers.js";
 import {
@@ -36,9 +45,7 @@ import {
 } from "./carriers.js";
 
 const DESIGN_DEPTH_TARGETS = Object.freeze([
-  "implementation_module_surface",
-  "aggregate_domain_model_surface",
-  "aggregate_sunny_day_sequence_surface"
+  "implementation_design_surface"
 ] as const);
 
 type DesignDepthTarget = (typeof DESIGN_DEPTH_TARGETS)[number];
@@ -70,6 +77,13 @@ function mutableRecord(input: unknown): Record<string, unknown> | null {
     return null;
   }
   return Object.fromEntries(Object.entries(input));
+}
+
+function unknownArray(input: unknown): readonly unknown[] {
+  if (!Array.isArray(input)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(input.map((item: unknown) => item));
 }
 
 function optionalString(input: unknown): string | null {
@@ -899,6 +913,9 @@ function normalizeRegisterCandidate(input: unknown): unknown {
     kind: record["kind"],
     registerVersion: record["registerVersion"],
     targetAssetType: record["targetAssetType"],
+    stackProfileRows: unknownArray(record["stackProfileRows"]),
+    implementationModuleRows: unknownArray(record["implementationModuleRows"]),
+    aggregateDomainModelRows: unknownArray(record["aggregateDomainModelRows"]),
     moduleSchemaFragments: normalizedSchemas,
     moduleStateDiagramFragments: Array.isArray(record["moduleStateDiagramFragments"])
       ? Object.freeze(
@@ -913,12 +930,105 @@ function normalizeRegisterCandidate(input: unknown): unknown {
     aggregateDomainModel: normalizeAggregateDomainModelCandidate(
       record["aggregateDomainModel"] ?? null
     ),
+    sunnyDaySequenceRows: unknownArray(record["sunnyDaySequenceRows"]),
     aggregateSunnyDaySequence: normalizeSunnyDaySequenceCandidate(
       record["aggregateSunnyDaySequence"] ?? null
     ),
+    componentTopologyRows: unknownArray(record["componentTopologyRows"]),
+    componentRealizationRows: unknownArray(record["componentRealizationRows"]),
+    fileTargetRows: unknownArray(record["fileTargetRows"]),
     designCompletenessVerdict: normalizeCompletenessVerdictCandidate(
       record["designCompletenessVerdict"] ?? null
     )
+  });
+}
+
+function parseStackProfileRow(
+  input: unknown,
+  label: string
+): SdlcImplementationStackProfileRow {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "stackRef",
+    "language",
+    "buildTool"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_stack_profile_row") {
+    throw new TypeError(`${label}.kind: unexpected stack profile row kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_stack_profile_row" as const,
+    stackRef: parseNonEmptyString(record["stackRef"], `${label}.stackRef`),
+    language: parseNonEmptyString(record["language"], `${label}.language`),
+    buildTool: parseNonEmptyString(record["buildTool"], `${label}.buildTool`)
+  });
+}
+
+function parseImplementationModuleRow(
+  input: unknown,
+  label: string
+): SdlcImplementationModuleRow {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "moduleName",
+    "moduleRef"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_implementation_module_row") {
+    throw new TypeError(`${label}.kind: unexpected implementation module row kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_implementation_module_row" as const,
+    moduleName: parseNonEmptyString(record["moduleName"], `${label}.moduleName`),
+    moduleRef: parseNonEmptyString(record["moduleRef"], `${label}.moduleRef`)
+  });
+}
+
+function parseAggregateDomainModelRow(
+  input: unknown,
+  label: string
+): SdlcAggregateDomainModelRow {
+  const record = parseClosedRecord(input, label, ["kind", "modelRef"]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_aggregate_domain_model_row") {
+    throw new TypeError(`${label}.kind: unexpected aggregate domain model row kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_aggregate_domain_model_row" as const,
+    modelRef: parseNonEmptyString(record["modelRef"], `${label}.modelRef`)
+  });
+}
+
+function parseSunnyDaySequenceRow(
+  input: unknown,
+  label: string
+): SdlcSunnyDaySequenceRow {
+  const record = parseClosedRecord(input, label, ["kind", "sequenceRef"]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_sunny_day_sequence_row") {
+    throw new TypeError(`${label}.kind: unexpected sunny-day sequence row kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_sunny_day_sequence_row" as const,
+    sequenceRef: parseNonEmptyString(record["sequenceRef"], `${label}.sequenceRef`)
+  });
+}
+
+function parseFileTargetRow(input: unknown, label: string): SdlcFileTargetRow {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "relativePath",
+    "role"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_file_target_row") {
+    throw new TypeError(`${label}.kind: unexpected file target row kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_file_target_row" as const,
+    relativePath: parseNonEmptyString(record["relativePath"], `${label}.relativePath`),
+    role: parseNonEmptyString(record["role"], `${label}.role`)
   });
 }
 
@@ -1312,10 +1422,17 @@ function parseRegister(input: unknown, label: string): SdlcDesignDepthRegister {
     "kind",
     "registerVersion",
     "targetAssetType",
+    "stackProfileRows",
+    "implementationModuleRows",
+    "aggregateDomainModelRows",
     "moduleSchemaFragments",
     "moduleStateDiagramFragments",
     "aggregateDomainModel",
+    "sunnyDaySequenceRows",
     "aggregateSunnyDaySequence",
+    "componentTopologyRows",
+    "componentRealizationRows",
+    "fileTargetRows",
     "designCompletenessVerdict"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
@@ -1333,6 +1450,21 @@ function parseRegister(input: unknown, label: string): SdlcDesignDepthRegister {
     kind: "sdlc_design_depth_register" as const,
     registerVersion: "ts-design-depth-v1" as const,
     targetAssetType: parseNonEmptyString(record["targetAssetType"], `${label}.targetAssetType`),
+    stackProfileRows: parseArray(
+      record["stackProfileRows"],
+      `${label}.stackProfileRows`,
+      parseStackProfileRow
+    ),
+    implementationModuleRows: parseArray(
+      record["implementationModuleRows"],
+      `${label}.implementationModuleRows`,
+      parseImplementationModuleRow
+    ),
+    aggregateDomainModelRows: parseArray(
+      record["aggregateDomainModelRows"],
+      `${label}.aggregateDomainModelRows`,
+      parseAggregateDomainModelRow
+    ),
     moduleSchemaFragments: parseArray(
       record["moduleSchemaFragments"],
       `${label}.moduleSchemaFragments`,
@@ -1347,9 +1479,29 @@ function parseRegister(input: unknown, label: string): SdlcDesignDepthRegister {
       record["aggregateDomainModel"],
       `${label}.aggregateDomainModel`
     ),
+    sunnyDaySequenceRows: parseArray(
+      record["sunnyDaySequenceRows"],
+      `${label}.sunnyDaySequenceRows`,
+      parseSunnyDaySequenceRow
+    ),
     aggregateSunnyDaySequence: parseSunnyDaySequence(
       record["aggregateSunnyDaySequence"],
       `${label}.aggregateSunnyDaySequence`
+    ),
+    componentTopologyRows: parseArray(
+      record["componentTopologyRows"],
+      `${label}.componentTopologyRows`,
+      parseComponentTopologyRow
+    ),
+    componentRealizationRows: parseArray(
+      record["componentRealizationRows"],
+      `${label}.componentRealizationRows`,
+      parseComponentRealizationRow
+    ),
+    fileTargetRows: parseArray(
+      record["fileTargetRows"],
+      `${label}.fileTargetRows`,
+      parseFileTargetRow
     ),
     designCompletenessVerdict: parseCompletenessVerdict(
       record["designCompletenessVerdict"],
@@ -1375,6 +1527,9 @@ function normalizeCandidate(input: unknown): unknown {
   }
   if (record["designDepthRegister"] !== undefined) {
     return normalizeRegisterCandidate(record["designDepthRegister"]);
+  }
+  if (record["payload"] !== undefined) {
+    return normalizeRegisterCandidate(record["payload"]);
   }
   return input;
 }
@@ -1450,48 +1605,6 @@ function writeDesignDepthCandidateEvidence(input: {
   return Object.freeze([pathToFileURL(rawPath).href, pathToFileURL(normalizedPath).href]);
 }
 
-function requiredContentPresent(input: {
-  readonly targetAssetType: DesignDepthTarget;
-  readonly register: SdlcDesignDepthRegister;
-}): readonly string[] {
-  switch (input.targetAssetType) {
-    case "implementation_module_surface":
-      return Object.freeze([
-        ...(input.register.moduleSchemaFragments.length > 0
-          ? []
-          : ["design_depth_module_schema_fragments_missing"]),
-        ...(input.register.moduleStateDiagramFragments.length > 0
-          ? []
-          : ["design_depth_module_state_diagram_fragments_missing"])
-      ]);
-    case "aggregate_domain_model_surface":
-      return Object.freeze([
-        ...(input.register.aggregateDomainModel === null
-          ? ["design_depth_aggregate_domain_model_missing"]
-          : []),
-        ...(input.register.designCompletenessVerdict === null
-          ? ["design_depth_completeness_verdict_missing"]
-          : [])
-      ]);
-    case "aggregate_sunny_day_sequence_surface":
-      return Object.freeze([
-        ...(input.register.aggregateDomainModel === null
-          ? ["design_depth_aggregate_domain_model_missing"]
-          : []),
-        ...(input.register.aggregateSunnyDaySequence === null
-          ? ["design_depth_aggregate_sunny_day_sequence_missing"]
-          : []),
-        ...(input.register.designCompletenessVerdict === null
-          ? ["design_depth_completeness_verdict_missing"]
-          : [])
-      ]);
-    default: {
-      const exhaustive: never = input.targetAssetType;
-      throw new TypeError(`Unsupported design-depth target ${exhaustive}`);
-    }
-  }
-}
-
 export function admitDesignDepthRegisterFromArtifact(input: {
   readonly targetAssetType: string;
   readonly outputFile: string;
@@ -1540,20 +1653,6 @@ export function admitDesignDepthRegisterFromArtifact(input: {
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(`design_depth_register_target_mismatch:${register.targetAssetType}`);
         continue;
-      }
-      const rowReasons = requiredContentPresent({
-        targetAssetType: input.targetAssetType,
-        register
-      });
-      if (rowReasons.length > 0) {
-        return Object.freeze({
-          kind: "sdlc_design_depth_register_admission" as const,
-          status: "partial" as const,
-          targetAssetType: input.targetAssetType,
-          register,
-          blockingReasons: rowReasons,
-          evidenceRefs: currentEvidenceRefs
-        });
       }
       return Object.freeze({
         kind: "sdlc_design_depth_register_admission" as const,

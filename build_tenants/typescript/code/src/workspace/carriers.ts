@@ -10,6 +10,7 @@ import {
   type IngressSourceSet,
   type ProjectIngressContract
 } from "../graph/library.js";
+import type { SdlcProfileOverlayStrategy } from "../shared/overlay_strategy.js";
 
 export const SDLC_SOURCE_INPUT_ROLE_VALUES = Object.freeze([
   "intent_surface",
@@ -102,6 +103,8 @@ export interface SdlcConformProjectProfile {
   readonly capabilityContracts: readonly SdlcCapabilityContract[];
   readonly rootCodePolicy: string;
   readonly realizationMode: SdlcRealizationMode;
+  readonly overlayStrategy: SdlcProfileOverlayStrategy;
+  readonly overlayRef: string;
   readonly resolutionReason: string;
   readonly sourceConstraintDigest: string;
 }

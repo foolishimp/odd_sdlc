@@ -617,11 +617,11 @@ test("T-141 installed runner closes authority induction and selects next materia
   );
   assert.equal(
     outcome.traversalConsequence.nextActionProjection.nextGraphFunctionRef,
-    "derive_feature_decomp_surface"
+    "derive_uat_testcases_surface"
   );
   assert.match(
     outcome.traversalConsequence.nextActionProjection.nextGraphVectorRef ?? "",
-    /derive_feature_decomp_surface/u
+    /derive_uat_testcases_surface/u
   );
   assert.match(
     outcome.traversalConsequence.nextActionProjection.selectedActionRef ?? "",

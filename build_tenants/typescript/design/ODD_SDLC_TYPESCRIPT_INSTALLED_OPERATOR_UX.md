@@ -234,7 +234,7 @@ process/protocol or declared-artifact progress remains a typed runtime concern.
 
 ## Product Materialization Law
 
-`code_surface` and `test_module_surface` are not satisfied by a markdown
+`code_surface` and `component_test_surface` are not satisfied by a markdown
 summary alone. Their handoff manifest carries a
 `SdlcConformProjectProfile` and a `SdlcProductMaterializationContract` derived
 from that profile:

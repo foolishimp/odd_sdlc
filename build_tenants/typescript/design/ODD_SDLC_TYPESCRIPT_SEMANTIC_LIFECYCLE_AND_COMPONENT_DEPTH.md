@@ -86,13 +86,13 @@ test class ids, testcase ids, component ids, and requirement ids.
 Release depth parity closes only when `releaseDepthParity.status` is `met`.
 `blocked` produces repair pressure. `repriced` produces design reframe pressure.
 
-## Legacy Surface Repricing
+## Composite Surface Authority
 
-`code_surface` remains a compatibility/rollup surface. It cannot be the only
-implementation authority once `component_code_surface` exists in the traversal.
+`code_surface` is the aggregate governed code surface. `component_code_surface`
+is the materialized component implementation boundary.
 
-`test_module_surface` remains a compatibility/rollup surface. It cannot be the
-only test authority once `component_test_surface` exists in the traversal.
+`test_design_surface` is the composite test-plan authority. `component_test_surface`
+is the materialized component-test boundary.
 
 `worker_result_report.json` remains a framework-generated read model. It does
 not own closure. The authoritative path is:

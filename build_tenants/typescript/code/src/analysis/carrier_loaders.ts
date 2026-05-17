@@ -60,6 +60,15 @@ export interface EdgeFulfillmentLedgerRecord {
     readonly missing?: number;
     readonly extra?: number;
   };
+  readonly targetCarrierAdmissionStatus?: string;
+  readonly targetCarrierAdmissionRef?: string | null;
+  readonly edgeResidualPressureRefs?: readonly string[];
+}
+
+export interface EdgeGainRecord {
+  readonly kind: "sdlc_edge_gain";
+  readonly residualPressureRefs?: readonly string[];
+  readonly evidenceRefs?: readonly string[];
 }
 
 export interface NextActionProjectionRecord {
@@ -145,6 +154,26 @@ export interface WorkerResultReportRecord {
   readonly outputFile?: string;
   readonly obligationAssessments?: readonly unknown[];
   readonly unresolvedReasons?: readonly unknown[];
+  readonly executionEvidence?: {
+    readonly status?: string;
+    readonly reportRefs?: readonly string[];
+    readonly testsObserved?: number | null;
+    readonly passedCount?: number | null;
+    readonly failedCount?: number | null;
+  } | null;
+}
+
+export interface WorkerConstructionBriefRecord {
+  readonly kind: "sdlc_worker_construction_brief";
+  readonly canonicalPromptCarrierPath?: string;
+  readonly promptSourcePolicyRef?: string;
+  readonly packageDigest?: string;
+  readonly packageDispositions?: readonly {
+    readonly packageName?: string;
+    readonly path?: string;
+    readonly digest?: string;
+    readonly disposition?: string;
+  }[];
 }
 
 export interface OperatorRunCarriers {
@@ -154,6 +183,7 @@ export interface OperatorRunCarriers {
   readonly postflight: LoadedJson<PostflightRecord>;
   readonly edgeClosure: LoadedJson<EdgeClosureDecisionRecord>;
   readonly edgeFulfillmentLedger: LoadedJson<EdgeFulfillmentLedgerRecord>;
+  readonly edgeGain: LoadedJson<EdgeGainRecord>;
   readonly nextActionProjection: LoadedJson<NextActionProjectionRecord>;
   readonly productManifest: LoadedJson<ProductMaterializationManifestRecord>;
   readonly handoffManifest: LoadedJson<HandoffManifestRecord>;
@@ -162,6 +192,7 @@ export interface OperatorRunCarriers {
   readonly workerProcessEvents: LoadedJsonl<WorkerProcessEventRecord>;
   readonly runtimeEvents: LoadedJson<RuntimeEventsArchiveRecord>;
   readonly workerResultReport: LoadedJson<WorkerResultReportRecord>;
+  readonly workerConstructionBrief: LoadedJson<WorkerConstructionBriefRecord>;
   readonly runPerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly edgePerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly fileSizes: OperatorRunFileSizes;
@@ -177,6 +208,7 @@ export interface OperatorRunFileSizes {
   readonly workerProcessEvents: number;
   readonly runtimeEvents: number;
   readonly workerResultReport: number;
+  readonly workerConstructionBrief: number;
   readonly productMaterializationManifest: number;
   readonly fpTransformRequest: number;
   readonly fpTransformResult: number;
@@ -186,6 +218,8 @@ export interface OperatorRunFileSizes {
   readonly sdlcWorksiteEvidence: number;
   readonly sdlcEdgeClosureDecision: number;
   readonly sdlcEdgeFulfillmentLedger: number;
+  readonly sdlcEdgeGain: number;
+  readonly sdlcEdgeResidualPressure: number;
   readonly sdlcNextActionProjection: number;
 }
 
@@ -238,6 +272,9 @@ const EDGE_CLOSURE_GUARD: (value: unknown) => value is EdgeClosureDecisionRecord
 const EDGE_FULFILLMENT_GUARD: (value: unknown) => value is EdgeFulfillmentLedgerRecord =
   guardKind<EdgeFulfillmentLedgerRecord>("sdlc_edge_fulfillment_ledger");
 
+const EDGE_GAIN_GUARD: (value: unknown) => value is EdgeGainRecord =
+  guardKind<EdgeGainRecord>("sdlc_edge_gain");
+
 const NEXT_ACTION_GUARD: (value: unknown) => value is NextActionProjectionRecord =
   guardKind<NextActionProjectionRecord>("sdlc_next_action_projection");
 
@@ -252,6 +289,9 @@ const RUNTIME_EVENTS_GUARD: (value: unknown) => value is RuntimeEventsArchiveRec
 
 const WORKER_RESULT_REPORT_GUARD: (value: unknown) => value is WorkerResultReportRecord =
   guardKind<WorkerResultReportRecord>("odd_sdlc.worker_result_report");
+
+const WORKER_CONSTRUCTION_BRIEF_GUARD: (value: unknown) => value is WorkerConstructionBriefRecord =
+  guardKind<WorkerConstructionBriefRecord>("sdlc_worker_construction_brief");
 
 const PERF_SUMMARY_GUARD: (value: unknown) => value is RunPerformanceSummaryRecord =
   guardKinds<RunPerformanceSummaryRecord>([
@@ -272,6 +312,7 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     workerProcessEvents: sizeOf("worker_process_events.jsonl"),
     runtimeEvents: sizeOf("runtime_events.json"),
     workerResultReport: sizeOf("worker_result_report.json"),
+    workerConstructionBrief: sizeOf("worker_construction_brief.json"),
     productMaterializationManifest: sizeOf("product_materialization_manifest.json"),
     fpTransformRequest: sizeOf("fp_transform_request.json"),
     fpTransformResult: sizeOf("fp_transform_result.json"),
@@ -281,6 +322,8 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     sdlcWorksiteEvidence: sizeOf("sdlc_worksite_evidence.json"),
     sdlcEdgeClosureDecision: sizeOf("sdlc_edge_closure_decision.json"),
     sdlcEdgeFulfillmentLedger: sizeOf("sdlc_edge_fulfillment_ledger.json"),
+    sdlcEdgeGain: sizeOf("sdlc_edge_gain.json"),
+    sdlcEdgeResidualPressure: sizeOf("sdlc_edge_residual_pressure.json"),
     sdlcNextActionProjection: sizeOf("sdlc_next_action_projection.json")
   });
   return Object.freeze({
@@ -304,6 +347,10 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     edgeFulfillmentLedger: loadJsonFile<EdgeFulfillmentLedgerRecord>(
       path.join(operatorRunRoot, "sdlc_edge_fulfillment_ledger.json"),
       EDGE_FULFILLMENT_GUARD
+    ),
+    edgeGain: loadJsonFile<EdgeGainRecord>(
+      path.join(operatorRunRoot, "sdlc_edge_gain.json"),
+      EDGE_GAIN_GUARD
     ),
     nextActionProjection: loadJsonFile<NextActionProjectionRecord>(
       path.join(operatorRunRoot, "sdlc_next_action_projection.json"),
@@ -336,6 +383,10 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     workerResultReport: loadJsonFile<WorkerResultReportRecord>(
       path.join(operatorRunRoot, "worker_result_report.json"),
       WORKER_RESULT_REPORT_GUARD
+    ),
+    workerConstructionBrief: loadJsonFile<WorkerConstructionBriefRecord>(
+      path.join(operatorRunRoot, "worker_construction_brief.json"),
+      WORKER_CONSTRUCTION_BRIEF_GUARD
     ),
     runPerformanceSummary: loadJsonFile<RunPerformanceSummaryRecord>(
       path.join(operatorRunRoot, "run_performance_summary.json"),

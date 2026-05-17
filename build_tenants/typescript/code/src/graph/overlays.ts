@@ -6,20 +6,17 @@ import {
 } from "@abiogenesis/typescript-tenant";
 import { parseNonEmptyString } from "../shared/validation.js";
 import {
-  BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   OPERATIONAL_FUNCTION_CATALOG,
+  OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
-  FG_UAT_TEST_CASES_EXECUTIVE,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
 import {
-  FG_CONFORM_PROJECT,
-  FG_CONFORM_PROJECT_AUTHORITY
+  FG_CONFORM_PROJECT
 } from "./library.js";
 import {
   sdlcGraphFunctionBoundaryRef,
@@ -29,8 +26,18 @@ import {
   assertSdlcEdgeGainClosureMatrix,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
 } from "./edge_gain_closure_contracts.js";
+import {
+  normalizeSdlcTraversalOverlayRef,
+  sdlcTraversalOverlayRefForStrategy,
+  SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+  SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
+  SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
+  type SdlcTraversalOverlayRef
+} from "../shared/overlay_strategy.js";
 
-export type SdlcTraversalOverlayRef = `overlay://odd-sdlc/${string}`;
 export type SdlcOverlayBindingRef = `overlay-binding://odd-sdlc/${string}`;
 export type SdlcOverlayPolicyRef = `policy://odd-sdlc/overlay/${string}`;
 export type SdlcGraphCatalogDigestRef = `graph-catalog-digest://odd-sdlc/${string}`;
@@ -41,23 +48,16 @@ export type SdlcOverlayStopDisposition =
   | "blocked";
 export type SdlcOverlayAssetBindingMode = "material" | "planned_from_template";
 
-export const SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF =
-  "overlay://odd-sdlc/current-full-traversal" as const;
-export const SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF =
-  "overlay://odd-sdlc/lite-design-module-implementation" as const;
-export const SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF =
-  "overlay://odd-sdlc/solution-architecture" as const;
-export const SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF =
-  "overlay://odd-sdlc/bootstrap-requirements" as const;
-export const SDLC_UAT_TEST_CASES_OVERLAY_REF =
-  "overlay://odd-sdlc/uat-test-cases" as const;
-
-export const SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF =
-  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF;
-
-function isSdlcTraversalOverlayRef(value: string): value is SdlcTraversalOverlayRef {
-  return value.startsWith("overlay://odd-sdlc/") && value.length > "overlay://odd-sdlc/".length;
-}
+export {
+  SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
+  SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
+  SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
+  sdlcTraversalOverlayRefForStrategy
+} from "../shared/overlay_strategy.js";
+export type { SdlcTraversalOverlayRef } from "../shared/overlay_strategy.js";
 
 function isSdlcOverlayPolicyRef(value: string): value is SdlcOverlayPolicyRef {
   return value.startsWith("policy://odd-sdlc/overlay/") &&
@@ -67,16 +67,6 @@ function isSdlcOverlayPolicyRef(value: string): value is SdlcOverlayPolicyRef {
 function isSdlcOverlayBindingRef(value: string): value is SdlcOverlayBindingRef {
   return value.startsWith("overlay-binding://odd-sdlc/") &&
     value.length > "overlay-binding://odd-sdlc/".length;
-}
-
-function admitSdlcTraversalOverlayRef(
-  value: string,
-  label: string
-): SdlcTraversalOverlayRef {
-  if (!isSdlcTraversalOverlayRef(value)) {
-    throw new TypeError(`${label}: expected overlay://odd-sdlc/... ref`);
-  }
-  return value;
 }
 
 function admitSdlcOverlayPolicyRef(
@@ -169,6 +159,18 @@ export interface SdlcTraversalOverlayCatalog {
   readonly catalogDigestRef: SdlcGraphCatalogDigestRef;
   readonly graphCatalogDigestRef: SdlcGraphCatalogDigestRef;
   readonly overlays: readonly SdlcTraversalOverlay[];
+}
+
+export interface SdlcTraversalOverlayGraphContinuation {
+  readonly kind: "sdlc_traversal_overlay_graph_continuation";
+  readonly overlayRef: SdlcTraversalOverlayRef;
+  readonly terminalGraphFunctionRef: string;
+  readonly completedGraphFunctionRef: string;
+  readonly completedGraphVectorRef: string;
+  readonly nextGraphFunctionRef: string;
+  readonly nextGraphVectorRef: string;
+  readonly targetNodeRef: string;
+  readonly sequenceIndex: number;
 }
 
 export interface SdlcOverlayBinding {
@@ -312,16 +314,14 @@ function uniqueNames(names: readonly string[]): readonly string[] {
 function overlayDefinitions(): readonly OverlayDefinition[] {
   const currentFullGraphFunctionNames = uniqueNames([
     FG_CONFORM_PROJECT,
-    FG_CONFORM_PROJECT_AUTHORITY,
     "bootstrap_release_self_test",
     "release_operational_cycle",
-    ...catalogFunctionNames(BOOTSTRAP_RELEASE_FUNCTION_CATALOG),
+    ...OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
     ...catalogFunctionNames(OPERATIONAL_FUNCTION_CATALOG)
   ]);
   const liteGraphFunctionNames = Object.freeze([
     FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-    FG_DERIVE_LITE_MODULE_SURFACE,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   ]);
   return [
@@ -332,14 +332,14 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
         "overlay://odd-sdlc/operational-cycle"
       ] as const),
       name: "current_full_traversal",
-      intent: "Compatibility baseline over the current full traversal path.",
+      intent: "Current full traversal over the consolidated SDLC graph spine.",
       graphFunctionNames: currentFullGraphFunctionNames,
       publicStartTargets: Object.freeze([
-        FG_CONFORM_PROJECT_AUTHORITY,
+        "derive_intent_surface",
         "bootstrap_release_self_test",
         "release_operational_cycle"
       ]),
-      defaultStartTarget: FG_CONFORM_PROJECT_AUTHORITY,
+      defaultStartTarget: "derive_intent_surface",
       terminalAssetTypes: Object.freeze(["release_surface", "retrofit_plan_surface"]),
       terminalGraphFunctionNames: Object.freeze([
         "bootstrap_release_self_test",
@@ -364,7 +364,7 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
     {
       overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       name: "lite_design_module_implementation",
-      intent: "Small software-change traversal from implementation design through module authority to product materialization.",
+      intent: "Small software-change traversal from composite implementation design to product materialization.",
       graphFunctionNames: liteGraphFunctionNames,
       publicStartTargets: Object.freeze([
         FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
@@ -410,7 +410,6 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
       predecessorOverlayRefs: Object.freeze([SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF]),
       nextEligibleOverlayRefs: Object.freeze([
         SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
-        SDLC_UAT_TEST_CASES_OVERLAY_REF,
         SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
       ])
     },
@@ -437,33 +436,8 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
       ]),
       nextEligibleOverlayRefs: Object.freeze([
         SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
-        SDLC_UAT_TEST_CASES_OVERLAY_REF,
         SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
       ])
-    },
-    {
-      overlayRef: SDLC_UAT_TEST_CASES_OVERLAY_REF,
-      name: "uat_test_cases",
-      intent: "UAT test-case traversal over requirements and admitted solution architecture authority.",
-      graphFunctionNames: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
-      publicStartTargets: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
-      defaultStartTarget: FG_UAT_TEST_CASES_EXECUTIVE,
-      terminalAssetTypes: Object.freeze(["uat_testcases_surface"]),
-      terminalGraphFunctionNames: Object.freeze([FG_UAT_TEST_CASES_EXECUTIVE]),
-      lawfulStopDispositions: Object.freeze(["overlay_segment_complete", "blocked"]),
-      assetTemplates: Object.freeze([
-        {
-          assetType: "uat_testcases_surface",
-          defaultPath: "design/uat_testcases_surface.md",
-          producerGraphFunctionName: FG_UAT_TEST_CASES_EXECUTIVE,
-          terminalRole: "terminal_asset"
-        }
-      ]),
-      predecessorOverlayRefs: Object.freeze([
-        SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
-        SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF
-      ]),
-      nextEligibleOverlayRefs: Object.freeze([SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF])
     }
   ] as const satisfies readonly OverlayDefinition[];
 }
@@ -629,10 +603,13 @@ export function constructSdlcTraversalOverlayCatalog(input: {
 
 function normalizeOverlayRef(value: string): SdlcTraversalOverlayRef {
   const raw = parseNonEmptyString(value, "overlayRef");
-  return admitSdlcTraversalOverlayRef(
-    raw.startsWith("overlay://odd-sdlc/") ? raw : `overlay://odd-sdlc/${raw}`,
-    "overlayRef"
+  const strategy = SDLC_PROFILE_OVERLAY_STRATEGY_VALUES.find(
+    (candidate) => candidate === raw
   );
+  if (strategy !== undefined) {
+    return sdlcTraversalOverlayRefForStrategy(strategy);
+  }
+  return normalizeSdlcTraversalOverlayRef(raw, "overlayRef");
 }
 
 export function resolveSdlcTraversalOverlay(input: {
@@ -659,6 +636,102 @@ export function sdlcTraversalOverlayForGraphFunction(input: {
     throw new TypeError("SdlcTraversalOverlayCatalog requires at least one overlay");
   }
   return overlay;
+}
+
+export function sdlcTraversalOverlayAllowsProductConvergence(input: {
+  readonly overlay: SdlcTraversalOverlay;
+  readonly completedGraphFunctionRef: string;
+  readonly module?: Module | undefined;
+}): boolean {
+  if (
+    !input.overlay.termination.lawfulStopDispositions.includes(
+      "product_converged"
+    ) ||
+    input.overlay.termination.nextEligibleOverlayRefs.length !== 0
+  ) {
+    return false;
+  }
+  if (
+    input.overlay.termination.terminalGraphFunctionRefs.includes(
+      input.completedGraphFunctionRef
+    )
+  ) {
+    return true;
+  }
+  if (input.module === undefined) {
+    return false;
+  }
+  const byName = graphFunctionByName(input.module);
+  for (const terminalGraphFunctionRef of
+    input.overlay.termination.terminalGraphFunctionRefs) {
+    const graphFunction = byName.get(terminalGraphFunctionRef);
+    if (graphFunction === undefined) {
+      continue;
+    }
+    const vectors = materializeGraphFunction(graphFunction).vectors;
+    const terminalVector = vectors[vectors.length - 1];
+    if (
+      terminalVector !== undefined &&
+      sdlcGraphVectorBoundaryRef(terminalVector) === input.completedGraphFunctionRef
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function sdlcTraversalOverlayNextGraphContinuation(input: {
+  readonly module: Module;
+  readonly overlay: SdlcTraversalOverlay;
+  readonly completedGraphFunctionRef: string;
+}): SdlcTraversalOverlayGraphContinuation | null {
+  const byName = graphFunctionByName(input.module);
+  for (const terminalGraphFunctionRef of
+    input.overlay.termination.terminalGraphFunctionRefs) {
+    const graphFunction = byName.get(terminalGraphFunctionRef);
+    if (graphFunction === undefined) {
+      continue;
+    }
+    const vectors = materializeGraphFunction(graphFunction).vectors;
+    const completedIndex = vectors.findIndex(
+      (vector) =>
+        vector.name === input.completedGraphFunctionRef ||
+        sdlcGraphVectorBoundaryRef(vector) === input.completedGraphFunctionRef
+    );
+    if (completedIndex < 0) {
+      continue;
+    }
+    const completedVector = vectors[completedIndex];
+    const nextVector = vectors[completedIndex + 1];
+    if (completedVector === undefined || nextVector === undefined) {
+      return null;
+    }
+    const nextGraphFunction = byName.get(nextVector.name);
+    if (nextGraphFunction === undefined) {
+      return null;
+    }
+    const nextGraphFunctionRef = sdlcGraphFunctionBoundaryRef(nextGraphFunction);
+    const nextGraph = materializeGraphFunction(nextGraphFunction);
+    const nextGraphVector =
+      nextGraph.vectors.find(
+        (vector) => sdlcGraphVectorBoundaryRef(vector) === nextVector.name
+      ) ?? nextGraph.vectors[0];
+    if (nextGraphVector === undefined) {
+      return null;
+    }
+    return Object.freeze({
+      kind: "sdlc_traversal_overlay_graph_continuation" as const,
+      overlayRef: input.overlay.overlayRef,
+      terminalGraphFunctionRef,
+      completedGraphFunctionRef: input.completedGraphFunctionRef,
+      completedGraphVectorRef: sdlcGraphVectorBoundaryRef(completedVector),
+      nextGraphFunctionRef,
+      nextGraphVectorRef: sdlcGraphVectorBoundaryRef(nextGraphVector),
+      targetNodeRef: nextGraphVector.target.id,
+      sequenceIndex: completedIndex + 1
+    });
+  }
+  return null;
 }
 
 export function publicSdlcOverlayStartTargets(input: {

@@ -329,11 +329,142 @@ function designVerdict(overrides = {}) {
   };
 }
 
+function implementationDesignRows(overrides = {}) {
+  return {
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://b086/scala",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-compiler",
+        moduleRef: "module://cdme-compiler"
+      }
+    ],
+    aggregateDomainModelRows: [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://b086/aggregate"
+      }
+    ],
+    sunnyDaySequenceRows: [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://b086/sunny-day"
+      }
+    ],
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "component://compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "src/main/scala/example/Compiler.scala",
+        publicBoundary: "public",
+        concernRole: "parser",
+        requirementIds: ["REQ-B086-001"],
+        sourceAssetRefs: ["fixture://b086/component-topology"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "component://compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "src/main/scala/example/Compiler.scala",
+        publicBoundary: "public",
+        trancheId: "tranche://b086/1",
+        firstProductFileToChange: "src/main/scala/example/Compiler.scala",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-B086-001"],
+        sourceAssetRefs: ["fixture://b086/component-realization"]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: "src/main/scala/example/Compiler.scala",
+        role: "source"
+      }
+    ],
+    ...overrides
+  };
+}
+
+function aggregateDomainModelFixture(overrides = {}) {
+  return {
+    kind: "sdlc_aggregate_domain_model",
+    modelVersion: "ts-design-depth-v1",
+    entities: [
+      {
+        kind: "sdlc_aggregate_domain_entity",
+        entityId: "entity:MappingSource",
+        ownerModuleName: "cdme-compiler",
+        attributes: [
+          {
+            kind: "sdlc_domain_attribute",
+            attributeId: "attr:MappingSource.designSurfaceRef",
+            name: "designSurfaceRef",
+            valueType: "ref:design_surface",
+            cardinality: "one",
+            invariantRefs: ["REQ-B086-001"]
+          }
+        ],
+        sourceModuleNames: ["cdme-compiler"]
+      }
+    ],
+    operations: [
+      {
+        kind: "sdlc_domain_operation",
+        operationId: "bindTypes",
+        moduleName: "cdme-compiler",
+        inputEntityIds: [],
+        outputEntityIds: ["entity:MappingSource"],
+        requiredAttributeIds: ["attr:MappingSource.designSurfaceRef"]
+      }
+    ],
+    crossModuleReferences: [
+      {
+        fromModuleName: "cdme-compiler",
+        toModuleName: "cdme-assurance",
+        entityId: "mapping-source"
+      }
+    ],
+    evidenceRefs: ["fixture://b086/aggregate"],
+    ...overrides
+  };
+}
+
+function sunnyDaySequenceFixture(overrides = {}) {
+  return {
+    kind: "sdlc_aggregate_sunny_day_sequence",
+    sequenceVersion: "ts-design-depth-v1",
+    steps: [
+      {
+        kind: "sdlc_sunny_day_sequence_step",
+        stepId: "step-01-bind-types",
+        moduleName: "cdme-compiler",
+        operationId: "operation:bindtypes",
+        inputEntityIds: [],
+        outputEntityIds: ["mapping-source"],
+        stateTransitionIds: []
+      }
+    ],
+    evidenceRefs: ["fixture://b086/sequence"],
+    ...overrides
+  };
+}
+
 function moduleSchemaRegister(overrides = {}) {
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
+    ...implementationDesignRows(),
     moduleSchemaFragments: [
       {
         kind: "sdlc_module_schema_fragment",
@@ -393,9 +524,9 @@ function moduleSchemaRegister(overrides = {}) {
         sourceAssetRefs: ["fixture://b086/state"]
       }
     ],
-    aggregateDomainModel: null,
-    aggregateSunnyDaySequence: null,
-    designCompletenessVerdict: null,
+    aggregateDomainModel: aggregateDomainModelFixture(),
+    aggregateSunnyDaySequence: sunnyDaySequenceFixture(),
+    designCompletenessVerdict: designVerdict(),
     ...overrides
   };
 }
@@ -404,65 +535,12 @@ function sunnyDayRegister(overrides = {}) {
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
-    aggregateDomainModel: {
-      kind: "sdlc_aggregate_domain_model",
-      modelVersion: "ts-design-depth-v1",
-      entities: [
-        {
-          kind: "sdlc_aggregate_domain_entity",
-          entityId: "entity:MappingSource",
-          ownerModuleName: "cdme-compiler",
-          attributes: [
-            {
-              kind: "sdlc_domain_attribute",
-              attributeId: "attr:MappingSource.designSurfaceRef",
-              name: "designSurfaceRef",
-              valueType: "ref:design_surface",
-              cardinality: "one",
-              invariantRefs: ["REQ-B086-001"]
-            }
-          ],
-          sourceModuleNames: ["cdme-compiler"]
-        }
-      ],
-      operations: [
-        {
-          kind: "sdlc_domain_operation",
-          operationId: "bindTypes",
-          moduleName: "cdme-compiler",
-          inputEntityIds: [],
-          outputEntityIds: ["entity:MappingSource"],
-          requiredAttributeIds: ["attr:MappingSource.designSurfaceRef"]
-        }
-      ],
-      crossModuleReferences: [
-        {
-          fromModuleName: "cdme-compiler",
-          toModuleName: "cdme-assurance",
-          entityId: "mapping-source"
-        }
-      ],
-      evidenceRefs: ["fixture://b086/aggregate"]
-    },
-    aggregateSunnyDaySequence: {
-      kind: "sdlc_aggregate_sunny_day_sequence",
-      sequenceVersion: "ts-design-depth-v1",
-      steps: [
-        {
-          kind: "sdlc_sunny_day_sequence_step",
-          stepId: "step-01-bind-types",
-          moduleName: "cdme-compiler",
-          operationId: "operation:bindtypes",
-          inputEntityIds: [],
-          outputEntityIds: ["mapping-source"],
-          stateTransitionIds: []
-        }
-      ],
-      evidenceRefs: ["fixture://b086/sequence"]
-    },
+    targetAssetType: "implementation_design_surface",
+    ...implementationDesignRows(),
+    moduleSchemaFragments: moduleSchemaRegister().moduleSchemaFragments,
+    moduleStateDiagramFragments: moduleSchemaRegister().moduleStateDiagramFragments,
+    aggregateDomainModel: aggregateDomainModelFixture(),
+    aggregateSunnyDaySequence: sunnyDaySequenceFixture(),
     designCompletenessVerdict: designVerdict(),
     ...overrides
   };
@@ -474,9 +552,9 @@ function featureScope(overrides = {}) {
     scopeVersion: "ts-scope-v1",
     mode: "steel_thread",
     scopeRef:
-      "scope://odd_sdlc/aggregate-sunny-day-sequence-surface/steel-thread/cdme-compiler",
+      "scope://odd_sdlc/implementation-design-surface/steel-thread/cdme-compiler",
     basisRefs: [
-      "strategy://odd_sdlc/derive_aggregate_sunny_day_sequence_surface/single_vertical_slice"
+      "strategy://odd_sdlc/derive_implementation_design_surface/full_breadth"
     ],
     includedModuleNames: ["cdme-compiler"],
     includedEntityIds: [],
@@ -666,11 +744,8 @@ test("B-086 component-depth exact protocol accepts canonical carrier and rejects
 
 test("B-086 component topology admits generic role and boundary aliases without tenant guesses", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_implementation_component_topology_surface");
-  writeComponentRegister(handoff, {
-    kind: "sdlc_component_depth_register",
-    registerVersion: "ts-component-depth-v1",
-    targetAssetType: "implementation_component_topology_surface",
+  const handoff = manifest(root, "derive_implementation_design_surface");
+  writeDesignRegister(handoff, moduleSchemaRegister({
     componentTopologyRows: [
       {
         componentId: "component://parser",
@@ -702,9 +777,9 @@ test("B-086 component topology admits generic role and boundary aliases without 
         sourceAssetRefs: ["fixture://b086/component-topology"]
       }
     ]
-  });
+  }));
 
-  const admitted = admitComponentDepthRegisterFromArtifact({
+  const admitted = admitDesignDepthRegisterFromArtifact({
     targetAssetType: handoff.targetAssetType,
     outputFile: handoff.outputFile
   });
@@ -718,10 +793,7 @@ test("B-086 component topology admits generic role and boundary aliases without 
     ["parser", "other", "reporting"]
   );
 
-  writeComponentRegister(handoff, {
-    kind: "sdlc_component_depth_register",
-    registerVersion: "ts-component-depth-v1",
-    targetAssetType: "implementation_component_topology_surface",
+  writeDesignRegister(handoff, moduleSchemaRegister({
     componentTopologyRows: [
       {
         kind: "sdlc_component_topology_row",
@@ -734,8 +806,8 @@ test("B-086 component topology admits generic role and boundary aliases without 
         sourceAssetRefs: ["fixture://b086/component-topology"]
       }
     ]
-  });
-  const rejected = admitComponentDepthRegisterFromArtifact({
+  }));
+  const rejected = admitDesignDepthRegisterFromArtifact({
     targetAssetType: handoff.targetAssetType,
     outputFile: handoff.outputFile
   });
@@ -1138,7 +1210,7 @@ test("B-086 accepted-carrier retry law is explicit and rejects unknown next acti
 
 test("B-086 design-depth admission accepts declared aliases and rejects missing hard identity", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_implementation_module_surface");
+  const handoff = manifest(root, "derive_implementation_design_surface");
   writeDesignRegister(
     handoff,
     moduleSchemaRegister({
@@ -1282,13 +1354,8 @@ test("B-086 design-depth admission accepts declared aliases and rejects missing 
 
 test("B-086 aggregate-domain admission normalizes redundant summaries and aggregate aliases", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_aggregate_domain_model_surface");
-  writeDesignRegister(handoff, {
-    kind: "sdlc_design_depth_register",
-    registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_domain_model_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
+  const handoff = manifest(root, "derive_implementation_design_surface");
+  writeDesignRegister(handoff, moduleSchemaRegister({
     aggregateDomainModel: {
       kind: "sdlc_aggregate_domain_model",
       ownerModuleNames: ["cdme-compiler"],
@@ -1348,7 +1415,6 @@ test("B-086 aggregate-domain admission normalizes redundant summaries and aggreg
       crossModuleReferences: [],
       evidenceRefs: ["fixture://b086/aggregate-alias"]
     },
-    aggregateSunnyDaySequence: null,
     designCompletenessVerdict: {
       kind: "sdlc_design_completeness_verdict",
       verdictVersion: "ts-design-completeness-v1",
@@ -1376,7 +1442,7 @@ test("B-086 aggregate-domain admission normalizes redundant summaries and aggreg
         }
       }
     }
-  });
+  }));
 
   const admitted = admitDesignDepthRegisterFromArtifact({
     targetAssetType: handoff.targetAssetType,
@@ -1416,7 +1482,7 @@ test("B-086 aggregate-domain admission normalizes redundant summaries and aggreg
 
 test("B-086 design completeness accepts allowed operation/entity aliases and rejects disambiguated mismatch", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_aggregate_sunny_day_sequence_surface");
+  const handoff = manifest(root, "derive_implementation_design_surface");
   writeDesignRegister(handoff, sunnyDayRegister());
   const admittedAlias = admitDesignDepthRegisterFromArtifact({
     targetAssetType: handoff.targetAssetType,
@@ -1488,7 +1554,7 @@ test("B-086 design completeness accepts allowed operation/entity aliases and rej
 
 test("B-086 aggregate sunny-day flow accepts graph-wide cross-module entity exchange", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_aggregate_sunny_day_sequence_surface");
+  const handoff = manifest(root, "derive_implementation_design_surface");
   const crossModuleRegister = (inputEntityIds) =>
     sunnyDayRegister({
       aggregateDomainModel: {
@@ -1605,7 +1671,7 @@ test("B-086 aggregate sunny-day flow accepts graph-wide cross-module entity exch
 
 test("B-086 worker-authored design completeness partial escalates to F_P instead of F_D failure", () => {
   const root = workspace();
-  const handoff = manifest(root, "derive_aggregate_sunny_day_sequence_surface");
+  const handoff = manifest(root, "derive_implementation_design_surface");
   writeDesignRegister(
     handoff,
     sunnyDayRegister({
@@ -1891,7 +1957,7 @@ test("B-086 traversal strategy and scope use ABG directives and do not invent mo
   assert.equal(fullBreadthDecision.selectedStrategy, "full_breadth");
 
   const boundScope = deriveSdlcFeatureScope({
-    targetAssetType: "aggregate_domain_model_surface",
+    targetAssetType: "implementation_design_surface",
     selectedStrategy: "steel_thread",
     strategyDirectiveRef: "strategy://odd_sdlc/steel-thread/cdme-compiler",
     selectedScheduleItemRefs: [],
@@ -1901,7 +1967,7 @@ test("B-086 traversal strategy and scope use ABG directives and do not invent mo
     materializedOperationIds: []
   });
   const unboundScope = deriveSdlcFeatureScope({
-    targetAssetType: "aggregate_domain_model_surface",
+    targetAssetType: "implementation_design_surface",
     selectedStrategy: "steel_thread",
     strategyDirectiveRef: "strategy://odd_sdlc/steel-thread/primary",
     selectedScheduleItemRefs: [],

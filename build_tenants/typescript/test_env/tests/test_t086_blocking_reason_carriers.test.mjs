@@ -18,6 +18,7 @@ import path from "node:path";
 import {
   admitSdlcBlockingReason,
   canonicalSdlcPriorGapReasonCode,
+  classifySdlcFdFailure,
   constructPostflightGapDossier,
   deriveWorkerHandoffManifest,
   evaluateWorkerResultPostflight,
@@ -137,6 +138,69 @@ test("T-086 blocking reason carrier admits closed typed legacy projection", () =
   assert.equal(legacy.reasonClass, "runtime_policy");
 });
 
+test("T-170 F_D failure severity separates protocol context diagnostics and content", () => {
+  const carrierMissing = makeSdlcBlockingReason({
+    code: "target_carrier_admission_missing",
+    evidenceRefs: ["carrier://missing"]
+  });
+  const staleTarget = makeSdlcBlockingReason({
+    code: "stale_query_domain",
+    evidenceRefs: ["query://stale"]
+  });
+  const failedExecution = makeSdlcBlockingReason({
+    code: "test_execution_not_succeeded",
+    evidenceRefs: ["execution://failed"]
+  });
+  const unconsumedShape = makeSdlcBlockingReason({
+    code: "worker_report_admission_failed",
+    detail: "optional_notes.unexpected",
+    evidenceRefs: ["register://diagnostic"]
+  });
+
+  assert.deepEqual(classifySdlcFdFailure({ reason: carrierMissing }), {
+    kind: "sdlc_fd_failure_classification",
+    severityClass: "protocol_invalid",
+    downstreamReadStatus: "not_applicable",
+    blocksAdmission: true,
+    blocksConstruction: false,
+    recordsResidualPressure: true,
+    routesToFpOrExecution: false
+  });
+  assert.deepEqual(classifySdlcFdFailure({ reason: staleTarget }), {
+    kind: "sdlc_fd_failure_classification",
+    severityClass: "construction_context_invalid",
+    downstreamReadStatus: "not_applicable",
+    blocksAdmission: false,
+    blocksConstruction: true,
+    recordsResidualPressure: true,
+    routesToFpOrExecution: false
+  });
+  assert.deepEqual(classifySdlcFdFailure({ reason: failedExecution }), {
+    kind: "sdlc_fd_failure_classification",
+    severityClass: "content_unproven",
+    downstreamReadStatus: "not_applicable",
+    blocksAdmission: false,
+    blocksConstruction: false,
+    recordsResidualPressure: true,
+    routesToFpOrExecution: true
+  });
+  assert.deepEqual(
+    classifySdlcFdFailure({
+      reason: unconsumedShape,
+      downstreamRead: false
+    }),
+    {
+      kind: "sdlc_fd_failure_classification",
+      severityClass: "diagnostic_shape_invalid",
+      downstreamReadStatus: "not_consumed_by_downstream",
+      blocksAdmission: false,
+      blocksConstruction: false,
+      recordsResidualPressure: true,
+      routesToFpOrExecution: false
+    }
+  );
+});
+
 test("T-086 legacy retry-frontier keys preserve execution shard detail", () => {
   const first = makeSdlcBlockingReason({
     code: "test_execution_shard_evidence_missing",
@@ -232,11 +296,11 @@ test("T-086/T-114 postflight classifies from typed truth, not report prose", () 
 
 test("B-086 postflight gap dossier preserves F_P escalation as lawful reentry", () => {
   const root = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_aggregate_domain_model_surface");
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: root,
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_aggregate_domain_model_surface",
+    edgeName: "derive_implementation_design_surface",
     vectorIndex: 0,
     contract
   });

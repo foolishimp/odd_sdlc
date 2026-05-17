@@ -1,6 +1,8 @@
 project:
   name: t132_hello_world_single_tenant
   kind: imported_workspace
+  overlay_strategy: full_lifecycle
+  overlay_ref: overlay://odd-sdlc/current-full-traversal
 active_tenant: hello_world_javascript
 selected_output_root: build_tenants/hello_world_javascript
 ambiguity_risk_appetite: low
@@ -15,5 +17,6 @@ build_tenants:
     language: JavaScript
     build_tool: node
     test_runner: node
+    test_execution_contract: node build_tenants/hello_world_javascript/src/hello.js
     module_structure:
       - hello_world_javascript

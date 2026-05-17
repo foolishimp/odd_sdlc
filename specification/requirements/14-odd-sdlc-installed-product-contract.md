@@ -318,23 +318,23 @@ Acceptance criteria:
   observed tests, missing report refs, or test failures block closure and
   produce replay-visible gap pressure
 
-### REQ-F-ODDSDLC-061 - test modules are discoverable by declared test contract
+### REQ-F-ODDSDLC-061 - component tests are discoverable by declared test contract
 
-`derive_test_module_surface` shall materialize test files that are discoverable
+`derive_component_test_surface` shall materialize test files that are discoverable
 by the conformed project's declared test execution contract, or block with a
 typed gap before the test-run archive edge.
 
 Acceptance criteria:
 
 - AC-1: when `conformedProject.testExecutionContract` is declared, generated
-  test modules are not sufficient unless the declared command can discover
+  component tests are not sufficient unless the declared command can discover
   them as tests
 - AC-2: for `sbt test`, standalone `main` objects are not closure evidence for
-  `test_module_surface`
+  `component_test_surface`
 - AC-3: when the selected tenant build configuration lacks a discoverable test
   framework binding, the worker must materialize or update build configuration
   and report it as `build_config`
-- AC-4: `test_module_surface` postflight blocks with a typed reason when
+- AC-4: `component_test_surface` postflight blocks with a typed reason when
   generated tests are not discoverable under the declared test execution
   contract
 - AC-5: blocking discoverability findings become replay-visible gap pressure

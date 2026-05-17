@@ -3,6 +3,7 @@
 import type {
   SdlcFdRunAnalysisActiveRunLiveness,
   SdlcFdRunAnalysisBloatAndSlope,
+  SdlcFdRunAnalysisConceptualStageCoverage,
   SdlcFdRunAnalysisCurrentStateTelemetry,
   SdlcFdRunAnalysisDiagnostic,
   SdlcFdRunAnalysisEdgeAttempt,
@@ -69,12 +70,50 @@ function renderEdgeTraversal(attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]):
   const lines: string[] = [
     "## Edge Traversal",
     "",
-    "| # | edge | target | worker_ms | edge_ms | det_ms | pf | closure | retry | blocking | files | obligations | lineage |",
-    "| - | - | - | - | - | - | - | - | - | - | - | - | - |"
+    "| # | edge | target | class | worker_ms | edge_ms | det_ms | pf | exec | pressure | closure | retry | blocking | files | obligations | lineage |",
+    "| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |"
   ];
   for (const attempt of attempts) {
     lines.push(
-      `| ${attempt.attemptOrdinal} | ${attempt.graphFunctionName ?? "n/a"} | ${attempt.targetAssetType ?? "n/a"} | ${formatMs(attempt.workerElapsedMs)} | ${formatMs(attempt.edgeWindowElapsedMs)} | ${formatMs(attempt.deterministicElapsedMs)} | ${attempt.postflightStatus ?? "n/a"} | ${attempt.closureDisposition ?? "n/a"} | ${attempt.predecessorAttemptRef === null ? "-" : "yes"} | ${attempt.blockingReasonCodes.join(",") || "-"} | ${attempt.productFilesWritten.length + attempt.productFilesReplayed.length} | ${attempt.requirementObligationCount ?? "n/a"} | ${attempt.productLineageCount} |`
+      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.targetAssetType ?? "n/a"} | ${attempt.traversalClass} | ${formatMs(attempt.workerElapsedMs)} | ${formatMs(attempt.edgeWindowElapsedMs)} | ${formatMs(attempt.deterministicElapsedMs)} | ${attempt.postflightStatus ?? "n/a"} | ${attempt.executionEvidenceStatus ?? "-"} | ${attempt.residualPressureTransition}:${attempt.residualPressureRefCount} | ${attempt.closureDisposition ?? "n/a"} | ${attempt.predecessorAttemptRef === null ? "-" : "yes"} | ${attempt.blockingReasonCodes.join(",") || "-"} | ${attempt.productFilesWritten.length + attempt.productFilesReplayed.length} | ${attempt.requirementObligationCount ?? "n/a"} | ${attempt.productLineageCount} |`
+    );
+  }
+  return lines.join("\n");
+}
+
+function renderPromptAndEvidence(attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]): string {
+  if (attempts.length === 0) {
+    return "## Prompt And Evidence Sources\n\nnone";
+  }
+  const lines: string[] = [
+    "## Prompt And Evidence Sources",
+    "",
+    "| # | edge | construction brief | brief digest | rendered prompt | prompt policy | execution reports |",
+    "| - | - | - | - | - | - | - |"
+  ];
+  for (const attempt of attempts) {
+    lines.push(
+      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.promptSourceCarrierRef ?? "-"} | ${attempt.promptSourceCarrierDigest ?? "-"} | ${attempt.promptRenderingRef ?? "-"} | ${attempt.promptSourcePolicyRef ?? "-"} | ${attempt.executionEvidenceReportCount} |`
+    );
+  }
+  return lines.join("\n");
+}
+
+function renderConceptualStageCoverage(
+  coverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[]
+): string {
+  if (coverage.length === 0) {
+    return "## Test35 Conceptual Stage Coverage\n\nnone";
+  }
+  const lines: string[] = [
+    "## Test35 Conceptual Stage Coverage",
+    "",
+    "| test35 stage | expected edge | expected target | mapped edge | mapped target | class | runs |",
+    "| - | - | - | - | - | - | - |"
+  ];
+  for (const row of coverage) {
+    lines.push(
+      `| ${row.test35StageRef} | ${row.expectedEdgeName} | ${row.expectedTargetAssetType} | ${row.mappedEdgeName ?? "-"} | ${row.mappedTargetAssetType ?? "-"} | ${row.stageClass} | ${row.operatorRunRefs.length} |`
     );
   }
   return lines.join("\n");
@@ -209,6 +248,10 @@ export function renderSdlcFdRunAnalysisMarkdown(result: SdlcFdRunAnalysisResult)
     renderTelemetry(result.currentStateTelemetrySummary),
     "",
     renderEdgeTraversal(result.edgeTraversal),
+    "",
+    renderPromptAndEvidence(result.edgeTraversal),
+    "",
+    renderConceptualStageCoverage(result.conceptualStageCoverage),
     "",
     renderLiveness(result.activeRunLiveness),
     "",

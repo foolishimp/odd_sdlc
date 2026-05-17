@@ -39,23 +39,11 @@ interface ComponentDepthContract {
 
 const COMPONENT_DEPTH_CONTRACTS = Object.freeze([
   {
-    targetAssetType: "implementation_component_topology_surface",
-    requiredMaterializedRole: null
-  },
-  {
-    targetAssetType: "component_realization_schedule_surface",
-    requiredMaterializedRole: null
-  },
-  {
     targetAssetType: "component_code_surface",
     requiredMaterializedRole: "source"
   },
   {
     targetAssetType: "component_realization_qualification_surface",
-    requiredMaterializedRole: null
-  },
-  {
-    targetAssetType: "test_component_topology_surface",
     requiredMaterializedRole: null
   },
   {
@@ -128,6 +116,26 @@ function materializedPathSet(input: {
   const paths = new Set<string>();
   for (const file of input.report.materializedFiles) {
     if (file.byteCount <= 0) {
+      continue;
+    }
+    const tenantRelativePath = normalizePortablePath(file.relativePath);
+    paths.add(tenantRelativePath);
+    paths.add(`${selectedOutputRoot}/${tenantRelativePath}`);
+  }
+  return paths;
+}
+
+function materializedPathSetForRole(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+  readonly role: SdlcMaterializedProductFileRole;
+}): ReadonlySet<string> {
+  const selectedOutputRoot = normalizePortablePath(
+    input.manifest.productMaterialization.selectedOutputRoot
+  );
+  const paths = new Set<string>();
+  for (const file of input.report.materializedFiles) {
+    if (file.role !== input.role || file.byteCount <= 0) {
       continue;
     }
     const tenantRelativePath = normalizePortablePath(file.relativePath);
@@ -214,28 +222,6 @@ function admissionReasons(
   );
 }
 
-function isComponentDepthAdmissionReason(code: string): boolean {
-  return (
-    code === "component_depth_output_missing" ||
-    code === "component_depth_register_missing" ||
-    code.startsWith("component_depth_register_invalid:") ||
-    code.startsWith("component_depth_register_target_mismatch:")
-  );
-}
-
-function requiredMaterializedRoleSatisfied(input: {
-  readonly report: SdlcWorkerResultReport;
-  readonly contract: ComponentDepthContract;
-}): boolean {
-  return (
-    input.contract.requiredMaterializedRole === null ||
-    pathSetForRole({
-      report: input.report,
-      role: input.contract.requiredMaterializedRole
-    }).size > 0
-  );
-}
-
 function requiredMaterializationReasons(input: {
   readonly report: SdlcWorkerResultReport;
   readonly contract: ComponentDepthContract;
@@ -253,40 +239,6 @@ function requiredMaterializationReasons(input: {
       message: `Component-depth surface ${input.contract.targetAssetType} did not materialize a non-empty ${role} file.`,
       evidenceRefs: [pathToFileURL(input.report.outputFile).href]
     })
-  ]);
-}
-
-function componentTopologyReasons(input: {
-  readonly register: SdlcComponentDepthRegister;
-  readonly evidenceRefs: readonly string[];
-}): readonly SdlcAssuranceLedgerReason[] {
-  const rows = input.register.componentTopologyRows;
-  return Object.freeze([
-    ...duplicateValues(rows.map((row) => row.componentId)).map((componentId) =>
-      reason({
-        code: `component_topology_duplicate_component:${componentId}`,
-        message: `Component topology declares duplicate componentId ${componentId}.`,
-        evidenceRefs: input.evidenceRefs
-      })
-    ),
-    ...rows
-      .filter((row) => row.requirementIds.length === 0)
-      .map((row) =>
-        reason({
-          code: `component_requirement_allocation_missing:${row.componentId}`,
-          message: `Component ${row.componentId} has no requirement allocation.`,
-          evidenceRefs: input.evidenceRefs
-        })
-      ),
-    ...rows
-      .filter((row) => row.sourceAssetRefs.length === 0)
-      .map((row) =>
-        reason({
-          code: `component_source_asset_refs_missing:${row.componentId}`,
-          message: `Component ${row.componentId} has no source asset refs.`,
-          evidenceRefs: input.evidenceRefs
-        })
-      )
   ]);
 }
 
@@ -410,14 +362,19 @@ function testTopologyReasons(input: {
 
 function componentTestReasons(input: {
   readonly rows: readonly SdlcComponentTestRealizationRow[];
+  readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
-  const testPaths = pathSetForRole({ report: input.report, role: "test" });
+  const testPaths = materializedPathSetForRole({
+    manifest: input.manifest,
+    report: input.report,
+    role: "test"
+  });
   const duplicatePaths = duplicateValues(input.rows.map((row) => row.relativePath));
   return Object.freeze([
     ...input.rows
-      .filter((row) => !testPaths.has(row.relativePath))
+      .filter((row) => !testPaths.has(normalizePortablePath(row.relativePath)))
       .map((row) =>
         reason({
           code: `test_class_missing_file:${row.testClassId}`,
@@ -734,12 +691,6 @@ function comparisonReasons(input: {
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
   switch (input.manifest.targetAssetType) {
-    case "implementation_component_topology_surface":
-      return componentTopologyReasons({
-        register: input.register,
-        evidenceRefs: input.evidenceRefs
-      });
-    case "component_realization_schedule_surface":
     case "component_realization_qualification_surface":
       return componentRealizationMetadataReasons({
         rows: input.register.componentRealizationRows,
@@ -752,14 +703,10 @@ function comparisonReasons(input: {
         report: input.report,
         evidenceRefs: input.evidenceRefs
       });
-    case "test_component_topology_surface":
-      return testTopologyReasons({
-        rows: input.register.testComponentTopologyRows,
-        evidenceRefs: input.evidenceRefs
-      });
     case "component_test_surface":
       return componentTestReasons({
         rows: input.register.componentTestRows,
+        manifest: input.manifest,
         report: input.report,
         evidenceRefs: input.evidenceRefs
       });
@@ -840,14 +787,6 @@ export function deriveComponentDepthAssuranceLedger(input: {
         item.lawfulReentryPoint !== "operator_blocked"
     )
     .map((item) => item.code);
-  const admissionOnlyNonblocking =
-    contract.requiredMaterializedRole !== null &&
-    requiredMaterializedRoleSatisfied({
-      report: input.report,
-      contract
-    }) &&
-    reasons.length > 0 &&
-    reasons.every((item) => isComponentDepthAdmissionReason(item.code));
   return assuranceLedger({
     dimension: "component_depth",
     verdict: verdictFromReasons({
@@ -855,7 +794,7 @@ export function deriveComponentDepthAssuranceLedger(input: {
       openGapReasonCodes,
       repriceReasonCodes
     }),
-    required: !admissionOnlyNonblocking,
+    required: true,
     reasons,
     evidenceRefs,
     carryForwardObligationRefs: reasons.map((item) => item.code)

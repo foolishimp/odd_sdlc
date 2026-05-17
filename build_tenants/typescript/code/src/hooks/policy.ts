@@ -49,6 +49,14 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "bootstrap_specification"
   }),
   policyEntry({
+    targetAssetType: "uat_testcases_surface",
+    edgeClass: "design"
+  }),
+  policyEntry({
+    targetAssetType: "testcase_authority_surface",
+    edgeClass: "design"
+  }),
+  policyEntry({
     targetAssetType: "feature_decomp_surface",
     edgeClass: "design"
   }),
@@ -69,30 +77,6 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     edgeClass: "design"
   }),
   policyEntry({
-    targetAssetType: "implementation_stack_profile",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
-    targetAssetType: "implementation_module_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
-    targetAssetType: "aggregate_domain_model_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
-    targetAssetType: "implementation_component_topology_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
-    targetAssetType: "component_realization_schedule_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
     targetAssetType: "component_code_surface",
     edgeClass: "implementation"
   }),
@@ -102,35 +86,11 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
     defaultOperation: "qualify"
   }),
   policyEntry({
-    targetAssetType: "realization_schedule_surface",
-    edgeClass: "implementation"
-  }),
-  policyEntry({
     targetAssetType: "code_surface",
     edgeClass: "implementation"
   }),
   policyEntry({
-    targetAssetType: "uat_testcases_surface",
-    edgeClass: "qualification"
-  }),
-  policyEntry({
-    targetAssetType: "test_stack_profile",
-    edgeClass: "qualification"
-  }),
-  policyEntry({
-    targetAssetType: "test_module_surface",
-    edgeClass: "qualification"
-  }),
-  policyEntry({
-    targetAssetType: "test_component_topology_surface",
-    edgeClass: "qualification"
-  }),
-  policyEntry({
     targetAssetType: "component_test_surface",
-    edgeClass: "qualification"
-  }),
-  policyEntry({
-    targetAssetType: "test_schedule_surface",
     edgeClass: "qualification"
   }),
   policyEntry({
@@ -145,11 +105,6 @@ export const SDLC_HOOK_TARGET_POLICY = Object.freeze([
   }),
   policyEntry({
     targetAssetType: "component_repair_schedule_surface",
-    edgeClass: "qualification",
-    defaultOperation: "qualify"
-  }),
-  policyEntry({
-    targetAssetType: "testcase_authority_surface",
     edgeClass: "qualification",
     defaultOperation: "qualify"
   }),

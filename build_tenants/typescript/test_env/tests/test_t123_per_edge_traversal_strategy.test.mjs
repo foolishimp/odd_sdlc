@@ -337,7 +337,7 @@ test("T-123 induction and requirement edges remain full-breadth", () => {
 });
 
 test("T-123 unqualified post-induction construction edges default to full wave", () => {
-  const manifest = manifestFor("derive_aggregate_domain_model_surface");
+  const manifest = manifestFor("derive_implementation_design_surface");
   assert.equal(
     manifest.traversalStrategyDecision.selectedStrategy,
     "full_breadth"

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import {
   dirMtimeMsOrNull,
+  fileSizeOrZero,
   operatorRunRef,
   walkDirectoryFiles,
   type SdlcFdRunAnalysisFileInfo
@@ -16,7 +17,8 @@ import type {
 } from "./carrier_loaders.js";
 import type {
   SdlcFdRunAnalysisByteAccount,
-  SdlcFdRunAnalysisEdgeAttempt
+  SdlcFdRunAnalysisEdgeAttempt,
+  SdlcFdRunAnalysisStageClass
 } from "./types.js";
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -98,6 +100,91 @@ function obligationCountFromWorkerReport(
   return report.obligationAssessments.length;
 }
 
+function classifyTraversalStage(input: {
+  readonly graphFunctionName: string | null;
+  readonly targetAssetType: string | null;
+  readonly workerElapsedMs: number | null;
+}): SdlcFdRunAnalysisStageClass {
+  const edgeName = input.graphFunctionName ?? "";
+  const target = input.targetAssetType ?? "";
+  if (edgeName.length === 0 && target.length === 0) {
+    return "unmapped";
+  }
+  if (
+    target === "code_surface" ||
+    target === "release_surface" ||
+    target === "release_depth_parity_surface" ||
+    edgeName.includes("rollup") ||
+    edgeName.includes("aggregate")
+  ) {
+    return "rollup";
+  }
+  if (
+    input.workerElapsedMs === null &&
+    (edgeName.startsWith("project_") ||
+      edgeName.startsWith("query_") ||
+      edgeName.includes("projection"))
+  ) {
+    return "projection";
+  }
+  return "constructive";
+}
+
+function fileRef(operatorRunRoot: string, relativePath: string): string | null {
+  return fileSizeOrZero(path.join(operatorRunRoot, relativePath)) > 0
+    ? `file://${path.join(operatorRunRoot, relativePath)}`
+    : null;
+}
+
+function executionEvidenceStatusFromReport(
+  report: WorkerResultReportRecord | null
+): {
+  readonly status: string | null;
+  readonly reportCount: number;
+} {
+  const evidence = report?.executionEvidence ?? null;
+  if (evidence === null || typeof evidence !== "object") {
+    return Object.freeze({ status: null, reportCount: 0 });
+  }
+  return Object.freeze({
+    status: typeof evidence.status === "string" ? evidence.status : null,
+    reportCount: Array.isArray(evidence.reportRefs) ? evidence.reportRefs.length : 0
+  });
+}
+
+function residualPressureRefs(carriers: OperatorRunCarriers): readonly string[] {
+  const fromGain =
+    carriers.edgeGain.status === "present" &&
+    Array.isArray(carriers.edgeGain.data.residualPressureRefs)
+      ? carriers.edgeGain.data.residualPressureRefs
+      : [];
+  if (fromGain.length > 0) {
+    return Object.freeze(fromGain.filter((ref): ref is string => typeof ref === "string"));
+  }
+  const fromLedger =
+    carriers.edgeFulfillmentLedger.status === "present" &&
+    Array.isArray(carriers.edgeFulfillmentLedger.data.edgeResidualPressureRefs)
+      ? carriers.edgeFulfillmentLedger.data.edgeResidualPressureRefs
+      : [];
+  return Object.freeze(fromLedger.filter((ref): ref is string => typeof ref === "string"));
+}
+
+function residualPressureTransition(input: {
+  readonly closureDisposition: string | null;
+  readonly residualPressureRefCount: number;
+}): "none" | "preserved" | "cleared" | "unknown" {
+  if (input.residualPressureRefCount > 0) {
+    return "preserved";
+  }
+  if (input.closureDisposition === "close") {
+    return "cleared";
+  }
+  if (input.closureDisposition === "retry" || input.closureDisposition === "repair") {
+    return "none";
+  }
+  return "unknown";
+}
+
 function operatorRunStartMs(operatorRunRoot: string): number | null {
   const baseName = path.basename(operatorRunRoot);
   const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})Z/u.exec(baseName);
@@ -161,6 +248,9 @@ export function deriveEdgeAttempt(
   const workerReport = carriers.workerResultReport.status === "present"
     ? carriers.workerResultReport.data
     : null;
+  const workerConstructionBrief = carriers.workerConstructionBrief.status === "present"
+    ? carriers.workerConstructionBrief.data
+    : null;
   const productFiles = productFilesFromManifest(productManifest?.files);
   const blockingReasonCodes = blockingReasonCodesFromPostflight(postflight);
   const workerElapsedMs = workerRun?.elapsedMs ?? null;
@@ -174,20 +264,55 @@ export function deriveEdgeAttempt(
   const promptContextBytes =
     carriers.fileSizes.workerPrompt +
     carriers.fileSizes.workerInvocationPackage +
-    carriers.fileSizes.traversalIntentPackage;
+    carriers.fileSizes.traversalIntentPackage +
+    carriers.fileSizes.workerConstructionBrief;
+  const executionEvidence = executionEvidenceStatusFromReport(workerReport);
+  const residualRefs = residualPressureRefs(carriers);
+  const closureDisposition = edgeClosure?.disposition ?? null;
+  const graphFunctionName =
+    operatorSummary?.graphFunctionName ?? handoff?.graphFunctionName ?? null;
+  const targetAssetType = handoff?.targetAssetType ?? null;
+  const canonicalPromptCarrierPath =
+    typeof workerConstructionBrief?.canonicalPromptCarrierPath === "string"
+      ? workerConstructionBrief.canonicalPromptCarrierPath
+      : null;
   return Object.freeze({
     attemptOrdinal,
     operatorRunRef: operatorRunRef(carriers.operatorRunRoot),
-    graphFunctionName:
-      operatorSummary?.graphFunctionName ?? handoff?.graphFunctionName ?? null,
+    graphFunctionName,
     graphVectorRef: handoff?.edgeName ?? null,
-    targetAssetType: handoff?.targetAssetType ?? null,
+    targetAssetType,
+    traversalClass: classifyTraversalStage({
+      graphFunctionName,
+      targetAssetType,
+      workerElapsedMs
+    }),
     workerElapsedMs,
     edgeWindowElapsedMs: edgeWindowMs,
     deterministicElapsedMs: deterministicMs,
     fpEvaluateStatus: fpEvaluate?.status ?? null,
     postflightStatus: postflight?.status ?? null,
-    closureDisposition: edgeClosure?.disposition ?? null,
+    executionEvidenceStatus: executionEvidence.status,
+    executionEvidenceReportCount: executionEvidence.reportCount,
+    residualPressureRefCount: residualRefs.length,
+    residualPressureTransition: residualPressureTransition({
+      closureDisposition,
+      residualPressureRefCount: residualRefs.length
+    }),
+    promptSourceCarrierRef:
+      canonicalPromptCarrierPath === null
+        ? fileRef(carriers.operatorRunRoot, "worker_construction_brief.json")
+        : `workspace://${canonicalPromptCarrierPath}`,
+    promptSourceCarrierDigest:
+      typeof workerConstructionBrief?.packageDigest === "string"
+        ? workerConstructionBrief.packageDigest
+        : null,
+    promptRenderingRef: fileRef(carriers.operatorRunRoot, "worker_prompt.md"),
+    promptSourcePolicyRef:
+      typeof workerConstructionBrief?.promptSourcePolicyRef === "string"
+        ? workerConstructionBrief.promptSourcePolicyRef
+        : null,
+    closureDisposition,
     selectedNextActionRef: nextAction?.selectedActionRef ?? null,
     predecessorAttemptRef: null,
     blockingReasonCodes,
@@ -237,6 +362,7 @@ function byteAccountForFile(
   }
   if (
     base === "worker_prompt.md" ||
+    base === "worker_construction_brief.json" ||
     base === "worker_invocation_package.json" ||
     base === "traversal_intent_package.json"
   ) {

@@ -17,19 +17,34 @@ The TypeScript tenant separates the ingress surface into these seams:
 | carrier vocabulary | `workspace/carriers.ts` | source input, project constraints, imported requirement authority, bootstrap lineage, and ingress report types |
 | source input derivation | `workspace/source_input.ts` | digest, role detection, authority-marker extraction, ambiguity classification, source-input admission |
 | project constraints | `workspace/project_constraints.ts` | closed project-profile admission and project slug parsing |
-| conform project profile | `workspace/project_profile.ts` | `{documents, project_constraints} -> ConformProjectProfile` canonicalization for tenant, output root, runtime layout, modules, capabilities, execution contracts, and realization mode |
+| conform project profile | `workspace/project_profile.ts` | `{documents, project_constraints} -> ConformProjectProfile` canonicalization for tenant, output root, runtime layout, modules, capabilities, execution contracts, realization mode, and overlay strategy binding |
 | bootstrap lineage | `workspace/bootstrap_lineage.ts` | imported requirement seed authority and `InputSet -> Project` lineage projection |
 | compatibility barrel | `workspace/ingress.ts` | export continuity only |
 
 ## Authority Rule
 
 Ingress may admit raw workspace snapshots and project constraints into typed
-truth. It may not mutate the workspace, choose a graph traversal, publish ABG
-runtime facts, or infer semantic authority from path names alone.
+truth. It may not mutate the workspace, imperatively choose a graph traversal,
+publish ABG runtime facts, or infer semantic authority from path names alone.
 
 Project constraints are input only. Downstream installed-operator handoff,
 product materialization, capability gates, and execution-contract prompts
 consume `ConformProjectProfile`, not direct YAML scalar scans.
+
+## Overlay Strategy Binding
+
+`ConformProjectProfile` is the single workspace-owned surface for profile-level
+overlay selection. The admitted strategy vocabulary is closed:
+
+- `thread`
+- `breadth`
+- `full_lifecycle`
+
+`overlayStrategy` and `overlayRef` come from project/profile truth. Operator
+`next` selection consumes those fields to pick the start overlay. Explicit
+operator starts may also use the strategy handles as overlay aliases. The
+binding is routing/admission truth only; it is not closure evidence and cannot
+erase downstream pressure.
 
 The standard conformed runtime layout is part of that same profile. Transform
 assets are archived under `.ai-workspace/runtime/odd_sdlc/assets`, operator run

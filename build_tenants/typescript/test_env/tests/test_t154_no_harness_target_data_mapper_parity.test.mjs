@@ -281,11 +281,7 @@ function authorityConsequence(context) {
     runRef: "run://odd-sdlc/t154/source-spec/no-harness",
     downstreamPressureRefs: ledger.downstreamPressureRefs,
     downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs,
-    admittedAssetTypes: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ]
+    admittedAssetTypes: ["implementation_design_surface"]
   });
   assert(action);
   const evaluator = deriveOddSdlcEvaluateNextReport({

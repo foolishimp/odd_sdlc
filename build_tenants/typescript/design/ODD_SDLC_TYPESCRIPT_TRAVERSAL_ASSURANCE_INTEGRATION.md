@@ -82,6 +82,24 @@ obligation loss.
 | `SdlcTraversalRequirementSatisfaction` | ledger fold | installed operator | total closure/retry decision |
 | `SdlcPostflightGapDossier` | installed operator | ABG-compatible retry events | replayable gap pressure |
 
+## F_D Severity Placement
+
+F_D findings are classified before they affect admission, construction,
+routing, or closure:
+
+| Severity Class | Blocks | Does Not Block | Runtime Meaning |
+| --- | --- | --- | --- |
+| `protocol_invalid` | Evidence admission for the affected carrier. | Independent F_P/content construction when its inputs remain valid. | Fixed protocol identity, target carrier envelope, digest, closed-kind, or required carrier field is invalid. |
+| `construction_context_invalid` | Construction or routing that depends on the invalid context. | Content evaluation on unrelated admitted evidence. | Required workspace, topology, target, policy, install, or command context is unavailable or stale. |
+| `diagnostic_shape_invalid` | Nothing by itself. | F_P construction, evidence admission, closure, or execution when no downstream consumer reads the malformed field. | A diagnostic/register field is malformed or extra but outside the downstream-read set for routing/admission/closure/execution construction. The finding records residual diagnostic pressure. |
+| `content_unproven` | Product/content close. | Evidence admission and next F_P/execution attempts. | Execution, test, requirement, or assurance evidence has not proven the declared product behavior. |
+
+The downstream-read rule is mechanical: a field can block only if a downstream
+consumer reads that field to choose routing, admit evidence, derive closure, or
+construct the declared execution command. Otherwise the finding is
+`diagnostic_shape_invalid` and remains visible as pressure without forcing a
+register-repair pass.
+
 ## Required Dimensions
 
 For non-product edges, product assurance is not applicable.
@@ -117,12 +135,12 @@ admission. `pending` is admissible as a carrier state, but it is not closure
 evidence. The archive edge blocks until execution evidence is `succeeded` with
 observed tests, report refs, and zero failures.
 
-For `test_module_surface`:
+For `component_test_surface`:
 
 - materialized test files must be discoverable by the declared test execution
   contract
 - when the contract is `sbt test`, standalone `object ... main` programs are
-  not test-module closure evidence
+  not component-test closure evidence
 - if the selected tenant build configuration lacks a discoverable test
   framework binding, the worker must materialize or update build configuration
   and report the file as `build_config`

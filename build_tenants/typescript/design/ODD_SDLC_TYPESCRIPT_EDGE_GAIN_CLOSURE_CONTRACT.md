@@ -49,6 +49,16 @@ compose_path_gain(edge_gains)
 The row declares meaning. The generic kernels execute the meaning. Runtime
 adapters only admit facts, archive facts, and publish read models.
 
+Target-carrier admission is an evidence dimension in this flow. It preserves
+output envelope identity and protocol pressure, but it is not the content metric
+for requirement fulfillment, implementation correctness, test adequacy, or
+product close.
+
+Executable code and executable test edges add one more declared evidence
+dimension: admitted execution evidence. Materialized files and well-formed
+target carriers are necessary evidence for those edges, but they are
+insufficient when the edge contract declares executable behavior.
+
 ## Irreducible Carrier Set
 
 | Carrier | Owns | Does Not Own |

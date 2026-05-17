@@ -1,5 +1,5 @@
 // T-160 JavaScript hello-world lite traversal scenario.
-// Starts from conformed project authority and selects the bounded lite overlay
+// Starts from loaded project authority and selects the bounded lite overlay
 // instead of the current full traversal.
 
 import { dirname, resolve } from "node:path";
@@ -41,7 +41,7 @@ const T160_HELLO_WORLD_OVERLAY_MATRIX = Object.freeze([
     id: "current_full_traversal",
     overlayHandle: "current-full-traversal",
     overlayRef: "overlay://odd-sdlc/current-full-traversal",
-    targetGraphFunction: "Fg_conform_project_authority"
+    targetGraphFunction: "derive_intent_surface"
   }),
   Object.freeze({
     id: "bootstrap_requirements",
@@ -54,12 +54,6 @@ const T160_HELLO_WORLD_OVERLAY_MATRIX = Object.freeze([
     overlayHandle: "solution-architecture",
     overlayRef: "overlay://odd-sdlc/solution-architecture",
     targetGraphFunction: "solution_architecture"
-  }),
-  Object.freeze({
-    id: "uat_test_cases",
-    overlayHandle: "uat-test-cases",
-    overlayRef: "overlay://odd-sdlc/uat-test-cases",
-    targetGraphFunction: "uat_test_cases"
   }),
   Object.freeze({
     id: "lite_design_module_implementation",

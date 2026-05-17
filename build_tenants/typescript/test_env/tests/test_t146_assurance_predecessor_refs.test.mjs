@@ -37,8 +37,8 @@ function manifest(input = {}) {
     kind: "sdlc_worker_handoff_manifest",
     manifestId: "manifest://t146",
     graphFunctionName: input.graphFunctionName ?? "bootstrap_release_self_test",
-    edgeName: input.edgeName ?? "derive_test_module_surface",
-    targetAssetType: input.targetAssetType ?? "test_module_surface",
+    edgeName: input.edgeName ?? "derive_component_test_surface",
+    targetAssetType: input.targetAssetType ?? "component_test_surface",
     reportFile: "report://t146/worker",
     archiveRoot: input.archiveRoot ?? "archive://t146",
     productMaterialization: {
@@ -70,8 +70,8 @@ function workerReport(input = {}) {
   return {
     kind: "odd_sdlc.worker_result_report",
     graphFunctionName: input.graphFunctionName ?? "bootstrap_release_self_test",
-    edgeName: input.edgeName ?? "derive_test_module_surface",
-    targetAssetType: input.targetAssetType ?? "test_module_surface",
+    edgeName: input.edgeName ?? "derive_component_test_surface",
+    targetAssetType: input.targetAssetType ?? "component_test_surface",
     outputFile: input.outputFile ?? "output://t146/report",
     digest: "sha256:t146",
     summary: "admitted worker report",
@@ -130,9 +130,26 @@ test("T-146 operator assurance gate emits replayable predecessor refs", () => {
     "MapperSpec.scala",
     "test(\"mapper\") { assert(Mapper.map(\"ab\") == \"ba\") }\n"
   );
+  const outputFile = componentDepthArtifact({
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "MapperSpec",
+        relativePath: "src/test/scala/MapperSpec.scala",
+        testcaseIds: ["TC-DM-001"],
+        componentIds: ["mapper"],
+        requirementIds: ["REQ-DM-001"],
+        shardId: null
+      }
+    ]
+  });
   const gate = deriveSdlcOperatorAssuranceGate({
     manifest: manifest(),
     report: workerReport({
+      outputFile,
       materializedFiles: [
         {
           kind: "sdlc_materialized_product_file",

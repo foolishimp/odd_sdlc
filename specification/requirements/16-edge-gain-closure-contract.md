@@ -58,6 +58,12 @@ turns admitted evidence into edge gain, residual pressure, and closure state.
 - AC-6: source-set matching is declared by the contract row or by a distinct
   overlay-specific contract row; runtime adapters may not relax source meaning
   through an omitted imperative check
+- AC-7: output carrier admission, materialized file presence, worker
+  assertion, postflight success, and register conformance are evidence
+  dimensions; none of them is product/content closure by itself
+- AC-8: when an edge declares executable product or test behavior, closure
+  requires admitted execution evidence or explicit no-close/projection-only
+  ownership
 
 ### REQ-F-ODDSDLC-065 — compound traversal closure preserves intermediate pressure
 
@@ -76,6 +82,9 @@ edge-local gains and closure decisions.
 - AC-5: specialized overlays that introduce direct or shortened vectors declare
   their own residual-pressure policy rather than silently inheriting full-route
   closure
+- AC-6: required graph, requirement, asset, carrier, execution, and downstream
+  pressure may clear only through clearing evidence, lawful reprice/re-entry,
+  or declared no-close/projection-only ownership
 
 ### REQ-F-ODDSDLC-066 — runtime artifacts carry the selected contract identity
 

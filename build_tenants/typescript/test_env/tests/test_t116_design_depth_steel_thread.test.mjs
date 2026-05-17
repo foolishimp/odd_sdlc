@@ -104,12 +104,33 @@ function sunnyDaySequence() {
   };
 }
 
-function moduleRegister() {
+function implementationDesignRegister(overrides = {}) {
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
-    moduleSchemaFragments: [
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t116/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-compiler",
+        moduleRef: "module://t116/cdme-compiler"
+      }
+    ],
+    aggregateDomainModelRows: [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://t116/aggregate"
+      }
+    ],
+    moduleSchemaFragments: overrides.moduleSchemaFragments ?? [
       {
         kind: "sdlc_module_schema_fragment",
         moduleName: "cdme-compiler",
@@ -119,7 +140,7 @@ function moduleRegister() {
         sourceAssetRefs: ["fixture://t116/module-schema"]
       }
     ],
-    moduleStateDiagramFragments: [
+    moduleStateDiagramFragments: overrides.moduleStateDiagramFragments ?? [
       {
         kind: "sdlc_module_state_diagram_fragment",
         moduleName: "cdme-compiler",
@@ -140,36 +161,70 @@ function moduleRegister() {
         sourceAssetRefs: ["fixture://t116/state-diagram"]
       }
     ],
-    aggregateDomainModel: null,
-    aggregateSunnyDaySequence: null,
-    designCompletenessVerdict: null
+    aggregateDomainModel: overrides.aggregateDomainModel ?? aggregateDomainModel(),
+    sunnyDaySequenceRows: [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://t116/sunny-day"
+      }
+    ],
+    aggregateSunnyDaySequence: overrides.aggregateSunnyDaySequence ?? sunnyDaySequence(),
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        concernRole: "parser",
+        publicBoundary: "package_internal",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T116-001"],
+        sourceAssetRefs: ["fixture://t116/component-topology"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        publicBoundary: "package_internal",
+        trancheId: "tranche:compiler",
+        firstProductFileToChange:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T116-001"],
+        sourceAssetRefs: ["fixture://t116/component-realization"]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        role: "source"
+      }
+    ],
+    designCompletenessVerdict: overrides.designCompletenessVerdict ?? satisfiedVerdict()
   };
+}
+
+function moduleRegister() {
+  return implementationDesignRegister();
 }
 
 function aggregateDomainRegister(model = aggregateDomainModel(), verdict = satisfiedVerdict()) {
-  return {
-    kind: "sdlc_design_depth_register",
-    registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_domain_model_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
+  return implementationDesignRegister({
     aggregateDomainModel: model,
-    aggregateSunnyDaySequence: null,
     designCompletenessVerdict: verdict
-  };
+  });
 }
 
 function sunnyDayRegister(sequence = sunnyDaySequence(), verdict = satisfiedVerdict()) {
-  return {
-    kind: "sdlc_design_depth_register",
-    registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
+  return implementationDesignRegister({
     aggregateDomainModel: aggregateDomainModel(),
     aggregateSunnyDaySequence: sequence,
     designCompletenessVerdict: verdict
-  };
+  });
 }
 
 function writeArtifact(targetAssetType, register) {
@@ -201,41 +256,33 @@ function ledgerFor(targetAssetType, register) {
   return { admission, ledger };
 }
 
-test("T-116 publishes aggregate design edges before realization scheduling", () => {
+test("T-116 publishes the consolidated implementation-design edge before realization", () => {
   const names = BOOTSTRAP_RELEASE_FUNCTION_CATALOG.map((entry) => entry.name);
   assert(
-    names.indexOf("derive_implementation_module_surface") <
-      names.indexOf("derive_aggregate_domain_model_surface")
+    names.indexOf("derive_implementation_design_surface") <
+      names.indexOf("derive_component_code_surface")
   );
   assert(
-    names.indexOf("derive_aggregate_domain_model_surface") <
-      names.indexOf("derive_implementation_component_topology_surface")
+    names.indexOf("derive_implementation_design_surface") <
+      names.indexOf("derive_test_design_surface")
   );
   assert(
-    names.indexOf("derive_implementation_component_topology_surface") <
-      names.indexOf("derive_aggregate_sunny_day_sequence_surface")
+    hookContractByEdgeName("derive_component_code_surface")
+      .sourceAssetTypes.includes("implementation_design_surface")
   );
   assert(
-    names.indexOf("derive_aggregate_sunny_day_sequence_surface") <
-      names.indexOf("derive_component_realization_schedule_surface")
+    hookContractByEdgeName("derive_test_design_surface")
+      .sourceAssetTypes.includes("implementation_design_surface")
   );
-  assert(
-    hookContractByEdgeName("derive_component_realization_schedule_surface")
-      .sourceAssetTypes.includes("aggregate_domain_model_surface")
-  );
-  assert(
-    hookContractByEdgeName("derive_component_realization_schedule_surface")
-      .sourceAssetTypes.includes("aggregate_sunny_day_sequence_surface")
-  );
-  assert(
-    hookContractByEdgeName("derive_test_schedule_surface")
-      .sourceAssetTypes.includes("aggregate_sunny_day_sequence_surface")
+  assert.equal(
+    names.filter((name) => name === "derive_implementation_design_surface").length,
+    1
   );
 });
 
 test("T-116 admits the steel-thread module schema and state diagram", () => {
   const { admission, ledger } = ledgerFor(
-    "implementation_module_surface",
+    "implementation_design_surface",
     moduleRegister()
   );
   assert.equal(admission.status, "admitted");
@@ -245,9 +292,64 @@ test("T-116 admits the steel-thread module schema and state diagram", () => {
   assert.equal(ledger.verdict, "satisfied");
 });
 
+test("T-169 design-depth admission is structural while content gaps stay in assurance", () => {
+  const minimalCarrier = {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface"
+  };
+  const { admission, ledger } = ledgerFor(
+    "implementation_design_surface",
+    minimalCarrier
+  );
+
+  assert.equal(admission.status, "admitted");
+  assert.deepEqual(admission.blockingReasons, []);
+  assert(ledger);
+  assert.equal(ledger.verdict, "open_gap");
+  assert(
+    ledger.reasons.some(
+      (reason) => reason.code === "design_depth_module_schema_fragments_missing"
+    )
+  );
+  assert(
+    ledger.reasons.some(
+      (reason) => reason.code === "design_depth_component_topology_rows_missing"
+    )
+  );
+  assert(
+    !ledger.reasons.some((reason) =>
+      reason.code.startsWith("design_depth_register_invalid:")
+    )
+  );
+});
+
+test("T-171 admits design-depth payload from the selected target-carrier envelope", () => {
+  const register = moduleRegister();
+  const envelopedCarrier = {
+    kind: "sdlc_implementation_design_surface_target_carrier",
+    targetAssetType: "implementation_design_surface",
+    edgeRef: "derive_lite_design_adr_surface",
+    contractRef:
+      "gtl://target-carrier-contract/odd-sdlc/derive_lite_design_adr_surface/implementation_design_surface",
+    contractDigest: "sha256:fixture",
+    payload: register
+  };
+  const { admission, ledger } = ledgerFor(
+    "implementation_design_surface",
+    envelopedCarrier
+  );
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.kind, "sdlc_design_depth_register");
+  assert.equal(admission.register.targetAssetType, "implementation_design_surface");
+  assert(ledger);
+  assert.equal(ledger.verdict, "satisfied");
+});
+
 test("T-116 admits aggregate domain model and sunny-day sequence steel thread", () => {
   const aggregate = ledgerFor(
-    "aggregate_domain_model_surface",
+    "implementation_design_surface",
     aggregateDomainRegister()
   );
   assert.equal(aggregate.admission.status, "admitted");
@@ -255,7 +357,7 @@ test("T-116 admits aggregate domain model and sunny-day sequence steel thread", 
   assert.equal(aggregate.ledger.verdict, "satisfied");
 
   const sequence = ledgerFor(
-    "aggregate_sunny_day_sequence_surface",
+    "implementation_design_surface",
     sunnyDayRegister()
   );
   assert.equal(sequence.admission.status, "admitted");
@@ -263,26 +365,25 @@ test("T-116 admits aggregate domain model and sunny-day sequence steel thread", 
   assert.equal(sequence.ledger.verdict, "satisfied");
 });
 
-test("T-116 aggregate domain model does not retry for downstream sunny-day flow", () => {
+test("T-116 consolidated implementation design escalates incomplete flow verdicts to F_P", () => {
   const downstreamOwnedFlowVerdict = {
     ...satisfiedVerdict(),
     flow: axis("flow", "partial", [
-      "Sunny-day sequence projection is owned by downstream derive_aggregate_sunny_day_sequence_surface."
+      "Sunny-day sequence projection is incomplete inside implementation_design_surface."
     ])
   };
   const { admission, ledger } = ledgerFor(
-    "aggregate_domain_model_surface",
+    "implementation_design_surface",
     aggregateDomainRegister(aggregateDomainModel(), downstreamOwnedFlowVerdict)
   );
 
   assert.equal(admission.status, "admitted");
   assert(ledger);
-  assert.equal(ledger.verdict, "satisfied");
-  assert.equal(
+  assert.equal(ledger.verdict, "fp_escalation");
+  assert(
     ledger.reasons.some((reason) =>
       reason.code === "design_completeness_flow_partial"
-    ),
-    false
+    )
   );
 });
 
@@ -295,7 +396,7 @@ test("T-116 blocks design completeness when an aggregate entity omits attributes
     sourceModuleNames: [entity.moduleName]
   };
   const { admission, ledger } = ledgerFor(
-    "aggregate_domain_model_surface",
+    "implementation_design_surface",
     aggregateDomainRegister(aggregateDomainModel([missingAttributeEntity]))
   );
   assert.equal(admission.status, "admitted");
@@ -319,7 +420,7 @@ test("T-116 blocks flow completeness when the sequence skips a published operati
     ]
   };
   const { admission, ledger } = ledgerFor(
-    "aggregate_sunny_day_sequence_surface",
+    "implementation_design_surface",
     sunnyDayRegister(badSequence)
   );
   assert.equal(admission.status, "admitted");

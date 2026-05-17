@@ -86,6 +86,7 @@ export interface SdlcPublicStartRequest {
   readonly defaultRegime: RuntimeRegime;
   readonly replayNextActionProjectionRef?: string | null;
   readonly replaySelectedActionRef?: string | null;
+  readonly replayNextGraphFunctionRef?: string | null;
   readonly replayNextGraphVectorRef?: string | null;
   readonly replayClosureDecisionRef?: string | null;
   readonly replayOverlayRef?: string | null;
@@ -146,6 +147,7 @@ export function admitSdlcPublicStartRequest(
     "defaultRegime",
     "replayNextActionProjectionRef",
     "replaySelectedActionRef",
+    "replayNextGraphFunctionRef",
     "replayNextGraphVectorRef",
     "replayClosureDecisionRef",
     "replayOverlayRef",
@@ -194,6 +196,14 @@ export function admitSdlcPublicStartRequest(
         : parseNonEmptyString(
             record["replaySelectedActionRef"],
             `${label}.replaySelectedActionRef`
+          ),
+    replayNextGraphFunctionRef:
+      record["replayNextGraphFunctionRef"] === undefined ||
+      record["replayNextGraphFunctionRef"] === null
+        ? null
+        : parseNonEmptyString(
+            record["replayNextGraphFunctionRef"],
+            `${label}.replayNextGraphFunctionRef`
           ),
     replayNextGraphVectorRef:
       record["replayNextGraphVectorRef"] === undefined ||
@@ -506,6 +516,7 @@ function evaluateInitialPublicStartAction(input: {
   readonly request: SdlcPublicStartRequest;
   readonly module: Module;
   readonly queryDomain: SdlcQueryDomainProjection;
+  readonly conformedProject: SdlcConformProjectProfile;
 }): PublicStartEvaluation {
   const targetPolicy = publicStartTargetPolicyFor(input.request.target.kind);
   let overlayCatalog: ReturnType<typeof constructSdlcTraversalOverlayCatalog> | null = null;
@@ -522,30 +533,63 @@ function evaluateInitialPublicStartAction(input: {
   let preferredTargetOutcomeRef: string | null = null;
   let requestedOverlay: SdlcTraversalOverlay | null = null;
   const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
+  const replayNextGraphFunctionRef =
+    input.request.replayNextGraphFunctionRef ?? null;
   if (targetPolicy.resolver === "published_start_targets") {
-    const startTargets = publicSdlcOverlayStartTargets({
-      module: input.module,
-      catalog: getOverlayCatalog(),
-      projectConformanceStatus: input.queryDomain.projectConformance?.status ?? null
-    });
-    candidates = Object.freeze(
-      startTargets
-        .map((target) =>
-          candidateForGraphFunction({
-            module: input.module,
-            graphFunctionName: target.name,
-            sourceRef
-          })
-        )
-        .filter(
-          (
-            candidate
-          ): candidate is PublicStartActionCandidate => candidate !== null
-        )
-    );
-    blockingReason =
-      startTargets.length === 0 ? "target_unavailable" : null;
-    preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
+    const conformanceStatus = input.queryDomain.projectConformance?.status ?? null;
+    if (replayNextGraphFunctionRef !== null) {
+      const candidate = candidateForGraphFunction({
+        module: input.module,
+        graphFunctionName: replayNextGraphFunctionRef,
+        sourceRef
+      });
+      candidates = Object.freeze(candidate === null ? [] : [candidate]);
+      blockingReason = candidate === null ? "stale_query_domain" : null;
+      preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
+    } else {
+      const profileOverlay =
+        conformanceStatus === "blocked"
+          ? null
+          : resolveSdlcTraversalOverlay({
+              catalog: getOverlayCatalog(),
+              overlayRef: input.conformedProject.overlayRef
+            });
+      if (profileOverlay !== null) {
+      requestedOverlay = profileOverlay;
+      const candidate = candidateForGraphFunction({
+        module: input.module,
+        graphFunctionName: profileOverlay.defaultStartTarget,
+        sourceRef
+      });
+      candidates = Object.freeze(candidate === null ? [] : [candidate]);
+      blockingReason = candidate === null ? "stale_query_domain" : null;
+      preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
+      } else {
+      const startTargets = publicSdlcOverlayStartTargets({
+        module: input.module,
+        catalog: getOverlayCatalog(),
+        projectConformanceStatus: conformanceStatus
+      });
+      candidates = Object.freeze(
+        startTargets
+          .map((target) =>
+            candidateForGraphFunction({
+              module: input.module,
+              graphFunctionName: target.name,
+              sourceRef
+            })
+          )
+          .filter(
+            (
+              candidate
+            ): candidate is PublicStartActionCandidate => candidate !== null
+          )
+      );
+      blockingReason =
+        startTargets.length === 0 ? "target_unavailable" : null;
+      preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
+      }
+    }
   } else if (targetPolicy.resolver === "named_graph_function") {
     const published = input.queryDomain.graphFunctions.some(
       (graphFunction) => graphFunction.name === input.request.target.handle
@@ -850,6 +894,10 @@ function evaluateInitialPublicStartAction(input: {
           graphCatalogDigestRef: overlayBinding.graphCatalogDigestRef,
           edgeAssuranceContractRef: null,
           edgeAssuranceContractDigest: null,
+          targetCarrierContractRef: null,
+          targetCarrierContractDigest: null,
+          targetCarrierAdmissionStatus: "not_required",
+          targetCarrierAdmissionRef: null,
           edgeGainRef: null,
           edgeClosureFunctionRef: null,
           edgeResidualPressureRefs: Object.freeze([]),
@@ -1016,7 +1064,8 @@ export function publicStartOnce(input: {
   const targetResolution = evaluateInitialPublicStartAction({
     request: input.request,
     module: input.module,
-    queryDomain: input.queryDomain
+    queryDomain: input.queryDomain,
+    conformedProject: input.conformedProject
   });
   if (
     targetResolution.targetGraphFunction === null ||

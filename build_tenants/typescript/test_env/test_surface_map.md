@@ -799,3 +799,57 @@ bootstrap input produces `Workspace.A.requirements.ledger`,
 `Workspace.A.requirements.schedule`, design, implementation, and qualification
 surfaces. The evaluator checks semantic content requirement-by-requirement and
 keeps F_D mechanical checks non-closing.
+
+## T-168 Design-Consumer Test Pipeline Lane
+
+Derives from:
+
+- `.ai-workspace/tickets/active/T-168-build-design-consumer-test-pipeline-for-co-affirming-implementation.md`
+- `specification/requirements/10-odd-sdlc-software-domain-buildout.md`
+- `specification/requirements/13-odd-sdlc-typescript-tenant.md`
+- `specification/requirements/16-edge-gain-closure-contract.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TEST_PIPELINE.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md`
+
+Canonical file:
+
+- `test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs`
+
+Canonical command:
+
+- `npm run test:t168`
+
+The lane proves the test pipeline is a graph-correlated design consumer, not a
+harness-only assertion. It checks the test lifecycle nodes and producing graph
+functions, binds test cases to test data, expected results, declared execution
+evidence, verification rows, and a co-affirmation ledger, and blocks closure
+when case range, data, framework execution, observed tests, or verification are
+missing. It also proves the current full overlay cannot collapse
+`derive_component_code_surface` into product convergence before the required
+test and release lifecycle closes.
+
+## T-169 Target Carrier Contract Lane
+
+Derives from:
+
+- `.ai-workspace/tickets/active/T-169-implement-gtl-target-carrier-contracts-for-sdlc-vector-outputs.md`
+- `/Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-133-declare-gtl-target-carrier-contracts-for-graph-vector-outputs.md`
+- `specification/requirements/17-target-carrier-contracts.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TARGET_CARRIER_CONTRACTS.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md`
+
+Canonical file:
+
+- `test_env/tests/test_t169_target_carrier_contracts.test.mjs`
+
+Canonical command:
+
+- `npm run test:t169`
+
+The lane proves close-capable SDLC graph-vector outputs carry product-owned GTL
+target carrier declarations, handoff manifests project the selected contract
+ref and digest, candidate admission accepts and rejects carrier envelopes from
+the same contract row, and rejected or missing target-carrier admission prevents
+edge closure while preserving carrier identity in fulfillment and closure
+surfaces.

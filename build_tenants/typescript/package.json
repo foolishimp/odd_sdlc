@@ -34,6 +34,7 @@
   "scripts": {
     "build:semantic": "tsc -p tsconfig.semantic-strict.json",
     "lint:semantic": "eslint --max-warnings=0 \"code/src/**/*.ts\"",
+    "lint:test-harness": "eslint --max-warnings=0 \"test_env/{tests,sandbox,live}/**/*.mjs\"",
     "test:semantic": "npm run build:semantic && node --test test_env/tests/*.test.mjs",
     "test:t027": "npm run build:semantic && node --test test_env/tests/test_t027_scaffold.test.mjs",
     "test:t028": "npm run build:semantic && node --test test_env/tests/test_t028_abiogenesis_substrate_binding.test.mjs",
@@ -120,6 +121,8 @@
     "test:t164:rust-service-live": "npm run test:scenario:t164-rust-hello-service-live",
     "test:t164:data-mapper-full-capability-live": "npm run build:semantic && ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE=1 node --test test_env/live/test_t164_data_mapper_full_capability_live.test.mjs",
     "test:t164:data-mapper-full-capability-live:resume": "npm run build:semantic && node test_env/live/resume_t164_data_mapper_full_capability_live.mjs",
+    "test:t168": "npm run build:semantic && node --test test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs",
+    "test:t169": "npm run build:semantic && node --test test_env/tests/test_t169_target_carrier_contracts.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",

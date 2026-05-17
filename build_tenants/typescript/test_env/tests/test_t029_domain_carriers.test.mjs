@@ -221,6 +221,26 @@ test("T-029 admission rejects open payloads and malformed lifecycle values", () 
   );
   assert.throws(
     () =>
+      admitSdlcAsset({
+        assetId: "asset://bad",
+        uri: "file://bad",
+        declaredType: "code_surface",
+        family: "implementation_branch",
+        mutability: "mutable_checkpointed",
+        provenance: {
+          model: "generated",
+          source: "fp",
+          mutable: true,
+          historyBasis: "test"
+        },
+        checkpoint: null,
+        loose: true,
+        alsoLoose: true
+      }),
+    /loose: unexpected field; .*alsoLoose: unexpected field/u
+  );
+  assert.throws(
+    () =>
       admitSdlcWorksiteAssetRef({
         ref: "file://bad",
         role: "hidden_controller",

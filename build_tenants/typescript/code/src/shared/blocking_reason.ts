@@ -69,6 +69,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "installed_topology_invalid",
   "target_unavailable",
   "stale_query_domain",
+  "target_carrier_admission_missing",
   "next_action_projection_graph_vector_missing",
   "legacy_graph_function_boundary_ref",
   "unknown_graph_function_boundary_ref",
@@ -133,6 +134,31 @@ export const SDLC_BLOCKING_REASON_REENTRY_POINTS = Object.freeze([
 
 export type SdlcBlockingReasonLawfulReentryPoint =
   (typeof SDLC_BLOCKING_REASON_REENTRY_POINTS)[number];
+
+export const SDLC_FD_FAILURE_SEVERITY_CLASSES = Object.freeze([
+  "protocol_invalid",
+  "construction_context_invalid",
+  "diagnostic_shape_invalid",
+  "content_unproven"
+] as const);
+
+export type SdlcFdFailureSeverityClass =
+  (typeof SDLC_FD_FAILURE_SEVERITY_CLASSES)[number];
+
+export type SdlcDownstreamReadStatus =
+  | "consumed_by_downstream"
+  | "not_consumed_by_downstream"
+  | "not_applicable";
+
+export interface SdlcFdFailureClassification {
+  readonly kind: "sdlc_fd_failure_classification";
+  readonly severityClass: SdlcFdFailureSeverityClass;
+  readonly downstreamReadStatus: SdlcDownstreamReadStatus;
+  readonly blocksAdmission: boolean;
+  readonly blocksConstruction: boolean;
+  readonly recordsResidualPressure: boolean;
+  readonly routesToFpOrExecution: boolean;
+}
 
 const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "materialized_product_role_missing",
@@ -329,6 +355,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Project or install topology is not ready for downstream traversal."
     });
   }
+  if (code === "target_carrier_admission_missing") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Target carrier envelope evidence is missing for the selected contract."
+    });
+  }
   if (
     code === "target_unavailable" ||
     code === "stale_query_domain" ||
@@ -422,6 +456,66 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     reasonClass: "unknown",
     lawfulReentryPoint: "operator_blocked",
     message: "Blocking reason was not recognized by the closed carrier catalog."
+  });
+}
+
+function severityClassForBlockingReason(
+  reason: SdlcBlockingReason
+): SdlcFdFailureSeverityClass {
+  if (
+    reason.code === "test_execution_evidence_missing" ||
+    reason.code === "test_execution_not_succeeded" ||
+    reason.code === "test_execution_zero_tests_observed" ||
+    reason.code === "test_execution_failures_present" ||
+    reason.reasonClass === "code_to_test" ||
+    reason.reasonClass === "assurance" ||
+    reason.reasonClass === "worker_unresolved" ||
+    reason.reasonClass === "missing_evidence"
+  ) {
+    return "content_unproven";
+  }
+  if (
+    reason.reasonClass === "topology" ||
+    reason.reasonClass === "target_resolution" ||
+    reason.reasonClass === "runtime_policy" ||
+    reason.reasonClass === "worker_runtime" ||
+    reason.reasonClass === "install"
+  ) {
+    return "construction_context_invalid";
+  }
+  return "protocol_invalid";
+}
+
+export function classifySdlcFdFailure(input: {
+  readonly reason: SdlcBlockingReason;
+  readonly downstreamRead?: boolean | null;
+}): SdlcFdFailureClassification {
+  const downstreamReadStatus: SdlcDownstreamReadStatus =
+    input.downstreamRead === true
+      ? "consumed_by_downstream"
+      : input.downstreamRead === false
+        ? "not_consumed_by_downstream"
+        : "not_applicable";
+  if (input.downstreamRead === false) {
+    return Object.freeze({
+      kind: "sdlc_fd_failure_classification" as const,
+      severityClass: "diagnostic_shape_invalid" as const,
+      downstreamReadStatus,
+      blocksAdmission: false,
+      blocksConstruction: false,
+      recordsResidualPressure: true,
+      routesToFpOrExecution: false
+    });
+  }
+  const severityClass = severityClassForBlockingReason(input.reason);
+  return Object.freeze({
+    kind: "sdlc_fd_failure_classification" as const,
+    severityClass,
+    downstreamReadStatus,
+    blocksAdmission: severityClass === "protocol_invalid",
+    blocksConstruction: severityClass === "construction_context_invalid",
+    recordsResidualPressure: true,
+    routesToFpOrExecution: severityClass === "content_unproven"
   });
 }
 

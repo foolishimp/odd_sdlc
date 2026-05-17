@@ -122,6 +122,11 @@ function workspaceWithoutProductTargets() {
     "# Imported Sources\n\nREQ-BT-003: Preserve missing target authority as F_P-visible pressure.\n",
     "utf8"
   );
+  writeFileSync(
+    path.join(root, "specification/REQUIREMENTS.md"),
+    "# Requirements\n\nREQ-BT-003: Preserve missing target authority as F_P-visible pressure.\n",
+    "utf8"
+  );
   return root;
 }
 
@@ -179,6 +184,15 @@ function workspaceWithModuleTargetProductAuthority() {
     path.join(root, "specification/requirements/00-imported-sources.md"),
     [
       "# Imported Sources",
+      "",
+      "REQ-BT-002: Compile the cdme-compiler module as the first steel-thread product slice."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/REQUIREMENTS.md"),
+    [
+      "# Requirements",
       "",
       "REQ-BT-002: Compile the cdme-compiler module as the first steel-thread product slice."
     ].join("\n"),

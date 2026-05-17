@@ -95,6 +95,11 @@ function writeEdgeAssuranceArchive(runRoot, edgeName, suffix = "") {
     edgeAssuranceContractRef: contractRef,
     edgeAssuranceContractDigest: contractDigest
   });
+  writeJson(path.join(runRoot, "worker_construction_brief.json"), {
+    kind: "sdlc_worker_construction_brief",
+    edgeName,
+    canonicalPromptCarrierPath: "worker_construction_brief.json"
+  });
   writeJson(path.join(runRoot, "sdlc_edge_gain.json"), {
     gainRef,
     contractRef,
@@ -201,16 +206,21 @@ for (const scenario of mindforgeAiAssistantVariantScenarios) {
   });
 }
 
-test("scenario sandbox: hello-world live descriptors allow full graph walk", () => {
+test("scenario sandbox: hello-world live descriptors bind profile overlay scope", () => {
   const worker = "process://claude";
   assert(
     helloWorldRustMinimumInductionLiveScenario({ worker }).maxAdvances >= 16
   );
   const jsLive = t132HelloWorldJsLiveScenario({ worker });
-  assert(jsLive.maxAdvances >= 16);
+  assert(jsLive.maxAdvances <= 4);
+  assert.deepEqual(jsLive.startTarget, "next");
+  assert.deepEqual(jsLive.expectations.handoffEdgeSequencePrefix, [
+    "derive_lite_design_adr_surface",
+    "derive_lite_component_code_surface"
+  ]);
   assert.deepEqual(
-    jsLive.expectations.handoffEdgeSequencePrefix.slice(-1),
-    ["derive_component_code_surface"]
+    jsLive.expectations.firstHandoffOverlayRef,
+    "overlay://odd-sdlc/lite-design-module-implementation"
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
@@ -624,7 +634,7 @@ const T132_LIVE_ENABLED = process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_
 const T132_LIVE_WORKER =
   process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_WORKER"] ?? "process://claude";
 const T132_LIVE_MAX_ADVANCES = Number.parseInt(
-  process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_MAX_ADVANCES"] ?? "16",
+  process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_MAX_ADVANCES"] ?? "24",
   10
 );
 

@@ -160,14 +160,19 @@ function carriesDownstreamRequirementTransformationSet(input: {
     input.assessment.blockingReasons.some((reason) =>
       reason.startsWith("requirement_recorded_for_future_closure:")
     );
+  const requirementCarriedForDownstreamClosure =
+    input.assessment.blockingReasons.some((reason) =>
+      reason.startsWith("requirement_carried_for_downstream_closure:")
+    );
   const authorityConformanceInducedRequirement =
     input.postflight.status === "passed" &&
     input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY;
   return (
     !input.manifest.productMaterialization.required &&
     input.assessment.obligationId.startsWith("requirement:") &&
-    ((input.manifest.targetAssetType === "requirement_surface" &&
-      requirementRecordedForFutureClosure) ||
+    (requirementCarriedForDownstreamClosure ||
+      (input.manifest.targetAssetType === "requirement_surface" &&
+        requirementRecordedForFutureClosure) ||
       authorityConformanceInducedRequirement)
   );
 }
@@ -595,7 +600,7 @@ export function deriveSdlcOperatorAssuranceGate(input: {
         surfaces,
         synthesisRequired: input.manifest.targetAssetType === "code_surface",
         executableProofRequired:
-          input.manifest.targetAssetType === "test_module_surface"
+          input.manifest.targetAssetType === "component_test_surface"
       })
     );
     requiredDimensions.push("shallow_realization");

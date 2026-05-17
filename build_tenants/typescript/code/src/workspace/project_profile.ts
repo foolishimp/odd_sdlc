@@ -38,27 +38,28 @@ import {
   type SdlcRealizationMode
 } from "./carriers.js";
 import {
+  admitSdlcProfileOverlayStrategy,
+  normalizeSdlcTraversalOverlayRef,
+  sdlcTraversalOverlayRefForStrategy,
+  SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
+  type SdlcProfileOverlayStrategy
+} from "../shared/overlay_strategy.js";
+import {
   admitSdlcRuntimeLayout,
   standardSdlcRuntimeLayout
 } from "./runtime_layout.js";
-import { isPlaceholderRequirementMarker } from "./source_input.js";
 
 const PROJECT_CONSTRAINTS_RELATIVE_PATH =
   ".ai-workspace/context/project_constraints.yml" as const;
 const INTENT_RELATIVE_PATH = "specification/INTENT.md" as const;
 const PRODUCT_RELATIVE_PATH = "specification/PRODUCT.md" as const;
 const GOALS_RELATIVE_PATH = "specification/GOALS.md" as const;
-const REQUIREMENTS_DIR_RELATIVE_PATH = "specification/requirements" as const;
 const IMPORTED_SOURCES_RELATIVE_PATH =
   "specification/requirements/00-imported-sources.md" as const;
 const PROJECT_BOOTSTRAP_RELATIVE_PATH =
   ".ai-workspace/context/project_bootstrap.md" as const;
 const TENANT_REGISTRY_RELATIVE_PATH = "build_tenants/TENANT_REGISTRY.md" as const;
 const CONFORM_PROJECT_EXPECTED_OUTPUT_RELATIVE_PATHS = Object.freeze([
-  INTENT_RELATIVE_PATH,
-  PRODUCT_RELATIVE_PATH,
-  GOALS_RELATIVE_PATH,
-  IMPORTED_SOURCES_RELATIVE_PATH,
   PROJECT_BOOTSTRAP_RELATIVE_PATH,
   PROJECT_CONSTRAINTS_RELATIVE_PATH,
   TENANT_REGISTRY_RELATIVE_PATH
@@ -73,7 +74,7 @@ const CONFORM_PROJECT_PHASE_CONTRACTS: readonly SdlcManagedTraversalPhaseContrac
     Object.freeze({
       kind: "sdlc_managed_traversal_phase_contract",
       phase: "execute",
-      contract: "materialize intent, product, requirement family, bootstrap, constraints, and tenant registry surfaces"
+      contract: "materialize runtime bootstrap read model, canonical constraints, and tenant registry only"
     }),
     Object.freeze({
       kind: "sdlc_managed_traversal_phase_contract",
@@ -98,8 +99,6 @@ const IMPORT_SOURCE_IGNORED_DIRS = Object.freeze([
   "build_tenants",
   "node_modules"
 ] as const);
-const REQUIREMENT_MARKER_EXPRESSION =
-  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
 const DEFAULT_AMBIGUITY_RISK_APPETITE = "medium" as const;
 const UNDECLARED_EXECUTION_CONTRACT = "undeclared" as const;
 const SOURCE_EXTENSIONS = Object.freeze([
@@ -649,6 +648,44 @@ function runtimeLayoutFromValues(values: Record<string, string>) {
   });
 }
 
+function defaultOverlayStrategyForProject(): SdlcProfileOverlayStrategy {
+  return "full_lifecycle";
+}
+
+function overlayStrategyFromValues(input: {
+  readonly values: Record<string, string>;
+  readonly tenant: MutableTenant;
+}): SdlcProfileOverlayStrategy {
+  const explicit = nonEmpty(
+    input.tenant.values["overlay_strategy"],
+    nonEmpty(
+      input.values["overlay_strategy"],
+      nonEmpty(input.values["traversal_overlay_strategy"], "")
+    )
+  );
+  if (explicit.length > 0) {
+    return admitSdlcProfileOverlayStrategy(explicit, "project.overlay_strategy");
+  }
+  return defaultOverlayStrategyForProject();
+}
+
+function overlayRefFromValues(input: {
+  readonly values: Record<string, string>;
+  readonly tenant: MutableTenant;
+  readonly overlayStrategy: SdlcProfileOverlayStrategy;
+}): string {
+  const explicit = nonEmpty(
+    input.tenant.values["overlay_ref"],
+    nonEmpty(
+      input.values["overlay_ref"],
+      nonEmpty(input.values["traversal_overlay_ref"], "")
+    )
+  );
+  return explicit.length > 0
+    ? normalizeSdlcTraversalOverlayRef(explicit, "project.overlay_ref")
+    : sdlcTraversalOverlayRefForStrategy(input.overlayStrategy);
+}
+
 function countSourceFiles(root: string, limit: number): number {
   let count = 0;
   const ignored = new Set<string>(IGNORED_DIR_NAMES);
@@ -697,6 +734,9 @@ export function conformProjectProfileFromConstraintsText(input: {
   const language = stringFrom(tenant, parsed.values, "language");
   const tool = stringFrom(tenant, parsed.values, "build_tool", "tool");
   const testRunner = stringFrom(tenant, parsed.values, "test_runner");
+  const projectSlug = projectSlugFromValues(parsed.values, input.workspaceRoot);
+  const projectKind = nonEmpty(parsed.values["kind"], "");
+  const declaredModuleNames = declaredModuleNamesFromStructure(moduleStructure);
   const executionContracts = inferExecutionContracts({
     activeTenant,
     language,
@@ -734,18 +774,27 @@ export function conformProjectProfileFromConstraintsText(input: {
     selectedOutputRoot,
     input.constraintsText.trim().length > 0
   );
+  const overlayStrategy = overlayStrategyFromValues({
+    values: parsed.values,
+    tenant
+  });
+  const overlayRef = overlayRefFromValues({
+    values: parsed.values,
+    tenant,
+    overlayStrategy
+  });
   const runtimeLayout = runtimeLayoutFromValues(parsed.values);
   return Object.freeze({
     kind: "sdlc_conform_project_profile",
     workspaceName: path.basename(input.workspaceRoot),
-    projectSlug: projectSlugFromValues(parsed.values, input.workspaceRoot),
-    projectKind: nonEmpty(parsed.values["kind"], ""),
+    projectSlug,
+    projectKind,
     language,
     testRunner,
     tool,
     version: nonEmpty(parsed.values["version"], ""),
     moduleStructure,
-    declaredModuleNames: declaredModuleNamesFromStructure(moduleStructure),
+    declaredModuleNames,
     ambiguityRiskAppetite,
     activeTenant,
     selectedOutputRoot,
@@ -758,6 +807,8 @@ export function conformProjectProfileFromConstraintsText(input: {
     capabilityContracts,
     rootCodePolicy: nonEmpty(parsed.values["root_code_policy"], ""),
     realizationMode: realization.realizationMode,
+    overlayStrategy,
+    overlayRef,
     resolutionReason: realization.resolutionReason,
     sourceConstraintDigest: sha256Text(input.constraintsText)
   });
@@ -852,22 +903,6 @@ export function deriveSdlcConformProjectReportFromWorkspaces(input: {
   }
   if (!existsSync(path.join(outputWorkspaceRoot, PROJECT_CONSTRAINTS_RELATIVE_PATH))) {
     conformanceGaps.push("project_constraints_missing");
-  }
-  if (!existsSync(path.join(outputWorkspaceRoot, INTENT_RELATIVE_PATH))) {
-    conformanceGaps.push("intent_surface_missing");
-  }
-  if (!existsSync(path.join(outputWorkspaceRoot, PRODUCT_RELATIVE_PATH))) {
-    conformanceGaps.push("product_surface_missing");
-  }
-  if (!existsSync(path.join(outputWorkspaceRoot, GOALS_RELATIVE_PATH))) {
-    conformanceGaps.push("goals_surface_missing");
-  }
-  const requirementsRoot = path.join(outputWorkspaceRoot, REQUIREMENTS_DIR_RELATIVE_PATH);
-  if (!existsSync(requirementsRoot) || !statSync(requirementsRoot).isDirectory()) {
-    conformanceGaps.push("requirements_family_missing");
-  }
-  if (!existsSync(path.join(outputWorkspaceRoot, IMPORTED_SOURCES_RELATIVE_PATH))) {
-    conformanceGaps.push("imported_sources_requirement_missing");
   }
   if (!existsSync(path.join(outputWorkspaceRoot, PROJECT_BOOTSTRAP_RELATIVE_PATH))) {
     conformanceGaps.push("project_bootstrap_missing");
@@ -1029,6 +1064,8 @@ function canonicalProjectConstraints(profile: SdlcConformProjectProfile): string
     "project:",
     `  name: ${profile.projectSlug}`,
     profile.projectKind.length > 0 ? `  kind: ${profile.projectKind}` : "  kind: imported_workspace",
+    `  overlay_strategy: ${profile.overlayStrategy}`,
+    `  overlay_ref: ${profile.overlayRef}`,
     `active_tenant: ${profile.activeTenant}`,
     `selected_output_root: ${profile.selectedOutputRoot}`,
     `ambiguity_risk_appetite: ${profile.ambiguityRiskAppetite}`,
@@ -1042,7 +1079,13 @@ function canonicalProjectConstraints(profile: SdlcConformProjectProfile): string
     `    output_dir: ${profile.selectedOutputRoot}`,
     profile.language.length > 0 ? `    language: ${profile.language}` : "    language: unknown",
     profile.tool.length > 0 ? `    build_tool: ${profile.tool}` : "    build_tool: undeclared",
+    profile.buildExecutionContract !== UNDECLARED_EXECUTION_CONTRACT
+      ? `    build_execution_contract: ${profile.buildExecutionContract}`
+      : "    build_execution_contract: undeclared",
     profile.testRunner.length > 0 ? `    test_runner: ${profile.testRunner}` : "    test_runner: undeclared",
+    profile.testExecutionContract !== UNDECLARED_EXECUTION_CONTRACT
+      ? `    test_execution_contract: ${profile.testExecutionContract}`
+      : "    test_execution_contract: undeclared",
     "    module_structure:",
     ...profile.declaredModuleNames.map((moduleName) => `      - ${moduleName}`),
     ""
@@ -1078,306 +1121,215 @@ function importedSourceRelativePaths(workspaceRoot: string): readonly string[] {
   return Object.freeze([...new Set(paths)].sort());
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function importedSelectedOutputTargetPaths(input: {
+function readWorkspaceTextIfFile(input: {
   readonly workspaceRoot: string;
-  readonly relativePaths: readonly string[];
-  readonly selectedOutputRoot: string;
-}): readonly string[] {
-  const selectedOutputRoot = input.selectedOutputRoot.replace(/\\/gu, "/").replace(/\/+$/u, "");
-  const targetPattern = new RegExp(
-    `${escapeRegExp(selectedOutputRoot)}(?:/[A-Za-z0-9._@+=:-]+)+`,
-    "gu"
-  );
-  const targets: string[] = [];
-  for (const relativePath of input.relativePaths) {
-    const absolutePath = path.join(input.workspaceRoot, relativePath);
-    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
-      continue;
-    }
-    const content = readFileSync(absolutePath, "utf8").replace(/\\/gu, "/");
-    for (const match of content.matchAll(targetPattern)) {
-      const candidate = match[0]
-        ?.replace(/[),.;:]+$/u, "")
-        .replace(/\/+$/u, "");
-      if (
-        candidate !== undefined &&
-        candidate.length > selectedOutputRoot.length &&
-        candidate !== selectedOutputRoot
-      ) {
-        targets.push(candidate);
-      }
-    }
-  }
-  return Object.freeze([...new Set(targets)].sort());
-}
-
-function importedProductAuthorityContent(input: {
-  readonly sourceWorkspaceRoot: string;
-  readonly relativePaths: readonly string[];
-  readonly profile: SdlcConformProjectProfile;
-}): string {
-  const sourceRefs = input.relativePaths.map((relativePath) =>
-    pathToFileURL(path.join(input.sourceWorkspaceRoot, relativePath)).href
-  );
-  const productFileTargets = importedSelectedOutputTargetPaths({
-    workspaceRoot: input.sourceWorkspaceRoot,
-    relativePaths: input.relativePaths,
-    selectedOutputRoot: input.profile.selectedOutputRoot
-  });
-  return [
-    "# Product",
-    "",
-    "**Status**: Active",
-    "**Derived From**: `Fg_conform_project`",
-    "",
-    `${input.profile.projectSlug} is an imported project inducted into spec_method topology.`,
-    "",
-    "Project-owned `WHAT` lives under `specification/`.",
-    "Project-owned realization `HOW` lives under `build_tenants/`.",
-    "",
-    "## Product Definition",
-    "",
-    `Product name: ${input.profile.projectSlug}`,
-    `Active tenant: ${input.profile.activeTenant}`,
-    `Selected output root: \`${input.profile.selectedOutputRoot}\``,
-    `Build Tool: ${input.profile.tool.length > 0 ? input.profile.tool : "undeclared"}`,
-    input.profile.language.length > 0
-      ? `Language: ${input.profile.language}`
-      : "Language: undeclared",
-    "",
-    "## Product Files",
-    "",
-    ...(productFileTargets.length > 0
-      ? productFileTargets.map((target) => `- \`${target}\``)
-      : ["- none_declared_from_imported_sources"]),
-    "",
-    "## Source Authority Refs",
-    "",
-    ...(sourceRefs.length > 0 ? sourceRefs.map((ref) => `- ${ref}`) : ["- none"]),
-    ""
-  ].join("\n");
-}
-
-function requirementMarkersFromImportedSources(input: {
-  readonly workspaceRoot: string;
-  readonly relativePaths: readonly string[];
-}): readonly string[] {
-  const markers: string[] = [];
-  for (const relativePath of input.relativePaths) {
-    const absolutePath = path.join(input.workspaceRoot, relativePath);
-    if (existsSync(absolutePath) && statSync(absolutePath).isFile()) {
-      const content = readFileSync(absolutePath, "utf8");
-      for (const match of content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
-      const marker = match[0];
-      if (marker !== undefined && !isPlaceholderRequirementMarker(marker)) {
-        markers.push(marker);
-      }
-      }
-    }
-  }
-  return Object.freeze([...new Set(markers)].sort());
-}
-
-function normalizeRequirementMarker(marker: string): string {
-  const parts = marker.toUpperCase().split("-");
-  const head = parts[0] === "RF" ? "REQ" : parts[0];
-  const tail = parts.slice(1).map((part) =>
-    /^\d+$/u.test(part) && part.length < 3 ? part.padStart(3, "0") : part
-  );
-  return [head, ...tail].join("-");
-}
-
-function requirementFamilyFromId(requirementId: string): string {
-  const parts = requirementId.toLowerCase().split("-");
-  const rawFamily =
-    parts.length >= 3 && parts[0] === "req" ? (parts[1] ?? "general") : "general";
-  const family = rawFamily.replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "");
-  return family.length === 0 ? "general" : family;
-}
-
-function lineSnippetForOffset(content: string, offset: number): string {
-  const lineStart = content.lastIndexOf("\n", offset) + 1;
-  const nextNewline = content.indexOf("\n", offset);
-  const lineEnd = nextNewline < 0 ? content.length : nextNewline;
-  return content
-    .slice(lineStart, lineEnd)
-    .replace(/\s+/gu, " ")
-    .trim()
-    .slice(0, 320);
-}
-
-function requirementSnippetForOffset(content: string, offset: number): string {
-  const lineStart = content.lastIndexOf("\n", offset) + 1;
-  const nextNewline = content.indexOf("\n", offset);
-  const lineEnd = nextNewline < 0 ? content.length : nextNewline;
-  const line = content.slice(lineStart, lineEnd);
-  const heading = /^(#{1,6})\s+.+$/u.exec(line);
-  if (heading === null) {
-    return lineSnippetForOffset(content, offset);
-  }
-  const depth = heading[1]?.length ?? 6;
-  let sectionEnd = content.length;
-  let cursor = nextNewline < 0 ? content.length : nextNewline + 1;
-  while (cursor < content.length) {
-    const candidateEnd = content.indexOf("\n", cursor);
-    const currentEnd = candidateEnd < 0 ? content.length : candidateEnd;
-    const candidateLine = content.slice(cursor, currentEnd);
-    const candidateHeading = /^(#{1,6})\s+.+$/u.exec(candidateLine);
-    if ((candidateHeading?.[1]?.length ?? Number.POSITIVE_INFINITY) <= depth) {
-      sectionEnd = cursor;
-      break;
-    }
-    cursor = candidateEnd < 0 ? content.length : candidateEnd + 1;
-  }
-  return content
-    .slice(lineStart, sectionEnd)
-    .trim()
-    .replace(/\n{3,}/gu, "\n\n")
-    .slice(0, 2400);
-}
-
-function markerOnlySnippet(snippet: string, marker: string): boolean {
-  const normalized = snippet
-    .replace(/^#+\s*/u, "")
-    .replace(/^[-*]\s*/u, "")
-    .replaceAll("`", "")
-    .trim();
-  return normalized === marker || normalized === normalizeRequirementMarker(marker);
-}
-
-function importedRequirementFamilyContents(input: {
-  readonly workspaceRoot: string;
-  readonly relativePaths: readonly string[];
-}): readonly {
   readonly relativePath: string;
-  readonly content: string;
-}[] {
-  const byFamily = new Map<
-    string,
-    {
-      readonly requirementId: string;
-      readonly sourceRef: string;
-      readonly sourceDigest: string;
-      readonly snippet: string;
-    }[]
-  >();
-  for (const relativePath of input.relativePaths) {
-    const absolutePath = path.join(input.workspaceRoot, relativePath);
-    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
-      continue;
-    }
-    const content = readFileSync(absolutePath, "utf8");
-    const sourceDigest = sha256Text(content);
-    const sourceRef = pathToFileURL(absolutePath).href;
-    for (const match of content.matchAll(REQUIREMENT_MARKER_EXPRESSION)) {
-      const marker = match[0];
-      if (
-        marker === undefined ||
-        isPlaceholderRequirementMarker(marker)
-      ) {
-        continue;
-      }
-      const snippet = requirementSnippetForOffset(content, match.index ?? 0);
-      if (snippet.length === 0 || markerOnlySnippet(snippet, marker)) {
-        continue;
-      }
-      const requirementId = normalizeRequirementMarker(marker);
-      const family = requirementFamilyFromId(requirementId);
-      const entries = byFamily.get(family) ?? [];
-      entries.push({
-        requirementId,
-        sourceRef,
-        sourceDigest,
-        snippet
-      });
-      byFamily.set(family, entries);
-    }
+}): string | null {
+  const absolutePath = path.join(input.workspaceRoot, input.relativePath);
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+    return null;
   }
-  return Object.freeze(
-    [...byFamily.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([family, entries], index) => {
-        const uniqueEntries = [
-          ...new Map(
-            entries
-              .sort((left, right) =>
-                `${left.requirementId}:${left.sourceRef}:${left.snippet}`.localeCompare(
-                  `${right.requirementId}:${right.sourceRef}:${right.snippet}`
-                )
-              )
-              .map((entry) => [
-                `${entry.requirementId}:${entry.sourceRef}:${entry.snippet}`,
-                entry
-              ])
-          ).values()
-        ];
-        const content = [
-          `# ${family.toUpperCase()} Requirements`,
-          "",
-          "**Status**: Active",
-          "**Derived From**: `Fg_conform_project`",
-          "",
-          "This file is a deterministic requirement-family projection from",
-          "imported bootstrap authority. It preserves concrete source pressure",
-          "for downstream prompt-bearing traversals.",
-          "",
-          ...uniqueEntries.flatMap((entry) => [
-            `## ${entry.requirementId}`,
-            "",
-            entry.snippet,
-            "",
-            `Source: ${entry.sourceRef}`,
-            `Source Digest: ${entry.sourceDigest}`,
-            ""
-          ])
-        ].join("\n");
-        return {
-          relativePath:
-            `${REQUIREMENTS_DIR_RELATIVE_PATH}/${String(index + 1).padStart(2, "0")}-${family}-requirements.md`,
-          content
-        };
-      })
-  );
+  return readFileSync(absolutePath, "utf8");
 }
 
-function importedSourcesContent(input: {
+function firstMarkdownTitle(content: string): string | null {
+  for (const line of content.split("\n")) {
+    const heading = /^#\s+(.+)$/u.exec(line.trim());
+    if (heading?.[1] !== undefined && heading[1].trim().length > 0) {
+      return heading[1].trim();
+    }
+  }
+  const projectLine = /\*\*Project\*\*:\s*(.+)$/mu.exec(content);
+  return projectLine?.[1]?.trim() ?? null;
+}
+
+function workspaceAuthorityRelativePaths(workspaceRoot: string): readonly string[] {
+  const preferred = Object.freeze([
+    "README.md",
+    INTENT_RELATIVE_PATH,
+    PRODUCT_RELATIVE_PATH,
+    GOALS_RELATIVE_PATH,
+    "specification/REQUIREMENTS.md",
+    "specification/mapper_requirements.md"
+  ] as const);
+  const preferredOrder = new Map<string, number>(
+    preferred.map((relativePath, index) => [relativePath, index])
+  );
+  return Object.freeze([
+    ...new Set([
+      ...preferred,
+      ...importedSourceRelativePaths(workspaceRoot)
+    ])
+  ].filter((relativePath) => {
+    const absolutePath = path.join(workspaceRoot, relativePath);
+    return existsSync(absolutePath) && statSync(absolutePath).isFile();
+  }).sort((left, right) => {
+    const leftIndex = preferredOrder.get(left) ?? -1;
+    const rightIndex = preferredOrder.get(right) ?? -1;
+    if (leftIndex >= 0 || rightIndex >= 0) {
+      return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+        (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    }
+    return left.localeCompare(right);
+  }));
+}
+
+function sourceTitleLines(input: {
+  readonly workspaceRoot: string;
+  readonly relativePaths: readonly string[];
+}): readonly string[] {
+  return Object.freeze(input.relativePaths.flatMap((relativePath) => {
+    const content = readWorkspaceTextIfFile({
+      workspaceRoot: input.workspaceRoot,
+      relativePath
+    });
+    if (content === null) {
+      return [];
+    }
+    return [`- \`${relativePath}\`: ${firstMarkdownTitle(content) ?? path.basename(relativePath)}`];
+  }));
+}
+
+function ontologyAnchorLines(input: {
+  readonly workspaceRoot: string;
+  readonly relativePaths: readonly string[];
+}): readonly string[] {
+  const anchors: string[] = [];
+  for (const relativePath of input.relativePaths) {
+    const content = readWorkspaceTextIfFile({
+      workspaceRoot: input.workspaceRoot,
+      relativePath
+    });
+    if (content === null) {
+      continue;
+    }
+    for (const line of content.split("\n")) {
+      const heading = /^(#{1,6})\s+(.+)$/u.exec(line.trim());
+      const title = heading?.[2]?.trim();
+      if (title === undefined || title.length === 0) {
+        continue;
+      }
+      const authoritative =
+        /^INT-\d+/u.test(title) ||
+        /^REQ-[A-Z0-9-]+/u.test(title) ||
+        /\b(?:requirements?|architecture|ontology|axioms?|morphisms?|execution|error domain|fidelity)\b/iu.test(title);
+      if (authoritative) {
+        anchors.push(`- \`${relativePath}\` -> ${title}`);
+      }
+      if (anchors.length >= 32) {
+        return Object.freeze(anchors);
+      }
+    }
+  }
+  return Object.freeze(anchors);
+}
+
+function readOrderLines(input: {
+  readonly workspaceRoot: string;
+  readonly sourceRelativePaths: readonly string[];
+  readonly profile: SdlcConformProjectProfile;
+}): readonly string[] {
+  const existsFile = (relativePath: string): boolean => {
+    const absolutePath = path.join(input.workspaceRoot, relativePath);
+    return existsSync(absolutePath) && statSync(absolutePath).isFile();
+  };
+  const primary = [
+    INTENT_RELATIVE_PATH,
+    "specification/REQUIREMENTS.md",
+    "specification/mapper_requirements.md",
+    IMPORTED_SOURCES_RELATIVE_PATH
+  ].filter((relativePath) => existsFile(relativePath));
+  const supplemental = input.sourceRelativePaths.filter(
+    (relativePath) =>
+      !primary.includes(relativePath) &&
+      !relativePath.startsWith("specification/appendices/")
+  );
+  return Object.freeze([
+    ...primary.map((relativePath) => `- \`${relativePath}\``),
+    ...supplemental.slice(0, 8).map((relativePath) => `- \`${relativePath}\``),
+    `- \`${input.profile.runtimeLayout.operatorRunRoot}\` for current traversal attempts and ledgers`,
+    `- \`${input.profile.runtimeLayout.transformAssetRoot}\` for generated transform artifacts`,
+    `- \`${PRODUCT_RELATIVE_PATH}\` and \`${GOALS_RELATIVE_PATH}\` after imported authority has been read`
+  ]);
+}
+
+function projectBootstrapReadModelContent(input: {
   readonly sourceWorkspaceRoot: string;
+  readonly outputWorkspaceRoot: string;
+  readonly profile: SdlcConformProjectProfile;
   readonly before: SdlcConformProjectReport;
 }): string {
-  const relativePaths = importedSourceRelativePaths(input.sourceWorkspaceRoot);
-  const refs = relativePaths.length > 0
-    ? relativePaths.map((relativePath) =>
-        pathToFileURL(path.join(input.sourceWorkspaceRoot, relativePath)).href
-      )
-    : input.before.sourceRefs.length > 0
-      ? input.before.sourceRefs
-      : [pathToFileURL(input.sourceWorkspaceRoot).href];
-  const requirementMarkers = requirementMarkersFromImportedSources({
+  const sourceRelativePaths = workspaceAuthorityRelativePaths(input.sourceWorkspaceRoot);
+  const intentText = readWorkspaceTextIfFile({
     workspaceRoot: input.sourceWorkspaceRoot,
-    relativePaths
+    relativePath: INTENT_RELATIVE_PATH
+  });
+  const authoritativeTitle =
+    intentText === null
+      ? input.profile.projectSlug
+      : firstMarkdownTitle(intentText) ?? input.profile.projectSlug;
+  const titleLines = sourceTitleLines({
+    workspaceRoot: input.sourceWorkspaceRoot,
+    relativePaths: sourceRelativePaths
+  });
+  const anchorLines = ontologyAnchorLines({
+    workspaceRoot: input.sourceWorkspaceRoot,
+    relativePaths: sourceRelativePaths
   });
   return [
-    "# Imported Sources",
+    "# Project Bootstrap",
     "",
-    "**Status**: Active",
-    "**Derived From**: `Fg_conform_project`",
+    "This generated surface is a deterministic read model over imported project authority.",
+    "It is not a replacement for project-owned specification truth.",
     "",
-    "This file is the deterministic induction ledger for imported or loose",
-    "bootstrap documents admitted before downstream traversal.",
+    "## Workspace Identity",
+    "",
+    `- workspace: \`${path.basename(input.outputWorkspaceRoot)}\``,
+    `- project slug: \`${input.profile.projectSlug}\``,
+    `- active tenant: \`${input.profile.activeTenant}\``,
+    `- selected output root: \`${input.profile.selectedOutputRoot}\``,
+    "",
+    "## Project Identity",
+    "",
+    `- authoritative project title: \`${authoritativeTitle}\``,
+    `- identity source: \`${intentText === null ? PROJECT_CONSTRAINTS_RELATIVE_PATH : INTENT_RELATIVE_PATH}\``,
+    "- workspace/template/bootstrap provenance does not change project identity",
+    "",
+    "## Source Titles",
+    "",
+    ...(titleLines.length > 0 ? titleLines : ["- none_observed"]),
+    "",
+    "## Ontology Anchors",
+    "",
+    ...(anchorLines.length > 0 ? anchorLines : ["- none_observed"]),
     "",
     "## Source Refs",
     "",
-    ...refs.map((ref) => `- ${ref}`),
+    ...(input.before.sourceRefs.length > 0
+      ? input.before.sourceRefs.map((ref) => `- ${ref}`)
+      : ["- none_observed"]),
     "",
-    "## Imported Requirement Markers",
+    "## Read Order",
     "",
-    ...(requirementMarkers.length > 0
-      ? requirementMarkers.map((marker) => `- ${marker}`)
-      : ["- none_detected"]),
+    ...readOrderLines({
+      workspaceRoot: input.sourceWorkspaceRoot,
+      sourceRelativePaths,
+      profile: input.profile
+    }),
+    "",
+    "## Installed Runtime Start Surface",
+    "",
+    "- inspect current gaps with `node_modules/.bin/odd-sdlc-ts gaps --workspace .`",
+    "- trigger bounded traversal with `node_modules/.bin/odd-sdlc-ts start --workspace . --target next --until converged --worker <transport>`",
+    "- treat retry caused by carrier/parser/prompt shape drift as framework failure, not product ambiguity",
+    "- treat release, test, deployment, or runtime closure without admitted execution evidence as incomplete proof",
+    "",
+    "## Interpretation Rule",
+    "",
+    "- use this surface to orient quickly",
+    "- use imported project sources as authority",
+    "- treat copied template/bootstrap history as provenance rather than live workspace guidance",
+    "- if ontology remains incomplete, preserve the gap as residual pressure instead of inferring it from repository context",
     ""
   ].join("\n");
 }
@@ -1406,70 +1358,14 @@ export function materializeSdlcProjectConformance(input: {
     }
   };
 
-  mkdirSync(path.join(input.workspaceRoot, REQUIREMENTS_DIR_RELATIVE_PATH), {
-    recursive: true
-  });
   mkdirSync(path.join(input.workspaceRoot, "build_tenants"), { recursive: true });
 
-  write(INTENT_RELATIVE_PATH, [
-    "# Intent",
-    "",
-    "**Status**: Active",
-    "**Derived From**: `Fg_conform_project`",
-    "",
-    `${profile.projectSlug} exists to transform admitted unordered source documents into governed project surfaces.`,
-    "",
-    "The current bootstrap target is a conformant constitutional project",
-    "surface containing intent, product definition, and requirement-family",
-    "authority before downstream traversal opens.",
-    ""
-  ].join("\n"));
-
-  const importedRelativePaths = importedSourceRelativePaths(sourceWorkspaceRoot);
-
-  write(PRODUCT_RELATIVE_PATH, importedProductAuthorityContent({
+  writeCanonical(PROJECT_BOOTSTRAP_RELATIVE_PATH, projectBootstrapReadModelContent({
     sourceWorkspaceRoot,
-    relativePaths: importedRelativePaths,
-    profile
-  }));
-
-  write(GOALS_RELATIVE_PATH, [
-    "# Goals",
-    "",
-    "**Status**: Active",
-    "**Derived From**: `Fg_conform_project`",
-    "",
-    "- preserve imported authority as governed source truth",
-    "- realize the selected tenant under `build_tenants/`",
-    "- keep downstream traversal blocked until project conformance passes",
-    ""
-  ].join("\n"));
-
-  write(IMPORTED_SOURCES_RELATIVE_PATH, importedSourcesContent({
-    sourceWorkspaceRoot,
+    outputWorkspaceRoot: input.workspaceRoot,
+    profile,
     before
   }));
-  for (const familyFile of importedRequirementFamilyContents({
-    workspaceRoot: sourceWorkspaceRoot,
-    relativePaths: importedRelativePaths
-  })) {
-    write(familyFile.relativePath, familyFile.content);
-  }
-
-  write(PROJECT_BOOTSTRAP_RELATIVE_PATH, [
-    "# Project Bootstrap",
-    "",
-    `project_slug: ${profile.projectSlug}`,
-    `active_tenant: ${profile.activeTenant}`,
-    `selected_output_root: ${profile.selectedOutputRoot}`,
-    `runtime_root: ${profile.runtimeLayout.runtimeRoot}`,
-    `runtime_transform_asset_root: ${profile.runtimeLayout.transformAssetRoot}`,
-    `runtime_operator_run_root: ${profile.runtimeLayout.operatorRunRoot}`,
-    "governing_graph_function: Fg_conform_project",
-    "",
-    "This is an installed read model. It does not outrank specification truth.",
-    ""
-  ].join("\n"));
 
   writeCanonical(PROJECT_CONSTRAINTS_RELATIVE_PATH, canonicalProjectConstraints(profile));
 
@@ -1546,6 +1442,8 @@ export function admitSdlcConformProjectProfile(
     "capabilityContracts",
     "rootCodePolicy",
     "realizationMode",
+    "overlayStrategy",
+    "overlayRef",
     "resolutionReason",
     "sourceConstraintDigest"
   ]);
@@ -1611,6 +1509,15 @@ export function admitSdlcConformProjectProfile(
       record["realizationMode"],
       `${label}.realizationMode`,
       SDLC_REALIZATION_MODE_VALUES
+    ),
+    overlayStrategy: parseEnumValue(
+      record["overlayStrategy"],
+      `${label}.overlayStrategy`,
+      SDLC_PROFILE_OVERLAY_STRATEGY_VALUES
+    ),
+    overlayRef: normalizeSdlcTraversalOverlayRef(
+      parseNonEmptyString(record["overlayRef"], `${label}.overlayRef`),
+      `${label}.overlayRef`
     ),
     resolutionReason: parseNonEmptyString(
       record["resolutionReason"],

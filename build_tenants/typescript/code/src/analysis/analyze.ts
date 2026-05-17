@@ -23,6 +23,7 @@ import { deriveSummaryDrift } from "./summary_drift.js";
 import { buildDiagnostics, type DiagnosticDraft } from "./diagnostics.js";
 import { resolveSdlcFdRunAnalysisProfile } from "./profiles.js";
 import type {
+  SdlcFdRunAnalysisConceptualStageCoverage,
   SdlcFdRunAnalysisCurrentStateTelemetry,
   SdlcFdRunAnalysisEdgeAttempt,
   SdlcFdRunAnalysisProfile,
@@ -181,6 +182,141 @@ function aggregateProductFileCount(
   return seen.size;
 }
 
+const TEST35_CONCEPTUAL_STAGES = Object.freeze([
+  Object.freeze({
+    test35StageRef: "test35://stage/project-conformance",
+    expectedEdgeName: "Fg_conform_project_authority",
+    expectedTargetAssetType: "project_bootstrap_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/feature-decomposition",
+    expectedEdgeName: "derive_feature_decomp_surface",
+    expectedTargetAssetType: "feature_decomp_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/scenario-uat-pressure",
+    expectedEdgeName: "derive_scenario_surface",
+    expectedTargetAssetType: "scenario_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/uat-testcases",
+    expectedEdgeName: "derive_uat_testcases_surface",
+    expectedTargetAssetType: "uat_testcases_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/implementation-design",
+    expectedEdgeName: "derive_implementation_design_surface",
+    expectedTargetAssetType: "implementation_design_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/component-code",
+    expectedEdgeName: "derive_component_code_surface",
+    expectedTargetAssetType: "component_code_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/test-design",
+    expectedEdgeName: "derive_test_design_surface",
+    expectedTargetAssetType: "test_design_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/component-test",
+    expectedEdgeName: "derive_component_test_surface",
+    expectedTargetAssetType: "component_test_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/test-execution-prep",
+    expectedEdgeName: "prepare_test_execution_surface",
+    expectedTargetAssetType: "test_execution_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/test-run-archive",
+    expectedEdgeName: "derive_test_run_archive_surface",
+    expectedTargetAssetType: "test_run_archive_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/test-execution-result",
+    expectedEdgeName: "derive_test_execution_result_surface",
+    expectedTargetAssetType: "test_execution_result_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/code-rollup",
+    expectedEdgeName: "derive_code_surface",
+    expectedTargetAssetType: "code_surface",
+    stageClass: "rollup" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/release-preparation",
+    expectedEdgeName: "prepare_release_surface",
+    expectedTargetAssetType: "release_surface",
+    stageClass: "rollup" as const
+  })
+]);
+
+function attemptMatchesStage(
+  attempt: SdlcFdRunAnalysisEdgeAttempt,
+  stage: {
+    readonly expectedEdgeName: string;
+    readonly expectedTargetAssetType: string;
+  }
+): boolean {
+  return (
+    attempt.graphVectorRef === stage.expectedEdgeName ||
+    attempt.graphFunctionName === stage.expectedEdgeName ||
+    attempt.targetAssetType === stage.expectedTargetAssetType
+  );
+}
+
+function deriveConceptualStageCoverage(
+  attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
+): readonly SdlcFdRunAnalysisConceptualStageCoverage[] {
+  const rows: SdlcFdRunAnalysisConceptualStageCoverage[] = [];
+  const mappedAttemptRefs = new Set<string>();
+  for (const stage of TEST35_CONCEPTUAL_STAGES) {
+    const matches = attempts.filter((attempt) => attemptMatchesStage(attempt, stage));
+    for (const match of matches) {
+      mappedAttemptRefs.add(match.operatorRunRef);
+    }
+    const first = matches[0] ?? null;
+    rows.push(Object.freeze({
+      kind: "sdlc_fd_run_analysis_conceptual_stage_coverage" as const,
+      test35StageRef: stage.test35StageRef,
+      expectedEdgeName: stage.expectedEdgeName,
+      expectedTargetAssetType: stage.expectedTargetAssetType,
+      mappedEdgeName: first?.graphVectorRef ?? first?.graphFunctionName ?? null,
+      mappedTargetAssetType: first?.targetAssetType ?? null,
+      stageClass: first?.traversalClass ?? "missing",
+      operatorRunRefs: Object.freeze(matches.map((attempt) => attempt.operatorRunRef))
+    }));
+  }
+  for (const attempt of attempts) {
+    if (mappedAttemptRefs.has(attempt.operatorRunRef)) {
+      continue;
+    }
+    rows.push(Object.freeze({
+      kind: "sdlc_fd_run_analysis_conceptual_stage_coverage" as const,
+      test35StageRef: "test35://stage/unmapped-runtime-edge",
+      expectedEdgeName: "unmapped",
+      expectedTargetAssetType: "unmapped",
+      mappedEdgeName: attempt.graphVectorRef ?? attempt.graphFunctionName,
+      mappedTargetAssetType: attempt.targetAssetType,
+      stageClass: "unmapped" as const,
+      operatorRunRefs: Object.freeze([attempt.operatorRunRef])
+    }));
+  }
+  return Object.freeze(rows);
+}
+
 function maxRequirementObligationCount(
   attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
 ): number {
@@ -227,6 +363,7 @@ export function analyzeSdlcFdRunArchive(
     nowMs
   });
   const retry = deriveRetryForensics({ carriers, attempts });
+  const conceptualStageCoverage = deriveConceptualStageCoverage(attempts);
   const requirementObligationCount = maxRequirementObligationCount(attempts);
   const productFileCount = aggregateProductFileCount(carriers);
   const bloat = deriveBloatAndSlope({
@@ -292,6 +429,7 @@ export function analyzeSdlcFdRunArchive(
     diagnostics,
     bloatAndSlopeAnalysis: bloat.bloat,
     retryForensics: retry.forensics,
+    conceptualStageCoverage,
     summaryDrift: summaryDrift.report,
     evidenceIndex: evidenceIndexFromCarriers(carriers)
   });

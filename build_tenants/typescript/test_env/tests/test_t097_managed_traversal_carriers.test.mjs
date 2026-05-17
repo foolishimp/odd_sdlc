@@ -90,8 +90,14 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   assert.equal(ledgerBefore.status, "blocked");
   assert(
     ledgerBefore.residualGaps.includes(
-      "missing_output:specification/INTENT.md"
+      "missing_output:.ai-workspace/context/project_bootstrap.md"
     )
+  );
+  assert.equal(
+    ledgerBefore.residualGaps.includes(
+      "missing_output:specification/INTENT.md"
+    ),
+    false
   );
 
   const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
@@ -115,10 +121,6 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   assert.equal(archivedManifest.kind, "sdlc_managed_traversal_manifest");
   assert.equal(archivedManifest.graphFunctionName, FG_CONFORM_PROJECT);
   assert.deepStrictEqual(archivedManifest.expectedOutputRelativePaths, [
-    "specification/INTENT.md",
-    "specification/PRODUCT.md",
-    "specification/GOALS.md",
-    "specification/requirements/00-imported-sources.md",
     ".ai-workspace/context/project_bootstrap.md",
     ".ai-workspace/context/project_constraints.yml",
     "build_tenants/TENANT_REGISTRY.md"
@@ -145,7 +147,7 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   );
   assert(
     archivedLedger.actualOutputRefs.some((ref) =>
-      ref.endsWith("specification/INTENT.md")
+      ref.endsWith(".ai-workspace/context/project_bootstrap.md")
     )
   );
 });

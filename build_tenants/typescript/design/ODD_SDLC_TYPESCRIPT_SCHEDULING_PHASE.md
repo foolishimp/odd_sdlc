@@ -11,23 +11,21 @@
 
 ## Design Claim
 
-The TypeScript executive graph inserts schedule/work-plan surfaces between
-design/module outputs and materialization edges.
+The TypeScript executive graph carries schedule/work-plan rows inside composite
+implementation and test design carriers before materialization and execution
+edges.
 
 ```text
 implementation_design_surface
-  + implementation_module_surface
-  + implementation_stack_profile
-  -> derive_realization_schedule_surface
-  -> realization_schedule_surface
+  -> derive_component_code_surface
+  -> qualify_component_realization_surface
   -> derive_code_surface
   -> code_surface
 
 test_design_surface
-  + test_module_surface
-  + test_stack_profile
-  -> derive_test_schedule_surface
-  -> test_schedule_surface
+  -> derive_component_test_surface
+  -> prepare_test_execution_surface
+  -> derive_test_execution_result_surface
   -> derive_test_run_archive_surface
   -> test_run_archive_surface
 ```
@@ -45,7 +43,7 @@ The schedule does not select the next vector outside ABG.
 
 ## Carrier Content
 
-A schedule surface may represent:
+Schedule rows may represent:
 
 - planned work packages
 - dependency order
@@ -63,22 +61,23 @@ A schedule surface may represent:
 
 ## Graph Integration
 
-`derive_realization_schedule_surface` is inserted before `derive_code_surface`.
-`derive_code_surface` consumes `realization_schedule_surface`.
+`derive_implementation_design_surface` carries implementation work-plan rows
+before component code and code aggregation. `derive_component_code_surface`,
+`qualify_component_realization_surface`, and `derive_code_surface` consume the
+composite implementation design carrier.
 
-`derive_test_schedule_surface` is inserted before
-`derive_test_run_archive_surface`. `derive_test_run_archive_surface` consumes
-`test_schedule_surface`.
+`derive_test_design_surface` carries test execution schedule rows before
+component tests, command execution, qualification, and the run archive.
 
 The hook contract catalog derives the new contracts from the graph catalog and
 the declared target policies. Worker handoff manifests therefore cite the
-schedule surface through `inputAssetTypes` and traversal obligations.
+composite design carrier through `inputAssetTypes` and traversal obligations.
 
 ## Local Optimization
 
-This first slice publishes schedule surfaces as ordinary prompt-bearing target
-assets and requires them to name dependency graphs and tranche ledgers when the
-module/test/evidence graph is decomposable. It does not introduce a hidden
+This slice publishes schedule rows as typed carrier content and requires them
+to name dependency graphs and tranche ledgers when the implementation,
+test, or evidence graph is decomposable. It does not introduce a hidden
 imperative execution planner.
 
 Prompt-bearing worker handoffs carry two pressure forms:

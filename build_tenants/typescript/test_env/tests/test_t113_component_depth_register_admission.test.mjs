@@ -13,20 +13,52 @@ import path from "node:path";
 import {
   admitComponentDepthRegisterFromArtifact,
   deriveComponentDepthAssuranceLedger,
+  deriveWorkerHandoffManifest,
+  hookContractByEdgeName,
+  materializeSdlcProjectConformance,
   sha256Text
 } from "../../build/semantic/code/src/index.js";
 
-function writeScheduleArtifact(register) {
-  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-schedule-"));
-  const outputFile = path.join(root, "component_realization_schedule_surface.md");
+function makeWorkspace() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-workspace-"));
+  mkdirSync(path.join(root, "specification"), { recursive: true });
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(path.join(root, "README.md"), "# T-113 Fixture\n", "utf8");
+  writeFileSync(
+    path.join(root, "specification/INTENT.md"),
+    "# Intent\n\nINT-T113: Prove component-depth carrier admission.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/REQUIREMENTS.md"),
+    "# Requirements\n\nREQ-T113-001: Materialized component files satisfy typed component rows.\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t113_fixture",
+      "active_tenant: scala_spark",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark",
+      "    language: scala",
+      "    build_tool: sbt"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: root });
+  return root;
+}
+
+function writeArtifact(register, name = register.targetAssetType) {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
+  const outputFile = path.join(root, `${name}.md`);
   const content = [
-    "# component_realization_schedule_surface",
+    `# ${register.targetAssetType}`,
     "",
-    "The schedule is intentionally production-shaped and includes tranche metadata.",
-    "",
-    "```text",
-    "component dependency graph prose can appear before the typed carrier",
-    "```",
+    "Typed component-depth carrier follows.",
     "",
     "```json component_depth_register",
     JSON.stringify(register, null, 2),
@@ -38,239 +70,202 @@ function writeScheduleArtifact(register) {
   return { outputFile, content };
 }
 
-function writeComponentTopologyArtifact(register) {
-  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-topology-"));
-  const outputFile = path.join(root, "implementation_component_topology_surface.md");
-  const content = [
-    "# implementation_component_topology_surface",
-    "",
-    "```json",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
-  mkdirSync(path.dirname(outputFile), { recursive: true });
-  writeFileSync(outputFile, content, "utf8");
-  return { outputFile, content };
-}
-
-function writeTestTopologyArtifact(register) {
-  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-test-topology-"));
-  const outputFile = path.join(root, "test_component_topology_surface.md");
-  const content = [
-    "# test_component_topology_surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
-  mkdirSync(path.dirname(outputFile), { recursive: true });
-  writeFileSync(outputFile, content, "utf8");
-  return { outputFile, content };
-}
-
-function reportFor(outputFile, content) {
+function reportFor(outputFile, content, manifest, materializedFiles = []) {
   return {
     kind: "odd_sdlc.worker_result_report",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_realization_schedule_surface",
-    targetAssetType: "component_realization_schedule_surface",
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
     outputFile,
     digest: sha256Text(content),
-    summary: "T-113 schedule admission fixture",
+    summary: "T-113 component-depth admission fixture",
     unresolvedReasons: [],
-    materializedFiles: [],
+    materializedFiles,
+    materializationDiagnostics: [],
     executionEvidence: null,
     executionEvidenceErrors: [],
-    obligationAssessments: []
+    obligationAssessments: [],
+    fpTransformRequestRef: null,
+    fpTransformResultRef: null,
+    fpTransformStatus: null,
+    fpEvaluateResultRef: null
   };
 }
 
-test("T-113 admits production-shaped component realization schedule registers", () => {
-  const register = {
-    kind: "sdlc_component_depth_register",
-    registerVersion: "ts-component-depth-v1",
-    targetAssetType: "component_realization_schedule_surface",
-    componentRealizationRows: [
-      {
-        kind: "sdlc_component_realization_row",
-        componentId: "C-2-3",
-        moduleName: "cdme-adjoint",
-        trancheId: "T-1",
-        relativePath: "modules/cdme-adjoint/src/main/scala/cdme/adjoint/BackwardTraversalPlanner.scala",
-        firstProductFileToChange: "modules/cdme-adjoint/src/main/scala/cdme/adjoint/BackwardTraversalPlanner.scala",
-        upstreamComponentIds: ["C-2-1", "C-2-2", "C-0-1"],
-        requirementIds: ["REQ-ADJ-004", "REQ-BT-001"],
-        sourceAssetRefs: [
-          "implementation_component_topology_surface:C-2-3",
-          "implementation_design_surface:I-2",
-          "implementation_module_surface:M-2:cdme-adjoint"
-        ]
-      }
-    ]
+function materializeSourceFile(manifest, relativePath, content) {
+  const absolutePath = path.join(manifest.productMaterialization.tenantRoot, relativePath);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, content, "utf8");
+  return {
+    kind: "sdlc_materialized_product_file",
+    role: "source",
+    relativePath,
+    absolutePath,
+    digest: sha256Text(content),
+    byteCount: Buffer.byteLength(content, "utf8"),
+    materializationSource: "current_attempt"
   };
-  const { outputFile, content } = writeScheduleArtifact(register);
+}
 
-  const admission = admitComponentDepthRegisterFromArtifact({
-    targetAssetType: "component_realization_schedule_surface",
-    outputFile
-  });
-  assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.registerVersion, "ts-component-depth-v1");
-  assert.equal(admission.register.componentRealizationRows.length, 1);
-  assert.equal(admission.register.componentRealizationRows[0].publicBoundary, admission.register.componentRealizationRows[0].firstProductFileToChange);
-  assert.deepEqual(admission.register.componentRealizationRows[0].upstreamComponentIds, ["C-2-1", "C-2-2", "C-0-1"]);
+function componentRow() {
+  return {
+    kind: "sdlc_component_realization_row",
+    componentId: "cmp.compiler.ir",
+    moduleName: "cdme-compiler",
+    relativePath: "cdme-compiler/src/main/scala/cdme/compiler/ir/package.scala",
+    publicBoundary: "package_internal",
+    trancheId: "tranche:foundation-ir",
+    firstProductFileToChange:
+      "cdme-compiler/src/main/scala/cdme/compiler/ir/package.scala",
+    upstreamComponentIds: [],
+    requirementIds: ["REQ-TYP-001"],
+    sourceAssetRefs: ["asset://implementation_design_surface"]
+  };
+}
 
-  const ledger = deriveComponentDepthAssuranceLedger({
-    manifest: {
-      targetAssetType: "component_realization_schedule_surface"
-    },
-    report: reportFor(outputFile, content)
-  });
-  assert(ledger);
-  assert.equal(ledger.reasons.length, 0);
-});
-
-test("B-084 admits metadata-rich worker component realization schedules after prose fences", () => {
-  const register = {
-    kind: "sdlc_component_depth_register",
-    registerVersion: "ts-component-depth-v1",
-    targetAssetType: "component_realization_schedule_surface",
+test("T-113 admits production-shaped component realization rows on current component targets", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_realization_schedule_surface",
-    vectorIndex: 14,
-    moduleDependencyGraph: {
-      nodes: ["cmp.compiler.ir"],
-      edges: []
-    },
-    componentRealizationRows: [
-      {
-        kind: "sdlc_component_realization_row",
-        componentId: "cmp.compiler.ir",
-        moduleName: "cdme-compiler",
-        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/ir/",
-        publicBoundary: "package_internal",
-        firstProductFileToChange:
-          "cdme-compiler/src/main/scala/cdme/compiler/ir/package.scala",
-        trancheId: "T1.foundation_ir",
-        realizationOrder: 1,
-        upstreamComponentIds: [],
-        publishesSurfaces: [],
-        sourceAssetRefs: ["asset://implementation_component_topology_surface"],
-        requirementIds: ["REQ-TYP-001"]
-      }
-    ]
+    edgeName: contract.edgeName,
+    vectorIndex: 9,
+    contract,
+    runId: "t113-component-depth"
+  });
+  const row = componentRow();
+  const materializedFile = materializeSourceFile(
+    manifest,
+    row.relativePath,
+    "package cdme.compiler.ir\n\nfinal case class IrNode(id: String)\n"
+  );
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [row]
   };
-  const { outputFile } = writeScheduleArtifact(register);
+  const { outputFile, content } = writeArtifact(register);
 
   const admission = admitComponentDepthRegisterFromArtifact({
-    targetAssetType: "component_realization_schedule_surface",
+    targetAssetType: "component_code_surface",
     outputFile
   });
-
   assert.equal(admission.status, "admitted");
   assert.equal(admission.register.componentRealizationRows.length, 1);
   assert.equal(
     admission.register.componentRealizationRows[0].firstProductFileToChange,
     "cdme-compiler/src/main/scala/cdme/compiler/ir/package.scala"
   );
+
+  const ledger = deriveComponentDepthAssuranceLedger({
+    manifest,
+    report: reportFor(outputFile, content, manifest, [materializedFile])
+  });
+  assert(ledger);
+  assert.equal(ledger.reasons.length, 0);
 });
 
-test("B-084 admits metadata-rich worker component topology registers", () => {
+test("B-084 admits metadata-rich component realization rows after prose fences", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
-    targetAssetType: "implementation_component_topology_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_implementation_component_topology_surface",
-    vectorIndex: 12,
-    featureScopeRef:
-      "scope://odd_sdlc/implementation-component-topology-surface/steel-thread/cdme-compiler",
-    includedModuleNames: ["cdme-compiler"],
-    deferredModuleNames: ["cdme-assurance"],
-    activeTenant: "scala_spark",
-    relativePathBasis: "tenant_root",
-    componentTopologyRows: [
+    targetAssetType: "component_realization_qualification_surface",
+    componentRealizationRows: [
       {
-        kind: "sdlc_component_topology_row",
-        componentId: "cmp.compiler.api",
-        moduleName: "cdme-compiler",
-        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/api/",
-        publicBoundary: "module_public",
-        publicSymbols: ["compile"],
-        concernRole: "io_adapter",
-        concern: "public_boundary_orchestration",
-        domainCarrier: null,
-        adapter: "orchestration_entry_adapter",
-        stateful: true,
-        operations: ["compile"],
-        sourceAssetRefs: ["asset://implementation_module_surface"],
-        requirementIds: ["REQ-AI-001"]
-      },
-      {
-        kind: "sdlc_component_topology_row",
-        componentId: "cmp.compiler.parse",
-        moduleName: "cdme-compiler",
-        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/parse/",
-        publicBoundary: "package_internal",
-        concernRole: "parser",
-        concern: "parsing",
-        domainCarrier: "surface_binding",
-        adapter: null,
-        sourceAssetRefs: ["asset://implementation_module_surface"],
-        requirementIds: ["REQ-TYP-001"]
+        ...componentRow(),
+        realizationOrder: 1,
+        publishesSurfaces: [],
+        sourceAssetRefs: ["asset://implementation_design_surface"]
       }
     ]
   };
-  const { outputFile } = writeComponentTopologyArtifact(register);
+  const { outputFile } = writeArtifact(register, "component_realization_qualification_surface");
 
   const admission = admitComponentDepthRegisterFromArtifact({
-    targetAssetType: "implementation_component_topology_surface",
+    targetAssetType: "component_realization_qualification_surface",
     outputFile
   });
 
   assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.componentTopologyRows.length, 2);
-  assert.equal(admission.register.componentTopologyRows[0].kind, "sdlc_component_topology_row");
-  assert.equal(admission.register.componentTopologyRows[0].concernRole, "io_adapter");
-  assert.equal(admission.register.componentTopologyRows[1].concernRole, "parser");
+  assert.equal(admission.register.componentRealizationRows.length, 1);
+  assert.equal(
+    admission.register.componentRealizationRows[0].publicBoundary,
+    "package_internal"
+  );
 });
 
-test("B-084 admits metadata-rich worker test component topology rows", () => {
+test("B-084 admits metadata-rich component test rows", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
-    targetAssetType: "test_component_topology_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_test_component_topology_surface",
-    vectorIndex: 21,
-    testComponentTopologyRows: [
+    targetAssetType: "component_test_surface",
+    componentTestRows: [
       {
-        kind: "sdlc_test_component_topology_row",
+        kind: "sdlc_component_test_realization_row",
         testClassId: "tc.compiler.api.compile-happy-path",
-        moduleName: "cdme-compiler",
         relativePath:
           "cdme-compiler/src/test/scala/cdme/compiler/api/CompilerSpec.scala",
-        testKind: "unit",
-        executionShard: "sbt:test",
         testcaseIds: ["TC-COMPILER-001"],
-        coveredComponentIds: ["cmp.compiler.api"],
-        requirementIds: ["REQ-AI-001"]
+        componentIds: ["cmp.compiler.api"],
+        requirementIds: ["REQ-AI-001"],
+        shardId: "sbt:test"
       }
     ]
   };
-  const { outputFile } = writeTestTopologyArtifact(register);
+  const { outputFile } = writeArtifact(register, "component_test_surface");
 
   const admission = admitComponentDepthRegisterFromArtifact({
-    targetAssetType: "test_component_topology_surface",
+    targetAssetType: "component_test_surface",
     outputFile
   });
 
   assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.testComponentTopologyRows.length, 1);
+  assert.equal(admission.register.componentTestRows.length, 1);
+  assert.equal(admission.register.componentTestRows[0].shardId, "sbt:test");
+});
+
+test("T-113 admits repair and release-depth rows on current component-depth targets", () => {
+  const repairRegister = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_repair_schedule_surface",
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "no_repair_required",
+      repairRows: [],
+      evidenceRefs: ["evidence://t113/repair"]
+    }
+  };
+  const releaseRegister = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "release_depth_parity_surface",
+    releaseDepthParity: {
+      kind: "sdlc_release_depth_parity_assessment",
+      status: "met",
+      summary: "current component-depth release parity is met",
+      blockingReasons: [],
+      evidenceRefs: ["evidence://t113/release"]
+    }
+  };
+  const repair = writeArtifact(repairRegister, "component_repair_schedule_surface");
+  const release = writeArtifact(releaseRegister, "release_depth_parity_surface");
+
   assert.equal(
-    admission.register.testComponentTopologyRows[0].shardId,
-    "sbt:test"
+    admitComponentDepthRegisterFromArtifact({
+      targetAssetType: "component_repair_schedule_surface",
+      outputFile: repair.outputFile
+    }).status,
+    "admitted"
+  );
+  assert.equal(
+    admitComponentDepthRegisterFromArtifact({
+      targetAssetType: "release_depth_parity_surface",
+      outputFile: release.outputFile
+    }).status,
+    "admitted"
   );
 });

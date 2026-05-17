@@ -28,9 +28,7 @@ import type {
 } from "./carriers.js";
 
 const DESIGN_COMPLETENESS_TARGETS = Object.freeze([
-  "implementation_module_surface",
-  "aggregate_domain_model_surface",
-  "aggregate_sunny_day_sequence_surface"
+  "implementation_design_surface"
 ] as const);
 
 function targetRequiresDesignCompleteness(targetAssetType: string): boolean {
@@ -211,6 +209,125 @@ function admissionReasons(
       })
     )
   );
+}
+
+function contentPresenceReasons(input: {
+  readonly register: SdlcDesignDepthRegister;
+  readonly evidenceRefs: readonly string[];
+}): readonly SdlcAssuranceLedgerReason[] {
+  if (input.register.targetAssetType !== "implementation_design_surface") {
+    return Object.freeze([]);
+  }
+  return Object.freeze([
+    ...(input.register.stackProfileRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_stack_profile_rows_missing",
+            message: "Implementation design content does not declare a stack profile row.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.implementationModuleRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_implementation_module_rows_missing",
+            message: "Implementation design content does not declare an implementation module row.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.aggregateDomainModelRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_aggregate_domain_model_rows_missing",
+            message: "Implementation design content does not declare an aggregate domain model row.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.moduleSchemaFragments.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_module_schema_fragments_missing",
+            message: "Implementation design content does not declare module schema fragments.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.moduleStateDiagramFragments.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_module_state_diagram_fragments_missing",
+            message: "Implementation design content does not declare module state diagram fragments.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.aggregateDomainModel === null
+      ? [
+          reason({
+            code: "design_depth_aggregate_domain_model_missing",
+            message: "Implementation design content does not declare an aggregate domain model.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]
+      : []),
+    ...(input.register.sunnyDaySequenceRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_sunny_day_sequence_rows_missing",
+            message: "Implementation design content does not declare a sunny-day sequence row.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.aggregateSunnyDaySequence === null
+      ? [
+          reason({
+            code: "design_depth_aggregate_sunny_day_sequence_missing",
+            message: "Implementation design content does not declare an aggregate sunny-day sequence.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]
+      : []),
+    ...(input.register.componentTopologyRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_component_topology_rows_missing",
+            message: "Implementation design content does not declare component topology rows.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.componentRealizationRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_component_realization_rows_missing",
+            message: "Implementation design content does not declare component realization rows.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.fileTargetRows.length > 0
+      ? []
+      : [
+          reason({
+            code: "design_depth_file_target_rows_missing",
+            message: "Implementation design content does not declare file target rows.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]),
+    ...(input.register.designCompletenessVerdict === null
+      ? [
+          reason({
+            code: "design_depth_completeness_verdict_missing",
+            message: "Implementation design content does not declare a design completeness verdict.",
+            evidenceRefs: input.evidenceRefs
+          })
+        ]
+      : [])
+  ]);
 }
 
 function moduleSchemaReasons(input: {
@@ -658,9 +775,6 @@ function axisVerdictReasons(input: {
   if (input.axis.status === "satisfied") {
     return Object.freeze([]);
   }
-  if (isDownstreamOwnedAggregateFlowPartial(input)) {
-    return Object.freeze([]);
-  }
   if (input.featureScope.mode !== "full_breadth") {
     const mentionsCurrentScope = input.axis.reasons.some((axisReason) =>
       axisReasonMentionsScope({
@@ -704,33 +818,6 @@ function axisVerdictReasons(input: {
   ]);
 }
 
-function isDownstreamOwnedAggregateFlowPartial(input: {
-  readonly targetAssetType: string;
-  readonly axis: SdlcDesignCompletenessAxisVerdict;
-}): boolean {
-  if (
-    input.targetAssetType !== "aggregate_domain_model_surface" ||
-    input.axis.axis !== "flow" ||
-    input.axis.status !== "partial" ||
-    input.axis.reasons.length === 0
-  ) {
-    return false;
-  }
-  return input.axis.reasons.every((axisReason) => {
-    const normalized = axisReason.toLowerCase();
-    const mentionsDownstream =
-      normalized.includes("downstream") ||
-      normalized.includes("next edge") ||
-      normalized.includes("next graph edge");
-    const mentionsSunnyDay =
-      normalized.includes("derive_aggregate_sunny_day_sequence_surface") ||
-      normalized.includes("aggregate_sunny_day_sequence_surface") ||
-      normalized.includes("sunny-day sequence") ||
-      normalized.includes("sunny day sequence");
-    return mentionsDownstream && mentionsSunnyDay;
-  });
-}
-
 function verdictReasons(input: {
   readonly register: SdlcDesignDepthRegister;
   readonly featureScope: SdlcFeatureScope;
@@ -768,7 +855,11 @@ function registerReasons(input: {
   readonly evidenceRefs: readonly string[];
 }): readonly SdlcAssuranceLedgerReason[] {
   return Object.freeze([
-    ...(input.register.targetAssetType === "implementation_module_surface"
+    ...contentPresenceReasons({
+      register: input.register,
+      evidenceRefs: input.evidenceRefs
+    }),
+    ...(input.register.targetAssetType === "implementation_design_surface"
       ? scopedModuleSchemaReasons({
           register: input.register,
           featureScope: input.featureScope,

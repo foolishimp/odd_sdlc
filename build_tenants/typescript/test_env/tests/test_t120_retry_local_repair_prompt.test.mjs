@@ -61,15 +61,15 @@ function workspaceRoot() {
 
 function retryDossier() {
   const reason =
-    "component_depth_register_invalid:component_depth_register.bindingId: unexpected field";
+    "component_depth_register_invalid:component_depth_register.componentRealizationRows[0].bindingId: unexpected field";
   const blockingReason = sdlcBlockingReasonFromLegacy({ reason });
   return {
     kind: "sdlc_postflight_gap_dossier",
     status: "open",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_implementation_component_topology_surface",
-    vectorIndex: 12,
-    targetAssetType: "implementation_component_topology_surface",
+    edgeName: "derive_component_code_surface",
+    vectorIndex: 14,
+    targetAssetType: "component_code_surface",
     reasons: [
       {
         kind: "sdlc_postflight_gap_reason",
@@ -79,7 +79,7 @@ function retryDossier() {
       }
     ],
     evidenceRefs: [
-      "file:///tmp/t120/implementation_component_topology_surface.md",
+      "file:///tmp/t120/component_code_surface.md",
       "file:///tmp/t120/postflight.json"
     ],
     priorManifestId: "file:///tmp/t120/handoff_manifest.json",
@@ -124,9 +124,9 @@ function designRetryDossier() {
     kind: "sdlc_postflight_gap_dossier",
     status: "open",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_implementation_module_surface",
+    edgeName: "derive_implementation_design_surface",
     vectorIndex: 10,
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     reasons: [
       {
         kind: "sdlc_postflight_gap_reason",
@@ -136,7 +136,7 @@ function designRetryDossier() {
       }
     ],
     evidenceRefs: [
-      "file:///tmp/t120/implementation_module_surface.md",
+      "file:///tmp/t120/implementation_design_surface.md",
       "file:///tmp/t120/design_depth_candidate_0_normalized.json",
       "file:///tmp/t120/postflight.json"
     ],
@@ -154,9 +154,9 @@ function designAttributeMissingRetryDossier() {
     kind: "sdlc_postflight_gap_dossier",
     status: "open",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_implementation_module_surface",
+    edgeName: "derive_implementation_design_surface",
     vectorIndex: 10,
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     reasons: [
       {
         kind: "sdlc_postflight_gap_reason",
@@ -166,7 +166,7 @@ function designAttributeMissingRetryDossier() {
       }
     ],
     evidenceRefs: [
-      "file:///tmp/t120/implementation_module_surface.md",
+      "file:///tmp/t120/implementation_design_surface.md",
       "file:///tmp/t120/design_depth_candidate_0_normalized.json"
     ],
     priorManifestId: "file:///tmp/t120/handoff_manifest.json",
@@ -177,9 +177,7 @@ function designAttributeMissingRetryDossier() {
 }
 
 function retryManifest() {
-  const contract = hookContractByEdgeName(
-    "derive_implementation_component_topology_surface"
-  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
   return deriveWorkerHandoffManifest({
     workspaceRoot: workspaceRoot(),
     graphFunctionName: "bootstrap_release_self_test",
@@ -243,22 +241,20 @@ function outsidePathRetryManifest() {
   });
 }
 
-function componentRealizationScheduleManifest() {
-  const contract = hookContractByEdgeName(
-    "derive_component_realization_schedule_surface"
-  );
+function componentRealizationManifest() {
+  const contract = hookContractByEdgeName("derive_component_code_surface");
   return deriveWorkerHandoffManifest({
     workspaceRoot: workspaceRoot(),
     graphFunctionName: "bootstrap_release_self_test",
     edgeName: contract.edgeName,
     vectorIndex: 13,
     contract,
-    runId: "t120-component-realization-schedule"
+    runId: "t120-component-realization"
   });
 }
 
 function designRetryManifest() {
-  const contract = hookContractByEdgeName("derive_implementation_module_surface");
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
   return deriveWorkerHandoffManifest({
     workspaceRoot: workspaceRoot(),
     graphFunctionName: "bootstrap_release_self_test",
@@ -275,7 +271,7 @@ function designRetryManifest() {
 }
 
 function designAttributeMissingRetryManifest() {
-  const contract = hookContractByEdgeName("derive_implementation_module_surface");
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
   return deriveWorkerHandoffManifest({
     workspaceRoot: workspaceRoot(),
     graphFunctionName: "bootstrap_release_self_test",
@@ -533,7 +529,7 @@ test("T-120 retry prompt projects exact schema-local carrier repair pressure", (
   assert.equal(instruction.repairScope, "schema_local");
   assert.equal(
     instruction.reason,
-    "component_depth_register_invalid:component_depth_register.bindingId: unexpected field"
+    "component_depth_register_invalid:component_depth_register.componentRealizationRows[0].bindingId: unexpected field"
   );
   assert.equal(instruction.reasonClass, "assurance");
   assert.equal(
@@ -542,17 +538,17 @@ test("T-120 retry prompt projects exact schema-local carrier repair pressure", (
   );
   assert(
     instruction.acceptedCarrierFieldSet.includes(
-      "componentTopologyRows[].componentId"
+      "componentRealizationRows[].componentId"
     )
   );
   assert(
     instruction.acceptedCarrierFieldSet.includes(
-      "componentTopologyRows[].sourceAssetRefs"
+      "componentRealizationRows[].sourceAssetRefs"
     )
   );
   assert(
     instruction.rejectedArtifactRefs.includes(
-      "file:///tmp/t120/implementation_component_topology_surface.md"
+      "file:///tmp/t120/component_code_surface.md"
     )
   );
   assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
@@ -582,6 +578,181 @@ test("T-158 retry frontier drops stale blockers repaired by the latest dossier",
     first.currentGapDossierRef,
     latest.currentGapDossierRef
   ]);
+});
+
+test("T-164 retry frontier preserves distinct same-code evaluated blockers", () => {
+  const first = retryDossierWithReasons("file:///tmp/t164/gap-1.json", [
+    "materialized_product_requirement_lineage_missing"
+  ]);
+  const latestRef = "file:///tmp/t164/gap-2.json";
+  const details = [
+    "cdme-assurance/src/main/scala/cdme/assurance/DataProfiler.scala: unrelated:requirement:workspace.stage_03_ai_requirements.req_dq_004",
+    "cdme-engine/src/main/scala/cdme/engine/LateArrivalHandler.scala: unrelated:requirement:workspace.stage_13_pdm_requirements.req_pdm_006",
+    "cdme-executor/src/main/scala/cdme/executor/ArtifactVersionStore.scala: unrelated:requirement:workspace.stage_05_cov_requirements.req_trv_005_b",
+    "cdme-executor/src/main/scala/cdme/executor/RunManifestManager.scala: unrelated:requirement:workspace.stage_03_ai_requirements.req_trv_005_a"
+  ];
+  const latest = {
+    ...retryDossierWithReasons(latestRef, []),
+    edgeName: "derive_component_code_surface",
+    vectorIndex: 14,
+    targetAssetType: "component_code_surface",
+    reasons: details.map((detail) => ({
+      kind: "sdlc_postflight_gap_reason",
+      reason: "materialized_product_requirement_lineage_missing",
+      reasonClass: "missing_evidence",
+      blockingReason: {
+        ...sdlcBlockingReasonFromLegacy({
+          reason: "materialized_product_requirement_lineage_missing"
+        }),
+        code: "materialized_product_requirement_lineage_missing",
+        reasonClass: "missing_evidence",
+        lawfulReentryPoint: "same_edge_retry",
+        message:
+          "Materialized product evidence does not satisfy the product contract.",
+        detail,
+        evidenceRefs: [latestRef]
+      }
+    }))
+  };
+
+  const [compact] = compactSdlcPriorGapDossiersForRetryContext([first, latest]);
+
+  assert(compact);
+  assert.equal(compact.currentGapDossierRef, latest.currentGapDossierRef);
+  assert.equal(compact.reasons.length, details.length);
+  assert.deepEqual(
+    compact.reasons.map((reason) => reason.blockingReason.detail),
+    details
+  );
+});
+
+test("T-164 retry prompt names current evaluated requirement gaps", () => {
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const reasons = [
+    "obligation_assessment_blocked:requirement:workspace.requirements.req_dq_003",
+    "obligation_assessment_blocked:requirement:workspace.stage_15_trv_requirements.req_trv_005_b"
+  ];
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 14,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 14,
+          targetAssetType: "component_code_surface",
+          reasons: reasons.map((reason) => ({
+            kind: "sdlc_postflight_gap_reason",
+            reason,
+            reasonClass: "assurance",
+            blockingReason: {
+              ...sdlcBlockingReasonFromLegacy({ reason }),
+              code: "assurance_ledger_reason",
+              detail: reason,
+              evidenceRefs: ["file:///tmp/t164/fp_evaluate_result.json"],
+              lawfulReentryPoint: "repair_worker_output"
+            }
+          })),
+          evidenceRefs: ["file:///tmp/t164/gap_dossier.json"],
+          priorManifestId: "file:///tmp/t164/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t164/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["repair_worker_output"]
+        }
+      ]
+    },
+    runId: "t164-current-evaluated-gaps"
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.match(prompt, /Current evaluated gaps:/u);
+  assert.match(prompt, /These are your current evaluated gaps/u);
+  assert.match(
+    prompt,
+    /requirementTraceObligationIds as the prompt-visible required product-file requirement tag set/u
+  );
+  assert.match(
+    prompt,
+    /Current evaluated gaps are also admissible repair tags/u
+  );
+  assert.doesNotMatch(prompt, /complete product-file requirement tag set/u);
+  assert.match(prompt, /gapDossierRef: file:\/\/\/tmp\/t164\/gap_dossier\.json/u);
+  assert.match(prompt, /requirement:workspace\.requirements\.req_dq_003/u);
+  assert.match(
+    prompt,
+    /requirement:workspace\.stage_15_trv_requirements\.req_trv_005_b/u
+  );
+  assert.match(prompt, /assurance_ledger_reason/u);
+  assert.match(prompt, /file:\/\/\/tmp\/t164\/fp_evaluate_result\.json/u);
+});
+
+test("T-164 retry prompt preserves workspace-relative diagnostic paths", () => {
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const detail =
+    "cdme-executor/src/main/scala/cdme/executor/RunManifestManager.scala: unrelated:requirement:workspace.stage_03_ai_requirements.req_trv_005_a";
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 14,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 14,
+          targetAssetType: "component_code_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason: "materialized_product_requirement_lineage_missing",
+              reasonClass: "missing_evidence",
+              blockingReason: {
+                ...sdlcBlockingReasonFromLegacy({
+                  reason: "materialized_product_requirement_lineage_missing"
+                }),
+                code: "materialized_product_requirement_lineage_missing",
+                reasonClass: "missing_evidence",
+                lawfulReentryPoint: "same_edge_retry",
+                message:
+                  "Materialized product evidence does not satisfy the product contract.",
+                detail,
+                evidenceRefs: ["file:///tmp/t164/gap_dossier.json"]
+              }
+            }
+          ],
+          evidenceRefs: ["file:///tmp/t164/gap_dossier.json"],
+          priorManifestId: "file:///tmp/t164/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t164/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t164-current-evaluated-relative-paths"
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.match(
+    prompt,
+    /cdme-executor\/src\/main\/scala\/cdme\/executor\/RunManifestManager\.scala/u
+  );
+  assert.doesNotMatch(prompt, /outside-workspace-path:RunManifestManager\.scala/u);
 });
 
 test("T-120 component carrier retry instructions fail closed if schema fields are omitted", () => {
@@ -616,7 +787,7 @@ test("T-120 retry prompts redact outside-workspace diagnostic paths", () => {
 });
 
 test("T-120 component realization schedule prompt publishes admitted row schema", () => {
-  const files = writeHandoffFiles(componentRealizationScheduleManifest());
+  const files = writeHandoffFiles(componentRealizationManifest());
   const invocationPackage = JSON.parse(
     readFileSync(files.invocationPackagePath, "utf8")
   );
@@ -639,34 +810,29 @@ test("T-120 component realization schedule prompt publishes admitted row schema"
 });
 
 test("T-120 component topology prompt declares publicBoundary as a string field", () => {
-  const files = writeHandoffFiles(retryManifest());
+  const files = writeHandoffFiles(designRetryManifest());
   const invocationPackage = JSON.parse(
     readFileSync(files.invocationPackagePath, "utf8")
   );
   const prompt = readFileSync(files.promptPath, "utf8");
+  const [instruction] = invocationPackage.retryRepairInstructions;
 
   assert(
     invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes(
-        "componentTopologyRows with kind=sdlc_component_topology_row"
-      )
+      directive.includes("sdlc_component_topology_row")
     )
+  );
+  assert(instruction);
+  assert(
+    instruction.acceptedCarrierFieldSet.includes("componentTopologyRows[].publicBoundary")
   );
   assert(
-    invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes("publicBoundary must be a string")
-    )
+    instruction.acceptedCarrierFieldSet.includes("componentTopologyRows[].concernRole")
   );
-  assert(
-    invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes(
-        "concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other"
-      )
-    )
+  assert.match(
+    prompt,
+    /componentTopologyRows\[\]\.componentId\/moduleName\/relativePath\/publicBoundary\/concernRole/u
   );
-  assert.match(prompt, /publicBoundary must be a string/u);
-  assert.match(prompt, /node-entry-script/u);
-  assert.match(prompt, /concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other/u);
 });
 
 test("T-120 design-depth retries carry nested canonical attribute fields", () => {
@@ -691,6 +857,26 @@ test("T-120 design-depth retries carry nested canonical attribute fields", () =>
   assert(
     instruction.acceptedCarrierFieldSet.includes(
       "moduleSchemaFragments[].entities[].attributes[].valueType"
+    )
+  );
+  assert(
+    instruction.acceptedCarrierFieldSet.includes(
+      "aggregateSunnyDaySequence.steps[].stepId"
+    )
+  );
+  assert(
+    instruction.acceptedCarrierFieldSet.includes(
+      "aggregateSunnyDaySequence.steps[].moduleName"
+    )
+  );
+  assert(
+    instruction.acceptedCarrierFieldSet.includes(
+      "designCompletenessVerdict.flow.status"
+    )
+  );
+  assert(
+    !instruction.acceptedCarrierFieldSet.includes(
+      "aggregateSunnyDaySequence.steps[].actor"
     )
   );
   assert(

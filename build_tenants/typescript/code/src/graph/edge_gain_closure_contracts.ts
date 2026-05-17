@@ -8,8 +8,7 @@
 
 import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE
 } from "./catalog.js";
 import {
   FG_AMBIGUITY_ASSURANCE_LEDGER,
@@ -31,8 +30,6 @@ export type SdlcEdgeGainClosureCategory =
   | "conformance"
   | "authority_synthesis"
   | "solution_formalisation"
-  | "testcase_synthesis_and_authority"
-  | "implementation_formalisation_and_planning"
   | "implementation_encoding"
   | "implementation_qualification"
   | "test_formalisation_and_planning"
@@ -132,8 +129,6 @@ const CATEGORY_ORDER = Object.freeze([
   "conformance",
   "authority_synthesis",
   "solution_formalisation",
-  "testcase_synthesis_and_authority",
-  "implementation_formalisation_and_planning",
   "implementation_encoding",
   "implementation_qualification",
   "test_formalisation_and_planning",
@@ -198,16 +193,6 @@ function deterministicOptimizationsForCategory(
       return Object.freeze([
         "fd://odd-sdlc/design-surface-shape",
         "fd://odd-sdlc/design-trace-coverage"
-      ]);
-    case "testcase_synthesis_and_authority":
-      return Object.freeze([
-        "fd://odd-sdlc/testcase-schema",
-        "fd://odd-sdlc/scenario-trace-coverage"
-      ]);
-    case "implementation_formalisation_and_planning":
-      return Object.freeze([
-        "fd://odd-sdlc/implementation-plan-shape",
-        "fd://odd-sdlc/module-allocation-coverage"
       ]);
     case "implementation_encoding":
       return Object.freeze([
@@ -610,10 +595,32 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/requirements"]
   }),
   contract({
+    edgeRef: "derive_uat_testcases_surface",
+    category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
+    sourceAssetTypes: ["requirement_surface"],
+    targetAssetType: "uat_testcases_surface",
+    compositionRole: "prerequisite",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t164/uat-testcases"],
+    residualPressureRefs: ["pressure://odd-sdlc/uat-testcases"]
+  }),
+  contract({
+    edgeRef: "derive_testcase_authority_surface",
+    category: "test_formalisation_and_planning",
+    closureClassification: "close_capable",
+    sourceAssetTypes: ["requirement_surface", "uat_testcases_surface"],
+    targetAssetType: "testcase_authority_surface",
+    compositionRole: "prerequisite",
+    authorityBasisRefs: TEST_REFS,
+    proofLaneRefs: ["test://odd-sdlc/t164/testcase-authority"],
+    residualPressureRefs: ["pressure://odd-sdlc/testcase-authority"]
+  }),
+  contract({
     edgeRef: "derive_feature_decomp_surface",
     category: "solution_formalisation",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["requirement_surface"],
+    sourceAssetTypes: ["requirement_surface", "uat_testcases_surface"],
     targetAssetType: "feature_decomp_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: DESIGN_REFS,
@@ -621,21 +628,15 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/feature-decomp"]
   }),
   contract({
-    edgeRef: "derive_uat_testcases_surface",
-    category: "testcase_synthesis_and_authority",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["requirement_surface", "implementation_design_surface"],
-    targetAssetType: "uat_testcases_surface",
-    compositionRole: "proof",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/testcase-authority"],
-    residualPressureRefs: ["pressure://odd-sdlc/uat-testcases"]
-  }),
-  contract({
     edgeRef: "derive_design_surface",
     category: "solution_formalisation",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["requirement_surface", "feature_decomp_surface"],
+    sourceAssetTypes: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "feature_decomp_surface"
+    ],
     targetAssetType: "design_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: DESIGN_REFS,
@@ -646,7 +647,12 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_scenario_surface",
     category: "solution_formalisation",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["requirement_surface", "design_surface"],
+    sourceAssetTypes: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "design_surface"
+    ],
     targetAssetType: "scenario_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: DESIGN_REFS,
@@ -665,98 +671,10 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/implementation-design"]
   }),
   contract({
-    edgeRef: "select_implementation_stack_profile",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["implementation_design_surface"],
-    targetAssetType: "implementation_stack_profile",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/implementation-stack"]
-  }),
-  contract({
-    edgeRef: "derive_implementation_module_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_design_surface",
-      "implementation_stack_profile"
-    ],
-    targetAssetType: "implementation_module_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/implementation-module"]
-  }),
-  contract({
-    edgeRef: "derive_aggregate_domain_model_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["implementation_module_surface"],
-    targetAssetType: "aggregate_domain_model_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/aggregate-domain-model"]
-  }),
-  contract({
-    edgeRef: "derive_implementation_component_topology_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_design_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "implementation_stack_profile"
-    ],
-    targetAssetType: "implementation_component_topology_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/component-topology"]
-  }),
-  contract({
-    edgeRef: "derive_aggregate_sunny_day_sequence_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "implementation_component_topology_surface"
-    ],
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/sunny-day-sequence"]
-  }),
-  contract({
-    edgeRef: "derive_component_realization_schedule_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_component_topology_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "implementation_stack_profile"
-    ],
-    targetAssetType: "component_realization_schedule_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/component-schedule"]
-  }),
-  contract({
     edgeRef: "derive_component_code_surface",
     category: "implementation_encoding",
     closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
+    sourceAssetTypes: ["implementation_design_surface"],
     targetAssetType: "component_code_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: IMPLEMENTATION_REFS,
@@ -768,7 +686,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     category: "implementation_qualification",
     closureClassification: "close_capable",
     sourceAssetTypes: [
-      "implementation_component_topology_surface",
+      "implementation_design_surface",
       "component_code_surface"
     ],
     targetAssetType: "component_realization_qualification_surface",
@@ -778,33 +696,11 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/component-realization"]
   }),
   contract({
-    edgeRef: "derive_realization_schedule_surface",
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "implementation_design_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
-    targetAssetType: "realization_schedule_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/implementation-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/realization-schedule"]
-  }),
-  contract({
     edgeRef: "derive_code_surface",
     category: "implementation_encoding",
     closureClassification: "close_capable",
     sourceAssetTypes: [
-      "implementation_module_surface",
-      "implementation_stack_profile",
-      "realization_schedule_surface",
-      "implementation_component_topology_surface",
+      "implementation_design_surface",
       "component_code_surface",
       "component_realization_qualification_surface"
     ],
@@ -818,7 +714,14 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_test_design_surface",
     category: "test_formalisation_and_planning",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["design_surface", "scenario_surface"],
+    sourceAssetTypes: [
+      "design_surface",
+      "scenario_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "implementation_design_surface",
+      "component_code_surface"
+    ],
     targetAssetType: "test_design_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,
@@ -826,50 +729,12 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/test-design"]
   }),
   contract({
-    edgeRef: "select_test_stack_profile",
-    category: "test_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["test_design_surface"],
-    targetAssetType: "test_stack_profile",
-    compositionRole: "intermediate",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/test-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/test-stack"]
-  }),
-  contract({
-    edgeRef: "derive_test_module_surface",
-    category: "test_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["test_design_surface", "test_stack_profile"],
-    targetAssetType: "test_module_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/test-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/test-module"]
-  }),
-  contract({
-    edgeRef: "derive_test_component_topology_surface",
-    category: "test_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "test_design_surface",
-      "test_module_surface",
-      "implementation_component_topology_surface"
-    ],
-    targetAssetType: "test_component_topology_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/test-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/test-topology"]
-  }),
-  contract({
     edgeRef: "derive_component_test_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
     sourceAssetTypes: [
-      "test_component_topology_surface",
+      "test_design_surface",
       "component_code_surface",
-      "test_stack_profile"
     ],
     targetAssetType: "component_test_surface",
     compositionRole: "intermediate",
@@ -878,29 +743,10 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/component-test"]
   }),
   contract({
-    edgeRef: "derive_test_schedule_surface",
-    category: "test_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "test_design_surface",
-      "test_module_surface",
-      "test_stack_profile",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "test_component_topology_surface",
-      "component_test_surface"
-    ],
-    targetAssetType: "test_schedule_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/test-planning"],
-    residualPressureRefs: ["pressure://odd-sdlc/test-schedule"]
-  }),
-  contract({
     edgeRef: "prepare_test_execution_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["test_schedule_surface"],
+    sourceAssetTypes: ["test_design_surface"],
     targetAssetType: "test_execution_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,
@@ -911,7 +757,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_test_execution_result_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
-    sourceAssetTypes: ["test_execution_surface", "test_schedule_surface"],
+    sourceAssetTypes: ["test_execution_surface", "test_design_surface"],
     targetAssetType: "test_execution_result_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,
@@ -924,7 +770,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     closureClassification: "close_capable",
     sourceAssetTypes: [
       "test_execution_result_surface",
-      "test_component_topology_surface",
+      "test_design_surface",
       "component_test_surface"
     ],
     targetAssetType: "component_test_qualification_surface",
@@ -953,9 +799,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     category: "repair_archive_release_qualification",
     closureClassification: "close_capable",
     sourceAssetTypes: [
-      "test_module_surface",
-      "test_stack_profile",
-      "test_schedule_surface",
+      "test_design_surface",
       "test_execution_result_surface",
       "component_test_qualification_surface",
       "component_repair_schedule_surface"
@@ -967,22 +811,11 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/test-run-archive"]
   }),
   contract({
-    edgeRef: "qualify_testcase_authority",
-    category: "testcase_synthesis_and_authority",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["uat_testcases_surface", "scenario_surface"],
-    targetAssetType: "testcase_authority_surface",
-    compositionRole: "proof",
-    authorityBasisRefs: TEST_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/testcase-authority"],
-    residualPressureRefs: ["pressure://odd-sdlc/testcase-authority"]
-  }),
-  contract({
     edgeRef: "derive_release_depth_parity_surface",
     category: "repair_archive_release_qualification",
     closureClassification: "close_capable",
     sourceAssetTypes: [
-      "implementation_component_topology_surface",
+      "implementation_design_surface",
       "component_realization_qualification_surface",
       "component_test_qualification_surface",
       "component_repair_schedule_surface",
@@ -1000,10 +833,12 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     closureClassification: "close_capable",
     sourceAssetTypes: [
       "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
       "design_surface",
       "scenario_surface",
       "code_surface",
-      "testcase_authority_surface",
+      "test_design_surface",
       "test_run_archive_surface",
       "component_repair_schedule_surface",
       "release_depth_parity_surface"
@@ -1103,25 +938,11 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     residualPressureRefs: ["pressure://odd-sdlc/lite-design"]
   }),
   contract({
-    edgeRef: FG_DERIVE_LITE_MODULE_SURFACE,
-    category: "implementation_formalisation_and_planning",
-    closureClassification: "close_capable",
-    sourceAssetTypes: ["implementation_design_surface"],
-    targetAssetType: "implementation_module_surface",
-    compositionRole: "intermediate",
-    authorityBasisRefs: IMPLEMENTATION_REFS,
-    proofLaneRefs: ["test://odd-sdlc/t164/lite-overlay"],
-    residualPressureRefs: ["pressure://odd-sdlc/lite-module"]
-  }),
-  contract({
     edgeRef: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
     category: "implementation_encoding",
     closureClassification: "close_capable",
     sourceAssetPolicy: "subset_allowed",
-    sourceAssetTypes: [
-      "implementation_design_surface",
-      "implementation_module_surface"
-    ],
+    sourceAssetTypes: ["implementation_design_surface"],
     targetAssetType: "component_code_surface",
     compositionRole: "terminal",
     authorityBasisRefs: IMPLEMENTATION_REFS,

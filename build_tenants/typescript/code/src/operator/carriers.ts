@@ -514,6 +514,177 @@ export interface SdlcComponentDepthRegisterAdmission {
   readonly evidenceRefs: readonly string[];
 }
 
+export const SDLC_TEST_CASE_KINDS = Object.freeze([
+  "positive",
+  "negative",
+  "boundary",
+  "integration",
+  "uat",
+  "regression"
+] as const);
+
+export type SdlcTestCaseKind = (typeof SDLC_TEST_CASE_KINDS)[number];
+
+export const SDLC_TEST_EXECUTION_LANES = Object.freeze([
+  "unit",
+  "integration",
+  "uat"
+] as const);
+
+export type SdlcTestExecutionLane =
+  (typeof SDLC_TEST_EXECUTION_LANES)[number];
+
+export interface SdlcDesignConsumptionContract {
+  readonly kind: "sdlc_design_consumption_contract";
+  readonly contractRef: string;
+  readonly sourceDesignObligationRefs: readonly string[];
+  readonly authorityBasisRefs: readonly string[];
+  readonly consumerGraphFunctionRefs: readonly string[];
+}
+
+export interface SdlcImplementationDesignBinding {
+  readonly kind: "sdlc_implementation_design_binding";
+  readonly bindingRef: string;
+  readonly implementationEvidenceRefs: readonly string[];
+  readonly designConsumptionContractRefs: readonly string[];
+  readonly sourceDesignObligationRefs: readonly string[];
+}
+
+export interface SdlcTestDesignBinding {
+  readonly kind: "sdlc_test_design_binding";
+  readonly bindingRef: string;
+  readonly testEvidenceRefs: readonly string[];
+  readonly designConsumptionContractRefs: readonly string[];
+  readonly sourceDesignObligationRefs: readonly string[];
+}
+
+export interface SdlcTestCaseRow {
+  readonly kind: "sdlc_test_case_row";
+  readonly testCaseRef: string;
+  readonly caseKind: SdlcTestCaseKind;
+  readonly executionLane: SdlcTestExecutionLane;
+  readonly sourceDesignObligationRefs: readonly string[];
+  readonly testcaseAuthorityRefs: readonly string[];
+  readonly expectedBehavior: string;
+}
+
+export interface SdlcTestDataBinding {
+  readonly kind: "sdlc_test_data_binding";
+  readonly testDataRef: string;
+  readonly testCaseRef: string;
+  readonly inputFixtureRefs: readonly string[];
+  readonly generationPolicyRef: string;
+  readonly expectedResultRef: string;
+  readonly sourceDesignObligationRefs: readonly string[];
+}
+
+export interface SdlcExpectedResultBinding {
+  readonly kind: "sdlc_expected_result_binding";
+  readonly expectedResultRef: string;
+  readonly testCaseRef: string;
+  readonly assertionRefs: readonly string[];
+  readonly expectedResultSummary: string;
+  readonly verificationPolicyRef: string;
+}
+
+export interface SdlcTestStackProfileRow {
+  readonly kind: "sdlc_test_stack_profile_row";
+  readonly stackRef: string;
+  readonly frameworkRef: string;
+  readonly buildTool: string;
+}
+
+export interface SdlcTestModuleRow {
+  readonly kind: "sdlc_test_module_row";
+  readonly moduleName: string;
+  readonly moduleRef: string;
+  readonly testRoot: string;
+}
+
+export interface SdlcUatIntegrationBinding {
+  readonly kind: "sdlc_uat_integration_binding";
+  readonly uatTestCaseRef: string;
+  readonly integrationTestCaseRef: string;
+  readonly executionLane: SdlcTestExecutionLane;
+}
+
+export interface SdlcTestExecutionScheduleRow {
+  readonly kind: "sdlc_test_execution_schedule_row";
+  readonly scheduleRef: string;
+  readonly testCaseRefs: readonly string[];
+  readonly command: string;
+  readonly frameworkRef: string;
+  readonly shardId: string | null;
+}
+
+export interface SdlcTestDesignRegister {
+  readonly kind: "sdlc_test_design_register";
+  readonly registerVersion: "ts-test-design-v1";
+  readonly targetAssetType: string;
+  readonly designConsumptionRows: readonly SdlcDesignConsumptionContract[];
+  readonly uatTestcaseRows: readonly SdlcTestCaseRow[];
+  readonly testcaseAuthorityRows: readonly SdlcTestCaseRow[];
+  readonly testStackProfileRows: readonly SdlcTestStackProfileRow[];
+  readonly testModuleRows: readonly SdlcTestModuleRow[];
+  readonly testComponentTopologyRows: readonly SdlcTestComponentTopologyRow[];
+  readonly testDataBindings: readonly SdlcTestDataBinding[];
+  readonly expectedResultBindings: readonly SdlcExpectedResultBinding[];
+  readonly uatIntegrationBindings: readonly SdlcUatIntegrationBinding[];
+  readonly testExecutionScheduleRows: readonly SdlcTestExecutionScheduleRow[];
+}
+
+export type SdlcTestDesignRegisterAdmissionStatus =
+  | "admitted"
+  | "rejected"
+  | "not_required";
+
+export interface SdlcTestDesignRegisterAdmission {
+  readonly kind: "sdlc_test_design_register_admission";
+  readonly status: SdlcTestDesignRegisterAdmissionStatus;
+  readonly targetAssetType: string;
+  readonly register: SdlcTestDesignRegister | null;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcTestExecutionEvidenceAdmission {
+  readonly kind: "sdlc_test_execution_evidence_admission";
+  readonly admissionRef: string;
+  readonly testExecutionSurfaceRef: string;
+  readonly declaredFrameworkRef: string;
+  readonly declaredCommand: string;
+  readonly observedResultRef: string;
+  readonly status: SdlcWorkerExecutionEvidence["status"];
+  readonly testsObserved: number;
+  readonly reportRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcTestResultVerificationRow {
+  readonly kind: "sdlc_test_result_verification_row";
+  readonly verificationRef: string;
+  readonly testCaseRef: string;
+  readonly expectedResultRef: string;
+  readonly observedResultRef: string;
+  readonly status: "passed" | "failed" | "blocked";
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcCoAffirmationLedger {
+  readonly kind: "sdlc_co_affirmation_ledger";
+  readonly ledgerRef: string;
+  readonly ledgerVersionRef: string;
+  readonly designObligationRefs: readonly string[];
+  readonly implementationEvidenceRefs: readonly string[];
+  readonly testEvidenceRefs: readonly string[];
+  readonly executionEvidenceRefs: readonly string[];
+  readonly verificationRefs: readonly string[];
+  readonly testcaseRefs: readonly string[];
+  readonly status: "coaffirmed" | "blocked";
+  readonly residualPressureRefs: readonly string[];
+  readonly predecessorRefs: readonly string[];
+}
+
 export const SDLC_DOMAIN_ENTITY_OWNERSHIP = Object.freeze([
   "owned",
   "referenced"
@@ -660,20 +831,55 @@ export interface SdlcDesignCompletenessVerdict {
   readonly flow: SdlcDesignCompletenessAxisVerdict;
 }
 
+export interface SdlcImplementationStackProfileRow {
+  readonly kind: "sdlc_stack_profile_row";
+  readonly stackRef: string;
+  readonly language: string;
+  readonly buildTool: string;
+}
+
+export interface SdlcImplementationModuleRow {
+  readonly kind: "sdlc_implementation_module_row";
+  readonly moduleName: string;
+  readonly moduleRef: string;
+}
+
+export interface SdlcAggregateDomainModelRow {
+  readonly kind: "sdlc_aggregate_domain_model_row";
+  readonly modelRef: string;
+}
+
+export interface SdlcSunnyDaySequenceRow {
+  readonly kind: "sdlc_sunny_day_sequence_row";
+  readonly sequenceRef: string;
+}
+
+export interface SdlcFileTargetRow {
+  readonly kind: "sdlc_file_target_row";
+  readonly relativePath: string;
+  readonly role: string;
+}
+
 export interface SdlcDesignDepthRegister {
   readonly kind: "sdlc_design_depth_register";
   readonly registerVersion: "ts-design-depth-v1";
   readonly targetAssetType: string;
+  readonly stackProfileRows: readonly SdlcImplementationStackProfileRow[];
+  readonly implementationModuleRows: readonly SdlcImplementationModuleRow[];
+  readonly aggregateDomainModelRows: readonly SdlcAggregateDomainModelRow[];
   readonly moduleSchemaFragments: readonly SdlcModuleSchemaFragment[];
   readonly moduleStateDiagramFragments: readonly SdlcModuleStateDiagramFragment[];
   readonly aggregateDomainModel: SdlcAggregateDomainModel | null;
+  readonly sunnyDaySequenceRows: readonly SdlcSunnyDaySequenceRow[];
   readonly aggregateSunnyDaySequence: SdlcAggregateSunnyDaySequence | null;
+  readonly componentTopologyRows: readonly SdlcComponentTopologyRow[];
+  readonly componentRealizationRows: readonly SdlcComponentRealizationRow[];
+  readonly fileTargetRows: readonly SdlcFileTargetRow[];
   readonly designCompletenessVerdict: SdlcDesignCompletenessVerdict | null;
 }
 
 export type SdlcDesignDepthRegisterAdmissionStatus =
   | "admitted"
-  | "partial"
   | "rejected"
   | "not_required";
 
@@ -784,6 +990,8 @@ export interface SdlcTraversalObligationContext {
   readonly kind: "sdlc_traversal_obligation_context";
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
+  readonly targetCarrierContractRef?: string;
+  readonly targetCarrierContractDigest?: string;
   readonly requiredSourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
   readonly obligations: readonly SdlcTraversalObligation[];
@@ -923,6 +1131,9 @@ export interface SdlcTraversalIntentPackage {
   readonly graphCatalogDigestRef: string | null;
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
+  readonly targetCarrierContractRef?: string;
+  readonly targetCarrierContractDigest?: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1029,6 +1240,46 @@ export interface SdlcWorkerInvocationOutputContract {
   readonly testExecutionContract: string;
 }
 
+export interface SdlcWorkerTargetCarrierObjectTemplate {
+  readonly kind: "sdlc_worker_target_carrier_object_template";
+  readonly templateRef: string;
+  readonly closed: true;
+  readonly requiredFields: readonly string[];
+  readonly fieldTypes: Readonly<Record<string, string>>;
+  readonly enumDomains: Readonly<Record<string, readonly string[]>>;
+  readonly example: Readonly<Record<string, unknown>>;
+}
+
+export interface SdlcWorkerTargetCarrierConstructionTemplate {
+  readonly kind: "sdlc_worker_target_carrier_construction_template";
+  readonly templateRef: string;
+  readonly targetAssetType: string;
+  readonly carrierKind: string;
+  readonly nestedPayloadPath: string;
+  readonly carrierEnvelope: SdlcWorkerTargetCarrierObjectTemplate;
+  readonly payloadTemplate: SdlcWorkerTargetCarrierObjectTemplate | null;
+  readonly rowTemplates: readonly SdlcWorkerTargetCarrierObjectTemplate[];
+}
+
+export interface SdlcWorkerTargetCarrierProjection {
+  readonly kind: "sdlc_worker_target_carrier_projection";
+  readonly targetCarrierContractRef: string;
+  readonly targetCarrierContractDigest: string;
+  readonly targetCarrierTemplateRef: string;
+  readonly outputCarrierKind: string;
+  readonly nestedPayloadPath: string;
+  readonly requiredFieldRefs: readonly string[];
+  readonly fixedProtocolFieldRefs: readonly string[];
+  readonly workerFillableFieldRefs: readonly string[];
+  readonly literalDomainRefs: readonly string[];
+  readonly schemaRef: string;
+  readonly handoffProjectionRef: string;
+  readonly constructionTemplateRef: string;
+  readonly constructionTemplate: SdlcWorkerTargetCarrierConstructionTemplate;
+  readonly closurePreconditionRef: string;
+  readonly testCaseGenerationRef: string;
+}
+
 export interface SdlcProductMaterializationAuthorityTarget {
   readonly kind: "sdlc_product_materialization_authority_target";
   readonly path: string;
@@ -1037,6 +1288,7 @@ export interface SdlcProductMaterializationAuthorityTarget {
   readonly policyRef: string;
   readonly source:
     | "context_expected_files"
+    | "design_asset_authority"
     | "product_authority"
     | "requirement_authority";
   readonly sourceRef: string;
@@ -1047,10 +1299,12 @@ export interface SdlcProductMaterializationAuthorityReconciliation {
   readonly status: "not_required" | "passed" | "missing" | "ambiguous";
   readonly selectedOutputRoot: string;
   readonly contextExpectedFileTargets: readonly string[];
+  readonly designAssetAuthorityTargets: readonly string[];
   readonly requirementAuthorityTargets: readonly string[];
   readonly productAuthorityTargets: readonly string[];
   readonly declaredProductFileTargets: readonly string[];
   readonly contextExpectedTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly designAssetAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly requirementAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly productAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly declaredProductTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
@@ -1063,6 +1317,9 @@ export interface SdlcWorkerInvocationPackage {
   readonly packageVersion: "ts-invocation-v1";
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
+  readonly targetCarrierContractRef?: string;
+  readonly targetCarrierContractDigest?: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1099,11 +1356,77 @@ export interface SdlcWorkerInvocationPackage {
   readonly packageDigest: string;
 }
 
+export interface SdlcWorkerConstructionBriefPackageDisposition {
+  readonly kind: "sdlc_worker_construction_brief_package_disposition";
+  readonly packageName: string;
+  readonly path: string;
+  readonly digest: string;
+  readonly disposition: "canonical" | "derive" | "forensic";
+  readonly role: string;
+}
+
+export interface SdlcWorkerConstructionBrief {
+  readonly kind: "sdlc_worker_construction_brief";
+  readonly briefVersion: "ts-worker-construction-brief-v1";
+  readonly graphFunctionName: string;
+  readonly edgeName: string;
+  readonly vectorIndex: number;
+  readonly sourceAssetTypes: readonly string[];
+  readonly targetAssetType: string;
+  readonly canonicalPromptCarrierPath: string;
+  readonly promptSourcePolicyRef: string;
+  readonly packageDispositions: readonly SdlcWorkerConstructionBriefPackageDisposition[];
+  readonly currentState: {
+    readonly workspaceRoot: string;
+    readonly archiveRoot: string;
+    readonly authorityRefs: readonly string[];
+    readonly authorityIndex: readonly SdlcAuthorityIndexEntry[];
+    readonly priorEdgeRefs: readonly string[];
+    readonly runtimeContextRefs: readonly string[];
+  };
+  readonly targetState: {
+    readonly outputFile: string;
+    readonly reportFile: string;
+    readonly materializationRequired: boolean;
+    readonly tenantRoot: string;
+    readonly selectedOutputRoot: string;
+    readonly declaredProductFileTargets: readonly string[];
+    readonly requiredRoles: readonly SdlcMaterializedProductFileRole[];
+    readonly buildExecutionContract: string;
+    readonly testExecutionContract: string;
+  };
+  readonly authority: {
+    readonly edgeAssuranceContractRef: string | null;
+    readonly edgeAssuranceContractDigest: string | null;
+    readonly targetCarrierContractRef: string | null;
+    readonly targetCarrierContractDigest: string | null;
+    readonly targetCarrierProjectionRef: string;
+    readonly traversalStrategyDecisionRef: string;
+    readonly featureScopeRef: string;
+  };
+  readonly obligations: {
+    readonly inlineObligationIds: readonly string[];
+    readonly requirementTraceObligationIds: readonly string[];
+    readonly omittedObligationCount: number;
+    readonly omittedRequirementTraceObligationCount: number;
+    readonly obligationDeltaSummary: SdlcTraversalObligationDeltaSummary;
+  };
+  readonly retryAndRepair: {
+    readonly retryAttemptRefs: readonly string[];
+    readonly gapDossierRefs: readonly string[];
+    readonly retryInstructionCount: number;
+    readonly repairReentryPlanCount: number;
+  };
+  readonly packageDigest: string;
+}
+
 export interface SdlcWorkerBrief {
   readonly kind: "sdlc_worker_brief";
   readonly briefVersion: "ts-worker-brief-v1";
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
+  readonly targetCarrierContractRef?: string;
+  readonly targetCarrierContractDigest?: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1140,6 +1463,9 @@ export interface SdlcWorkerHandoffManifest {
   readonly graphCatalogDigestRef: string | null;
   readonly edgeAssuranceContractRef?: string;
   readonly edgeAssuranceContractDigest?: string;
+  readonly targetCarrierContractRef?: string;
+  readonly targetCarrierContractDigest?: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
   readonly graphFunctionName: string;

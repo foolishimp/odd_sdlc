@@ -180,8 +180,9 @@ function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const register = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: 'implementation_component_topology_surface', componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }] };",
-      "const content = ['# implementation_component_topology_surface', '', '```json component_depth_register', JSON.stringify(register, null, 2), '```', ''].join('\\n');",
+      "const axis = (axis) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis, status: 'satisfied', reasons: ['fixture complete'], evidenceRefs: ['fixture://t064'] });",
+      "const register = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: 'implementation_design_surface', stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://typescript', language: 'typescript', buildTool: 'node' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'typescript', moduleRef: 'module://typescript' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://typescript' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'typescript', entities: [{ kind: 'sdlc_domain_entity', entityId: 'entity:entry', moduleName: 'typescript', ownership: 'owned', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], invariants: [], sourceAssetRefs: ['fixture://t064'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'typescript', entityId: 'entity:entry', stateless: true, states: [], transitions: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], aggregateDomainModel: { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [{ kind: 'sdlc_aggregate_domain_entity', entityId: 'entity:entry', ownerModuleName: 'typescript', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], sourceModuleNames: ['typescript'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], crossModuleReferences: [], evidenceRefs: ['fixture://t064'] }, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://typescript/hello' }], aggregateSunnyDaySequence: { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:emit', moduleName: 'typescript', operationId: 'operation:typescript.emit', inputEntityIds: [], outputEntityIds: ['entity:entry'], stateTransitionIds: [] }], evidenceRefs: ['fixture://t064'] }, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', trancheId: null, firstProductFileToChange: 'src/index.ts', upstreamComponentIds: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: 'src/index.ts', role: 'source' }], designCompletenessVerdict: { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') } };",
+      "const content = ['# implementation_design_surface', '', '```json design_depth_register', JSON.stringify(register, null, 2), '```', ''].join('\\n');",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, content, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`;",
@@ -280,7 +281,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
     workspace
   ]);
   assert.equal(firstGaps.status, "ok");
-  assert.equal(firstGaps.payload.projection.currentEdge, "Fg_conform_project_authority");
+  assert.equal(firstGaps.payload.projection.currentEdge, "derive_intent_surface");
 
   const start = await invokeOddSdlcSpecMethodCommand([
     "start",
@@ -370,7 +371,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.match(startedContext.manifestRef, /handoff_manifest\.json$/u);
   assert.match(startedContext.promptRef, /worker_prompt\.md$/u);
   assert.match(startedContext.reportRef, /worker_result_report\.json$/u);
-  assert.match(startedContext.outputRef, /intent_surface\.md$/u);
+  assert.match(startedContext.outputRef, /specification\/INTENT\.md$/u);
   assert.equal(startedContext.pid > 0, true);
   if (startedContext.executorProfile === "pty-terminal") {
     assert.equal(typeof startedContext.terminalSessionId, "string");
@@ -389,7 +390,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   assert.match(processSummary.manifestRef, /handoff_manifest\.json$/u);
   assert.match(processSummary.promptRef, /worker_prompt\.md$/u);
   assert.match(processSummary.reportRef, /worker_result_report\.json$/u);
-  assert.match(processSummary.outputRef, /intent_surface\.md$/u);
+  assert.match(processSummary.outputRef, /specification\/INTENT\.md$/u);
   assert.equal(processSummary.timeoutMs > processSummary.inactivityTimeoutMs, true);
   assert.equal(processSummary.signalSequence.length, 0);
   assert.match(
@@ -476,7 +477,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
       `process://node?script=${encodeURIComponent(workerScript)}`
     ]);
 
-    assert.equal(start.status, "ok");
+    assert.equal(start.status, "ok", start.payload?.error ?? start.status);
     assert.equal(start.payload.status, "worker_failed");
     assert.equal(start.payload.workerRun.timedOut, true);
     assert.equal(start.payload.workerRun.stdoutByteCount, 0);
@@ -600,7 +601,7 @@ test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () 
     assert.match(processSummary.manifestRef, /handoff_manifest\.json$/u);
     assert.match(processSummary.promptRef, /worker_prompt\.md$/u);
     assert.match(processSummary.reportRef, /worker_result_report\.json$/u);
-    assert.match(processSummary.outputRef, /intent_surface\.md$/u);
+    assert.match(processSummary.outputRef, /specification\/INTENT\.md$/u);
     const livenessProjection = JSON.parse(
       readFileSync(
         path.join(start.payload.archiveRoot, "runtime_liveness_observer_projection.json"),
@@ -880,7 +881,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
     "--workspace",
     workspace,
     "--target",
-    "graph_function:derive_implementation_component_topology_surface",
+    "graph_function:derive_implementation_design_surface",
     "--until",
     "first_traversal",
     "--worker",
@@ -901,7 +902,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   assert.match(evaluateResult.postflightRef, /assurance_postflight\.json$/u);
   assert.match(
     evaluateResult.blockingReasons.join(","),
-    /component_depth_register_invalid/u
+    /design_depth_register_invalid/u
   );
 });
 
@@ -984,6 +985,115 @@ test("T-092 installed start --until blocked delegates iteration to ABG until a r
   assert.equal(compact.status, 0, compact.stderr);
   assert.doesNotMatch(compact.stdout, /loop_steps:/u);
   assert.doesNotMatch(compact.stdout, /loop_stop:/u);
+
+  const replayedStart = spawnSync(
+    process.execPath,
+    [
+      CLI_MAIN,
+      "start",
+      "--workspace",
+      workspace,
+      "--target",
+      "graph_function:bootstrap_release_self_test",
+      "--until",
+      "first_traversal",
+      "--worker",
+      `process://node?script=${encodeURIComponent(workerScript)}`
+    ],
+    {
+      cwd: PACKAGE_ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ODD_SDLC_TS_OUTPUT: "json"
+      },
+      maxBuffer: 1024 * 1024 * 5
+    }
+  );
+  assert.equal(replayedStart.status, 0, replayedStart.stderr);
+  const replayedPayload = JSON.parse(replayedStart.stdout);
+  assert.equal(replayedPayload.status, "ok");
+  assert.equal(replayedPayload.payload.status, "worker_failed");
+  assert.equal(
+    replayedPayload.payload.summary.currentEdge,
+    "derive_product_surface"
+  );
+});
+
+test("T-171 fresh next starts persist replay-visible graph cursor events", async () => {
+  const workspace = makeWorkspace();
+  const install = await installOddSdlcTypescript({
+    targetRoot: workspace,
+    packageSourceRoot: PACKAGE_ROOT,
+    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
+    installedPackageName: "odd-sdlc-t171-continuation-cursor"
+  });
+  assert.equal(install.kind, "installed");
+  const workerScript = writeWorkerScript(workspace);
+  const expectedEdges = [
+    "derive_intent_surface",
+    "derive_product_surface",
+    "derive_goal_surface"
+  ];
+
+  for (const [index, expectedEdge] of expectedEdges.entries()) {
+    const start = await invokeOddSdlcSpecMethodCommand([
+      "start",
+      "--workspace",
+      workspace,
+      "--target",
+      index === 0 ? "graph_function:bootstrap_release_self_test" : "next",
+      "--until",
+      "first_traversal",
+      "--worker",
+      `process://node?script=${encodeURIComponent(workerScript)}`
+    ]);
+    assert.equal(start.status, "ok", start.payload?.error ?? start.status);
+    assert.equal(start.payload.kind, "sdlc_installed_operator_start_outcome");
+    assert.equal(start.payload.manifest.edgeName, expectedEdge);
+    assert.equal(start.payload.status, "worker_invoked");
+    const ledger = JSON.parse(
+      readFileSync(
+        path.join(start.payload.archiveRoot, "sdlc_edge_fulfillment_ledger.json"),
+        "utf8"
+      )
+    );
+    assert(
+      ledger.materializationRefs.includes(
+        pathToFileURL(start.payload.manifest.outputFile).href
+      ),
+      `${expectedEdge} ledger must cite its graph target output as materialized evidence`
+    );
+  }
+
+  const eventLog = path.join(workspace, ".ai-workspace/events/events.jsonl");
+  const replayEvents = readFileSync(eventLog, "utf8")
+    .trim()
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const basisVectors = new Map();
+  for (const event of replayEvents) {
+    if (event.kind !== "vector_closed" || typeof event.basisId !== "string") {
+      continue;
+    }
+    const vectors = basisVectors.get(event.basisId) ?? [];
+    vectors.push(event.vectorIndex);
+    basisVectors.set(event.basisId, vectors);
+  }
+  assert(
+    [...basisVectors.values()].some(
+      (indexes) => indexes[0] === 0 && indexes[1] === 1
+    ),
+    "product continuation basis must persist vector 0 cursor before vector 1 close"
+  );
+  assert(
+    [...basisVectors.values()].some(
+      (indexes) =>
+        indexes[0] === 0 && indexes[1] === 1 && indexes[2] === 2
+    ),
+    "goal continuation basis must persist vector 0 and 1 cursor before vector 2 close"
+  );
 });
 
 test("T-067 installed operator preserves non-generate operation type for qualification edges", () => {

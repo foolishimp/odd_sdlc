@@ -67,13 +67,13 @@ const T132_EDGE_ORDER = Object.freeze([
   { name: "derive_design_surface", target: "design_surface" },
   { name: "derive_scenario_surface", target: "scenario_surface" },
   { name: "derive_implementation_design_surface", target: "implementation_design_surface" },
-  { name: "select_implementation_stack_profile", target: "implementation_stack_profile_surface" },
-  { name: "derive_implementation_module_surface", target: "implementation_module_surface" },
-  { name: "derive_aggregate_domain_model_surface", target: "aggregate_domain_model_surface" },
-  { name: "derive_implementation_component_topology_surface", target: "implementation_component_topology_surface" },
-  { name: "derive_aggregate_sunny_day_sequence_surface", target: "aggregate_sunny_day_sequence_surface" },
-  { name: "derive_component_realization_schedule_surface", target: "component_realization_schedule_surface" },
-  { name: "derive_component_code_surface", target: "component_code_surface" }
+  { name: "derive_component_code_surface", target: "component_code_surface" },
+  { name: "qualify_component_realization_surface", target: "component_realization_qualification_surface" },
+  { name: "derive_code_surface", target: "code_surface" },
+  { name: "derive_test_design_surface", target: "test_design_surface" },
+  { name: "derive_component_test_surface", target: "component_test_surface" },
+  { name: "prepare_test_execution_surface", target: "test_execution_surface" },
+  { name: "derive_test_execution_result_surface", target: "test_execution_result_surface" }
 ]);
 
 const T132_LINEAGE_REFS = Object.freeze([
@@ -185,6 +185,25 @@ function buildSyntheticT132Archive(opts) {
     const closureDisposition = override.closureDisposition ?? "close";
     const postflightStatus = override.postflightStatus ?? "passed";
     const blockingReasonCodes = override.blockingReasonCodes ?? [];
+    const residualPressureRefs = override.residualPressureRefs ?? [];
+    const executionEvidence = override.executionEvidence ??
+      (
+        edge.target === "component_code_surface" ||
+        edge.target === "test_execution_result_surface"
+          ? {
+              kind: "sdlc_worker_execution_evidence",
+              lane: "test",
+              command: "node build_tenants/hello_world_javascript/src/hello.js",
+              status: "succeeded",
+              reportRefs: [
+                `file://${path.join(operatorRunRoot, "test-shard-01-hello-world-javascript.stdout.log")}`
+              ],
+              testsObserved: 1,
+              passedCount: 1,
+              failedCount: 0
+            }
+          : null
+      );
     const blockingReasonCarriers = blockingReasonCodes.map((code) => ({
       kind: "sdlc_blocking_reason",
       code,
@@ -279,7 +298,24 @@ function buildSyntheticT132Archive(opts) {
             unfulfilled: 0,
             missing: 0,
             extra: 0
-          }
+          },
+          edgeResidualPressureRefs: residualPressureRefs,
+          targetCarrierAdmissionStatus:
+            override.targetCarrierAdmissionStatus ?? "admitted",
+          targetCarrierAdmissionRef:
+            override.targetCarrierAdmissionRef ?? null
+        },
+        dirMtimeMs
+      );
+      writeJson(
+        path.join(operatorRunRoot, "sdlc_edge_gain.json"),
+        {
+          kind: "sdlc_edge_gain",
+          edgeRef: edge.name,
+          fulfilledCount: closureDisposition === "close" ? 1 : 0,
+          expectedCount: 1,
+          residualPressureRefs,
+          evidenceRefs: executionEvidence === null ? [] : executionEvidence.reportRefs
         },
         dirMtimeMs
       );
@@ -343,7 +379,7 @@ function buildSyntheticT132Archive(opts) {
           unresolvedReasons: [],
           materializedFiles: [],
           materializationDiagnostics: [],
-          executionEvidence: null,
+          executionEvidence,
           executionEvidenceErrors: [],
           obligationAssessments: Array.from({ length: 22 }, (_, i) => ({
             kind: "sdlc_worker_obligation_assessment",
@@ -352,6 +388,42 @@ function buildSyntheticT132Archive(opts) {
             evidenceRefs: [],
             blockingReasons: []
           }))
+        },
+        dirMtimeMs
+      );
+      writeJson(
+        path.join(operatorRunRoot, "worker_construction_brief.json"),
+        {
+          kind: "sdlc_worker_construction_brief",
+          briefVersion: "ts-worker-construction-brief-v1",
+          graphFunctionName: edge.name,
+          edgeName: edge.name,
+          vectorIndex: 0,
+          sourceAssetTypes: [],
+          targetAssetType: edge.target,
+          canonicalPromptCarrierPath:
+            path.join(operatorRunRoot, "worker_construction_brief.json"),
+          promptSourcePolicyRef:
+            "policy://odd-sdlc/worker-prompt-source/worker-construction-brief/v1",
+          packageDispositions: [
+            {
+              kind: "sdlc_worker_construction_brief_package_disposition",
+              packageName: "worker_construction_brief.json",
+              path: path.join(operatorRunRoot, "worker_construction_brief.json"),
+              digest: "sha256:synthetic-construction-brief",
+              disposition: "canonical",
+              role: "single prompt source carrier"
+            },
+            {
+              kind: "sdlc_worker_construction_brief_package_disposition",
+              packageName: "worker_invocation_package.json",
+              path: path.join(operatorRunRoot, "worker_invocation_package.json"),
+              digest: "sha256:synthetic-invocation-package",
+              disposition: "derive",
+              role: "structured invocation projection"
+            }
+          ],
+          packageDigest: "sha256:synthetic-construction-brief"
         },
         dirMtimeMs
       );
@@ -604,6 +676,69 @@ test("T-161 clean synthetic T-132 archive: 12 attempts, zero retries, hello.js w
   }
 });
 
+test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressure, and test35 stage coverage", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t171-analysis-");
+  try {
+    buildSyntheticT132Archive({
+      rootDir: archiveRoot,
+      overrides: {
+        5: {
+          residualPressureRefs: []
+        }
+      }
+    });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+
+    const componentEdge = result.edgeTraversal.find(
+      (attempt) => attempt.targetAssetType === "component_code_surface"
+    );
+    assert.ok(componentEdge !== undefined);
+    assert.equal(componentEdge.traversalClass, "constructive");
+    assert.equal(componentEdge.executionEvidenceStatus, "succeeded");
+    assert.equal(componentEdge.executionEvidenceReportCount, 1);
+    assert.equal(componentEdge.residualPressureTransition, "cleared");
+    assert.equal(componentEdge.residualPressureRefCount, 0);
+    assert.match(
+      componentEdge.promptSourceCarrierRef ?? "",
+      /worker_construction_brief\.json/u
+    );
+    assert.equal(
+      componentEdge.promptSourceCarrierDigest,
+      "sha256:synthetic-construction-brief"
+    );
+    assert.match(componentEdge.promptRenderingRef ?? "", /worker_prompt\.md/u);
+    assert.equal(
+      componentEdge.promptSourcePolicyRef,
+      "policy://odd-sdlc/worker-prompt-source/worker-construction-brief/v1"
+    );
+
+    const executionResultStage = result.conceptualStageCoverage.find(
+      (row) => row.expectedEdgeName === "derive_test_execution_result_surface"
+    );
+    assert.ok(executionResultStage !== undefined);
+    assert.equal(executionResultStage.stageClass, "constructive");
+    assert.equal(executionResultStage.operatorRunRefs.length, 1);
+
+    const missingRunArchiveStage = result.conceptualStageCoverage.find(
+      (row) => row.expectedEdgeName === "derive_test_run_archive_surface"
+    );
+    assert.ok(missingRunArchiveStage !== undefined);
+    assert.equal(missingRunArchiveStage.stageClass, "missing");
+    assert.equal(missingRunArchiveStage.operatorRunRefs.length, 0);
+
+    const markdown = renderSdlcFdRunAnalysisMarkdown(result);
+    assert.match(markdown, /## Prompt And Evidence Sources/u);
+    assert.match(markdown, /worker_construction_brief\.json/u);
+    assert.match(markdown, /## Test35 Conceptual Stage Coverage/u);
+    assert.match(markdown, /derive_test_run_archive_surface/u);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-161 retry-heavy synthetic archive emits retry/repair/block diagnostics with wasted worker seconds", () => {
   const archiveRoot = makeTempDir("odd-sdlc-ts-t161-retry-");
   try {
@@ -636,11 +771,89 @@ test("T-161 retry-heavy synthetic archive emits retry/repair/block diagnostics w
     assert.ok(retryRow.workerSecondsBefore !== null && retryRow.workerSecondsBefore > 0);
     assert.equal(retryRow.likelyCauseClass, "deterministic_evaluator_bug");
     const outsideRow = result.retryForensics.find(
-      (r) => r.edgeName === "derive_aggregate_sunny_day_sequence_surface"
+      (r) => r.edgeName === "derive_component_test_surface"
     );
     assert.ok(outsideRow !== undefined);
     assert.equal(outsideRow.likelyCauseClass, "worker_policy_violation");
     assert.equal(outsideRow.outsideWorkspaceReadCount, 1);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-171 framework carrier/parser drift is classified as framework drift", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t171-framework-drift-");
+  try {
+    buildSyntheticT132Archive({
+      rootDir: archiveRoot,
+      overrides: {
+        5: {
+          closureDisposition: "repair",
+          postflightStatus: "blocked",
+          blockingReasonCodes: [
+            "component_depth_register_invalid:component_depth_register.payload: unexpected field"
+          ]
+        }
+      }
+    });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const driftRow = result.retryForensics.find(
+      (row) => row.likelyCauseClass === "framework_carrier_parser_drift"
+    );
+    assert.ok(driftRow !== undefined);
+    assert.equal(driftRow.edgeName, "derive_component_code_surface");
+    assert.equal(driftRow.schemaViolationCount, 1);
+    assert.equal(driftRow.outsideWorkspaceReadCount, 0);
+    assert.ok(
+      result.diagnostics.some((diagnostic) => diagnostic.code === "repair_observed"),
+      "repair is still reported as a failure signal"
+    );
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-161 target-carrier-admission-missing block (postflight passed, ledger says missing) classifies correctly", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-target-carrier-");
+  try {
+    buildSyntheticT132Archive({
+      rootDir: archiveRoot,
+      overrides: {
+        // Block disposition + postflight passed + no blocking codes +
+        // ledger.targetCarrierAdmissionStatus="missing" → T-133 admission gate
+        2: {
+          closureDisposition: "block",
+          postflightStatus: "passed",
+          blockingReasonCodes: [],
+          targetCarrierAdmissionStatus: "missing"
+        }
+      }
+    });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const row = result.retryForensics.find(
+      (r) => r.likelyCauseClass === "target_carrier_admission_missing"
+    );
+    assert.ok(row !== undefined, "target_carrier_admission_missing row present");
+    assert.equal(row.outsideWorkspaceReadCount, 0);
+    assert.equal(row.schemaViolationCount, 0);
+    // Sanity: previously this would have been deterministic_evaluator_bug
+    // via the catch-all. The catch-all is now `unknown`; a clean block
+    // with neither admission-missing nor any postflight rejection falls
+    // through to `unknown`, not `deterministic_evaluator_bug`.
+    const unknownCatchAll = result.retryForensics.find(
+      (r) => r.likelyCauseClass === "deterministic_evaluator_bug"
+    );
+    assert.equal(
+      unknownCatchAll,
+      undefined,
+      "no spurious deterministic_evaluator_bug from the catch-all"
+    );
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }

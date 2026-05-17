@@ -344,6 +344,67 @@ test("T-113 component-depth assurance blocks collapsed component test materializ
   ].sort());
 });
 
+test("T-168 component-depth assurance normalizes selected-output-root test paths", () => {
+  const outputFile = componentDepthArtifact({
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "MapperComponentSpec",
+        relativePath: "build_tenants/scala_spark/src/test/scala/MapperComponentSpec.scala",
+        testcaseIds: ["TC-DM-001"],
+        componentIds: ["mapper"],
+        requirementIds: ["REQ-DM-001"],
+        shardId: null
+      }
+    ]
+  });
+  const componentDepth = deriveComponentDepthAssuranceLedger({
+    manifest: {
+      ...manifest(),
+      targetAssetType: "component_test_surface"
+    },
+    report: {
+      kind: "odd_sdlc.worker_result_report",
+      graphFunctionName: "bootstrap_release_self_test",
+      edgeName: "derive_component_test_surface",
+      targetAssetType: "component_test_surface",
+      outputFile,
+      digest: "sha256:component-test",
+      summary: "framework-generated post-transform report from observed artifacts",
+      unresolvedReasons: [],
+      materializedFiles: [
+        {
+          kind: "sdlc_materialized_product_file",
+          role: "test",
+          relativePath: "src/test/scala/MapperComponentSpec.scala",
+          absolutePath: "/workspace/build_tenants/scala_spark/src/test/scala/MapperComponentSpec.scala",
+          digest: "sha256:test",
+          byteCount: 42
+        }
+      ],
+      executionEvidence: null,
+      executionEvidenceErrors: [],
+      obligationAssessments: [],
+      fpTransformRequestRef: null,
+      fpTransformResultRef: null,
+      fpTransformStatus: null,
+      fpEvaluateResultRef: null
+    }
+  });
+
+  assert(componentDepth);
+  assert.equal(componentDepth.verdict, "satisfied");
+  assert.equal(
+    componentDepth.reasons.some((item) =>
+      item.code.startsWith("test_class_missing_file:")
+    ),
+    false
+  );
+});
+
 test("T-084 folds real outputs from every assurance dimension", () => {
   const materialization = deriveMaterializationAssuranceLedger({
     manifest: manifest(),
@@ -480,9 +541,78 @@ test("T-084 folds real outputs from every assurance dimension", () => {
   const designDepthOutputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_domain_model_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t084/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "mapper",
+        moduleRef: "module://t084/mapper"
+      }
+    ],
+    aggregateDomainModelRows: [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://t084/aggregate"
+      }
+    ],
+    moduleSchemaFragments: [
+      {
+        kind: "sdlc_module_schema_fragment",
+        moduleName: "mapper",
+        entities: [
+          {
+            kind: "sdlc_domain_entity",
+            entityId: "entity:MapperInput",
+            moduleName: "mapper",
+            ownership: "owned",
+            attributes: [
+              {
+                kind: "sdlc_domain_attribute",
+                attributeId: "attr:MapperInput.value",
+                name: "value",
+                valueType: "String",
+                cardinality: "one",
+                invariantRefs: ["REQ-DM-001"]
+              }
+            ],
+            invariants: ["mapper input value is present"],
+            sourceAssetRefs: ["fixture://requirements"]
+          }
+        ],
+        operations: [
+          {
+            kind: "sdlc_domain_operation",
+            operationId: "operation:Mapper.map",
+            moduleName: "mapper",
+            inputEntityIds: ["entity:MapperInput"],
+            outputEntityIds: ["entity:MapperInput"],
+            requiredAttributeIds: ["attr:MapperInput.value"]
+          }
+        ],
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://requirements"]
+      }
+    ],
+    moduleStateDiagramFragments: [
+      {
+        kind: "sdlc_module_state_diagram_fragment",
+        moduleName: "mapper",
+        entityId: "entity:MapperInput",
+        stateless: true,
+        states: [],
+        transitions: [],
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://requirements"]
+      }
+    ],
     aggregateDomainModel: {
       kind: "sdlc_aggregate_domain_model",
       modelVersion: "ts-design-depth-v1",
@@ -517,7 +647,61 @@ test("T-084 folds real outputs from every assurance dimension", () => {
       crossModuleReferences: [],
       evidenceRefs: ["fixture://design-depth"]
     },
-    aggregateSunnyDaySequence: null,
+    sunnyDaySequenceRows: [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://t084/mapper-map"
+      }
+    ],
+    aggregateSunnyDaySequence: {
+      kind: "sdlc_aggregate_sunny_day_sequence",
+      sequenceVersion: "ts-design-depth-v1",
+      steps: [
+        {
+          kind: "sdlc_sunny_day_sequence_step",
+          stepId: "step:Mapper.map",
+          moduleName: "mapper",
+          operationId: "operation:Mapper.map",
+          inputEntityIds: ["entity:MapperInput"],
+          outputEntityIds: ["entity:MapperInput"],
+          stateTransitionIds: []
+        }
+      ],
+      evidenceRefs: ["fixture://design-depth"]
+    },
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "mapper",
+        moduleName: "mapper",
+        relativePath: "src/main/scala/Mapper.scala",
+        publicBoundary: "Mapper.map",
+        concernRole: "mapper",
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://requirements"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "mapper",
+        moduleName: "mapper",
+        relativePath: "src/main/scala/Mapper.scala",
+        publicBoundary: "Mapper.map",
+        trancheId: "tranche:mapper",
+        firstProductFileToChange: "src/main/scala/Mapper.scala",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://requirements"]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: "src/main/scala/Mapper.scala",
+        role: "source"
+      }
+    ],
     designCompletenessVerdict: {
       kind: "sdlc_design_completeness_verdict",
       verdictVersion: "ts-design-depth-v1",
@@ -547,7 +731,7 @@ test("T-084 folds real outputs from every assurance dimension", () => {
   const designCompleteness = deriveDesignCompletenessAssuranceLedger({
     manifest: {
       ...manifest(),
-      targetAssetType: "aggregate_domain_model_surface"
+      targetAssetType: "implementation_design_surface"
     },
     report: {
       outputFile: designDepthOutputFile

@@ -144,6 +144,8 @@ test("T-098 requirements-to-design closes through existing assurance ledgers", a
   assert.equal(designRun.manifest.targetAssetType, "design_surface");
   assert.deepStrictEqual(designRun.manifest.inputAssetTypes, [
     "requirement_surface",
+    "uat_testcases_surface",
+    "testcase_authority_surface",
     "feature_decomp_surface"
   ]);
 

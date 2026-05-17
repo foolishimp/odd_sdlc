@@ -86,7 +86,7 @@ function steelThreadScope() {
     scopeVersion: "ts-scope-v1",
     mode: "steel_thread",
     scopeRef: "scope://odd_sdlc/aggregate-domain-model-surface/steel-thread/cdme-compiler",
-    basisRefs: ["strategy://odd_sdlc/derive_aggregate_domain_model_surface/single_vertical_slice"],
+    basisRefs: ["strategy://odd_sdlc/derive_implementation_design_surface/single_vertical_slice"],
     includedModuleNames: ["cdme-compiler"],
     includedEntityIds: [],
     includedOperationIds: [],
@@ -104,17 +104,112 @@ function fullBreadthScope() {
   };
 }
 
+function completeDesignDepthRegister(register) {
+  const defaultModuleRegister = moduleRegister({ includeCompilerDiagram: true });
+  return {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: register.stackProfileRows ?? [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t122/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: register.implementationModuleRows ?? [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-compiler",
+        moduleRef: "module://t122/cdme-compiler"
+      }
+    ],
+    aggregateDomainModelRows: register.aggregateDomainModelRows ?? [
+      {
+        kind: "sdlc_aggregate_domain_model_row",
+        modelRef: "model://t122/aggregate"
+      }
+    ],
+    moduleSchemaFragments:
+      register.moduleSchemaFragments ?? defaultModuleRegister.moduleSchemaFragments,
+    moduleStateDiagramFragments:
+      register.moduleStateDiagramFragments ?? defaultModuleRegister.moduleStateDiagramFragments,
+    aggregateDomainModel:
+      register.aggregateDomainModel ?? aggregateRegister().aggregateDomainModel,
+    sunnyDaySequenceRows: register.sunnyDaySequenceRows ?? [
+      {
+        kind: "sdlc_sunny_day_sequence_row",
+        sequenceRef: "sequence://t122/compile"
+      }
+    ],
+    aggregateSunnyDaySequence: register.aggregateSunnyDaySequence ?? {
+      kind: "sdlc_aggregate_sunny_day_sequence",
+      sequenceVersion: "ts-design-depth-v1",
+      steps: [
+        {
+          kind: "sdlc_sunny_day_sequence_step",
+          stepId: "step:compileMappingPlan",
+          moduleName: "cdme-compiler",
+          operationId: "operation:compileMappingPlan",
+          inputEntityIds: ["entity:MappingPlan"],
+          outputEntityIds: ["entity:MappingPlan"],
+          stateTransitionIds: ["transition:MappingPlan.draft.compiled"]
+        }
+      ],
+      evidenceRefs: ["fixture://t122/sunny-day"]
+    },
+    componentTopologyRows: register.componentTopologyRows ?? [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        concernRole: "parser",
+        publicBoundary: "package_internal",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T122-001"],
+        sourceAssetRefs: ["fixture://t122/component-topology"]
+      }
+    ],
+    componentRealizationRows: register.componentRealizationRows ?? [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cmp.cdme.compiler",
+        moduleName: "cdme-compiler",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        publicBoundary: "package_internal",
+        trancheId: "tranche:compiler",
+        firstProductFileToChange:
+          "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T122-001"],
+        sourceAssetRefs: ["fixture://t122/component-realization"]
+      }
+    ],
+    fileTargetRows: register.fileTargetRows ?? [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+        role: "source"
+      }
+    ],
+    designCompletenessVerdict: register.designCompletenessVerdict ?? verdict()
+  };
+}
+
 function designDepthArtifact(register) {
+  const normalizedRegister = completeDesignDepthRegister(register);
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t122-"));
-  const outputFile = path.join(root, `${register.targetAssetType}.md`);
+  const outputFile = path.join(root, `${normalizedRegister.targetAssetType}.md`);
   mkdirSync(path.dirname(outputFile), { recursive: true });
   writeFileSync(
     outputFile,
     [
-      `# ${register.targetAssetType}`,
+      `# ${normalizedRegister.targetAssetType}`,
       "",
       "```design_depth_register",
-      JSON.stringify(register, null, 2),
+      JSON.stringify(normalizedRegister, null, 2),
       "```",
       ""
     ].join("\n"),
@@ -154,7 +249,7 @@ function moduleRegister({ includeCompilerDiagram }) {
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     moduleSchemaFragments: [
       {
         kind: "sdlc_module_schema_fragment",
@@ -206,9 +301,10 @@ function aggregateRegister({ compilerAttributes = [compilerAttribute] } = {}) {
   return {
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_domain_model_surface",
-    moduleSchemaFragments: [],
-    moduleStateDiagramFragments: [],
+    targetAssetType: "implementation_design_surface",
+    moduleSchemaFragments: moduleRegister({ includeCompilerDiagram: true }).moduleSchemaFragments,
+    moduleStateDiagramFragments:
+      moduleRegister({ includeCompilerDiagram: true }).moduleStateDiagramFragments,
     aggregateDomainModel: {
       kind: "sdlc_aggregate_domain_model",
       modelVersion: "ts-design-depth-v1",
@@ -242,10 +338,11 @@ function aggregateRegister({ compilerAttributes = [compilerAttribute] } = {}) {
 }
 
 function ledgerFor(register, featureScope) {
-  const outputFile = designDepthArtifact(register);
+  const normalizedRegister = completeDesignDepthRegister(register);
+  const outputFile = designDepthArtifact(normalizedRegister);
   return deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: register.targetAssetType,
+      targetAssetType: normalizedRegister.targetAssetType,
       featureScope
     },
     report: { outputFile }
@@ -254,9 +351,9 @@ function ledgerFor(register, featureScope) {
 
 test("T-122 derives a small steel-thread scope from strategy and declared modules", () => {
   const scope = deriveSdlcFeatureScope({
-    targetAssetType: "aggregate_domain_model_surface",
+    targetAssetType: "implementation_design_surface",
     strategyDirectiveRef:
-      "strategy://odd_sdlc/derive_aggregate_domain_model_surface/single_vertical_slice",
+      "strategy://odd_sdlc/derive_implementation_design_surface/single_vertical_slice",
     selectedScheduleItemRefs: ["schedule://odd_sdlc/aggregate/cdme-compiler"],
     requiredProgressArtifactRefs: [],
     declaredModuleNames: ["cdme-compiler", "cdme-accounting"],
@@ -272,9 +369,9 @@ test("T-122 derives a small steel-thread scope from strategy and declared module
 
 test("T-122 steel-thread scope falls back to full breadth when refs do not bind a module", () => {
   const scope = deriveSdlcFeatureScope({
-    targetAssetType: "aggregate_domain_model_surface",
+    targetAssetType: "implementation_design_surface",
     strategyDirectiveRef:
-      "strategy://odd_sdlc/derive_aggregate_domain_model_surface/single_vertical_slice",
+      "strategy://odd_sdlc/derive_implementation_design_surface/single_vertical_slice",
     selectedScheduleItemRefs: ["schedule://odd_sdlc/aggregate/primary"],
     requiredProgressArtifactRefs: [],
     declaredModuleNames: ["cdme-compiler", "cdme-accounting"],
@@ -535,7 +632,7 @@ test("T-122 design-depth admission normalizes relational partial candidates", ()
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     runId: "worker-authored-metadata-is-not-register-law",
     includedModuleNames: ["cdme-compiler"],
     moduleSchemaFragments: [
@@ -570,7 +667,7 @@ test("T-122 design-depth admission normalizes relational partial candidates", ()
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "implementation_module_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }
@@ -593,7 +690,7 @@ test("B-084 design-depth admission normalizes state diagram fragments without ca
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     moduleSchemaFragments: [
       {
         moduleName: "cdme-compiler",
@@ -643,7 +740,7 @@ test("B-084 design-depth admission normalizes state diagram fragments without ca
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "implementation_module_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }
@@ -661,7 +758,7 @@ test("B-084 design-depth admission rejects missing module identity", () => {
     {
       kind: "sdlc_design_depth_register",
       registerVersion: "ts-design-depth-v1",
-      targetAssetType: "implementation_module_surface",
+      targetAssetType: "implementation_design_surface",
       moduleSchemaFragments: [
         {
           entities: [
@@ -703,7 +800,7 @@ test("B-084 design-depth admission rejects contradictory schema and entity modul
     {
       kind: "sdlc_design_depth_register",
       registerVersion: "ts-design-depth-v1",
-      targetAssetType: "implementation_module_surface",
+      targetAssetType: "implementation_design_surface",
       moduleSchemaFragments: [
         {
           moduleName: "cdme-compiler",
@@ -749,7 +846,7 @@ test("B-084 design-depth admission normalizes attributeId/type shorthand", () =>
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "implementation_module_surface",
+    targetAssetType: "implementation_design_surface",
     moduleSchemaFragments: [
       {
         moduleName: "cdme-compiler",
@@ -800,7 +897,7 @@ test("B-084 design-depth admission normalizes attributeId/type shorthand", () =>
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "implementation_module_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }
@@ -817,7 +914,7 @@ test("B-084 design-depth admission normalizes aggregate model metadata and verdi
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_domain_model_surface",
+    targetAssetType: "implementation_design_surface",
     aggregateDomainModel: {
       compositionRule: "merge_module_schema_fragments_for_included_modules",
       includedModuleNames: ["cdme-compiler"],
@@ -878,7 +975,7 @@ test("B-084 design-depth admission normalizes aggregate model metadata and verdi
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "aggregate_domain_model_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }
@@ -895,7 +992,7 @@ test("B-084 design-depth admission normalizes sunny-day sequence metadata", () =
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
+    targetAssetType: "implementation_design_surface",
     aggregateDomainModel: {
       compositionRule: "merge_module_schema_fragments_for_included_modules",
       includedModuleNames: ["cdme-compiler"],
@@ -969,7 +1066,7 @@ test("B-084 design-depth admission normalizes sunny-day sequence metadata", () =
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "aggregate_sunny_day_sequence_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }
@@ -986,7 +1083,7 @@ test("B-084 design-depth assurance accepts allowed carrier-id aliases when ident
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
-    targetAssetType: "aggregate_sunny_day_sequence_surface",
+    targetAssetType: "implementation_design_surface",
     aggregateDomainModel: {
       kind: "sdlc_aggregate_domain_model",
       modelVersion: "ts-design-depth-v1",
@@ -1047,7 +1144,7 @@ test("B-084 design-depth assurance accepts allowed carrier-id aliases when ident
   });
   const ledger = deriveDesignCompletenessAssuranceLedger({
     manifest: {
-      targetAssetType: "aggregate_sunny_day_sequence_surface",
+      targetAssetType: "implementation_design_surface",
       featureScope: steelThreadScope()
     },
     report: { outputFile }

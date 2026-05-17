@@ -17,6 +17,7 @@ export type {
   SdlcFdRunAnalysisBloatAndSlope,
   SdlcFdRunAnalysisBloatBucket,
   SdlcFdRunAnalysisByteAccount,
+  SdlcFdRunAnalysisConceptualStageCoverage,
   SdlcFdRunAnalysisCurrentStateTelemetry,
   SdlcFdRunAnalysisDiagnostic,
   SdlcFdRunAnalysisDiagnosticCode,

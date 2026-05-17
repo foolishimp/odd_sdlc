@@ -8,6 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -22,9 +23,12 @@ import {
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveWorkerHandoffManifest,
   declaredProductFileTargets,
+  constructWorkerInvocationPackage,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 
@@ -39,6 +43,11 @@ function makeWorkspace(name, constraintsText) {
   writeFileSync(
     path.join(root, "specification/requirements/00-imported-sources.md"),
     "# Imported Sources\n",
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, "specification/requirements/10-generated-bootstrap.md"),
+    "# Requirements\n\nREQ-T068-001: Preserve graph-owned requirement lineage.\n",
     "utf8"
   );
   writeFileSync(
@@ -115,6 +124,8 @@ build_tenants:
   assert.equal(profile.deploymentContract, "undeclared");
   assert.equal(profile.runtimeObservationContract, "undeclared");
   assert.equal(profile.realizationMode, "planned_output_tree");
+  assert.equal(profile.overlayStrategy, "full_lifecycle");
+  assert.equal(profile.overlayRef, SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
   assert.deepStrictEqual(
     profile.capabilityContracts.map((contract) => `${contract.name}:${contract.value}`),
     ["cli_runner:true", "junit:true"]
@@ -184,6 +195,11 @@ build_tenants:
     "utf8"
   );
   assert.match(constraintsText, /runtime:\n/);
+  assert.match(constraintsText, /  overlay_strategy: full_lifecycle\n/);
+  assert.match(
+    constraintsText,
+    /  overlay_ref: overlay:\/\/odd-sdlc\/current-full-traversal\n/
+  );
   assert.match(constraintsText, /  root: \.ai-workspace\/runtime\/odd_sdlc\n/);
   assert.match(
     constraintsText,
@@ -199,7 +215,7 @@ build_tenants:
   );
 });
 
-test("T-164 conformance preserves bootstrap product targets for lite materialization", () => {
+test("T-171 conformance does not synthesize product or requirement authority", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-conform-"));
   mkdirSync(path.join(workspace, ".ai-workspace/context"), { recursive: true });
   writeFileSync(
@@ -207,6 +223,8 @@ test("T-164 conformance preserves bootstrap product targets for lite materializa
     [
       "project:",
       "  name: t164 rust service",
+      "  overlay_strategy: thread",
+      "  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation",
       "active_tenant: hello_world_rust_service",
       "selected_output_root: build_tenants/hello_world_rust_service",
       "build_tenants:",
@@ -247,18 +265,29 @@ test("T-164 conformance preserves bootstrap product targets for lite materializa
 
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
 
-  const product = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
-  const requirements = readFileSync(
-    path.join(workspace, "specification/requirements/01-t164-requirements.md"),
+  for (const relativePath of [
+    "specification/PRODUCT.md",
+    "specification/GOALS.md",
+    "specification/requirements/00-imported-sources.md",
+    "specification/requirements/01-t164-requirements.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      false,
+      `${relativePath} must be graph traversal output, not conformance output`
+    );
+  }
+  const bootstrapReadModel = readFileSync(
+    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
     "utf8"
   );
-  assert.match(product, /Build Tool: cargo/);
-  assert.match(product, /`build_tenants\/hello_world_rust_service\/Cargo\.toml`/);
-  assert.match(product, /`build_tenants\/hello_world_rust_service\/src\/main\.rs`/);
-  assert.match(requirements, /The product shall provide one Cargo manifest/);
-  assert.match(requirements, /The product shall provide one Rust executable source file/);
+  assert.match(bootstrapReadModel, /deterministic read model over imported project authority/);
+  assert.match(bootstrapReadModel, /It is not a replacement for project-owned specification truth/);
 
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const profile = deriveSdlcConformProjectProfileFromWorkspace(workspace);
+  assert.equal(profile.overlayStrategy, "thread");
+  assert.equal(profile.overlayRef, SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF);
   const contract = hookContractByEdgeName("derive_lite_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -270,10 +299,7 @@ test("T-164 conformance preserves bootstrap product targets for lite materializa
     runId: "t164-conformed-product-targets"
   });
 
-  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
-    "build_tenants/hello_world_rust_service/Cargo.toml",
-    "build_tenants/hello_world_rust_service/src/main.rs"
-  ]);
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), []);
 });
 
 test("T-068 infers execution contracts from selected tenant truth without workload-specific code", () => {
@@ -371,4 +397,58 @@ build_tenants:
   assert.equal(manifest.productMaterialization.testExecutionContract, "npm test");
   assert.equal(archivedProfile.projectSlug, "document_compiler");
   assert.match(readFileSync(handoffFiles.promptPath, "utf8"), /Declared modules: parser, renderer/);
+});
+
+test("T-171 graph traversal owns workspace specification output paths and typed templates", () => {
+  const workspace = makeWorkspace(
+    "odd-sdlc-t171-workspace-spec-surfaces",
+    `
+project:
+  name: spec surface fixture
+active_tenant: node_cli
+build_tenants:
+  node_cli:
+    output_dir: build_tenants/node_cli
+    language: javascript
+    build_tool: npm
+    module_structure:
+      - app
+`
+  );
+
+  for (const [edgeName, expectedOutput] of [
+    ["derive_requirement_surface", "specification/requirements/10-generated-bootstrap.md"],
+    ["derive_uat_testcases_surface", "specification/scenarios/20-generated-uat-testcases.md"],
+    ["derive_testcase_authority_surface", "specification/scenarios/30-generated-testcase-authority.md"]
+  ]) {
+    const contract = hookContractByEdgeName(edgeName);
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot: workspace,
+      graphFunctionName: "bootstrap_release_self_test",
+      edgeName: contract.edgeName,
+      vectorIndex: 0,
+      contract,
+      runId: `t171-${edgeName}`
+    });
+    const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+    assert.equal(manifest.outputFile.endsWith(expectedOutput), true, edgeName);
+    assert.equal(
+      manifest.allowedWriteRoots.some((root) =>
+        manifest.outputFile.startsWith(root)
+      ),
+      true,
+      edgeName
+    );
+    assert.equal(
+      invocationPackage.targetCarrierProjection.constructionTemplate.payloadTemplate !== null,
+      true,
+      edgeName
+    );
+    assert.equal(
+      invocationPackage.targetCarrierProjection.constructionTemplate.rowTemplates.length,
+      1,
+      edgeName
+    );
+  }
 });

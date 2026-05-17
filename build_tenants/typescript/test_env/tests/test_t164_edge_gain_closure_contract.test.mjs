@@ -130,6 +130,8 @@ function edgeAssuranceClosureContext(edgeRef, closeReady) {
     ledgerVersionRef: `ledger-version://odd-sdlc/t164/${edgeRef}/edge-fulfillment/1`,
     edgeAssuranceContractRef: gain.contractRef,
     edgeAssuranceContractDigest: gain.contractDigest,
+    targetCarrierAdmissionStatus: gain.targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef: gain.targetCarrierAdmissionRef,
     edgeGainRef: gain.gainRef,
     edgeResidualPressureRefs: residualPressure.requiredPressureRefs,
     edgeRef: `edge://odd-sdlc/t164/${edgeRef}`,
@@ -298,7 +300,7 @@ test("T-164 current-full overlay vectors all have gain and closure contract rows
   });
   const uniqueCurrentFullVectorRefs = unique(currentFull.graphVectorRefs);
 
-  assert.equal(uniqueCurrentFullVectorRefs.length, 42);
+  assert.equal(uniqueCurrentFullVectorRefs.length, 30);
 
   const categoryCounts = {};
   for (const graphVectorRef of uniqueCurrentFullVectorRefs) {
@@ -322,13 +324,11 @@ test("T-164 current-full overlay vectors all have gain and closure contract rows
 
   assert.deepStrictEqual(categoryCounts, {
     conformance: 1,
-    authority_synthesis: 5,
+    authority_synthesis: 4,
+    test_formalisation_and_planning: 3,
     solution_formalisation: 4,
-    testcase_synthesis_and_authority: 2,
-    implementation_formalisation_and_planning: 7,
     implementation_encoding: 2,
     implementation_qualification: 1,
-    test_formalisation_and_planning: 5,
     test_encoding_and_execution: 4,
     repair_archive_release_qualification: 4,
     operational_transition_and_return: 7
@@ -343,8 +343,8 @@ test("T-164 published graph vector inventory is fully classified", () => {
     contracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
   });
 
-  assert.equal(publishedGraphVectorRefs.length, 62);
-  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 62);
+  assert.equal(publishedGraphVectorRefs.length, 50);
+  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.length, 50);
 
   assertSdlcEdgeGainClosureContractsRegistered({
     publishedGraphVectorRefs,
@@ -371,12 +371,12 @@ test("T-164 published graph vector inventory is fully classified", () => {
   }
 
   assert.deepStrictEqual(classificationCounts, {
-    close_capable: 47,
     library_only: 9,
+    close_capable: 35,
     projection_only: 6
   });
   assert.deepStrictEqual(sourcePolicyCounts, {
-    strict: 61,
+    strict: 49,
     subset_allowed: 1
   });
 });
@@ -401,7 +401,7 @@ test("T-164 query domain and gaps expose edge assurance as a read-only view", ()
     queryDomain.edgeAssurance.actionClosureEvaluationFunction,
     "evaluate_action"
   );
-  assert.equal(queryDomain.edgeAssurance.rows.length, 62);
+  assert.equal(queryDomain.edgeAssurance.rows.length, 50);
   assert.deepStrictEqual(queryDomain.edgeAssurance.diagnostics, []);
   assert.equal(intentRow.edgeAssuranceContractRef, intentContractRef);
   assert.equal(intentRow.edgeAssuranceContractDigest, intentContractDigest);
@@ -480,8 +480,8 @@ test("T-164 overlay matrix covers every current overlay-selected vector", () => 
     catalog.overlays.flatMap((overlay) => overlay.graphVectorRefs)
   );
 
-  assert.equal(catalog.overlays.length, 5);
-  assert.equal(overlayVectorUnion.length, 45);
+  assert.equal(catalog.overlays.length, 4);
+  assert.equal(overlayVectorUnion.length, 32);
 
   for (const overlay of catalog.overlays) {
     assertSdlcOverlayEdgeGainClosureContracts({
@@ -502,7 +502,7 @@ test("T-164 lite direct implementation vector has a specialized residual-pressur
 
   assert.deepStrictEqual(
     liteDirectVector.source.map((node) => node.name),
-    ["implementation_design_surface", "implementation_module_surface"]
+    ["implementation_design_surface"]
   );
   assert.equal(liteDirectVector.target.name, "component_code_surface");
 
@@ -577,7 +577,7 @@ test("T-164 matrix validation fails closed for missing duplicate ambiguous and u
 });
 
 test("T-164 category templates declare the common function pack shape", () => {
-  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES.length, 15);
+  assert.equal(SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES.length, 13);
   for (const template of SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES) {
     assert.match(
       template.functionPack.deriveObligationsRef,
@@ -743,6 +743,79 @@ test("T-164 artifact presence alone is rejected as behavioral closure evidence",
     /artifact_presence_without_behavioral_fulfillment/
   );
   assert.equal(gain.obligationsAndLedgersComplete, false);
+});
+
+test("T-171 execution-required edge cannot close without admitted execution result evidence", () => {
+  const contract = contractByEdge("derive_test_execution_result_surface");
+  const obligationRef = "BehavioralFulfillment(test-execution-result)";
+  const obligations = deriveSdlcEdgeObligations({
+    contract,
+    obligationRefs: [obligationRef]
+  });
+  const workerOnlyAdmission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t171/worker-assertion",
+        sourceKind: "worker_assessment",
+        obligationRefs: [obligationRef],
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const workerOnlyGain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: workerOnlyAdmission.admittedEvidence,
+    ledgerInputs: allLedgerInputsFor(contract),
+    requiredEvidenceSourceKinds: ["execution_result"]
+  });
+  const workerOnlyResidual = deriveSdlcEdgeResidualPressure(workerOnlyGain);
+  const workerOnlyDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: workerOnlyGain,
+    residualPressure: workerOnlyResidual
+  });
+
+  assert.equal(workerOnlyGain.missingCount, 0);
+  assert.equal(workerOnlyGain.obligationsAndLedgersComplete, true);
+  assert.equal(workerOnlyResidual.clear, false);
+  assert(
+    workerOnlyResidual.requiredPressureRefs.some((ref) =>
+      ref.includes("missing-evidence-source")
+    )
+  );
+  assert.equal(workerOnlyDecision.disposition, "retry");
+
+  const executionAdmission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t171/test-run-report",
+        sourceKind: "execution_result",
+        obligationRefs: [obligationRef],
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const executionGain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: executionAdmission.admittedEvidence,
+    ledgerInputs: allLedgerInputsFor(contract),
+    requiredEvidenceSourceKinds: ["execution_result"]
+  });
+  const executionResidual = deriveSdlcEdgeResidualPressure(executionGain);
+  const executionDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: executionGain,
+    residualPressure: executionResidual
+  });
+
+  assert.equal(executionResidual.clear, true);
+  assert.equal(executionDecision.disposition, "close");
 });
 
 test("T-164 compound traversal gain exposes the open edge in a three-vector chain", () => {
@@ -1021,6 +1094,8 @@ test("T-164 installed closure dispositions are governed by edge assurance close 
     ledgerVersionRef: "ledger-version://odd-sdlc/t164/block/edge-fulfillment/1",
     edgeAssuranceContractRef: blockedGain.contractRef,
     edgeAssuranceContractDigest: blockedGain.contractDigest,
+    targetCarrierAdmissionStatus: blockedGain.targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef: blockedGain.targetCarrierAdmissionRef,
     edgeGainRef: blockedGain.gainRef,
     edgeResidualPressureRefs: blockedResidualPressure.requiredPressureRefs,
     edgeRef: "edge://odd-sdlc/t164/block",
@@ -1063,6 +1138,7 @@ test("T-164 consequence carriers retain gain close and residual pressure identit
     graphCatalogDigestRef: "sha256:t164-catalog",
     edgeAssuranceContractRef: contractRef,
     edgeAssuranceContractDigest: contractDigest,
+    targetCarrierAdmissionStatus: "not_required",
     edgeGainRef,
     edgeResidualPressureRefs: residualPressureRefs,
     edgeRef: "edge://odd-sdlc/t164/derive-design",

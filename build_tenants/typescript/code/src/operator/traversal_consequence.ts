@@ -1,7 +1,10 @@
 // Implements: T-136
 // Implements: T-138
 
-import type { SdlcEdgeAssuranceCloseDecision } from "./edge_gain_closure.js";
+import type {
+  SdlcEdgeAssuranceCloseDecision,
+  SdlcTargetCarrierClosureStatus
+} from "./edge_gain_closure.js";
 
 export type SdlcEdgeClosureDisposition =
   | "close"
@@ -111,6 +114,10 @@ export interface SdlcEdgeFulfillmentLedger {
   readonly graphCatalogDigestRef: string | null;
   readonly edgeAssuranceContractRef: string | null;
   readonly edgeAssuranceContractDigest: string | null;
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
+  readonly targetCarrierAdmissionRef: string | null;
   readonly edgeGainRef: string | null;
   readonly edgeResidualPressureRefs: readonly string[];
   readonly edgeRef: string;
@@ -154,6 +161,10 @@ export interface SdlcEdgeClosureDecision {
   readonly graphCatalogDigestRef: string | null;
   readonly edgeAssuranceContractRef: string | null;
   readonly edgeAssuranceContractDigest: string | null;
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
+  readonly targetCarrierAdmissionRef: string | null;
   readonly edgeGainRef: string | null;
   readonly edgeClosureFunctionRef: string | null;
   readonly edgeAssuranceDecisionRef?: string | null;
@@ -273,6 +284,38 @@ function obligationDownstreamPressureRef(obligationId: string): string {
     obligationId,
     reason: "downstream_transformation_set"
   });
+}
+
+function edgeScopedPressureRef(input: {
+  readonly pressureKind: string;
+  readonly edgeRef: string;
+  readonly reason: string;
+}): string {
+  return [
+    "pressure://odd-sdlc",
+    encodeURIComponent(input.pressureKind),
+    encodeURIComponent(input.edgeRef),
+    encodeURIComponent(input.reason)
+  ].join("/");
+}
+
+function targetCarrierAdmissionPressureRefs(input: {
+  readonly edgeRef: string;
+  readonly status: SdlcTargetCarrierClosureStatus;
+}): readonly string[] {
+  if (input.status === "missing" || input.status === "rejected") {
+    return Object.freeze([
+      edgeScopedPressureRef({
+        pressureKind: "target-carrier",
+        edgeRef: input.edgeRef,
+        reason:
+          input.status === "missing"
+            ? "missing_admission"
+            : "rejected_admission"
+      })
+    ]);
+  }
+  return Object.freeze([]);
 }
 
 function nonEmptyUniqueSorted(
@@ -651,6 +694,10 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
   readonly graphCatalogDigestRef?: string | null;
   readonly edgeAssuranceContractRef?: string | null;
   readonly edgeAssuranceContractDigest?: string | null;
+  readonly targetCarrierContractRef?: string | null;
+  readonly targetCarrierContractDigest?: string | null;
+  readonly targetCarrierAdmissionStatus?: SdlcTargetCarrierClosureStatus | null;
+  readonly targetCarrierAdmissionRef?: string | null;
   readonly edgeGainRef?: string | null;
   readonly edgeResidualPressureRefs?: readonly string[];
   readonly edgeRef: string;
@@ -702,6 +749,27 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
   const downstreamTargetBindingRefs = uniqueSorted(
     input.downstreamTargetBindingRefs ?? []
   );
+  const targetCarrierIdentityDeclared =
+    (input.targetCarrierContractRef !== undefined &&
+      input.targetCarrierContractRef !== null) ||
+    (input.edgeAssuranceContractRef !== undefined &&
+      input.edgeAssuranceContractRef !== null);
+  const targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus =
+    input.targetCarrierAdmissionStatus === undefined ||
+    input.targetCarrierAdmissionStatus === null
+      ? targetCarrierIdentityDeclared
+        ? "missing"
+        : "not_required"
+      : input.targetCarrierAdmissionStatus;
+  const edgeRef = requireNonEmptyString(input.edgeRef, "edgeRef");
+  const targetCarrierPressureRefs = targetCarrierAdmissionPressureRefs({
+    edgeRef,
+    status: targetCarrierAdmissionStatus
+  });
+  const edgeResidualPressureRefs = uniqueSorted([
+    ...(input.edgeResidualPressureRefs ?? []),
+    ...targetCarrierPressureRefs
+  ]);
   const ledger = Object.freeze({
     kind: "sdlc_edge_fulfillment_ledger" as const,
     ledgerRef: requireNonEmptyString(input.ledgerRef, "ledgerRef"),
@@ -738,14 +806,37 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
             input.edgeAssuranceContractDigest,
             "edgeAssuranceContractDigest"
           ),
+    targetCarrierContractRef:
+      input.targetCarrierContractRef === undefined ||
+      input.targetCarrierContractRef === null
+        ? null
+        : requireNonEmptyString(
+            input.targetCarrierContractRef,
+            "targetCarrierContractRef"
+          ),
+    targetCarrierContractDigest:
+      input.targetCarrierContractDigest === undefined ||
+      input.targetCarrierContractDigest === null
+        ? null
+        : requireNonEmptyString(
+            input.targetCarrierContractDigest,
+            "targetCarrierContractDigest"
+          ),
+    targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef:
+      input.targetCarrierAdmissionRef === undefined ||
+      input.targetCarrierAdmissionRef === null
+        ? null
+        : requireNonEmptyString(
+            input.targetCarrierAdmissionRef,
+            "targetCarrierAdmissionRef"
+          ),
     edgeGainRef:
       input.edgeGainRef === undefined || input.edgeGainRef === null
         ? null
         : requireNonEmptyString(input.edgeGainRef, "edgeGainRef"),
-    edgeResidualPressureRefs: uniqueSorted(
-      input.edgeResidualPressureRefs ?? []
-    ),
-    edgeRef: requireNonEmptyString(input.edgeRef, "edgeRef"),
+    edgeResidualPressureRefs,
+    edgeRef,
     attemptRef: requireNonEmptyString(input.attemptRef, "attemptRef"),
     targetBindingRefs,
     evidenceBundleRefs,
@@ -769,7 +860,8 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       edgeConvergedFromCounts(counts) &&
       admitted &&
       targetCertificationPassed &&
-      fdRecheckPassed,
+      fdRecheckPassed &&
+      edgeResidualPressureRefs.length === 0,
     predecessorRefs: uniqueSorted([
       ...targetBindingRefs,
       ...downstreamTargetBindingRefs,
@@ -794,10 +886,22 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       input.edgeAssuranceContractDigest === null
         ? []
         : [input.edgeAssuranceContractDigest]),
+      ...(input.targetCarrierContractRef === undefined ||
+      input.targetCarrierContractRef === null
+        ? []
+        : [input.targetCarrierContractRef]),
+      ...(input.targetCarrierContractDigest === undefined ||
+      input.targetCarrierContractDigest === null
+        ? []
+        : [input.targetCarrierContractDigest]),
+      ...(input.targetCarrierAdmissionRef === undefined ||
+      input.targetCarrierAdmissionRef === null
+        ? []
+        : [input.targetCarrierAdmissionRef]),
       ...(input.edgeGainRef === undefined || input.edgeGainRef === null
         ? []
         : [input.edgeGainRef]),
-      ...(input.edgeResidualPressureRefs ?? []),
+      ...edgeResidualPressureRefs,
       ...(input.predecessorRefs ?? [])
     ])
   });
@@ -861,6 +965,26 @@ export function deriveSdlcEdgeClosureDecision(input: {
       edgeAssuranceCloseDecision.gainRef !== input.ledger.edgeGainRef
     ) {
       throw new TypeError("edge assurance close decision gain ref drift");
+    }
+    if (
+      input.ledger.targetCarrierContractRef !== null &&
+      edgeAssuranceCloseDecision.targetCarrierContractRef !==
+        input.ledger.targetCarrierContractRef
+    ) {
+      throw new TypeError("edge assurance close decision target carrier ref drift");
+    }
+    if (
+      input.ledger.targetCarrierContractDigest !== null &&
+      edgeAssuranceCloseDecision.targetCarrierContractDigest !==
+        input.ledger.targetCarrierContractDigest
+    ) {
+      throw new TypeError("edge assurance close decision target carrier digest drift");
+    }
+    if (
+      edgeAssuranceCloseDecision.targetCarrierAdmissionStatus !==
+      input.ledger.targetCarrierAdmissionStatus
+    ) {
+      throw new TypeError("edge assurance close decision target carrier admission drift");
     }
   }
   const candidates = new Set<SdlcEdgeClosureDisposition>(["block"]);
@@ -929,6 +1053,10 @@ export function deriveSdlcEdgeClosureDecision(input: {
     graphCatalogDigestRef: input.ledger.graphCatalogDigestRef,
     edgeAssuranceContractRef: input.ledger.edgeAssuranceContractRef,
     edgeAssuranceContractDigest: input.ledger.edgeAssuranceContractDigest,
+    targetCarrierContractRef: input.ledger.targetCarrierContractRef,
+    targetCarrierContractDigest: input.ledger.targetCarrierContractDigest,
+    targetCarrierAdmissionStatus: input.ledger.targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef: input.ledger.targetCarrierAdmissionRef,
     edgeGainRef: input.ledger.edgeGainRef,
     edgeClosureFunctionRef:
       input.edgeClosureFunctionRef === undefined ||
@@ -951,6 +1079,15 @@ export function deriveSdlcEdgeClosureDecision(input: {
       ...(input.ledger.edgeAssuranceContractDigest === null
         ? []
         : [input.ledger.edgeAssuranceContractDigest]),
+      ...(input.ledger.targetCarrierContractRef === null
+        ? []
+        : [input.ledger.targetCarrierContractRef]),
+      ...(input.ledger.targetCarrierContractDigest === null
+        ? []
+        : [input.ledger.targetCarrierContractDigest]),
+      ...(input.ledger.targetCarrierAdmissionRef === null
+        ? []
+        : [input.ledger.targetCarrierAdmissionRef]),
       ...(input.ledger.edgeGainRef === null ? [] : [input.ledger.edgeGainRef]),
       ...(input.edgeClosureFunctionRef === undefined ||
       input.edgeClosureFunctionRef === null
@@ -997,6 +1134,15 @@ export function deriveSdlcEdgeClosureDecision(input: {
       ...(input.ledger.edgeAssuranceContractDigest === null
         ? []
         : [input.ledger.edgeAssuranceContractDigest]),
+      ...(input.ledger.targetCarrierContractRef === null
+        ? []
+        : [input.ledger.targetCarrierContractRef]),
+      ...(input.ledger.targetCarrierContractDigest === null
+        ? []
+        : [input.ledger.targetCarrierContractDigest]),
+      ...(input.ledger.targetCarrierAdmissionRef === null
+        ? []
+        : [input.ledger.targetCarrierAdmissionRef]),
       ...(input.ledger.edgeGainRef === null ? [] : [input.ledger.edgeGainRef]),
       ...(edgeAssuranceCloseDecision === null
         ? []
@@ -1053,6 +1199,15 @@ export function constructSdlcOverlaySegmentCompletion(input: {
   );
   const remainingAssetPressureRefs = uniqueSorted(input.remainingAssetPressureRefs ?? []);
   const nextEligibleOverlayRefs = uniqueSorted(input.nextEligibleOverlayRefs ?? []);
+  if (
+    input.stopDisposition === "product_converged" &&
+    (remainingGraphPressureRefs.length > 0 ||
+      remainingRequirementPressureRefs.length > 0 ||
+      remainingAssetPressureRefs.length > 0 ||
+      nextEligibleOverlayRefs.length > 0)
+  ) {
+    throw new TypeError("product convergence cannot carry remaining overlay pressure");
+  }
   const productConverged =
     input.stopDisposition === "product_converged" &&
     remainingGraphPressureRefs.length === 0 &&
@@ -1384,6 +1539,18 @@ export function replaySdlcTraversalConsequence(input: {
     edgeClosureDecision.ledgerVersionRef,
     "edgeFulfillmentLedger"
   );
+  if (
+    edgeClosureDecision.targetCarrierContractRef !==
+      edgeFulfillmentLedger.targetCarrierContractRef ||
+    edgeClosureDecision.targetCarrierContractDigest !==
+      edgeFulfillmentLedger.targetCarrierContractDigest ||
+    edgeClosureDecision.targetCarrierAdmissionStatus !==
+      edgeFulfillmentLedger.targetCarrierAdmissionStatus ||
+    edgeClosureDecision.targetCarrierAdmissionRef !==
+      edgeFulfillmentLedger.targetCarrierAdmissionRef
+  ) {
+    throw new TypeError("edge closure decision target carrier identity drift");
+  }
   requireRefsContain({
     refs: edgeClosureDecision.predecessorRefs,
     requiredRefs: [

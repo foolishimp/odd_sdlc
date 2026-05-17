@@ -20,7 +20,10 @@ import {
 } from "@abiogenesis/typescript-tenant";
 
 import {
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   constructSdlcGtlModule,
   invokeOddSdlcSpecMethodCommandSync,
   serializeOddSdlcSpecMethodResult
@@ -308,6 +311,61 @@ test("T-158 archived next traversal does not compare predecessor overlay binding
   );
 });
 
+test("T-170 archived next traversal preserves target-next basis identity", () => {
+  const workspace = makeConformantWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t132_hello_world_single_tenant",
+      "  overlay_strategy: thread",
+      "  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation",
+      "active_tenant: hello_world_javascript",
+      "selected_output_root: build_tenants/hello_world_javascript",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node",
+      "    module_structure:",
+      "      - hello_world_javascript"
+    ].join("\n"),
+    "utf8"
+  );
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    nextGraphFunctionRef: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+    nextGraphVectorRef: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  assert.match(
+    result.payload.start.executionContract.overlayBindingRef,
+    /public-start%2Fnext%2Fnext/
+  );
+  assert.doesNotMatch(
+    result.payload.start.executionContract.overlayBindingRef,
+    /public-start%2Fgraph_function/
+  );
+});
+
 test("T-160 archived next traversal rejects inconsistent predecessor overlay binding", () => {
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace, {
@@ -507,11 +565,11 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
     "--workspace",
     workspace,
     "--evaluator-priority-edge",
-    "Fg_conform_project_authority"
+    "derive_intent_surface"
   ]);
 
   assert.equal(result.status, "ok");
-  assert.equal(result.payload.projection.currentEdge, "Fg_conform_project_authority");
+  assert.equal(result.payload.projection.currentEdge, "derive_intent_surface");
   assert.equal(result.payload.dossier.choosesNextTraversal, false);
   assert.equal(
     result.payload.dossier.rankingAuthority,
@@ -524,14 +582,14 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
   );
   assert.equal(
     result.payload.dossier.bestGraphVectorRef,
-    "Fg_conform_project_authority"
+    "derive_intent_surface"
   );
   assert.deepEqual(result.payload.dossier.nextLawfulActions, [
-    "construction-action:Fg_conform_project_authority:Fg_conform_project_authority"
+    "construction-action:derive_intent_surface:derive_intent_surface"
   ]);
   assert(
     result.payload.dossier.rankingReasonRefs.includes(
-      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/Fg_conform_project_authority"
+      "spec-method://odd-sdlc/gaps/evaluator-priority-edge/derive_intent_surface"
     )
   );
 
@@ -540,7 +598,7 @@ test("T-058 Spec Method gaps command admits one evaluator priority surface", () 
     "--workspace",
     workspace,
     "--evaluator-priority-edge",
-    "Fg_conform_project_authority"
+    "derive_intent_surface"
   ]);
   assert.equal(rejected.status, "error");
   assert.match(rejected.payload.error, /only valid for gaps/);
@@ -592,7 +650,7 @@ test("T-058 Spec Method gaps priority fails closed on invalid edge selectors", (
     "--workspace",
     closedWorkspace,
     "--evaluator-priority-edge",
-    "Fg_conform_project_authority"
+    "derive_intent_surface"
   ]);
   assert.equal(closed.status, "error");
   assert.match(closed.payload.error, /already closed graph edge/);

@@ -9,9 +9,9 @@
 // Implements: REQ-F-ODDSDLC-065
 // Implements: REQ-F-ODDSDLC-066
 
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
   admitGraphSpanAssessment,
   constructEnginePluginContract,
@@ -24,6 +24,7 @@ import {
   constructRuntimeWatchdogPolicy,
   constructVectorClosedEvent,
   constructVectorEvaluatedEvent,
+  constructVectorTraversalPlannedEvent,
   foldGraphSpanAssessments,
   deriveAdvancementTransition,
   deriveGraphReentryFrontierProjection,
@@ -42,6 +43,7 @@ import {
   type Module,
   type RuntimeAggregateProjection,
   type RuntimeEvent,
+  type RuntimeFailureClass,
   type RuntimeLivenessObserverProjection,
   type SupervisedProcessActorResult,
   type TracedProcessExecutorProfile,
@@ -51,15 +53,26 @@ import {
 import {
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  admitSdlcTargetCarrierCandidate,
   constructSdlcGtlModule,
+  constructSdlcTargetCarrierRegistry,
   constructSdlcTraversalOverlayCatalog,
+  missingSdlcTargetCarrierAdmission,
+  requireSdlcTargetCarrierRow,
+  resolveSdlcTraversalOverlay,
+  sdlcTargetCarrierCandidate,
   sdlcGraphFunctionBoundaryRef,
   sdlcGraphVectorBoundaryRef,
   sdlcPublishedActionRef,
   sdlcPublishedTraversalTargetRef,
+  sdlcTraversalOverlayAllowsProductConvergence,
+  sdlcTraversalOverlayNextGraphContinuation,
   sdlcTargetOutcomeRef,
-  withSdlcOverlayBindingPostActionEvidence
+  withSdlcOverlayBindingPostActionEvidence,
+  type SdlcTargetCarrierCandidateAdmission,
+  type SdlcTargetCarrierContractRow
 } from "../graph/index.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
@@ -80,6 +93,7 @@ import type {
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcPostflightResult,
+  SdlcWorkerObligationAssessment,
   SdlcWorkerHandoffManifest,
   SdlcWorkerProcessStartedContext,
   SdlcWorkerProcessSummary,
@@ -153,6 +167,7 @@ import {
   resolveSdlcEdgeGainClosureContract,
   sdlcEdgeAssuranceContractRef,
   type SdlcEdgeEvidenceCandidate,
+  type SdlcEdgeEvidenceSourceKind,
   type SdlcEdgeLedgerInputRef
 } from "./edge_gain_closure.js";
 import {
@@ -165,6 +180,9 @@ import {
   type SdlcBlockingReasonCode,
   type SdlcBlockingReasonLawfulReentryPoint
 } from "../shared/blocking_reason.js";
+import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
+import { admitDesignDepthRegisterFromArtifact } from "./design_depth_register.js";
+import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
@@ -419,6 +437,13 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
       sourceProjectionRef
     });
   }
+  const priorGapDossiers =
+    input.outcome.gapDossier === null
+      ? Object.freeze([])
+      : Object.freeze([input.outcome.gapDossier]);
+  const priorAuthorityRef =
+    priorGapDossiers[0]?.currentGapDossierRef ??
+    consequence.edgeClosureDecision.decisionRef;
   const manifestRef = pathToFileURL(
     join(input.outcome.manifest.archiveRoot, "handoff_manifest.json")
   ).href;
@@ -431,12 +456,12 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
         retryRunId: `retry-run://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
         retryCallId: `retry-call://odd-sdlc-ts/installed-reentry/${refSegment}/${input.attemptIndex}`,
         manifestId: manifestRef,
-        priorAuthorityRef: consequence.edgeClosureDecision.decisionRef,
+        priorAuthorityRef,
         attemptIndex: input.attemptIndex,
         sourceProjectionRef
       })
     ]),
-    priorGapDossiers: Object.freeze([])
+    priorGapDossiers
   });
   return Object.freeze({
     kind: "sdlc_worker_retry_context_derivation" as const,
@@ -524,6 +549,38 @@ function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
 }
 
+function compactSdlcPriorGapReasonForRetryContext(
+  reason: SdlcPostflightGapReason,
+  currentGapDossierRef: string
+): SdlcPostflightGapReason {
+  const canonicalReason = canonicalSdlcPriorGapReasonCode(reason.reason);
+  return Object.freeze({
+    ...reason,
+    reason: canonicalReason,
+    blockingReason: makeSdlcBlockingReason({
+      code: reason.blockingReason.code,
+      detail:
+        reason.blockingReason.code === "assurance_ledger_reason"
+          ? canonicalReason
+          : reason.blockingReason.detail,
+      reasonClass: reason.blockingReason.reasonClass,
+      lawfulReentryPoint: reason.blockingReason.lawfulReentryPoint,
+      message: reason.blockingReason.message,
+      evidenceRefs: [currentGapDossierRef]
+    })
+  });
+}
+
+function compactSdlcPriorGapReasonKey(reason: SdlcPostflightGapReason): string {
+  return [
+    reason.reason,
+    reason.blockingReason.code,
+    reason.blockingReason.detail ?? "",
+    reason.blockingReason.reasonClass,
+    reason.blockingReason.lawfulReentryPoint
+  ].join("\u001f");
+}
+
 export function compactSdlcPriorGapDossiersForRetryContext(
   dossiers: readonly SdlcPostflightGapDossier[]
 ): readonly SdlcPostflightGapDossier[] {
@@ -535,27 +592,13 @@ export function compactSdlcPriorGapDossiersForRetryContext(
   if (latest === undefined) {
     return Object.freeze([]);
   }
-  const latestReasonByCode = new Map<string, SdlcPostflightGapReason>();
+  const latestReasonByKey = new Map<string, SdlcPostflightGapReason>();
   for (const reason of latest.reasons) {
-    const canonicalReason = canonicalSdlcPriorGapReasonCode(reason.reason);
-    latestReasonByCode.set(
-      canonicalReason,
-      Object.freeze({
-        ...reason,
-        reason: canonicalReason,
-        blockingReason: makeSdlcBlockingReason({
-          code: reason.blockingReason.code,
-          detail:
-            reason.blockingReason.code === "assurance_ledger_reason"
-              ? canonicalReason
-              : reason.blockingReason.detail,
-          reasonClass: reason.blockingReason.reasonClass,
-          lawfulReentryPoint: reason.blockingReason.lawfulReentryPoint,
-          message: reason.blockingReason.message,
-          evidenceRefs: [latest.currentGapDossierRef]
-        })
-      })
+    const compactReason = compactSdlcPriorGapReasonForRetryContext(
+      reason,
+      latest.currentGapDossierRef
     );
+    latestReasonByKey.set(compactSdlcPriorGapReasonKey(compactReason), compactReason);
   }
   const compact: SdlcPostflightGapDossier = Object.freeze({
     kind: latest.kind,
@@ -565,8 +608,13 @@ export function compactSdlcPriorGapDossiersForRetryContext(
     vectorIndex: latest.vectorIndex,
     targetAssetType: latest.targetAssetType,
     reasons: Object.freeze(
-      [...latestReasonByCode.values()].sort((left, right) =>
-        left.reason.localeCompare(right.reason)
+      [...latestReasonByKey.values()].sort(
+        (left, right) =>
+          left.reason.localeCompare(right.reason) ||
+          (left.blockingReason.detail ?? "").localeCompare(
+            right.blockingReason.detail ?? ""
+          ) ||
+          left.blockingReason.code.localeCompare(right.blockingReason.code)
       )
     ),
     evidenceRefs: refs,
@@ -630,7 +678,71 @@ function postActionProjectionHasExplicitFeatureScope(input: {
   );
 }
 
-function resumeContextFromPostActionProjection(input: {
+function postActionProjectionCarriesRetryContext(input: {
+  readonly nextActionProjection: NonNullable<
+    SdlcPublicStartOutcome["executionContract"]
+  >["nextActionProjection"];
+}): boolean {
+  return (
+    input.nextActionProjection.gapPressureRefs.length > 0 ||
+    postActionProjectionHasExplicitFeatureScope({
+      nextActionProjectionRef: input.nextActionProjection.nextActionProjectionRef,
+      selectedActionRef: input.nextActionProjection.selectedActionRef ?? ""
+    })
+  );
+}
+
+const POST_ACTION_GAP_PRESSURE_PREFIX = "pressure://odd-sdlc/post-action/";
+
+function postActionArchiveRefFromGapPressureRef(ref: string): string | null {
+  if (!ref.startsWith(POST_ACTION_GAP_PRESSURE_PREFIX)) {
+    return null;
+  }
+  const remainder = ref.slice(POST_ACTION_GAP_PRESSURE_PREFIX.length);
+  const separator = remainder.lastIndexOf("/");
+  if (separator <= 0) {
+    return null;
+  }
+  const decoded = decodedRefForScope(remainder.slice(0, separator));
+  return decoded.startsWith("file://") ? decoded : null;
+}
+
+function gapDossierFromPostActionArchiveRef(
+  archiveRef: string
+): SdlcPostflightGapDossier | null {
+  try {
+    const archivePath = fileURLToPath(archiveRef);
+    const archiveRoot = archivePath.endsWith("/general")
+      ? dirname(archivePath)
+      : archivePath;
+    return readPostflightGapDossierRef(
+      pathToFileURL(join(archiveRoot, "gap_dossier.json")).href
+    );
+  } catch {
+    return null;
+  }
+}
+
+function postActionGapDossiersFromProjection(input: {
+  readonly nextActionProjection: NonNullable<
+    SdlcPublicStartOutcome["executionContract"]
+  >["nextActionProjection"];
+}): readonly SdlcPostflightGapDossier[] {
+  const byRef = new Map<string, SdlcPostflightGapDossier>();
+  for (const pressureRef of input.nextActionProjection.gapPressureRefs) {
+    const archiveRef = postActionArchiveRefFromGapPressureRef(pressureRef);
+    if (archiveRef === null) {
+      continue;
+    }
+    const dossier = gapDossierFromPostActionArchiveRef(archiveRef);
+    if (dossier !== null) {
+      byRef.set(dossier.currentGapDossierRef, dossier);
+    }
+  }
+  return compactSdlcPriorGapDossiersForRetryContext([...byRef.values()]);
+}
+
+export function deriveSdlcWorkerRetryContextFromPostActionProjection(input: {
   readonly nextActionProjection: NonNullable<
     SdlcPublicStartOutcome["executionContract"]
   >["nextActionProjection"];
@@ -643,14 +755,15 @@ function resumeContextFromPostActionProjection(input: {
   ) {
     return undefined;
   }
-  if (
-    !postActionProjectionHasExplicitFeatureScope({
-      nextActionProjectionRef: input.nextActionProjection.nextActionProjectionRef,
-      selectedActionRef: input.nextActionProjection.selectedActionRef
-    })
-  ) {
+  if (!postActionProjectionCarriesRetryContext(input)) {
     return undefined;
   }
+  const priorGapDossiers = postActionGapDossiersFromProjection({
+    nextActionProjection: input.nextActionProjection
+  });
+  const priorAuthorityRef =
+    priorGapDossiers[0]?.currentGapDossierRef ??
+    input.nextActionProjection.selectedActionRef;
   return Object.freeze({
     kind: "sdlc_worker_retry_context" as const,
     retryAttemptRefs: Object.freeze([
@@ -659,12 +772,12 @@ function resumeContextFromPostActionProjection(input: {
         retryRunId: "post-action-reentry",
         retryCallId: input.nextActionProjection.nextActionProjectionRef,
         manifestId: input.nextActionProjection.nextActionProjectionRef,
-        priorAuthorityRef: input.nextActionProjection.selectedActionRef,
+        priorAuthorityRef,
         attemptIndex: 0,
         sourceProjectionRef: input.nextActionProjection.nextActionProjectionRef
       })
     ]),
-    priorGapDossiers: Object.freeze([])
+    priorGapDossiers
   });
 }
 
@@ -717,6 +830,69 @@ function mergedRetryContext(input: {
   });
 }
 
+function latestRuntimeGapDossierForRetryContext(input: {
+  readonly workspaceRoot: string;
+  readonly vectorIndex: number;
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+}): SdlcPostflightGapDossier | null {
+  const operatorRunsRoot = join(
+    input.workspaceRoot,
+    deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
+      .operatorRunRoot
+  );
+  if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
+    return null;
+  }
+  let latest: SdlcPostflightGapDossier | null = null;
+  const runIds = readdirSync(operatorRunsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  for (const runId of runIds) {
+    const gapDossierRef = pathToFileURL(
+      join(operatorRunsRoot, runId, "gap_dossier.json")
+    ).href;
+    const dossier = readPostflightGapDossierRef(gapDossierRef);
+    if (
+      dossier !== null &&
+      dossier.vectorIndex === input.vectorIndex &&
+      dossier.edgeName === input.edgeName &&
+      dossier.targetAssetType === input.targetAssetType &&
+      dossier.retryEligible
+    ) {
+      latest = dossier;
+    }
+  }
+  return latest;
+}
+
+export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
+  readonly projected: SdlcWorkerRetryContext;
+  readonly workspaceRoot: string;
+  readonly vectorIndex: number;
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+}): SdlcWorkerRetryContext {
+  const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
+  if (latestGapDossier === null) {
+    return input.projected;
+  }
+  const dossierByRef = new Map<string, SdlcPostflightGapDossier>();
+  for (const dossier of [
+    ...input.projected.priorGapDossiers,
+    latestGapDossier
+  ]) {
+    dossierByRef.set(dossier.currentGapDossierRef, dossier);
+  }
+  return Object.freeze({
+    ...input.projected,
+    priorGapDossiers: compactSdlcPriorGapDossiersForRetryContext([
+      ...dossierByRef.values()
+    ])
+  });
+}
+
 function vectorIndexByEdgeName(input: {
   readonly basis: ExecutionBasis;
   readonly edgeName: string;
@@ -725,6 +901,86 @@ function vectorIndexByEdgeName(input: {
     (vector) => vector.name === input.edgeName
   );
   return index < 0 ? null : index;
+}
+
+interface GraphContinuationReplayCursor {
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly cursorEvents: readonly RuntimeEvent[];
+}
+
+function replayEventsWithGraphContinuationCursor(input: {
+  readonly basis: ExecutionBasis;
+  readonly replayEvents: readonly RuntimeEvent[];
+  readonly nextGraphVectorRef: string | null;
+}): GraphContinuationReplayCursor {
+  if (input.nextGraphVectorRef === null) {
+    return Object.freeze({
+      replayEvents: input.replayEvents,
+      cursorEvents: Object.freeze([])
+    });
+  }
+  const targetIndex = vectorIndexByEdgeName({
+    basis: input.basis,
+    edgeName: input.nextGraphVectorRef
+  });
+  if (targetIndex === null || targetIndex <= 0) {
+    return Object.freeze({
+      replayEvents: input.replayEvents,
+      cursorEvents: Object.freeze([])
+    });
+  }
+  const closedIndexes = new Set<number>();
+  try {
+    for (const vectorIndex of deriveRuntimeAggregateProjection(
+      input.basis,
+      input.replayEvents
+    ).closedVectorIndexes) {
+      closedIndexes.add(vectorIndex);
+    }
+  } catch {
+    for (const event of input.replayEvents) {
+      if (event.kind !== "vector_closed") {
+        continue;
+      }
+      const vectorIndex = Reflect.get(event, "vectorIndex");
+      if (
+        typeof vectorIndex === "number" &&
+        (event.basisId === input.basis.id ||
+          input.basis.graph.vectors[vectorIndex]?.name === event.edge)
+      ) {
+        closedIndexes.add(vectorIndex);
+      }
+    }
+  }
+  const cursorEvents: RuntimeEvent[] = [];
+  for (let vectorIndex = 0; vectorIndex < targetIndex; vectorIndex += 1) {
+    if (closedIndexes.has(vectorIndex)) {
+      continue;
+    }
+    cursorEvents.push(
+      constructVectorTraversalPlannedEvent({
+        basis: input.basis,
+        vectorIndex
+      }),
+      constructVectorEvaluatedEvent({
+        basis: input.basis,
+        vectorIndex,
+        status: "accepted"
+      }),
+      constructVectorClosedEvent({
+        basis: input.basis,
+        vectorIndex,
+        closureKind: "advanced"
+      })
+    );
+  }
+  return Object.freeze({
+    replayEvents:
+      cursorEvents.length === 0
+        ? input.replayEvents
+        : Object.freeze([...input.replayEvents, ...cursorEvents]),
+    cursorEvents: Object.freeze(cursorEvents)
+  });
 }
 
 function vectorNodeRefFor(input: {
@@ -1116,7 +1372,7 @@ function dispatchResultRef(manifest: SdlcWorkerHandoffManifest): string {
 }
 
 function runtimeFailureArtifact(input: {
-  readonly failureClass: "runtime_failure" | "payload_contract_failure";
+  readonly failureClass: RuntimeFailureClass;
   readonly detail: string;
 }): Readonly<Record<string, unknown>> {
   return Object.freeze({
@@ -1124,6 +1380,29 @@ function runtimeFailureArtifact(input: {
     failureClass: input.failureClass,
     detail: input.detail
   });
+}
+
+function workerFailureRuntimeFailureClass(
+  postflight: SdlcPostflightResult
+): RuntimeFailureClass {
+  const carrier = postflight.blockingReasonCarriers[0];
+  if (
+    carrier !== undefined &&
+    (carrier.code === "silent_worker_inactivity" ||
+      carrier.code === "worker_hard_timeout") &&
+    (carrier.detail?.includes("stdoutBytes=0;stderrBytes=0") ?? false)
+  ) {
+    return "no_output";
+  }
+  if (
+    carrier !== undefined &&
+    (carrier.code === "worker_executor_unavailable" ||
+      carrier.code === "worker_launch_failed" ||
+      carrier.code === "worker_lost_terminal")
+  ) {
+    return "transport_failure";
+  }
+  return "runtime_failure";
 }
 
 function actorInvocationForPluginInput(input: {
@@ -2244,6 +2523,19 @@ function materializedFileRef(file: {
   return pathToFileURL(file.absolutePath).href;
 }
 
+function workerOutputMaterializationRefs(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  const report = state.workerReport;
+  if (report === null) {
+    return Object.freeze([]);
+  }
+  return uniqueSorted([
+    pathToFileURL(report.outputFile).href,
+    ...report.materializedFiles.map(materializedFileRef)
+  ]);
+}
+
 export type SdlcPublishedProductMaterializationActionStatus =
   | "eligible"
   | "unpublished"
@@ -2407,6 +2699,7 @@ function admittedAssetTypesForState(input: {
     ...admittedAssetTypesFromEvents(input.emittedEvents),
     ...(currentEdgeAdmitted
       ? [
+          ...input.state.manifest.inputAssetTypes,
           input.state.manifest.targetAssetType,
           ...graphFunctionOutputAssetTypes({
             module: input.module,
@@ -2758,6 +3051,17 @@ function fallbackFulfillmentStatusForState(
   return "blocked";
 }
 
+export function sdlcAssessmentCarriesRequirementForDownstreamClosure(
+  assessment: SdlcWorkerObligationAssessment
+): boolean {
+  return (
+    assessment.obligationId.startsWith("requirement:") &&
+    assessment.blockingReasons.some((reason) =>
+      reason.startsWith("requirement_carried_for_downstream_closure:")
+    )
+  );
+}
+
 function edgeFulfillmentProjectionFor(input: {
   readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
@@ -2776,6 +3080,7 @@ function edgeFulfillmentProjectionFor(input: {
           assessment.obligationId.startsWith("requirement:") &&
           !input.state.manifest.productMaterialization.required &&
           (authorityRequirementInduction ||
+            sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment) ||
             (input.state.manifest.targetAssetType === "requirement_surface" &&
               assessment.blockingReasons.some((reason) =>
                 reason.startsWith("requirement_recorded_for_future_closure:")
@@ -2930,6 +3235,70 @@ function postActionCandidateFor(input: {
     ]),
     eligibleReasonRefs: Object.freeze([
       "evaluate_next_post_action_selected_published_graph_action"
+    ])
+  });
+}
+
+export function deriveSdlcPostCloseOverlayContinuationActionInput(input: {
+  readonly module: Module;
+  readonly overlayRef: string | null;
+  readonly completedGraphFunctionRef: string;
+  readonly runRef: string;
+}): OddSdlcEvaluateNextActionInput | null {
+  if (input.overlayRef === null) {
+    return null;
+  }
+  const catalog = constructSdlcTraversalOverlayCatalog({
+    module: input.module
+  });
+  const overlay = resolveSdlcTraversalOverlay({
+    catalog,
+    overlayRef: input.overlayRef
+  });
+  if (overlay === null) {
+    return null;
+  }
+  const continuation = sdlcTraversalOverlayNextGraphContinuation({
+    module: input.module,
+    overlay,
+    completedGraphFunctionRef: input.completedGraphFunctionRef
+  });
+  if (continuation === null) {
+    return null;
+  }
+  const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef: continuation.nextGraphFunctionRef,
+    graphVectorRef: continuation.nextGraphVectorRef
+  });
+  const targetOutcomeRef = sdlcTargetOutcomeRef({
+    graphFunctionRef: continuation.nextGraphFunctionRef,
+    targetNodeRef: continuation.targetNodeRef
+  });
+  return Object.freeze({
+    actionRef: [
+      "construction-action://odd-sdlc/post-action",
+      continuation.nextGraphFunctionRef,
+      "post_close_overlay_continuation",
+      continuation.nextGraphVectorRef,
+      encodeURIComponent(input.runRef)
+    ].join("/"),
+    actionKind: "invoke_graph_function" as const,
+    graphFunctionRef: continuation.nextGraphFunctionRef,
+    graphVectorRef: continuation.nextGraphVectorRef,
+    publishedTraversalTargetRef,
+    targetOutcomeRef,
+    inputAssetRefs: Object.freeze([]),
+    expectedOutputAssetRefs: Object.freeze([targetOutcomeRef]),
+    requiredAuthorityRefs: Object.freeze([publishedTraversalTargetRef]),
+    eligibleReasonRefs: Object.freeze([
+      "evaluate_next_post_close_overlay_continuation",
+      `overlay:${continuation.overlayRef}`,
+      `terminal_graph:${continuation.terminalGraphFunctionRef}`,
+      `completed_graph:${continuation.completedGraphFunctionRef}`,
+      `completed_vector:${continuation.completedGraphVectorRef}`,
+      `next_graph:${continuation.nextGraphFunctionRef}`,
+      `next_vector:${continuation.nextGraphVectorRef}`,
+      `sequence_index:${continuation.sequenceIndex}`
     ])
   });
 }
@@ -3147,6 +3516,9 @@ function postActionCandidates(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly closureDecisionDisposition: string;
   readonly nextVectorIndex: number | null;
+  readonly activeOverlayRef: string | null;
+  readonly completedGraphFunctionRef: string;
+  readonly runRef: string;
   readonly downstreamPressureRefs: readonly string[];
   readonly downstreamTargetBindingRefs: readonly string[];
   readonly admittedAssetTypes: readonly string[];
@@ -3196,6 +3568,23 @@ function postActionCandidates(input: {
       productMaterializationCandidate === null
         ? []
         : [productMaterializationCandidate]
+    );
+  }
+  if (
+    input.closureDecisionDisposition === "close" &&
+    input.nextVectorIndex === null
+  ) {
+    const overlayContinuationCandidate =
+      deriveSdlcPostCloseOverlayContinuationActionInput({
+        module: input.module,
+        overlayRef: input.activeOverlayRef,
+        completedGraphFunctionRef: input.completedGraphFunctionRef,
+        runRef: input.runRef
+      });
+    return Object.freeze(
+      overlayContinuationCandidate === null
+        ? []
+        : [overlayContinuationCandidate]
     );
   }
   if (
@@ -3289,25 +3678,76 @@ function edgeAssuranceEvidenceCandidatesFor(input: {
   readonly obligationIds: readonly string[];
 }): readonly SdlcEdgeEvidenceCandidate[] {
   const closureObligationIds = new Set(input.obligationIds);
-  return Object.freeze(
-    (input.state.workerReport?.obligationAssessments ?? Object.freeze([]))
-      .filter(
-        (assessment) =>
-          assessment.fulfillmentStatus === "fulfilled" &&
-          closureObligationIds.has(assessment.obligationId)
+  const assessmentCandidates = (input.state.workerReport?.obligationAssessments ??
+    Object.freeze([]))
+    .filter(
+      (assessment) =>
+        assessment.fulfillmentStatus === "fulfilled" &&
+        closureObligationIds.has(assessment.obligationId)
+    )
+    .flatMap((assessment) =>
+      assessment.evidenceRefs.map((evidenceRef) =>
+        Object.freeze({
+          kind: "sdlc_edge_evidence_candidate" as const,
+          evidenceRef,
+          sourceKind: "worker_assessment" as const,
+          obligationRefs: Object.freeze([assessment.obligationId]),
+          supportsBehavioralFulfillment: true
+        })
       )
-      .flatMap((assessment) =>
-        assessment.evidenceRefs.map((evidenceRef) =>
+    );
+  const executionEvidence = input.state.workerReport?.executionEvidence ?? null;
+  const executionCandidates =
+    executionEvidence !== null &&
+    executionEvidence.status === "succeeded" &&
+    (executionEvidence.testsObserved ?? 0) > 0 &&
+    (executionEvidence.failedCount ?? 0) === 0
+      ? executionEvidence.reportRefs.map((evidenceRef) =>
           Object.freeze({
             kind: "sdlc_edge_evidence_candidate" as const,
             evidenceRef,
-            sourceKind: "worker_assessment" as const,
-            obligationRefs: Object.freeze([assessment.obligationId]),
+            sourceKind: "execution_result" as const,
+            obligationRefs: Object.freeze(input.obligationIds),
             supportsBehavioralFulfillment: true
           })
         )
-      )
+      : Object.freeze([] as const);
+  return Object.freeze([...assessmentCandidates, ...executionCandidates]);
+}
+
+function declaredExecutionContract(input: string): boolean {
+  const contract = input.trim().toLowerCase();
+  return (
+    contract.length > 0 &&
+    contract !== "undeclared" &&
+    contract !== "none" &&
+    contract !== "n/a" &&
+    contract !== "not_applicable"
   );
+}
+
+function stateRequiresExecutionEvidence(
+  state: SdlcAbgOwnedFpDispatchState
+): boolean {
+  return (
+    state.manifest.targetAssetType === "test_execution_result_surface" ||
+    ((state.manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
+      state.manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
+      state.manifest.edgeName === "derive_component_code_surface") &&
+      state.manifest.targetAssetType === "component_code_surface" &&
+      state.manifest.productMaterialization.required &&
+      declaredExecutionContract(
+        state.manifest.productMaterialization.testExecutionContract
+      ))
+  );
+}
+
+function requiredEvidenceSourceKindsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly SdlcEdgeEvidenceSourceKind[] {
+  return stateRequiresExecutionEvidence(state)
+    ? Object.freeze(["execution_result"] as const)
+    : Object.freeze([]);
 }
 
 function plannedEdgeAssuranceLedgerInputs(input: {
@@ -3332,6 +3772,163 @@ function plannedEdgeAssuranceLedgerInputs(input: {
       ledgerRef: input.nextActionProjectionRef
     })
   ]);
+}
+
+function targetCarrierRowForInstalledEdge(input: {
+  readonly module: Module;
+  readonly edgeName: string;
+}): SdlcTargetCarrierContractRow {
+  return requireSdlcTargetCarrierRow({
+    registry: constructSdlcTargetCarrierRegistry({
+      module: input.module,
+      contracts: Object.freeze([resolveSdlcEdgeGainClosureContract(input.edgeName)])
+    }),
+    edgeRef: input.edgeName
+  });
+}
+
+function targetCarrierAdmissionForState(input: {
+  readonly module: Module;
+  readonly state: SdlcAbgOwnedFpDispatchState;
+}): SdlcTargetCarrierCandidateAdmission {
+  const row = targetCarrierRowForInstalledEdge({
+    module: input.module,
+    edgeName: input.state.manifest.edgeName
+  });
+  if (input.state.workerReport === null) {
+    return missingSdlcTargetCarrierAdmission({
+      row,
+      reason: "worker_report_missing"
+    });
+  }
+  const reportRef = pathToFileURL(input.state.manifest.reportFile).href;
+  const report = input.state.workerReport;
+  const artifactRef = pathToFileURL(report.outputFile).href;
+  const targetPayload = targetCarrierPayloadForState({
+    state: input.state,
+    reportRef,
+    artifactRef
+  });
+  if (targetPayload.structuralAdmissionStatus === "rejected") {
+    return missingSdlcTargetCarrierAdmission({
+      row,
+      payloadRef: targetPayload.payloadRef,
+      reason: targetPayload.structuralBlockingReasons.length === 0
+        ? "target_payload_structural_admission_rejected"
+        : targetPayload.structuralBlockingReasons.join(",")
+    });
+  }
+  const candidate = sdlcTargetCarrierCandidate({
+    row,
+    payload: targetPayload.payload,
+    summary: report.summary,
+    evidenceRefs: targetPayload.evidenceRefs
+  });
+  return admitSdlcTargetCarrierCandidate({
+    row,
+    payloadRef: targetPayload.payloadRef,
+    candidate
+  });
+}
+
+function workerResultTargetPayload(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly reportRef: string;
+}): Readonly<Record<string, unknown>> {
+  const report = input.state.workerReport;
+  if (report === null) {
+    throw new TypeError("worker result target payload requires a worker report");
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_result_target_payload",
+    reportRef: input.reportRef,
+    outputFile: report.outputFile,
+    digest: report.digest,
+    materializedFiles: report.materializedFiles,
+    materializationDiagnostics: report.materializationDiagnostics,
+    executionEvidence: report.executionEvidence,
+    executionEvidenceErrors: report.executionEvidenceErrors,
+    obligationAssessments: report.obligationAssessments,
+    fpTransformRequestRef: report.fpTransformRequestRef,
+    fpTransformResultRef: report.fpTransformResultRef,
+    fpTransformStatus: report.fpTransformStatus,
+    fpEvaluateResultRef: report.fpEvaluateResultRef
+  });
+}
+
+function targetCarrierPayloadForState(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly reportRef: string;
+  readonly artifactRef: string;
+}): {
+  readonly payload: unknown;
+  readonly payloadRef: string;
+  readonly evidenceRefs: readonly string[];
+  readonly structuralAdmissionStatus: "admitted" | "rejected" | "not_required";
+  readonly structuralBlockingReasons: readonly string[];
+} {
+  const report = input.state.workerReport;
+  if (report === null) {
+    throw new TypeError("target carrier payload requires a worker report");
+  }
+  const baseEvidenceRefs = uniqueSorted([
+    input.reportRef,
+    input.artifactRef,
+    ...report.materializedFiles.map(materializedFileRef)
+  ]);
+  if (input.state.manifest.targetAssetType === "implementation_design_surface") {
+    const admission = admitDesignDepthRegisterFromArtifact({
+      targetAssetType: input.state.manifest.targetAssetType,
+      outputFile: report.outputFile,
+      archiveRoot: input.state.manifest.archiveRoot
+    });
+    return Object.freeze({
+      payload: admission.register ?? Object.freeze({}),
+      payloadRef: input.artifactRef,
+      evidenceRefs: uniqueSorted([...baseEvidenceRefs, ...admission.evidenceRefs]),
+      structuralAdmissionStatus: admission.status,
+      structuralBlockingReasons: admission.blockingReasons
+    });
+  }
+  if (input.state.manifest.targetAssetType === "test_design_surface") {
+    const admission = admitTestDesignRegisterFromArtifact({
+      targetAssetType: input.state.manifest.targetAssetType,
+      outputFile: report.outputFile
+    });
+    return Object.freeze({
+      payload: admission.register ?? Object.freeze({}),
+      payloadRef: input.artifactRef,
+      evidenceRefs: uniqueSorted([...baseEvidenceRefs, ...admission.evidenceRefs]),
+      structuralAdmissionStatus: admission.status,
+      structuralBlockingReasons: admission.blockingReasons
+    });
+  }
+  const componentAdmission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: input.state.manifest.targetAssetType,
+    outputFile: report.outputFile
+  });
+  if (componentAdmission.status === "admitted") {
+    return Object.freeze({
+      payload: componentAdmission.register ?? Object.freeze({}),
+      payloadRef: input.artifactRef,
+      evidenceRefs: uniqueSorted([
+        ...baseEvidenceRefs,
+        ...componentAdmission.evidenceRefs
+      ]),
+      structuralAdmissionStatus: componentAdmission.status,
+      structuralBlockingReasons: componentAdmission.blockingReasons
+    });
+  }
+  return Object.freeze({
+    payload: workerResultTargetPayload({
+      state: input.state,
+      reportRef: input.reportRef
+    }),
+    payloadRef: input.reportRef,
+    evidenceRefs: baseEvidenceRefs,
+    structuralAdmissionStatus: "not_required" as const,
+    structuralBlockingReasons: Object.freeze([])
+  });
 }
 
 function deriveInstalledTraversalConsequence(input: {
@@ -3439,13 +4036,18 @@ function deriveInstalledTraversalConsequence(input: {
     contract: edgeAssuranceContract,
     obligationRefs: fulfillmentProjection.edgeLocalObligationIds
   });
+  const targetCarrierAdmission = targetCarrierAdmissionForState({
+    module,
+    state: input.state
+  });
   const edgeEvidenceAdmission = admitSdlcEdgeEvidence({
     contract: edgeAssuranceContract,
     obligations: edgeAssuranceObligations,
     candidates: edgeAssuranceEvidenceCandidatesFor({
       state: input.state,
       obligationIds: fulfillmentProjection.edgeLocalObligationIds
-    })
+    }),
+    targetCarrierAdmission
   });
   const edgeGain = measureSdlcEdgeGain({
     contract: edgeAssuranceContract,
@@ -3455,7 +4057,10 @@ function deriveInstalledTraversalConsequence(input: {
       ledgerRef,
       closureDecisionRef,
       nextActionProjectionRef: plannedNextActionProjectionRef
-    })
+    }),
+    targetCarrierAdmission,
+    targetCarrierRequired: true,
+    requiredEvidenceSourceKinds: requiredEvidenceSourceKindsForState(input.state)
   });
   const edgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
   const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
@@ -3483,18 +4088,24 @@ function deriveInstalledTraversalConsequence(input: {
       input.start.executionContract.overlayBinding.graphCatalogDigestRef,
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
+    targetCarrierContractRef: edgeGain.targetCarrierContractRef,
+    targetCarrierContractDigest: edgeGain.targetCarrierContractDigest,
+    targetCarrierAdmissionStatus: edgeGain.targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef: edgeGain.targetCarrierAdmissionRef,
     edgeGainRef: edgeGain.gainRef,
     edgeResidualPressureRefs: edgeResidualPressure.requiredPressureRefs,
     edgeRef,
     attemptRef: `attempt://odd-sdlc/${runRef}/${input.state.manifest.vectorIndex}`,
     targetBindingRefs: input.start.executionContract.nextActionProjection.targetBindingRefs,
     evidenceBundleRefs: Object.freeze([worksiteEvidence.evidenceBundleRef]),
-    materializationRefs: Object.freeze([
-      ...(input.state.workerReport?.materializedFiles.map(materializedFileRef) ??
-        [])
-    ]),
+    materializationRefs: workerOutputMaterializationRefs(input.state),
     livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs,
-    admissionRefs: evidenceRefs,
+    admissionRefs: Object.freeze([
+      ...evidenceRefs,
+      ...(targetCarrierAdmission?.status === "admitted"
+        ? [targetCarrierAdmission.validationRef]
+        : [])
+    ]),
     downstreamTransformationSetRefs:
       fulfillmentProjection.downstreamTransformationSetRefs,
     downstreamPressureRefs,
@@ -3546,11 +4157,20 @@ function deriveInstalledTraversalConsequence(input: {
     input.nextVectorIndex === null &&
     activeOverlay !== null
       ? (() => {
+          const completedGraphFunctionRef =
+            input.start.executionContract.targetGraphFunction;
+          const productConvergenceAllowed = sdlcTraversalOverlayAllowsProductConvergence({
+            overlay: activeOverlay,
+            completedGraphFunctionRef,
+            module
+          });
+          const hasRemainingOverlayPressure =
+            activeOverlay.termination.remainingGraphPressureRefs.length > 0 ||
+            activeOverlay.termination.remainingRequirementPressureRefs.length > 0 ||
+            activeOverlay.termination.remainingAssetPressureRefs.length > 0 ||
+            activeOverlay.termination.nextEligibleOverlayRefs.length > 0;
           const productConverged =
-            activeOverlay.termination.lawfulStopDispositions.includes(
-              "product_converged"
-            ) &&
-            activeOverlay.termination.nextEligibleOverlayRefs.length === 0;
+            productConvergenceAllowed && !hasRemainingOverlayPressure;
           return constructSdlcOverlaySegmentCompletion({
             completionRef: `overlay-segment-completion://odd-sdlc/${runRef}`,
             closureDecision,
@@ -3560,18 +4180,13 @@ function deriveInstalledTraversalConsequence(input: {
             terminalAssetTypes: activeOverlay.termination.terminalAssetTypes,
             terminalGraphFunctionRefs:
               activeOverlay.termination.terminalGraphFunctionRefs,
-            remainingGraphPressureRefs: productConverged
-              ? Object.freeze([])
-              : activeOverlay.termination.remainingGraphPressureRefs,
-            remainingRequirementPressureRefs: productConverged
-              ? Object.freeze([])
-              : activeOverlay.termination.remainingRequirementPressureRefs,
-            remainingAssetPressureRefs: productConverged
-              ? Object.freeze([])
-              : activeOverlay.termination.remainingAssetPressureRefs,
-            nextEligibleOverlayRefs: productConverged
-              ? Object.freeze([])
-              : activeOverlay.termination.nextEligibleOverlayRefs
+            remainingGraphPressureRefs:
+              activeOverlay.termination.remainingGraphPressureRefs,
+            remainingRequirementPressureRefs:
+              activeOverlay.termination.remainingRequirementPressureRefs,
+            remainingAssetPressureRefs:
+              activeOverlay.termination.remainingAssetPressureRefs,
+            nextEligibleOverlayRefs: activeOverlay.termination.nextEligibleOverlayRefs
           });
         })()
       : null;
@@ -3581,6 +4196,9 @@ function deriveInstalledTraversalConsequence(input: {
     state: input.state,
     closureDecisionDisposition: closureDecision.disposition,
     nextVectorIndex: input.nextVectorIndex,
+    activeOverlayRef: activeOverlay?.overlayRef ?? null,
+    completedGraphFunctionRef: input.start.executionContract.targetGraphFunction,
+    runRef,
     downstreamPressureRefs: ledger.downstreamPressureRefs,
     downstreamTargetBindingRefs: ledger.downstreamTargetBindingRefs,
     admittedAssetTypes
@@ -4171,8 +4789,15 @@ function compactRuntimeEventArchivePayload(
     });
   }
   const basis = input.start.executionContract.basis;
+  const replayCursor = replayEventsWithGraphContinuationCursor({
+    basis,
+    replayEvents: input.replayEvents,
+    nextGraphVectorRef:
+      input.start.executionContract.nextActionProjection.nextGraphVectorRef
+  });
+  const effectiveReplayEvents = replayCursor.replayEvents;
   const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? input.workspaceRoot;
-  const projection = deriveRuntimeAggregateProjection(basis, input.replayEvents);
+  const projection = deriveRuntimeAggregateProjection(basis, effectiveReplayEvents);
   const decision = deriveIterationAdvanceDecision(basis, projection);
   if (decision.kind === "converged") {
     return terminalOutcome({
@@ -4195,7 +4820,7 @@ function compactRuntimeEventArchivePayload(
     });
   }
 
-  const transition = deriveAdvancementTransition(basis, input.replayEvents);
+  const transition = deriveAdvancementTransition(basis, effectiveReplayEvents);
   if (transition.kind === "fd_advance") {
     if (transition.edge !== FG_CONFORM_PROJECT) {
       return terminalOutcome({
@@ -4259,12 +4884,22 @@ function compactRuntimeEventArchivePayload(
       relativePath: "conform_project_report.json",
       payload: report
     });
-    const emitted = await appendFdConformanceRuntimeEvents({
+    if (replayCursor.cursorEvents.length > 0) {
+      await appendOddSdlcRuntimeEvents({
+        workspaceRoot: input.workspaceRoot,
+        events: replayCursor.cursorEvents
+      });
+    }
+    const conformanceEvents = await appendFdConformanceRuntimeEvents({
       workspaceRoot: input.workspaceRoot,
       basis,
-      replayEvents: input.replayEvents,
+      replayEvents: effectiveReplayEvents,
       vectorIndex: transition.vectorIndex
     });
+    const emitted = Object.freeze([
+      ...replayCursor.cursorEvents,
+      ...conformanceEvents
+    ]);
     const outcome = terminalOutcome({
       workspaceRoot: input.workspaceRoot,
       status: "converged",
@@ -4393,7 +5028,7 @@ function compactRuntimeEventArchivePayload(
       basis,
       start: input.start,
       state,
-      replayEvents: input.replayEvents,
+      replayEvents: effectiveReplayEvents,
       emittedEvents: emitted,
       nextVectorIndex
     });
@@ -4419,12 +5054,20 @@ function compactRuntimeEventArchivePayload(
             (ref) => ref.vectorIndex === pluginInput.vectorIndex
           )
         ),
-        override: resumeContextFromPostActionProjection({
+        override: deriveSdlcWorkerRetryContextFromPostActionProjection({
           nextActionProjection: executionContract.nextActionProjection,
           vectorIndex: pluginInput.vectorIndex
         }),
         vectorIndex: pluginInput.vectorIndex
       });
+      const retryContextWithRuntimeGaps =
+        mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+          projected: projectedRetryContext,
+          workspaceRoot: input.workspaceRoot,
+          vectorIndex: pluginInput.vectorIndex,
+          edgeName: pluginInput.edge,
+          targetAssetType: contract.targetAssetType
+        });
       const manifest = deriveWorkerHandoffManifest({
         workspaceRoot: input.workspaceRoot,
         overlayRef: executionContract.overlayRef,
@@ -4438,7 +5081,7 @@ function compactRuntimeEventArchivePayload(
         traversalAttemptEnvelope: pluginInput.traversalAttemptEnvelope,
         conformedProject: executionContract.conformedProject,
         retryContext: mergedRetryContext({
-          projected: projectedRetryContext,
+          projected: retryContextWithRuntimeGaps,
           override: input.retryContextOverride,
           vectorIndex: pluginInput.vectorIndex
         })
@@ -4501,7 +5144,7 @@ function compactRuntimeEventArchivePayload(
           attachedResultArtifact: stopForRuntimeTriage
             ? null
             : runtimeFailureArtifact({
-                failureClass: "runtime_failure",
+                failureClass: workerFailureRuntimeFailureClass(failurePostflight),
                 detail: failurePostflight.blockingReasons.join(",")
               }),
           evidenceRefs: uniqueSorted([
@@ -4578,7 +5221,7 @@ function compactRuntimeEventArchivePayload(
             status: "blocked",
             resultRef: gapDossier.currentGapDossierRef,
             attachedResultArtifact: runtimeFailureArtifact({
-              failureClass: "payload_contract_failure",
+              failureClass: "contract_failure",
               detail: rejectionPostflight.blockingReasons.join(",")
             }),
             evidenceRefs: uniqueSorted([
@@ -4900,7 +5543,7 @@ function compactRuntimeEventArchivePayload(
   });
   const engineResult = await runEngineIterateAsync({
     basis,
-    runtimeEvents: input.replayEvents,
+    runtimeEvents: effectiveReplayEvents,
     eventSink: (event) => {
       emitted.push(event);
     },
@@ -4909,9 +5552,13 @@ function compactRuntimeEventArchivePayload(
   });
   const completedDispatchState = dispatchState.current;
   if (completedDispatchState === null) {
+    const eventsToAppend = Object.freeze([
+      ...replayCursor.cursorEvents,
+      ...emitted
+    ]);
     await appendOddSdlcRuntimeEvents({
       workspaceRoot: input.workspaceRoot,
-      events: emitted
+      events: eventsToAppend
     });
     return terminalOutcome({
       workspaceRoot: input.workspaceRoot,
@@ -4925,8 +5572,10 @@ function compactRuntimeEventArchivePayload(
       gapDossier: null,
       hookOutcome: null,
       replayEventCountBefore: input.replayEvents.length,
-      replayEventCountAfter: input.replayEvents.length + emitted.length,
-      emittedRuntimeEventKinds: Object.freeze(emitted.map((event) => event.kind)),
+      replayEventCountAfter: input.replayEvents.length + eventsToAppend.length,
+      emittedRuntimeEventKinds: Object.freeze(
+        eventsToAppend.map((event) => event.kind)
+      ),
       archiveRoot: null,
       blockingReason: "unsupported_transition:fp_dispatch_without_plugin_call",
       blockingReasonCarriers: Object.freeze([
@@ -4943,7 +5592,7 @@ function compactRuntimeEventArchivePayload(
     ...repairReentryGraphSpanRuntimeEvents({
       basis,
       outcome: completedDispatchState,
-      replayEvents: input.replayEvents,
+      replayEvents: effectiveReplayEvents,
       emittedEvents: emitted
     })
   );
@@ -4955,7 +5604,7 @@ function compactRuntimeEventArchivePayload(
     basis,
     start: input.start,
     state: completedDispatchState,
-    replayEvents: input.replayEvents,
+    replayEvents: effectiveReplayEvents,
     admittedAssetEvents: input.eventGraphEvents ?? input.replayEvents,
     emittedEvents: emitted,
     nextVectorIndex: engineResult.projection.nextVectorIndex
@@ -4965,13 +5614,17 @@ function compactRuntimeEventArchivePayload(
       basis,
       consequence: traversalConsequence,
       currentVectorIndex: completedDispatchState.manifest.vectorIndex,
-      replayEvents: input.replayEvents,
+      replayEvents: effectiveReplayEvents,
       emittedEvents: emitted
     })
   );
+  const eventsToAppend = Object.freeze([
+    ...replayCursor.cursorEvents,
+    ...emitted
+  ]);
   await appendOddSdlcRuntimeEvents({
     workspaceRoot: input.workspaceRoot,
-    events: emitted
+    events: eventsToAppend
   });
   writeTraversalConsequenceArchive({
     manifest: completedDispatchState.manifest,
@@ -5011,8 +5664,10 @@ function compactRuntimeEventArchivePayload(
     gapDossier: completedDispatchState.gapDossier,
     hookOutcome: completedDispatchState.hookOutcome,
     replayEventCountBefore: input.replayEvents.length,
-    replayEventCountAfter: input.replayEvents.length + emitted.length,
-    emittedRuntimeEventKinds: Object.freeze(emitted.map((event) => event.kind)),
+    replayEventCountAfter: input.replayEvents.length + eventsToAppend.length,
+    emittedRuntimeEventKinds: Object.freeze(
+      eventsToAppend.map((event) => event.kind)
+    ),
     archiveRoot: completedDispatchState.manifest.archiveRoot,
     blockingReason,
     blockingReasonCarriers: completedDispatchState.blockingReasonCarriers,
@@ -5028,7 +5683,7 @@ function compactRuntimeEventArchivePayload(
   writeOperatorArchiveFile({
     archiveRoot: completedDispatchState.manifest.archiveRoot,
     relativePath: "runtime_events.json",
-    payload: compactRuntimeEventArchivePayload(emitted)
+    payload: compactRuntimeEventArchivePayload(eventsToAppend)
   });
   writeRunArchive({ manifest: completedDispatchState.manifest, outcome });
   if (completedDispatchState.status === "worker_invoked") {

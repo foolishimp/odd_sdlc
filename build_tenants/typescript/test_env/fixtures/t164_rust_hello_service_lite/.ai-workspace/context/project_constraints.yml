@@ -1,6 +1,8 @@
 project:
   name: t164_rust_hello_service_lite
   kind: imported_workspace
+  overlay_strategy: thread
+  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation
 active_tenant: hello_world_rust_service
 selected_output_root: build_tenants/hello_world_rust_service
 ambiguity_risk_appetite: low
@@ -17,4 +19,3 @@ build_tenants:
     test_runner: curl
     module_structure:
       - hello_world_rust_service
-

@@ -14,6 +14,8 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
       "product_doc",
       "goal_surface",
       "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
       "work_request_surface"
     ],
     realizationStatus: "active_first_slice"
@@ -25,39 +27,36 @@ export const SOFTWARE_DOMAIN_ASSET_FAMILIES = Object.freeze([
     representativeAssetTypes: [
       "feature_decomp_surface",
       "design_surface",
-      "scenario_surface"
+      "scenario_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface"
     ],
     realizationStatus: "active_first_slice"
   }),
   admitSdlcAssetFamily({
     name: "implementation_branch",
-    description: "Implementation design, stack, module, and code surfaces for the active software branch under construction.",
+    description: "Composite implementation design, code, and qualification surfaces for the active software branch under construction.",
     lifecycleRole: "build",
     representativeAssetTypes: [
       "implementation_design_surface",
-      "implementation_stack_profile",
-      "implementation_module_surface",
-      "realization_schedule_surface",
+      "component_code_surface",
+      "component_realization_qualification_surface",
       "code_surface"
     ],
     realizationStatus: "active_first_slice"
   }),
   admitSdlcAssetFamily({
     name: "qualification_branch",
-    description: "Test design, planned coverage, and archived evidence surfaces used to qualify the active software branch, including realized developer-test source generated under the archive stage.",
+    description: "Composite test design, materialized test source, execution, verification, repair, and archived evidence surfaces used to qualify the active software branch.",
     lifecycleRole: "qualification",
     representativeAssetTypes: [
-      "uat_testcases_surface",
       "test_design_surface",
-      "test_stack_profile",
-      "test_module_surface",
-      "test_component_topology_surface",
       "component_test_surface",
+      "test_execution_surface",
+      "test_execution_result_surface",
       "component_test_qualification_surface",
       "component_repair_schedule_surface",
-      "test_schedule_surface",
-      "test_run_archive_surface",
-      "testcase_authority_surface"
+      "test_run_archive_surface"
     ],
     realizationStatus: "active_first_slice"
   }),
@@ -265,30 +264,21 @@ export const SOFTWARE_DOMAIN_ASSET_TYPES = Object.freeze(
     "product_doc",
     "goal_surface",
     "requirement_surface",
+    "uat_testcases_surface",
+    "testcase_authority_surface",
     "work_request_surface",
     "feature_decomp_surface",
     "design_surface",
     "scenario_surface",
     "implementation_design_surface",
-    "implementation_stack_profile",
-    "implementation_module_surface",
-    "implementation_component_topology_surface",
-    "component_realization_schedule_surface",
     "component_code_surface",
     "component_realization_qualification_surface",
-    "realization_schedule_surface",
     "code_surface",
-    "uat_testcases_surface",
     "test_design_surface",
-    "test_stack_profile",
-    "test_module_surface",
-    "test_component_topology_surface",
     "component_test_surface",
     "component_test_qualification_surface",
     "component_repair_schedule_surface",
-    "test_schedule_surface",
     "test_run_archive_surface",
-    "testcase_authority_surface",
     "release_surface",
     "release_document_surface",
     "deployment_record_surface",

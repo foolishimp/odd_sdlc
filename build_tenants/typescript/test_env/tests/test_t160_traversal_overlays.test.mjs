@@ -23,10 +23,8 @@ import {
   FG_CONFORM_PROJECT,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
-  FG_UAT_TEST_CASES_EXECUTIVE,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicSdlcOverlayStartTargets,
@@ -35,7 +33,6 @@ import {
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
-  SDLC_UAT_TEST_CASES_OVERLAY_REF,
   withSdlcOverlayBindingPostActionEvidence
 } from "../../build/semantic/code/src/index.js";
 
@@ -70,7 +67,7 @@ function startContext(workspaceRoot = "/workspace/t160") {
   return { module, queryDomain, conformedProject, workspaceRoot };
 }
 
-test("T-160 publishes five governed traversal overlays with boundary refs", () => {
+test("T-160 publishes four governed traversal overlays with boundary refs", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
   const overlays = new Map(catalog.overlays.map((overlay) => [overlay.overlayRef, overlay]));
@@ -81,8 +78,7 @@ test("T-160 publishes five governed traversal overlays with boundary refs", () =
       SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
       SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
-      SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
-      SDLC_UAT_TEST_CASES_OVERLAY_REF
+      SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF
     ]
   );
   assert.equal(overlays.has("overlay://odd-sdlc/hello-world-light"), false);
@@ -127,10 +123,6 @@ test("T-160 publishes five governed traversal overlays with boundary refs", () =
     overlays.get(SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF).publicStartTargets,
     [FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE]
   );
-  assert.deepStrictEqual(
-    overlays.get(SDLC_UAT_TEST_CASES_OVERLAY_REF).publicStartTargets,
-    [FG_UAT_TEST_CASES_EXECUTIVE]
-  );
 });
 
 test("T-160 lite overlay terminates on a bounded implementation edge", () => {
@@ -147,7 +139,6 @@ test("T-160 lite overlay terminates on a bounded implementation edge", () => {
     graph.vectors.map((vector) => vector.name),
     [
       FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-      FG_DERIVE_LITE_MODULE_SURFACE,
       FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
     ]
   );
@@ -155,41 +146,13 @@ test("T-160 lite overlay terminates on a bounded implementation edge", () => {
   assert.equal(finalVector.target.name, "component_code_surface");
   assert.deepStrictEqual(
     finalVector.source.map((node) => node.name),
-    [
-      "implementation_design_surface",
-      "implementation_module_surface"
-    ]
+    ["implementation_design_surface"]
   );
   assert.equal(
     finalVector.source.some((node) =>
-      [
-        "implementation_component_topology_surface",
-        "component_realization_schedule_surface",
-        "implementation_stack_profile"
-      ].includes(node.name)
+      node.name !== "implementation_design_surface"
     ),
     false
-  );
-});
-
-test("T-160 UAT overlay consumes requirements and solution architecture authority", () => {
-  const module = constructSdlcGtlModule();
-  const uatExecutive = module.graphFunctions.find(
-    (graphFunction) => graphFunction.name === FG_UAT_TEST_CASES_EXECUTIVE
-  );
-  assert(uatExecutive);
-  const graph = materializeGraphFunction(uatExecutive);
-  const finalVector = graph.vectors.at(-1);
-  assert(finalVector);
-
-  assert.equal(finalVector.name, "derive_uat_testcases_surface");
-  assert.equal(finalVector.target.name, "uat_testcases_surface");
-  assert.deepStrictEqual(
-    finalVector.source.map((node) => node.name),
-    [
-      "requirement_surface",
-      "implementation_design_surface"
-    ]
   );
 });
 
@@ -413,6 +376,152 @@ test("T-160 public start admits overlay binding directly for lite traversal", ()
   );
 });
 
+test("T-170 hello-world profile selects thread overlay for next start", () => {
+  const { module, queryDomain, workspaceRoot } = startContext();
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText: [
+      "project:",
+      "  name: t132_hello_world_single_tenant",
+      "  kind: imported_workspace",
+      "  overlay_strategy: thread",
+      "  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation",
+      "active_tenant: hello_world_javascript",
+      "selected_output_root: build_tenants/hello_world_javascript",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node",
+      "    module_structure:",
+      "      - hello_world_javascript"
+    ].join("\n")
+  });
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "next",
+        handle: "auto"
+      },
+      until: "blocked",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(conformedProject.overlayStrategy, "thread");
+  assert.equal(
+    conformedProject.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.targetGraphFunction,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+  assert.equal(
+    outcome.executionContract.overlayBinding.selection.selectedStartTargetRef,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+});
+
+test("T-170 data-mapper profile selects full lifecycle and preserves broad pressure", () => {
+  const { module, queryDomain, workspaceRoot } = startContext();
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText: [
+      "project:",
+      "  name: data_mapper.test35",
+      "  kind: data-pipeline",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - cdme-compiler",
+      "      - cdme-assurance",
+      "      - cdme-executor"
+    ].join("\n")
+  });
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "next",
+        handle: "auto"
+      },
+      until: "blocked",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(conformedProject.overlayStrategy, "full_lifecycle");
+  assert.equal(conformedProject.overlayRef, SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF);
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.targetGraphFunction,
+    "derive_intent_surface"
+  );
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+  );
+  assert(outcome.executionContract.overlayBinding.remainingGraphPressureRefs.length > 0);
+  assert(outcome.executionContract.overlayBinding.remainingRequirementPressureRefs.length > 0);
+  assert(outcome.executionContract.overlayBinding.remainingAssetPressureRefs.length > 0);
+  assert(
+    outcome.executionContract.overlayBinding.remainingGraphPressureRefs.every((ref) =>
+      ref.includes("current-full-traversal")
+    )
+  );
+});
+
+test("T-170 explicit operator overlay selection admits strategy handles", () => {
+  const { module, queryDomain, conformedProject, workspaceRoot } = startContext();
+  const outcome = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      workspaceRoot,
+      target: {
+        kind: "overlay",
+        handle: "thread"
+      },
+      until: "blocked",
+      defaultRegime: "F_P"
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert.equal(outcome.kind, "sdlc_public_start_blocked");
+  assert(outcome.executionContract);
+  assert.equal(
+    outcome.executionContract.overlayRef,
+    SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+  );
+});
+
 test("T-160 public start binds existing overlay assets as material workspace truth", () => {
   const workspaceRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t160-material-"));
   const materialPath = path.join(
@@ -541,9 +650,9 @@ test("T-160 overlay replay keeps stable traversal identity while selecting next 
   const replay = publicStartOnce({
     request: admitSdlcPublicStartRequest({
       ...baseRequest,
-      replayNextActionProjectionRef: "next-action://odd-sdlc/t160/select-stack",
-      replaySelectedActionRef: "construction-action://odd-sdlc/t160/select-stack",
-      replayNextGraphVectorRef: FG_DERIVE_LITE_MODULE_SURFACE,
+      replayNextActionProjectionRef: "next-action://odd-sdlc/t160/derive-design",
+      replaySelectedActionRef: "construction-action://odd-sdlc/t160/derive-design",
+      replayNextGraphVectorRef: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
       replayClosureDecisionRef: "closure-decision://odd-sdlc/t160/derive-design",
       replayOverlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
     }),
@@ -557,7 +666,82 @@ test("T-160 overlay replay keeps stable traversal identity while selecting next 
   assert(replay.executionContract);
   assert.equal(
     replay.executionContract.overlayBinding.selection.selectedGraphVectorRef,
-    FG_DERIVE_LITE_MODULE_SURFACE
+    FG_DERIVE_LITE_DESIGN_ADR_SURFACE
+  );
+  assert.equal(
+    replay.executionContract.overlayBindingRef,
+    first.executionContract.overlayBindingRef
+  );
+  assert.equal(replay.executionContract.basis.id, first.executionContract.basis.id);
+});
+
+test("T-170 profile next replay keeps public-start identity while selecting next vector", () => {
+  const { module, queryDomain, workspaceRoot } = startContext();
+  const conformedProject = conformProjectProfileFromConstraintsText({
+    workspaceRoot,
+    constraintsText: [
+      "project:",
+      "  name: t132_hello_world_single_tenant",
+      "  overlay_strategy: thread",
+      "  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation",
+      "active_tenant: hello_world_javascript",
+      "selected_output_root: build_tenants/hello_world_javascript",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node",
+      "    module_structure:",
+      "      - hello_world_javascript"
+    ].join("\n")
+  });
+  const baseRequest = {
+    workspaceRoot,
+    target: {
+      kind: "next",
+      handle: "auto"
+    },
+    until: "first_traversal",
+    defaultRegime: "F_P"
+  };
+  const first = publicStartOnce({
+    request: admitSdlcPublicStartRequest(baseRequest),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+  const replay = publicStartOnce({
+    request: admitSdlcPublicStartRequest({
+      ...baseRequest,
+      replayNextActionProjectionRef: "next-action://odd-sdlc/t170/code",
+      replaySelectedActionRef: "construction-action://odd-sdlc/t170/code",
+      replayNextGraphFunctionRef: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
+      replayNextGraphVectorRef: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+      replayClosureDecisionRef: "closure-decision://odd-sdlc/t170/design",
+      replayOverlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
+    }),
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({ transportContract: null })
+  });
+
+  assert(first.executionContract);
+  assert(replay.executionContract);
+  assert.equal(
+    replay.executionContract.nextActionProjection.nextGraphFunctionRef,
+    FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
+  );
+  assert.equal(
+    replay.executionContract.nextActionProjection.nextGraphVectorRef,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  );
+  assert.equal(
+    replay.executionContract.overlayBinding.selection.selectedGraphVectorRef,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   );
   assert.equal(
     replay.executionContract.overlayBindingRef,
@@ -579,7 +763,7 @@ test("T-160 stale overlay binding replay fails closed", () => {
       defaultRegime: "F_P",
       replayNextActionProjectionRef: "next-action://odd-sdlc/t160/stale",
       replaySelectedActionRef: "construction-action://odd-sdlc/t160/stale",
-      replayNextGraphVectorRef: FG_DERIVE_LITE_MODULE_SURFACE,
+      replayNextGraphVectorRef: FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
       replayClosureDecisionRef: "closure-decision://odd-sdlc/t160/stale",
       replayOverlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       replayOverlayBindingRef: "overlay-binding://odd-sdlc/wrong"
@@ -645,7 +829,6 @@ test("T-160 overlay segment completion is separate from product convergence", ()
   for (const overlayRef of [
     SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
     SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
-    SDLC_UAT_TEST_CASES_OVERLAY_REF,
     SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF
   ]) {
     const overlay = catalog.overlays.find((candidate) => candidate.overlayRef === overlayRef);
@@ -723,7 +906,7 @@ test("T-160 current full overlay can refine prior lite ledger and event truth", 
     preActionWorkspaceObservationRef: "observation://t160/pre-current-full",
     preActionWorkspaceFingerprintRef: "fingerprint://t160/pre-current-full",
     selectedGraphFunctionRef: overlay.graphFunctionRefs[0],
-    selectedStartTargetRef: "Fg_conform_project_authority",
+    selectedStartTargetRef: "derive_intent_surface",
     requestedBy: "public_start",
     priorLedgerRefs: ["ledger://odd-sdlc/t160/lite"],
     priorEventRefs: ["event://odd-sdlc/t160/lite-vector-closed"]

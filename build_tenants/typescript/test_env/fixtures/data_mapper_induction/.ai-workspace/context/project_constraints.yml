@@ -5,6 +5,8 @@
 project:
   name: ""  # set to test run name (e.g. data_mapper.test11)
   kind: "data-pipeline"
+  overlay_strategy: full_lifecycle
+  overlay_ref: overlay://odd-sdlc/current-full-traversal
   language: "Scala"
   test_runner: "sbt test"
 

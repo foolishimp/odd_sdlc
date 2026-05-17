@@ -23,20 +23,20 @@ import {
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
-  FG_UAT_TEST_CASES_EXECUTIVE,
   LITE_FUNCTION_CATALOG,
   LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
+  OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG,
   SDLC_FUNCTION_CATALOG,
   SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
   TRIAGE_FUNCTION_CATALOG,
-  UAT_TEST_CASES_EXECUTIVE_STEPS,
   type SdlcExecutiveProgramEntry,
   type SdlcFunctionCatalogEntry,
   type SdlcGraphFunctionCatalog
 } from "./catalog.js";
 import type { SdlcReusableGraphFunctionCatalogEntry } from "./library.js";
+import { sdlcTargetCarrierDeclarationForTarget } from "./target_carrier_contracts.js";
 import {
   activeOddSdlcTraversalStrategyPlan,
   defaultSdlcTraversalScopeRefsForName,
@@ -236,9 +236,15 @@ function reusableGraphFunctionDeclarations(
 
 function vectorDeclarations(
   entry: SdlcFunctionCatalogEntry,
-  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig,
+  target: Node
 ): SerializedAttrs {
   return attrs([
+    sdlcTargetCarrierDeclarationForTarget({
+      edgeRef: entry.name,
+      targetAssetType: firstOutput(entry),
+      target
+    }),
     traversalModulationDeclaration(entry.name, traversalStrategyPlan),
     attr("intent", scalarValue(entry.intent)),
     attr("backing_graph_function", scalarValue(entry.backingGraphFunction)),
@@ -263,9 +269,15 @@ function vectorDeclarations(
 
 function reusableVectorDeclarations(
   entry: SdlcReusableGraphFunctionCatalogEntry,
-  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig
+  traversalStrategyPlan: OddSdlcTraversalStrategyPlanConfig,
+  target: Node
 ): SerializedAttrs {
   return attrs([
+    sdlcTargetCarrierDeclarationForTarget({
+      edgeRef: entry.name,
+      targetAssetType: firstOutput(entry),
+      target
+    }),
     traversalModulationDeclaration(entry.name, traversalStrategyPlan),
     attr("intent", scalarValue(entry.intent)),
     attr("catalog_role", scalarValue(entry.graphFunctionRole)),
@@ -291,7 +303,7 @@ function graphFunctionForEntry(
     contexts: [],
     rule: null,
     allowsSubwork: false,
-    declarations: vectorDeclarations(entry, traversalStrategyPlan),
+    declarations: vectorDeclarations(entry, traversalStrategyPlan, target),
     tags: ["odd_sdlc", "leaf_graph_function"]
   });
 
@@ -343,7 +355,7 @@ function reusableGraphFunctionForEntry(
     contexts: [],
     rule: null,
     allowsSubwork: false,
-    declarations: reusableVectorDeclarations(entry, traversalStrategyPlan),
+    declarations: reusableVectorDeclarations(entry, traversalStrategyPlan, primaryTarget),
     tags: ["odd_sdlc", "reusable_graph_function"]
   });
   const vector = firstVector(primaryGraph, entry.name);
@@ -519,10 +531,6 @@ function jobFor(graphFunction: GraphFunction) {
 
 export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
   const traversalStrategyPlan = activeOddSdlcTraversalStrategyPlan();
-  const bootstrapFunctions = leafFunctions(
-    BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
-    traversalStrategyPlan
-  );
   const operationalFunctions = leafFunctions(
     OPERATIONAL_FUNCTION_CATALOG,
     traversalStrategyPlan
@@ -534,8 +542,8 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
     executives: Object.freeze([
       executiveEntry({
         name: "bootstrap_release_self_test",
-        intent: "Top-level bootstrap-to-release executive over the retained proving subset.",
-        steps: functionNames(bootstrapFunctions),
+        intent: "Top-level bootstrap-to-release executive over consolidated implementation and test plan carriers.",
+        steps: OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
         outputs: ["release_surface"]
       }),
       executiveEntry({
@@ -558,15 +566,9 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
       }),
       executiveEntry({
         name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-        intent: "Lite traversal from implementation design through module authority to component implementation.",
+        intent: "Lite traversal from composite implementation design to component implementation.",
         steps: LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
         outputs: ["component_code_surface"]
-      }),
-      executiveEntry({
-        name: FG_UAT_TEST_CASES_EXECUTIVE,
-        intent: "Bounded UAT test-case traversal from requirements to UAT testcase authority.",
-        steps: UAT_TEST_CASES_EXECUTIVE_STEPS,
-        outputs: ["uat_testcases_surface"]
       })
     ])
   });
@@ -601,8 +603,12 @@ export function constructSdlcGtlModule(input: {
   const liteExecutiveFunctions = liteFunctions;
   const bootstrapExecutive = constructExecutive({
     name: "bootstrap_release_self_test",
-    intent: "Top-level bootstrap-to-release executive over the retained proving subset.",
-    functions: bootstrapFunctions,
+    intent: "Top-level bootstrap-to-release executive over consolidated implementation and test plan carriers.",
+    functions: functionsByNames(
+      bootstrapFunctions,
+      OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
+      "bootstrap_release_self_test"
+    ),
     outputs: ["release_surface"]
   });
   const operationalExecutive = constructExecutive({
@@ -633,23 +639,13 @@ export function constructSdlcGtlModule(input: {
   });
   const liteDesignModuleImplementationExecutive = constructExecutive({
     name: FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-    intent: "Lite traversal from implementation design through module authority to component implementation.",
+    intent: "Lite traversal from composite implementation design to component implementation.",
     functions: functionsByNames(
       liteExecutiveFunctions,
       LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
       FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
     ),
     outputs: ["component_code_surface"]
-  });
-  const uatTestCasesExecutive = constructExecutive({
-    name: FG_UAT_TEST_CASES_EXECUTIVE,
-    intent: "Bounded UAT test-case traversal from requirements to UAT testcase authority.",
-    functions: functionsByNames(
-      bootstrapFunctions,
-      UAT_TEST_CASES_EXECUTIVE_STEPS,
-      FG_UAT_TEST_CASES_EXECUTIVE
-    ),
-    outputs: ["uat_testcases_surface"]
   });
   const graphFunctions = Object.freeze([
     ...libraryFunctions,
@@ -658,7 +654,6 @@ export function constructSdlcGtlModule(input: {
     bootstrapRequirementsExecutive,
     solutionArchitectureExecutive,
     liteDesignModuleImplementationExecutive,
-    uatTestCasesExecutive,
     ...bootstrapFunctions,
     ...liteFunctions,
     ...operationalFunctions,

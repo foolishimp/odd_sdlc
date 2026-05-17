@@ -9,7 +9,6 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
   invokeOddSdlcSpecMethodCommand
@@ -110,50 +109,51 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   ]);
 
   for (const relativePath of [
-    "specification/PRODUCT.md",
-    "specification/GOALS.md",
-    "specification/requirements/00-imported-sources.md",
-    "specification/requirements/01-eng-requirements.md",
-    "specification/requirements/02-ldm-requirements.md",
+    "specification/INTENT.md",
+    "specification/REQUIREMENTS.md",
     ".ai-workspace/context/project_bootstrap.md",
     ".ai-workspace/context/project_constraints.yml",
     "build_tenants/TENANT_REGISTRY.md"
   ]) {
     assert.equal(existsSync(path.join(workspace, relativePath)), true, relativePath);
   }
-  assert.match(
-    readFileSync(
-      path.join(workspace, "specification/requirements/02-ldm-requirements.md"),
-      "utf8"
-    ),
-    /REQ-LDM-001: Preserve lineage between source and target mappings\./u
-  );
+  for (const relativePath of [
+    "specification/PRODUCT.md",
+    "specification/GOALS.md",
+    "specification/requirements/00-imported-sources.md",
+    "specification/requirements/02-ldm-requirements.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      false,
+      `${relativePath} must be produced by graph traversal, not Fg_conform_project`
+    );
+  }
   const report = JSON.parse(
     readFileSync(path.join(induction.payload.archiveRoot, "conform_project_report.json"), "utf8")
   );
   assert.equal(report.status, "passed");
   assert.deepStrictEqual(report.conformanceGaps, []);
-  assert(
-    report.materializedTopologyRefs.some((ref) =>
-      ref.endsWith("specification/requirements/00-imported-sources.md")
-    )
-  );
-  assert(
-    report.materializedTopologyRefs.some((ref) =>
-      ref.endsWith("specification/requirements/02-ldm-requirements.md")
-    )
-  );
+  assert.equal(report.materializedTopologyRefs.some((ref) => ref.includes("specification/requirements/")), false);
   assert(
     report.sourceRefs.some((ref) =>
       ref.endsWith("specification/REQUIREMENTS.md")
     )
   );
+  const bootstrap = readFileSync(
+    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
+    "utf8"
+  );
+  assert.match(bootstrap, /deterministic read model over imported project authority/u);
+  assert.match(bootstrap, /## Source Titles/u);
+  assert.match(bootstrap, /## Read Order/u);
+  assert.doesNotMatch(bootstrap, /governing_graph_function: Fg_conform_project/u);
 
   const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok", JSON.stringify(secondGaps.payload));
   assert.equal(
     secondGaps.payload.start.executionContract.targetGraphFunction,
-    FG_CONFORM_PROJECT_AUTHORITY
+    "derive_intent_surface"
   );
-  assert.equal(secondGaps.payload.projection.currentEdge, FG_CONFORM_PROJECT_AUTHORITY);
+  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
 });

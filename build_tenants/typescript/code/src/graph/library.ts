@@ -397,7 +397,7 @@ export const REUSABLE_GRAPH_FUNCTION_CATALOG: readonly SdlcReusableGraphFunction
       kind: "sdlc_reusable_graph_function_catalog_entry",
       name: FG_CONFORM_PROJECT_AUTHORITY,
       intent:
-        "Conform an already defined workspace into initial SDLC authority surfaces and next-action projection without running release construction.",
+        "Audit an already loaded workspace authority surface and next-action projection without authoring replacement specification truth.",
       graphFunctionRole: "reusable_library",
       inputs: PROJECT_AUTHORITY_CONFORMANCE_INPUTS,
       outputs: PROJECT_AUTHORITY_CONFORMANCE_OUTPUTS,
@@ -417,9 +417,9 @@ export const REUSABLE_GRAPH_FUNCTION_CATALOG: readonly SdlcReusableGraphFunction
         "projection"
       ]),
       sdlcOwnedDomainTruth: Object.freeze([
-        "project_authority_meaning",
+        "project_authority_read_model",
         "supportable_authority_surfaces",
-        "authority_conformance_interpretation",
+        "authority_gap_interpretation",
         "next_action_interpretation"
       ])
     }),

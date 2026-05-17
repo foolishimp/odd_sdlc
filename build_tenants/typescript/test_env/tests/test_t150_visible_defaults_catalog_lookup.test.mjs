@@ -274,6 +274,12 @@ test("T-150 archive next-action lookup requires a published catalog ref", () => 
     workspace
   ]);
 
-  assert.equal(result.status, "error");
-  assert.match(result.payload.error, /unknown_graph_function_boundary_ref/u);
+  assert.equal(result.status, "ok");
+  assert.equal(result.payload.blockingReason, "unknown_graph_function_boundary_ref");
+  assert(
+    result.payload.blockingReasonCarriers.some(
+      (reason) => reason.code === "unknown_graph_function_boundary_ref"
+    ),
+    JSON.stringify(result.payload, null, 2)
+  );
 });

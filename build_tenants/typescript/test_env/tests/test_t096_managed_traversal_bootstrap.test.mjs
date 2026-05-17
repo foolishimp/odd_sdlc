@@ -7,7 +7,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   writeFileSync
 } from "node:fs";
@@ -79,15 +78,7 @@ function makeUnorderedSourceWorkspace() {
   return root;
 }
 
-function allRequirementFiles(workspace) {
-  const root = path.join(workspace, "specification/requirements");
-  return readdirSync(root)
-    .filter((entry) => entry.endsWith(".md"))
-    .sort()
-    .map((entry) => path.join(root, entry));
-}
-
-test("T-096 proves Fg_conform_project as managed traversal from unordered source set to constitutional bootstrap surfaces", async () => {
+test("T-096 proves Fg_conform_project as managed traversal from unordered source set to runtime bootstrap read model", async () => {
   const workspace = makeUnorderedSourceWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -115,27 +106,34 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
   ]);
 
   for (const relativePath of [
-    "specification/INTENT.md",
-    "specification/PRODUCT.md",
-    "specification/requirements/00-imported-sources.md",
     ".ai-workspace/context/project_bootstrap.md",
+    ".ai-workspace/context/project_constraints.yml",
     "build_tenants/TENANT_REGISTRY.md"
   ]) {
     assert.equal(existsSync(path.join(workspace, relativePath)), true, relativePath);
   }
 
-  const intent = readFileSync(path.join(workspace, "specification/INTENT.md"), "utf8");
-  assert.match(intent, /Derived From\*\*: `Fg_conform_project`/u);
-  assert.match(intent, /unordered source documents/u);
+  for (const relativePath of [
+    "specification/INTENT.md",
+    "specification/PRODUCT.md",
+    "specification/requirements/00-imported-sources.md",
+    "specification/requirements/01-eng-requirements.md"
+  ]) {
+    assert.equal(
+      existsSync(path.join(workspace, relativePath)),
+      false,
+      `${relativePath} must be graph-traversal output, not conformance output`
+    );
+  }
 
-  const product = readFileSync(path.join(workspace, "specification/PRODUCT.md"), "utf8");
-  assert.match(product, /Project-owned `WHAT` lives under `specification\/`/u);
-
-  const requirementContent = allRequirementFiles(workspace)
-    .map((file) => readFileSync(file, "utf8"))
-    .join("\n");
-  assert.match(requirementContent, /REQ-BOOT-096: Bootstrap must produce intent/u);
-  assert.match(requirementContent, /REQ-ENG-096: The inducted project must preserve/u);
+  const bootstrap = readFileSync(
+    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
+    "utf8"
+  );
+  assert.match(bootstrap, /deterministic read model over imported project authority/u);
+  assert.match(bootstrap, /It is not a replacement for project-owned specification truth/u);
+  assert.match(bootstrap, /incoming\/context\/source-a\.md/u);
+  assert.match(bootstrap, /incoming\/requirements\/source-b\.md/u);
 
   const report = JSON.parse(
     readFileSync(path.join(induction.payload.archiveRoot, "conform_project_report.json"), "utf8")
@@ -144,19 +142,16 @@ test("T-096 proves Fg_conform_project as managed traversal from unordered source
   assert.deepStrictEqual(report.conformanceGaps, []);
   assert(report.sourceRefs.some((ref) => ref.endsWith("incoming/context/source-a.md")));
   assert(report.sourceRefs.some((ref) => ref.endsWith("incoming/requirements/source-b.md")));
-  assert(report.materializedTopologyRefs.some((ref) => ref.endsWith("specification/INTENT.md")));
-  assert(report.materializedTopologyRefs.some((ref) => ref.endsWith("specification/PRODUCT.md")));
-  assert(
-    report.materializedTopologyRefs.some((ref) =>
-      ref.includes("specification/requirements/") && !ref.endsWith("00-imported-sources.md")
-    )
-  );
+  assert(report.materializedTopologyRefs.some((ref) => ref.endsWith(".ai-workspace/context/project_bootstrap.md")));
+  assert(report.materializedTopologyRefs.some((ref) => ref.endsWith(".ai-workspace/context/project_constraints.yml")));
+  assert(report.materializedTopologyRefs.some((ref) => ref.endsWith("build_tenants/TENANT_REGISTRY.md")));
+  assert.equal(report.materializedTopologyRefs.some((ref) => ref.includes("specification/")), false);
 
   const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok");
   assert.equal(
     secondGaps.payload.start.executionContract.targetGraphFunction,
-    "Fg_conform_project_authority"
+    "derive_intent_surface"
   );
-  assert.equal(secondGaps.payload.projection.currentEdge, "Fg_conform_project_authority");
+  assert.equal(secondGaps.payload.projection.currentEdge, "derive_intent_surface");
 });

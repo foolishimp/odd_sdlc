@@ -10,8 +10,13 @@ import { createHash } from "node:crypto";
 import {
   indexSdlcEdgeGainClosureContracts,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
-  type SdlcEdgeGainClosureContract
+  type SdlcEdgeGainClosureContract,
+  type SdlcTargetCarrierCandidateAdmission
 } from "../graph/index.js";
+
+export type SdlcTargetCarrierClosureStatus =
+  | SdlcTargetCarrierCandidateAdmission["status"]
+  | "not_required";
 
 export type SdlcEdgeEvidenceSourceKind =
   | "worker_assessment"
@@ -60,6 +65,10 @@ export interface SdlcEdgeEvidenceAdmission {
   readonly kind: "sdlc_edge_evidence_admission";
   readonly contractRef: string;
   readonly contractDigest: string;
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
+  readonly targetCarrierAdmissionRef: string | null;
   readonly admittedEvidence: readonly SdlcAdmittedEdgeEvidence[];
   readonly rejectedEvidence: readonly SdlcRejectedEdgeEvidence[];
 }
@@ -91,6 +100,10 @@ export interface SdlcEdgeGain {
   readonly metricFunctionRef: string;
   readonly thresholdPolicyRef: string;
   readonly closureFunctionRef: string;
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
+  readonly targetCarrierAdmissionRef: string | null;
   readonly obligationGains: readonly SdlcEdgeObligationGain[];
   readonly expectedCount: number;
   readonly fulfilledCount: number;
@@ -109,6 +122,9 @@ export interface SdlcEdgeResidualPressure {
   readonly contractRef: string;
   readonly contractDigest: string;
   readonly edgeRef: string;
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
   readonly requiredPressureRefs: readonly string[];
   readonly informationalPressureRefs: readonly string[];
   readonly clear: boolean;
@@ -121,6 +137,9 @@ export interface SdlcEdgeAssuranceCloseDecision {
   readonly contractDigest: string;
   readonly edgeRef: string;
   readonly disposition: "close" | "retry" | "block";
+  readonly targetCarrierContractRef: string | null;
+  readonly targetCarrierContractDigest: string | null;
+  readonly targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus;
   readonly gainRef: string;
   readonly residualPressureRef: string;
   readonly basisRefs: readonly string[];
@@ -229,6 +248,7 @@ export function admitSdlcEdgeEvidence(input: {
   readonly contract: SdlcEdgeGainClosureContract;
   readonly obligations: readonly SdlcEdgeDerivedObligation[];
   readonly candidates: readonly SdlcEdgeEvidenceCandidate[];
+  readonly targetCarrierAdmission?: SdlcTargetCarrierCandidateAdmission | null;
 }): SdlcEdgeEvidenceAdmission {
   const obligationRefs = new Set(input.obligations.map((obligation) => obligation.obligationRef));
   const admitted: SdlcAdmittedEdgeEvidence[] = [];
@@ -290,6 +310,15 @@ export function admitSdlcEdgeEvidence(input: {
     kind: "sdlc_edge_evidence_admission" as const,
     contractRef: sdlcEdgeAssuranceContractRef(input.contract),
     contractDigest: digestSdlcEdgeGainClosureContract(input.contract),
+    targetCarrierContractRef: input.targetCarrierAdmission?.contractRef ?? null,
+    targetCarrierContractDigest:
+      input.targetCarrierAdmission?.contractDigest ?? null,
+    targetCarrierAdmissionStatus:
+      input.targetCarrierAdmission?.status ?? "not_required",
+    targetCarrierAdmissionRef:
+      input.targetCarrierAdmission?.status === "admitted"
+        ? input.targetCarrierAdmission.validationRef
+        : null,
     admittedEvidence: Object.freeze(admitted),
     rejectedEvidence: Object.freeze(rejected)
   });
@@ -300,6 +329,9 @@ export function measureSdlcEdgeGain(input: {
   readonly obligations: readonly SdlcEdgeDerivedObligation[];
   readonly admittedEvidence: readonly SdlcAdmittedEdgeEvidence[];
   readonly ledgerInputs: readonly SdlcEdgeLedgerInputRef[];
+  readonly targetCarrierAdmission?: SdlcTargetCarrierCandidateAdmission | null;
+  readonly targetCarrierRequired?: boolean;
+  readonly requiredEvidenceSourceKinds?: readonly SdlcEdgeEvidenceSourceKind[];
 }): SdlcEdgeGain {
   const contractRef = sdlcEdgeAssuranceContractRef(input.contract);
   const contractDigest = digestSdlcEdgeGainClosureContract(input.contract);
@@ -348,11 +380,51 @@ export function measureSdlcEdgeGain(input: {
       suffix: kind
     })
   );
+  const targetCarrierAdmissionStatus: SdlcTargetCarrierClosureStatus =
+    input.targetCarrierAdmission?.status ??
+    (input.targetCarrierRequired === true ? "missing" : "not_required");
+  const targetCarrierPressureRefs =
+    input.targetCarrierAdmission?.status === "rejected"
+      ? Object.freeze([
+          edgeScopedRef({
+            prefix: "pressure://odd-sdlc/target-carrier",
+            edgeRef: input.contract.edgeRef,
+            suffix: input.targetCarrierAdmission.rejectionClass
+          })
+        ])
+      : targetCarrierAdmissionStatus === "missing"
+        ? Object.freeze([
+            edgeScopedRef({
+              prefix: "pressure://odd-sdlc/target-carrier",
+              edgeRef: input.contract.edgeRef,
+              suffix: "missing_admission"
+            })
+          ])
+        : Object.freeze([] as const);
+  const requiredEvidenceSourceKinds: readonly SdlcEdgeEvidenceSourceKind[] =
+    Object.freeze([...(new Set(input.requiredEvidenceSourceKinds ?? []))]);
+  const admittedEvidenceSourceKinds = new Set(
+    input.admittedEvidence.map((evidence) => evidence.sourceKind)
+  );
+  const missingRequiredEvidenceSourceKindPressureRefs =
+    requiredEvidenceSourceKinds
+      .filter((sourceKind) => !admittedEvidenceSourceKinds.has(sourceKind))
+      .map((sourceKind) =>
+        edgeScopedRef({
+          prefix: "pressure://odd-sdlc/missing-evidence-source",
+          edgeRef: input.contract.edgeRef,
+          suffix: sourceKind
+        })
+      );
   const residualPressureRefs = uniqueSorted([
     ...missingObligationPressureRefs,
     ...missingLedgerPressureRefs,
+    ...targetCarrierPressureRefs,
+    ...missingRequiredEvidenceSourceKindPressureRefs,
     ...(missingObligationPressureRefs.length === 0 &&
-    missingLedgerPressureRefs.length === 0
+    missingLedgerPressureRefs.length === 0 &&
+    targetCarrierPressureRefs.length === 0 &&
+    missingRequiredEvidenceSourceKindPressureRefs.length === 0
       ? []
       : input.contract.residualPressureRefs)
   ]);
@@ -375,6 +447,14 @@ export function measureSdlcEdgeGain(input: {
     metricFunctionRef: input.contract.metricFunctionRef,
     thresholdPolicyRef: input.contract.thresholdPolicyRef,
     closureFunctionRef: input.contract.closureFunctionRef,
+    targetCarrierContractRef: input.targetCarrierAdmission?.contractRef ?? null,
+    targetCarrierContractDigest:
+      input.targetCarrierAdmission?.contractDigest ?? null,
+    targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef:
+      input.targetCarrierAdmission?.status === "admitted"
+        ? input.targetCarrierAdmission.validationRef
+        : null,
     obligationGains: Object.freeze(obligationGains),
     expectedCount,
     fulfilledCount,
@@ -404,6 +484,9 @@ export function deriveSdlcEdgeResidualPressure(
     contractRef: gain.contractRef,
     contractDigest: gain.contractDigest,
     edgeRef: gain.edgeRef,
+    targetCarrierContractRef: gain.targetCarrierContractRef,
+    targetCarrierContractDigest: gain.targetCarrierContractDigest,
+    targetCarrierAdmissionStatus: gain.targetCarrierAdmissionStatus,
     requiredPressureRefs: gain.residualPressureRefs,
     informationalPressureRefs: Object.freeze([]),
     clear: gain.residualPressureRefs.length === 0
@@ -416,12 +499,13 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
 }): SdlcEdgeAssuranceCloseDecision {
   const closeReady =
     input.gain.obligationsAndLedgersComplete && input.residualPressure.clear;
+  const hasBlockingProtocolPressure =
+    input.gain.missingLedgerInputKinds.length > 0 ||
+    input.residualPressure.requiredPressureRefs.some((ref) =>
+      ref.startsWith("pressure://odd-sdlc/target-carrier/")
+    );
   const disposition =
-    input.gain.missingLedgerInputKinds.length > 0
-      ? "block"
-      : closeReady
-        ? "close"
-        : "retry";
+    closeReady ? "close" : hasBlockingProtocolPressure ? "block" : "retry";
   return Object.freeze({
     kind: "sdlc_edge_assurance_close_decision" as const,
     decisionRef: edgeScopedRef({
@@ -433,6 +517,9 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
     contractDigest: input.gain.contractDigest,
     edgeRef: input.gain.edgeRef,
     disposition,
+    targetCarrierContractRef: input.gain.targetCarrierContractRef,
+    targetCarrierContractDigest: input.gain.targetCarrierContractDigest,
+    targetCarrierAdmissionStatus: input.gain.targetCarrierAdmissionStatus,
     gainRef: input.gain.gainRef,
     residualPressureRef: input.residualPressure.pressureRef,
     basisRefs: uniqueSorted([
@@ -441,7 +528,13 @@ export function deriveSdlcEdgeAssuranceCloseDecision(input: {
       input.gain.gainRef,
       input.residualPressure.pressureRef,
       input.gain.metricFunctionRef,
-      input.gain.closureFunctionRef
+      input.gain.closureFunctionRef,
+      ...(input.gain.targetCarrierContractRef === null
+        ? []
+        : [input.gain.targetCarrierContractRef]),
+      ...(input.gain.targetCarrierContractDigest === null
+        ? []
+        : [input.gain.targetCarrierContractDigest])
     ]),
     reasonRefs: input.residualPressure.requiredPressureRefs
   });

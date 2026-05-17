@@ -57,6 +57,7 @@ const MULTI_ADVANCE_STOP_STATUSES = Object.freeze([
 
 const EDGE_ASSURANCE_ARCHIVE_ARTIFACTS = Object.freeze([
   "handoff_manifest.json",
+  "worker_construction_brief.json",
   "sdlc_edge_gain.json",
   "sdlc_edge_residual_pressure.json",
   "sdlc_edge_fulfillment_ledger.json",
@@ -217,6 +218,16 @@ function handoffArchiveGroups(workspace) {
     }
   }
   return groups;
+}
+
+function firstHandoffManifest(workspace) {
+  for (const archiveRoot of operatorRunRoots(workspace)) {
+    const manifest = readJsonFile(path.join(archiveRoot, "handoff_manifest.json"));
+    if (typeof manifest?.edgeName === "string") {
+      return manifest;
+    }
+  }
+  return null;
 }
 
 function latestOperatorRunRoot(workspace) {
@@ -705,7 +716,7 @@ function findRequirementIds(workspace) {
     .sort()
     .flatMap((entry) => {
       const content = readFileSync(path.join(requirementsRoot, entry), "utf8");
-      return [...content.matchAll(/^## (REQ-[A-Z0-9-]+)/gmu)].map((m) => m[1]);
+      return [...content.matchAll(/\b(REQ-[A-Z0-9-]+)\b/gmu)].map((m) => m[1]);
     });
 }
 
@@ -808,6 +819,15 @@ export function assertScenarioExpectations(result, scenario) {
         );
       }
     });
+  }
+  if (expectations.firstHandoffOverlayRef !== undefined) {
+    const manifest = firstHandoffManifest(result.workspace);
+    const overlayRef = manifest?.overlayRef;
+    if (overlayRef !== expectations.firstHandoffOverlayRef) {
+      throw new Error(
+        `${scenario.scenarioId}: first handoff overlay mismatch — expected ${expectations.firstHandoffOverlayRef}, saw ${overlayRef}`
+      );
+    }
   }
   if (Array.isArray(expectations.edgeAssuranceArchiveSequencePrefix)) {
     assertEdgeAssuranceArchiveSequencePrefix(

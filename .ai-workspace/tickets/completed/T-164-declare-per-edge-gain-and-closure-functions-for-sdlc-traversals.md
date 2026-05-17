@@ -3,7 +3,7 @@ id: T-164
 title: Declare per-edge gain and closure functions for SDLC traversals
 type: feature
 ticket_category: edge_gain_closure_contract
-status: active
+status: completed
 goal: failed-closure-tickets-collapse-into-edge-assurance-proof-contract
 build_tenant: typescript
 owner: odd_sdlc
@@ -13,7 +13,7 @@ re_entry_point: requirements
 priority: critical
 triaged_at: 2026-05-13
 created_at: 2026-05-13
-updated_at: 2026-05-14
+updated_at: 2026-05-15
 activated_at: 2026-05-13
 governance_scope: STDO Method
 intake_source: Operator consolidated the data_mapper/test35 vs TypeScript closure analysis into a generic SDLC work formulation: every edge and compound traversal needs a declared gain function and close function, with ledgers as measuring tools and closure derived only from admitted evidence.
@@ -932,7 +932,7 @@ intent alone.
 
 | Done | Row | Work item | Target surface | Proof required |
 | --- | --- | --- | --- | --- |
-| [ ] | P1-P4 | Run the full internal `data_mapper` proof as the combined absorbed-ticket gate. | `test_env/sandbox/scenarios/data_mapper_internal.scenario.mjs`, `test_env/test_runs/scenario_data_mapper_internal/*` | The run proves same-edge replay admission, data_mapper closure-semantics preservation, full-breadth design depth, and multi-target materialization/fan-out closure under the T-164 edge contract model. |
+| [x] | P1-P4 | Run the full internal `data_mapper` proof as the combined absorbed-ticket gate. | `test_env/live/test_t164_data_mapper_full_capability_live.test.mjs`, `test_env/test_runs/t164_data_mapper_full_capability_live/20260514T105715480Z_pid16615/` | The run proves same-edge replay admission, data_mapper closure-semantics preservation, full-breadth design depth, and multi-target materialization/fan-out closure under the T-164 edge contract model. |
 | [x] | P1 | Collapse T-158 same-edge materialization replay into the full internal `data_mapper` run. | product materialization edge contract and tests | The P1-P4 run must prove prior manifest evidence is admitted only when workspace, graph edge, target binding, evidence policy, and digest match; unresolved pressure blocks close. |
 | [x] | P2 | Collapse T-103 data_mapper/test35 parity into the full internal `data_mapper` run. | data_mapper comparison proof | The P1-P4 run must prove closure-semantics preservation, not file-count parity. |
 | [x] | P3 | Collapse T-130 full-breadth design depth into the full internal `data_mapper` run. | design completeness assurance | The P1-P4 run must prove full-breadth module schema, state, aggregate model, and sunny-day evidence; steel-thread deferral remains residual pressure when selected. |
@@ -1242,3 +1242,111 @@ edges were reached, so `missingFullGraphEdges` still contains every required
 edge after `Fg_conform_project_authority`, including the full test lifecycle and
 release-readiness edges. This is a valid P1-P4 non-closure result, not a harness
 push loop.
+
+### Closure Evidence - 2026-05-15
+
+P1-P4 is complete as a full internal `data_mapper` proof gate.
+
+Controlling preserved sandbox:
+
+```text
+build_tenants/typescript/test_env/test_runs/t164_data_mapper_full_capability_live/20260514T105715480Z_pid16615/
+```
+
+Final resume command:
+
+```text
+ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_RESUME_ARCHIVE_ROOT=/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/t164_data_mapper_full_capability_live/20260514T105715480Z_pid16615 npm run test:t164:data-mapper-full-capability-live:resume
+```
+
+Final result:
+
+```text
+startStatus: converged
+currentEdge: null
+blockingReason: null
+workerTimeoutMs: 43200000
+workerInactivityTimeoutMs: 1800000
+edgeNames:
+  Fg_conform_project_authority
+  derive_feature_decomp_surface
+  derive_design_surface
+  derive_scenario_surface
+  derive_implementation_design_surface
+  select_implementation_stack_profile
+  derive_implementation_module_surface
+  derive_aggregate_domain_model_surface
+  derive_implementation_component_topology_surface
+  derive_aggregate_sunny_day_sequence_surface
+  derive_component_realization_schedule_surface
+  derive_component_code_surface
+```
+
+The run was used as the intended STDO bug-finding substrate. Platform defects
+found and fixed while preserving the same sandbox:
+
+- Retry prompts now include the current evaluated gap dossier, blocked
+  requirements, evidence refs, and evaluator reasons instead of relying on
+  stale retry prose.
+- Same-session executor tool-result metadata is filtered generically from
+  worker read-boundary checks; real outside-workspace reads still fail closed.
+- Post-action and runtime gap registers now preserve the latest current gap
+  dossier across restart/re-entry instead of reverting to stale retry refs.
+- Retry gap compaction preserves distinct same-code evaluator blockers by
+  detail, so four concrete lineage failures are not collapsed into one prompt
+  reason.
+- Diagnostic redaction no longer rewrites workspace-relative paths such as
+  `cdme-executor/src/...` into `outside-workspace-path`.
+- Product-lineage validation checks `unrelated` tags against the full canonical
+  lineage set while keeping prompt-sized current required closure pressure,
+  so valid full-run repair tags beyond the prompt slice are admitted without
+  expanding every edge into a full-repo product-file obligation.
+- Product-materialization prompt text now names `requirementTraceObligationIds`
+  as the prompt-visible required tag set and explicitly admits current
+  evaluated gap ids as retry repair tags.
+
+Verification commands:
+
+```text
+cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
+npm run build:semantic
+node --test test_env/tests/test_t120_retry_local_repair_prompt.test.mjs test_env/tests/test_t140_no_local_forced_iteration_authority.test.mjs
+node --test test_env/tests/test_t066_product_materialization_contract.test.mjs test_env/tests/test_t164_edge_gain_closure_contract.test.mjs
+npm run lint:semantic
+git diff --check
+```
+
+Results:
+
+```text
+build:semantic: pass
+T-120/T-140 focused retry tests: 23/23 pass
+T-066/T-164 product-materialization and edge-closure tests: 89/89 pass
+lint:semantic: pass
+git diff --check: pass
+full L14/P1-P4 data_mapper resume: converged
+```
+
+Release-cut evidence:
+
+```text
+cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
+npm run test:semantic
+npm run lint:semantic
+node build/semantic/code/src/cli/main.js rc-report
+node build/semantic/code/src/cli/main.js release-cut --archive-root /Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260515T001126Z
+git diff --check
+```
+
+Results:
+
+```text
+test:semantic: 567/567 pass
+lint:semantic: pass
+rc-report: ok
+release-cut: ok
+release manifest: .ai-workspace/release-cuts/typescript/20260515T001126Z/release-cut-manifest.json
+release postmortem: .ai-workspace/release-cuts/typescript/20260515T001126Z/release-cut-postmortem.md
+release tarball: .ai-workspace/release-cuts/typescript/20260515T001126Z/package/pack-cDSCun/odd-sdlc-typescript-tenant-0.0.0-dev.tgz
+git diff --check: pass
+```

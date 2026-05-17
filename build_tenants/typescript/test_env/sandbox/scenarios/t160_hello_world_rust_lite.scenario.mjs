@@ -1,5 +1,5 @@
 // T-160 Rust hello-world lite traversal scenario.
-// Starts from conformed project authority and selects the bounded lite overlay
+// Starts from loaded project authority and selects the bounded lite overlay
 // instead of the current full traversal.
 
 import { dirname, resolve } from "node:path";
@@ -77,4 +77,3 @@ export function t160HelloWorldRustLiteLiveScenario({
     stopAfterWorkspaceFilesExist: true
   });
 }
-

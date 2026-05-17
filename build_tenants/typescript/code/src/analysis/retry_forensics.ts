@@ -16,6 +16,7 @@ function classifyCause(input: {
   readonly closureDisposition: string | null;
   readonly outsideWorkspaceReadCount: number;
   readonly schemaViolationCount: number;
+  readonly targetCarrierAdmissionStatus: string | null;
 }): SdlcFdRunAnalysisRetryCauseClass {
   const codes = input.blockingReasonCodes;
   if (input.outsideWorkspaceReadCount > 0) {
@@ -28,6 +29,16 @@ function classifyCause(input: {
     )
   ) {
     return "worker_policy_violation";
+  }
+  if (
+    codes.some((code) =>
+      code.startsWith("component_depth_register_invalid") ||
+      code.startsWith("design_depth_register_invalid") ||
+      code.startsWith("test_design_register_invalid") ||
+      code.startsWith("target_carrier_contract_invalid")
+    )
+  ) {
+    return "framework_carrier_parser_drift";
   }
   if (
     codes.some((code) =>
@@ -77,10 +88,21 @@ function classifyCause(input: {
   ) {
     return "tenant_source_defect";
   }
-  if (input.closureDisposition === "block") {
-    return "deterministic_evaluator_bug";
+  if (
+    input.closureDisposition === "block" &&
+    input.targetCarrierAdmissionStatus === "missing"
+  ) {
+    return "target_carrier_admission_missing";
   }
   return "unknown";
+}
+
+function targetCarrierAdmissionStatus(carriers: OperatorRunCarriers): string | null {
+  if (carriers.edgeFulfillmentLedger.status !== "present") {
+    return null;
+  }
+  const status = carriers.edgeFulfillmentLedger.data.targetCarrierAdmissionStatus;
+  return typeof status === "string" ? status : null;
 }
 
 function outsideWorkspaceReadCount(carriers: OperatorRunCarriers): number {
@@ -120,6 +142,10 @@ function schemaViolationCount(carriers: OperatorRunCarriers): number {
       codeValue.startsWith("output_") ||
       codeValue.startsWith("adr_output_") ||
       codeValue.startsWith("materialized_product_") ||
+      codeValue.startsWith("component_depth_register_invalid") ||
+      codeValue.startsWith("design_depth_register_invalid") ||
+      codeValue.startsWith("test_design_register_invalid") ||
+      codeValue.startsWith("target_carrier_contract_invalid") ||
       codeValue === "context_expected_files_not_materialization_authority"
     ) {
       count += 1;
@@ -196,7 +222,8 @@ export function deriveRetryForensics(input: {
           blockingReasonCodes: attempt.blockingReasonCodes,
           closureDisposition: disposition,
           outsideWorkspaceReadCount: outsideReadCount,
-          schemaViolationCount: schemaCount
+          schemaViolationCount: schemaCount,
+          targetCarrierAdmissionStatus: targetCarrierAdmissionStatus(carriers)
         })
       });
       forensics.push(forensic);

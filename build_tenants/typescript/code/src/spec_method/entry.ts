@@ -62,6 +62,7 @@ import {
 import { describeOddSdlcTypescriptRcQualification } from "../qualification/index.js";
 import { deriveOddSdlcTypescriptReleaseCut } from "../release/index.js";
 import {
+  deriveSdlcPostCloseOverlayContinuationActionInput,
   executeInstalledOperatorStartWithReentry,
   readOddSdlcRuntimeEvents,
   readOddSdlcRuntimeEventsSync
@@ -906,6 +907,74 @@ function specMethodBlockingPayload(
   });
 }
 
+function completedGraphFunctionNameFromArchive(archiveRoot: string): string | null {
+  const handoff = jsonRecordFromFile(path.join(archiveRoot, "handoff_manifest.json"));
+  if (handoff === null) {
+    return null;
+  }
+  return (
+    stringField(handoff, "graphFunctionName") ??
+    stringField(handoff, "edgeName")
+  );
+}
+
+function selectedNextGraphFunctionFromOverlayCompletionArchive(input: {
+  readonly archiveRoot: string;
+  readonly projectionRecord: Readonly<Record<string, unknown>>;
+  readonly decision: NonNullable<ReturnType<typeof edgeClosureDecisionFromArchive>>;
+  readonly module: ReturnType<typeof constructSdlcGtlModule>;
+}): SelectedNextGraphFunctionFromArchive | null {
+  const completion = jsonRecordFromFile(
+    path.join(input.archiveRoot, "sdlc_overlay_segment_completion.json")
+  );
+  if (
+    completion?.["kind"] !== "sdlc_overlay_segment_completion" ||
+    stringField(completion, "stopDisposition") !== "overlay_segment_complete" ||
+    stringArrayField(completion, "remainingGraphPressureRefs").length === 0
+  ) {
+    return null;
+  }
+  const completedGraphFunctionRef =
+    completedGraphFunctionNameFromArchive(input.archiveRoot);
+  const overlayRef = stringField(input.projectionRecord, "overlayRef");
+  const nextActionProjectionRef = stringField(
+    input.projectionRecord,
+    "nextActionProjectionRef"
+  );
+  if (
+    completedGraphFunctionRef === null ||
+    overlayRef === null ||
+    nextActionProjectionRef === null
+  ) {
+    return null;
+  }
+  const action = deriveSdlcPostCloseOverlayContinuationActionInput({
+    module: input.module,
+    overlayRef,
+    completedGraphFunctionRef,
+    runRef: pathToFileURL(input.archiveRoot).href
+  });
+  if (
+    action === null ||
+    action.actionRef === undefined ||
+    action.graphFunctionRef === undefined ||
+    action.graphFunctionRef === null ||
+    action.graphVectorRef === undefined ||
+    action.graphVectorRef === null
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    graphFunctionName: action.graphFunctionRef,
+    nextActionProjectionRef,
+    selectedActionRef: action.actionRef,
+    nextGraphVectorRef: action.graphVectorRef,
+    closureDecisionRef: input.decision.decisionRef,
+    overlayRef,
+    overlayBindingRef: stringField(input.projectionRecord, "overlayBindingRef")
+  });
+}
+
 function isSpecMethodBlockingPayload(
   input: unknown
 ): input is OddSdlcSpecMethodBlockingPayload {
@@ -939,6 +1008,16 @@ function selectedNextGraphFunctionFromArchive(input: {
       record["choosesNextTraversal"] !== true ||
       stringField(record, "selectedActionRef") === null
     ) {
+      const overlayContinuation =
+        selectedNextGraphFunctionFromOverlayCompletionArchive({
+          archiveRoot,
+          projectionRecord: record,
+          decision,
+          module: input.module
+        });
+      if (overlayContinuation !== null) {
+        return overlayContinuation;
+      }
       return null;
     }
     if (
@@ -1313,6 +1392,7 @@ function startOutcomeFor(
   replayNextAction?: {
     readonly nextActionProjectionRef: string;
     readonly selectedActionRef: string;
+    readonly nextGraphFunctionRef: string;
     readonly nextGraphVectorRef: string;
     readonly closureDecisionRef: string;
     readonly overlayRef: string | null;
@@ -1341,6 +1421,8 @@ function startOutcomeFor(
             replayNextActionProjectionRef:
               replayNextAction.nextActionProjectionRef,
             replaySelectedActionRef: replayNextAction.selectedActionRef,
+            replayNextGraphFunctionRef:
+              replayNextAction.nextGraphFunctionRef,
             replayNextGraphVectorRef: replayNextAction.nextGraphVectorRef,
             replayClosureDecisionRef: replayNextAction.closureDecisionRef,
             // The archive projection's overlayBindingRef belongs to the
@@ -1428,6 +1510,7 @@ function startOutcomeForObservedReplay(input: {
     const selected = startOutcomeFor({
       ...input.request,
       target:
+        input.request.target.kind === "next" ||
         input.request.target.kind === "overlay"
           ? input.request.target
           : {
@@ -1437,6 +1520,7 @@ function startOutcomeForObservedReplay(input: {
     }, {
       nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
       selectedActionRef: selectedNextGraphFunction.selectedActionRef,
+      nextGraphFunctionRef: selectedNextGraphFunction.graphFunctionName,
       nextGraphVectorRef: selectedNextGraphFunction.nextGraphVectorRef,
       closureDecisionRef: selectedNextGraphFunction.closureDecisionRef,
       overlayRef: selectedNextGraphFunction.overlayRef,
@@ -2152,10 +2236,156 @@ function compactInstalledStartJsonPayload(payload: unknown): unknown {
   });
 }
 
+function compactPublicStartForGapsJson(payload: unknown): unknown {
+  if (!isRecord(payload)) {
+    return payload;
+  }
+  const executionContract = childRecord(payload, "executionContract");
+  const nextActionProjection =
+    executionContract === null
+      ? null
+      : childRecord(executionContract, "nextActionProjection");
+  const basis =
+    executionContract === null ? null : childRecord(executionContract, "basis");
+  return Object.freeze({
+    kind: stringField(payload, "kind"),
+    status: stringField(payload, "status"),
+    blockingReason: stringField(payload, "blockingReason"),
+    stopPredicate: stringField(payload, "stopPredicate"),
+    detail: stringField(payload, "detail"),
+    executionContract:
+      executionContract === null
+        ? null
+        : Object.freeze({
+            kind: stringField(executionContract, "kind"),
+            targetGraphFunction: stringField(executionContract, "targetGraphFunction"),
+            requestedUntil: stringField(executionContract, "requestedUntil"),
+            overlayRef: stringField(executionContract, "overlayRef"),
+            overlayBindingRef: stringField(executionContract, "overlayBindingRef"),
+            workerAttachment: executionContract["workerAttachment"],
+            nextActionProjection:
+              nextActionProjection === null
+                ? null
+                : Object.freeze({
+                    nextGraphVectorRef: stringField(
+                      nextActionProjection,
+                      "nextGraphVectorRef"
+                    ),
+                    nextGraphFunctionRef: stringField(
+                      nextActionProjection,
+                      "nextGraphFunctionRef"
+                    ),
+                    selectedActionRef: stringField(
+                      nextActionProjection,
+                      "selectedActionRef"
+                    ),
+                    targetBindingRefs: stringArrayField(
+                      nextActionProjection,
+                      "targetBindingRefs"
+                    )
+                  }),
+            basis:
+              basis === null
+                ? null
+                : Object.freeze({
+                    id: stringField(basis, "id"),
+                    workspaceRoot: stringField(basis, "workspaceRoot"),
+                    outputWorkspaceRoot: stringField(basis, "outputWorkspaceRoot"),
+                    workKey: stringField(basis, "workKey"),
+                    runId: stringField(basis, "runId")
+                  })
+          })
+  });
+}
+
+function compactGapsJsonPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) {
+    return payload;
+  }
+  const requirementFulfillment = compactRequirementFulfillmentForGapsJson(
+    payload["requirementFulfillment"]
+  );
+  return Object.freeze({
+    ...payload,
+    start: compactPublicStartForGapsJson(payload["start"]),
+    dossier: compactGapDossierForGapsJson(payload["dossier"]),
+    requirementFulfillment
+  });
+}
+
+function compactRequirementFulfillmentRowForGapsJson(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    kind: stringField(value, "kind"),
+    requirementId: stringField(value, "requirementId"),
+    requirementDisplayId: stringField(value, "requirementDisplayId"),
+    requirementAuthorityRef: stringField(value, "requirementAuthorityRef"),
+    fulfillmentStatus: stringField(value, "fulfillmentStatus"),
+    carryStatus: stringField(value, "carryStatus"),
+    openReasons: Array.isArray(value["openReasons"])
+      ? Object.freeze(value["openReasons"].filter((entry): entry is string => typeof entry === "string"))
+      : Object.freeze([]),
+    evidenceRefCount: Array.isArray(value["evidenceRefs"])
+      ? value["evidenceRefs"].length
+      : 0,
+    ledgerRefCount: Array.isArray(value["ledgerRefs"])
+      ? value["ledgerRefs"].length
+      : 0,
+    closureDecisionRefCount: Array.isArray(value["closureDecisionRefs"])
+      ? value["closureDecisionRefs"].length
+      : 0
+  });
+}
+
+function compactRequirementFulfillmentForGapsJson(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.freeze({
+    ...value,
+    rows: Array.isArray(value["rows"])
+      ? Object.freeze(value["rows"].map(compactRequirementFulfillmentRowForGapsJson))
+      : value["rows"]
+  });
+}
+
+function compactGapDossierForGapsJson(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  const compacted = compactGapDossier(value);
+  if (!isRecord(compacted)) {
+    return compacted;
+  }
+  const requirementFulfillment = childRecord(value, "requirementFulfillment");
+  return Object.freeze({
+    ...compacted,
+    requirementFulfillment:
+      requirementFulfillment === null
+        ? null
+        : Object.freeze({
+            kind: stringField(requirementFulfillment, "kind"),
+            sourceRegisterRef: stringField(requirementFulfillment, "sourceRegisterRef"),
+            counts: requirementFulfillment["counts"] ?? null,
+            edgeFulfillmentCounts:
+              requirementFulfillment["edgeFulfillmentCounts"] ?? null,
+            rowCount: Array.isArray(requirementFulfillment["rows"])
+              ? requirementFulfillment["rows"].length
+              : 0
+          })
+  });
+}
+
 function jsonPayloadForResult(result: OddSdlcSpecMethodResult): unknown {
-  return result.command === "start"
-    ? compactInstalledStartJsonPayload(result.payload)
-    : result.payload;
+  if (result.command === "start") {
+    return compactInstalledStartJsonPayload(result.payload);
+  }
+  if (result.command === "gaps") {
+    return compactGapsJsonPayload(result.payload);
+  }
+  return result.payload;
 }
 
 function compactGapsResult(result: OddSdlcSpecMethodResult): string | null {

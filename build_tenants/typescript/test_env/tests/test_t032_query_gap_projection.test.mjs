@@ -91,7 +91,7 @@ test("T-032 query-domain is a read-only projection over catalogs and module publ
   assert(projection.graphFunctions.some((entry) => entry.name === "Fg_conform_project_authority"));
   assert(projection.functions.some((entry) => entry.name === "derive_code_surface"));
   assert(projection.programs.some((entry) => entry.name === "release_operational_cycle"));
-  assert(projection.startTargets.some((entry) => entry.name === "Fg_conform_project_authority"));
+  assert(projection.startTargets.some((entry) => entry.name === "derive_intent_surface"));
   assert(
     projection.assetOwnership.some(
       (entry) =>
@@ -102,8 +102,8 @@ test("T-032 query-domain is a read-only projection over catalogs and module publ
   assert(
     projection.targetBindings.some(
       (entry) =>
-        entry.declaredTargetAssetType === "project_bootstrap_surface" &&
-        entry.admissibleGraphFunctionNames.includes("Fg_conform_project_authority")
+        entry.declaredTargetAssetType === "intent_surface" &&
+        entry.admissibleGraphFunctionNames.includes("derive_intent_surface")
     )
   );
 });
@@ -205,7 +205,6 @@ test("T-032 span analysis supports bounded edge selectors and rejects invalid sp
   assert.equal(span.readOnly, true);
   assert.deepStrictEqual(span.edges, [
     "derive_feature_decomp_surface",
-    "derive_uat_testcases_surface",
     "derive_design_surface"
   ]);
   assert.throws(

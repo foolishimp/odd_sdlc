@@ -18,10 +18,16 @@ export function parseClosedRecord(
   }
   const record = input;
   const allowed = new Set(allowedKeys);
-  for (const key of Object.keys(record)) {
-    if (!allowed.has(key)) {
-      throw new TypeError(`${label}.${key}: unexpected field`);
-    }
+  const unexpectedKeys = Object.keys(record).filter((key) => !allowed.has(key));
+  if (unexpectedKeys.length === 1) {
+    throw new TypeError(`${label}.${unexpectedKeys[0]}: unexpected field`);
+  }
+  if (unexpectedKeys.length > 1) {
+    throw new TypeError(
+      unexpectedKeys
+        .map((key) => `${label}.${key}: unexpected field`)
+        .join("; ")
+    );
   }
   return record;
 }

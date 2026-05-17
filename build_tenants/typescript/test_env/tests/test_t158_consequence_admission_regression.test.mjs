@@ -422,11 +422,7 @@ test("T-158 product materialization Eval_Action fails closed on unresolved graph
     module: withoutComponentCodeTrack,
     runRef: "run://t158/unresolved-track",
     downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
-    admittedAssetTypes: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
+    admittedAssetTypes: ["implementation_design_surface"],
     downstreamTargetBindingRefs: [
       "target-binding://odd-sdlc/component_code_surface"
     ]
@@ -446,11 +442,7 @@ test("T-158 product materialization Eval_Action fails closed on unresolved graph
       module: withoutComponentCodeTrack,
       runRef: "run://t158/unresolved-track",
       downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
-      admittedAssetTypes: [
-        "implementation_component_topology_surface",
-        "component_realization_schedule_surface",
-        "implementation_stack_profile"
-      ],
+      admittedAssetTypes: ["implementation_design_surface"],
       downstreamTargetBindingRefs: [
         "target-binding://odd-sdlc/component_code_surface"
       ]
@@ -461,7 +453,7 @@ test("T-158 product materialization Eval_Action fails closed on unresolved graph
 
 test("T-158 product materialization Eval_Action walks graph prerequisites before terminal code", () => {
   const module = constructSdlcGtlModule();
-  const featureDecomp = graphTrackRefs("derive_feature_decomp_surface");
+  const uatTestcases = graphTrackRefs("derive_uat_testcases_surface");
 
   const action = deriveSdlcPostProductMaterializationActionInput({
     module,
@@ -482,8 +474,8 @@ test("T-158 product materialization Eval_Action walks graph prerequisites before
   });
 
   assert(action);
-  assert.equal(action.graphFunctionRef, featureDecomp.graphFunctionRef);
-  assert.equal(action.graphVectorRef, featureDecomp.graphVectorRef);
+  assert.equal(action.graphFunctionRef, uatTestcases.graphFunctionRef);
+  assert.equal(action.graphVectorRef, uatTestcases.graphVectorRef);
   assert(
     action.eligibleReasonRefs.includes(
       "graph_track_requested_target:component_code_surface"
@@ -491,7 +483,49 @@ test("T-158 product materialization Eval_Action walks graph prerequisites before
   );
   assert(
     action.eligibleReasonRefs.includes(
-      "graph_track_selected_target:feature_decomp_surface"
+      "graph_track_selected_target:uat_testcases_surface"
+    )
+  );
+});
+
+test("T-171 post-intent continuation admits source basis before selecting product", () => {
+  const module = constructSdlcGtlModule();
+  const product = graphTrackRefs("derive_product_surface");
+
+  const blockedWithoutSourceBasis =
+    deriveSdlcPostProductMaterializationActionResolution({
+      module,
+      runRef: "run://t171/post-intent-without-source",
+      downstreamPressureRefs: ["downstream-pressure://t171/component-code"],
+      downstreamTargetBindingRefs: [
+        "target-binding://odd-sdlc/component_code_surface"
+      ],
+      admittedAssetTypes: ["intent_surface"]
+    });
+
+  assert.equal(blockedWithoutSourceBasis.status, "blocked");
+  assert.equal(
+    blockedWithoutSourceBasis.blockingReason.code,
+    "post_materialization_graph_track_unresolved"
+  );
+  assert.match(blockedWithoutSourceBasis.blockingReason.detail, /input_set/u);
+
+  const action = deriveSdlcPostProductMaterializationActionInput({
+    module,
+    runRef: "run://t171/post-intent-with-source",
+    downstreamPressureRefs: ["downstream-pressure://t171/component-code"],
+    downstreamTargetBindingRefs: [
+      "target-binding://odd-sdlc/component_code_surface"
+    ],
+    admittedAssetTypes: ["input_set", "intent_surface"]
+  });
+
+  assert(action);
+  assert.equal(action.graphFunctionRef, product.graphFunctionRef);
+  assert.equal(action.graphVectorRef, product.graphVectorRef);
+  assert(
+    action.eligibleReasonRefs.includes(
+      "graph_track_selected_target:product_surface"
     )
   );
 });
@@ -520,12 +554,6 @@ test("T-158 product materialization Eval_Action stops when requested target is a
       "design_surface",
       "scenario_surface",
       "implementation_design_surface",
-      "implementation_stack_profile",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "implementation_component_topology_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "component_realization_schedule_surface",
       "component_code_surface"
     ]
   });
@@ -567,11 +595,7 @@ test("T-158 product materialization Eval_Action fails closed on ambiguous graph 
     module: ambiguousModule,
     runRef: "run://t158/ambiguous-track",
     downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
-    admittedAssetTypes: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
+    admittedAssetTypes: ["implementation_design_surface"],
     downstreamTargetBindingRefs: [
       "target-binding://odd-sdlc/component_code_surface"
     ]
@@ -609,11 +633,7 @@ test("T-158 product materialization graph track treats untagged peers as ambiguo
     module: ambiguousModule,
     runRef: "run://t158/untagged-peer-track",
     downstreamPressureRefs: ["downstream-pressure://t158/component-code"],
-    admittedAssetTypes: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
+    admittedAssetTypes: ["implementation_design_surface"],
     downstreamTargetBindingRefs: [
       "target-binding://odd-sdlc/component_code_surface"
     ]

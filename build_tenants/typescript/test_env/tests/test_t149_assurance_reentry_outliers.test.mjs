@@ -55,9 +55,9 @@ function manifest(input = {}) {
     kind: "sdlc_worker_handoff_manifest",
     manifestId: "manifest://t149",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_topology",
+    edgeName: input.edgeName ?? "derive_component_code_surface",
     vectorIndex: 149,
-    targetAssetType: input.targetAssetType ?? "implementation_component_topology_surface",
+    targetAssetType: input.targetAssetType ?? "component_code_surface",
     reportFile: "report://t149/worker",
     archiveRoot: "archive://t149",
     productMaterialization: {
@@ -89,8 +89,8 @@ function workerReport(input = {}) {
   return {
     kind: "odd_sdlc.worker_result_report",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_topology",
-    targetAssetType: input.targetAssetType ?? "implementation_component_topology_surface",
+    edgeName: input.edgeName ?? "derive_component_code_surface",
+    targetAssetType: input.targetAssetType ?? "component_code_surface",
     outputFile: input.outputFile ?? "output://t149/report",
     digest: "sha256:t149",
     summary: input.summary ?? "admitted worker report",
@@ -190,9 +190,26 @@ test("T-149 capability evidence missing without basis remains a hard block", () 
 
 test("T-149 component-depth missing output is no-basis block, not repair or yield", () => {
   const missingOutput = join(tmpRoot("odd-sdlc-t149-missing-output-"), "missing.md");
+  const sourceFile = tmpFile(
+    "odd-sdlc-t149-missing-output-source-",
+    "component.ts",
+    "export const t149 = true;\n"
+  );
   const gate = deriveSdlcOperatorAssuranceGate({
     manifest: manifest(),
-    report: workerReport({ outputFile: missingOutput }),
+    report: workerReport({
+      outputFile: missingOutput,
+      materializedFiles: [
+        {
+          kind: "sdlc_materialized_product_file",
+          role: "source",
+          relativePath: "src/component.ts",
+          absolutePath: sourceFile,
+          digest: "sha256:t149-source",
+          byteCount: 26
+        }
+      ]
+    }),
     postflight: passedPostflight()
   });
   assert(gate.blockingPostflight);

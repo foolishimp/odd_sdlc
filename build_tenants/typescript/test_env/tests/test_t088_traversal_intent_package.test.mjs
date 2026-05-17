@@ -62,6 +62,47 @@ function makeWorkspace() {
   return root;
 }
 
+function makeBootstrapOnlyWorkspace() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t088-bootstrap-"));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(
+    path.join(root, "bootstrap.md"),
+    [
+      "# Bootstrap-Only Product Contract",
+      "",
+      "REQ-T088-B001: Generate build_tenants/node_app/src/hello.js.",
+      "REQ-T088-B002: Running node build_tenants/node_app/src/hello.js prints Hello, world!."
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t088_bootstrap_only",
+      "active_tenant: node_app",
+      "selected_output_root: build_tenants/node_app",
+      "runtime:",
+      "  root: .ai-workspace/runtime/odd_sdlc",
+      "  transform_asset_root: .ai-workspace/runtime/odd_sdlc/assets",
+      "  operator_run_root: .ai-workspace/runtime/odd_sdlc/operator-runs",
+      "  product_materialization_root_policy: selected_output_root",
+      "build_tenants:",
+      "  node_app:",
+      "    output_dir: build_tenants/node_app",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node",
+      "    test_execution_contract: node build_tenants/node_app/src/hello.js",
+      "    module_structure:",
+      "      - node_app"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: root });
+  return root;
+}
+
 function replaceIntentPackage(manifest, patch) {
   const { packageDigest: _oldDigest, ...oldBasis } = manifest.traversalIntentPackage;
   const digestBasis = { ...oldBasis, ...patch };
@@ -79,9 +120,9 @@ function gapDossier(ref, reasons) {
     kind: "sdlc_postflight_gap_dossier",
     status: "open",
     graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_test_module_surface",
+    edgeName: "derive_test_design_surface",
     vectorIndex: 15,
-    targetAssetType: "test_module_surface",
+    targetAssetType: "test_design_surface",
     reasons: reasons.map((reason) => ({
       kind: "sdlc_postflight_gap_reason",
       reason,
@@ -128,10 +169,7 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   assert.equal(manifest.traversalIntentPackage.edgeName, "derive_code_surface");
   assert.equal(manifest.traversalIntentPackage.targetAssetType, "code_surface");
   assert.deepStrictEqual(manifest.traversalIntentPackage.sourceAssetTypes, [
-    "implementation_module_surface",
-    "implementation_stack_profile",
-    "realization_schedule_surface",
-    "implementation_component_topology_surface",
+    "implementation_design_surface",
     "component_code_surface",
     "component_realization_qualification_surface"
   ]);
@@ -143,12 +181,19 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   assert.equal(existsSync(intentPath), true);
   assert.equal(existsSync(files.workerBriefPath), true);
   assert.match(prompt, /Read in order:/u);
-  assert.match(prompt, /traversal intent package:/u);
+  assert.match(prompt, /construction brief:/u);
+  assert.match(prompt, /traversal intent projection:/u);
   assert.match(prompt, /traversal_intent_package\.json/u);
   assert(
     manifest.traversalIntentPackage.authorityRefs.some((ref) =>
-      ref.endsWith("specification/requirements/00-imported-sources.md")
+      ref.endsWith("specification/REQUIREMENTS.md")
     )
+  );
+  assert.equal(
+    manifest.traversalIntentPackage.authorityRefs.some((ref) =>
+      ref.endsWith("specification/requirements/00-imported-sources.md")
+    ),
+    false
   );
   assert(
     manifest.traversalObligationContext.obligations.some(
@@ -170,9 +215,50 @@ test("T-088 handoff manifest carries typed cumulative traversal intent package",
   );
 });
 
+test("T-088 source-loaded bootstrap requirements are concrete traversal lineage", () => {
+  const workspace = makeBootstrapOnlyWorkspace();
+  const contract = hookContractByEdgeName("derive_lite_design_adr_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 1,
+    contract,
+    runId: "t088-bootstrap-requirement-lineage"
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+  const requirementObligations = manifest.traversalObligationContext.obligations
+    .filter((obligation) => obligation.obligationKind === "requirement");
+
+  assert.doesNotThrow(() => assertTraversalIntentPackagePressure(manifest));
+  assert(
+    manifest.traversalIntentPackage.authorityRefs.some((ref) =>
+      ref.endsWith("/bootstrap.md")
+    ),
+    "bootstrap.md source contract should be admitted as authority"
+  );
+  assert.equal(
+    manifest.traversalIntentPackage.authorityRefs.some((ref) =>
+      ref.endsWith("specification/requirements/00-imported-sources.md")
+    ),
+    false
+  );
+  assert(
+    requirementObligations.some(
+      (obligation) =>
+        obligation.payload.status === "concrete" &&
+        obligation.summary.includes("REQ-T088-B001") &&
+        obligation.payload.sourceRefs.some((ref) => ref.endsWith("/bootstrap.md"))
+    ),
+    "bootstrap requirement markers should become concrete F_P obligations"
+  );
+  assert.match(prompt, /worker_construction_brief\.json/u);
+});
+
 test("T-088 retry pressure stays linked and does not expand into prior-gap obligations", () => {
   const workspace = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_test_module_surface");
+  const contract = hookContractByEdgeName("derive_test_design_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
     graphFunctionName: "bootstrap_release_self_test",

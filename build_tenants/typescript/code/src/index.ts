@@ -45,6 +45,7 @@ export function describeOddSdlcTypescriptTenant(): OddSdlcTypescriptTenantInfo {
 
 export * from "./runtime/index.js";
 export * from "./shared/blocking_reason.js";
+export * from "./shared/overlay_strategy.js";
 export * from "./domain/index.js";
 export * from "./graph/index.js";
 export * from "./workspace/index.js";

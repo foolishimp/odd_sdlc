@@ -25,9 +25,7 @@ import {
 const DATA_MAPPER_TARGET_BINDING =
   "target-binding://odd-sdlc/component_code_surface";
 const COMPONENT_CODE_PREREQUISITES = Object.freeze([
-  "implementation_component_topology_surface",
-  "component_realization_schedule_surface",
-  "implementation_stack_profile"
+  "implementation_design_surface"
 ]);
 
 function graphTrackRefs(module, graphFunctionName) {

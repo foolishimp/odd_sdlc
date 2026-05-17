@@ -454,9 +454,8 @@ classDiagram
 Current TS graph catalog has the right graph shape:
 
 - `derive_implementation_design_surface`
-- `select_implementation_stack_profile`
-- `derive_implementation_module_surface`
-- `derive_realization_schedule_surface`
+- `derive_component_code_surface`
+- `qualify_component_realization_surface`
 - `derive_code_surface`
 
 Current TS worker handoff has the right transform direction:

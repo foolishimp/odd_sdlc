@@ -1,6 +1,8 @@
 project:
   name: t133_rust_hello_world_minimal
   kind: imported_workspace
+  overlay_strategy: thread
+  overlay_ref: overlay://odd-sdlc/lite-design-module-implementation
 active_tenant: hello_world_rust
 selected_output_root: build_tenants/hello_world_rust
 ambiguity_risk_appetite: low

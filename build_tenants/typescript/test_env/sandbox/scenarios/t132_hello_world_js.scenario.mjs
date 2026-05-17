@@ -5,7 +5,10 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { FG_CONFORM_PROJECT } from "../../../build/semantic/code/src/index.js";
+import {
+  FG_CONFORM_PROJECT,
+  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+} from "../../../build/semantic/code/src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = resolve(HERE, "../../fixtures/t132_hello_world_single_tenant");
@@ -40,7 +43,6 @@ export const t132HelloWorldJsScenario = Object.freeze({
       "vector_evaluated",
       "vector_closed"
     ],
-    requirementIds: T132_HELLO_WORLD_JS_REQUIREMENT_IDS,
     archiveArtifacts: ["conform_project_report.json"]
   },
   maxAdvances: 1
@@ -48,7 +50,7 @@ export const t132HelloWorldJsScenario = Object.freeze({
 
 export function t132HelloWorldJsLiveScenario({
   worker,
-  maxAdvances = 16,
+  maxAdvances = 24,
   startUntil = "first_traversal"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
@@ -60,23 +62,49 @@ export function t132HelloWorldJsLiveScenario({
     installedPackageName: "odd-sdlc-scenario-t132-hello-world-js-live",
     expectations: {
       ...t132HelloWorldJsScenario.expectations,
+      requirementIds: T132_HELLO_WORLD_JS_REQUIREMENT_IDS,
       workspaceFiles: [
+        "specification/INTENT.md",
+        "specification/PRODUCT.md",
+        "specification/GOALS.md",
+        "specification/requirements/10-generated-bootstrap.md",
+        "specification/scenarios/20-generated-uat-testcases.md",
+        "specification/scenarios/30-generated-testcase-authority.md",
+        "build_tenants/hello_world_javascript/src/hello.js"
+      ],
+      materializationEvidenceWorkspaceFiles: [
+        "specification/requirements/10-generated-bootstrap.md",
+        "specification/scenarios/20-generated-uat-testcases.md",
+        "specification/scenarios/30-generated-testcase-authority.md",
         "build_tenants/hello_world_javascript/src/hello.js"
       ],
       handoffEdgeSequencePrefix: [
-        "Fg_conform_project_authority",
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_uat_testcases_surface",
+        "derive_testcase_authority_surface",
         "derive_feature_decomp_surface",
         "derive_design_surface",
         "derive_scenario_surface",
         "derive_implementation_design_surface",
-        "select_implementation_stack_profile",
-        "derive_implementation_module_surface",
-        "derive_aggregate_domain_model_surface",
-        "derive_implementation_component_topology_surface",
-        "derive_aggregate_sunny_day_sequence_surface",
-        "derive_component_realization_schedule_surface",
         "derive_component_code_surface"
       ],
+      edgeAssuranceArchiveSequencePrefix: [
+        "derive_intent_surface",
+        "derive_product_surface",
+        "derive_goal_surface",
+        "derive_requirement_surface",
+        "derive_uat_testcases_surface",
+        "derive_testcase_authority_surface",
+        "derive_feature_decomp_surface",
+        "derive_design_surface",
+        "derive_scenario_surface",
+        "derive_implementation_design_surface",
+        "derive_component_code_surface"
+      ],
+      firstHandoffOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
       processChecks: [
         {
           command: "node",
@@ -86,6 +114,10 @@ export function t132HelloWorldJsLiveScenario({
       ]
     },
     liveWorker: worker,
+    startTargetSequence: [
+      "next",
+      "graph_function:bootstrap_release_self_test"
+    ],
     startTarget: "next",
     startUntil,
     maxAdvances,

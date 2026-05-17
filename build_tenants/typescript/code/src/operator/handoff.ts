@@ -32,11 +32,14 @@ import {
   type SdlcWorkOperation
 } from "../hooks/index.js";
 import {
+  constructSdlcTargetCarrierRegistry,
+  constructSdlcGtlModule,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE,
   FG_CONFORM_PROJECT_AUTHORITY,
-  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+  FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  requireSdlcTargetCarrierRow,
+  type SdlcTargetCarrierContractRow
 } from "../graph/index.js";
 import {
   parseClosedRecord,
@@ -81,6 +84,13 @@ import {
   localRequirementMarker,
   requirementAuthorityIdentityForMarker
 } from "../workspace/source_input.js";
+import {
+  SDLC_COMPONENT_CONCERN_ROLES,
+  SDLC_DESIGN_COMPLETENESS_AXES,
+  SDLC_DESIGN_COMPLETENESS_STATUSES,
+  SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES,
+  SDLC_DOMAIN_ENTITY_OWNERSHIP
+} from "./carriers.js";
 import type {
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
@@ -103,8 +113,12 @@ import type {
   SdlcProductMaterializationAuthorityReconciliation,
   SdlcProductMaterializationAuthorityTarget,
   SdlcWorkerBrief,
+  SdlcWorkerTargetCarrierConstructionTemplate,
+  SdlcWorkerTargetCarrierObjectTemplate,
   SdlcWorkerInvocationObligation,
   SdlcWorkerInvocationPackage,
+  SdlcWorkerTargetCarrierProjection,
+  SdlcWorkerConstructionBrief,
   SdlcWorkerRetryRepairInstruction,
   SdlcWorkerRetryRepairScope,
   SdlcWorkerHandoffManifest,
@@ -164,30 +178,15 @@ const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
   scenario_surface: "design/scenario_surface.md",
   implementation_design_surface:
     "design/adrs/ADR-002-implementation-design-surface.md",
-  implementation_stack_profile: "design/implementation_stack_profile.md",
-  implementation_module_surface: "design/implementation_module_surface.md",
-  aggregate_domain_model_surface: "design/aggregate_domain_model_surface.md",
-  implementation_component_topology_surface:
-    "design/implementation_component_topology_surface.md",
-  aggregate_sunny_day_sequence_surface:
-    "design/aggregate_sunny_day_sequence_surface.md",
-  component_realization_schedule_surface:
-    "design/component_realization_schedule_surface.md",
   component_code_surface: "design/component_code_surface.md",
   component_realization_qualification_surface:
     "design/component_realization_qualification_surface.md",
-  realization_schedule_surface: "design/realization_schedule_surface.md",
   code_surface: "design/code_surface.md",
-  uat_testcases_surface: "design/uat_testcases_surface.md",
   test_design_surface: "design/adrs/ADR-003-test-design-surface.md",
-  test_stack_profile: "design/test_stack_profile.md",
-  test_module_surface: "design/test_module_surface.md",
-  test_component_topology_surface: "design/test_component_topology_surface.md",
   component_test_surface: "design/component_test_surface.md",
   component_test_qualification_surface:
     "design/component_test_qualification_surface.md",
   component_repair_schedule_surface: "design/component_repair_schedule_surface.md",
-  testcase_authority_surface: "design/testcase_authority_surface.md",
   release_depth_parity_surface: "design/release_depth_parity_surface.md",
   release_surface: "design/release_surface.md",
   retrofit_design_surface: "design/adrs/ADR-004-retrofit-design-surface.md",
@@ -198,6 +197,16 @@ const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
   repricing_proposal_surface: "design/repricing_proposal_surface.md",
   ticket_work_item_route_surface: "design/ticket_work_item_route_surface.md",
   gap_retirement_surface: "design/gap_retirement_surface.md"
+} as const satisfies Record<string, string>);
+
+const WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
+  intent_surface: "specification/INTENT.md",
+  product_surface: "specification/PRODUCT.md",
+  goal_surface: "specification/GOALS.md",
+  requirement_surface: "specification/requirements/10-generated-bootstrap.md",
+  uat_testcases_surface: "specification/scenarios/20-generated-uat-testcases.md",
+  testcase_authority_surface:
+    "specification/scenarios/30-generated-testcase-authority.md"
 } as const satisfies Record<string, string>);
 
 const POSTFLIGHT_GAP_REASON_CLASSES = Object.freeze([
@@ -230,6 +239,8 @@ const POSTFLIGHT_GAP_ACTIONS = Object.freeze([
   "reprice_requirement_or_design"
 ] as const);
 
+const REQUIREMENT_MARKER_TOKEN_EXPRESSION =
+  /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/;
 const REQUIREMENT_MARKER_EXPRESSION =
   /\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/g;
 const LOCAL_REQUIREMENT_HEADING_EXPRESSION =
@@ -240,9 +251,15 @@ const TRAVERSAL_AUTHORITY_PATHS = Object.freeze([
   "specification/INTENT.md",
   "specification/PRODUCT.md",
   "specification/GOALS.md",
+  "specification/REQUIREMENTS.md",
+  "specification/mapper_requirements.md",
+  "bootstrap.md",
   ".ai-workspace/context/project_bootstrap.md",
   ".ai-workspace/context/project_constraints.yml"
 ] as const);
+
+const PROJECT_BOOTSTRAP_RELATIVE_PATH =
+  ".ai-workspace/context/project_bootstrap.md" as const;
 
 const TRAVERSAL_RUNTIME_CONTEXT_PATHS = Object.freeze([
   ".ai-workspace/runtime/odd_sdlc-requirement-closure.json",
@@ -282,11 +299,37 @@ function tenantLocalSdlcSurfaceRelativePath(targetAssetType: string): string | n
   return null;
 }
 
+function workspaceLocalSdlcSurfaceRelativePath(targetAssetType: string): string | null {
+  for (const [assetType, relativePath] of Object.entries(
+    WORKSPACE_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
+  )) {
+    if (assetType === targetAssetType) {
+      return relativePath;
+    }
+  }
+  return null;
+}
+
+function isTenantLocalSdlcSurfaceRelativePath(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath);
+  const tenantLocalPaths: readonly string[] = Object.values(
+    TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS
+  );
+  return tenantLocalPaths.includes(normalized);
+}
+
 function deriveOutputFileForTarget(input: {
   readonly defaultOutputRoot: string;
+  readonly workspaceRoot: string;
   readonly targetAssetType: string;
   readonly materialization: SdlcProductMaterializationContract;
 }): string {
+  const workspaceRelativePath = workspaceLocalSdlcSurfaceRelativePath(
+    input.targetAssetType
+  );
+  if (workspaceRelativePath !== null) {
+    return join(input.workspaceRoot, workspaceRelativePath);
+  }
   const tenantRelativePath = tenantLocalSdlcSurfaceRelativePath(
     input.targetAssetType
   );
@@ -343,7 +386,9 @@ function productMaterializationRequiresTestExecutionEvidence(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
   return (
-    manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
+    (manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
+      manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
+      manifest.edgeName === "derive_component_code_surface") &&
     manifest.targetAssetType === "component_code_surface" &&
     manifest.productMaterialization.required &&
     declaredExecutionContract(manifest.productMaterialization.testExecutionContract)
@@ -377,6 +422,1318 @@ function targetRequiresSourceAssetObligations(input: {
   );
 }
 
+function targetCarrierRowForEdge(edgeName: string): SdlcTargetCarrierContractRow {
+  return requireSdlcTargetCarrierRow({
+    registry: constructSdlcTargetCarrierRegistry({
+      module: constructSdlcGtlModule()
+    }),
+    edgeRef: edgeName
+  });
+}
+
+function targetCarrierObjectTemplate(input: {
+  readonly templateRef: string;
+  readonly requiredFields: readonly string[];
+  readonly fieldTypes: Readonly<Record<string, string>>;
+  readonly enumDomains?: Readonly<Record<string, readonly string[]>>;
+  readonly example: Readonly<Record<string, unknown>>;
+}): SdlcWorkerTargetCarrierObjectTemplate {
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_object_template" as const,
+    templateRef: input.templateRef,
+    closed: true as const,
+    requiredFields: Object.freeze([...input.requiredFields]),
+    fieldTypes: Object.freeze({ ...input.fieldTypes }),
+    enumDomains: Object.freeze({ ...(input.enumDomains ?? {}) }),
+    example: Object.freeze({ ...input.example })
+  });
+}
+
+function implementationDesignConstructionTemplate(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierConstructionTemplate {
+  const modulePlaceholder = "<module>";
+  const entityPlaceholder = "<entity>";
+  const attributePlaceholder = `attr:${modulePlaceholder}.${entityPlaceholder}.runtime`;
+  const attributeExample = Object.freeze({
+    kind: "sdlc_domain_attribute",
+    attributeId: attributePlaceholder,
+    name: "runtime",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: ["<requirement-or-invariant-ref>"]
+  });
+  const operationExample = Object.freeze({
+    kind: "sdlc_domain_operation",
+    operationId: "<operation>",
+    moduleName: modulePlaceholder,
+    inputEntityIds: [],
+    outputEntityIds: [entityPlaceholder],
+    requiredAttributeIds: [attributePlaceholder]
+  });
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_construction_template" as const,
+    templateRef: row.constructionTemplateRef,
+    targetAssetType: row.targetAssetType,
+    carrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    carrierEnvelope: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/carrier-envelope`,
+      requiredFields: row.requiredFieldRefs,
+      fieldTypes: Object.freeze({
+        kind: "literal",
+        targetAssetType: "literal",
+        edgeRef: "literal",
+        contractRef: "literal",
+        contractDigest: "sha256",
+        payload: "sdlc_design_depth_register"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([row.outputCarrierKind]),
+        targetAssetType: Object.freeze([row.targetAssetType]),
+        edgeRef: Object.freeze([row.edgeRef]),
+        contractRef: Object.freeze([row.targetCarrierContractRef])
+      }),
+      example: Object.freeze({
+        kind: row.outputCarrierKind,
+        targetAssetType: row.targetAssetType,
+        edgeRef: row.edgeRef,
+        contractRef: row.targetCarrierContractRef,
+        contractDigest: row.targetCarrierContractDigest,
+        payload: "<design_depth_register>"
+      })
+    }),
+    payloadTemplate: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/payload/design-depth-register`,
+      requiredFields: Object.freeze([
+        "kind",
+        "registerVersion",
+        "targetAssetType",
+        "stackProfileRows",
+        "implementationModuleRows",
+        "aggregateDomainModelRows",
+        "moduleSchemaFragments",
+        "moduleStateDiagramFragments",
+        "aggregateDomainModel",
+        "sunnyDaySequenceRows",
+        "aggregateSunnyDaySequence",
+        "componentTopologyRows",
+        "componentRealizationRows",
+        "fileTargetRows",
+        "designCompletenessVerdict"
+      ]),
+      fieldTypes: Object.freeze({
+        kind: "literal:sdlc_design_depth_register",
+        registerVersion: "literal:ts-design-depth-v1",
+        targetAssetType: "literal:implementation_design_surface",
+        stackProfileRows: "sdlc_stack_profile_row[]",
+        implementationModuleRows: "sdlc_implementation_module_row[]",
+        aggregateDomainModelRows: "sdlc_aggregate_domain_model_row[]",
+        moduleSchemaFragments: "sdlc_module_schema_fragment[]",
+        moduleStateDiagramFragments: "sdlc_module_state_diagram_fragment[]",
+        aggregateDomainModel: "sdlc_aggregate_domain_model",
+        sunnyDaySequenceRows: "sdlc_sunny_day_sequence_row[]",
+        aggregateSunnyDaySequence: "sdlc_aggregate_sunny_day_sequence",
+        componentTopologyRows: "sdlc_component_topology_row[]",
+        componentRealizationRows: "sdlc_component_realization_row[]",
+        fileTargetRows: "sdlc_file_target_row[]",
+        designCompletenessVerdict: "sdlc_design_completeness_verdict"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze(["sdlc_design_depth_register"]),
+        registerVersion: Object.freeze(["ts-design-depth-v1"]),
+        targetAssetType: Object.freeze(["implementation_design_surface"])
+      }),
+      example: Object.freeze({
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: ["<sdlc_stack_profile_row>"],
+        implementationModuleRows: ["<sdlc_implementation_module_row>"],
+        aggregateDomainModelRows: ["<sdlc_aggregate_domain_model_row>"],
+        moduleSchemaFragments: ["<sdlc_module_schema_fragment>"],
+        moduleStateDiagramFragments: ["<sdlc_module_state_diagram_fragment>"],
+        aggregateDomainModel: "<sdlc_aggregate_domain_model>",
+        sunnyDaySequenceRows: ["<sdlc_sunny_day_sequence_row>"],
+        aggregateSunnyDaySequence: "<sdlc_aggregate_sunny_day_sequence>",
+        componentTopologyRows: ["<sdlc_component_topology_row>"],
+        componentRealizationRows: ["<sdlc_component_realization_row>"],
+        fileTargetRows: ["<sdlc_file_target_row>"],
+        designCompletenessVerdict: "<sdlc_design_completeness_verdict>"
+      })
+    }),
+    rowTemplates: Object.freeze([
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/stack-profile`,
+        requiredFields: Object.freeze([
+          "kind",
+          "stackRef",
+          "language",
+          "buildTool"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_stack_profile_row",
+          stackRef: "uri",
+          language: "string",
+          buildTool: "string"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_stack_profile_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_stack_profile_row",
+          stackRef: "<stack-ref>",
+          language: "<language>",
+          buildTool: "<tool>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/implementation-module`,
+        requiredFields: Object.freeze([
+          "kind",
+          "moduleName",
+          "moduleRef"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_implementation_module_row",
+          moduleName: "string",
+          moduleRef: "uri"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_implementation_module_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_implementation_module_row",
+          moduleName: modulePlaceholder,
+          moduleRef: `module://${modulePlaceholder}`
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/aggregate-domain-model-row`,
+        requiredFields: Object.freeze([
+          "kind",
+          "modelRef"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_aggregate_domain_model_row",
+          modelRef: "uri"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_aggregate_domain_model_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_aggregate_domain_model_row",
+          modelRef: `<model-ref>`
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/domain-attribute`,
+        requiredFields: Object.freeze([
+          "kind",
+          "attributeId",
+          "name",
+          "valueType",
+          "cardinality",
+          "invariantRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_domain_attribute",
+          attributeId: "string",
+          name: "string",
+          valueType: "string",
+          cardinality: "enum",
+          invariantRefs: "string[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_domain_attribute"]),
+          cardinality: SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES
+        }),
+        example: attributeExample
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/module-schema-fragment`,
+        requiredFields: Object.freeze([
+          "kind",
+          "moduleName",
+          "entities",
+          "operations",
+          "requirementIds",
+          "sourceAssetRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_module_schema_fragment",
+          moduleName: "string",
+          entities: "sdlc_domain_entity[]",
+          operations: "sdlc_domain_operation[]",
+          requirementIds: "string[]",
+          sourceAssetRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_module_schema_fragment"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_module_schema_fragment",
+          moduleName: modulePlaceholder,
+          entities: [
+            {
+              kind: "sdlc_domain_entity",
+              entityId: entityPlaceholder,
+              moduleName: modulePlaceholder,
+              ownership: "owned",
+              attributes: [attributeExample],
+              invariants: [],
+              sourceAssetRefs: ["workspace://..."]
+            }
+          ],
+          operations: [operationExample],
+          requirementIds: ["<requirement-id>"],
+          sourceAssetRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/domain-entity`,
+        requiredFields: Object.freeze([
+          "kind",
+          "entityId",
+          "moduleName",
+          "ownership",
+          "attributes",
+          "invariants",
+          "sourceAssetRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_domain_entity",
+          entityId: "string",
+          moduleName: "string",
+          ownership: "enum",
+          attributes: "sdlc_domain_attribute[]",
+          invariants: "string[]",
+          sourceAssetRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_domain_entity"]),
+          ownership: SDLC_DOMAIN_ENTITY_OWNERSHIP
+        }),
+        example: Object.freeze({
+          kind: "sdlc_domain_entity",
+          entityId: entityPlaceholder,
+          moduleName: modulePlaceholder,
+          ownership: "owned",
+          attributes: [attributeExample],
+          invariants: [],
+          sourceAssetRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/domain-operation`,
+        requiredFields: Object.freeze([
+          "kind",
+          "operationId",
+          "moduleName",
+          "inputEntityIds",
+          "outputEntityIds",
+          "requiredAttributeIds"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_domain_operation",
+          operationId: "string",
+          moduleName: "string",
+          inputEntityIds: "string[]",
+          outputEntityIds: "string[]",
+          requiredAttributeIds: "attributeId[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_domain_operation"])
+        }),
+        example: operationExample
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/aggregate-domain-model`,
+        requiredFields: Object.freeze([
+          "kind",
+          "modelVersion",
+          "entities",
+          "operations",
+          "crossModuleReferences",
+          "evidenceRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_aggregate_domain_model",
+          modelVersion: "literal:ts-design-depth-v1",
+          entities: "sdlc_aggregate_domain_entity[]",
+          operations: "sdlc_domain_operation[]",
+          crossModuleReferences: "sdlc_cross_module_reference[]",
+          evidenceRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_aggregate_domain_model"]),
+          modelVersion: Object.freeze(["ts-design-depth-v1"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_aggregate_domain_model",
+          modelVersion: "ts-design-depth-v1",
+          entities: [
+            {
+              kind: "sdlc_aggregate_domain_entity",
+              entityId: entityPlaceholder,
+              ownerModuleName: modulePlaceholder,
+              attributes: [attributeExample],
+              sourceModuleNames: [modulePlaceholder]
+            }
+          ],
+          operations: [operationExample],
+          crossModuleReferences: [],
+          evidenceRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/aggregate-domain-entity`,
+        requiredFields: Object.freeze([
+          "kind",
+          "entityId",
+          "ownerModuleName",
+          "attributes",
+          "sourceModuleNames"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_aggregate_domain_entity",
+          entityId: "string",
+          ownerModuleName: "string",
+          attributes: "sdlc_domain_attribute[]",
+          sourceModuleNames: "string[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_aggregate_domain_entity"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_aggregate_domain_entity",
+          entityId: entityPlaceholder,
+          ownerModuleName: modulePlaceholder,
+          attributes: [attributeExample],
+          sourceModuleNames: [modulePlaceholder]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/cross-module-reference`,
+        requiredFields: Object.freeze([
+          "fromModuleName",
+          "toModuleName",
+          "entityId"
+        ]),
+        fieldTypes: Object.freeze({
+          fromModuleName: "string",
+          toModuleName: "string",
+          entityId: "string"
+        }),
+        enumDomains: Object.freeze({}),
+        example: Object.freeze({
+          fromModuleName: "<from-module>",
+          toModuleName: "<to-module>",
+          entityId: entityPlaceholder
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/state-transition`,
+        requiredFields: Object.freeze([
+          "kind",
+          "transitionId",
+          "fromState",
+          "toState",
+          "operationId",
+          "entityId"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_entity_state_transition",
+          transitionId: "string",
+          fromState: "string",
+          toState: "string",
+          operationId: "string",
+          entityId: "string"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_entity_state_transition"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_entity_state_transition",
+          transitionId: "<transition>",
+          fromState: "<from>",
+          toState: "<to>",
+          operationId: operationExample.operationId,
+          entityId: entityPlaceholder
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/module-state-diagram-fragment`,
+        requiredFields: Object.freeze([
+          "kind",
+          "moduleName",
+          "entityId",
+          "stateless",
+          "states",
+          "transitions",
+          "requirementIds",
+          "sourceAssetRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_module_state_diagram_fragment",
+          moduleName: "string",
+          entityId: "string",
+          stateless: "boolean",
+          states: "string[]",
+          transitions: "sdlc_entity_state_transition[]",
+          requirementIds: "string[]",
+          sourceAssetRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_module_state_diagram_fragment"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_module_state_diagram_fragment",
+          moduleName: modulePlaceholder,
+          entityId: entityPlaceholder,
+          stateless: true,
+          states: [],
+          transitions: [],
+          requirementIds: ["<requirement-id>"],
+          sourceAssetRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/sunny-day-sequence-row`,
+        requiredFields: Object.freeze([
+          "kind",
+          "sequenceRef"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_sunny_day_sequence_row",
+          sequenceRef: "uri"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_sunny_day_sequence_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_sunny_day_sequence_row",
+          sequenceRef: "<sequence-ref>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/sunny-day-sequence-step`,
+        requiredFields: Object.freeze([
+          "kind",
+          "stepId",
+          "moduleName",
+          "operationId",
+          "inputEntityIds",
+          "outputEntityIds",
+          "stateTransitionIds"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_sunny_day_sequence_step",
+          stepId: "string",
+          moduleName: "string",
+          operationId: "string",
+          inputEntityIds: "string[]",
+          outputEntityIds: "string[]",
+          stateTransitionIds: "string[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_sunny_day_sequence_step"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_sunny_day_sequence_step",
+          stepId: "<step>",
+          moduleName: modulePlaceholder,
+          operationId: operationExample.operationId,
+          inputEntityIds: [],
+          outputEntityIds: [entityPlaceholder],
+          stateTransitionIds: []
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/aggregate-sunny-day-sequence`,
+        requiredFields: Object.freeze([
+          "kind",
+          "sequenceVersion",
+          "steps",
+          "evidenceRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_aggregate_sunny_day_sequence",
+          sequenceVersion: "literal:ts-design-depth-v1",
+          steps: "sdlc_sunny_day_sequence_step[]",
+          evidenceRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_aggregate_sunny_day_sequence"]),
+          sequenceVersion: Object.freeze(["ts-design-depth-v1"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_aggregate_sunny_day_sequence",
+          sequenceVersion: "ts-design-depth-v1",
+          steps: [
+            {
+              kind: "sdlc_sunny_day_sequence_step",
+              stepId: "<step>",
+              moduleName: modulePlaceholder,
+              operationId: operationExample.operationId,
+              inputEntityIds: [],
+              outputEntityIds: [entityPlaceholder],
+              stateTransitionIds: []
+            }
+          ],
+          evidenceRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/component-topology`,
+        requiredFields: Object.freeze([
+          "kind",
+          "componentId",
+          "moduleName",
+          "relativePath",
+          "publicBoundary",
+          "concernRole",
+          "requirementIds",
+          "sourceAssetRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_component_topology_row",
+          componentId: "string",
+          moduleName: "string",
+          relativePath: "workspace-relative-path",
+          publicBoundary: "string",
+          concernRole: "enum",
+          requirementIds: "string[]",
+          sourceAssetRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_component_topology_row"]),
+          concernRole: SDLC_COMPONENT_CONCERN_ROLES
+        }),
+        example: Object.freeze({
+          kind: "sdlc_component_topology_row",
+          componentId: "<component>",
+          moduleName: modulePlaceholder,
+          relativePath: "<source-file>",
+          publicBoundary: "<boundary>",
+          concernRole: "io_adapter",
+          requirementIds: ["<requirement-id>"],
+          sourceAssetRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/component-realization`,
+        requiredFields: Object.freeze([
+          "kind",
+          "componentId",
+          "moduleName",
+          "relativePath",
+          "publicBoundary",
+          "trancheId",
+          "firstProductFileToChange",
+          "upstreamComponentIds",
+          "requirementIds",
+          "sourceAssetRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_component_realization_row",
+          componentId: "string",
+          moduleName: "string",
+          relativePath: "workspace-relative-path",
+          publicBoundary: "string",
+          trancheId: "string|null",
+          firstProductFileToChange: "workspace-relative-path|null",
+          upstreamComponentIds: "string[]",
+          requirementIds: "string[]",
+          sourceAssetRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_component_realization_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_component_realization_row",
+          componentId: "<component>",
+          moduleName: modulePlaceholder,
+          relativePath: "<source-file>",
+          publicBoundary: "<boundary>",
+          trancheId: null,
+          firstProductFileToChange: "<source-file>",
+          upstreamComponentIds: [],
+          requirementIds: ["<requirement-id>"],
+          sourceAssetRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/file-target`,
+        requiredFields: Object.freeze([
+          "kind",
+          "relativePath",
+          "role"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_file_target_row",
+          relativePath: "workspace-relative-path",
+          role: "string"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_file_target_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_file_target_row",
+          relativePath: "<source-file>",
+          role: "source"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/design-completeness-axis-verdict`,
+        requiredFields: Object.freeze([
+          "kind",
+          "axis",
+          "status",
+          "reasons",
+          "evidenceRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_design_completeness_axis_verdict",
+          axis: "enum",
+          status: "enum",
+          reasons: "string[]",
+          evidenceRefs: "workspace-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_design_completeness_axis_verdict"]),
+          axis: SDLC_DESIGN_COMPLETENESS_AXES,
+          status: SDLC_DESIGN_COMPLETENESS_STATUSES
+        }),
+        example: Object.freeze({
+          kind: "sdlc_design_completeness_axis_verdict",
+          axis: "entity",
+          status: "satisfied",
+          reasons: [],
+          evidenceRefs: ["workspace://..."]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/design-completeness-verdict`,
+        requiredFields: Object.freeze([
+          "kind",
+          "verdictVersion",
+          "entity",
+          "attribute",
+          "flow"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_design_completeness_verdict",
+          verdictVersion: "literal:ts-design-depth-v1",
+          entity: "sdlc_design_completeness_axis_verdict",
+          attribute: "sdlc_design_completeness_axis_verdict",
+          flow: "sdlc_design_completeness_axis_verdict"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_design_completeness_verdict"]),
+          verdictVersion: Object.freeze(["ts-design-depth-v1"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_design_completeness_verdict",
+          verdictVersion: "ts-design-depth-v1",
+          entity: {
+            kind: "sdlc_design_completeness_axis_verdict",
+            axis: "entity",
+            status: "satisfied",
+            reasons: [],
+            evidenceRefs: ["workspace://..."]
+          },
+          attribute: {
+            kind: "sdlc_design_completeness_axis_verdict",
+            axis: "attribute",
+            status: "satisfied",
+            reasons: [],
+            evidenceRefs: ["workspace://..."]
+          },
+          flow: {
+            kind: "sdlc_design_completeness_axis_verdict",
+            axis: "flow",
+            status: "satisfied",
+            reasons: [],
+            evidenceRefs: ["workspace://..."]
+          }
+        })
+      })
+    ])
+  });
+}
+
+function testDesignConstructionTemplate(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierConstructionTemplate {
+  const testCaseRef = "<test-case-ref>";
+  const obligationRef = "<source-design-obligation-ref>";
+  const authorityRef = "<testcase-authority-ref>";
+  const frameworkRef = "<framework-ref>";
+  const shardId = "<shard-id>";
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_construction_template" as const,
+    templateRef: row.constructionTemplateRef,
+    targetAssetType: row.targetAssetType,
+    carrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    carrierEnvelope: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/carrier-envelope`,
+      requiredFields: row.requiredFieldRefs,
+      fieldTypes: Object.freeze({
+        kind: "literal",
+        targetAssetType: "literal",
+        edgeRef: "literal",
+        contractRef: "literal",
+        contractDigest: "sha256",
+        payload: "sdlc_test_design_register"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([row.outputCarrierKind]),
+        targetAssetType: Object.freeze([row.targetAssetType]),
+        edgeRef: Object.freeze([row.edgeRef]),
+        contractRef: Object.freeze([row.targetCarrierContractRef])
+      }),
+      example: Object.freeze({
+        kind: row.outputCarrierKind,
+        targetAssetType: row.targetAssetType,
+        edgeRef: row.edgeRef,
+        contractRef: row.targetCarrierContractRef,
+        contractDigest: row.targetCarrierContractDigest,
+        payload: "<test_design_register>"
+      })
+    }),
+    payloadTemplate: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/payload/test-design-register`,
+      requiredFields: Object.freeze([
+        "kind",
+        "registerVersion",
+        "targetAssetType",
+        "designConsumptionRows",
+        "uatTestcaseRows",
+        "testcaseAuthorityRows",
+        "testStackProfileRows",
+        "testModuleRows",
+        "testComponentTopologyRows",
+        "testDataBindings",
+        "expectedResultBindings",
+        "uatIntegrationBindings",
+        "testExecutionScheduleRows"
+      ]),
+      fieldTypes: Object.freeze({
+        kind: "literal:sdlc_test_design_register",
+        registerVersion: "literal:ts-test-design-v1",
+        targetAssetType: "literal:test_design_surface",
+        designConsumptionRows: "sdlc_design_consumption_contract[]",
+        uatTestcaseRows: "sdlc_test_case_row[]",
+        testcaseAuthorityRows: "sdlc_test_case_row[]",
+        testStackProfileRows: "sdlc_test_stack_profile_row[]",
+        testModuleRows: "sdlc_test_module_row[]",
+        testComponentTopologyRows: "sdlc_test_component_topology_row[]",
+        testDataBindings: "sdlc_test_data_binding[]",
+        expectedResultBindings: "sdlc_expected_result_binding[]",
+        uatIntegrationBindings: "sdlc_uat_integration_binding[]",
+        testExecutionScheduleRows: "sdlc_test_execution_schedule_row[]"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze(["sdlc_test_design_register"]),
+        registerVersion: Object.freeze(["ts-test-design-v1"]),
+        targetAssetType: Object.freeze(["test_design_surface"])
+      }),
+      example: Object.freeze({
+        kind: "sdlc_test_design_register",
+        registerVersion: "ts-test-design-v1",
+        targetAssetType: "test_design_surface",
+        designConsumptionRows: ["<sdlc_design_consumption_contract>"],
+        uatTestcaseRows: ["<sdlc_test_case_row>"],
+        testcaseAuthorityRows: ["<sdlc_test_case_row>"],
+        testStackProfileRows: ["<sdlc_test_stack_profile_row>"],
+        testModuleRows: ["<sdlc_test_module_row>"],
+        testComponentTopologyRows: ["<sdlc_test_component_topology_row>"],
+        testDataBindings: ["<sdlc_test_data_binding>"],
+        expectedResultBindings: ["<sdlc_expected_result_binding>"],
+        uatIntegrationBindings: ["<sdlc_uat_integration_binding>"],
+        testExecutionScheduleRows: ["<sdlc_test_execution_schedule_row>"]
+      })
+    }),
+    rowTemplates: Object.freeze([
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/design-consumption`,
+        requiredFields: Object.freeze([
+          "kind",
+          "contractRef",
+          "sourceDesignObligationRefs",
+          "authorityBasisRefs",
+          "consumerGraphFunctionRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_design_consumption_contract",
+          contractRef: "uri",
+          sourceDesignObligationRefs: "ref[]",
+          authorityBasisRefs: "ref[]",
+          consumerGraphFunctionRefs: "graph-function-ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_design_consumption_contract"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_design_consumption_contract",
+          contractRef: "design-consumption://<tenant>/test-design",
+          sourceDesignObligationRefs: [obligationRef],
+          authorityBasisRefs: ["workspace://<design-asset>"],
+          consumerGraphFunctionRefs: [
+            "derive_component_test_surface",
+            "prepare_test_execution_surface",
+            "derive_test_execution_result_surface",
+            "qualify_component_test_execution_surface"
+          ]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-case`,
+        requiredFields: Object.freeze([
+          "kind",
+          "testCaseRef",
+          "caseKind",
+          "executionLane",
+          "sourceDesignObligationRefs",
+          "testcaseAuthorityRefs",
+          "expectedBehavior"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_case_row",
+          testCaseRef: "uri",
+          caseKind: "positive|negative|boundary|integration|uat|regression",
+          executionLane: "unit|integration|uat",
+          sourceDesignObligationRefs: "ref[]",
+          testcaseAuthorityRefs: "ref[]",
+          expectedBehavior: "string"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_case_row"]),
+          caseKind: Object.freeze([
+            "positive",
+            "negative",
+            "boundary",
+            "integration",
+            "uat",
+            "regression"
+          ]),
+          executionLane: Object.freeze(["unit", "integration", "uat"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_case_row",
+          testCaseRef,
+          caseKind: "uat",
+          executionLane: "integration",
+          sourceDesignObligationRefs: [obligationRef],
+          testcaseAuthorityRefs: [authorityRef],
+          expectedBehavior: "<observable behavior>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-stack-profile`,
+        requiredFields: Object.freeze([
+          "kind",
+          "stackRef",
+          "frameworkRef",
+          "buildTool"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_stack_profile_row",
+          stackRef: "uri",
+          frameworkRef: "uri",
+          buildTool: "string"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_stack_profile_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_stack_profile_row",
+          stackRef: "stack://<tenant>/tests",
+          frameworkRef,
+          buildTool: "<declared-tool>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-module`,
+        requiredFields: Object.freeze([
+          "kind",
+          "moduleName",
+          "moduleRef",
+          "testRoot"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_module_row",
+          moduleName: "string",
+          moduleRef: "uri",
+          testRoot: "relative-path"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_module_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_module_row",
+          moduleName: "<module-tests>",
+          moduleRef: "module://<module-tests>",
+          testRoot: "<tenant-test-root>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-component-topology`,
+        requiredFields: Object.freeze([
+          "kind",
+          "testClassId",
+          "relativePath",
+          "testcaseIds",
+          "componentIds",
+          "requirementIds",
+          "shardId"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_component_topology_row",
+          testClassId: "string",
+          relativePath: "relative-path",
+          testcaseIds: "ref[]",
+          componentIds: "ref[]",
+          requirementIds: "ref[]",
+          shardId: "string|null"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_component_topology_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_component_topology_row",
+          testClassId: "<test-class-id>",
+          relativePath: "<tenant-test-root>/<test-file>",
+          testcaseIds: [testCaseRef],
+          componentIds: ["<component-id>"],
+          requirementIds: ["<requirement-id>"],
+          shardId
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-data-binding`,
+        requiredFields: Object.freeze([
+          "kind",
+          "testDataRef",
+          "testCaseRef",
+          "inputFixtureRefs",
+          "generationPolicyRef",
+          "expectedResultRef",
+          "sourceDesignObligationRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_data_binding",
+          testDataRef: "uri",
+          testCaseRef: "uri",
+          inputFixtureRefs: "ref[]",
+          generationPolicyRef: "uri",
+          expectedResultRef: "uri",
+          sourceDesignObligationRefs: "ref[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_data_binding"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_data_binding",
+          testDataRef: "test-data://<tenant>/<case>",
+          testCaseRef,
+          inputFixtureRefs: ["fixture://<tenant>/<case>"],
+          generationPolicyRef: "generation-policy://<tenant>/test-data",
+          expectedResultRef: "expected-result://<tenant>/<case>",
+          sourceDesignObligationRefs: [obligationRef]
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/expected-result`,
+        requiredFields: Object.freeze([
+          "kind",
+          "expectedResultRef",
+          "testCaseRef",
+          "assertionRefs",
+          "expectedResultSummary",
+          "verificationPolicyRef"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_expected_result_binding",
+          expectedResultRef: "uri",
+          testCaseRef: "uri",
+          assertionRefs: "ref[]",
+          expectedResultSummary: "string",
+          verificationPolicyRef: "uri"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_expected_result_binding"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_expected_result_binding",
+          expectedResultRef: "expected-result://<tenant>/<case>",
+          testCaseRef,
+          assertionRefs: ["assertion://<tenant>/<case>"],
+          expectedResultSummary: "<expected result>",
+          verificationPolicyRef: "verification-policy://<tenant>/<framework>"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/uat-integration`,
+        requiredFields: Object.freeze([
+          "kind",
+          "uatTestCaseRef",
+          "integrationTestCaseRef",
+          "executionLane"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_uat_integration_binding",
+          uatTestCaseRef: "uri",
+          integrationTestCaseRef: "uri",
+          executionLane: "unit|integration|uat"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_uat_integration_binding"]),
+          executionLane: Object.freeze(["unit", "integration", "uat"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_uat_integration_binding",
+          uatTestCaseRef: testCaseRef,
+          integrationTestCaseRef: testCaseRef,
+          executionLane: "integration"
+        })
+      }),
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-execution-schedule`,
+        requiredFields: Object.freeze([
+          "kind",
+          "scheduleRef",
+          "testCaseRefs",
+          "command",
+          "frameworkRef",
+          "shardId"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_execution_schedule_row",
+          scheduleRef: "uri",
+          testCaseRefs: "ref[]",
+          command: "string",
+          frameworkRef: "uri",
+          shardId: "string|null"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_execution_schedule_row"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_execution_schedule_row",
+          scheduleRef: "test-schedule://<tenant>/<framework>",
+          testCaseRefs: [testCaseRef],
+          command: "<declared test command>",
+          frameworkRef,
+          shardId
+        })
+      })
+    ])
+  });
+}
+
+function workspaceSpecSurfaceConstructionTemplate(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierConstructionTemplate {
+  const payloadKindByTarget: Readonly<Record<string, string>> = Object.freeze({
+    intent_surface: "sdlc_intent_surface_register",
+    product_surface: "sdlc_product_surface_register",
+    goal_surface: "sdlc_goal_surface_register",
+    requirement_surface: "sdlc_requirement_surface_register",
+    uat_testcases_surface: "sdlc_uat_testcase_register",
+    testcase_authority_surface: "sdlc_testcase_authority_register"
+  });
+  const rowKindByTarget: Readonly<Record<string, string>> = Object.freeze({
+    intent_surface: "sdlc_intent_row",
+    product_surface: "sdlc_product_definition_row",
+    goal_surface: "sdlc_goal_row",
+    requirement_surface: "sdlc_requirement_row",
+    uat_testcases_surface: "sdlc_test_case_row",
+    testcase_authority_surface: "sdlc_testcase_authority_row"
+  });
+  const payloadKind =
+    payloadKindByTarget[row.targetAssetType] ?? "sdlc_workspace_spec_surface_register";
+  const rowKind =
+    rowKindByTarget[row.targetAssetType] ?? "sdlc_workspace_spec_surface_row";
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_construction_template" as const,
+    templateRef: row.constructionTemplateRef,
+    targetAssetType: row.targetAssetType,
+    carrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    carrierEnvelope: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/carrier-envelope`,
+      requiredFields: row.requiredFieldRefs,
+      fieldTypes: Object.freeze({
+        kind: "literal",
+        targetAssetType: "literal",
+        edgeRef: "literal",
+        contractRef: "literal",
+        contractDigest: "sha256",
+        payload: payloadKind
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([row.outputCarrierKind]),
+        targetAssetType: Object.freeze([row.targetAssetType]),
+        edgeRef: Object.freeze([row.edgeRef]),
+        contractRef: Object.freeze([row.targetCarrierContractRef])
+      }),
+      example: Object.freeze({
+        kind: row.outputCarrierKind,
+        targetAssetType: row.targetAssetType,
+        edgeRef: row.edgeRef,
+        contractRef: row.targetCarrierContractRef,
+        contractDigest: row.targetCarrierContractDigest,
+        payload: {
+          kind: payloadKind,
+          registerVersion: "ts-workspace-spec-surface-v1",
+          targetAssetType: row.targetAssetType,
+          authorityRefs: ["workspace://specification/..."],
+          rows: []
+        }
+      })
+    }),
+    payloadTemplate: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/payload`,
+      requiredFields: Object.freeze([
+        "kind",
+        "registerVersion",
+        "targetAssetType",
+        "authorityRefs",
+        "rows"
+      ]),
+      fieldTypes: Object.freeze({
+        kind: `literal:${payloadKind}`,
+        registerVersion: "literal:ts-workspace-spec-surface-v1",
+        targetAssetType: "literal",
+        authorityRefs: "uri[]",
+        rows: `${rowKind}[]`,
+        summary: "string"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([payloadKind]),
+        registerVersion: Object.freeze(["ts-workspace-spec-surface-v1"]),
+        targetAssetType: Object.freeze([row.targetAssetType])
+      }),
+      example: Object.freeze({
+        kind: payloadKind,
+        registerVersion: "ts-workspace-spec-surface-v1",
+        targetAssetType: row.targetAssetType,
+        authorityRefs: ["workspace://specification/..."],
+        rows: [],
+        summary: "<content summary>"
+      })
+    }),
+    rowTemplates: Object.freeze([
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/${rowKind}`,
+        requiredFields: Object.freeze([
+          "kind",
+          "rowRef",
+          "title",
+          "sourceRefs",
+          "content"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: `literal:${rowKind}`,
+          rowRef: "uri",
+          title: "string",
+          sourceRefs: "uri[]",
+          content: "string",
+          requirementRefs: "ref[]",
+          expectedBehavior: "string",
+          verificationPolicyRef: "uri"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze([rowKind])
+        }),
+        example: Object.freeze({
+          kind: rowKind,
+          rowRef: `workspace-spec-row://${row.targetAssetType}/<id>`,
+          title: "<row title>",
+          sourceRefs: ["workspace://specification/..."],
+          content: "<row content>",
+          requirementRefs: ["REQ-..."]
+        })
+      })
+    ])
+  });
+}
+
+function targetCarrierConstructionTemplateForRow(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierConstructionTemplate {
+  if (row.targetAssetType === "implementation_design_surface") {
+    return implementationDesignConstructionTemplate(row);
+  }
+  if (row.targetAssetType === "test_design_surface") {
+    return testDesignConstructionTemplate(row);
+  }
+  if (workspaceLocalSdlcSurfaceRelativePath(row.targetAssetType) !== null) {
+    return workspaceSpecSurfaceConstructionTemplate(row);
+  }
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_construction_template" as const,
+    templateRef: row.constructionTemplateRef,
+    targetAssetType: row.targetAssetType,
+    carrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    carrierEnvelope: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/carrier-envelope`,
+      requiredFields: row.requiredFieldRefs,
+      fieldTypes: Object.freeze({
+        kind: "literal",
+        targetAssetType: "literal",
+        edgeRef: "literal",
+        contractRef: "literal",
+        contractDigest: "sha256",
+        payload: "object"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([row.outputCarrierKind]),
+        targetAssetType: Object.freeze([row.targetAssetType]),
+        edgeRef: Object.freeze([row.edgeRef]),
+        contractRef: Object.freeze([row.targetCarrierContractRef])
+      }),
+      example: Object.freeze({
+        kind: row.outputCarrierKind,
+        targetAssetType: row.targetAssetType,
+        edgeRef: row.edgeRef,
+        contractRef: row.targetCarrierContractRef,
+        contractDigest: row.targetCarrierContractDigest,
+        payload: {}
+      })
+    }),
+    payloadTemplate: null,
+    rowTemplates: Object.freeze([])
+  });
+}
+
+function targetCarrierProjectionForRow(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierProjection {
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_projection" as const,
+    targetCarrierContractRef: row.targetCarrierContractRef,
+    targetCarrierContractDigest: row.targetCarrierContractDigest,
+    targetCarrierTemplateRef: row.targetCarrierTemplateRef,
+    outputCarrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    requiredFieldRefs: row.requiredFieldRefs,
+    fixedProtocolFieldRefs: row.fixedProtocolFieldRefs,
+    workerFillableFieldRefs: row.workerFillableFieldRefs,
+    literalDomainRefs: row.literalDomainRefs,
+    schemaRef: row.schemaRef,
+    handoffProjectionRef: row.handoffProjectionRef,
+    constructionTemplateRef: row.constructionTemplateRef,
+    constructionTemplate: targetCarrierConstructionTemplateForRow(row),
+    closurePreconditionRef: row.closurePreconditionRef,
+    testCaseGenerationRef: row.testCaseGenerationRef
+  });
+}
+
 function executionCommandMatchesContract(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly command: string;
@@ -406,6 +1763,7 @@ function executionCommandMatchesContract(input: {
 function productMaterializationContract(input: {
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
+  readonly edgeName: string;
   readonly targetAssetType: string;
   readonly conformedProject?: SdlcConformProjectProfile | undefined;
   readonly projectConstraints?: Pick<
@@ -443,6 +1801,7 @@ function productMaterializationContract(input: {
     manifestFile: join(input.archiveRoot, "product_materialization_manifest.json"),
     requiredRoles,
     executionShards: executionShardsFor({
+      edgeName: input.edgeName,
       targetAssetType: input.targetAssetType,
       tenantRoot,
       declaredModuleNames,
@@ -1197,6 +2556,88 @@ function targetContractsFromSeeds(input: {
   );
 }
 
+function testTargetSeedFromDesignRelativePath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly relativePath: string;
+}): DeclaredProductTargetSeed | null {
+  const normalizedRelativePath = input.relativePath
+    .replace(/\\/gu, "/")
+    .replace(/^workspace:\/\//u, "")
+    .replace(/^\.\//u, "")
+    .replace(/^\/+/u, "");
+  const selectedOutputRoot = normalizedSelectedOutputRoot(
+    input.manifest.productMaterialization.selectedOutputRoot
+  );
+  const candidate = normalizedRelativePath.startsWith(`${selectedOutputRoot}/`)
+    ? normalizedRelativePath
+    : `${selectedOutputRoot}/${normalizedRelativePath}`;
+  const relativeToOutputRoot = targetRelativeToSelectedOutputRoot({
+    targetPath: candidate,
+    selectedOutputRoot
+  });
+  if (
+    relativeToOutputRoot === ".ai-workspace" ||
+    relativeToOutputRoot.startsWith(".ai-workspace/") ||
+    relativeToOutputRoot.includes("/.ai-workspace/")
+  ) {
+    return null;
+  }
+  const normalized = normalizeDeclaredProductFileTarget({
+    value: candidate,
+    selectedOutputRoot
+  });
+  if (normalized === null) {
+    return null;
+  }
+  return Object.freeze({
+    ...normalized,
+    requiredRole: "test" as const,
+    policyRef: "target-role-policy://odd-sdlc/product-test-tree"
+  });
+}
+
+function designAssetAuthorityTargetsFor(
+  manifest: SdlcWorkerHandoffManifest
+): {
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly sourceRefs: readonly string[];
+} {
+  if (manifest.targetAssetType !== "component_test_surface") {
+    return Object.freeze({
+      targets: Object.freeze([]),
+      sourceRefs: Object.freeze([])
+    });
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    return Object.freeze({
+      targets: Object.freeze([]),
+      sourceRefs: Object.freeze([])
+    });
+  }
+  const sourceRef = admission.evidenceRefs[0] ?? pathToFileURL(manifest.outputFile).href;
+  const seeds = admission.register.componentTestRows
+    .map((row) =>
+      testTargetSeedFromDesignRelativePath({
+        manifest,
+        relativePath: row.relativePath
+      })
+    )
+    .filter((seed): seed is DeclaredProductTargetSeed => seed !== null);
+  return Object.freeze({
+    targets: targetContractsFromSeeds({
+      source: "design_asset_authority",
+      sourceRef,
+      manifest,
+      seeds
+    }),
+    sourceRefs: Object.freeze([sourceRef])
+  });
+}
+
 function normalizedSelectedOutputRoot(input: string): string {
   return input.replace(/\\/gu, "/").replace(/\/+$/u, "");
 }
@@ -1298,15 +2739,35 @@ function sameTargetSet(
   );
 }
 
+function targetsForCurrentMaterializationEdge(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly targets: readonly SdlcProductMaterializationAuthorityTarget[];
+}): readonly SdlcProductMaterializationAuthorityTarget[] {
+  if (input.manifest.targetAssetType !== "component_test_surface") {
+    return input.targets;
+  }
+  return Object.freeze(
+    input.targets.filter(
+      (target) =>
+        target.requiredRole === "test" || target.requiredRole === "build_config"
+    )
+  );
+}
+
 export function reconcileSdlcProductMaterializationAuthority(
   manifest: SdlcWorkerHandoffManifest
 ): SdlcProductMaterializationAuthorityReconciliation {
   const context = contextExpectedFileTargetsFor(manifest);
+  const design = designAssetAuthorityTargetsFor(manifest);
   const requirement = requirementAuthorityTargetsFor(manifest);
   const product = productAuthorityTargetsFor(manifest);
   const contextTargets = scopeProductMaterializationAuthorityTargets({
     manifest,
     targets: context.targets
+  });
+  const designTargets = scopeProductMaterializationAuthorityTargets({
+    manifest,
+    targets: design.targets
   });
   const requirementTargets = scopeProductMaterializationAuthorityTargets({
     manifest,
@@ -1316,13 +2777,30 @@ export function reconcileSdlcProductMaterializationAuthority(
     manifest,
     targets: product.targets
   });
+  const currentDesignTargets = targetsForCurrentMaterializationEdge({
+    manifest,
+    targets: designTargets
+  });
+  const currentRequirementTargets = targetsForCurrentMaterializationEdge({
+    manifest,
+    targets: requirementTargets
+  });
+  const currentProductTargets = targetsForCurrentMaterializationEdge({
+    manifest,
+    targets: productTargets
+  });
   const contextTargetPaths = uniqueSorted(contextTargets.map((target) => target.path));
+  const designTargetPaths = uniqueSorted(designTargets.map((target) => target.path));
   const requirementTargetPaths = uniqueSorted(
     requirementTargets.map((target) => target.path)
   );
   const productTargetPaths = uniqueSorted(productTargets.map((target) => target.path));
   const declaredProductTargetContracts =
-    requirementTargets.length > 0 ? requirementTargets : productTargets;
+    currentRequirementTargets.length > 0
+      ? currentRequirementTargets
+      : currentDesignTargets.length > 0
+        ? currentDesignTargets
+        : currentProductTargets;
   const declaredProductFileTargets = uniqueSorted(
     declaredProductTargetContracts.map((target) => target.path)
   );
@@ -1332,12 +2810,23 @@ export function reconcileSdlcProductMaterializationAuthority(
   }
   if (
     contextTargets.length !== context.targets.length ||
+    designTargets.length !== design.targets.length ||
     requirementTargets.length !== requirement.targets.length ||
     productTargets.length !== product.targets.length
   ) {
     reasonRefs.add(
       `product_targets_scoped_by_feature_scope:${manifest.featureScope.includedModuleNames.join(",")}`
     );
+  }
+  if (designTargetPaths.length > 0) {
+    reasonRefs.add("design_asset_materialization_targets");
+  }
+  if (
+    requirementTargetPaths.length > 0 &&
+    designTargetPaths.length > 0 &&
+    !sameTargetSet(requirementTargetPaths, designTargetPaths)
+  ) {
+    reasonRefs.add("requirement_design_target_mismatch");
   }
   if (
     requirementTargetPaths.length > 0 &&
@@ -1372,15 +2861,18 @@ export function reconcileSdlcProductMaterializationAuthority(
         : "missing",
     selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot,
     contextExpectedFileTargets: contextTargetPaths,
+    designAssetAuthorityTargets: designTargetPaths,
     requirementAuthorityTargets: requirementTargetPaths,
     productAuthorityTargets: productTargetPaths,
     declaredProductFileTargets,
     contextExpectedTargetContracts: contextTargets,
+    designAssetAuthorityTargetContracts: designTargets,
     requirementAuthorityTargetContracts: requirementTargets,
     productAuthorityTargetContracts: productTargets,
     declaredProductTargetContracts,
     sourceRefs: uniqueSorted([
       ...context.sourceRefs,
+      ...design.sourceRefs,
       ...requirement.sourceRefs,
       ...product.sourceRefs
     ]),
@@ -1500,6 +2992,7 @@ function shellToken(input: string): string {
 
 function executionShardCommand(input: {
   readonly moduleName: string;
+  readonly tenantRoot: string;
   readonly testExecutionContract: string;
 }): string {
   const contract = input.testExecutionContract.trim();
@@ -1530,17 +3023,68 @@ function executionShardCommand(input: {
   if (/^(?:\.\/)?gradlew?(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
     return `${contract.split(/\s+/u)[0]} :${moduleName.replace(/\//gu, ":")}:test`;
   }
+  if (contract === "node") {
+    const testFiles = discoverNodeTestFilePaths(input.tenantRoot);
+    if (testFiles.length > 0) {
+      return `node --test ${testFiles.map(shellToken).join(" ")}`;
+    }
+  }
   return contract;
 }
 
+function discoverNodeTestFilePaths(tenantRoot: string): readonly string[] {
+  if (!existsSync(tenantRoot) || !statSync(tenantRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  const results: string[] = [];
+  const ignoredDirs = new Set([
+    ".git",
+    ".ai-workspace",
+    "node_modules",
+    "dist",
+    "coverage",
+    "target"
+  ]);
+  function walk(dir: string): void {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!ignoredDirs.has(entry.name)) {
+          walk(join(dir, entry.name));
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const absolutePath = join(dir, entry.name);
+      const relativePath = relative(tenantRoot, absolutePath).split(path.sep).join("/");
+      if (
+        /(?:^|\/)(?:test|tests)\//u.test(relativePath) &&
+        /\.(?:test|spec)\.(?:mjs|js|cjs)$/u.test(relativePath)
+      ) {
+        results.push(relativePath);
+      }
+    }
+  }
+  walk(tenantRoot);
+  return Object.freeze(results.sort());
+}
+
 function executionShardsFor(input: {
+  readonly edgeName: string;
   readonly targetAssetType: string;
   readonly tenantRoot: string;
   readonly declaredModuleNames: readonly string[];
   readonly testExecutionContract: string;
 }): SdlcProductMaterializationContract["executionShards"] {
   if (
-    input.targetAssetType !== "test_schedule_surface" &&
+    input.targetAssetType !== "component_test_surface" &&
+    !(
+      (input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
+        input.edgeName === "derive_component_code_surface") &&
+      input.targetAssetType === "component_code_surface" &&
+      declaredExecutionContract(input.testExecutionContract)
+    ) &&
     input.targetAssetType !== "test_execution_surface" &&
     input.targetAssetType !== "test_execution_result_surface" &&
     input.targetAssetType !== "test_run_archive_surface"
@@ -1562,6 +3106,7 @@ function executionShardsFor(input: {
         moduleName,
         command: executionShardCommand({
           moduleName,
+          tenantRoot: input.tenantRoot,
           testExecutionContract: input.testExecutionContract
         }),
         workingDirectory: input.tenantRoot,
@@ -1737,28 +3282,41 @@ function readableFileRef(ref: string): { readonly ref: string; readonly filePath
   });
 }
 
-function importedSourceRefsFromLedger(ref: string): readonly string[] {
+function workspaceRootForImportedSourceRef(sourceFilePath: string): string | null {
+  const normalizedPath = sourceFilePath.split(path.sep).join("/");
+  for (const suffix of [
+    "/specification/requirements/00-imported-sources.md",
+    `/${PROJECT_BOOTSTRAP_RELATIVE_PATH}`
+  ]) {
+    if (normalizedPath.endsWith(suffix)) {
+      return sourceFilePath.slice(0, sourceFilePath.length - suffix.length);
+    }
+  }
+  return null;
+}
+
+function importedSourceRefsFromMarkdownRef(ref: string): readonly string[] {
   const source = readableFileRef(ref);
   if (source === null) {
     return Object.freeze([]);
   }
-  const ledgerSuffix = "/specification/requirements/00-imported-sources.md";
-  const normalizedLedgerPath = source.filePath.split(path.sep).join("/");
-  const workspaceRoot = normalizedLedgerPath.endsWith(ledgerSuffix)
-    ? source.filePath.slice(0, source.filePath.length - ledgerSuffix.length)
-    : null;
+  const workspaceRoot = workspaceRootForImportedSourceRef(source.filePath);
   const refs: string[] = [];
   for (const line of source.content.split("\n")) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("- file://")) {
-      refs.push(trimmed.slice(2).trim());
+    const bulletMatch = /^-\s+`?([^`]+?)`?\s*$/u.exec(trimmed);
+    const bulletRef = bulletMatch?.[1]?.trim();
+    if (bulletRef === undefined) {
       continue;
     }
-    if (workspaceRoot !== null && trimmed.startsWith("- workspace://")) {
-      const relativeRef = trimmed
-        .slice("- workspace://".length)
+    if (bulletRef.startsWith("file://")) {
+      refs.push(bulletRef);
+      continue;
+    }
+    if (workspaceRoot !== null && bulletRef.startsWith("workspace://")) {
+      const relativeRef = bulletRef
+        .slice("workspace://".length)
         .trim()
-        .replace(/^`|`$/gu, "")
         .replace(/^\/+/u, "");
       const absoluteRefPath = join(workspaceRoot, relativeRef);
       if (existsSync(absoluteRefPath) && statSync(absoluteRefPath).isFile()) {
@@ -1767,6 +3325,21 @@ function importedSourceRefsFromLedger(ref: string): readonly string[] {
     }
   }
   return uniqueSorted(refs);
+}
+
+function importedSourceRefsFromLedger(ref: string): readonly string[] {
+  return importedSourceRefsFromMarkdownRef(ref);
+}
+
+function sourceContainsRequirementAuthority(ref: string): boolean {
+  const source = readableFileRef(ref);
+  if (source === null) {
+    return false;
+  }
+  return (
+    REQUIREMENT_MARKER_TOKEN_EXPRESSION.test(source.content) ||
+    [...source.content.matchAll(LOCAL_REQUIREMENT_HEADING_EXPRESSION)].length > 0
+  );
 }
 
 function expandedRequirementAuthorityRefs(
@@ -1778,7 +3351,17 @@ function expandedRequirementAuthorityRefs(
       continue;
     }
     const filePath = fileURLToPath(ref);
-    if (!filePath.includes("/specification/requirements/")) {
+    if (
+      !filePath.includes("/specification/requirements/") &&
+      !filePath.endsWith("/specification/REQUIREMENTS.md") &&
+      !filePath.endsWith("/specification/mapper_requirements.md") &&
+      !filePath.endsWith(`/${PROJECT_BOOTSTRAP_RELATIVE_PATH}`) &&
+      !sourceContainsRequirementAuthority(ref)
+    ) {
+      continue;
+    }
+    if (filePath.endsWith(`/${PROJECT_BOOTSTRAP_RELATIVE_PATH}`)) {
+      expanded.push(...importedSourceRefsFromMarkdownRef(ref));
       continue;
     }
     if (filePath.endsWith("/specification/requirements/00-imported-sources.md")) {
@@ -1832,6 +3415,13 @@ function concreteRequirementBodySnippet(input: {
     if (/^\*\*Acceptance Criteria\*\*:/iu.test(line)) {
       continue;
     }
+    const nextMarker = REQUIREMENT_MARKER_TOKEN_EXPRESSION.exec(line)?.[0];
+    if (
+      nextMarker !== undefined &&
+      markerOnlySnippet(line, nextMarker)
+    ) {
+      return null;
+    }
     const bulletMatch = /^[-*]\s+(.+)$/u.exec(line);
     return `${requirementId}: ${bulletMatch?.[1] ?? line}`.slice(0, 320);
   }
@@ -1871,12 +3461,25 @@ function authorityRefsFor(input: {
     ...markdownFilesIn(input.workspaceRoot, `build_tenants/${input.activeTenant}/design`),
     ...markdownFilesIn(input.workspaceRoot, `build_tenants/${input.activeTenant}/modules`)
   ]);
-  return uniqueSorted(
+  const directRefs = uniqueSorted(
     candidatePaths.flatMap((relativePath) => {
       const ref = fileRef(input.workspaceRoot, relativePath);
       return ref === null ? [] : [ref];
     })
   );
+  return uniqueSorted([
+    ...directRefs,
+    ...directRefs.flatMap((ref) => {
+      const source = readableFileRef(ref);
+      if (
+        source === null ||
+        !source.filePath.endsWith(`/${PROJECT_BOOTSTRAP_RELATIVE_PATH}`)
+      ) {
+        return [];
+      }
+      return importedSourceRefsFromMarkdownRef(ref);
+    })
+  ]);
 }
 
 function authorityCategoryFor(filePath: string): SdlcAuthorityIndexCategory {
@@ -1992,7 +3595,7 @@ function trancheKeysFor(input: {
     keys.push("realization:tranche_execution");
   }
   if (
-    input.contract.targetAssetType === "test_module_surface" ||
+    input.contract.targetAssetType === "test_design_surface" ||
     targetAdmitsTestExecutionEvidence(input.contract.targetAssetType) ||
     (input.contract.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
       input.contract.targetAssetType === "component_code_surface" &&
@@ -2092,7 +3695,7 @@ function scopedAuthorityRefsForFeatureScope(input: {
     input.authorityRefs.filter(
       (ref) =>
         !ref.includes("/specification/requirements/") ||
-        ref.endsWith("/specification/requirements/00-imported-sources.md") ||
+        !ref.includes("/specification/requirements/00-imported-sources.md") ||
         usedRefs.has(ref)
     )
   );
@@ -2401,6 +4004,7 @@ function deriveTraversalObligationContext(input: {
   readonly contract: SdlcHookContract;
   readonly edgeAssuranceContractRef: string;
   readonly edgeAssuranceContractDigest: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly materialization: SdlcProductMaterializationContract;
   readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly retryContext: SdlcWorkerRetryContext;
@@ -2516,6 +4120,10 @@ function deriveTraversalObligationContext(input: {
     kind: "sdlc_traversal_obligation_context" as const,
     edgeAssuranceContractRef: input.edgeAssuranceContractRef,
     edgeAssuranceContractDigest: input.edgeAssuranceContractDigest,
+    targetCarrierContractRef:
+      input.targetCarrierProjection.targetCarrierContractRef,
+    targetCarrierContractDigest:
+      input.targetCarrierProjection.targetCarrierContractDigest,
     requiredSourceAssetTypes: Object.freeze([...input.contract.sourceAssetTypes]),
     targetAssetType: input.contract.targetAssetType,
     obligations: scopedObligations,
@@ -2549,6 +4157,7 @@ function constructTraversalIntentPackage(input: {
   readonly graphCatalogDigestRef?: string | null | undefined;
   readonly edgeAssuranceContractRef: string;
   readonly edgeAssuranceContractDigest: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -2571,6 +4180,11 @@ function constructTraversalIntentPackage(input: {
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
     edgeAssuranceContractRef: input.edgeAssuranceContractRef,
     edgeAssuranceContractDigest: input.edgeAssuranceContractDigest,
+    targetCarrierContractRef:
+      input.targetCarrierProjection.targetCarrierContractRef,
+    targetCarrierContractDigest:
+      input.targetCarrierProjection.targetCarrierContractDigest,
+    targetCarrierProjection: input.targetCarrierProjection,
     graphFunctionName: input.graphFunctionName,
     edgeName: input.edgeName,
     vectorIndex: input.vectorIndex,
@@ -2619,11 +4233,19 @@ export function assertTraversalIntentPackagePressure(
     pkg.graphCatalogDigestRef !== manifest.graphCatalogDigestRef ||
     pkg.edgeAssuranceContractRef !== manifest.edgeAssuranceContractRef ||
     pkg.edgeAssuranceContractDigest !== manifest.edgeAssuranceContractDigest ||
+    pkg.targetCarrierContractRef !== manifest.targetCarrierContractRef ||
+    pkg.targetCarrierContractDigest !== manifest.targetCarrierContractDigest ||
     pkg.targetAssetType !== manifest.targetAssetType ||
     pkg.outputFile !== manifest.outputFile ||
     pkg.reportFile !== manifest.reportFile
   ) {
     throw new TypeError("traversal intent package identity does not match manifest");
+  }
+  if (
+    JSON.stringify(pkg.targetCarrierProjection) !==
+    JSON.stringify(manifest.targetCarrierProjection)
+  ) {
+    throw new TypeError("traversal intent package target carrier projection drift");
   }
   if (
     JSON.stringify(pkg.traversalStrategyDecision) !==
@@ -2639,13 +4261,25 @@ export function assertTraversalIntentPackagePressure(
   if (pkg.authorityRefs.length === 0) {
     throw new TypeError("traversal intent package missing source authority refs");
   }
+  const concreteRequirementObligations =
+    manifest.traversalObligationContext.obligations.filter(
+      (obligation) =>
+        obligation.obligationKind === "requirement" &&
+        obligation.payload.status === "concrete"
+    );
   if (
     manifest.productMaterialization.required &&
-    !pkg.authorityRefs.some((ref) =>
-      ref.endsWith("specification/requirements/00-imported-sources.md")
+    concreteRequirementObligations.length === 0
+  ) {
+    throw new TypeError("traversal intent package missing concrete requirement lineage");
+  }
+  if (
+    manifest.productMaterialization.required &&
+    !concreteRequirementObligations.every((obligation) =>
+      pkg.obligationIds.includes(obligation.obligationId)
     )
   ) {
-    throw new TypeError("traversal intent package missing induction lineage ref");
+    throw new TypeError("traversal intent package missing concrete requirement obligation");
   }
   if (
     manifest.productMaterialization.required &&
@@ -2715,6 +4349,7 @@ export function deriveWorkerHandoffManifest(input: {
   const baseMaterialization = productMaterializationContract({
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
+    edgeName: input.edgeName,
     targetAssetType: input.contract.targetAssetType,
     conformedProject,
     projectConstraints: input.projectConstraints
@@ -2740,6 +4375,9 @@ export function deriveWorkerHandoffManifest(input: {
     sdlcEdgeAssuranceContractRef(edgeAssuranceContract);
   const edgeAssuranceContractDigest =
     digestSdlcEdgeGainClosureContract(edgeAssuranceContract);
+  const targetCarrierProjection = targetCarrierProjectionForRow(
+    targetCarrierRowForEdge(input.edgeName)
+  );
   const retryContext = input.retryContext ?? emptyRetryContext();
   const methodRefs = Object.freeze([
     "workspace://.abiogenesis/docs/standards/SPEC_METHOD.md",
@@ -2789,6 +4427,7 @@ export function deriveWorkerHandoffManifest(input: {
   });
   const outputFile = deriveOutputFileForTarget({
     defaultOutputRoot: outputRoot,
+    workspaceRoot: input.workspaceRoot,
     targetAssetType: input.contract.targetAssetType,
     materialization
   });
@@ -2796,8 +4435,12 @@ export function deriveWorkerHandoffManifest(input: {
     resolve(outputFile),
     resolve(materialization.tenantRoot)
   );
+  const outputFileIsWorkspaceLocal =
+    workspaceLocalSdlcSurfaceRelativePath(input.contract.targetAssetType) !== null;
   const baseAllowedWriteRoots = materialization.required || outputFileIsTenantLocal
     ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
+    : outputFileIsWorkspaceLocal
+      ? Object.freeze([outputRoot, archiveRoot, dirname(outputFile)])
     : input.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
       ? Object.freeze([
           outputRoot,
@@ -2811,6 +4454,7 @@ export function deriveWorkerHandoffManifest(input: {
     contract: input.contract,
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
+    targetCarrierProjection,
     materialization,
     featureScope,
     retryContext
@@ -2821,6 +4465,7 @@ export function deriveWorkerHandoffManifest(input: {
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
+    targetCarrierProjection,
     graphFunctionName: input.graphFunctionName,
     edgeName: input.edgeName,
     vectorIndex: input.vectorIndex,
@@ -2843,6 +4488,11 @@ export function deriveWorkerHandoffManifest(input: {
     graphCatalogDigestRef: input.graphCatalogDigestRef ?? null,
     edgeAssuranceContractRef,
     edgeAssuranceContractDigest,
+    targetCarrierContractRef:
+      targetCarrierProjection.targetCarrierContractRef,
+    targetCarrierContractDigest:
+      targetCarrierProjection.targetCarrierContractDigest,
+    targetCarrierProjection,
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
     graphFunctionName: input.graphFunctionName,
@@ -2953,6 +4603,16 @@ function requirementTraceObligationIdsForPrompt(
   );
 }
 
+function requirementTraceObligationIdsForProductLineage(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return Object.freeze(
+    canonicalRequirementTraceObligationsForPrompt(manifest).map(
+      (obligation) => obligation.obligationId
+    )
+  );
+}
+
 function omittedRequirementTraceObligationCount(
   manifest: SdlcWorkerHandoffManifest
 ): number {
@@ -3021,9 +4681,12 @@ function componentDepthFieldSetForTarget(
     "registerVersion=ts-component-depth-v1",
     `targetAssetType=${targetAssetType}`
   ];
-  if (targetAssetType === "implementation_component_topology_surface") {
+  if (targetAssetType === "implementation_design_surface") {
     return Object.freeze([
       ...envelope,
+      "stackProfileRows[]",
+      "implementationModuleRows[]",
+      "aggregateDomainModelRows[]",
       "componentTopologyRows[].kind",
       "componentTopologyRows[].componentId",
       "componentTopologyRows[].moduleName",
@@ -3035,7 +4698,6 @@ function componentDepthFieldSetForTarget(
     ]);
   }
   if (
-    targetAssetType === "component_realization_schedule_surface" ||
     targetAssetType === "component_code_surface" ||
     targetAssetType === "component_realization_qualification_surface"
   ) {
@@ -3048,18 +4710,6 @@ function componentDepthFieldSetForTarget(
       "componentRealizationRows[].publicBoundary",
       "componentRealizationRows[].requirementIds",
       "componentRealizationRows[].sourceAssetRefs"
-    ]);
-  }
-  if (targetAssetType === "test_component_topology_surface") {
-    return Object.freeze([
-      ...envelope,
-      "testComponentTopologyRows[].kind",
-      "testComponentTopologyRows[].testClassId",
-      "testComponentTopologyRows[].relativePath",
-      "testComponentTopologyRows[].testcaseIds",
-      "testComponentTopologyRows[].componentIds",
-      "testComponentTopologyRows[].requirementIds",
-      "testComponentTopologyRows[].shardId"
     ]);
   }
   if (targetAssetType === "component_test_surface") {
@@ -3120,11 +4770,20 @@ function componentDepthFieldSetForTarget(
 }
 
 function designDepthFieldSetForTarget(targetAssetType: string): readonly string[] {
-  if (targetAssetType === "implementation_module_surface") {
+  if (targetAssetType === "implementation_design_surface") {
     return Object.freeze([
       "kind",
       "registerVersion",
       "targetAssetType",
+      "stackProfileRows[].kind=sdlc_stack_profile_row",
+      "stackProfileRows[].stackRef",
+      "stackProfileRows[].language",
+      "stackProfileRows[].buildTool",
+      "implementationModuleRows[].kind=sdlc_implementation_module_row",
+      "implementationModuleRows[].moduleName",
+      "implementationModuleRows[].moduleRef",
+      "aggregateDomainModelRows[].kind=sdlc_aggregate_domain_model_row",
+      "aggregateDomainModelRows[].modelRef",
       "moduleSchemaFragments[].kind",
       "moduleSchemaFragments[].moduleName",
       "moduleSchemaFragments[].entities[].kind",
@@ -3159,36 +4818,147 @@ function designDepthFieldSetForTarget(targetAssetType: string): readonly string[
       "moduleStateDiagramFragments[].transitions[].operationId",
       "moduleStateDiagramFragments[].transitions[].entityId",
       "moduleStateDiagramFragments[].requirementIds",
-      "moduleStateDiagramFragments[].sourceAssetRefs"
-    ]);
-  }
-  if (targetAssetType === "aggregate_domain_model_surface") {
-    return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
-      "aggregateDomainModel.kind",
-      "aggregateDomainModel.entities",
-      "aggregateDomainModel.operations",
-      "aggregateDomainModel.crossModuleReferences",
-      "designCompletenessVerdict.entity",
-      "designCompletenessVerdict.attribute",
-      "designCompletenessVerdict.flow"
-    ]);
-  }
-  if (targetAssetType === "aggregate_sunny_day_sequence_surface") {
-    return Object.freeze([
-      "kind",
-      "registerVersion",
-      "targetAssetType",
-      "aggregateDomainModel",
-      "aggregateSunnyDaySequence.steps",
-      "designCompletenessVerdict.entity",
-      "designCompletenessVerdict.attribute",
-      "designCompletenessVerdict.flow"
+      "moduleStateDiagramFragments[].sourceAssetRefs",
+      "aggregateDomainModel.kind=sdlc_aggregate_domain_model",
+      "aggregateDomainModel.modelVersion",
+      "aggregateDomainModel.entities[].kind=sdlc_aggregate_domain_entity",
+      "aggregateDomainModel.entities[].entityId",
+      "aggregateDomainModel.entities[].ownerModuleName",
+      "aggregateDomainModel.entities[].attributes[].kind",
+      "aggregateDomainModel.entities[].attributes[].attributeId",
+      "aggregateDomainModel.entities[].attributes[].name",
+      "aggregateDomainModel.entities[].attributes[].valueType",
+      "aggregateDomainModel.entities[].attributes[].cardinality",
+      "aggregateDomainModel.entities[].attributes[].invariantRefs",
+      "aggregateDomainModel.entities[].sourceModuleNames",
+      "aggregateDomainModel.operations[].kind=sdlc_domain_operation",
+      "aggregateDomainModel.operations[].operationId",
+      "aggregateDomainModel.operations[].moduleName",
+      "aggregateDomainModel.operations[].inputEntityIds",
+      "aggregateDomainModel.operations[].outputEntityIds",
+      "aggregateDomainModel.operations[].requiredAttributeIds",
+      "aggregateDomainModel.crossModuleReferences[].fromModuleName",
+      "aggregateDomainModel.crossModuleReferences[].toModuleName",
+      "aggregateDomainModel.crossModuleReferences[].entityId",
+      "aggregateDomainModel.evidenceRefs",
+      "sunnyDaySequenceRows[].kind=sdlc_sunny_day_sequence_row",
+      "sunnyDaySequenceRows[].sequenceRef",
+      "aggregateSunnyDaySequence.kind=sdlc_aggregate_sunny_day_sequence",
+      "aggregateSunnyDaySequence.sequenceVersion",
+      "aggregateSunnyDaySequence.steps[].kind=sdlc_sunny_day_sequence_step",
+      "aggregateSunnyDaySequence.steps[].stepId",
+      "aggregateSunnyDaySequence.steps[].moduleName",
+      "aggregateSunnyDaySequence.steps[].operationId",
+      "aggregateSunnyDaySequence.steps[].inputEntityIds",
+      "aggregateSunnyDaySequence.steps[].outputEntityIds",
+      "aggregateSunnyDaySequence.steps[].stateTransitionIds",
+      "aggregateSunnyDaySequence.evidenceRefs",
+      "componentTopologyRows[].kind=sdlc_component_topology_row",
+      "componentTopologyRows[].componentId",
+      "componentTopologyRows[].moduleName",
+      "componentTopologyRows[].relativePath",
+      "componentTopologyRows[].publicBoundary",
+      "componentTopologyRows[].concernRole",
+      "componentTopologyRows[].requirementIds",
+      "componentTopologyRows[].sourceAssetRefs",
+      "componentRealizationRows[].kind=sdlc_component_realization_row",
+      "componentRealizationRows[].componentId",
+      "componentRealizationRows[].moduleName",
+      "componentRealizationRows[].relativePath",
+      "componentRealizationRows[].publicBoundary",
+      "componentRealizationRows[].trancheId",
+      "componentRealizationRows[].firstProductFileToChange",
+      "componentRealizationRows[].upstreamComponentIds",
+      "componentRealizationRows[].requirementIds",
+      "componentRealizationRows[].sourceAssetRefs",
+      "fileTargetRows[].kind=sdlc_file_target_row",
+      "fileTargetRows[].relativePath",
+      "fileTargetRows[].role",
+      "designCompletenessVerdict.kind=sdlc_design_completeness_verdict",
+      "designCompletenessVerdict.verdictVersion",
+      "designCompletenessVerdict.entity.kind=sdlc_design_completeness_axis_verdict",
+      "designCompletenessVerdict.entity.axis",
+      "designCompletenessVerdict.entity.status",
+      "designCompletenessVerdict.entity.reasons",
+      "designCompletenessVerdict.entity.evidenceRefs",
+      "designCompletenessVerdict.attribute.kind=sdlc_design_completeness_axis_verdict",
+      "designCompletenessVerdict.attribute.axis",
+      "designCompletenessVerdict.attribute.status",
+      "designCompletenessVerdict.attribute.reasons",
+      "designCompletenessVerdict.attribute.evidenceRefs",
+      "designCompletenessVerdict.flow.kind=sdlc_design_completeness_axis_verdict",
+      "designCompletenessVerdict.flow.axis",
+      "designCompletenessVerdict.flow.status",
+      "designCompletenessVerdict.flow.reasons",
+      "designCompletenessVerdict.flow.evidenceRefs"
     ]);
   }
   return Object.freeze(["kind", "registerVersion", "targetAssetType"]);
+}
+
+function testDesignFieldSetForTarget(targetAssetType: string): readonly string[] {
+  return Object.freeze([
+    "kind=sdlc_test_design_register",
+    "registerVersion=ts-test-design-v1",
+    `targetAssetType=${targetAssetType}`,
+    "designConsumptionRows[].kind=sdlc_design_consumption_contract",
+    "designConsumptionRows[].contractRef",
+    "designConsumptionRows[].sourceDesignObligationRefs",
+    "designConsumptionRows[].authorityBasisRefs",
+    "designConsumptionRows[].consumerGraphFunctionRefs",
+    "uatTestcaseRows[].kind=sdlc_test_case_row",
+    "uatTestcaseRows[].testCaseRef",
+    "uatTestcaseRows[].caseKind",
+    "uatTestcaseRows[].executionLane",
+    "uatTestcaseRows[].sourceDesignObligationRefs",
+    "uatTestcaseRows[].testcaseAuthorityRefs",
+    "uatTestcaseRows[].expectedBehavior",
+    "testcaseAuthorityRows[].kind=sdlc_test_case_row",
+    "testcaseAuthorityRows[].testCaseRef",
+    "testcaseAuthorityRows[].caseKind",
+    "testcaseAuthorityRows[].executionLane",
+    "testcaseAuthorityRows[].sourceDesignObligationRefs",
+    "testcaseAuthorityRows[].testcaseAuthorityRefs",
+    "testcaseAuthorityRows[].expectedBehavior",
+    "testStackProfileRows[].kind=sdlc_test_stack_profile_row",
+    "testStackProfileRows[].stackRef",
+    "testStackProfileRows[].frameworkRef",
+    "testStackProfileRows[].buildTool",
+    "testModuleRows[].kind=sdlc_test_module_row",
+    "testModuleRows[].moduleName",
+    "testModuleRows[].moduleRef",
+    "testModuleRows[].testRoot",
+    "testComponentTopologyRows[].kind=sdlc_test_component_topology_row",
+    "testComponentTopologyRows[].testClassId",
+    "testComponentTopologyRows[].relativePath",
+    "testComponentTopologyRows[].testcaseIds",
+    "testComponentTopologyRows[].componentIds",
+    "testComponentTopologyRows[].requirementIds",
+    "testComponentTopologyRows[].shardId",
+    "testDataBindings[].kind=sdlc_test_data_binding",
+    "testDataBindings[].testDataRef",
+    "testDataBindings[].testCaseRef",
+    "testDataBindings[].inputFixtureRefs",
+    "testDataBindings[].generationPolicyRef",
+    "testDataBindings[].expectedResultRef",
+    "testDataBindings[].sourceDesignObligationRefs",
+    "expectedResultBindings[].kind=sdlc_expected_result_binding",
+    "expectedResultBindings[].expectedResultRef",
+    "expectedResultBindings[].testCaseRef",
+    "expectedResultBindings[].assertionRefs",
+    "expectedResultBindings[].expectedResultSummary",
+    "expectedResultBindings[].verificationPolicyRef",
+    "uatIntegrationBindings[].kind=sdlc_uat_integration_binding",
+    "uatIntegrationBindings[].uatTestCaseRef",
+    "uatIntegrationBindings[].integrationTestCaseRef",
+    "uatIntegrationBindings[].executionLane",
+    "testExecutionScheduleRows[].kind=sdlc_test_execution_schedule_row",
+    "testExecutionScheduleRows[].scheduleRef",
+    "testExecutionScheduleRows[].testCaseRefs",
+    "testExecutionScheduleRows[].command",
+    "testExecutionScheduleRows[].frameworkRef",
+    "testExecutionScheduleRows[].shardId"
+  ]);
 }
 
 function acceptedCarrierSchemaForReason(input: {
@@ -3209,12 +4979,28 @@ function acceptedCarrierSchemaForReason(input: {
   if (
     input.reason.startsWith("design_depth_register_invalid:") ||
     input.reason === "design_depth_register_missing" ||
+    input.reason.startsWith("design_depth_") ||
     input.reason.startsWith("design_attribute_missing:") ||
-    input.reason.startsWith("design_operation_required_attributes_missing:")
+    input.reason.startsWith("design_flow_") ||
+    input.reason.startsWith("design_state_") ||
+    input.reason.startsWith("design_entity_") ||
+    input.reason.startsWith("design_module_") ||
+    input.reason.startsWith("design_cross_module_") ||
+    input.reason.startsWith("design_operation_")
   ) {
     return Object.freeze({
       schemaRef: "schema://odd_sdlc/design_depth_register",
       fieldSet: designDepthFieldSetForTarget(input.targetAssetType)
+    });
+  }
+  if (
+    input.reason.startsWith("test_design_register_invalid:") ||
+    input.reason === "test_design_register_missing" ||
+    input.reason.startsWith("test_design_register_")
+  ) {
+    return Object.freeze({
+      schemaRef: "schema://odd_sdlc/test_design_register",
+      fieldSet: testDesignFieldSetForTarget(input.targetAssetType)
     });
   }
   if (
@@ -3265,8 +5051,8 @@ function repairReentryTargetForRepairTarget(
   }
   if (repairTarget === "test_schedule") {
     return Object.freeze({
-      targetEdgeName: "derive_test_schedule_surface",
-      targetAssetType: "test_schedule_surface"
+      targetEdgeName: "derive_test_design_surface",
+      targetAssetType: "test_design_surface"
     });
   }
   if (repairTarget === "test_execution_surface") {
@@ -3642,9 +5428,13 @@ function transformAxiomsForWorker(): readonly string[] {
   return Object.freeze([
     "F_P.transform only: produce bounded candidate transform evidence.",
     "Do not write ledgers, runtime events, closure decisions, evaluator projections, or framework result carriers.",
-    "Use worker_brief, worker_invocation_package, traversal_intent_package, and explicitly referenced manifest fields as authority.",
-    "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_invocation_package is the closed schema authority for this traversal.",
+    "Do not run odd_sdlc, abiogenesis, genesis, start, gaps, analyze-run, install, traversal, or resume commands; the framework controls traversal after this worker exits.",
+    "Do not spawn another worker or resume traversal; this process is the worker.",
+    "Use worker_construction_brief.json as the single prompt-source carrier; worker_brief, worker_invocation_package, traversal_intent_package, and handoff_manifest are derived or forensic projections only.",
+    "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_construction_brief.json carries the selected target contract and derived projections for this traversal.",
     "Read boundary: use only relative paths under the current workspace; do not glob, read, cite, or copy sibling sandboxes, historical test_runs, home memory, or absolute paths outside the active workspace.",
+    "Temporary execution logs are workspace evidence: do not create, read, or write outside-workspace temporary files such as /tmp; write transient logs only under allowed write roots.",
+    "Allowed write roots are workspace-root-relative unless already absolute; if a command changes cwd, resolve allowed write roots to workspace-root absolute paths before writing evidence logs.",
     "Do not use PTY transcripts, runtime logs, or worker archives as product authority unless a package ref names them.",
     "Start the output artifact with ## Execution Plan naming read authority, bounded steps, and first materialization target.",
     "When requirementTraceObligationIds is non-empty, include ## Requirement Trace Register with those exact ids. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
@@ -3654,71 +5444,97 @@ function transformAxiomsForWorker(): readonly string[] {
 function compactComponentDepthDirective(
   manifest: SdlcWorkerHandoffManifest
 ): string | null {
+  const projection = manifest.targetCarrierProjection;
   const envelopeDirective =
-    `Emit a fenced \`json component_depth_register\` carrier with ` +
-    `\`kind:"sdlc_component_depth_register"\`, ` +
-    `\`registerVersion:"ts-component-depth-v1"\`, and ` +
-    `\`targetAssetType:"${manifest.targetAssetType}"\`.`;
+    `Emit a fenced \`json component_depth_register\` selected target-carrier envelope with ` +
+    `\`kind:"${projection.outputCarrierKind}"\`, ` +
+    `\`targetAssetType:"${manifest.targetAssetType}"\`, ` +
+    `\`edgeRef:"${manifest.edgeName}"\`, ` +
+    `\`contractRef:"${projection.targetCarrierContractRef}"\`, ` +
+    `\`contractDigest:"${projection.targetCarrierContractDigest}"\`, and ` +
+    `\`payload.kind:"sdlc_component_depth_register"\`, ` +
+    `\`payload.registerVersion:"ts-component-depth-v1"\`, ` +
+    `\`payload.targetAssetType:"${manifest.targetAssetType}"\`.`;
   const componentRealizationRowsDirective =
-    "Emit component_depth_register.componentRealizationRows with kind=sdlc_component_realization_row, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs; order rows by dependency reason and keep progress component-addressable.";
+    "Emit payload.componentRealizationRows with kind=sdlc_component_realization_row, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs; order rows by dependency reason and keep progress component-addressable.";
   switch (manifest.targetAssetType) {
-    case "implementation_component_topology_surface":
-      return `${envelopeDirective} Emit component_depth_register.componentTopologyRows with kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs. concernRole must be exactly one of parser, validator, mapper, error_model, io_adapter, reporting, domain_model, other; use io_adapter for entry scripts that adapt a process/stdout boundary. publicBoundary must be a string; for an entry script with no exported API, use a non-empty entrypoint string such as node-entry-script:<relativePath>, never [] or null.`;
-    case "component_realization_schedule_surface":
-      return `${envelopeDirective} ${componentRealizationRowsDirective}`;
     case "component_code_surface":
       if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
       }
-      return `${envelopeDirective} ${componentRealizationRowsDirective} Preserve declared component boundaries from topology/schedule authority.`;
+      return `${envelopeDirective} ${componentRealizationRowsDirective} Preserve declared component boundaries from the composite implementation design authority.`;
     case "component_realization_qualification_surface":
       return `${envelopeDirective} ${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
-    case "test_component_topology_surface":
-      return `${envelopeDirective} Emit component_depth_register.testComponentTopologyRows with testClassId, relativePath, testcaseIds, componentIds, requirementIds, test kind, and shard.`;
     case "component_test_surface":
-      return `${envelopeDirective} Emit component_depth_register with componentTestRows and preserve testClassId/testcase allocation from topology authority.`;
+      return `${envelopeDirective} Emit payload.componentTestRows and preserve testClassId/testcase allocation from the composite test design authority.`;
     case "component_test_qualification_surface":
-      return `${envelopeDirective} Emit component_depth_register.componentTestQualificationRows; failed rows must carry componentExecutionFailureRegister evidence.`;
+      return `${envelopeDirective} Emit payload.componentTestQualificationRows; failed rows must carry payload.componentExecutionFailureRegister evidence.`;
     case "component_repair_schedule_surface":
-      return `${envelopeDirective} Emit component_depth_register.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.`;
+      return `${envelopeDirective} Emit payload.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.`;
     case "release_depth_parity_surface":
-      return `${envelopeDirective} Emit component_depth_register.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.`;
+      return `${envelopeDirective} Emit payload.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.`;
     default:
       return null;
   }
+}
+
+function compactTestDesignDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  if (manifest.targetAssetType !== "test_design_surface") {
+    return null;
+  }
+  return [
+    "Apply workerInvocationPackage.targetCarrierProjection.constructionTemplate as the authoritative test-design carrier shape; do not derive row field names from prose tables.",
+    "Emit a fenced `json test_design_register` carrier with `kind:\"sdlc_test_design_register\"`, `registerVersion:\"ts-test-design-v1\"`, and `targetAssetType:\"test_design_surface\"`.",
+    "Use one composite test design carrier with designConsumptionRows, uatTestcaseRows, testcaseAuthorityRows, testStackProfileRows, testModuleRows, testComponentTopologyRows, testDataBindings, expectedResultBindings, uatIntegrationBindings, and testExecutionScheduleRows.",
+    "Use exact row kinds: `sdlc_design_consumption_contract`, `sdlc_test_case_row`, `sdlc_test_stack_profile_row`, `sdlc_test_module_row`, `sdlc_test_component_topology_row`, `sdlc_test_data_binding`, `sdlc_expected_result_binding`, `sdlc_uat_integration_binding`, and `sdlc_test_execution_schedule_row`.",
+    "Use exact row fields from the construction template: contractRef/sourceDesignObligationRefs/authorityBasisRefs/consumerGraphFunctionRefs for design consumption, caseKind/executionLane/expectedBehavior for test cases, testClassId/relativePath/testcaseIds/componentIds for test topology, inputFixtureRefs/generationPolicyRef for test data, assertionRefs/expectedResultSummary/verificationPolicyRef for expected results, and uatTestCaseRef/integrationTestCaseRef for UAT integration.",
+    "testExecutionScheduleRows must bind scheduleRef, testCaseRefs, command, frameworkRef, and shardId to the declared test execution contract."
+  ].join(" ");
+}
+
+function compactWorkspaceSpecSurfaceDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  const workspacePath =
+    workspaceLocalSdlcSurfaceRelativePath(manifest.targetAssetType);
+  if (workspacePath === null) {
+    return null;
+  }
+  if (
+    manifest.targetAssetType !== "requirement_surface" &&
+    manifest.targetAssetType !== "uat_testcases_surface" &&
+    manifest.targetAssetType !== "testcase_authority_surface"
+  ) {
+    return "Use the target-carrier construction template as shape guidance for the workspace specification surface; write the Markdown authority surface at the declared output path. The template is construction/disambiguation support, not product-closure authority.";
+  }
+  return [
+    `Write the graph-owned workspace specification surface at \`${workspacePath}\`; do not treat this as conformance output.`,
+    "Use workerInvocationPackage.targetCarrierProjection.constructionTemplate to organize content rows and preserve stable row refs.",
+    "The construction template is GTL typed construction shape for F_P clarity; it is not an assurance gate and does not close product meaning.",
+    manifest.targetAssetType === "requirement_surface"
+      ? "For requirement_surface, derive requirement rows from imported authority and current intent/product/goal pressure."
+      : manifest.targetAssetType === "uat_testcases_surface"
+        ? "For uat_testcases_surface, derive user-acceptance testcase rows directly from requirement pressure before design construction."
+        : "For testcase_authority_surface, bind testcase authority rows to requirements and UAT testcase refs so downstream design/test implementation consumes declared test pressure."
+  ].join(" ");
 }
 
 function compactDesignDepthDirective(
   manifest: SdlcWorkerHandoffManifest
 ): string | null {
   switch (manifest.targetAssetType) {
-    case "implementation_module_surface":
+    case "implementation_design_surface":
       return [
-        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"implementation_module_surface\"`.",
-        "Use these exact top-level fields: `moduleSchemaFragments` (non-empty), `moduleStateDiagramFragments` (non-empty), `aggregateDomainModel:null`, `aggregateSunnyDaySequence:null`, and `designCompletenessVerdict:null`.",
-        "Keep the carrier proportional to immediate implementation structure: identify only the modules, implementation entities, and operations needed to materialize the declared product surface from current source assets.",
+        "Apply workerInvocationPackage.targetCarrierProjection.constructionTemplate as the authoritative implementation-design carrier shape.",
+        "Emit a fenced `json design_depth_register` carrier that conforms to constructionTemplate.payloadTemplate and constructionTemplate.rowTemplates; do not learn the schema from F_D retries.",
+        "Treat the construction template as shape and disambiguation only; content quality is evaluated from requirement, design, obligation, and assurance evidence.",
+        "Use canonical row kinds including sdlc_stack_profile_row, sdlc_implementation_module_row, sdlc_aggregate_domain_model_row, sdlc_module_schema_fragment, sdlc_module_state_diagram_fragment, sdlc_sunny_day_sequence_row, sdlc_component_topology_row, sdlc_component_realization_row, and sdlc_file_target_row.",
+        "componentTopologyRows[].componentId/moduleName/relativePath/publicBoundary/concernRole are required string fields on each component topology row.",
+        "Keep the carrier proportional to immediate implementation structure: identify only the stack, modules, entities, operations, component/file targets, and realization rows needed to materialize the declared product surface from current source assets.",
         "Do not flatten requirement obligations, runtime execution proof, process archives, test assertions, downstream evidence, or audit lineage into separate module entities unless the source design explicitly declares them as implementation modules or product data.",
-        "For a single-file or script product, one moduleSchemaFragments row, one primary source/program entity, one materialization/invocation operation when needed, and one stateless moduleStateDiagramFragments row are sufficient; do not create one entity or stateless diagram row per requirement.",
-        "Use only canonical schema kinds: `sdlc_module_schema_fragment`, `sdlc_domain_entity`, `sdlc_domain_attribute`, `sdlc_domain_operation`, `sdlc_module_state_diagram_fragment`, `sdlc_entity_state_transition`.",
-        "Use exact nested field names: `moduleSchemaFragments[].moduleName`, `entities[].entityId`, `entities[].moduleName`, `entities[].ownership`, `attributes[].attributeId`, `attributes[].valueType`, `attributes[].cardinality`, `attributes[].invariantRefs`, `operations[].operationId`, `operations[].inputEntityIds`, `operations[].outputEntityIds`, and `operations[].requiredAttributeIds`.",
-        "Each `moduleSchemaFragments` item must be an object, not a string or index row: {\"kind\":\"sdlc_module_schema_fragment\",\"moduleName\":\"<module>\",\"entities\":[{\"kind\":\"sdlc_domain_entity\",\"entityId\":\"<entity>\",\"moduleName\":\"<module>\",\"ownership\":\"owned|referenced\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"<attribute>\",\"name\":\"<name>\",\"valueType\":\"<type>\",\"cardinality\":\"one|optional|many\",\"invariantRefs\":[\"<requirement-or-invariant-ref>\"]}],\"invariants\":[],\"sourceAssetRefs\":[\"workspace://...\"]}],\"operations\":[{\"kind\":\"sdlc_domain_operation\",\"operationId\":\"<operation>\",\"moduleName\":\"<module>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"requiredAttributeIds\":[\"<attribute>\"]}],\"requirementIds\":[\"<requirement-id>\"],\"sourceAssetRefs\":[\"workspace://...\"]}.",
-        "For stateless implementation, emit the smallest non-empty `moduleStateDiagramFragments` set: {\"kind\":\"sdlc_module_state_diagram_fragment\",\"moduleName\":\"<module>\",\"entityId\":\"<primary-entity>\",\"stateless\":true,\"states\":[],\"transitions\":[],\"requirementIds\":[\"<requirement-id>\"],\"sourceAssetRefs\":[\"workspace://...\"]}."
-      ].join(" ");
-    case "aggregate_domain_model_surface":
-      return [
-        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"aggregate_domain_model_surface\"`.",
-        "Use exact top-level fields: `moduleSchemaFragments:[]`, `moduleStateDiagramFragments:[]`, non-null `aggregateDomainModel`, `aggregateSunnyDaySequence:null`, and non-null `designCompletenessVerdict`.",
-        "Use this aggregate model object shape: {\"kind\":\"sdlc_aggregate_domain_model\",\"modelVersion\":\"ts-design-depth-v1\",\"entities\":[{\"kind\":\"sdlc_aggregate_domain_entity\",\"entityId\":\"<entity>\",\"ownerModuleName\":\"<module>\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"<attribute>\",\"name\":\"<name>\",\"valueType\":\"<type>\",\"cardinality\":\"one|optional|many\",\"invariantRefs\":[\"<requirement-or-invariant-ref>\"]}],\"sourceModuleNames\":[\"<module>\"]}],\"operations\":[{\"kind\":\"sdlc_domain_operation\",\"operationId\":\"<operation>\",\"moduleName\":\"<module>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"requiredAttributeIds\":[\"<attribute>\"]}],\"crossModuleReferences\":[],\"evidenceRefs\":[\"workspace://...\"]}.",
-        "Use this completeness verdict shape with axes `entity`, `attribute`, and `flow`: {\"kind\":\"sdlc_design_completeness_verdict\",\"verdictVersion\":\"ts-design-depth-v1\",\"entity\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"entity\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]},\"attribute\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"attribute\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]},\"flow\":{\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"flow\",\"status\":\"satisfied|partial|blocked\",\"reasons\":[],\"evidenceRefs\":[\"workspace://...\"]}}.",
-        "For `aggregate_domain_model_surface`, mark the flow axis `satisfied` when the aggregate model declares the in-scope operations; do not mark flow partial solely because `aggregateSunnyDaySequence` is null or because sunny-day sequence projection is owned by downstream `derive_aggregate_sunny_day_sequence_surface`."
-      ].join(" ");
-    case "aggregate_sunny_day_sequence_surface":
-      return [
-        "Emit a fenced `json design_depth_register` carrier with `kind:\"sdlc_design_depth_register\"`, `registerVersion:\"ts-design-depth-v1\"`, and `targetAssetType:\"aggregate_sunny_day_sequence_surface\"`.",
-        "Use exact top-level fields: `moduleSchemaFragments:[]`, `moduleStateDiagramFragments:[]`, non-null `aggregateDomainModel`, non-null `aggregateSunnyDaySequence`, and non-null `designCompletenessVerdict`.",
-        "Use canonical `aggregateDomainModel` shape with `kind:\"sdlc_aggregate_domain_model\"`, `modelVersion:\"ts-design-depth-v1\"`, `entities`, `operations`, `crossModuleReferences`, and `evidenceRefs`.",
-        "Use this sunny-day sequence object shape: {\"kind\":\"sdlc_aggregate_sunny_day_sequence\",\"sequenceVersion\":\"ts-design-depth-v1\",\"steps\":[{\"kind\":\"sdlc_sunny_day_sequence_step\",\"stepId\":\"<step>\",\"moduleName\":\"<module>\",\"operationId\":\"<operation>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"<entity>\"],\"stateTransitionIds\":[]}],\"evidenceRefs\":[\"workspace://...\"]}.",
-        "Use `designCompletenessVerdict` with `kind:\"sdlc_design_completeness_verdict\"`, `verdictVersion:\"ts-design-depth-v1\"`, and `entity`, `attribute`, `flow` axis verdicts."
+        "For a single-file or script product, one moduleSchemaFragments row, one primary source/program entity, one materialization/invocation operation when needed, and one stateless moduleStateDiagramFragments row are sufficient; do not create one entity or stateless diagram row per requirement."
       ].join(" ");
     default:
       return null;
@@ -3743,6 +5559,8 @@ function compactExecutionEvidenceDirective(
     "executionEvidence.testsObserved, passedCount, and failedCount MUST be numbers or null.",
     "For non-failed executable test evidence, testsObserved MUST be greater than zero; add or run a real discoverable test for the declared test contract rather than reporting zero observed tests.",
     "If execution exits non-zero during compile, discovery, or test phases, record failed, not pending.",
+    "Capture stdout/stderr and report files under allowed write roots from worker_brief.allowedWriteRoots; never use /tmp or any outside-workspace path for test logs.",
+    "allowedWriteRoots are workspace-root-relative unless already absolute; if a shard command changes cwd, resolve them to workspace-root absolute paths before redirecting stdout/stderr.",
     "Use pending only when execution did not run or external evidence is still unavailable. Pending evidence is a lawful non-closure carrier for triage or repricing; do not present a not-run document as release closure evidence."
   ].join(" ");
 }
@@ -3790,7 +5608,14 @@ function outcomeDirectivesForWorker(
   const directives: string[] = [
     `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
     `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
-    `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`
+    `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`,
+    `Target carrier contract: ${manifest.targetCarrierProjection.targetCarrierContractRef}.`,
+    `Target carrier digest: ${manifest.targetCarrierProjection.targetCarrierContractDigest}.`,
+    `Target carrier kind: ${manifest.targetCarrierProjection.outputCarrierKind}; nested payload path: ${manifest.targetCarrierProjection.nestedPayloadPath}.`,
+    `Target carrier required fields: ${manifest.targetCarrierProjection.requiredFieldRefs.join(", ")}.`,
+    `Target carrier fixed protocol fields: ${manifest.targetCarrierProjection.fixedProtocolFieldRefs.join(", ")}.`,
+    `Worker-fillable target carrier fields: ${manifest.targetCarrierProjection.workerFillableFieldRefs.join(", ")}.`,
+    `Target carrier construction template: workerInvocationPackage.targetCarrierProjection.constructionTemplate (${manifest.targetCarrierProjection.constructionTemplateRef}).`
   ];
   directives.push(...retryDefectDirectivesForWorker(manifest));
   if (manifest.featureScope.mode === "full_breadth") {
@@ -3824,14 +5649,11 @@ function outcomeDirectivesForWorker(
     }
     if (manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
       directives.push(
-        "This edge conforms project authority from bootstrap documents.",
-        "Conform project authority from bootstrap/source fragments into context, intent, product, goals, and requirements surfaces.",
-        "MUST create/update authority files, not only the transform artifact: .ai-workspace/context/project_bootstrap.md, specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md, specification/requirements/README.md, specification/requirements/*.md.",
-        "Read root bootstrap/source files and .ai-workspace/context JSON/YAML/Markdown fragments before writing authority surfaces.",
-        "Preserve product identity, tenant/language/runtime, expected files, exact output, and execution command in INTENT, PRODUCT, and requirements.",
-        "INTENT must preserve source role and builder anchors: bootstrap document, odd_sdlc, language/runtime, and process execution proof.",
-        "Preserve declared product files, expected output, and execution command as explicit requirement obligations.",
-        "Cite Fg_conform_project_authority as Derived From for created/updated authority surfaces."
+        "This legacy authority-audit edge is not allowed to create replacement authority surfaces.",
+        "Use the deterministic project bootstrap read model and imported specification files as current state.",
+        "Do not write specification/INTENT.md, specification/PRODUCT.md, specification/GOALS.md, or specification/requirements/* from this edge.",
+        "If authority is missing or ambiguous, report residual pressure in the worker assessment; do not synthesize a conformant script or substitute authority.",
+        "Current-full traversal should normally enter through Fg_conform_project and derive_intent_surface, not this edge."
       );
     }
     if (manifest.edgeName === FG_DERIVE_LITE_DESIGN_ADR_SURFACE) {
@@ -3841,21 +5663,9 @@ function outcomeDirectivesForWorker(
         "Keep the design proportional to the bounded product: decision, module boundary, product file target, execution command, and requirement lineage are sufficient when the product is a single script."
       );
     }
-    if (manifest.edgeName === FG_DERIVE_LITE_MODULE_SURFACE) {
-      directives.push(
-        "This is the lite module-authority edge.",
-        "Produce only the implementation module authority needed by the lite implementation edge.",
-        "Do not introduce aggregate domain models, component topology, stack profiles, realization schedules, or one module/entity row per requirement unless the design artifact explicitly requires it."
-      );
-    }
     if (manifest.targetAssetType === "code_surface") {
       directives.push(
         "For code_surface, produce a compatibility rollup over admitted component_code_surface and component_realization_qualification_surface evidence."
-      );
-    }
-    if (manifest.targetAssetType === "test_module_surface") {
-      directives.push(
-        "For test_module_surface, produce a compatibility rollup over test topology/component test evidence."
       );
     }
   } else {
@@ -3875,7 +5685,9 @@ function outcomeDirectivesForWorker(
       `Required roles: ${listForPrompt(effectiveProductMaterializationRequiredRoles(manifest))}.`,
       `Build/test contracts: ${manifest.productMaterialization.buildExecutionContract} / ${manifest.productMaterialization.testExecutionContract}.`,
       productFileTargets.length === 0
-        ? "Declared product file targets: none."
+        ? manifest.targetAssetType === "component_test_surface"
+          ? "Declared product file targets: pending component-test register; componentTestRows[].relativePath becomes the test product target set for this edge."
+          : "Declared product file targets: none."
         : `Declared product file targets: ${productFileTargets.join(", ")}.`,
       productMaterializationAuthority.declaredProductTargetContracts.length === 0
         ? "Declared product target role policy: none."
@@ -3886,12 +5698,18 @@ function outcomeDirectivesForWorker(
             )
             .join("; ")}.`,
       productFileTargets.length === 0
-        ? "Declared product file target set is empty; do not leave tenant-root build/test byproducts as product materialization."
+        ? manifest.targetAssetType === "component_test_surface"
+          ? "Component test files required by this edge are product materialization under the selected output root; operator-run asset archives may hold evidence, but they do not satisfy role=test product materialization."
+          : "Declared product file target set is empty; do not leave tenant-root build/test byproducts as product materialization."
         : "Declared product file targets are the exact product surface for this edge. Build/test byproducts not listed as declared product targets, including Cargo.lock, target/, node_modules/, __pycache__/, dist/, and coverage/, must not remain under the tenant root when returning; write transient evidence under operator-run roots or clean byproducts after capturing execution evidence.",
       `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
       `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`,
+      "Do not use /tmp or any outside-workspace path for temporary build/test evidence; write transient logs under allowed write roots.",
+      "Allowed write roots are workspace-root-relative unless already absolute; if you change cwd into a tenant or shard directory, resolve allowed write roots to workspace-root absolute paths before writing logs.",
       "Do not create or modify product files outside the declared product file targets and allowed shared build roots for this edge.",
-      "Apply requirementTraceObligationIds as the complete product-file requirement tag set for this edge. Do not expand product file tags from traversal_intent_package; it is audit context for the broader graph.",
+      "Apply requirementTraceObligationIds as the prompt-visible required product-file requirement tag set for this edge.",
+      "On retry, requirement ids named by Current evaluated gaps are also admissible repair tags even when they are omitted from the prompt-limited requirementTraceObligationIds list; do not remove a current evaluated gap id solely because it is absent from that list.",
+      "Do not expand product file tags from traversal_intent_package alone; it is audit context for the broader graph.",
       "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file and list the cited obligation ids on materializedFiles[].requirementTraceObligationIds.",
       "For source files, put the requirement tags at the top of the file using valid native comment syntax, one exact id per line, for example `// requirement:<canonical-id>`; do not rely on the report alone for product-file lineage."
     );
@@ -3903,9 +5721,10 @@ function outcomeDirectivesForWorker(
         "If product target inventory is missing or ambiguous, inspect PRODUCT.md, requirements, and context refs in workerInvocationPackage.productMaterializationAuthority; derive the product topology and report the rationale in the worker result."
       );
     }
-    if (manifest.targetAssetType === "test_module_surface") {
+    if (manifest.targetAssetType === "test_design_surface") {
       directives.push(
-        "Generated tests must be discoverable by the declared test execution contract."
+        "Generated test plan rows must define discoverable tests for the declared test execution contract.",
+        "Emit a fenced ```test_design_register JSON block whose top-level kind is sdlc_test_design_register and whose row fields match workerInvocationPackage.targetCarrierProjection.constructionTemplate rowTemplates exactly."
       );
     }
     if (manifest.targetAssetType === "component_code_surface") {
@@ -3913,7 +5732,7 @@ function outcomeDirectivesForWorker(
         manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
           ? "For declared product materialization, materialize product files under the declared product file targets. The output artifact is the traversal summary carrier, not a substitute for source/build files. Use minimal source structure only when no topology authority is present."
           : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
-          ? "For lite component_code_surface, materialize only the bounded implementation files declared by the lite design/module authority. Do not expand into full component inventory, topology, realization schedule, release, or test-execution surfaces."
+          ? "For lite component_code_surface, materialize only the bounded implementation files declared by the lite composite implementation design authority. Do not expand into release or test-execution surfaces."
           : "For component_code_surface, materialize implementation files for each declared component and record Component Realization Register evidence."
       );
       if (
@@ -3921,7 +5740,7 @@ function outcomeDirectivesForWorker(
         manifest.edgeName !== FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
       ) {
         directives.push(
-          "When declared product file targets are empty, derive the product source target set from admitted component topology/schedule authority: read component_realization_schedule_surface and materialize source files at component_depth_register.componentRealizationRows[].relativePath.",
+          "When declared product file targets are empty, derive the product source target set from admitted composite implementation design authority and materialize source files at payload.componentRealizationRows[].relativePath.",
           "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization."
         );
       }
@@ -3929,12 +5748,18 @@ function outcomeDirectivesForWorker(
     if (manifest.targetAssetType === "component_test_surface") {
       directives.push(
         "For component_test_surface, materialize developer test files for each declared test class/file and record Component Test Register evidence.",
+        "When declared product file targets are empty, derive test product file targets from admitted composite test design and materialize them under selected output root; for node/javascript use test/<testClassId>.test.js unless admitted design names another tenant-root test path, and for other stacks choose a framework-discoverable test path under selected output root.",
+        "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
+        "Generated tests must execute from the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; do not assume the workspace root is the process cwd unless the shard declares it.",
+        "For node/javascript tests, derive tenant and workspace paths from import.meta.url or process.cwd() plus the shard workingDirectory; proof-binding checks may execute workspace-root product paths by setting cwd explicitly, not by assuming the test runner cwd.",
         "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS."
       );
     }
   }
   for (const directive of [
     compactDesignDepthDirective(manifest),
+    compactTestDesignDirective(manifest),
+    compactWorkspaceSpecSurfaceDirective(manifest),
     compactComponentDepthDirective(manifest),
     compactExecutionEvidenceDirective(manifest),
     compactScheduleDirective(manifest)
@@ -3975,6 +5800,13 @@ export function constructWorkerInvocationPackage(input: {
     ...(input.manifest.edgeAssuranceContractDigest === undefined
       ? {}
       : { edgeAssuranceContractDigest: input.manifest.edgeAssuranceContractDigest }),
+    ...(input.manifest.targetCarrierContractRef === undefined
+      ? {}
+      : { targetCarrierContractRef: input.manifest.targetCarrierContractRef }),
+    ...(input.manifest.targetCarrierContractDigest === undefined
+      ? {}
+      : { targetCarrierContractDigest: input.manifest.targetCarrierContractDigest }),
+    targetCarrierProjection: input.manifest.targetCarrierProjection,
     graphFunctionName: input.manifest.graphFunctionName,
     edgeName: input.manifest.edgeName,
     vectorIndex: input.manifest.vectorIndex,
@@ -4114,6 +5946,12 @@ export function constructWorkerBrief(input: {
     ...(input.manifest.edgeAssuranceContractDigest === undefined
       ? {}
       : { edgeAssuranceContractDigest: input.manifest.edgeAssuranceContractDigest }),
+    ...(input.manifest.targetCarrierContractRef === undefined
+      ? {}
+      : { targetCarrierContractRef: input.manifest.targetCarrierContractRef }),
+    ...(input.manifest.targetCarrierContractDigest === undefined
+      ? {}
+      : { targetCarrierContractDigest: input.manifest.targetCarrierContractDigest }),
     graphFunctionName: input.manifest.graphFunctionName,
     edgeName: input.manifest.edgeName,
     vectorIndex: input.manifest.vectorIndex,
@@ -4161,6 +5999,162 @@ export function constructWorkerBrief(input: {
   });
 }
 
+export function constructWorkerConstructionBrief(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly manifestPath: string;
+  readonly workerInvocationPackagePath: string;
+  readonly workerBriefPath: string;
+  readonly traversalIntentPath: string;
+  readonly conformedProjectPath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackage: SdlcWorkerInvocationPackage;
+  readonly workerBrief: SdlcWorkerBrief;
+}): SdlcWorkerConstructionBrief {
+  const manifestDigest = sha256Text(stableOperatorJson(input.manifest));
+  const workerBriefDigest = sha256Text(stableOperatorJson(input.workerBrief));
+  const authorityRefs =
+    input.manifest.traversalObligationContext.authorityRefs ??
+    input.manifest.traversalIntentPackage.authorityRefs;
+  const authorityIndex =
+    input.manifest.traversalObligationContext.authorityIndex ??
+    authorityIndexFor(authorityRefs);
+  const packageDispositions = Object.freeze([
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "worker_construction_brief.json",
+      path: workerFacingPath(input.manifest, input.constructionBriefPath),
+      digest: "<self>",
+      disposition: "canonical" as const,
+      role: "single prompt source carrier"
+    }),
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "worker_invocation_package.json",
+      path: workerFacingPath(input.manifest, input.workerInvocationPackagePath),
+      digest: input.invocationPackage.packageDigest,
+      disposition: "derive" as const,
+      role: "structured invocation projection"
+    }),
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "worker_brief.json",
+      path: workerFacingPath(input.manifest, input.workerBriefPath),
+      digest: workerBriefDigest,
+      disposition: "derive" as const,
+      role: "compact worker-facing projection"
+    }),
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "traversal_intent_package.json",
+      path: workerFacingPath(input.manifest, input.traversalIntentPath),
+      digest: input.manifest.traversalIntentPackage.packageDigest,
+      disposition: "derive" as const,
+      role: "traversal pressure and obligation projection"
+    }),
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "handoff_manifest.json",
+      path: workerFacingPath(input.manifest, input.manifestPath),
+      digest: manifestDigest,
+      disposition: "forensic" as const,
+      role: "operator archive manifest"
+    }),
+    Object.freeze({
+      kind: "sdlc_worker_construction_brief_package_disposition" as const,
+      packageName: "conformed_project.json",
+      path: workerFacingPath(input.manifest, input.conformedProjectPath),
+      digest: sha256Text(stableOperatorJson(input.manifest.conformedProject)),
+      disposition: "derive" as const,
+      role: "workspace conformance projection"
+    })
+  ]);
+  const base = Object.freeze({
+    kind: "sdlc_worker_construction_brief" as const,
+    briefVersion: "ts-worker-construction-brief-v1" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    vectorIndex: input.manifest.vectorIndex,
+    sourceAssetTypes: input.manifest.inputAssetTypes,
+    targetAssetType: input.manifest.targetAssetType,
+    canonicalPromptCarrierPath: workerFacingPath(
+      input.manifest,
+      input.constructionBriefPath
+    ),
+    promptSourcePolicyRef:
+      "policy://odd-sdlc/worker-prompt-source/worker-construction-brief/v1",
+    packageDispositions,
+    currentState: Object.freeze({
+      workspaceRoot: workerFacingPath(input.manifest, input.manifest.workspaceRoot),
+      archiveRoot: workerFacingPath(input.manifest, input.manifest.archiveRoot),
+      authorityRefs,
+      authorityIndex,
+      priorEdgeRefs: input.invocationPackage.priorEdgeRefs,
+      runtimeContextRefs: input.invocationPackage.runtimeContextRefs
+    }),
+    targetState: Object.freeze({
+      outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
+      reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+      materializationRequired: input.manifest.productMaterialization.required,
+      tenantRoot: workerFacingPath(
+        input.manifest,
+        input.manifest.productMaterialization.tenantRoot
+      ),
+      selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+      declaredProductFileTargets:
+        input.invocationPackage.outputContract.declaredProductFileTargets,
+      requiredRoles: input.invocationPackage.outputContract.requiredRoles,
+      buildExecutionContract:
+        input.manifest.productMaterialization.buildExecutionContract,
+      testExecutionContract:
+        input.manifest.productMaterialization.testExecutionContract
+    }),
+    authority: Object.freeze({
+      edgeAssuranceContractRef:
+        input.manifest.edgeAssuranceContractRef ?? null,
+      edgeAssuranceContractDigest:
+        input.manifest.edgeAssuranceContractDigest ?? null,
+      targetCarrierContractRef:
+        input.manifest.targetCarrierContractRef ?? null,
+      targetCarrierContractDigest:
+        input.manifest.targetCarrierContractDigest ?? null,
+      targetCarrierProjectionRef:
+        input.manifest.targetCarrierProjection.handoffProjectionRef,
+      traversalStrategyDecisionRef:
+        input.manifest.traversalStrategyDecision.strategyPlanRef,
+      featureScopeRef: input.manifest.featureScope.scopeRef
+    }),
+    obligations: Object.freeze({
+      inlineObligationIds: input.invocationPackage.inlineObligationIds,
+      requirementTraceObligationIds:
+        input.invocationPackage.requirementTraceObligationIds,
+      omittedObligationCount: input.invocationPackage.omittedObligationCount,
+      omittedRequirementTraceObligationCount:
+        input.invocationPackage.omittedRequirementTraceObligationCount,
+      obligationDeltaSummary: input.invocationPackage.obligationDeltaSummary
+    }),
+    retryAndRepair: Object.freeze({
+      retryAttemptRefs: input.invocationPackage.retryFrontier.retryAttemptRefs,
+      gapDossierRefs: input.invocationPackage.retryFrontier.dossierRefs,
+      retryInstructionCount:
+        input.invocationPackage.retryRepairInstructions.length,
+      repairReentryPlanCount:
+        input.invocationPackage.repairReentryPlans.length
+    })
+  });
+  const packageDigest = sha256Text(stableOperatorJson(base));
+  return Object.freeze({
+    ...base,
+    packageDispositions: Object.freeze(
+      base.packageDispositions.map((disposition) =>
+        disposition.packageName === "worker_construction_brief.json"
+          ? Object.freeze({ ...disposition, digest: packageDigest })
+          : disposition
+      )
+    ),
+    packageDigest
+  });
+}
+
 function workerFacingPath(
   manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
   filePath: string
@@ -4205,8 +6199,13 @@ function workerFacingDiagnosticText(
         return "[outside-workspace-file]";
       }
     })
-    .replace(/\/[A-Za-z0-9._~!$&'*+=:@%/-]+/gu, (candidate) =>
-      workerFacingDiagnosticPath(manifest, candidate)
+    .replace(
+      /(^|[\s;,(="'])\/(?!\/)[A-Za-z0-9._~!$&'*+=:@%/-]+/gu,
+      (match, prefix: string) =>
+        `${prefix}${workerFacingDiagnosticPath(
+          manifest,
+          match.slice(prefix.length)
+        )}`
     );
 }
 
@@ -4279,6 +6278,10 @@ function workerFacingProductMaterializationAuthority(
     contextExpectedTargetContracts: workerFacingTargetContracts(
       manifest,
       reconciliation.contextExpectedTargetContracts
+    ),
+    designAssetAuthorityTargetContracts: workerFacingTargetContracts(
+      manifest,
+      reconciliation.designAssetAuthorityTargetContracts
     ),
     requirementAuthorityTargetContracts: workerFacingTargetContracts(
       manifest,
@@ -4363,8 +6366,99 @@ function workerFacingRepairReentryPlans(
   );
 }
 
+const CURRENT_EVALUATED_GAP_PROMPT_REASON_LIMIT = 64;
+const CURRENT_EVALUATED_GAP_PROMPT_EVIDENCE_LIMIT = 6;
+
+function currentEvaluatedGapRequirementIds(
+  dossier: SdlcPostflightGapDossier
+): readonly string[] {
+  const ids = new Set<string>();
+  const pattern = /(?:requirement:)?workspace(?:\.[A-Za-z0-9_-]+)+/gu;
+  for (const reason of dossier.reasons) {
+    const candidates = [
+      reason.reason,
+      reason.blockingReason.message,
+      reason.blockingReason.detail ?? ""
+    ];
+    for (const candidate of candidates) {
+      for (const match of candidate.matchAll(pattern)) {
+        const raw = match[0];
+        ids.add(raw.startsWith("requirement:") ? raw : `requirement:${raw}`);
+      }
+    }
+  }
+  return uniqueSorted([...ids]);
+}
+
+function currentEvaluatedGapPromptLines(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const priorGapDossiers = manifest.retryContext.priorGapDossiers;
+  if (priorGapDossiers.length === 0) {
+    return Object.freeze([]);
+  }
+  const dossier = priorGapDossiers[priorGapDossiers.length - 1];
+  if (dossier === undefined) {
+    return Object.freeze([]);
+  }
+  const requirementIds = currentEvaluatedGapRequirementIds(dossier);
+  const evidenceRefs = workerFacingRefs(
+    manifest,
+    uniqueSorted([
+      ...dossier.evidenceRefs,
+      ...dossier.reasons.flatMap((reason) => reason.blockingReason.evidenceRefs)
+    ])
+  );
+  const reasonLines = dossier.reasons
+    .slice(0, CURRENT_EVALUATED_GAP_PROMPT_REASON_LIMIT)
+    .map((reason, index) => {
+      const detail = reason.blockingReason.detail ?? "";
+      const diagnostic =
+        detail.length > 0 && detail !== reason.reason
+          ? `${reason.reason} detail=${detail}`
+          : reason.reason;
+      return [
+        `${index + 1}. ${workerFacingDiagnosticText(manifest, diagnostic)}`,
+        `[class=${reason.reasonClass}; code=${reason.blockingReason.code}; reentry=${reason.blockingReason.lawfulReentryPoint}]`
+      ].join(" ");
+    });
+  return Object.freeze([
+    "",
+    "Current evaluated gaps:",
+    "- These are your current evaluated gaps for this retry; repair these concrete evaluator blockers before adding new scope.",
+    `- gapDossierRef: ${workerFacingRef(manifest, dossier.currentGapDossierRef)}`,
+    `- evaluated edge=${dossier.edgeName}; target=${dossier.targetAssetType}; retryEligible=${dossier.retryEligible}; reasonCount=${dossier.reasons.length}`,
+    ...(requirementIds.length > 0
+      ? [
+          "- blocked requirement obligations:",
+          ...requirementIds.map((id) => `  - ${workerFacingDiagnosticText(manifest, id)}`)
+        ]
+      : []),
+    ...(evidenceRefs.length > 0
+      ? [
+          `- evidence refs: ${evidenceRefs
+            .slice(0, CURRENT_EVALUATED_GAP_PROMPT_EVIDENCE_LIMIT)
+            .join(", ")}`
+        ]
+      : []),
+    "- evaluator reasons:",
+    ...reasonLines.map((reason) => `  - ${reason}`),
+    ...(dossier.reasons.length > CURRENT_EVALUATED_GAP_PROMPT_REASON_LIMIT
+      ? [
+          `  - omitted reason count: ${
+            dossier.reasons.length - CURRENT_EVALUATED_GAP_PROMPT_REASON_LIMIT
+          }`
+        ]
+      : [])
+  ]);
+}
+
 export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   const manifestPath = join(manifest.archiveRoot, "handoff_manifest.json");
+  const constructionBriefPath = join(
+    manifest.archiveRoot,
+    "worker_construction_brief.json"
+  );
   const invocationPackagePath = join(
     manifest.archiveRoot,
     "worker_invocation_package.json"
@@ -4374,6 +6468,14 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     manifest.archiveRoot,
     "traversal_intent_package.json"
   );
+  const productMaterializationAuthority =
+    reconcileSdlcProductMaterializationAuthority(manifest);
+  const declaredProductFileTargetLine =
+    productMaterializationAuthority.declaredProductFileTargets.length === 0
+      ? "declared product file targets: none"
+      : `declared product file targets: ${listForPrompt(
+          productMaterializationAuthority.declaredProductFileTargets
+        )}`;
   const outcomeSummary = [
     `edge=${manifest.edgeName}`,
     `target=${manifest.targetAssetType}`,
@@ -4383,19 +6485,48 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   const outcomeDirectives = outcomeDirectivesForWorker(manifest).map(
     (directive) => `- ${directive}`
   );
+  const currentEvaluatedGaps = currentEvaluatedGapPromptLines(manifest);
   return [
     "odd_sdlc F_P.transform launch contract.",
     `Outcome: ${outcomeSummary}`,
     "",
+    "Primary transform intent:",
+    `- graph function: ${manifest.graphFunctionName}`,
+    `- edge: ${manifest.edgeName} (${manifest.inputAssetTypes.join(", ")} -> ${manifest.targetAssetType})`,
+    `- selected target carrier: kind=${manifest.targetCarrierProjection.outputCarrierKind}; contract=${manifest.targetCarrierProjection.targetCarrierContractRef}; digest=${manifest.targetCarrierProjection.targetCarrierContractDigest}; payload path=${manifest.targetCarrierProjection.nestedPayloadPath}`,
+    `- output surface: ${workerFacingPath(manifest, manifest.outputFile)}`,
+    `- report surface: ${workerFacingPath(manifest, manifest.reportFile)}`,
+    `- materialization: ${
+      manifest.productMaterialization.required
+        ? `required; tenant=${workerFacingPath(
+            manifest,
+            manifest.productMaterialization.tenantRoot
+          )}; outputRoot=${manifest.productMaterialization.selectedOutputRoot}; roles=${listForPrompt(
+            effectiveProductMaterializationRequiredRoles(manifest)
+          )}`
+        : "not required"
+    }`,
+    `- ${declaredProductFileTargetLine}`,
+    `- execution contracts: build=${manifest.productMaterialization.buildExecutionContract}; test=${manifest.productMaterialization.testExecutionContract}`,
+    `- obligations in scope: ${manifest.traversalObligationContext.obligations.length}; feature scope=${manifest.featureScope.mode}; included modules=${listForPrompt(manifest.featureScope.includedModuleNames)}`,
+    "This section is the core F_P transform. The construction brief is the structured carrier for these same facts, not a replacement for reading the transform intent.",
+    "",
     "Read in order:",
-    `1. worker brief: ${workerFacingPath(manifest, workerBriefPath)}`,
-    `2. invocation package: ${workerFacingPath(manifest, invocationPackagePath)}`,
-    `3. traversal intent package: ${workerFacingPath(manifest, traversalIntentPath)}`,
-    `4. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
+    `1. construction brief: ${workerFacingPath(manifest, constructionBriefPath)}`,
+    `2. worker brief projection: ${workerFacingPath(manifest, workerBriefPath)}`,
+    `3. invocation package projection: ${workerFacingPath(manifest, invocationPackagePath)}`,
+    `4. traversal intent projection: ${workerFacingPath(manifest, traversalIntentPath)}`,
+    `5. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
     "",
     "Terse axioms:",
-    "- Apply workerInvocationPackage.transformAxioms as the single axiom authority.",
+    "- Apply worker_construction_brief.json as the single prompt source carrier.",
+    "- Treat worker brief, invocation package, traversal intent package, and handoff manifest as derived or forensic projections; do not invent competing prompt authority from them.",
+    "- Apply workerInvocationPackage.transformAxioms through the construction brief projection.",
     "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
+    "- Control boundary: do not run `odd-sdlc-ts`, `abiogenesis-ts`, `genesis-ts`, `start`, `gaps`, `analyze-run`, install, traversal, or resume commands from inside this worker.",
+    "- Do not spawn another worker or resume traversal. This process is the worker.",
+    "- Write only the contracted output/product artifacts, then exit; the framework evaluates the artifact after this process exits.",
+    "- Do not inspect or act on sibling operator-run directories except package files listed under Read in order for this invocation.",
     "- Do not add local axiom variants from this launch frame.",
     "",
     "Outcome directives:",
@@ -4409,6 +6540,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- traversalStrategyDecision",
     "- featureScope",
     "- retryRepairInstructions and repairReentryPlans when present.",
+    ...currentEvaluatedGaps,
     "",
     manifest.productMaterialization.required
       ? "Product materialization is REQUIRED for this edge."
@@ -4420,6 +6552,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
 export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   readonly manifestPath: string;
   readonly promptPath: string;
+  readonly constructionBriefPath: string;
   readonly invocationPackagePath: string;
   readonly workerBriefPath: string;
 } {
@@ -4437,6 +6570,10 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     "worker_invocation_package.json"
   );
   const workerBriefPath = join(manifest.archiveRoot, "worker_brief.json");
+  const constructionBriefPath = join(
+    manifest.archiveRoot,
+    "worker_construction_brief.json"
+  );
   const promptPath = join(manifest.archiveRoot, "worker_prompt.md");
   const conformedProjectPath = join(manifest.archiveRoot, "conformed_project.json");
   const traversalIntentPath = join(manifest.archiveRoot, "traversal_intent_package.json");
@@ -4453,9 +6590,25 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     conformedProjectPath,
     invocationPackage
   });
+  const constructionBrief = constructWorkerConstructionBrief({
+    manifest,
+    manifestPath,
+    workerInvocationPackagePath: invocationPackagePath,
+    workerBriefPath,
+    traversalIntentPath,
+    conformedProjectPath,
+    constructionBriefPath,
+    invocationPackage,
+    workerBrief
+  });
   writeFileSync(manifestPath, stableOperatorJson(manifest), "utf8");
   writeFileSync(invocationPackagePath, stableOperatorJson(invocationPackage), "utf8");
   writeFileSync(workerBriefPath, stableOperatorJson(workerBrief), "utf8");
+  writeFileSync(
+    constructionBriefPath,
+    stableOperatorJson(constructionBrief),
+    "utf8"
+  );
   writeFileSync(promptPath, promptForHandoff(manifest), "utf8");
   writeFileSync(conformedProjectPath, stableOperatorJson(manifest.conformedProject), "utf8");
   writeFileSync(
@@ -4473,6 +6626,7 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   return Object.freeze({
     manifestPath,
     promptPath,
+    constructionBriefPath,
     invocationPackagePath,
     workerBriefPath
   });
@@ -4978,6 +7132,10 @@ interface WorkerAuthorityBoundaryViolation {
   readonly path: string;
 }
 
+interface WorkerAuthorityRuntimeMetadataContext {
+  readonly executorSessionIds: ReadonlySet<string>;
+}
+
 function normalizedAuthorityPathKey(input: string): string {
   return input.replace(/[-_]/gu, "").toLowerCase();
 }
@@ -5002,6 +7160,64 @@ function looksLikeAnchoredFilesystemPath(input: string): boolean {
   return /^(?:\/Users|\/private|\/tmp|\/var|\/opt|\/Volumes|\/home)(?:\/|$)/u.test(
     input
   );
+}
+
+function normalizedWorkerRuntimePath(input: string): string {
+  return resolve(input).split(path.sep).join("/");
+}
+
+function collectExecutorSessionIdsFromWorkerEvent(
+  input: unknown,
+  sessionIds: Set<string>
+): void {
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      collectExecutorSessionIdsFromWorkerEvent(item, sessionIds);
+    }
+    return;
+  }
+  const record = objectRecord(input);
+  if (record === null) {
+    return;
+  }
+  for (const [key, value] of Object.entries(record)) {
+    if (
+      normalizedAuthorityPathKey(key) === "sessionid" &&
+      typeof value === "string" &&
+      value.length > 0
+    ) {
+      sessionIds.add(value);
+    }
+    collectExecutorSessionIdsFromWorkerEvent(value, sessionIds);
+  }
+}
+
+function workerAuthorityRuntimeMetadataContextFromEvents(
+  events: readonly unknown[]
+): WorkerAuthorityRuntimeMetadataContext {
+  const executorSessionIds = new Set<string>();
+  for (const event of events) {
+    collectExecutorSessionIdsFromWorkerEvent(event, executorSessionIds);
+  }
+  return Object.freeze({
+    executorSessionIds
+  });
+}
+
+function isWorkerRuntimeMetadataPath(input: {
+  readonly candidate: string;
+  readonly context: WorkerAuthorityRuntimeMetadataContext;
+}): boolean {
+  const normalized = normalizedWorkerRuntimePath(input.candidate);
+  if (!normalized.includes("/tool-results/")) {
+    return false;
+  }
+  for (const sessionId of input.context.executorSessionIds) {
+    if (normalized.includes(`/${sessionId}/tool-results/`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function candidateFilesystemPathsFromWorkerField(input: string): readonly string[] {
@@ -5043,6 +7259,7 @@ function collectWorkerAuthorityPathViolations(input: {
   readonly fieldPath: string;
   readonly workspaceRoot: string;
   readonly pathKeyContext: boolean;
+  readonly runtimeMetadataContext: WorkerAuthorityRuntimeMetadataContext;
   readonly violations: WorkerAuthorityBoundaryViolation[];
 }): void {
   if (typeof input.value === "string") {
@@ -5050,7 +7267,13 @@ function collectWorkerAuthorityPathViolations(input: {
       return;
     }
     for (const candidate of candidateFilesystemPathsFromWorkerField(input.value)) {
-      if (!pathIsInside(candidate, input.workspaceRoot)) {
+      if (
+        !pathIsInside(candidate, input.workspaceRoot) &&
+        !isWorkerRuntimeMetadataPath({
+          candidate,
+          context: input.runtimeMetadataContext
+        })
+      ) {
         input.violations.push(
           Object.freeze({
             sourceFile: input.sourceFile,
@@ -5070,6 +7293,7 @@ function collectWorkerAuthorityPathViolations(input: {
         fieldPath: `${input.fieldPath}[${index}]`,
         workspaceRoot: input.workspaceRoot,
         pathKeyContext: input.pathKeyContext,
+        runtimeMetadataContext: input.runtimeMetadataContext,
         violations: input.violations
       })
     );
@@ -5088,6 +7312,7 @@ function collectWorkerAuthorityPathViolations(input: {
       pathKeyContext:
         input.pathKeyContext ||
         workerAuthorityPathKeyCarriesFilesystemRef(key),
+      runtimeMetadataContext: input.runtimeMetadataContext,
       violations: input.violations
     });
   }
@@ -5144,6 +7369,7 @@ function evaluateWorkerAuthorityReadBoundary(input: {
     }
     evidenceRefs.add(pathToFileURL(logFile).href);
     const lines = readFileSync(logFile, "utf8").split(/\r?\n/u);
+    const parsedEvents: { readonly lineIndex: number; readonly value: unknown }[] = [];
     lines.forEach((line, lineIndex) => {
       const trimmed = line.trim();
       if (trimmed.length === 0) {
@@ -5153,14 +7379,21 @@ function evaluateWorkerAuthorityReadBoundary(input: {
       if (!parsed.ok) {
         return;
       }
-      for (const payload of workerAuthorityPayloadsFromEvent(parsed.value)) {
+      parsedEvents.push({ lineIndex, value: parsed.value });
+    });
+    const runtimeMetadataContext = workerAuthorityRuntimeMetadataContextFromEvents(
+      parsedEvents.map((event) => event.value)
+    );
+    for (const parsedEvent of parsedEvents) {
+      for (const payload of workerAuthorityPayloadsFromEvent(parsedEvent.value)) {
         const violations: WorkerAuthorityBoundaryViolation[] = [];
         collectWorkerAuthorityPathViolations({
           value: payload.value,
           sourceFile: logFile,
-          fieldPath: `${fileName}:${lineIndex + 1}.${payload.fieldPath}`,
+          fieldPath: `${fileName}:${parsedEvent.lineIndex + 1}.${payload.fieldPath}`,
           workspaceRoot,
           pathKeyContext: false,
+          runtimeMetadataContext,
           violations
         });
         for (const violation of violations) {
@@ -5170,7 +7403,7 @@ function evaluateWorkerAuthorityReadBoundary(input: {
           );
         }
       }
-    });
+    }
   }
   const violations = [...violationsByKey.values()];
   if (violations.length === 0) {
@@ -5539,10 +7772,7 @@ function materializedRoleForObservedFile(input: {
   ) {
     return "test";
   }
-  if (
-    input.manifest.targetAssetType === "test_module_surface" ||
-    targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)
-  ) {
+  if (targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType)) {
     return "test";
   }
   if (isLikelySourceMaterialization(input.relativePath)) {
@@ -5664,6 +7894,19 @@ function targetContractForMaterializedFile(input: {
         normalizedRelativePath: normalized
       })
     ) ?? null
+  );
+}
+
+function isAdmissibleAuxiliaryBuildConfig(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcMaterializedProductFile;
+}): boolean {
+  return (
+    input.file.role === "build_config" &&
+    declaredBuildConfigRoleForObservedFile({
+      manifest: input.manifest,
+      normalizedRelativePath: normalizedRelativePath(input.file.relativePath)
+    }) === "build_config"
   );
 }
 
@@ -5849,6 +8092,74 @@ function priorAdmittedMaterializedFileForObservedFile(input: {
   return Object.freeze({ kind: "none" as const });
 }
 
+function priorAdmittedMaterializedFileForObservedProductLineage(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly file: SdlcObservedProductFileSnapshot;
+}): PriorAdmittedObservedMaterializedFileLookup {
+  for (const archiveRoot of productMaterializationReplayArchives(input.manifest)) {
+    const manifestFile = join(archiveRoot, "product_materialization_manifest.json");
+    if (!existsSync(manifestFile) || !statSync(manifestFile).isFile()) {
+      continue;
+    }
+    try {
+      const replayManifest = parseOpenRecord(
+        JSON.parse(readFileSync(manifestFile, "utf8")),
+        "productMaterializationLineage.manifest"
+      );
+      if (replayManifest["kind"] !== "sdlc_product_materialization_manifest") {
+        continue;
+      }
+      const priorContract = parseOpenRecord(
+        replayManifest["contract"],
+        "productMaterializationLineage.contract"
+      );
+      if (
+        resolve(
+          parseNonEmptyString(
+            priorContract["tenantRoot"],
+            "productMaterializationLineage.contract.tenantRoot"
+          )
+        ) !== resolve(input.manifest.productMaterialization.tenantRoot) ||
+        parseNonEmptyString(
+          priorContract["activeTenant"],
+          "productMaterializationLineage.contract.activeTenant"
+        ) !== input.manifest.productMaterialization.activeTenant ||
+        parseNonEmptyString(
+          priorContract["selectedOutputRoot"],
+          "productMaterializationLineage.contract.selectedOutputRoot"
+        ) !== input.manifest.productMaterialization.selectedOutputRoot
+      ) {
+        continue;
+      }
+      const files = parseArray(
+        replayManifest["files"],
+        "productMaterializationLineage.manifest.files",
+        admitMaterializedProductFile
+      );
+      const matched = files.find(
+        (candidate) =>
+          candidate.relativePath === input.file.relativePath &&
+          candidate.digest === input.file.digest
+      );
+      if (matched !== undefined) {
+        return Object.freeze({
+          kind: "file" as const,
+          file: replayMaterializedFile({
+            manifest: input.manifest,
+            file: matched,
+            sourceManifestRef: pathToFileURL(manifestFile).href,
+            sourceHandoffManifestRef: handoffManifestRefForArchiveRoot(archiveRoot),
+            sourceAttemptRef: attemptRefForArchiveRoot(archiveRoot)
+          })
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+  return Object.freeze({ kind: "none" as const });
+}
+
 function observeProductMaterializationDeltaWithDiagnostics(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly before: SdlcProductMaterializationSnapshot;
@@ -5872,30 +8183,45 @@ function observeProductMaterializationDeltaWithDiagnostics(input: {
     ) {
       continue;
     }
+    if (
+      !input.manifest.productMaterialization.required &&
+      isTenantLocalSdlcSurfaceRelativePath(file.relativePath)
+    ) {
+      continue;
+    }
     const changed = beforeByPath.get(file.relativePath)?.digest !== file.digest;
-    if (!changed && input.manifest.productMaterialization.required) {
-      const priorAdmitted = priorAdmittedMaterializedFileForObservedFile({
-        manifest: input.manifest,
-        file
-      });
-      if (
-        priorAdmitted.kind === "file" &&
-        effectiveProductMaterializationRequiredRoles(input.manifest).includes(
-          priorAdmitted.file.role
-        )
-      ) {
-        observedByPath.set(file.relativePath, priorAdmitted.file);
-        continue;
-      }
-      if (priorAdmitted.kind === "diagnostic") {
-        for (const diagnostic of priorAdmitted.diagnostics) {
-          diagnosticsByKey.set(
-            `${diagnostic.code}\n${diagnostic.detail}\n${diagnostic.evidenceRefs.join("\n")}`,
-            diagnostic
-          );
+    const priorAdmitted =
+      input.manifest.productMaterialization.required && !changed
+        ? priorAdmittedMaterializedFileForObservedFile({
+            manifest: input.manifest,
+            file
+          })
+        : !input.manifest.productMaterialization.required
+          ? priorAdmittedMaterializedFileForObservedProductLineage({
+              manifest: input.manifest,
+              file
+            })
+          : Object.freeze({ kind: "none" as const });
+    if (priorAdmitted.kind === "file") {
+      if (input.manifest.productMaterialization.required) {
+        if (
+          effectiveProductMaterializationRequiredRoles(input.manifest).includes(
+            priorAdmitted.file.role
+          )
+        ) {
+          observedByPath.set(file.relativePath, priorAdmitted.file);
         }
-        continue;
       }
+      continue;
+    }
+    if (priorAdmitted.kind === "diagnostic") {
+      for (const diagnostic of priorAdmitted.diagnostics) {
+        diagnosticsByKey.set(
+          `${diagnostic.code}\n${diagnostic.detail}\n${diagnostic.evidenceRefs.join("\n")}`,
+          diagnostic
+        );
+      }
+      continue;
     }
     const satisfiesRequiredRole = observedFileSatisfiesRequiredRole({
       manifest: input.manifest,
@@ -6400,6 +8726,9 @@ function materializedFileRequirementLineage(input: {
   }
   const lineageByPath = new Map<string, Set<string>>();
   const canonicalByObligationId = canonicalRequirementLineageMap(input.manifest);
+  const requirementDisplayIds = requirementDisplayIdByObligationId(input.manifest);
+  const equivalentRequirementIdsByCanonical =
+    equivalentRequirementLineageIdsByCanonical(input.manifest);
   const fileRefByPath = new Map(
     input.report.materializedFiles.map((file) => [
       resolve(file.absolutePath),
@@ -6422,16 +8751,44 @@ function materializedFileRequirementLineage(input: {
     ) {
       continue;
     }
-    const evidenceRefs = new Set(assessment.evidenceRefs);
+    const evidenceRefs = new Set(
+      assessment.evidenceRefs.flatMap((ref) => coverageRefAliases(ref))
+    );
     for (const [absolutePath, fileRef] of fileRefByPath.entries()) {
-      if (!evidenceRefs.has(fileRef)) {
+      const fileAliases = [
+        ...coverageRefAliases(fileRef),
+        ...coverageRefAliases(absolutePath)
+      ];
+      if (!fileAliases.some((alias) => evidenceRefs.has(alias))) {
+        continue;
+      }
+      const content =
+        existsSync(absolutePath) && statSync(absolutePath).isFile()
+          ? readFileSync(absolutePath, "utf8")
+          : "";
+      const canonicalRequirementId =
+        canonicalByObligationId.get(assessment.obligationId) ??
+        assessment.obligationId;
+      const equivalentIds =
+        equivalentRequirementIdsByCanonical.get(canonicalRequirementId) ??
+        Object.freeze([assessment.obligationId, canonicalRequirementId]);
+      if (
+        !equivalentIds.some((obligationId) =>
+          contentCarriesRequirementObligation({
+            content,
+            obligationId,
+            displayId:
+              requirementDisplayIds.get(obligationId) ??
+              requirementDisplayIds.get(assessment.obligationId) ??
+              requirementDisplayIds.get(canonicalRequirementId) ??
+              null
+          })
+        )
+      ) {
         continue;
       }
       const existing = lineageByPath.get(absolutePath) ?? new Set<string>();
-      existing.add(
-        canonicalByObligationId.get(assessment.obligationId) ??
-          assessment.obligationId
-      );
+      existing.add(canonicalRequirementId);
       lineageByPath.set(absolutePath, existing);
     }
   }
@@ -6451,7 +8808,6 @@ function productMaterializationRequirementLineageRequired(
     requirementTraceObligationIdsForPrompt(manifest).length > 0 &&
     (manifest.targetAssetType === "component_code_surface" ||
       manifest.targetAssetType === "component_test_surface" ||
-      manifest.targetAssetType === "test_module_surface" ||
       manifest.targetAssetType === "code_surface")
   );
 }
@@ -6528,12 +8884,16 @@ function postTransformObligationAssessments(input: {
           input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
           !input.manifest.productMaterialization.required &&
           !recordsRequirementSurfaceOnly;
+        const carriesNonMaterializedRequirementForward =
+          !input.manifest.productMaterialization.required &&
+          !recordsRequirementSurfaceOnly;
         const fulfillmentStatus =
           observed && recordsRequirementSurfaceOnly
             ? "partial"
             : observed
               ? "fulfilled"
-              : carriesAuthorityRequirementForward
+              : carriesAuthorityRequirementForward ||
+                  carriesNonMaterializedRequirementForward
                 ? "partial"
                 : "blocked";
         return Object.freeze({
@@ -6546,6 +8906,8 @@ function postTransformObligationAssessments(input: {
               ? Object.freeze([])
               : Object.freeze([
                   carriesAuthorityRequirementForward
+                    ? `requirement_carried_for_downstream_closure:${requirementId}`
+                    : carriesNonMaterializedRequirementForward
                     ? `requirement_carried_for_downstream_closure:${requirementId}`
                     : observed
                     ? `requirement_recorded_for_future_closure:${requirementId}`
@@ -7373,10 +9735,9 @@ function evaluateMaterializedProductFiles(input: {
     equivalentRequirementLineageIdsByCanonical(input.manifest);
   const requirementLineageRequired =
     productMaterializationRequirementLineageRequired(input.manifest);
-  const currentRequirementLineageIds = new Set(
-    requirementTraceObligationIdsForPrompt(input.manifest)
+  const validRequirementLineageIds = new Set(
+    requirementTraceObligationIdsForProductLineage(input.manifest)
   );
-  const carriedCurrentRequirementLineageIds = new Set<string>();
   for (const file of input.report.materializedFiles) {
     const absolutePath = resolve(file.absolutePath);
     const fileEvidenceRef = pathToFileURL(absolutePath).href;
@@ -7389,7 +9750,11 @@ function evaluateMaterializedProductFiles(input: {
     });
     if (
       materializationAuthority.declaredProductTargetContracts.length > 0 &&
-      targetContract === null
+      targetContract === null &&
+      !isAdmissibleAuxiliaryBuildConfig({
+        manifest: input.manifest,
+        file
+      })
     ) {
       input.blockingReasonCarriers.push(
         makeSdlcBlockingReason({
@@ -7499,13 +9864,8 @@ function evaluateMaterializedProductFiles(input: {
       manifest: input.manifest,
       obligationIds: file.requirementTraceObligationIds ?? []
     });
-    for (const obligationId of requirementTraceObligationIds) {
-      if (currentRequirementLineageIds.has(obligationId)) {
-        carriedCurrentRequirementLineageIds.add(obligationId);
-      }
-    }
     const unrelatedRequirementLineage = requirementTraceObligationIds.filter(
-      (obligationId) => !currentRequirementLineageIds.has(obligationId)
+      (obligationId) => !validRequirementLineageIds.has(obligationId)
     );
     const missingRequirementLineage =
       requirementLineageRequired && requirementTraceObligationIds.length === 0
@@ -7560,22 +9920,6 @@ function evaluateMaterializedProductFiles(input: {
         makeSdlcBlockingReason({
           code: "materialized_product_digest_mismatch",
           evidenceRefs: [fileEvidenceRef]
-        })
-      );
-    }
-  }
-  if (requirementLineageRequired) {
-    const missingCurrentRequirementLineage = [...currentRequirementLineageIds].filter(
-      (obligationId) => !carriedCurrentRequirementLineageIds.has(obligationId)
-    );
-    if (missingCurrentRequirementLineage.length > 0) {
-      input.blockingReasonCarriers.push(
-        makeSdlcBlockingReason({
-          code: "materialized_product_requirement_lineage_missing",
-          detail: `current_requirements: ${missingCurrentRequirementLineage.join(", ")}`,
-          evidenceRefs: [
-            pathToFileURL(resolve(input.manifest.productMaterialization.tenantRoot)).href
-          ]
         })
       );
     }
@@ -8132,7 +10476,7 @@ export function evaluateWorkerResultPostflight(input: {
   const replayResolution = resolveProductMaterializationReplay(input);
   const report = replayResolution.report;
   const blockingReasonCarriers: SdlcBlockingReason[] = [];
-  const materializationDiagnostics = report.materializationDiagnostics;
+  const materializationDiagnostics = report.materializationDiagnostics ?? [];
   for (const diagnostic of materializationDiagnostics) {
     blockingReasonCarriers.push(
       makeSdlcBlockingReason({

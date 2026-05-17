@@ -47,11 +47,8 @@ export const FG_SOLUTION_ARCHITECTURE_EXECUTIVE =
   "solution_architecture" as const;
 export const FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE =
   "lite_design_module_implementation" as const;
-export const FG_UAT_TEST_CASES_EXECUTIVE = "uat_test_cases" as const;
 export const FG_DERIVE_LITE_DESIGN_ADR_SURFACE =
   "derive_lite_design_adr_surface" as const;
-export const FG_DERIVE_LITE_MODULE_SURFACE =
-  "derive_lite_module_surface" as const;
 export const FG_DERIVE_LITE_COMPONENT_CODE_SURFACE =
   "derive_lite_component_code_surface" as const;
 
@@ -63,6 +60,8 @@ export const BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS = Object.freeze([
 ] as const);
 
 export const SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS = Object.freeze([
+  "derive_uat_testcases_surface",
+  "derive_testcase_authority_surface",
   "derive_feature_decomp_surface",
   "derive_design_surface",
   "derive_scenario_surface",
@@ -71,12 +70,7 @@ export const SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS = Object.freeze([
 
 export const LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
-] as const);
-
-export const UAT_TEST_CASES_EXECUTIVE_STEPS = Object.freeze([
-  "derive_uat_testcases_surface"
 ] as const);
 
 function entry(input: {
@@ -84,7 +78,7 @@ function entry(input: {
   readonly intent: string;
   readonly inputs: readonly string[];
   readonly outputs: readonly string[];
-  readonly graphTrackPublication?: "default" | "overlay_only";
+  readonly graphTrackPublication?: SdlcFunctionCatalogEntry["graphTrackPublication"];
 }): SdlcFunctionCatalogEntry {
   return Object.freeze({
     kind: "sdlc_function_catalog_entry",
@@ -103,6 +97,31 @@ function entry(input: {
 
 export const SDLC_REUSABLE_GRAPH_FUNCTION_CATALOG =
   REUSABLE_GRAPH_FUNCTION_CATALOG;
+
+export const OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS = Object.freeze([
+  "derive_intent_surface",
+  "derive_product_surface",
+  "derive_goal_surface",
+  "derive_requirement_surface",
+  "derive_uat_testcases_surface",
+  "derive_testcase_authority_surface",
+  "derive_feature_decomp_surface",
+  "derive_design_surface",
+  "derive_scenario_surface",
+  "derive_implementation_design_surface",
+  "derive_component_code_surface",
+  "qualify_component_realization_surface",
+  "derive_code_surface",
+  "derive_test_design_surface",
+  "derive_component_test_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "qualify_component_test_execution_surface",
+  "derive_component_repair_schedule_surface",
+  "derive_test_run_archive_surface",
+  "derive_release_depth_parity_surface",
+  "prepare_release_surface"
+] as const);
 
 export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   entry({
@@ -130,127 +149,71 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["requirement_surface"]
   }),
   entry({
-    name: "derive_feature_decomp_surface",
-    intent: "Derive feature decomposition from current requirements.",
-    inputs: ["requirement_surface"],
-    outputs: ["feature_decomp_surface"]
-  }),
-  entry({
     name: "derive_uat_testcases_surface",
-    intent: "Derive operator UAT testcase structure from requirements and admitted solution architecture authority.",
-    inputs: ["requirement_surface", "implementation_design_surface"],
+    intent: "Derive UAT testcase pressure directly from requirements before solution design so tests can constrain design instead of being reconstructed from it.",
+    inputs: ["requirement_surface"],
     outputs: ["uat_testcases_surface"]
   }),
   entry({
+    name: "derive_testcase_authority_surface",
+    intent: "Derive testcase authority that binds UAT testcase rows to requirement pressure before design and implementation planning.",
+    inputs: ["requirement_surface", "uat_testcases_surface"],
+    outputs: ["testcase_authority_surface"]
+  }),
+  entry({
+    name: "derive_feature_decomp_surface",
+    intent: "Derive feature decomposition from current requirements.",
+    inputs: ["requirement_surface", "uat_testcases_surface"],
+    outputs: ["feature_decomp_surface"]
+  }),
+  entry({
     name: "derive_design_surface",
-    intent: "Derive design from requirements and feature decomposition.",
-    inputs: ["requirement_surface", "feature_decomp_surface"],
+    intent: "Derive design from requirements, UAT pressure, testcase authority, and feature decomposition.",
+    inputs: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "feature_decomp_surface"
+    ],
     outputs: ["design_surface"]
   }),
   entry({
     name: "derive_scenario_surface",
     intent: "Derive scenario bundles from requirements and design.",
-    inputs: ["requirement_surface", "design_surface"],
+    inputs: [
+      "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "design_surface"
+    ],
     outputs: ["scenario_surface"]
   }),
   entry({
     name: "derive_implementation_design_surface",
-    intent: "Derive recursive implementation design from design and scenarios.",
+    intent: "Derive the composite implementation plan carrier from design and scenarios, including stack profile, module rows, aggregate domain model rows, component topology rows, sunny-day sequence rows, realization schedule rows, and file target rows.",
     inputs: ["design_surface", "scenario_surface"],
     outputs: ["implementation_design_surface"]
   }),
   entry({
-    name: "select_implementation_stack_profile",
-    intent: "Select implementation stack profile for the implementation design.",
-    inputs: ["implementation_design_surface"],
-    outputs: ["implementation_stack_profile"]
-  }),
-  entry({
-    name: "derive_implementation_module_surface",
-    intent: "Derive implementation module structure, requirement allocation, per-module attribute schemas, and per-module state diagrams.",
-    inputs: ["implementation_design_surface", "implementation_stack_profile"],
-    outputs: ["implementation_module_surface"]
-  }),
-  entry({
-    name: "derive_aggregate_domain_model_surface",
-    intent: "Compose per-module typed schemas into one aggregate domain model before component topology and scheduling.",
-    inputs: ["implementation_module_surface"],
-    outputs: ["aggregate_domain_model_surface"]
-  }),
-  entry({
-    name: "derive_implementation_component_topology_surface",
-    intent: "Derive production-shaped implementation component topology from implementation design, module authority, aggregate domain model, and stack profile.",
-    inputs: [
-      "implementation_design_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "implementation_stack_profile"
-    ],
-    outputs: ["implementation_component_topology_surface"]
-  }),
-  entry({
-    name: "derive_aggregate_sunny_day_sequence_surface",
-    intent: "Compose component topology and aggregate domain model into one end-to-end sunny-day sequence before realization scheduling.",
-    inputs: [
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "implementation_component_topology_surface"
-    ],
-    outputs: ["aggregate_sunny_day_sequence_surface"]
-  }),
-  entry({
-    name: "derive_component_realization_schedule_surface",
-    intent: "Derive component-level realization schedule from component topology, aggregate design surfaces, module authority, and stack profile.",
-    inputs: [
-      "implementation_component_topology_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "implementation_stack_profile"
-    ],
-    outputs: ["component_realization_schedule_surface"]
-  }),
-  entry({
     name: "derive_component_code_surface",
-    intent: "Materialize or repair component-shaped implementation code from component topology, realization schedule, and any admitted component repair schedule.",
-    inputs: [
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
+    intent: "Materialize or repair component-shaped implementation code from the composite implementation plan carrier and any admitted component repair schedule.",
+    inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"]
   }),
   entry({
     name: "qualify_component_realization_surface",
     intent: "Qualify component code against the declared implementation component topology.",
     inputs: [
-      "implementation_component_topology_surface",
+      "implementation_design_surface",
       "component_code_surface"
     ],
     outputs: ["component_realization_qualification_surface"]
   }),
   entry({
-    name: "derive_realization_schedule_surface",
-    intent: "Derive governed realization schedule from implementation design, modules, and stack profile.",
+    name: "derive_code_surface",
+    intent: "Derive the aggregate governed code surface from the composite implementation plan carrier, component code, and component realization qualification.",
     inputs: [
       "implementation_design_surface",
-      "implementation_module_surface",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "implementation_component_topology_surface",
-      "component_realization_schedule_surface",
-      "implementation_stack_profile"
-    ],
-    outputs: ["realization_schedule_surface"]
-  }),
-  entry({
-    name: "derive_code_surface",
-    intent: "Derive governed code from implementation modules, stack profile, and admitted realization schedule.",
-    inputs: [
-      "implementation_module_surface",
-      "implementation_stack_profile",
-      "realization_schedule_surface",
-      "implementation_component_topology_surface",
       "component_code_surface",
       "component_realization_qualification_surface"
     ],
@@ -258,74 +221,44 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
   }),
   entry({
     name: "derive_test_design_surface",
-    intent: "Derive recursive test design from design and scenarios.",
-    inputs: ["design_surface", "scenario_surface"],
+    intent: "Derive the composite test plan carrier from design, scenarios, implementation plan, and component code evidence, including design-consumption rows, UAT testcase rows, testcase-authority rows, stack profile rows, test module rows, test topology rows, test data bindings, expected-result bindings, UAT-to-integration bindings, and execution schedule rows.",
+    inputs: [
+      "design_surface",
+      "scenario_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
+      "implementation_design_surface",
+      "component_code_surface"
+    ],
     outputs: ["test_design_surface"]
   }),
   entry({
-    name: "select_test_stack_profile",
-    intent: "Select the test stack profile for the current test design.",
-    inputs: ["test_design_surface"],
-    outputs: ["test_stack_profile"]
-  }),
-  entry({
-    name: "derive_test_module_surface",
-    intent: "Derive test module structure and planned validation allocation.",
-    inputs: ["test_design_surface", "test_stack_profile"],
-    outputs: ["test_module_surface"]
-  }),
-  entry({
-    name: "derive_test_component_topology_surface",
-    intent: "Derive test-class topology and TC allocation over implementation component topology.",
+    name: "derive_component_test_surface",
+    intent: "Materialize or repair component-shaped test code from the composite test plan carrier, component code, and any admitted component repair schedule.",
     inputs: [
       "test_design_surface",
-      "test_module_surface",
-      "implementation_component_topology_surface"
-    ],
-    outputs: ["test_component_topology_surface"]
-  }),
-  entry({
-    name: "derive_component_test_surface",
-    intent: "Materialize or repair component-shaped test code from test component topology, component code, and any admitted component repair schedule.",
-    inputs: [
-      "test_component_topology_surface",
-      "component_code_surface",
-      "test_stack_profile"
+      "component_code_surface"
     ],
     outputs: ["component_test_surface"]
   }),
   entry({
-    name: "derive_test_schedule_surface",
-    intent: "Derive governed test execution schedule from test design, modules, and stack profile.",
-    inputs: [
-      "test_design_surface",
-      "test_module_surface",
-      "test_stack_profile",
-      "aggregate_domain_model_surface",
-      "aggregate_sunny_day_sequence_surface",
-      "test_component_topology_surface",
-      "component_test_surface"
-    ],
-    outputs: ["test_schedule_surface"]
-  }),
-  entry({
     name: "prepare_test_execution_surface",
-    intent: "Prepare command-side test execution transition surface from the admitted test schedule.",
-    inputs: ["test_schedule_surface"],
+    intent: "Prepare declared framework or command-side test execution transition surface from the admitted composite test plan.",
+    inputs: ["test_design_surface"],
     outputs: ["test_execution_surface"]
   }),
   entry({
     name: "derive_test_execution_result_surface",
-    intent: "Admit governed test execution evidence before archive publication.",
-    inputs: ["test_execution_surface", "test_schedule_surface"],
+    intent: "Admit governed framework execution evidence and observed test results before archive publication.",
+    inputs: ["test_execution_surface", "test_design_surface"],
     outputs: ["test_execution_result_surface"]
   }),
   entry({
     name: "qualify_component_test_execution_surface",
-    intent: "Qualify component test execution evidence against test component topology and materialized component tests.",
+    intent: "Verify observed test results against expected results in the composite test plan and materialized component tests.",
     inputs: [
       "test_execution_result_surface",
-      "test_component_topology_surface",
+      "test_design_surface",
       "component_test_surface"
     ],
     outputs: ["component_test_qualification_surface"]
@@ -344,9 +277,7 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     name: "derive_test_run_archive_surface",
     intent: "Derive governed test run archive surface from admitted test execution result truth and component repair schedule state.",
     inputs: [
-      "test_module_surface",
-      "test_stack_profile",
-      "test_schedule_surface",
+      "test_design_surface",
       "test_execution_result_surface",
       "component_test_qualification_surface",
       "component_repair_schedule_surface"
@@ -354,16 +285,10 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     outputs: ["test_run_archive_surface"]
   }),
   entry({
-    name: "qualify_testcase_authority",
-    intent: "Qualify UAT and scenario surfaces as testcase authority.",
-    inputs: ["uat_testcases_surface", "scenario_surface"],
-    outputs: ["testcase_authority_surface"]
-  }),
-  entry({
     name: "derive_release_depth_parity_surface",
-    intent: "Derive release depth parity evidence from component realization, component tests, and admitted test run archive truth.",
+    intent: "Derive release depth parity and co-affirmation evidence from component realization, component tests, and admitted test run archive truth.",
     inputs: [
-      "implementation_component_topology_surface",
+      "implementation_design_surface",
       "component_realization_qualification_surface",
       "component_test_qualification_surface",
       "component_repair_schedule_surface",
@@ -376,10 +301,12 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     intent: "Prepare release readiness from requirements, design, code, tests, and archive evidence.",
     inputs: [
       "requirement_surface",
+      "uat_testcases_surface",
+      "testcase_authority_surface",
       "design_surface",
       "scenario_surface",
       "code_surface",
-      "testcase_authority_surface",
+      "test_design_surface",
       "test_run_archive_surface",
       "component_repair_schedule_surface",
       "release_depth_parity_surface"
@@ -481,19 +408,9 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
     graphTrackPublication: "overlay_only"
   }),
   entry({
-    name: FG_DERIVE_LITE_MODULE_SURFACE,
-    intent: "Derive compact module authority from the lite design/ADR surface for immediate implementation.",
-    inputs: ["implementation_design_surface"],
-    outputs: ["implementation_module_surface"],
-    graphTrackPublication: "overlay_only"
-  }),
-  entry({
     name: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-    intent: "Materialize a bounded component implementation from lite design/ADR and module authority without expanding through full topology, stack profile, or realization scheduling.",
-    inputs: [
-      "implementation_design_surface",
-      "implementation_module_surface"
-    ],
+    intent: "Materialize a bounded component implementation from the lite composite implementation design carrier.",
+    inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"],
     graphTrackPublication: "overlay_only"
   })

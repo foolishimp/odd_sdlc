@@ -31,14 +31,12 @@ import {
   SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS,
   TRIAGE_FUNCTION_CATALOG,
   LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
+  OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-  FG_DERIVE_LITE_MODULE_SURFACE,
-  UAT_TEST_CASES_EXECUTIVE_STEPS,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
-  FG_UAT_TEST_CASES_EXECUTIVE,
   assertSdlcModuleJobsTargetPublishedGraphFunctions,
   constructSdlcGraphFunctionCatalog,
   constructSdlcGtlModule,
@@ -145,13 +143,12 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
       "release_operational_cycle",
       FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
       FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
-      FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
-      FG_UAT_TEST_CASES_EXECUTIVE
+      FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE
     ]
   );
   assert.deepStrictEqual(
     catalog.executives[0].steps,
-    BOOTSTRAP_RELEASE_FUNCTION_CATALOG.map((entry) => entry.name)
+    [...OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS]
   );
   assert.deepStrictEqual(
     catalog.executives[1].steps,
@@ -169,18 +166,10 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
     catalog.executives[4].steps,
     [...LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS]
   );
-  assert.deepStrictEqual(
-    catalog.executives[5].steps,
-    [...UAT_TEST_CASES_EXECUTIVE_STEPS]
+  assert.equal(
+    catalog.functions.find((entry) => entry.name === "derive_test_design_surface")?.outputs[0],
+    "test_design_surface"
   );
-  const uatEntry = catalog.functions.find(
-    (entry) => entry.name === "derive_uat_testcases_surface"
-  );
-  assert(uatEntry);
-  assert.deepStrictEqual(uatEntry.inputs, [
-    "requirement_surface",
-    "implementation_design_surface"
-  ]);
 });
 
 test("T-030 reusable graph functions preserve catalog input and output signatures", () => {
@@ -220,10 +209,8 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   assert(graphFunctionNames.includes(FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE));
   assert(graphFunctionNames.includes(FG_SOLUTION_ARCHITECTURE_EXECUTIVE));
   assert(graphFunctionNames.includes(FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE));
-  assert(graphFunctionNames.includes(FG_UAT_TEST_CASES_EXECUTIVE));
   for (const liteGraphFunctionName of [
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
-    FG_DERIVE_LITE_MODULE_SURFACE,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   ]) {
     const liteGraphFunction = module.graphFunctions.find(
@@ -241,11 +228,8 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
     BOOTSTRAP_RELEASE_FUNCTION_CATALOG
       .filter((entry) =>
         [
-          "derive_implementation_component_topology_surface",
-          "derive_component_realization_schedule_surface",
           "derive_component_code_surface",
           "qualify_component_realization_surface",
-          "derive_test_component_topology_surface",
           "derive_component_test_surface",
           "qualify_component_test_execution_surface",
           "derive_component_repair_schedule_surface",
@@ -254,11 +238,8 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
       )
       .map((entry) => entry.name),
     [
-      "derive_implementation_component_topology_surface",
-      "derive_component_realization_schedule_surface",
       "derive_component_code_surface",
       "qualify_component_realization_surface",
-      "derive_test_component_topology_surface",
       "derive_component_test_surface",
       "qualify_component_test_execution_surface",
       "derive_component_repair_schedule_surface",
@@ -273,7 +254,7 @@ test("T-030 materializes executive graph functions through ABIogenesis GTL carri
   const authorityConformanceProbe = deriveTraversalStructureProbe(authorityConformanceBasis);
   const operationalProbe = deriveTraversalStructureProbe(operationalBasis);
 
-  assert.equal(bootstrapBasis.graph.vectors.length, 33);
+  assert.equal(bootstrapBasis.graph.vectors.length, 22);
   assert.equal(authorityConformanceBasis.graph.vectors.length, 1);
   assert.equal(operationalBasis.graph.vectors.length, 7);
   assert.equal(bootstrapProbe.edge, "derive_intent_surface");

@@ -38,11 +38,8 @@ import {
 } from "./carriers.js";
 
 const COMPONENT_DEPTH_TARGETS = Object.freeze([
-  "implementation_component_topology_surface",
-  "component_realization_schedule_surface",
   "component_code_surface",
   "component_realization_qualification_surface",
-  "test_component_topology_surface",
   "component_test_surface",
   "component_test_qualification_surface",
   "component_repair_schedule_surface",
@@ -73,7 +70,7 @@ function parseArray<T>(
   );
 }
 
-function parseComponentTopologyRow(
+export function parseComponentTopologyRow(
   input: unknown,
   label: string
 ): SdlcComponentTopologyRow {
@@ -108,7 +105,7 @@ function parseComponentTopologyRow(
   });
 }
 
-function parseComponentRealizationRow(
+export function parseComponentRealizationRow(
   input: unknown,
   label: string
 ): SdlcComponentRealizationRow {
@@ -161,7 +158,7 @@ function parseComponentRealizationRow(
   });
 }
 
-function parseTestComponentTopologyRow(
+export function parseTestComponentTopologyRow(
   input: unknown,
   label: string
 ): SdlcTestComponentTopologyRow {
@@ -698,8 +695,12 @@ function normalizeComponentTestRealizationRow(input: unknown): unknown {
   if (record === null) {
     return input;
   }
+  const kind =
+    record["kind"] === "sdlc_component_test_row"
+      ? "sdlc_component_test_realization_row"
+      : record["kind"];
   return Object.freeze({
-    kind: record["kind"],
+    kind,
     testClassId: record["testClassId"],
     relativePath: record["relativePath"],
     testcaseIds: record["testcaseIds"],
@@ -707,6 +708,7 @@ function normalizeComponentTestRealizationRow(input: unknown): unknown {
     requirementIds: record["requirementIds"],
     shardId:
       record["shardId"] ??
+      record["shard"] ??
       record["expectedExecutionShard"] ??
       record["executionShard"] ??
       null
@@ -901,6 +903,10 @@ function componentDepthCandidateRecord(input: Record<string, unknown>): unknown 
   if (input["componentDepthRegister"] !== undefined) {
     return input["componentDepthRegister"];
   }
+  const payload = objectRecord(input["payload"]);
+  if (payload?.["kind"] === "sdlc_component_depth_register") {
+    return input["payload"];
+  }
   if (
     input["kind"] === "sdlc_component_depth_register"
   ) {
@@ -1004,20 +1010,11 @@ function requiredRowsPresent(input: {
   readonly register: SdlcComponentDepthRegister;
 }): readonly string[] {
   switch (input.targetAssetType) {
-    case "implementation_component_topology_surface":
-      return input.register.componentTopologyRows.length > 0
-        ? Object.freeze([])
-        : Object.freeze(["component_depth_register_component_topology_rows_missing"]);
-    case "component_realization_schedule_surface":
     case "component_code_surface":
     case "component_realization_qualification_surface":
       return input.register.componentRealizationRows.length > 0
         ? Object.freeze([])
         : Object.freeze(["component_depth_register_component_realization_rows_missing"]);
-    case "test_component_topology_surface":
-      return input.register.testComponentTopologyRows.length > 0
-        ? Object.freeze([])
-        : Object.freeze(["component_depth_register_test_component_topology_rows_missing"]);
     case "component_test_surface":
       return input.register.componentTestRows.length > 0
         ? Object.freeze([])

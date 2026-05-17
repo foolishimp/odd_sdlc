@@ -126,9 +126,10 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   );
 
   assert.match(prompt, /Read in order:/);
-  assert.match(prompt, /worker brief:/);
-  assert.match(prompt, /invocation package:/);
-  assert.match(prompt, /traversal intent package:/);
+  assert.match(prompt, /construction brief:/);
+  assert.match(prompt, /worker brief projection:/);
+  assert.match(prompt, /invocation package projection:/);
+  assert.match(prompt, /traversal intent projection:/);
   assert.match(prompt, /forensic manifest only when a package ref requires it:/);
   assert.doesNotMatch(prompt, /Compact worker invocation package/);
   assert.doesNotMatch(prompt, /"packageVersion": "ts-invocation-v1"/);
@@ -157,32 +158,26 @@ test("T-099 prompt-bearing handoff carries indexed authority and compact pressur
   );
 });
 
-test("T-099 schedule-surface prompt requires dependency graph and tranches", () => {
+test("T-099 test-design prompt carries execution schedule rows and qualification tranches", () => {
   const workspace = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_realization_schedule_surface");
+  const contract = hookContractByEdgeName("derive_test_design_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
     graphFunctionName: "bootstrap_release_self_test",
     edgeName: contract.edgeName,
-    vectorIndex: 11,
+    vectorIndex: 17,
     contract,
-    runId: "t099-schedule-tranches"
+    runId: "t099-test-design-schedule-rows"
   });
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
 
-  assert.match(prompt, /dependency graph/);
-  assert.match(prompt, /tranches/);
-  assert.match(prompt, /obligation ledger/);
-  assert.match(prompt, /next tranche selector/);
+  assert.match(prompt, /testExecutionScheduleRows/u);
+  assert.match(prompt, /sdlc_test_execution_schedule_row/u);
+  assert.match(prompt, /declared test execution contract/u);
   assert(
     manifest.traversalObligationContext.trancheKeys.includes(
-      "schedule:dependency_graph"
-    )
-  );
-  assert(
-    manifest.traversalObligationContext.trancheKeys.includes(
-      "schedule:tranche_plan"
+      "qualification:tranche_execution"
     )
   );
 });

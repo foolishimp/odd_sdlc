@@ -89,7 +89,9 @@ export type SdlcFdRunAnalysisProductiveSignal =
 
 export const SDLC_FD_RUN_ANALYSIS_RETRY_CAUSE_CLASS_VALUES = Object.freeze([
   "prompt_schema_gap",
+  "framework_carrier_parser_drift",
   "worker_policy_violation",
+  "target_carrier_admission_missing",
   "deterministic_evaluator_bug",
   "harness_bug",
   "runtime_bug",
@@ -99,6 +101,17 @@ export const SDLC_FD_RUN_ANALYSIS_RETRY_CAUSE_CLASS_VALUES = Object.freeze([
 
 export type SdlcFdRunAnalysisRetryCauseClass =
   (typeof SDLC_FD_RUN_ANALYSIS_RETRY_CAUSE_CLASS_VALUES)[number];
+
+export const SDLC_FD_RUN_ANALYSIS_STAGE_CLASS_VALUES = Object.freeze([
+  "constructive",
+  "projection",
+  "rollup",
+  "missing",
+  "unmapped"
+] as const);
+
+export type SdlcFdRunAnalysisStageClass =
+  (typeof SDLC_FD_RUN_ANALYSIS_STAGE_CLASS_VALUES)[number];
 
 export interface SdlcFdRunAnalysisDiagnostic {
   readonly kind: "sdlc_fd_run_analysis_diagnostic";
@@ -156,11 +169,20 @@ export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly graphFunctionName: string | null;
   readonly graphVectorRef: string | null;
   readonly targetAssetType: string | null;
+  readonly traversalClass: SdlcFdRunAnalysisStageClass;
   readonly workerElapsedMs: number | null;
   readonly edgeWindowElapsedMs: number | null;
   readonly deterministicElapsedMs: number | null;
   readonly fpEvaluateStatus: string | null;
   readonly postflightStatus: string | null;
+  readonly executionEvidenceStatus: string | null;
+  readonly executionEvidenceReportCount: number;
+  readonly residualPressureRefCount: number;
+  readonly residualPressureTransition: "none" | "preserved" | "cleared" | "unknown";
+  readonly promptSourceCarrierRef: string | null;
+  readonly promptSourceCarrierDigest: string | null;
+  readonly promptRenderingRef: string | null;
+  readonly promptSourcePolicyRef: string | null;
   readonly closureDisposition: string | null;
   readonly selectedNextActionRef: string | null;
   readonly predecessorAttemptRef: string | null;
@@ -245,6 +267,17 @@ export interface SdlcFdRunAnalysisRetryForensic {
   readonly likelyCauseClass: SdlcFdRunAnalysisRetryCauseClass;
 }
 
+export interface SdlcFdRunAnalysisConceptualStageCoverage {
+  readonly kind: "sdlc_fd_run_analysis_conceptual_stage_coverage";
+  readonly test35StageRef: string;
+  readonly expectedEdgeName: string;
+  readonly expectedTargetAssetType: string;
+  readonly mappedEdgeName: string | null;
+  readonly mappedTargetAssetType: string | null;
+  readonly stageClass: SdlcFdRunAnalysisStageClass;
+  readonly operatorRunRefs: readonly string[];
+}
+
 export interface SdlcFdRunAnalysisProfilePolicyRefs {
   readonly profile: SdlcFdRunAnalysisProfile;
   readonly profilePolicyRef: string;
@@ -304,6 +337,7 @@ export interface SdlcFdRunAnalysisResult {
   readonly diagnostics: readonly SdlcFdRunAnalysisDiagnostic[];
   readonly bloatAndSlopeAnalysis: SdlcFdRunAnalysisBloatAndSlope;
   readonly retryForensics: readonly SdlcFdRunAnalysisRetryForensic[];
+  readonly conceptualStageCoverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[];
   readonly summaryDrift: SdlcFdRunAnalysisSummaryDriftReport;
   readonly evidenceIndex: readonly string[];
 }
