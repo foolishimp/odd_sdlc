@@ -320,8 +320,7 @@ test("T-135 evaluate_action fails closed without declared obligations", () => {
         fulfillmentStatus: "fulfilled",
         evidenceRefs: ["event://t135/worker-invoked"]
       }
-    ],
-    fallbackStatus: "fulfilled"
+    ]
   });
 
   assert.deepEqual(projection.counts, {

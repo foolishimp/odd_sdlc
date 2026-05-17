@@ -57,6 +57,7 @@ source_documents:
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TARGET_CARRIER_CONTRACTS.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TEST_PIPELINE.md
+  - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DECOMMISSION_REGISTER.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_FP_EVALUATION_LEDGER_PURPOSE.md
@@ -94,6 +95,7 @@ affected_boundary:
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TARGET_CARRIER_CONTRACTS.md
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TEST_PIPELINE.md
+    - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DECOMMISSION_REGISTER.md
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md
     - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_FP_EVALUATION_LEDGER_PURPOSE.md
@@ -171,6 +173,7 @@ proof_surface:
     - deterministic tests for analyzer constructive-edge and rollup-edge disambiguation
   live_or_archive:
     - data_mapper test72 successor run using the active TypeScript tenant
+    - npm run test:t171:data-mapper-lifecycle-live
     - analyzer markdown and JSON output for the same run
     - comparison update against /Users/jim/src/apps/abiogenesis/.ai-workspace/comments/codex/20260516T121044Z_test35_python_success_walkthrough.md
 non_closure_conditions:
@@ -504,6 +507,84 @@ Live proof status:
 - Current deterministic proof after the `test79` fix passed at the then-current pre-audit count; superseded by the 2026-05-17 audit correction below.
 - The next clean data_mapper run must be created from the current rebuilt tenant and must admit execution-result evidence before the live proof acceptance items can be checked.
 
+### 2026-05-17 Current Main Review Assessment And Patches
+
+Review baseline: current main at the review point had semantic build/lints
+passing, but T-171 still could not close because the live proof path was
+bounded before generated test execution and release.
+
+Non-stale findings accepted into this ticket:
+
+- H1 confirmed: `test_env/sandbox/scenarios/t132_hello_world_js.scenario.mjs`
+  hard-stopped the live scenario at `derive_component_code_surface` with
+  direct product process checks and `stopAfterWorkspaceFilesExist: true`.
+  Patch: the live descriptor now names the full lifecycle edge sequence through
+  `prepare_release_surface`, removes direct `node hello.js` process checks, and
+  no longer stops when source files first exist. Proof pending: fresh live
+  hello-world full-graph run.
+- H2 partially stale: direct overlay continuation already had deterministic
+  proof for `derive_component_code_surface` to
+  `qualify_component_realization_surface`, but the integrated installed
+  operator path could suppress that continuation when the
+  product-materialization candidate was absent. Patch:
+  `build_tenants/typescript/code/src/operator/installed_operator.ts` now falls
+  through to overlay continuation when downstream pressure exists but no
+  materialization action is selected.
+- H3 confirmed: component-code smoke execution was being treated as lifecycle
+  proof. Patch: full `derive_component_code_surface` no longer admits or
+  requires execution evidence; graph-generated tests and
+  `derive_test_execution_result_surface` own lifecycle execution evidence.
+  The T-132 fixture now declares `node --test test/hello.test.js`, and analyzer
+  output distinguishes `component_smoke` from
+  `graph_test_execution_result`.
+- H4 confirmed and fixed: the decommission map is ratified in
+  `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DECOMMISSION_REGISTER.md`
+  instead of living only as a comment.
+- H5 stale locally: the cited T-110 regression was not reproduced after the
+  current build. Focused T-110 proof passed locally. Full suite proof remains
+  to be rerun after this patch set.
+- M2 accepted and fixed: `fallbackFulfillmentStatusForState` and the dead
+  `fallbackStatus` parameter were removed because they suggested a closure
+  bypass that no active code used.
+
+New delivery surface:
+
+- `build_tenants/typescript/test_env/live/run_t171_data_mapper_lifecycle.mjs`
+  wraps the data_mapper live runner and fails unless the archive shows the full
+  lifecycle edge order, graph-generated `derive_test_execution_result_surface`
+  evidence with concrete test counts, release after execution evidence, and
+  final close.
+- `npm run test:t171:data-mapper-lifecycle-live` is the named delivery command
+  for the TS.t171/data_mapper lifecycle proof. This command is not a substitute
+  for the initial live hello-world full-graph gate; it is the final data_mapper
+  comparison proof once deterministic and hello-world gates pass.
+
+Current deterministic proof after this patch set:
+
+```sh
+cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
+npm run build:semantic
+npm run lint:semantic
+npm run lint:test-harness
+node --test --test-name-pattern "hello-world live descriptors" test_env/sandbox/test_scenario_sandbox.test.mjs
+node --test test_env/tests/test_t110_abg37_callout_projection.test.mjs test_env/tests/test_t171_execution_backed_closure_law.test.mjs test_env/tests/test_t066_product_materialization_contract.test.mjs test_env/tests/test_t161_fd_run_analysis_linter.test.mjs test_env/tests/test_t135_evaluator_owned_runner_spine.test.mjs
+npm run test:semantic
+```
+
+Results so far:
+
+- semantic build passed
+- semantic lint passed
+- test-harness lint passed
+- hello-world live descriptor proof passed: `1/1`
+- focused deterministic slice passed: `124/124`
+- full semantic suite passed: `611/611`
+
+This does not close T-171. The next required proof is a fresh live
+hello-world full-graph run against the rebuilt tenant, followed by the
+TS.t171/data_mapper lifecycle run only after the deterministic suite and
+hello-world proof are green.
+
 ### 2026-05-17 Audit Correction After Claude Review
 
 Claude review findings H1-H4 were evaluated against current workspace truth and corrected as follows:
@@ -515,7 +596,7 @@ Claude review findings H1-H4 were evaluated against current workspace truth and 
   - `T-171 explicit residual pressure survives fulfilled counts`
   - `T-171 target-carrier admission alone cannot close product content`
 - H3 live-state correction: `ps -p 56988,57039` returned no active process rows. `node build/semantic/code/src/cli/main.js analyze-run --workspace /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test80.TS.cl --format markdown` reports one `derive_intent_surface` operator-run, `aborted attempts: 1`, `process alive: false`, no `worker_run.json`, no `fp_evaluate_result.json`, no fulfillment ledger, no closure decision, and no next-action projection. `data_mapper.test80.TS.cl` is invalid as proof.
-- H4 decommission map: G0 is now recorded in `.ai-workspace/comments/codex/20260517T121500Z_T171_decommission_map.md`. The map classifies touched legacy surfaces as retain, derive, replace, or delete and records the grep audit interpretation.
+- H4 decommission map: G0 is now design-owned by `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DECOMMISSION_REGISTER.md`. The prior comment post remains evidence only; the register classifies touched legacy surfaces as retain, derive, replace, or delete and is now part of the affected design boundary.
 
 Current deterministic proof after the audit correction:
 
@@ -729,3 +810,165 @@ Analyzer result:
 - per-edge timing emitted for both constructive worker edges
 - retry forensics: none
 - runtime artifact gaps: none
+
+## Implementation Audit - 2026-05-17 Full-Graph Hello-World Prep
+
+Scope: G1/G2 deterministic proof plus live-run bug repair. This still does not
+close T-171 because the accepted live proof must be a fresh full-graph run that
+reaches generated test execution evidence, test-run archive, and release
+preparation without framework-induced retry.
+
+### Live Bug Repairs
+
+1. Target-carrier envelope drift on `derive_test_design_surface`.
+   - Failure evidence: invalid run
+     `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260517T045453428Z_pid23714`.
+   - Symptom: worker returned the selected target-carrier envelope with nested
+     `payload.kind = "sdlc_test_design_register"`, while
+     `test_design_register.ts` admitted only the raw register payload. Closure
+     blocked on missing target-carrier admission after useful F_P content.
+   - Fix: `build_tenants/typescript/code/src/operator/test_design_register.ts`
+     now admits the declared nested payload path.
+   - Proof:
+     `build_tenants/typescript/test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs`
+     adds `T-171 admits test-design payload from selected target-carrier envelope`.
+
+2. Empty predecessor materialization replay on `derive_component_test_surface`.
+   - Failure evidence: invalid run
+     `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260517T054327856Z_pid84665`.
+   - Symptom: one retry produced an empty
+     `product_materialization_manifest.json`; the next attempt materialized
+     `test/hello.test.js`, but stale predecessor diagnostic
+     `materialized_product_manifest_replay_empty` still blocked the current
+     admitted materialization rows.
+   - Fix: `build_tenants/typescript/code/src/operator/handoff.ts` now treats
+     current admitted materialization rows as superseding an empty predecessor
+     replay diagnostic.
+   - Proof:
+     `build_tenants/typescript/test_env/tests/test_t066_product_materialization_contract.test.mjs`
+     adds `T-171 current component-test materialization supersedes empty predecessor replay`.
+
+3. Live proof executor mismatch.
+   - Finding: the invalid `20260517T054327856Z_pid84665` hello-world run used
+     `executorProfile = "local-spawn"`, `streamModel = "stdio"`, and
+     `terminalSessionId = null`. `worker_process_started.json` only proves the
+     null terminal session; executor profile and stream model are proven by
+     `worker_run.json`.
+   - Fix:
+     `build_tenants/typescript/package.json` keeps
+     `test:scenario:t132-hello-world-js-live` on the default fast
+     `local-spawn` path and adds an explicit
+     `test:scenario:t132-hello-world-js-live:pty` lane that sets
+     `ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE=pty-terminal` and
+     `ABG_TS_AGENT_EXECUTOR_PROFILE=pty-terminal`. T-171 also exposes
+     `test:t171:hello-world-lifecycle-live` and
+     `test:t171:hello-world-lifecycle-live:pty` as the reviewer-facing
+     lifecycle aliases over the default and PTY lanes.
+   - Synthetic guard:
+     `build_tenants/typescript/test_env/tests/test_t171_pty_executor_profile_guards.test.mjs`
+     proves default executor selection, PTY prompt-file redirection, local
+     stdio launch behavior, and the package-script split.
+   - Proof required: the accepted PTY preconfigured live archive must show
+     completed `worker_run.json` records with `executorProfile = "pty-terminal"`,
+     `streamModel = "terminal-transcript"`, and non-empty
+     `terminalSessionId`. Ordinary default live runs may remain local-spawn.
+
+4. Component-code/test-role boundary drift.
+   - Failure evidence: invalid run
+     `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260517T065143313Z_pid80634`.
+   - Symptom: `derive_component_code_surface` retried after the worker emitted
+     component-code output with only source materialization while the upstream
+     implementation-design carrier had placed the proof test path
+     `test/hello.test.js` into `componentRealizationRows`. The component-depth
+     assurance fold therefore looked for a test file on the component-code edge
+     and produced `component_declared_path_not_materialized:test/hello.test.js`.
+   - Fix: `build_tenants/typescript/code/src/operator/handoff.ts` now pins the
+     prompt contract at both `implementation_design_surface` and
+     `component_code_surface`: `componentRealizationRows` are source /
+     implementation rows only, role=`test` file targets remain `fileTargetRows`
+     and are consumed by `test_design_surface` / `component_test_surface`.
+   - Proof:
+     `build_tenants/typescript/test_env/tests/test_t066_product_materialization_contract.test.mjs`
+     extends `T-159 component-depth prompts pin the top-level register envelope
+     on first attempt` to assert the source/test carrier split.
+
+5. Component-test qualification row status drift.
+   - Failure evidence: invalid PTY run
+     `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260517T073315118Z_pid10553`.
+   - Symptom: the run reached `derive_test_execution_result_surface` and
+     admitted execution evidence (`testsObserved = 6`, `passedCount = 6`,
+     `failedCount = 0`), then retried on
+     `qualify_component_test_execution_surface` because the worker emitted
+     `componentTestQualificationRows[0].qualificationStatus = "passed"` while
+     the component-depth row contract requires the literal field
+     `componentTestQualificationRows[].status`.
+   - Blocking reason:
+     `component_depth_register_invalid:component_depth_register.componentTestQualificationRows[0].status: expected string`.
+   - Root cause: prompt/contract drift at the worker boundary. The contract and
+     admission parser already required `status`, but the compact component-depth
+     prompt only said to emit qualification rows and did not explicitly forbid
+     the natural but non-contract alias `qualificationStatus`.
+   - Fix: `build_tenants/typescript/code/src/operator/handoff.ts` now spells
+     the component-test-qualification row fields explicitly, requires
+     `status` with the declared enum values, and forbids `qualificationStatus`
+     or `verdict` as substitutes.
+   - Proof:
+     `build_tenants/typescript/test_env/tests/test_t066_product_materialization_contract.test.mjs`
+     extends `T-159 component-depth prompts pin the top-level register envelope
+     on first attempt` to assert the component-test-qualification status field
+     directive.
+
+### Deterministic Proof
+
+Commands run from `build_tenants/typescript` after the fixes:
+
+```sh
+npm run build:semantic
+node --test test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs test_env/tests/test_t171_execution_backed_closure_law.test.mjs test_env/tests/test_t161_fd_run_analysis_linter.test.mjs test_env/tests/test_t066_product_materialization_contract.test.mjs
+node --test test_env/tests/test_t171_pty_executor_profile_guards.test.mjs
+npm run lint:semantic
+npm run lint:test-harness
+npm run test:semantic
+```
+
+Results:
+
+- semantic build passed
+- focused regression tests: 116/116 passed
+- PTY/default executor guard tests: 4/4 passed
+- component-code/source-test split prompt guard: 77/77 passed
+- focused T-161/T-171 regression suite: 43/43 passed
+- semantic lint passed
+- test-harness lint passed
+- full semantic suite: 617/617 passed
+- 2026-05-17T08:39Z after component-test qualification status drift fix:
+  - semantic build passed
+  - T-066 prompt/materialization suite: 77/77 passed
+  - semantic lint passed
+  - focused T-161/T-171 regression suite: 43/43 passed
+  - test-harness lint passed
+  - full semantic suite: 617/617 passed
+- 2026-05-17T10:00Z checkpoint RC deterministic gate:
+  - semantic build passed
+  - semantic lint passed
+  - test-harness lint passed
+  - focused T-093/T-101 schedule/retry tests passed: 4/4
+  - focused T-066 data_mapper successor inventory test passed: 1/1
+  - full semantic suite passed: 617/617
+  - checkpoint release cut:
+    `.ai-workspace/release-cuts/typescript/20260517T095944Z_t171_checkpoint_rc`
+
+### Proof Status
+
+The invalid `20260517T054327856Z_pid84665`, `20260517T065143313Z_pid80634`,
+and `20260517T073315118Z_pid10553` runs are not accepted as proof because they
+retried and/or used a pre-fix runtime. They remain useful only as evidence
+sources for the framework bugs above.
+
+Checkpoint RC proof is deterministic only. Live lifecycle proof is post-RC.
+The fast default lane may use local-spawn; the separate PTY preconfigured lane
+must also remain available as a live regression guard. The accepted post-RC
+lifecycle proof must traverse through generated test design, component test
+materialization, test execution preparation, execution-result admission with
+concrete pass/fail counts, test-run archive, and release preparation before any
+data_mapper successor proof is accepted.

@@ -367,7 +367,6 @@ function fulfillmentConvergedFromCounts(
 export function deriveSdlcEdgeFulfillmentCountsFromAssessments(input: {
   readonly declaredObligationIds: readonly string[];
   readonly assessments: readonly SdlcEdgeFulfillmentAssessmentInput[];
-  readonly fallbackStatus?: SdlcEdgeFulfillmentAssessmentStatus;
 }): SdlcEdgeFulfillmentCountProjection {
   const declaredObligationIds = uniqueSorted(
     input.declaredObligationIds.filter((obligationId) => obligationId.trim().length > 0)

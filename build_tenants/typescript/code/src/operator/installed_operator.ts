@@ -153,7 +153,6 @@ import {
   constructSdlcWorksiteEvidence,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
-  type SdlcEdgeFulfillmentAssessmentStatus,
   type SdlcEdgeFulfillmentCountProjection,
   type SdlcYieldResumeBasis
 } from "./traversal_consequence.js";
@@ -183,6 +182,7 @@ import {
 import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
 import { admitDesignDepthRegisterFromArtifact } from "./design_depth_register.js";
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
+import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
 
 export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
 export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
@@ -3036,21 +3036,6 @@ export function deriveSdlcPublishedProductMaterializationAction(input: {
   });
 }
 
-function fallbackFulfillmentStatusForState(
-  state: SdlcAbgOwnedFpDispatchState
-): SdlcEdgeFulfillmentAssessmentStatus {
-  if (state.status === "worker_invoked") {
-    return "fulfilled";
-  }
-  if (
-    state.status === "postflight_failed" ||
-    state.status === "fp_escalation"
-  ) {
-    return "partial";
-  }
-  return "blocked";
-}
-
 export function sdlcAssessmentCarriesRequirementForDownstreamClosure(
   assessment: SdlcWorkerObligationAssessment
 ): boolean {
@@ -3114,8 +3099,7 @@ function edgeFulfillmentProjectionFor(input: {
             .filter((obligationId) => obligationId.startsWith("requirement:"))
         : [])
     ]),
-    assessments,
-    fallbackStatus: fallbackFulfillmentStatusForState(input.state)
+    assessments
   });
 }
 
@@ -3546,11 +3530,9 @@ function postActionCandidates(input: {
         scopeModuleName: nextDeferredModule,
         scopeScheduleRef
       });
-    return Object.freeze(
-      productMaterializationCandidate === null
-        ? []
-        : [productMaterializationCandidate]
-    );
+    if (productMaterializationCandidate !== null) {
+      return Object.freeze([productMaterializationCandidate]);
+    }
   }
   if (
     input.closureDecisionDisposition === "close" &&
@@ -3732,8 +3714,7 @@ function stateRequiresExecutionEvidence(
   return (
     state.manifest.targetAssetType === "test_execution_result_surface" ||
     ((state.manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      state.manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
-      state.manifest.edgeName === "derive_component_code_surface") &&
+      state.manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
       state.manifest.targetAssetType === "component_code_surface" &&
       state.manifest.productMaterialization.required &&
       declaredExecutionContract(
@@ -3892,6 +3873,19 @@ function targetCarrierPayloadForState(input: {
   }
   if (input.state.manifest.targetAssetType === "test_design_surface") {
     const admission = admitTestDesignRegisterFromArtifact({
+      targetAssetType: input.state.manifest.targetAssetType,
+      outputFile: report.outputFile
+    });
+    return Object.freeze({
+      payload: admission.register ?? Object.freeze({}),
+      payloadRef: input.artifactRef,
+      evidenceRefs: uniqueSorted([...baseEvidenceRefs, ...admission.evidenceRefs]),
+      structuralAdmissionStatus: admission.status,
+      structuralBlockingReasons: admission.blockingReasons
+    });
+  }
+  if (input.state.manifest.targetAssetType === "test_execution_surface") {
+    const admission = admitTestExecutionSurfaceRegisterFromArtifact({
       targetAssetType: input.state.manifest.targetAssetType,
       outputFile: report.outputFile
     });

@@ -387,8 +387,7 @@ function productMaterializationRequiresTestExecutionEvidence(
 ): boolean {
   return (
     (manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
-      manifest.edgeName === "derive_component_code_surface") &&
+      manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
     manifest.targetAssetType === "component_code_surface" &&
     manifest.productMaterialization.required &&
     declaredExecutionContract(manifest.productMaterialization.testExecutionContract)
@@ -1534,6 +1533,129 @@ function testDesignConstructionTemplate(
   });
 }
 
+function testExecutionSurfaceConstructionTemplate(
+  row: SdlcTargetCarrierContractRow
+): SdlcWorkerTargetCarrierConstructionTemplate {
+  return Object.freeze({
+    kind: "sdlc_worker_target_carrier_construction_template" as const,
+    templateRef: row.constructionTemplateRef,
+    targetAssetType: row.targetAssetType,
+    carrierKind: row.outputCarrierKind,
+    nestedPayloadPath: row.nestedPayloadPath,
+    carrierEnvelope: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/carrier-envelope`,
+      requiredFields: row.requiredFieldRefs,
+      fieldTypes: Object.freeze({
+        kind: "literal",
+        targetAssetType: "literal",
+        edgeRef: "literal",
+        contractRef: "literal",
+        contractDigest: "sha256",
+        payload: "sdlc_test_execution_surface_register"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze([row.outputCarrierKind]),
+        targetAssetType: Object.freeze([row.targetAssetType]),
+        edgeRef: Object.freeze([row.edgeRef]),
+        contractRef: Object.freeze([row.targetCarrierContractRef])
+      }),
+      example: Object.freeze({
+        kind: row.outputCarrierKind,
+        targetAssetType: row.targetAssetType,
+        edgeRef: row.edgeRef,
+        contractRef: row.targetCarrierContractRef,
+        contractDigest: row.targetCarrierContractDigest,
+        payload: "<test_execution_surface_register>"
+      })
+    }),
+    payloadTemplate: targetCarrierObjectTemplate({
+      templateRef: `${row.constructionTemplateRef}/payload/test-execution-surface-register`,
+      requiredFields: Object.freeze([
+        "kind",
+        "registerVersion",
+        "targetAssetType",
+        "testExecutionPreparationRows",
+        "evidenceRefs"
+      ]),
+      fieldTypes: Object.freeze({
+        kind: "literal:sdlc_test_execution_surface_register",
+        registerVersion: "literal:ts-test-execution-v1",
+        targetAssetType: "literal:test_execution_surface",
+        testExecutionPreparationRows: "sdlc_test_execution_preparation_row[]",
+        evidenceRefs: "uri[]",
+        summary: "string"
+      }),
+      enumDomains: Object.freeze({
+        kind: Object.freeze(["sdlc_test_execution_surface_register"]),
+        registerVersion: Object.freeze(["ts-test-execution-v1"]),
+        targetAssetType: Object.freeze(["test_execution_surface"])
+      }),
+      example: Object.freeze({
+        kind: "sdlc_test_execution_surface_register",
+        registerVersion: "ts-test-execution-v1",
+        targetAssetType: "test_execution_surface",
+        testExecutionPreparationRows: [],
+        evidenceRefs: ["workspace://build_tenants/<tenant>/test/<file>"],
+        summary: "<test execution preparation summary>"
+      })
+    }),
+    rowTemplates: Object.freeze([
+      targetCarrierObjectTemplate({
+        templateRef: `${row.constructionTemplateRef}/row/test-execution-preparation`,
+        requiredFields: Object.freeze([
+          "kind",
+          "scheduleRef",
+          "moduleName",
+          "testClassId",
+          "testcaseIds",
+          "command",
+          "workingDirectory",
+          "frameworkRef",
+          "shardId",
+          "sourceTestFileRefs",
+          "requirementIds",
+          "status",
+          "evidenceRefs"
+        ]),
+        fieldTypes: Object.freeze({
+          kind: "literal:sdlc_test_execution_preparation_row",
+          scheduleRef: "uri",
+          moduleName: "string",
+          testClassId: "uri",
+          testcaseIds: "uri[]",
+          command: "string",
+          workingDirectory: "workspace-relative-path",
+          frameworkRef: "uri",
+          shardId: "string|null",
+          sourceTestFileRefs: "workspace-uri[]",
+          requirementIds: "ref[]",
+          status: "prepared|blocked|pending",
+          evidenceRefs: "uri[]"
+        }),
+        enumDomains: Object.freeze({
+          kind: Object.freeze(["sdlc_test_execution_preparation_row"]),
+          status: Object.freeze(["prepared", "blocked", "pending"])
+        }),
+        example: Object.freeze({
+          kind: "sdlc_test_execution_preparation_row",
+          scheduleRef: "test-schedule://<tenant>/<runner>",
+          moduleName: "<module>",
+          testClassId: "test-class://<tenant>/<class>",
+          testcaseIds: ["test-case://<tenant>/<case>"],
+          command: "<declared test command>",
+          workingDirectory: "build_tenants/<tenant>",
+          frameworkRef: "framework://node-test",
+          shardId: "<shard-id>",
+          sourceTestFileRefs: ["workspace://build_tenants/<tenant>/test/<file>"],
+          requirementIds: ["REQ-..."],
+          status: "prepared",
+          evidenceRefs: ["workspace://build_tenants/<tenant>/test/<file>"]
+        })
+      })
+    ])
+  });
+}
+
 function workspaceSpecSurfaceConstructionTemplate(
   row: SdlcTargetCarrierContractRow
 ): SdlcWorkerTargetCarrierConstructionTemplate {
@@ -1670,6 +1792,9 @@ function targetCarrierConstructionTemplateForRow(
   }
   if (row.targetAssetType === "test_design_surface") {
     return testDesignConstructionTemplate(row);
+  }
+  if (row.targetAssetType === "test_execution_surface") {
+    return testExecutionSurfaceConstructionTemplate(row);
   }
   if (workspaceLocalSdlcSurfaceRelativePath(row.targetAssetType) !== null) {
     return workspaceSpecSurfaceConstructionTemplate(row);
@@ -3080,8 +3205,7 @@ function executionShardsFor(input: {
   if (
     input.targetAssetType !== "component_test_surface" &&
     !(
-      (input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE ||
-        input.edgeName === "derive_component_code_surface") &&
+      input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE &&
       input.targetAssetType === "component_code_surface" &&
       declaredExecutionContract(input.testExecutionContract)
     ) &&
@@ -5462,13 +5586,19 @@ function compactComponentDepthDirective(
       if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
       }
-      return `${envelopeDirective} ${componentRealizationRowsDirective} Preserve declared component boundaries from the composite implementation design authority.`;
+      return `${envelopeDirective} ${componentRealizationRowsDirective} For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier. Preserve source component boundaries from the composite implementation design authority.`;
     case "component_realization_qualification_surface":
       return `${envelopeDirective} ${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
     case "component_test_surface":
       return `${envelopeDirective} Emit payload.componentTestRows and preserve testClassId/testcase allocation from the composite test design authority.`;
     case "component_test_qualification_surface":
-      return `${envelopeDirective} Emit payload.componentTestQualificationRows; failed rows must carry payload.componentExecutionFailureRegister evidence.`;
+      return (
+        `${envelopeDirective} Emit payload.componentTestQualificationRows with each row carrying ` +
+        `kind, testClassId, testcaseIds, componentIds, requirementIds, status, and evidenceRefs. ` +
+        `Use the literal field name status with one of passed, failed, blocked, pending, or unproven; ` +
+        `do not emit qualificationStatus or verdict as a substitute for status. ` +
+        `Failed rows must carry payload.componentExecutionFailureRegister evidence.`
+      );
     case "component_repair_schedule_surface":
       return `${envelopeDirective} Emit payload.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.`;
     case "release_depth_parity_surface":
@@ -5491,6 +5621,23 @@ function compactTestDesignDirective(
     "Use exact row kinds: `sdlc_design_consumption_contract`, `sdlc_test_case_row`, `sdlc_test_stack_profile_row`, `sdlc_test_module_row`, `sdlc_test_component_topology_row`, `sdlc_test_data_binding`, `sdlc_expected_result_binding`, `sdlc_uat_integration_binding`, and `sdlc_test_execution_schedule_row`.",
     "Use exact row fields from the construction template: contractRef/sourceDesignObligationRefs/authorityBasisRefs/consumerGraphFunctionRefs for design consumption, caseKind/executionLane/expectedBehavior for test cases, testClassId/relativePath/testcaseIds/componentIds for test topology, inputFixtureRefs/generationPolicyRef for test data, assertionRefs/expectedResultSummary/verificationPolicyRef for expected results, and uatTestCaseRef/integrationTestCaseRef for UAT integration.",
     "testExecutionScheduleRows must bind scheduleRef, testCaseRefs, command, frameworkRef, and shardId to the declared test execution contract."
+  ].join(" ");
+}
+
+function compactTestExecutionSurfaceDirective(
+  manifest: SdlcWorkerHandoffManifest
+): string | null {
+  if (manifest.targetAssetType !== "test_execution_surface") {
+    return null;
+  }
+  const projection = manifest.targetCarrierProjection;
+  return [
+    "Apply workerInvocationPackage.targetCarrierProjection.constructionTemplate as the authoritative test-execution preparation carrier shape; do not inspect framework source code to infer row fields.",
+    `Emit a fenced \`json test_execution_surface_register\` selected target-carrier envelope with \`kind:"${projection.outputCarrierKind}"\`, \`targetAssetType:"${manifest.targetAssetType}"\`, \`edgeRef:"${manifest.edgeName}"\`, \`contractRef:"${projection.targetCarrierContractRef}"\`, \`contractDigest:"${projection.targetCarrierContractDigest}"\`, and \`payload.kind:"sdlc_test_execution_surface_register"\`, \`payload.registerVersion:"ts-test-execution-v1"\`, \`payload.targetAssetType:"test_execution_surface"\`.`,
+    "Emit payload.testExecutionPreparationRows with row kind `sdlc_test_execution_preparation_row`.",
+    "Each preparation row must carry scheduleRef, moduleName, testClassId, testcaseIds, command, workingDirectory, frameworkRef, shardId, sourceTestFileRefs, requirementIds, status, and evidenceRefs.",
+    "Use status `prepared` only when the declared command, workspace-relative workingDirectory, and graph-generated test files are present; use `blocked` or `pending` with evidenceRefs when they are not.",
+    "Do not run the test command in this edge; derive_test_execution_result_surface is the only graph edge that emits execution evidence."
   ].join(" ");
 }
 
@@ -5533,6 +5680,8 @@ function compactDesignDepthDirective(
         "Use canonical row kinds including sdlc_stack_profile_row, sdlc_implementation_module_row, sdlc_aggregate_domain_model_row, sdlc_module_schema_fragment, sdlc_module_state_diagram_fragment, sdlc_sunny_day_sequence_row, sdlc_component_topology_row, sdlc_component_realization_row, and sdlc_file_target_row.",
         "componentTopologyRows[].componentId/moduleName/relativePath/publicBoundary/concernRole are required string fields on each component topology row.",
         "Keep the carrier proportional to immediate implementation structure: identify only the stack, modules, entities, operations, component/file targets, and realization rows needed to materialize the declared product surface from current source assets.",
+        "Use fileTargetRows to name every declared product file and role. componentRealizationRows are source/implementation realization rows only; do not put role=test file targets or proof-test targets in componentRealizationRows.",
+        "Graph-generated tests are declared as fileTargetRows with role=test, then realized by test_design_surface and component_test_surface. They are not component_code_surface realization rows.",
         "Do not flatten requirement obligations, runtime execution proof, process archives, test assertions, downstream evidence, or audit lineage into separate module entities unless the source design explicitly declares them as implementation modules or product data.",
         "For a single-file or script product, one moduleSchemaFragments row, one primary source/program entity, one materialization/invocation operation when needed, and one stateless moduleStateDiagramFragments row are sufficient; do not create one entity or stateless diagram row per requirement."
       ].join(" ");
@@ -5733,7 +5882,7 @@ function outcomeDirectivesForWorker(
           ? "For declared product materialization, materialize product files under the declared product file targets. The output artifact is the traversal summary carrier, not a substitute for source/build files. Use minimal source structure only when no topology authority is present."
           : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
           ? "For lite component_code_surface, materialize only the bounded implementation files declared by the lite composite implementation design authority. Do not expand into release or test-execution surfaces."
-          : "For component_code_surface, materialize implementation files for each declared component and record Component Realization Register evidence."
+          : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, or execution evidence on this edge."
       );
       if (
         manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
@@ -5741,6 +5890,7 @@ function outcomeDirectivesForWorker(
       ) {
         directives.push(
           "When declared product file targets are empty, derive the product source target set from admitted composite implementation design authority and materialize source files at payload.componentRealizationRows[].relativePath.",
+          "Exclude role=test fileTargetRows, validator/proof-test component topology rows, and any test/ path from component_code_surface componentRealizationRows; those targets are consumed by component_test_surface.",
           "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization."
         );
       }
@@ -5759,6 +5909,7 @@ function outcomeDirectivesForWorker(
   for (const directive of [
     compactDesignDepthDirective(manifest),
     compactTestDesignDirective(manifest),
+    compactTestExecutionSurfaceDirective(manifest),
     compactWorkspaceSpecSurfaceDirective(manifest),
     compactComponentDepthDirective(manifest),
     compactExecutionEvidenceDirective(manifest),
@@ -6522,6 +6673,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
     "- Treat worker brief, invocation package, traversal intent package, and handoff manifest as derived or forensic projections; do not invent competing prompt authority from them.",
     "- Apply workerInvocationPackage.transformAxioms through the construction brief projection.",
+    "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_construction_brief.json carries the selected target contract and derived projections for this traversal.",
     "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
     "- Control boundary: do not run `odd-sdlc-ts`, `abiogenesis-ts`, `genesis-ts`, `start`, `gaps`, `analyze-run`, install, traversal, or resume commands from inside this worker.",
     "- Do not spawn another worker or resume traversal. This process is the worker.",
@@ -9476,12 +9628,19 @@ function resolveProductMaterializationReplay(input: {
     lineageRefs.push(handoffManifestRef);
   }
   if (replayedFiles.length === 0) {
+    const supersededDiagnostics = new Set<SdlcBlockingReasonCode>(
+      currentFiles.length > 0
+        ? ["materialized_product_manifest_replay_empty"]
+        : []
+    );
     return Object.freeze({
       report: Object.freeze({
         ...reportWithLineage,
         materializedFiles: Object.freeze(currentFiles)
       }),
-      diagnostics: Object.freeze(diagnostics),
+      diagnostics: Object.freeze(
+        diagnostics.filter((diagnostic) => !supersededDiagnostics.has(diagnostic.code))
+      ),
       replay: null
     });
   }

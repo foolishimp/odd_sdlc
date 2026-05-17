@@ -30,9 +30,12 @@ The tenant root is `build_tenants/hello_world_javascript`.
 
 Generate `build_tenants/hello_world_javascript/src/hello.js`.
 
-Run `node build_tenants/hello_world_javascript/src/hello.js`; it must print
-exactly `Hello, world!`.
+Generate `build_tenants/hello_world_javascript/test/hello.test.js`.
+
+Run `node --test test/hello.test.js` from `build_tenants/hello_world_javascript`;
+the generated test must execute the product behavior and prove the exact stdout
+or exported behavior `Hello, world!`.
 
 Requirement markers: `REQ-T132-001` single tenant, `REQ-T132-002` Node runtime,
-`REQ-T132-003` source file, `REQ-T132-004` exact stdout, `REQ-T132-005`
-execution command evidence.
+`REQ-T132-003` source file, `REQ-T132-004` graph-generated test proves exact
+Hello World behavior, `REQ-T132-005` execution command evidence.

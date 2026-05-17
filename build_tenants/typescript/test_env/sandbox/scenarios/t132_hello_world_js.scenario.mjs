@@ -26,6 +26,31 @@ export const T132_HELLO_WORLD_JS_REQUIREMENT_IDS = Object.freeze([
   "REQ-T132-005"
 ]);
 
+export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
+  "derive_intent_surface",
+  "derive_product_surface",
+  "derive_goal_surface",
+  "derive_requirement_surface",
+  "derive_uat_testcases_surface",
+  "derive_testcase_authority_surface",
+  "derive_feature_decomp_surface",
+  "derive_design_surface",
+  "derive_scenario_surface",
+  "derive_implementation_design_surface",
+  "derive_component_code_surface",
+  "qualify_component_realization_surface",
+  "derive_code_surface",
+  "derive_test_design_surface",
+  "derive_component_test_surface",
+  "prepare_test_execution_surface",
+  "derive_test_execution_result_surface",
+  "qualify_component_test_execution_surface",
+  "derive_component_repair_schedule_surface",
+  "derive_test_run_archive_surface",
+  "derive_release_depth_parity_surface",
+  "prepare_release_surface"
+]);
+
 export const t132HelloWorldJsScenario = Object.freeze({
   scenarioId: "scenario_t132_hello_world_js",
   installedPackageName: "odd-sdlc-scenario-t132-hello-world-js",
@@ -78,40 +103,10 @@ export function t132HelloWorldJsLiveScenario({
         "specification/scenarios/30-generated-testcase-authority.md",
         "build_tenants/hello_world_javascript/src/hello.js"
       ],
-      handoffEdgeSequencePrefix: [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_uat_testcases_surface",
-        "derive_testcase_authority_surface",
-        "derive_feature_decomp_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_implementation_design_surface",
-        "derive_component_code_surface"
-      ],
-      edgeAssuranceArchiveSequencePrefix: [
-        "derive_intent_surface",
-        "derive_product_surface",
-        "derive_goal_surface",
-        "derive_requirement_surface",
-        "derive_uat_testcases_surface",
-        "derive_testcase_authority_surface",
-        "derive_feature_decomp_surface",
-        "derive_design_surface",
-        "derive_scenario_surface",
-        "derive_implementation_design_surface",
-        "derive_component_code_surface"
-      ],
+      handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
+      edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
       firstHandoffOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
-      processChecks: [
-        {
-          command: "node",
-          args: ["build_tenants/hello_world_javascript/src/hello.js"],
-          stdout: "Hello, world!"
-        }
-      ]
+      processChecks: []
     },
     liveWorker: worker,
     startTargetSequence: [
@@ -122,6 +117,6 @@ export function t132HelloWorldJsLiveScenario({
     startUntil,
     maxAdvances,
     continueOnEdgeConverge: true,
-    stopAfterWorkspaceFilesExist: true
+    stopAfterWorkspaceFilesExist: false
   });
 }

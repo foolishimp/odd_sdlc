@@ -76,6 +76,32 @@ const T132_EDGE_ORDER = Object.freeze([
   { name: "derive_test_execution_result_surface", target: "test_execution_result_surface" }
 ]);
 
+const T132_FULL_LIFECYCLE_EDGE_ORDER = Object.freeze([
+  { name: "Fg_conform_project_authority", target: "project_bootstrap_surface" },
+  { name: "derive_intent_surface", target: "intent_surface" },
+  { name: "derive_product_surface", target: "product_surface" },
+  { name: "derive_goal_surface", target: "goal_surface" },
+  { name: "derive_requirement_surface", target: "requirement_surface" },
+  { name: "derive_uat_testcases_surface", target: "uat_testcases_surface" },
+  { name: "derive_testcase_authority_surface", target: "testcase_authority_surface" },
+  { name: "derive_feature_decomp_surface", target: "feature_decomp_surface" },
+  { name: "derive_design_surface", target: "design_surface" },
+  { name: "derive_scenario_surface", target: "scenario_surface" },
+  { name: "derive_implementation_design_surface", target: "implementation_design_surface" },
+  { name: "derive_component_code_surface", target: "component_code_surface" },
+  { name: "qualify_component_realization_surface", target: "component_realization_qualification_surface" },
+  { name: "derive_code_surface", target: "code_surface" },
+  { name: "derive_test_design_surface", target: "test_design_surface" },
+  { name: "derive_component_test_surface", target: "component_test_surface" },
+  { name: "prepare_test_execution_surface", target: "test_execution_surface" },
+  { name: "derive_test_execution_result_surface", target: "test_execution_result_surface" },
+  { name: "qualify_component_test_execution_surface", target: "component_test_execution_qualification_surface" },
+  { name: "derive_component_repair_schedule_surface", target: "component_repair_schedule_surface" },
+  { name: "derive_test_run_archive_surface", target: "test_run_archive_surface" },
+  { name: "derive_release_depth_parity_surface", target: "release_depth_parity_surface" },
+  { name: "prepare_release_surface", target: "release_surface" }
+]);
+
 const T132_LINEAGE_REFS = Object.freeze([
   "requirement:t132_hello_world_single_tenant.stage_01_t132_requirements.req_t132_001",
   "requirement:t132_hello_world_single_tenant.stage_01_t132_requirements.req_t132_002",
@@ -186,6 +212,15 @@ function buildSyntheticT132Archive(opts) {
     const postflightStatus = override.postflightStatus ?? "passed";
     const blockingReasonCodes = override.blockingReasonCodes ?? [];
     const residualPressureRefs = override.residualPressureRefs ?? [];
+    const defaultExecutionCommand = edge.target === "test_execution_result_surface"
+      ? "node --test test/hello.test.js"
+      : "node build_tenants/hello_world_javascript/src/hello.js";
+    const defaultExecutionReportRef = `file://${path.join(
+      operatorRunRoot,
+      edge.target === "test_execution_result_surface"
+        ? "test-shard-01-graph-test.stdout.log"
+        : "test-shard-01-hello-world-javascript.stdout.log"
+    )}`;
     const executionEvidence = override.executionEvidence ??
       (
         edge.target === "component_code_surface" ||
@@ -193,10 +228,16 @@ function buildSyntheticT132Archive(opts) {
           ? {
               kind: "sdlc_worker_execution_evidence",
               lane: "test",
-              command: "node build_tenants/hello_world_javascript/src/hello.js",
+              command: defaultExecutionCommand,
               status: "succeeded",
-              reportRefs: [
-                `file://${path.join(operatorRunRoot, "test-shard-01-hello-world-javascript.stdout.log")}`
+              reportRefs: [defaultExecutionReportRef],
+              shardEvidence: [
+                {
+                  shardId: "test-shard-01",
+                  command: defaultExecutionCommand,
+                  status: "succeeded",
+                  reportRef: defaultExecutionReportRef
+                }
               ],
               testsObserved: 1,
               passedCount: 1,
@@ -698,7 +739,16 @@ test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressu
     assert.ok(componentEdge !== undefined);
     assert.equal(componentEdge.traversalClass, "constructive");
     assert.equal(componentEdge.executionEvidenceStatus, "succeeded");
+    assert.equal(componentEdge.executionEvidenceSource, "component_smoke");
+    assert.equal(
+      componentEdge.executionEvidenceCommand,
+      "node build_tenants/hello_world_javascript/src/hello.js"
+    );
     assert.equal(componentEdge.executionEvidenceReportCount, 1);
+    assert.equal(componentEdge.executionEvidenceShardCount, 1);
+    assert.equal(componentEdge.executionEvidenceTestsObserved, 1);
+    assert.equal(componentEdge.executionEvidencePassedCount, 1);
+    assert.equal(componentEdge.executionEvidenceFailedCount, 0);
     assert.equal(componentEdge.residualPressureTransition, "cleared");
     assert.equal(componentEdge.residualPressureRefCount, 0);
     assert.match(
@@ -721,6 +771,19 @@ test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressu
     assert.ok(executionResultStage !== undefined);
     assert.equal(executionResultStage.stageClass, "constructive");
     assert.equal(executionResultStage.operatorRunRefs.length, 1);
+    const executionResultEdge = result.edgeTraversal.find(
+      (attempt) => attempt.targetAssetType === "test_execution_result_surface"
+    );
+    assert.ok(executionResultEdge !== undefined);
+    assert.equal(
+      executionResultEdge.executionEvidenceSource,
+      "graph_test_execution_result"
+    );
+    assert.equal(
+      executionResultEdge.executionEvidenceCommand,
+      "node --test test/hello.test.js"
+    );
+    assert.equal(executionResultEdge.executionEvidenceReportCount, 1);
 
     const missingRunArchiveStage = result.conceptualStageCoverage.find(
       (row) => row.expectedEdgeName === "derive_test_run_archive_surface"
@@ -732,8 +795,59 @@ test("T-171 analyzer exposes prompt carrier, execution evidence, residual pressu
     const markdown = renderSdlcFdRunAnalysisMarkdown(result);
     assert.match(markdown, /## Prompt And Evidence Sources/u);
     assert.match(markdown, /worker_construction_brief\.json/u);
+    assert.match(markdown, /component_smoke/u);
+    assert.match(markdown, /graph_test_execution_result/u);
     assert.match(markdown, /## Test35 Conceptual Stage Coverage/u);
     assert.match(markdown, /derive_test_run_archive_surface/u);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-171 full lifecycle synthetic archive reaches graph-generated test execution before release", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t171-full-lifecycle-");
+  try {
+    buildSyntheticT132Archive({
+      rootDir: archiveRoot,
+      edges: T132_FULL_LIFECYCLE_EDGE_ORDER
+    });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    assert.equal(
+      result.currentStateTelemetrySummary.operatorRunCount,
+      T132_FULL_LIFECYCLE_EDGE_ORDER.length
+    );
+    assert.deepEqual(
+      result.currentStateTelemetrySummary.graphEdgeSequence,
+      T132_FULL_LIFECYCLE_EDGE_ORDER.map((edge) => edge.name)
+    );
+
+    const executionResultIndex = result.edgeTraversal.findIndex(
+      (attempt) => attempt.graphFunctionName === "derive_test_execution_result_surface"
+    );
+    const releaseIndex = result.edgeTraversal.findIndex(
+      (attempt) => attempt.graphFunctionName === "prepare_release_surface"
+    );
+    assert.ok(executionResultIndex >= 0, "test execution result edge present");
+    assert.ok(releaseIndex > executionResultIndex, "release follows execution result");
+
+    const executionResultEdge = result.edgeTraversal[executionResultIndex];
+    assert.equal(
+      executionResultEdge.executionEvidenceSource,
+      "graph_test_execution_result"
+    );
+    assert.equal(executionResultEdge.executionEvidenceStatus, "succeeded");
+    assert.equal(executionResultEdge.executionEvidenceReportCount, 1);
+    assert.equal(executionResultEdge.executionEvidenceShardCount, 1);
+    assert.equal(executionResultEdge.executionEvidenceTestsObserved, 1);
+    assert.equal(executionResultEdge.executionEvidenceFailedCount, 0);
+
+    const missingStages = result.conceptualStageCoverage.filter(
+      (row) => row.stageClass === "missing"
+    );
+    assert.deepEqual(missingStages, []);
   } finally {
     rmSync(archiveRoot, { recursive: true, force: true });
   }

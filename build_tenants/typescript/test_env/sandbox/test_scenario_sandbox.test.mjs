@@ -29,6 +29,7 @@ import {
   t131OddChatScenario
 } from "./scenarios/t131_odd_chat.scenario.mjs";
 import {
+  T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
   t132HelloWorldJsLiveScenario,
   t132HelloWorldJsScenario
 } from "./scenarios/t132_hello_world_js.scenario.mjs";
@@ -212,15 +213,15 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     helloWorldRustMinimumInductionLiveScenario({ worker }).maxAdvances >= 16
   );
   const jsLive = t132HelloWorldJsLiveScenario({ worker });
-  assert(jsLive.maxAdvances <= 4);
+  assert(jsLive.maxAdvances >= T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES.length);
   assert.deepEqual(jsLive.startTarget, "next");
   assert.deepEqual(jsLive.expectations.handoffEdgeSequencePrefix, [
-    "derive_lite_design_adr_surface",
-    "derive_lite_component_code_surface"
+    ...T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES
   ]);
+  assert.equal(jsLive.stopAfterWorkspaceFilesExist, false);
   assert.deepEqual(
     jsLive.expectations.firstHandoffOverlayRef,
-    "overlay://odd-sdlc/lite-design-module-implementation"
+    "overlay://odd-sdlc/current-full-traversal"
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });

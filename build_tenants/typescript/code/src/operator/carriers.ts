@@ -647,6 +647,45 @@ export interface SdlcTestDesignRegisterAdmission {
   readonly evidenceRefs: readonly string[];
 }
 
+export interface SdlcTestExecutionPreparationRow {
+  readonly kind: "sdlc_test_execution_preparation_row";
+  readonly scheduleRef: string;
+  readonly moduleName: string;
+  readonly testClassId: string;
+  readonly testcaseIds: readonly string[];
+  readonly command: string;
+  readonly workingDirectory: string;
+  readonly frameworkRef: string;
+  readonly shardId: string | null;
+  readonly sourceTestFileRefs: readonly string[];
+  readonly requirementIds: readonly string[];
+  readonly status: "prepared" | "blocked" | "pending";
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcTestExecutionSurfaceRegister {
+  readonly kind: "sdlc_test_execution_surface_register";
+  readonly registerVersion: "ts-test-execution-v1";
+  readonly targetAssetType: "test_execution_surface";
+  readonly testExecutionPreparationRows: readonly SdlcTestExecutionPreparationRow[];
+  readonly evidenceRefs: readonly string[];
+  readonly summary: string | null;
+}
+
+export type SdlcTestExecutionSurfaceRegisterAdmissionStatus =
+  | "admitted"
+  | "rejected"
+  | "not_required";
+
+export interface SdlcTestExecutionSurfaceRegisterAdmission {
+  readonly kind: "sdlc_test_execution_surface_register_admission";
+  readonly status: SdlcTestExecutionSurfaceRegisterAdmissionStatus;
+  readonly targetAssetType: string;
+  readonly register: SdlcTestExecutionSurfaceRegister | null;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
 export interface SdlcTestExecutionEvidenceAdmission {
   readonly kind: "sdlc_test_execution_evidence_admission";
   readonly admissionRef: string;

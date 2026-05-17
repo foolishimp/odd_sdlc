@@ -1,13 +1,15 @@
 # ODD SDLC TypeScript Design-Consumer Test Pipeline
 
-**Status**: Superseded design input for T-170 repair
+**Status**: Active design input for T-171 lifecycle parity
 **Date**: 2026-05-15
 **Owner Ticket**:
-`.ai-workspace/tickets/active/T-170-implement-authority-placement-strategy-and-repair-fd-overreach.md`
+`.ai-workspace/tickets/active/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`
 **Superseded Ticket**:
 `.ai-workspace/tickets/completed/T-168-build-design-consumer-test-pipeline-for-co-affirming-implementation.md`
 **Superseding Strategy**:
 `.ai-workspace/comments/codex/20260516T024852Z_STRATEGY_fp_fd_eventual_consistency_steel_thread_execution.md`
+**Decommission Register**:
+`ODD_SDLC_TYPESCRIPT_DECOMMISSION_REGISTER.md`
 **Implements**: REQ-F-ODDSDLC-010, REQ-F-ODDSDLC-011,
 REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015,
 REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-040,
@@ -22,7 +24,7 @@ REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066
 `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`,
 `ODD_SDLC_TYPESCRIPT_SCHEDULING_PHASE.md`
 
-T-170 must repair this design where test-pipeline conformance can become a
+T-171 repairs this design where test-pipeline conformance could become a
 substitute for execution-backed co-affirmation and F_P/content judgment.
 
 ## STDO Re-Triage
@@ -160,6 +162,13 @@ product closure points. They produce implementation evidence for later
 co-affirmation. If any downstream test/release node is required by the active
 overlay or edge contract, their closure decision must carry residual pressure or
 next-action truth rather than causing `product_converged`.
+
+`derive_code_surface` is a compatibility rollup over admitted
+`component_code_surface` and `component_realization_qualification_surface`
+evidence. The rollup may summarize or package those facts for downstream
+consumers, but it must not synthesize new implementation truth, bypass the
+component realization qualification, or substitute for later generated-test,
+execution-result, archive, parity, or release evidence.
 
 ## Test Case Execution Contract
 

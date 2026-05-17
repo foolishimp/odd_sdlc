@@ -391,6 +391,38 @@ function parseRegister(input: unknown, label: string): SdlcTestDesignRegister {
   });
 }
 
+function objectRecord(input: unknown): Record<string, unknown> | null {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return null;
+  }
+  return Object.fromEntries(Object.entries(input));
+}
+
+function testDesignCandidateRecord(input: Record<string, unknown>): unknown {
+  if (input["test_design_register"] !== undefined) {
+    return input["test_design_register"];
+  }
+  if (input["testDesignRegister"] !== undefined) {
+    return input["testDesignRegister"];
+  }
+  const payload = objectRecord(input["payload"]);
+  if (payload?.["kind"] === "sdlc_test_design_register") {
+    return input["payload"];
+  }
+  if (input["kind"] === "sdlc_test_design_register") {
+    return input;
+  }
+  return null;
+}
+
+function normalizeCandidate(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return testDesignCandidateRecord(record) ?? input;
+}
+
 function jsonCandidates(content: string): readonly unknown[] {
   const candidates: unknown[] = [];
   const trimmed = content.trim();
@@ -500,7 +532,10 @@ export function admitTestDesignRegisterFromArtifact(input: {
   const errors: string[] = [];
   for (const candidate of jsonCandidates(content)) {
     try {
-      const register = parseRegister(candidate, "test_design_register");
+      const register = parseRegister(
+        normalizeCandidate(candidate),
+        "test_design_register"
+      );
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(`test_design_register_target_mismatch:${register.targetAssetType}`);
         continue;

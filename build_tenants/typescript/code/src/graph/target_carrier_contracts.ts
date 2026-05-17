@@ -237,6 +237,9 @@ function payloadRequiredFieldRefsForTarget(
       "payload.testExecutionScheduleRows"
     ]);
   }
+  if (targetAssetType === "test_execution_surface") {
+    return Object.freeze(["payload.testExecutionPreparationRows"]);
+  }
   return Object.freeze([]);
 }
 

@@ -177,6 +177,14 @@ export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly postflightStatus: string | null;
   readonly executionEvidenceStatus: string | null;
   readonly executionEvidenceReportCount: number;
+  readonly executionEvidenceLane: string | null;
+  readonly executionEvidenceCommand: string | null;
+  readonly executionEvidenceTestsObserved: number | null;
+  readonly executionEvidencePassedCount: number | null;
+  readonly executionEvidenceFailedCount: number | null;
+  readonly executionEvidenceShardCount: number;
+  readonly executionEvidenceReportRefs: readonly string[];
+  readonly executionEvidenceSource: "none" | "component_smoke" | "graph_test_execution_result";
   readonly residualPressureRefCount: number;
   readonly residualPressureTransition: "none" | "preserved" | "cleared" | "unknown";
   readonly promptSourceCarrierRef: string | null;

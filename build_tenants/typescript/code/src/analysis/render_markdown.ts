@@ -70,12 +70,12 @@ function renderEdgeTraversal(attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]):
   const lines: string[] = [
     "## Edge Traversal",
     "",
-    "| # | edge | target | class | worker_ms | edge_ms | det_ms | pf | exec | pressure | closure | retry | blocking | files | obligations | lineage |",
-    "| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |"
+    "| # | edge | target | class | worker_ms | edge_ms | det_ms | pf | exec | exec_source | pressure | closure | retry | blocking | files | obligations | lineage |",
+    "| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |"
   ];
   for (const attempt of attempts) {
     lines.push(
-      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.targetAssetType ?? "n/a"} | ${attempt.traversalClass} | ${formatMs(attempt.workerElapsedMs)} | ${formatMs(attempt.edgeWindowElapsedMs)} | ${formatMs(attempt.deterministicElapsedMs)} | ${attempt.postflightStatus ?? "n/a"} | ${attempt.executionEvidenceStatus ?? "-"} | ${attempt.residualPressureTransition}:${attempt.residualPressureRefCount} | ${attempt.closureDisposition ?? "n/a"} | ${attempt.predecessorAttemptRef === null ? "-" : "yes"} | ${attempt.blockingReasonCodes.join(",") || "-"} | ${attempt.productFilesWritten.length + attempt.productFilesReplayed.length} | ${attempt.requirementObligationCount ?? "n/a"} | ${attempt.productLineageCount} |`
+      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.targetAssetType ?? "n/a"} | ${attempt.traversalClass} | ${formatMs(attempt.workerElapsedMs)} | ${formatMs(attempt.edgeWindowElapsedMs)} | ${formatMs(attempt.deterministicElapsedMs)} | ${attempt.postflightStatus ?? "n/a"} | ${attempt.executionEvidenceStatus ?? "-"} | ${attempt.executionEvidenceSource} | ${attempt.residualPressureTransition}:${attempt.residualPressureRefCount} | ${attempt.closureDisposition ?? "n/a"} | ${attempt.predecessorAttemptRef === null ? "-" : "yes"} | ${attempt.blockingReasonCodes.join(",") || "-"} | ${attempt.productFilesWritten.length + attempt.productFilesReplayed.length} | ${attempt.requirementObligationCount ?? "n/a"} | ${attempt.productLineageCount} |`
     );
   }
   return lines.join("\n");
@@ -88,12 +88,17 @@ function renderPromptAndEvidence(attempts: readonly SdlcFdRunAnalysisEdgeAttempt
   const lines: string[] = [
     "## Prompt And Evidence Sources",
     "",
-    "| # | edge | construction brief | brief digest | rendered prompt | prompt policy | execution reports |",
-    "| - | - | - | - | - | - | - |"
+    "| # | edge | construction brief | brief digest | rendered prompt | prompt policy | execution | command | reports | shards | counts |",
+    "| - | - | - | - | - | - | - | - | - | - | - |"
   ];
   for (const attempt of attempts) {
+    const counts = [
+      attempt.executionEvidenceTestsObserved ?? "n/a",
+      attempt.executionEvidencePassedCount ?? "n/a",
+      attempt.executionEvidenceFailedCount ?? "n/a"
+    ].join("/");
     lines.push(
-      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.promptSourceCarrierRef ?? "-"} | ${attempt.promptSourceCarrierDigest ?? "-"} | ${attempt.promptRenderingRef ?? "-"} | ${attempt.promptSourcePolicyRef ?? "-"} | ${attempt.executionEvidenceReportCount} |`
+      `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.promptSourceCarrierRef ?? "-"} | ${attempt.promptSourceCarrierDigest ?? "-"} | ${attempt.promptRenderingRef ?? "-"} | ${attempt.promptSourcePolicyRef ?? "-"} | ${attempt.executionEvidenceSource}:${attempt.executionEvidenceStatus ?? "-"} | ${attempt.executionEvidenceCommand ?? "-"} | ${attempt.executionEvidenceReportCount} | ${attempt.executionEvidenceShardCount} | ${counts} |`
     );
   }
   return lines.join("\n");

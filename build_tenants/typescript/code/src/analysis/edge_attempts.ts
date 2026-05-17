@@ -137,18 +137,55 @@ function fileRef(operatorRunRoot: string, relativePath: string): string | null {
 }
 
 function executionEvidenceStatusFromReport(
-  report: WorkerResultReportRecord | null
+  report: WorkerResultReportRecord | null,
+  targetAssetType: string | null
 ): {
   readonly status: string | null;
   readonly reportCount: number;
+  readonly lane: string | null;
+  readonly command: string | null;
+  readonly testsObserved: number | null;
+  readonly passedCount: number | null;
+  readonly failedCount: number | null;
+  readonly shardCount: number;
+  readonly reportRefs: readonly string[];
+  readonly source: "none" | "component_smoke" | "graph_test_execution_result";
 } {
   const evidence = report?.executionEvidence ?? null;
   if (evidence === null || typeof evidence !== "object") {
-    return Object.freeze({ status: null, reportCount: 0 });
+    return Object.freeze({
+      status: null,
+      reportCount: 0,
+      lane: null,
+      command: null,
+      testsObserved: null,
+      passedCount: null,
+      failedCount: null,
+      shardCount: 0,
+      reportRefs: Object.freeze([]),
+      source: "none" as const
+    });
   }
+  const reportRefs = Array.isArray(evidence.reportRefs)
+    ? evidence.reportRefs.filter((ref): ref is string => typeof ref === "string")
+    : [];
+  const source = targetAssetType === "test_execution_result_surface"
+    ? "graph_test_execution_result"
+    : "component_smoke";
   return Object.freeze({
     status: typeof evidence.status === "string" ? evidence.status : null,
-    reportCount: Array.isArray(evidence.reportRefs) ? evidence.reportRefs.length : 0
+    reportCount: reportRefs.length,
+    lane: typeof evidence.lane === "string" ? evidence.lane : null,
+    command: typeof evidence.command === "string" ? evidence.command : null,
+    testsObserved:
+      typeof evidence.testsObserved === "number" ? evidence.testsObserved : null,
+    passedCount:
+      typeof evidence.passedCount === "number" ? evidence.passedCount : null,
+    failedCount:
+      typeof evidence.failedCount === "number" ? evidence.failedCount : null,
+    shardCount: Array.isArray(evidence.shardEvidence) ? evidence.shardEvidence.length : 0,
+    reportRefs: Object.freeze(reportRefs),
+    source
   });
 }
 
@@ -251,6 +288,9 @@ export function deriveEdgeAttempt(
   const workerConstructionBrief = carriers.workerConstructionBrief.status === "present"
     ? carriers.workerConstructionBrief.data
     : null;
+  const graphFunctionName =
+    operatorSummary?.graphFunctionName ?? handoff?.graphFunctionName ?? null;
+  const targetAssetType = handoff?.targetAssetType ?? null;
   const productFiles = productFilesFromManifest(productManifest?.files);
   const blockingReasonCodes = blockingReasonCodesFromPostflight(postflight);
   const workerElapsedMs = workerRun?.elapsedMs ?? null;
@@ -266,12 +306,12 @@ export function deriveEdgeAttempt(
     carriers.fileSizes.workerInvocationPackage +
     carriers.fileSizes.traversalIntentPackage +
     carriers.fileSizes.workerConstructionBrief;
-  const executionEvidence = executionEvidenceStatusFromReport(workerReport);
+  const executionEvidence = executionEvidenceStatusFromReport(
+    workerReport,
+    targetAssetType
+  );
   const residualRefs = residualPressureRefs(carriers);
   const closureDisposition = edgeClosure?.disposition ?? null;
-  const graphFunctionName =
-    operatorSummary?.graphFunctionName ?? handoff?.graphFunctionName ?? null;
-  const targetAssetType = handoff?.targetAssetType ?? null;
   const canonicalPromptCarrierPath =
     typeof workerConstructionBrief?.canonicalPromptCarrierPath === "string"
       ? workerConstructionBrief.canonicalPromptCarrierPath
@@ -294,6 +334,14 @@ export function deriveEdgeAttempt(
     postflightStatus: postflight?.status ?? null,
     executionEvidenceStatus: executionEvidence.status,
     executionEvidenceReportCount: executionEvidence.reportCount,
+    executionEvidenceLane: executionEvidence.lane,
+    executionEvidenceCommand: executionEvidence.command,
+    executionEvidenceTestsObserved: executionEvidence.testsObserved,
+    executionEvidencePassedCount: executionEvidence.passedCount,
+    executionEvidenceFailedCount: executionEvidence.failedCount,
+    executionEvidenceShardCount: executionEvidence.shardCount,
+    executionEvidenceReportRefs: executionEvidence.reportRefs,
+    executionEvidenceSource: executionEvidence.source,
     residualPressureRefCount: residualRefs.length,
     residualPressureTransition: residualPressureTransition({
       closureDisposition,

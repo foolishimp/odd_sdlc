@@ -155,11 +155,24 @@ export interface WorkerResultReportRecord {
   readonly obligationAssessments?: readonly unknown[];
   readonly unresolvedReasons?: readonly unknown[];
   readonly executionEvidence?: {
+    readonly lane?: string;
+    readonly command?: string;
     readonly status?: string;
     readonly reportRefs?: readonly string[];
     readonly testsObserved?: number | null;
     readonly passedCount?: number | null;
     readonly failedCount?: number | null;
+    readonly shardEvidence?: readonly {
+      readonly shardId?: string;
+      readonly moduleName?: string;
+      readonly lane?: string;
+      readonly command?: string;
+      readonly status?: string;
+      readonly reportRefs?: readonly string[];
+      readonly testsObserved?: number | null;
+      readonly passedCount?: number | null;
+      readonly failedCount?: number | null;
+    }[];
   } | null;
 }
 

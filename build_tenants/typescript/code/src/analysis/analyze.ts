@@ -238,15 +238,15 @@ const TEST35_CONCEPTUAL_STAGES = Object.freeze([
     stageClass: "constructive" as const
   }),
   Object.freeze({
-    test35StageRef: "test35://stage/test-run-archive",
-    expectedEdgeName: "derive_test_run_archive_surface",
-    expectedTargetAssetType: "test_run_archive_surface",
-    stageClass: "constructive" as const
-  }),
-  Object.freeze({
     test35StageRef: "test35://stage/test-execution-result",
     expectedEdgeName: "derive_test_execution_result_surface",
     expectedTargetAssetType: "test_execution_result_surface",
+    stageClass: "constructive" as const
+  }),
+  Object.freeze({
+    test35StageRef: "test35://stage/test-run-archive",
+    expectedEdgeName: "derive_test_run_archive_surface",
+    expectedTargetAssetType: "test_run_archive_surface",
     stageClass: "constructive" as const
   }),
   Object.freeze({
