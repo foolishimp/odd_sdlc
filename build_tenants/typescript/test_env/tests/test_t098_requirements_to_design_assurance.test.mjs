@@ -96,6 +96,7 @@ function writeWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const obligationLines = manifest.traversalObligationContext.obligations.flatMap((obligation) => [`- ${obligation.obligationId}: ${obligation.summary}`, ...obligation.payload.sourceSnippets.map((snippet) => `  - ${snippet}`)]);",
       "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, `target: ${manifest.targetAssetType}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Obligations', ...(obligationLines.length > 0 ? obligationLines : ['- none']), '', '## Design Body', 'The design surface satisfies admitted requirement and feature decomposition pressure through the current graph edge.'].join('\\n');",
@@ -103,7 +104,7 @@ function writeWorkerScript(workspaceRoot) {
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: `generated ${manifest.targetAssetType} for ${manifest.edgeName}`, unresolvedReasons: [], materializedFiles: [], executionEvidence: null, obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: `generated ${manifest.targetAssetType} for ${manifest.edgeName}`, unresolvedReasons: [], materializedFiles: [], executionEvidence: null, obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );

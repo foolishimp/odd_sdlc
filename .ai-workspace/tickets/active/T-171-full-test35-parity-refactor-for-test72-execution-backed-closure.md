@@ -9,7 +9,7 @@ priority: critical
 owner: odd_sdlc
 build_tenant: typescript
 created_at: 2026-05-17
-updated_at: 2026-05-17
+updated_at: 2026-05-18
 triaged_at: 2026-05-17
 activated_at: 2026-05-17
 goal: restore-test35-behavior-in-typescript-through-execution-backed-fp-closure
@@ -25,10 +25,9 @@ cutover_policy: hard cutover by design; the old closure and prompt paths are fal
 canonical_prompt_carrier: worker_construction_brief.json
 test35_surface_loading_policy: TS must load the target workspace's existing source/spec/design/runtime surfaces as the current authority substrate, matching test35 behavior. Conformance may index, normalize, and expose those surfaces, but it must not replace them with a worker-authored conformant script or synthetic authority substitute.
 legacy_decommission_policy: every legacy TypeScript feature touched by this refactor must be classified as retain, derive, replace, or delete; unmapped appendages are non-closure
-current_closure_blocker: latest live hello-world proof stopped at component-code materialization/process execution and did not drive the full current_full_traversal through generated tests, test execution result, run archive, and release closure.
+current_closure_blocker: hello-world lifecycle now has an RC checkpoint through generated tests, execution-result admission, run archive, release-depth parity, and release preparation. T-171 remains open on the live data_mapper/test72 successor proof and test35 comparison.
 closure_acceptance_policy: T-171 closes only when a TS.t171 successor run supports a like-for-like lifecycle comparison against data_mapper.test35 and matches or improves the test35 behavior. The run must traverse the full graph through active generated tests, admit concrete test execution results, review failures, preserve residual pressure, perform bug-fix continuation when needed, and close only from execution-backed evidence.
 open_proof_gates:
-  - live hello-world full graph run through derive_test_design_surface, derive_component_test_surface, prepare_test_execution_surface, derive_test_execution_result_surface, derive_test_run_archive_surface, and prepare_release_surface
   - live data_mapper test72 successor run admitting derive_test_execution_result_surface-class evidence with concrete pass/fail counts before release-level close
   - analyzer comparison showing test35 conceptual stages as mapped or explicitly invariant-preserving consolidated, not hidden by bounded scenario stop conditions
   - edge-by-edge like-for-like comparison showing TS.t171 matches or improves test35 on graph lifecycle, prompt/current-state construction, ledger pressure preservation, active test execution, failure review, bug-fix continuation, and final closure evidence
@@ -421,7 +420,7 @@ Unclassified legacy code is non-closure.
 - [x] Analyzer distinguishes constructive edges, projection edges, rollup edges, and missing/unmapped conceptual test35 stages.
 - [x] Retry classification treats framework carrier/parser/prompt shape drift as failure.
 - [x] Hello-world no-op path has no framework-induced retry.
-- [ ] Live hello-world full-graph scenario drives past component-code materialization into generated test design, component tests, test execution preparation, execution result admission, test run archive, and release preparation.
+- [x] Live hello-world full-graph scenario drives past component-code materialization into generated test design, component tests, test execution preparation, execution result admission, test run archive, and release preparation.
 - [ ] Data_mapper test72 successor run admits execution result evidence and can be compared against test35 edge by edge.
 - [ ] TS.t171/data_mapper lifecycle comparison shows the TypeScript run matches or improves test35 on edge sequence, active test execution, result review, residual pressure, bug-fix continuation, and final release closure evidence.
 - [ ] Superseded closure and prompt paths are deleted, not retained as compatibility debt.
@@ -957,6 +956,24 @@ Results:
   - full semantic suite passed: 617/617
   - checkpoint release cut:
     `.ai-workspace/release-cuts/typescript/20260517T095944Z_t171_checkpoint_rc`
+- 2026-05-18T12:57Z checkpoint RC live hello-world lifecycle gate:
+  - `git diff --check` passed
+  - semantic build passed
+  - live command passed: `npm run test:t132:hello-world-live`
+  - Node test result: `tests 1`, `pass 1`, `fail 0`
+  - live archive:
+    `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T114036171Z_pid75297`
+  - analyzer summary: `operatorRunCount=28`, `graphEdgeSequence=19`,
+    `sameEdgeRetryCount=2`, `repairAttemptCount=4`, `blockedAttemptCount=2`,
+    `yieldedAttemptCount=0`, `abortedAttemptCount=0`,
+    `finalClosureDisposition=close`
+  - execution evidence: `derive_test_execution_result_surface` passed with
+    `executionEvidenceStatus=succeeded`, command `node --test test/hello.test.js`,
+    `tests=1`, `passed=1`, `failed=0`
+  - final live edge: `prepare_release_surface -> release_surface`, passed and
+    closed
+  - checkpoint release cut:
+    `.ai-workspace/release-cuts/typescript/20260518T125740Z_t171_hello_world_lifecycle_rc`
 
 ### Proof Status
 
@@ -965,10 +982,13 @@ and `20260517T073315118Z_pid10553` runs are not accepted as proof because they
 retried and/or used a pre-fix runtime. They remain useful only as evidence
 sources for the framework bugs above.
 
-Checkpoint RC proof is deterministic only. Live lifecycle proof is post-RC.
+The 2026-05-17 checkpoint RC proof is deterministic only. The 2026-05-18
+checkpoint RC proof adds the hello-world live lifecycle gate through generated
+test design, component test materialization, test execution preparation,
+execution-result admission with concrete pass/fail counts, test-run archive,
+release-depth parity, and release preparation. This is still not a final release
+and does not close T-171: the data_mapper/test72 successor proof and test35
+comparison remain open.
+
 The fast default lane may use local-spawn; the separate PTY preconfigured lane
-must also remain available as a live regression guard. The accepted post-RC
-lifecycle proof must traverse through generated test design, component test
-materialization, test execution preparation, execution-result admission with
-concrete pass/fail counts, test-run archive, and release preparation before any
-data_mapper successor proof is accepted.
+must also remain available as a live regression guard.

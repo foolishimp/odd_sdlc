@@ -112,6 +112,7 @@ function writeWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const edgeLog = path.join(manifest.workspaceRoot, '.ai-workspace', 'runtime', 'odd_sdlc', 't093_edge_log.jsonl');",
       "mkdirSync(dirname(edgeLog), { recursive: true });",
@@ -186,9 +187,11 @@ function writeWorkerScript(workspaceRoot) {
       "if (manifest.targetAssetType === 'component_test_surface') { materializedFiles.push(materializedFile('test', testRelative, ['// Validates: REQ-T093-002', \"import test from 'node:test';\", \"import assert from 'node:assert/strict';\", \"test('scheduled value proof', () => {\", '  const actual = 2 + 2;', '  assert.equal(actual, 4);', '});', ''].join('\\n'))); }",
       "const evidenceRefs = [manifest.outputFile, ...materializedFiles.map((file) => file.absolutePath)];",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [...evidenceRefs, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "const shardEvidence = manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 }));",
-      "const executionEvidence = manifest.productMaterialization.executionShards.length > 0 ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: shardEvidence.length, passedCount: shardEvidence.length, failedCount: 0, shardEvidence } : null;",
-      "const report = { kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: digestText(`${outputContent}\\n`), summary: `generated ${manifest.targetAssetType}`, unresolvedReasons: [], materializedFiles, executionEvidence, obligationAssessments };",
+      "const declaredExecutionContract = typeof manifest.productMaterialization.testExecutionContract === 'string' && !['', 'undeclared', 'none', 'n/a', 'not_applicable'].includes(manifest.productMaterialization.testExecutionContract.trim().toLowerCase());",
+      "const admitsExecutionEvidence = manifest.targetAssetType === 'test_execution_result_surface' || (manifest.targetAssetType === 'component_code_surface' && manifest.productMaterialization.required && declaredExecutionContract);",
+      "const shardEvidence = admitsExecutionEvidence ? manifest.productMaterialization.executionShards.map((shard) => ({ kind: 'sdlc_worker_execution_shard_evidence', shardId: shard.shardId, moduleName: shard.moduleName, lane: 'test', command: shard.command, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: 1, passedCount: 1, failedCount: 0 })) : [];",
+      "const executionEvidence = shardEvidence.length > 0 ? { kind: 'sdlc_worker_execution_evidence', lane: 'test', command: manifest.productMaterialization.testExecutionContract, status: 'succeeded', reportRefs: [manifest.outputFile], testsObserved: shardEvidence.length, passedCount: shardEvidence.length, failedCount: 0, shardEvidence } : null;",
+      "const report = { kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: digestText(`${outputContent}\\n`), summary: `generated ${manifest.targetAssetType}`, unresolvedReasons: [], materializedFiles, executionEvidence, obligationAssessments };",
       "writeFileSync(manifest.reportFile, `${JSON.stringify(report, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"

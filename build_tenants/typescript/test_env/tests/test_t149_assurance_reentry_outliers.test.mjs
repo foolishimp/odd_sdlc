@@ -101,7 +101,7 @@ function workerReport(input = {}) {
     obligationAssessments: [],
     fpTransformRequestRef: null,
     fpTransformResultRef: null,
-    fpTransformStatus: null,
+    fpTransformStatusSnapshot: null,
     fpEvaluateResultRef: null
   };
 }

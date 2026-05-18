@@ -2,7 +2,7 @@
 
 **Status**: Active
 **Owner Ticket**: `T-076`
-**Implements**: REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-039, REQ-F-ODDSDLC-051, REQ-F-ODDSDLC-052, REQ-F-ODDSDLC-053, REQ-F-ODDSDLC-054, REQ-F-ODDSDLC-055
+**Implements**: REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-039, REQ-F-ODDSDLC-051, REQ-F-ODDSDLC-052, REQ-F-ODDSDLC-053, REQ-F-ODDSDLC-054, REQ-F-ODDSDLC-055, REQ-F-ODDSDLC-074, REQ-F-ODDSDLC-075, REQ-F-ODDSDLC-076, REQ-F-ODDSDLC-077, REQ-F-ODDSDLC-078, REQ-F-ODDSDLC-079
 **Derives From**: `ODD_SDLC_TYPESCRIPT_INSTALLED_OPERATOR_UX.md`, `ODD_SDLC_TYPESCRIPT_RECURSIVE_REALIZATION_DEEPENING.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
 
 ## Position
@@ -66,7 +66,7 @@ terminal result is claimed.
 | `SdlcFeatureScope` | feature-scope pressure | non-narrowing full-breadth or scoped steel-thread/targeted-repair pressure | derived from the strategy decision and archived in the handoff | full-breadth induction filtered to one module |
 | `SdlcWorkerRetryContext` | same-edge re-entry | replay-derived prior failure state | derived from ABG retry projection and admitted gap dossiers | local attempt counter |
 | `SdlcProductMaterializationContract` | product file output | tenant-root materialization law | declares tenant root, selected output root, required roles, and `relativePathBasis=tenant_root` | path convention inferred by worker |
-| `SdlcWorkerResultReport` | worker result | F_P candidate surface | closed JSON report with output digest and materialized file inventory | prose scrape or stdout inference |
+| `SdlcWorkerResultReport` | worker admission envelope and archive projection | non-authoritative projection over typed F_P stage carriers | closed JSON report with output digest, materialized file inventory, `projectionRole: typed_fp_stage_projection`, and a same-archive `authoritativeStageResultRef` to `fp_evaluate_result.json` | prose scrape, stdout inference, or compatibility report without typed-stage citation |
 | `SdlcPostflightResult` | deterministic admission | F_D postflight verdict | output, digest, unresolved reasons, materialization, and evidence checks | accepting generated files because they exist |
 | `SdlcPostflightGapDossier` | failure classification | odd_sdlc domain gap meaning | derives from postflight verdict, worker report, materialization contract, and evidence refs | flat blocking-reason string as repair contract |
 | `SdlcAssuranceLedger` | assurance dimension | odd_sdlc domain evaluation truth | one deterministic ledger over materialization, semantic convergence, obligation carry, requirement fulfillment, ambiguity, capability, or shallow realization | hidden evaluator branch or prose-only assessment |
@@ -130,9 +130,10 @@ instruction must not advertise a carrier shape that the parser will reject.
 The first T-076 implementation slice governs the failed-postflight path:
 
 ```text
-WorkerResultReport
-  -> evaluateWorkerResultPostflight
-  -> SdlcPostflightResult(blocked)
+F_P.transform result
+  -> worker admission envelope projected as WorkerResultReport
+  -> F_P.evaluate / evaluateWorkerResultPostflight
+  -> SdlcPostflightResult(blocked) + fp_evaluate_result.json
   -> SdlcPostflightGapDossier(open)
   -> AssuranceLedgerSet
   -> TraversalRequirementSatisfaction(blocked | retry_same_edge | reprice_required)
@@ -144,8 +145,10 @@ WorkerResultReport
 The pass path remains:
 
 ```text
-WorkerResultReport
-  -> evaluateWorkerResultPostflight
+F_P.transform result
+  -> worker admission envelope projected as WorkerResultReport
+  -> F_P.evaluate / evaluateWorkerResultPostflight
+  -> fp_evaluate_result.json
   -> AssuranceLedgerSet
   -> TraversalRequirementSatisfaction(close_allowed)
   -> hook admission
@@ -212,6 +215,47 @@ The core classification remains pure:
 - fold traversal requirement satisfaction
 - derive retry decision input
 - construct emitted runtime events
+
+## Construction Algebra Governance
+
+T-102 enters at requirements because REQ-F-ODDSDLC-074 through
+REQ-F-ODDSDLC-079 define the constitutional algebra. This design carries those
+requirements down into the deterministic realization boundary.
+
+The runtime fold is therefore tested as a construction algebra, not only as a
+successful scenario:
+
+- every disposition maps to one lawful next-action basis
+- close plus same-vector projection normalizes away from same-edge retry and
+  falls through to overlay continuation or terminal close
+- repair and retry preserve same-edge continuation pressure
+- output-limit worker process facts stay typed as same-edge retry or repair
+  pressure
+- evidence admission remains separate from closure
+- live repair admission preserves current observed product bytes and digests over
+  stale replay manifest bytes
+- execution-result edges own execution evidence and execution-repair scoped
+  tenant edits
+- edge permission classes govern whether product writes are admissible
+- product-materialization lineage is role-sensitive: source/test product files
+  carry requirement lineage while declared auxiliary build config stays
+  admissible without pretending content closure
+- every published hook contract is swept to prove the transform prompt and
+  construction obligations do not carry evaluator obligations, report-writing
+  instructions, unresolved-reason fields, or closure work
+- evaluator expectations remain carried as the post-transform evaluation
+  contract, not as worker-authored transform obligations
+- `fp_transform_result.json` and `fp_evaluate_result.json` are the governing
+  stage carriers; `worker_result_report.json` is archived only as a
+  `typed_fp_stage_projection` that points back to the authoritative stage result
+- `sdlc_edge_fulfillment_ledger.json` carries `fp_evaluate_result.json` in its
+  admission and predecessor refs. The transform result remains transform/output
+  evidence and does not substitute for the evaluation ledger fact.
+
+The deterministic sweep lives with the installed-operator/postflight tests so
+that the STDO path stays connected: requirements define the algebra, this design
+declares the realization boundary, and the TypeScript test proves the fold and
+permission cases as executable governance.
 
 ## Local And Global Optimization Review
 

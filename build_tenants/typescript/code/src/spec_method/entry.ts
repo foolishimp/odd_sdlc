@@ -65,7 +65,8 @@ import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
   executeInstalledOperatorStartWithReentry,
   readOddSdlcRuntimeEvents,
-  readOddSdlcRuntimeEventsSync
+  readOddSdlcRuntimeEventsSync,
+  type SdlcInstalledOperatorStartOutcome
 } from "../operator/index.js";
 import {
   SDLC_PUBLIC_START_UNTIL_VALUES,
@@ -484,7 +485,7 @@ function parseReleaseCutOptions(argv: readonly string[]): SpecMethodReleaseCutOp
 function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOptionReadModel {
   let inspectedRoot: string | null = null;
   let profile: SdlcFdRunAnalysisProfile = "generic";
-  let format: SdlcFdRunAnalysisFormat = "json";
+  let format: SdlcFdRunAnalysisFormat = "markdown";
   let outputPath: string | null = null;
   let strict = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -515,6 +516,8 @@ function parseAnalyzeRunOptions(argv: readonly string[]): SpecMethodAnalyzeRunOp
       }
       format = value;
       index += 1;
+    } else if (token === "--raw") {
+      format = "json";
     } else if (token === "--output") {
       outputPath = requireOptionValue(argv, index, "--output");
       index += 1;
@@ -862,6 +865,7 @@ function nextActionProjectionFromArchive(
 }
 
 interface SelectedNextGraphFunctionFromArchive {
+  readonly completedGraphFunctionName: string | null;
   readonly graphFunctionName: string;
   readonly nextActionProjectionRef: string;
   readonly selectedActionRef: string;
@@ -908,14 +912,17 @@ function specMethodBlockingPayload(
 }
 
 function completedGraphFunctionNameFromArchive(archiveRoot: string): string | null {
-  const handoff = jsonRecordFromFile(path.join(archiveRoot, "handoff_manifest.json"));
-  if (handoff === null) {
-    return null;
+  for (const fileName of ["handoff_manifest.json", "worker_invocation_package.json"]) {
+    const record = jsonRecordFromFile(path.join(archiveRoot, fileName));
+    const graphFunctionName =
+      record === null
+        ? null
+        : stringField(record, "graphFunctionName") ?? stringField(record, "edgeName");
+    if (graphFunctionName !== null) {
+      return graphFunctionName;
+    }
   }
-  return (
-    stringField(handoff, "graphFunctionName") ??
-    stringField(handoff, "edgeName")
-  );
+  return null;
 }
 
 function selectedNextGraphFunctionFromOverlayCompletionArchive(input: {
@@ -965,6 +972,7 @@ function selectedNextGraphFunctionFromOverlayCompletionArchive(input: {
     return null;
   }
   return Object.freeze({
+    completedGraphFunctionName: completedGraphFunctionRef,
     graphFunctionName: action.graphFunctionRef,
     nextActionProjectionRef,
     selectedActionRef: action.actionRef,
@@ -1071,6 +1079,8 @@ function selectedNextGraphFunctionFromArchive(input: {
         evidenceRefs: Object.freeze([pathToFileURL(projectionPath).href])
       });
     }
+    const completedGraphFunctionName =
+      completedGraphFunctionNameFromArchive(archiveRoot);
     let graphFunctionName: string;
     try {
       graphFunctionName = admitSdlcGraphFunctionBoundaryRef({
@@ -1116,6 +1126,7 @@ function selectedNextGraphFunctionFromArchive(input: {
       throw error;
     }
     return Object.freeze({
+      completedGraphFunctionName,
       graphFunctionName,
       nextActionProjectionRef,
       selectedActionRef,
@@ -1404,6 +1415,13 @@ function startOutcomeFor(
     outputWorkspaceRoot: request.outputWorkspaceRoot
   });
   const queryDomain = queryDomainFor(context);
+  const target =
+    replayNextAction !== undefined && request.target.kind === "graph_function"
+      ? ({
+          kind: "graph_function",
+          handle: replayNextAction.nextGraphFunctionRef
+        } as const)
+      : request.target;
   return publicStartOnce({
     request: {
       kind: "sdlc_public_start_request",
@@ -1412,7 +1430,7 @@ function startOutcomeFor(
         context.outputWorkspaceRoot === context.workspaceRoot
           ? null
           : context.outputWorkspaceRoot,
-      target: request.target,
+      target,
       until: request.until,
       defaultRegime: defaultRegimeFor({ request, queryDomain }),
       ...(replayNextAction === undefined
@@ -1441,6 +1459,33 @@ function startOutcomeFor(
   });
 }
 
+function replayNextActionFromOutcome(
+  outcome: SdlcInstalledOperatorStartOutcome
+): Parameters<typeof startOutcomeFor>[1] | undefined {
+  const consequence = outcome.traversalConsequence;
+  if (consequence === null) {
+    return undefined;
+  }
+  const projection = consequence.nextActionProjection;
+  if (
+    projection.choosesNextTraversal !== true ||
+    projection.selectedActionRef === null ||
+    projection.nextGraphFunctionRef === null ||
+    projection.nextGraphVectorRef === null
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    nextActionProjectionRef: projection.nextActionProjectionRef,
+    selectedActionRef: projection.selectedActionRef,
+    nextGraphFunctionRef: projection.nextGraphFunctionRef,
+    nextGraphVectorRef: projection.nextGraphVectorRef,
+    closureDecisionRef: consequence.edgeClosureDecision.decisionRef,
+    overlayRef: projection.overlayRef,
+    overlayBindingRef: projection.overlayBindingRef
+  });
+}
+
 function basisIdValue(event: RuntimeEvent): string | null {
   const value: unknown = Reflect.get(event, "basisId");
   return typeof value === "string" ? value : null;
@@ -1466,6 +1511,34 @@ function selectedArchiveMatchesRequestedStart(input: {
     input.request.target.handle === input.selected.graphFunctionName
   ) {
     return true;
+  }
+  if (
+    input.request.target.kind === "graph_function" &&
+    input.request.until === "converged" &&
+    input.request.target.handle === input.selected.completedGraphFunctionName
+  ) {
+    return true;
+  }
+  if (
+    input.request.target.kind === "graph_function" &&
+    input.request.until === "converged" &&
+    input.selected.overlayRef !== null
+  ) {
+    const catalog = constructSdlcTraversalOverlayCatalog({
+      module: input.module
+    });
+    const selectedOverlay = resolveSdlcTraversalOverlay({
+      catalog,
+      overlayRef: input.selected.overlayRef
+    });
+    const requestedGraphFunction = input.module.graphFunctions.find(
+      (graphFunction) => graphFunction.name === input.request.target.handle
+    );
+    if (selectedOverlay !== null && requestedGraphFunction !== undefined) {
+      return selectedOverlay.graphFunctionRefs.includes(
+        sdlcGraphFunctionBoundaryRef(requestedGraphFunction)
+      );
+    }
   }
   if (
     input.request.target.kind === "overlay" &&
@@ -1681,12 +1754,16 @@ async function installedStartPayloadFor(
     eventGraphEvents: runtimeEvents,
     requestedUntil: request.until,
     requireInstalledTopology: true,
-    refreshReplayState: async () => {
+    refreshReplayState: async (latestOutcome) => {
       const refreshedEvents = await readOddSdlcRuntimeEvents(outputWorkspaceRoot);
-      const refreshedStart = startOutcomeForObservedReplay({
-        request,
-        events: refreshedEvents
-      });
+      const replayNextAction = replayNextActionFromOutcome(latestOutcome);
+      const refreshedStart =
+        replayNextAction === undefined
+          ? startOutcomeForObservedReplay({
+              request,
+              events: refreshedEvents
+            })
+          : startOutcomeFor(request, replayNextAction);
       if (isSpecMethodBlockingPayload(refreshedStart)) {
         return Object.freeze({
           start,

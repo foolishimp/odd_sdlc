@@ -1576,6 +1576,47 @@ test("T-161 CLI dispatch returns JSON envelope and exit code 0 on clean syntheti
   }
 });
 
+test("T-161 CLI dispatch defaults to markdown when neither --format nor --raw is given", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-default-md-");
+  try {
+    buildSyntheticT132Archive({ rootDir: archiveRoot });
+    const result = invokeOddSdlcSpecMethodCommandSync([
+      "analyze-run",
+      "--run-archive",
+      archiveRoot,
+      "--profile",
+      "hello_world"
+    ]);
+    assert.equal(result.status, "ok");
+    const serialized = serializeOddSdlcSpecMethodResult(result);
+    assert.ok(serialized.startsWith("# F_D Run Analysis"));
+    assert.ok(serialized.includes("## Current State Telemetry"));
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-161 CLI dispatch --raw emits JSON envelope", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-raw-");
+  try {
+    buildSyntheticT132Archive({ rootDir: archiveRoot });
+    const result = invokeOddSdlcSpecMethodCommandSync([
+      "analyze-run",
+      "--run-archive",
+      archiveRoot,
+      "--profile",
+      "hello_world",
+      "--raw"
+    ]);
+    assert.equal(result.status, "ok");
+    const serialized = serializeOddSdlcSpecMethodResult(result);
+    const parsed = JSON.parse(serialized);
+    assert.equal(parsed.kind, SDLC_FD_RUN_ANALYSIS_KIND);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-161 CLI dispatch markdown format emits markdown text", () => {
   const archiveRoot = makeTempDir("odd-sdlc-ts-t161-cli-md-");
   try {

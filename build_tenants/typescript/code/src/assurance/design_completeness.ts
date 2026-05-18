@@ -933,6 +933,8 @@ export function deriveDesignCompletenessAssuranceLedger(input: {
         .filter((item) => item.lawfulReentryPoint === "escalate_to_fp")
         .map((item) => item.code)
     }),
+    // Structural admission gates closure; admitted content gaps remain assurance evidence.
+    required: admission.status !== "admitted",
     reasons,
     evidenceRefs,
     carryForwardObligationRefs:

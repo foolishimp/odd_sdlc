@@ -331,7 +331,7 @@ test("T-113 component-depth assurance blocks collapsed component test materializ
       obligationAssessments: [],
       fpTransformRequestRef: null,
       fpTransformResultRef: null,
-      fpTransformStatus: null,
+      fpTransformStatusSnapshot: null,
       fpEvaluateResultRef: null
     }
   });
@@ -390,7 +390,7 @@ test("T-168 component-depth assurance normalizes selected-output-root test paths
       obligationAssessments: [],
       fpTransformRequestRef: null,
       fpTransformResultRef: null,
-      fpTransformStatus: null,
+      fpTransformStatusSnapshot: null,
       fpEvaluateResultRef: null
     }
   });
@@ -533,7 +533,7 @@ test("T-084 folds real outputs from every assurance dimension", () => {
       obligationAssessments: [],
       fpTransformRequestRef: null,
       fpTransformResultRef: null,
-      fpTransformStatus: null,
+      fpTransformStatusSnapshot: null,
       fpEvaluateResultRef: null
     }
   });

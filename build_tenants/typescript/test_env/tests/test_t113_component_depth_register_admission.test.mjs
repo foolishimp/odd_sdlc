@@ -87,7 +87,7 @@ function reportFor(outputFile, content, manifest, materializedFiles = []) {
     obligationAssessments: [],
     fpTransformRequestRef: null,
     fpTransformResultRef: null,
-    fpTransformStatus: null,
+    fpTransformStatusSnapshot: null,
     fpEvaluateResultRef: null
   };
 }
@@ -194,6 +194,29 @@ test("B-084 admits metadata-rich component realization rows after prose fences",
     admission.register.componentRealizationRows[0].publicBoundary,
     "package_internal"
   );
+});
+
+test("T-171 normalizes boolean publicBoundary on component realization rows", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [
+      {
+        ...componentRow(),
+        publicBoundary: true
+      }
+    ]
+  };
+  const { outputFile } = writeArtifact(register, "component_code_surface");
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentRealizationRows[0].publicBoundary, "public");
 });
 
 test("B-084 admits metadata-rich component test rows", () => {

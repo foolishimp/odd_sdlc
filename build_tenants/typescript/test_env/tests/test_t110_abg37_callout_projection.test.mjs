@@ -194,6 +194,7 @@ test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lea
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));",
       "process.stdout.write('activity-0\\n');",
@@ -206,7 +207,7 @@ test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lea
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated ABG liveness reset fixture', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated ABG liveness reset fixture', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );

@@ -36,3 +36,8 @@ as the governing method reference when writing or revising these files.
 - `16-edge-gain-closure-contract.md` defines the product-owned gain, evidence,
   metric, close, residual-pressure, and composition contract for every
   published typed vector traversal.
+- `17-target-carrier-contracts.md` defines SDLC target carrier bindings and
+  carrier admission as envelope/evidence truth rather than content closure.
+- `18-typed-construction-algebra.md` defines the requirements-level algebra for
+  typed construction stages, ABG-owned admission/fold, continuation, edge
+  permission, execution-repair scope, and the required axiomatic sweep.

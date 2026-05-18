@@ -647,7 +647,7 @@ function normalizeComponentRealizationRow(input: unknown): unknown {
     componentId: record["componentId"],
     moduleName: record["moduleName"],
     relativePath: record["relativePath"],
-    publicBoundary: record["publicBoundary"],
+    publicBoundary: normalizeComponentPublicBoundary(record["publicBoundary"]),
     trancheId: record["trancheId"],
     firstProductFileToChange: record["firstProductFileToChange"],
     upstreamComponentIds: record["upstreamComponentIds"],

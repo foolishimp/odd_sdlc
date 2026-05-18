@@ -169,6 +169,7 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`].join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
@@ -181,7 +182,7 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
       "const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
       "const materializedFiles = [{ kind: 'sdlc_materialized_product_file', role: 'source', relativePath: tenantRelative, absolutePath: sourcePath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8') }];",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'generated source without traversal obligation assessments', unresolvedReasons: [], materializedFiles, executionEvidence: null }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest: outputDigest, summary: 'generated source without traversal obligation assessments', unresolvedReasons: [], materializedFiles, executionEvidence: null }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );

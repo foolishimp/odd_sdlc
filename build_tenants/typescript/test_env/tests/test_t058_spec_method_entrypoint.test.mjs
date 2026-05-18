@@ -416,6 +416,66 @@ test("T-158 explicit graph-function target is not overridden by another archived
   );
 });
 
+test("T-102 converged graph-function target resumes its archived post-close successor", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: "derive_test_execution_result_surface",
+    nextGraphFunctionRef: "qualify_component_test_execution_surface",
+    nextGraphVectorRef: "qualify_component_test_execution_surface",
+    overlayRef: "overlay://odd-sdlc/current-full-traversal"
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:derive_test_execution_result_surface",
+    "--until",
+    "converged"
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    "qualify_component_test_execution_surface"
+  );
+  assert.equal(
+    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    "qualify_component_test_execution_surface"
+  );
+});
+
+test("T-102 converged graph-function target resumes later same-overlay archived successor", () => {
+  const workspace = makeConformantWorkspace();
+  writePostCloseNextActionArchive(workspace, {
+    graphFunctionName: "qualify_component_test_execution_surface",
+    nextGraphFunctionRef: "derive_component_repair_schedule_surface",
+    nextGraphVectorRef: "derive_component_repair_schedule_surface",
+    overlayRef: "overlay://odd-sdlc/current-full-traversal"
+  });
+
+  const result = invokeOddSdlcSpecMethodCommandSync([
+    "gaps",
+    "--workspace",
+    workspace,
+    "--target",
+    "graph_function:derive_test_execution_result_surface",
+    "--until",
+    "converged"
+  ]);
+
+  assert.equal(result.status, "ok");
+  assert.equal(
+    result.payload.start.executionContract.targetGraphFunction,
+    "derive_component_repair_schedule_surface"
+  );
+  assert.equal(
+    result.payload.start.executionContract.nextActionProjection.nextGraphVectorRef,
+    "derive_component_repair_schedule_surface"
+  );
+});
+
 test("T-058 newer terminal post-close projection prevents stale next-action replay", () => {
   const workspace = makeConformantWorkspace();
   writePostCloseNextActionArchive(workspace, {

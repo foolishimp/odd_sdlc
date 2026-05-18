@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  admitWorkerResultReport,
   admitSdlcProjectConstraints,
   constructWorkerProcessFailurePostflight,
   constructSdlcGtlModule,
@@ -114,6 +115,7 @@ function writeWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "process.stdout.write('t064 stdout before report\\n');",
       "process.stderr.write('t064 stderr before report\\n');",
@@ -122,7 +124,7 @@ function writeWorkerScript(workspaceRoot) {
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile, ...obligation.evidenceRefs], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated governed first-slice intent surface', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated governed first-slice intent surface', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );
@@ -137,6 +139,7 @@ function writeSecondEdgeFailingWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "if (manifest.edgeName === 'derive_product_surface') process.exit(7);",
       "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'This is governed autonomous-loop output.'].join('\\n');",
@@ -144,7 +147,7 @@ function writeSecondEdgeFailingWorkerScript(workspaceRoot) {
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(`${content}\\n`, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated governed autonomous-loop output', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'generated governed autonomous-loop output', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );
@@ -168,6 +171,45 @@ function writeTransformOnlyWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function t102WorkerProjectionReport(manifest, overrides = {}) {
+  const content = [
+    `# ${manifest.targetAssetType}`,
+    "",
+    "T-102 projection admission fixture."
+  ].join("\n");
+  const artifact = `${content}\n`;
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, artifact, "utf8");
+  return {
+    kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(
+      manifest.fpEvaluateResultFile
+    ).href,
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile,
+    digest: sha256Text(artifact),
+    summary: "T-102 projection admission fixture",
+    unresolvedReasons: [],
+    materializedFiles: [],
+    materializationDiagnostics: [],
+    executionEvidence: null,
+    executionEvidenceErrors: [],
+    obligationAssessments: [],
+    fpTransformRequestRef: manifest.fpTransformRequest?.requestRef ?? null,
+    fpTransformResultRef:
+      manifest.fpTransformRequest === null
+        ? null
+        : pathToFileURL(manifest.fpTransformResultFile).href,
+    fpTransformStatusSnapshot:
+      manifest.fpTransformRequest === null ? null : "returned",
+    fpEvaluateResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
+    ...overrides
+  };
+}
+
 function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
   const workerPath = path.join(
     workspaceRoot,
@@ -179,6 +221,7 @@ function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
       "import { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const axis = (axis) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis, status: 'satisfied', reasons: ['fixture complete'], evidenceRefs: ['fixture://t064'] });",
       "const register = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: 'implementation_design_surface', stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://typescript', language: 'typescript', buildTool: 'node' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'typescript', moduleRef: 'module://typescript' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://typescript' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'typescript', entities: [{ kind: 'sdlc_domain_entity', entityId: 'entity:entry', moduleName: 'typescript', ownership: 'owned', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], invariants: [], sourceAssetRefs: ['fixture://t064'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'typescript', entityId: 'entity:entry', stateless: true, states: [], transitions: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], aggregateDomainModel: { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [{ kind: 'sdlc_aggregate_domain_entity', entityId: 'entity:entry', ownerModuleName: 'typescript', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], sourceModuleNames: ['typescript'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], crossModuleReferences: [], evidenceRefs: ['fixture://t064'] }, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://typescript/hello' }], aggregateSunnyDaySequence: { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:emit', moduleName: 'typescript', operationId: 'operation:typescript.emit', inputEntityIds: [], outputEntityIds: ['entity:entry'], stateTransitionIds: [] }], evidenceRefs: ['fixture://t064'] }, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', trancheId: null, firstProductFileToChange: 'src/index.ts', upstreamComponentIds: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: 'src/index.ts', role: 'source' }], designCompletenessVerdict: { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') } };",
@@ -187,7 +230,7 @@ function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
       "writeFileSync(manifest.outputFile, content, 'utf8');",
       "const digest = `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`;",
       "const obligationAssessments = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_worker_obligation_assessment', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', evidenceRefs: [manifest.outputFile], blockingReasons: [] }));",
-      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'invalid component topology register for assurance regression', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
+      "writeFileSync(manifest.reportFile, `${JSON.stringify({ kind: 'odd_sdlc.worker_result_report', projectionRole: 'typed_fp_stage_projection', authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href, graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, outputFile: manifest.outputFile, digest, summary: 'invalid component topology register for assurance regression', unresolvedReasons: [], materializedFiles: [], obligationAssessments }, null, 2)}\\n`, 'utf8');"
     ].join("\n"),
     "utf8"
   );
@@ -811,7 +854,66 @@ test("T-064 worker provider rate limits stay inside same-edge retry law", () => 
   assert(postflight.evidenceRefs.includes(pathToFileURL(finalOutputPath).href));
 });
 
-test("T-064 operator observes F_P.transform output and generates report", async () => {
+test("T-102 worker output limits stay inside same-edge retry law", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("prepare_test_execution_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t102-worker-output-limit"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(stdoutPath, "", "utf8");
+  writeFileSync(
+    stderrPath,
+    "Error: response exceeded the 32000 output token maximum\n",
+    "utf8"
+  );
+  writeFileSync(finalOutputPath, "max_output_tokens exceeded\n", "utf8");
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: { kind: "exited", status: 1 },
+    executorProfile: "pty-terminal",
+    streamModel: "terminal-transcript",
+    finalOutputRef: pathToFileURL(finalOutputPath).href,
+    status: 1,
+    signal: null,
+    elapsedMs: 1866,
+    timedOut: false,
+    stdoutByteCount: 0,
+    stderrByteCount: 58,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(
+    postflight.blockingReasonCarriers[0].code,
+    "worker_output_limit_exceeded"
+  );
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+  assert(postflight.evidenceRefs.includes(pathToFileURL(finalOutputPath).href));
+});
+
+test("T-102 operator observes F_P.transform output and archives only a typed stage projection report", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -839,9 +941,27 @@ test("T-064 operator observes F_P.transform output and generates report", async 
   assert.equal(start.payload.status, "worker_invoked");
   assert.equal(start.payload.workerRun.status, 0);
   assert.equal(start.payload.workerReport.kind, "odd_sdlc.worker_result_report");
+  assert.equal(start.payload.workerReport.projectionRole, "typed_fp_stage_projection");
+  const workerReportProjectionRef = pathToFileURL(
+    path.join(start.payload.archiveRoot, "worker_result_report.json")
+  ).href;
+  const fpEvaluateResultRef = pathToFileURL(
+    path.join(start.payload.archiveRoot, "fp_evaluate_result.json")
+  ).href;
+  const fpTransformResultRef = pathToFileURL(
+    path.join(start.payload.archiveRoot, "fp_transform_result.json")
+  ).href;
+  assert.match(
+    start.payload.workerReport.authoritativeStageResultRef,
+    /fp_evaluate_result\.json$/u
+  );
+  assert.equal(
+    start.payload.workerReport.authoritativeStageResultRef,
+    fpEvaluateResultRef
+  );
   assert.match(start.payload.workerReport.summary, /framework-generated/u);
   assert.match(start.payload.workerReport.fpTransformResultRef, /fp_transform_result\.json$/u);
-  assert.equal(start.payload.workerReport.fpTransformStatus, "returned");
+  assert.equal(start.payload.workerReport.fpTransformStatusSnapshot, "returned");
   assert.equal(start.payload.postflight.status, "passed");
   const transformRequest = JSON.parse(
     readFileSync(path.join(start.payload.archiveRoot, "fp_transform_request.json"), "utf8")
@@ -858,10 +978,85 @@ test("T-064 operator observes F_P.transform output and generates report", async 
   assert.equal(transformResult.status, "returned");
   assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
   assert.equal(evaluateResult.stage, "F_P.evaluate");
+  assert.equal(evaluateResult.stageAuthority, "typed_fp_stage_carriers");
+  assert.equal("reportRef" in evaluateResult, false);
+  assert.match(evaluateResult.workerReportProjectionRef, /worker_result_report\.json$/u);
+  assert.equal(evaluateResult.workerReportProjectionRef, workerReportProjectionRef);
   assert.equal(evaluateResult.status, "passed");
+  const workerPrompt = readFileSync(
+    path.join(start.payload.archiveRoot, "worker_prompt.md"),
+    "utf8"
+  );
+  assert.match(workerPrompt, /F_P\.transform launch contract/u);
+  assert.doesNotMatch(workerPrompt, /fp_evaluate_result\.json/u);
+  assert.doesNotMatch(workerPrompt, /sdlc_edge_fulfillment_ledger\.json/u);
+  const edgeLedger = JSON.parse(
+    readFileSync(
+      path.join(start.payload.archiveRoot, "sdlc_edge_fulfillment_ledger.json"),
+      "utf8"
+    )
+  );
+  assert.equal(edgeLedger.admissionRefs.includes(fpEvaluateResultRef), true);
+  assert.equal(edgeLedger.predecessorRefs.includes(fpEvaluateResultRef), true);
+  assert.equal(edgeLedger.admissionRefs.includes(fpTransformResultRef), false);
   assert.equal(
     existsSync(path.join(start.payload.archiveRoot, "post_transform_observation.json")),
     true
+  );
+});
+
+test("T-102 worker report projection admission fails closed without same-archive evaluate citation", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_intent_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t102-worker-report-projection-admission"
+  });
+  writeHandoffFiles(manifest);
+  const report = t102WorkerProjectionReport(manifest);
+
+  assert.equal(
+    admitWorkerResultReport(report, manifest).authoritativeStageResultRef,
+    pathToFileURL(manifest.fpEvaluateResultFile).href
+  );
+
+  const missingRole = { ...report };
+  delete missingRole.projectionRole;
+  assert.throws(
+    () => admitWorkerResultReport(missingRole, manifest),
+    /projectionRole/u
+  );
+
+  const missingStageRef = { ...report };
+  delete missingStageRef.authoritativeStageResultRef;
+  assert.throws(
+    () => admitWorkerResultReport(missingStageRef, manifest),
+    /authoritativeStageResultRef/u
+  );
+
+  assert.throws(
+    () =>
+      admitWorkerResultReport(
+        { ...report, projectionRole: "worker_owned_report" },
+        manifest
+      ),
+    /typed_fp_stage_projection/u
+  );
+  assert.throws(
+    () =>
+      admitWorkerResultReport(
+        {
+          ...report,
+          authoritativeStageResultRef:
+            "file:///tmp/other-archive/fp_evaluate_result.json"
+        },
+        manifest
+      ),
+    /same-archive fp_evaluate_result\.json/u
   );
 });
 
@@ -1122,6 +1317,8 @@ test("T-067 installed operator preserves non-generate operation type for qualifi
     `${JSON.stringify(
       {
         kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
         graphFunctionName: manifest.graphFunctionName,
         edgeName: manifest.edgeName,
         targetAssetType: manifest.targetAssetType,

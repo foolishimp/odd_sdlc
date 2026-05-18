@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
@@ -499,6 +500,10 @@ function writeWorkerResultReport(input) {
     `${JSON.stringify(
       {
         kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          input.manifest.fpEvaluateResultFile
+        ).href,
         graphFunctionName: input.manifest.graphFunctionName,
         edgeName: input.manifest.edgeName,
         targetAssetType: input.manifest.targetAssetType,

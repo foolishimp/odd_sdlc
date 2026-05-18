@@ -1,6 +1,7 @@
 // Validates: REQ-F-ODDSDLC-013
 // Validates: REQ-F-ODDSDLC-014
 // Validates: REQ-F-ODDSDLC-053
+// Validates: REQ-F-ODDSDLC-074
 // Validates: T-089
 
 import test from "node:test";
@@ -91,7 +92,7 @@ function reportFor(manifest, overrides = {}) {
   };
 }
 
-test("T-089 early non-materializing edge carries target evaluator and requirement obligations", () => {
+test("T-089 early non-materializing edge keeps evaluator contract separate from transform obligations", () => {
   const manifest = earlyManifest(makeWorkspace());
   const obligations = manifest.traversalObligationContext.obligations;
 
@@ -103,9 +104,16 @@ test("T-089 early non-materializing edge carries target evaluator and requiremen
     )
   );
   assert(
-    obligations.some((obligation) =>
-      obligation.obligationId.startsWith("evaluator:")
+    obligations.every(
+      (obligation) => !obligation.obligationId.startsWith("evaluator:")
     )
+  );
+  assert.equal(
+    manifest.traversalIntentPackage.evaluatorExpectations.kind,
+    "sdlc_hook_transform_profile"
+  );
+  assert(
+    manifest.traversalIntentPackage.evaluatorExpectations.postflightFd.length > 0
   );
   assert(
     obligations.some((obligation) =>

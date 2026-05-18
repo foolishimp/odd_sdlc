@@ -377,14 +377,6 @@ function normalizeOperationCandidate(input: {
   });
 }
 
-function moduleNameFromStateEntityId(
-  entityId: string,
-  defaultModuleName: string
-): string {
-  void entityId;
-  return defaultModuleName;
-}
-
 function normalizeTransitionCandidate(input: {
   readonly entityId: string;
   readonly candidate: unknown;
@@ -420,23 +412,30 @@ function normalizeTransitionCandidate(input: {
 function normalizeStateDiagramCandidate(input: {
   readonly candidate: unknown;
   readonly defaultModuleName: string;
+  readonly moduleNameByRef: ReadonlyMap<string, string>;
 }): unknown {
   const record = mutableRecord(input.candidate);
   if (record === null) {
     return input.candidate;
   }
-  const entityId = stringFromRecord(record, ["entityId", "entity", "name"]);
-  if (entityId === null) {
+  const moduleRef = stringFromRecord(record, ["moduleRef", "ref"]);
+  const moduleName =
+    optionalString(record["moduleName"]) ??
+    moduleNameFromModuleRef(moduleRef, input.moduleNameByRef) ??
+    input.defaultModuleName;
+  const stateless =
+    typeof record["stateless"] === "boolean" ? record["stateless"] : false;
+  const entityId =
+    stringFromRecord(record, ["entityId", "entity", "name"]) ??
+    (moduleName.length > 0 ? `module:${moduleName}` : null);
+  if (entityId === null || moduleName.length === 0) {
     return input.candidate;
   }
   return Object.freeze({
     kind: "sdlc_module_state_diagram_fragment" as const,
-    moduleName:
-      optionalString(record["moduleName"]) ??
-      moduleNameFromStateEntityId(entityId, input.defaultModuleName),
+    moduleName,
     entityId,
-    stateless:
-      typeof record["stateless"] === "boolean" ? record["stateless"] : false,
+    stateless,
     states: Array.isArray(record["states"])
       ? Object.freeze(record["states"].map(normalizeStateCandidate))
       : Object.freeze([]),
@@ -783,23 +782,54 @@ function normalizeCompletenessVerdictCandidate(input: unknown): unknown {
     return input ?? null;
   }
   const axisVerdicts = mutableRecord(record["axisVerdicts"]);
+  const notes = stringFromRecord(record, ["notes", "summary", "rationale"]);
+  const entityCoverage =
+    record["entityCoverage"] === undefined
+      ? undefined
+      : Object.freeze({
+          status: record["entityCoverage"],
+          reasons: notes === null ? Object.freeze([]) : Object.freeze([notes])
+        });
+  const attributeCoverage =
+    record["attributeCoverage"] === undefined
+      ? undefined
+      : Object.freeze({
+          status: record["attributeCoverage"],
+          reasons: notes === null ? Object.freeze([]) : Object.freeze([notes])
+        });
+  const flowCoverage =
+    record["flowCoverage"] === undefined
+      ? undefined
+      : Object.freeze({
+          status: record["flowCoverage"],
+          reasons: notes === null ? Object.freeze([]) : Object.freeze([notes])
+        });
   return Object.freeze({
     kind: "sdlc_design_completeness_verdict" as const,
     verdictVersion: "ts-design-depth-v1" as const,
     entity: normalizeAxisVerdictCandidate({
       axis: "entity",
-      candidate: record["entity"] ?? record["entityAxis"] ?? axisVerdicts?.["entity"]
+      candidate:
+        record["entity"] ??
+        record["entityAxis"] ??
+        axisVerdicts?.["entity"] ??
+        entityCoverage
     }),
     attribute: normalizeAxisVerdictCandidate({
       axis: "attribute",
       candidate:
         record["attribute"] ??
         record["attributeAxis"] ??
-        axisVerdicts?.["attribute"]
+        axisVerdicts?.["attribute"] ??
+        attributeCoverage
     }),
     flow: normalizeAxisVerdictCandidate({
       axis: "flow",
-      candidate: record["flow"] ?? record["flowAxis"] ?? axisVerdicts?.["flow"]
+      candidate:
+        record["flow"] ??
+        record["flowAxis"] ??
+        axisVerdicts?.["flow"] ??
+        flowCoverage
     })
   });
 }
@@ -812,17 +842,42 @@ function normalizeSunnyDayStepCandidate(input: unknown): unknown {
   if (record["kind"] === "sdlc_sunny_day_sequence_step") {
     return input;
   }
+  const stepId =
+    stringFromRecord(record, ["stepId", "id", "stepRef"]) ??
+    (typeof record["step"] === "number" || typeof record["step"] === "string"
+      ? `step:${record["step"]}`
+      : null);
+  const moduleName = stringFromRecord(record, [
+    "moduleName",
+    "actor",
+    "component",
+    "module"
+  ]);
+  const operationText = stringFromRecord(record, [
+    "operationId",
+    "operation",
+    "action",
+    "description"
+  ]);
   return Object.freeze({
-    kind: record["kind"] ?? "sdlc_sunny_day_sequence_step",
-    stepId: record["stepId"],
-    moduleName: record["moduleName"],
+    kind: "sdlc_sunny_day_sequence_step" as const,
+    stepId: stepId ?? record["stepId"],
+    moduleName: moduleName ?? record["moduleName"],
     operationId:
       typeof record["operationId"] === "string"
         ? canonicalOperationId(record["operationId"])
-        : record["operationId"],
-    inputEntityIds: record["inputEntityIds"],
-    outputEntityIds: record["outputEntityIds"],
-    stateTransitionIds: record["stateTransitionIds"]
+        : operationText === null
+          ? record["operationId"]
+          : canonicalOperationId(operationText),
+    inputEntityIds: Array.isArray(record["inputEntityIds"])
+      ? record["inputEntityIds"]
+      : Object.freeze([]),
+    outputEntityIds: Array.isArray(record["outputEntityIds"])
+      ? record["outputEntityIds"]
+      : Object.freeze([]),
+    stateTransitionIds: Array.isArray(record["stateTransitionIds"])
+      ? record["stateTransitionIds"]
+      : Object.freeze([])
   });
 }
 
@@ -845,13 +900,170 @@ function normalizeSunnyDaySequenceCandidate(input: unknown): unknown {
   });
 }
 
-function normalizeModuleSchemaCandidate(input: unknown): unknown {
+function normalizeStackProfileCandidate(input: unknown): unknown {
   const record = mutableRecord(input);
   if (record === null) {
     return input;
   }
+  const stackRef = stringFromRecord(record, ["stackRef", "ref"]);
+  const language = stringFromRecord(record, ["language", "languageName"]);
+  const buildTool = stringFromRecord(record, ["buildTool", "buildToolName"]);
+  if (stackRef === null || language === null || buildTool === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"] ?? "sdlc_stack_profile_row",
+    stackRef,
+    language,
+    buildTool
+  });
+}
+
+function normalizeAggregateDomainModelRowCandidate(input: unknown): unknown {
+  const record = mutableRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const modelRef = stringFromRecord(record, ["modelRef", "ref"]);
+  if (modelRef === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"] ?? "sdlc_aggregate_domain_model_row",
+    modelRef
+  });
+}
+
+function normalizeSunnyDaySequenceRowCandidate(input: unknown): unknown {
+  const record = mutableRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const sequenceRef = stringFromRecord(record, ["sequenceRef", "ref"]);
+  if (sequenceRef === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"] ?? "sdlc_sunny_day_sequence_row",
+    sequenceRef
+  });
+}
+
+function normalizeFileTargetRowCandidate(input: unknown): unknown {
+  const record = mutableRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const relativePath = stringFromRecord(record, ["relativePath", "path"]);
+  const role = stringFromRecord(record, ["role", "targetRole"]);
+  if (relativePath === null || role === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: record["kind"] ?? "sdlc_file_target_row",
+    relativePath,
+    role
+  });
+}
+
+function componentTopologyByIdFromRows(
+  input: readonly unknown[]
+): ReadonlyMap<string, Readonly<Record<string, unknown>>> {
+  const entries = input.flatMap(
+    (item): readonly [string, Readonly<Record<string, unknown>>][] => {
+      const record = mutableRecord(item);
+      if (record === null) {
+        return Object.freeze([]);
+      }
+      const componentId = stringFromRecord(record, ["componentId", "id"]);
+      return componentId === null
+        ? Object.freeze([])
+        : Object.freeze([[componentId, record] as const]);
+    }
+  );
+  return new Map(entries);
+}
+
+function normalizeComponentRealizationCandidate(input: {
+  readonly candidate: unknown;
+  readonly topologyById: ReadonlyMap<string, Readonly<Record<string, unknown>>>;
+}): unknown {
+  const record = mutableRecord(input.candidate);
+  if (record === null) {
+    return input.candidate;
+  }
+  const componentId = stringFromRecord(record, ["componentId", "id"]);
+  const topology =
+    componentId === null ? undefined : input.topologyById.get(componentId);
+  return Object.freeze({
+    kind: record["kind"] ?? "sdlc_component_realization_row",
+    componentId: record["componentId"],
+    moduleName: record["moduleName"],
+    relativePath: record["relativePath"],
+    publicBoundary: record["publicBoundary"],
+    trancheId: record["trancheId"],
+    firstProductFileToChange: record["firstProductFileToChange"],
+    upstreamComponentIds: Array.isArray(record["upstreamComponentIds"])
+      ? record["upstreamComponentIds"]
+      : Object.freeze([]),
+    requirementIds: Array.isArray(record["requirementIds"])
+      ? record["requirementIds"]
+      : Array.isArray(topology?.["requirementIds"])
+        ? topology["requirementIds"]
+        : Object.freeze([]),
+    sourceAssetRefs: Array.isArray(record["sourceAssetRefs"])
+      ? record["sourceAssetRefs"]
+      : Array.isArray(topology?.["sourceAssetRefs"])
+        ? topology["sourceAssetRefs"]
+        : Object.freeze([])
+  });
+}
+
+function moduleNameFromModuleRef(
+  moduleRef: string | null,
+  moduleNameByRef: ReadonlyMap<string, string>
+): string | null {
+  if (moduleRef === null) {
+    return null;
+  }
+  const mapped = moduleNameByRef.get(moduleRef);
+  if (mapped !== undefined) {
+    return mapped;
+  }
+  const tail = moduleRef.split("/").filter((part) => part.length > 0).at(-1);
+  return tail === undefined || tail.length === 0 ? null : tail;
+}
+
+function moduleNameByRefFromImplementationRows(
+  input: readonly unknown[]
+): ReadonlyMap<string, string> {
+  const entries = input.flatMap((item): readonly [string, string][] => {
+    const record = mutableRecord(item);
+    if (record === null) {
+      return Object.freeze([]);
+    }
+    const moduleRef = stringFromRecord(record, ["moduleRef", "ref"]);
+    const moduleName = stringFromRecord(record, ["moduleName", "name"]);
+    return moduleRef === null || moduleName === null
+      ? Object.freeze([])
+      : Object.freeze([[moduleRef, moduleName] as const]);
+  });
+  return new Map(entries);
+}
+
+function normalizeModuleSchemaCandidate(input: {
+  readonly candidate: unknown;
+  readonly moduleNameByRef: ReadonlyMap<string, string>;
+}): unknown {
+  const record = mutableRecord(input.candidate);
+  if (record === null) {
+    return input.candidate;
+  }
   const moduleName = optionalString(record["moduleName"]);
-  if (moduleName === null) {
+  const moduleRef = stringFromRecord(record, ["moduleRef", "ref"]);
+  const selectedModuleName =
+    moduleName ?? moduleNameFromModuleRef(moduleRef, input.moduleNameByRef);
+  if (selectedModuleName === null) {
     return Object.freeze({
       kind: record["kind"] ?? "sdlc_module_schema_fragment",
       moduleName: record["moduleName"],
@@ -869,12 +1081,12 @@ function normalizeModuleSchemaCandidate(input: unknown): unknown {
     : Object.freeze([]);
   return Object.freeze({
     kind: record["kind"] ?? "sdlc_module_schema_fragment",
-    moduleName,
+    moduleName: selectedModuleName,
     entities: Array.isArray(record["entities"])
       ? Object.freeze(
           record["entities"].map((entity) =>
             normalizeEntityCandidate({
-              moduleName,
+              moduleName: selectedModuleName,
               candidate: entity,
               schemaAttributes,
               sourceAssetRefs
@@ -885,7 +1097,10 @@ function normalizeModuleSchemaCandidate(input: unknown): unknown {
     operations: Array.isArray(record["operations"])
       ? Object.freeze(
           record["operations"].map((operation) =>
-            normalizeOperationCandidate({ moduleName, candidate: operation })
+            normalizeOperationCandidate({
+              moduleName: selectedModuleName,
+              candidate: operation
+            })
           )
         )
       : Object.freeze([]),
@@ -901,8 +1116,24 @@ function normalizeRegisterCandidate(input: unknown): unknown {
   if (record === null) {
     return input;
   }
+  const stackProfileRows = unknownArray(record["stackProfileRows"]).map(
+    normalizeStackProfileCandidate
+  );
+  const implementationModuleRows = unknownArray(record["implementationModuleRows"]);
+  const moduleNameByRef = moduleNameByRefFromImplementationRows(
+    implementationModuleRows
+  );
+  const componentTopologyRows = unknownArray(record["componentTopologyRows"]);
+  const topologyById = componentTopologyByIdFromRows(componentTopologyRows);
   const normalizedSchemas = Array.isArray(record["moduleSchemaFragments"])
-    ? Object.freeze(record["moduleSchemaFragments"].map(normalizeModuleSchemaCandidate))
+    ? Object.freeze(
+        record["moduleSchemaFragments"].map((candidate) =>
+          normalizeModuleSchemaCandidate({
+            candidate,
+            moduleNameByRef
+          })
+        )
+      )
     : Object.freeze([]);
   const defaultModuleName =
     mutableRecord(normalizedSchemas[0]) === null
@@ -913,16 +1144,19 @@ function normalizeRegisterCandidate(input: unknown): unknown {
     kind: record["kind"],
     registerVersion: record["registerVersion"],
     targetAssetType: record["targetAssetType"],
-    stackProfileRows: unknownArray(record["stackProfileRows"]),
-    implementationModuleRows: unknownArray(record["implementationModuleRows"]),
-    aggregateDomainModelRows: unknownArray(record["aggregateDomainModelRows"]),
+    stackProfileRows,
+    implementationModuleRows,
+    aggregateDomainModelRows: unknownArray(record["aggregateDomainModelRows"]).map(
+      normalizeAggregateDomainModelRowCandidate
+    ),
     moduleSchemaFragments: normalizedSchemas,
     moduleStateDiagramFragments: Array.isArray(record["moduleStateDiagramFragments"])
       ? Object.freeze(
           record["moduleStateDiagramFragments"].map((diagram) =>
             normalizeStateDiagramCandidate({
               candidate: diagram,
-              defaultModuleName
+              defaultModuleName,
+              moduleNameByRef
             })
           )
         )
@@ -930,13 +1164,23 @@ function normalizeRegisterCandidate(input: unknown): unknown {
     aggregateDomainModel: normalizeAggregateDomainModelCandidate(
       record["aggregateDomainModel"] ?? null
     ),
-    sunnyDaySequenceRows: unknownArray(record["sunnyDaySequenceRows"]),
+    sunnyDaySequenceRows: unknownArray(record["sunnyDaySequenceRows"]).map(
+      normalizeSunnyDaySequenceRowCandidate
+    ),
     aggregateSunnyDaySequence: normalizeSunnyDaySequenceCandidate(
       record["aggregateSunnyDaySequence"] ?? null
     ),
-    componentTopologyRows: unknownArray(record["componentTopologyRows"]),
-    componentRealizationRows: unknownArray(record["componentRealizationRows"]),
-    fileTargetRows: unknownArray(record["fileTargetRows"]),
+    componentTopologyRows,
+    componentRealizationRows: unknownArray(record["componentRealizationRows"]).map(
+      (candidate) =>
+        normalizeComponentRealizationCandidate({
+          candidate,
+          topologyById
+        })
+    ),
+    fileTargetRows: unknownArray(record["fileTargetRows"]).map(
+      normalizeFileTargetRowCandidate
+    ),
     designCompletenessVerdict: normalizeCompletenessVerdictCandidate(
       record["designCompletenessVerdict"] ?? null
     )

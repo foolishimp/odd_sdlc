@@ -2504,6 +2504,7 @@ function traversalConsequenceEvidenceRefs(input: {
       ? []
       : [pathToFileURL(input.state.workerReport.outputFile).href]),
     ...(input.state.postflight?.evidenceRefs ?? []),
+    ...fpEvaluateResultRefsForState(input.state),
     ...(input.state.gapDossier === null
       ? []
       : [
@@ -2511,6 +2512,19 @@ function traversalConsequenceEvidenceRefs(input: {
           ...input.state.gapDossier.evidenceRefs
         ])
   ]);
+}
+
+function fpEvaluateResultRefsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  if (
+    state.workerReport === null ||
+    state.postflight === null ||
+    !existsSync(state.manifest.fpEvaluateResultFile)
+  ) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([pathToFileURL(state.manifest.fpEvaluateResultFile).href]);
 }
 
 function manifestRefSegment(manifest: SdlcWorkerHandoffManifest): string {
@@ -3494,6 +3508,20 @@ function candidateProjectionScopeSegment(
     : `module/${encodeURIComponent(scopedModule)}`;
 }
 
+export function normalizePostCloseContinuationVectorIndex(input: {
+  readonly closureDecisionDisposition: string;
+  readonly currentVectorIndex: number;
+  readonly nextVectorIndex: number | null;
+}): number | null {
+  if (
+    input.closureDecisionDisposition === "close" &&
+    input.nextVectorIndex === input.currentVectorIndex
+  ) {
+    return null;
+  }
+  return input.nextVectorIndex;
+}
+
 function postActionCandidates(input: {
   readonly basis: ExecutionBasis;
   readonly module: Module;
@@ -3507,6 +3535,11 @@ function postActionCandidates(input: {
   readonly downstreamTargetBindingRefs: readonly string[];
   readonly admittedAssetTypes: readonly string[];
 }) {
+  const nextVectorIndex = normalizePostCloseContinuationVectorIndex({
+    closureDecisionDisposition: input.closureDecisionDisposition,
+    currentVectorIndex: input.state.manifest.vectorIndex,
+    nextVectorIndex: input.nextVectorIndex
+  });
   const nextDeferredModule =
     input.closureDecisionDisposition === "close"
       ? deferredProductMaterializationModuleFor(input.state)
@@ -3546,15 +3579,13 @@ function postActionCandidates(input: {
         downstreamTargetBindingRefs: input.downstreamTargetBindingRefs,
         admittedAssetTypes: input.admittedAssetTypes
       });
-    return Object.freeze(
-      productMaterializationCandidate === null
-        ? []
-        : [productMaterializationCandidate]
-    );
+    if (productMaterializationCandidate !== null) {
+      return Object.freeze([productMaterializationCandidate]);
+    }
   }
   if (
     input.closureDecisionDisposition === "close" &&
-    input.nextVectorIndex === null
+    nextVectorIndex === null
   ) {
     const overlayContinuationCandidate =
       deriveSdlcPostCloseOverlayContinuationActionInput({
@@ -3571,12 +3602,12 @@ function postActionCandidates(input: {
   }
   if (
     input.closureDecisionDisposition === "close" &&
-    input.nextVectorIndex !== null
+    nextVectorIndex !== null
   ) {
     return Object.freeze([
       postActionCandidateFor({
         basis: input.basis,
-        vectorIndex: input.nextVectorIndex,
+        vectorIndex: nextVectorIndex,
         basisKind: "post_close_graph_continuation",
         actionKind: "continue_graph_call"
       })
@@ -3832,7 +3863,7 @@ function workerResultTargetPayload(input: {
     obligationAssessments: report.obligationAssessments,
     fpTransformRequestRef: report.fpTransformRequestRef,
     fpTransformResultRef: report.fpTransformResultRef,
-    fpTransformStatus: report.fpTransformStatus,
+    fpTransformStatusSnapshot: report.fpTransformStatusSnapshot,
     fpEvaluateResultRef: report.fpEvaluateResultRef
   });
 }
@@ -3939,6 +3970,7 @@ function deriveInstalledTraversalConsequence(input: {
   }
   const constructionIntent = input.start.executionContract.constructionIntent;
   const module = constructSdlcGtlModule();
+  const fpEvaluateResultRefs = fpEvaluateResultRefsForState(input.state);
   const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
   const runRef = manifestRefSegment(input.state.manifest);
   const ledgerRef = `ledger://odd-sdlc/${runRef}/edge-fulfillment`;
@@ -4114,6 +4146,7 @@ function deriveInstalledTraversalConsequence(input: {
     predecessorRefs: Object.freeze([
       constructionIntent.intentRef,
       worksiteEvidence.evidenceBundleRef,
+      ...fpEvaluateResultRefs,
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
@@ -4390,10 +4423,25 @@ function workerRunRateLimited(workerRun: SdlcWorkerRunResult): boolean {
   );
 }
 
+function workerRunOutputLimitExceeded(workerRun: SdlcWorkerRunResult): boolean {
+  const text = [
+    readOptionalWorkerTextRef(workerRun.finalOutputRef),
+    readOptionalWorkerTextRef(workerRun.traceResultRef),
+    readOptionalWorkerTextPath(workerRun.stdoutPath),
+    readOptionalWorkerTextPath(workerRun.stderrPath)
+  ].join("\n");
+  return /max_output_tokens|response exceeded the \d+ output token maximum|output token maximum|CLAUDE_CODE_MAX_OUTPUT_TOKENS/u.test(
+    text
+  );
+}
+
 function workerFailureCode(input: {
   readonly workerRun: SdlcWorkerRunResult;
   readonly silentInactivity: boolean;
 }): SdlcBlockingReasonCode {
+  if (workerRunOutputLimitExceeded(input.workerRun)) {
+    return "worker_output_limit_exceeded";
+  }
   if (workerRunRateLimited(input.workerRun)) {
     return "worker_rate_limited";
   }
@@ -5148,41 +5196,47 @@ function compactRuntimeEventArchivePayload(
           reason: failurePostflight.blockingReasons.join(",")
         });
       }
-      let workerReport: SdlcWorkerResultReport;
+      let workerReport: SdlcWorkerResultReport | null = null;
       try {
         workerReport = readWorkerResultReport(manifest);
       } catch (error: unknown) {
-        try {
-          workerReport = buildPostTransformWorkerResultReport({
-            manifest,
-            before: beforeMaterialization
-          });
-          writeOperatorArchiveFile({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "worker_result_report.json",
-            payload: workerReport
-          });
-          writeOperatorArchiveFile({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "post_transform_observation.json",
-            payload: {
-              kind: "sdlc_post_transform_observation",
-              sourceFunction: "worker.F_P.transform",
-              generatedFunction: "ABG.events",
-              previousReportAdmissionError:
-                error instanceof Error ? error.message : "worker_report_rejected",
-              materializedFileCount: workerReport.materializedFiles.length,
-              outputFile: workerReport.outputFile,
-              digest: workerReport.digest
-            }
-          });
-        } catch (postTransformError: unknown) {
+        let reportAdmissionError = error;
+        if (!existsSync(manifest.reportFile)) {
+          try {
+            workerReport = buildPostTransformWorkerResultReport({
+              manifest,
+              before: beforeMaterialization
+            });
+            writeOperatorArchiveFile({
+              archiveRoot: manifest.archiveRoot,
+              relativePath: "worker_result_report.json",
+              payload: workerReport
+            });
+            writeOperatorArchiveFile({
+              archiveRoot: manifest.archiveRoot,
+              relativePath: "post_transform_observation.json",
+              payload: {
+                kind: "sdlc_post_transform_observation",
+                sourceFunction: "worker.F_P.transform",
+                generatedFunction: "ABG.events",
+                previousReportAdmissionError:
+                  error instanceof Error ? error.message : "worker_report_missing",
+                materializedFileCount: workerReport.materializedFiles.length,
+                outputFile: workerReport.outputFile,
+                digest: workerReport.digest
+              }
+            });
+          } catch (postTransformError: unknown) {
+            reportAdmissionError = postTransformError;
+          }
+        }
+        if (workerReport === null) {
           const rejectionPostflight = workerReportAdmissionPostflight({
             manifest,
             workerRun,
             reason:
-              postTransformError instanceof Error
-                ? postTransformError.message
+              reportAdmissionError instanceof Error
+                ? reportAdmissionError.message
                 : error instanceof Error
                   ? error.message
                   : "worker_report_rejected"
@@ -5222,9 +5276,12 @@ function compactRuntimeEventArchivePayload(
               ...rejectionPostflight.evidenceRefs,
               consequence.nextActionProjection.nextActionProjectionRef
             ]),
-            reason: rejectionPostflight.blockingReasons.join(",")
-          });
+              reason: rejectionPostflight.blockingReasons.join(",")
+            });
         }
+      }
+      if (workerReport === null) {
+        throw new TypeError("worker report admission did not produce a report");
       }
       workerReport = workerResultReportWithFpStageRefs({
         manifest,
@@ -5719,7 +5776,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   readonly eventGraphEvents?: readonly RuntimeEvent[];
   readonly requestedUntil: string;
   readonly requireInstalledTopology?: boolean;
-  readonly refreshReplayState: () => Promise<{
+  readonly refreshReplayState: (outcome: SdlcInstalledOperatorStartOutcome) => Promise<{
     readonly start: SdlcPublicStartOutcome;
     readonly replayEvents: readonly RuntimeEvent[];
     readonly eventGraphEvents?: readonly RuntimeEvent[];
@@ -5812,7 +5869,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
             attemptIndex: attemptIndex + 1
           }).retryContext ?? undefined
         : undefined;
-    const refreshed = await input.refreshReplayState();
+    const refreshed = await input.refreshReplayState(latest);
     start = refreshed.start;
     replayEvents = refreshed.replayEvents;
     eventGraphEvents = refreshed.eventGraphEvents ?? refreshed.replayEvents;

@@ -1,0 +1,25 @@
+{
+  "kind": "odd_sdlc_typescript_release_cut_manifest",
+  "packageName": "@odd-sdlc/typescript-tenant",
+  "packageVersion": "0.0.0-dev",
+  "packageSourceRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript",
+  "archiveRoot": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260518T125740Z_t171_hello_world_lifecycle_rc",
+  "tarballPath": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260518T125740Z_t171_hello_world_lifecycle_rc/package/pack-8e6PCK/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+  "releaseManifestPath": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260518T125740Z_t171_hello_world_lifecycle_rc/release-cut-manifest.json",
+  "binaryBinding": {
+    "commandName": "odd-sdlc-ts",
+    "relativePackageCommandPath": "./build/semantic/code/src/cli/main.js",
+    "sourceCommandPath": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.js"
+  },
+  "packageIdentity": {
+    "kind": "node_package_identity",
+    "packageName": "@odd-sdlc/typescript-tenant",
+    "packageVersion": "0.0.0-dev",
+    "dependencies": [
+      "@abiogenesis/typescript-tenant"
+    ],
+    "bin": {
+      "odd-sdlc-ts": "./build/semantic/code/src/cli/main.js"
+    }
+  }
+}

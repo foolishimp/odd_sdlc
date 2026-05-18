@@ -155,6 +155,7 @@ export interface SdlcWorkerProcessStartedContext {
   readonly processEventsRef: string;
   readonly manifestRef: string;
   readonly promptRef: string;
+  /** Process-level path to the archived projection report, not authority. */
   readonly reportRef: string;
   readonly outputRef: string;
   readonly stdoutRef: string;
@@ -189,6 +190,7 @@ export interface SdlcWorkerProcessSummary {
   readonly processEventsRef: string;
   readonly manifestRef: string;
   readonly promptRef: string;
+  /** Process-level path to the archived projection report, not authority. */
   readonly reportRef: string;
   readonly outputRef: string;
   readonly stdoutRef: string;
@@ -1533,6 +1535,8 @@ export interface SdlcWorkerHandoffManifest {
 
 export interface SdlcWorkerResultReport {
   readonly kind: "odd_sdlc.worker_result_report";
+  readonly projectionRole: "typed_fp_stage_projection";
+  readonly authoritativeStageResultRef: string;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly targetAssetType: string;
@@ -1547,7 +1551,7 @@ export interface SdlcWorkerResultReport {
   readonly obligationAssessments: readonly SdlcWorkerObligationAssessment[];
   readonly fpTransformRequestRef: string | null;
   readonly fpTransformResultRef: string | null;
-  readonly fpTransformStatus: FpTransformResult["status"] | null;
+  readonly fpTransformStatusSnapshot: FpTransformResult["status"] | null;
   readonly fpEvaluateResultRef: string | null;
 }
 
@@ -1569,7 +1573,8 @@ export interface SdlcPostflightResult {
 export interface SdlcFpEvaluateResult {
   readonly kind: "sdlc_fp_evaluate_result";
   readonly stage: "F_P.evaluate";
-  readonly reportRef: string;
+  readonly stageAuthority: "typed_fp_stage_carriers";
+  readonly workerReportProjectionRef: string;
   readonly transformResultRef: string | null;
   readonly postflightRef: string;
   readonly status:
@@ -1585,7 +1590,7 @@ export interface SdlcFpEvaluateResult {
     readonly blocked: number;
     readonly unassessed: number;
   };
-  readonly executionEvidenceStatus: SdlcWorkerExecutionEvidence["status"] | null;
+  readonly executionEvidenceStatusSnapshot: SdlcWorkerExecutionEvidence["status"] | null;
 }
 
 export interface SdlcInstalledOperatorStartOutcome {

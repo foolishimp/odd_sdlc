@@ -65,6 +65,7 @@ function classifyCause(input: {
       code === "worker_hard_timeout" ||
       code === "worker_lost_terminal" ||
       code === "silent_worker_inactivity" ||
+      code === "worker_output_limit_exceeded" ||
       code === "worker_rate_limited"
     )
   ) {

@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   admitComponentDepthRegisterFromArtifact,
@@ -133,6 +134,10 @@ function writeDesignRegister(manifest, register) {
 function workerReport(manifest, output, overrides = {}) {
   return {
     kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(
+      manifest.fpEvaluateResultFile
+    ).href,
     graphFunctionName: manifest.graphFunctionName,
     edgeName: manifest.edgeName,
     targetAssetType: manifest.targetAssetType,
@@ -250,6 +255,10 @@ function releaseDepthRegister(overrides = {}) {
 function executionReportPayload(manifest, output, executionEvidence) {
   return {
     kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(
+      manifest.fpEvaluateResultFile
+    ).href,
     graphFunctionName: manifest.graphFunctionName,
     edgeName: manifest.edgeName,
     targetAssetType: manifest.targetAssetType,
@@ -295,6 +304,8 @@ function executionEvidence(manifest, overrides = {}) {
 function assuranceWorkerReport(input = {}) {
   return {
     kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: "file:///tmp/b086/fp_evaluate_result.json",
     graphFunctionName: "bootstrap_release_self_test",
     edgeName: "derive_code_surface",
     targetAssetType: "code_surface",

@@ -546,6 +546,7 @@ test("B-086 generic worker-authored design verdict escalates to F_P instead of F
   );
   assert(ledger);
   assert.equal(ledger.verdict, "fp_escalation");
+  assert.equal(ledger.required, false);
   const reason = ledger.reasons.find(
     (item) => item.code === "design_completeness_attribute_partial"
   );
@@ -555,11 +556,8 @@ test("B-086 generic worker-authored design verdict escalates to F_P instead of F
     requiredDimensions: ["design_completeness"],
     ledgers: [ledger]
   });
-  assert.equal(satisfaction.status, "fp_escalation");
-  assert.deepStrictEqual(
-    satisfaction.fpEscalationReasons.map((item) => item.code),
-    ["design_completeness_attribute_partial"]
-  );
+  assert.equal(satisfaction.status, "not_applicable");
+  assert.deepStrictEqual(satisfaction.fpEscalationReasons, []);
 });
 
 function obligation(obligationId, obligationKind, text) {
@@ -745,6 +743,141 @@ test("B-084 design-depth admission normalizes state diagram fragments without ca
     },
     report: { outputFile }
   });
+  assert(ledger);
+  assert(
+    !ledger.reasons.some((reason) =>
+      reason.code.startsWith("design_depth_register_invalid:")
+    )
+  );
+});
+
+test("B-084 design-depth admission normalizes implementation module refs and stack extras", () => {
+  const ledger = ledgerFor(
+    {
+      kind: "sdlc_design_depth_register",
+      registerVersion: "ts-design-depth-v1",
+      targetAssetType: "implementation_design_surface",
+      stackProfileRows: [
+        {
+          kind: "sdlc_stack_profile_row",
+          stackRef: "stack://scala_spark/cdme",
+          language: "Scala 2.13",
+          buildTool: "sbt 1.x",
+          runtimePlatform: "Apache Spark 3.5",
+          testFramework: "ScalaTest 3.2",
+          buildCommand: "sbt clean assembly",
+          testCommand: "sbt test"
+        }
+      ],
+      implementationModuleRows: [
+        {
+          kind: "sdlc_implementation_module_row",
+          moduleName: "cdme-compiler",
+          moduleRef: "module://cdme/compiler"
+        }
+      ],
+      moduleSchemaFragments: [
+        {
+          kind: "sdlc_module_schema_fragment",
+          moduleRef: "module://cdme/compiler",
+          fragmentVersion: "v1",
+          entities: [
+            "MappingPlan"
+          ],
+          operations: [
+            {
+              operationId: "compileMappingPlan"
+            }
+          ],
+          requirementIds: ["REQ-TYP-001"],
+          sourceAssetRefs: ["fixture://t122/module-ref-schema"]
+        }
+      ],
+      moduleStateDiagramFragments: [
+        {
+          moduleRef: "module://cdme/compiler",
+          stateless: false,
+          note: "Compiler module state is carried by immutable run records.",
+          states: ["Pending", "Compiled"],
+          transitions: [
+            {
+              from: "Pending",
+              to: "Compiled",
+              trigger: "compileMappingPlan"
+            }
+          ],
+          requirementIds: ["REQ-TYP-001"],
+          sourceAssetRefs: ["fixture://t122/module-ref-schema"]
+        }
+      ],
+      aggregateDomainModelRows: [
+        {
+          kind: "sdlc_aggregate_domain_model_row",
+          modelRef: "model://cdme/aggregate",
+          description: "Aggregate CDME domain model"
+        }
+      ],
+      sunnyDaySequenceRows: [
+        {
+          kind: "sdlc_sunny_day_sequence_row",
+          sequenceRef: "seq://cdme/nominal-run",
+          description: "Nominal compile and execute flow",
+          scenarioRef: "SS-01"
+        }
+      ],
+      aggregateSunnyDaySequence: {
+        sequenceRef: "seq://cdme/nominal-run",
+        steps: [
+          {
+            step: 1,
+            actor: "cdme-compiler",
+            action: "compile mapping plan"
+          }
+        ]
+      },
+      fileTargetRows: [
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: "build_tenants/scala_spark/build.sbt",
+          role: "source",
+          moduleName: "root",
+          generatedBy: "worker"
+        }
+      ],
+      componentTopologyRows: [
+        {
+          kind: "sdlc_component_topology_row",
+          componentId: "comp://cdme/compiler/Compiler",
+          moduleName: "cdme-compiler",
+          relativePath:
+            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+          publicBoundary: true,
+          concernRole: "domain_model",
+          requirementIds: ["REQ-TYP-001"],
+          sourceAssetRefs: ["fixture://t122/module-ref-schema"]
+        }
+      ],
+      componentRealizationRows: [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "comp://cdme/compiler/Compiler",
+          moduleName: "cdme-compiler",
+          relativePath:
+            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
+          realizationRole: "source",
+          generatesArtifacts: true
+        }
+      ],
+      designCompletenessVerdict: {
+        kind: "sdlc_design_completeness_verdict",
+        entityCoverage: "satisfied",
+        attributeCoverage: "satisfied",
+        flowCoverage: "satisfied",
+        notes: "All module-level implementation design rows are represented."
+      }
+    },
+    fullBreadthScope()
+  );
   assert(ledger);
   assert(
     !ledger.reasons.some((reason) =>

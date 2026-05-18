@@ -81,6 +81,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "project_conformance_gaps",
   "unsupported_transition",
   "fp_worker_unattached",
+  "worker_output_limit_exceeded",
   "worker_rate_limited",
   "worker_process_failed",
   "worker_hard_timeout",
@@ -419,6 +420,13 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "worker_runtime",
       lawfulReentryPoint: "same_edge_retry",
       message: "Worker provider rate limit or quota exhaustion prevented the actor from completing."
+    });
+  }
+  if (code === "worker_output_limit_exceeded") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Worker response exceeded the provider or executor output limit before the artifact was admitted."
     });
   }
   if (code === "worker_process_failed") {
