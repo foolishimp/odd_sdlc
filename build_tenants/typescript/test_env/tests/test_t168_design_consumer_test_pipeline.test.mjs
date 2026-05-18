@@ -473,7 +473,10 @@ test("T-168 component-test handoff declares shard cwd and workspace-only logs", 
     manifest.productMaterialization.executionShards[0].workingDirectory,
     /build_tenants\/hello_world_javascript$/
   );
-  assert.match(directives, /executionShards\[\]\.workingDirectory/);
+  assert.match(directives, /authored for the matching workerInvocationPackage\.productMaterialization\.executionShards\[\]\.workingDirectory/);
+  assert.match(directives, /installed operator executes the declared shard command after this transform returns/);
+  assert.doesNotMatch(directives, /proof-binding checks may execute/);
+  assert.doesNotMatch(directives, /Generated tests must execute/);
   assert.match(directives, /Do not use \/tmp/);
   assert.match(directives, /resolve allowed write roots to workspace-root absolute paths/);
   assert.match(axioms, /outside-workspace temporary files such as \/tmp/);

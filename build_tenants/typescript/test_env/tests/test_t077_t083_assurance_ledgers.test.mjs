@@ -648,3 +648,25 @@ test("T-083 shallow realization ledger rejects constant-success logic", () => {
     "constant_success_surface:file://AlwaysPassSpec.scala"
   ]);
 });
+
+test("T-083 shallow realization ledger admits test double return values", () => {
+  const ledger = deriveShallowRealizationAssuranceLedger({
+    synthesisRequired: false,
+    executableProofRequired: true,
+    surfaces: [
+      {
+        kind: "sdlc_realization_text_surface",
+        role: "test",
+        ref: "file://Hello.test.js",
+        content: [
+          "test('captures stdout', () => {",
+          "  process.stdout.write = () => true;",
+          "  assert.equal(render(), 'Hello, world!');",
+          "});"
+        ].join("\n")
+      }
+    ]
+  });
+
+  assert.equal(ledger.verdict, "satisfied");
+});

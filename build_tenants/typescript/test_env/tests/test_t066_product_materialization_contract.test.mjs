@@ -28,6 +28,7 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  admitComponentDepthRegisterFromArtifact,
   admitSdlcProjectConstraints,
   buildPostTransformWorkerResultReport,
   constructWorkerInvocationPackage,
@@ -72,6 +73,7 @@ import {
   sha256Text,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
+  writeInstalledOperatorOwnedEvaluationArtifact,
   writeProductMaterializationManifest
 } from "../../build/semantic/code/src/index.js";
 
@@ -383,7 +385,7 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "const tenantRelative = sourceRelative;",
       "const sourcePath = path.join(manifest.productMaterialization.tenantRoot, tenantRelative);",
       "mkdirSync(dirname(sourcePath), { recursive: true });",
-      "const source = `${requirementTraceHeader}\\npackage generated\\nobject Core { def run(value: String): String = value.reverse }\\n`; ",
+      "const source = `${requirementTraceHeader}\\n// edge: ${manifest.edgeName}\\npackage generated\\nobject Core { def run(value: String): String = value.reverse }\\n`; ",
       "writeFileSync(sourcePath, source, 'utf8');",
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
       "const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
@@ -592,7 +594,7 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "const requirementTraceHeader = [...requirementObligationIds.map((id) => `// ${id}`), ...activeRequirementTags.map((tag) => `// Validates: ${tag}`)].join('\\n');",
       "function testExecutionSurfaceRegister() {",
       "  if (manifest.targetAssetType !== 'test_execution_surface') return null;",
-      "  const payload = { kind: 'sdlc_test_execution_surface_register', registerVersion: 'ts-test-execution-v1', targetAssetType: 'test_execution_surface', testExecutionPreparationRows: [{ kind: 'sdlc_test_execution_preparation_row', scheduleRef: 'test-schedule://data-mapper/sbt-test', moduleName: 'cdme-core-tests', testClassId: 'CoreSpec', testcaseIds: ['TC-DM-001'], command: 'sbt test', workingDirectory: 'build_tenants/data_mapper', frameworkRef: 'framework://scalatest', shardId: 'test-shard-01-cdme-core', sourceTestFileRefs: [`workspace://${testRelative}`], requirementIds: requirementObligationIds, status: 'prepared', evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`] }], evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`], summary: 'prepared data_mapper ScalaTest execution surface' };",
+      "  const payload = { kind: 'sdlc_test_execution_surface_register', registerVersion: 'ts-test-execution-v1', targetAssetType: 'test_execution_surface', testExecutionPreparationRows: [{ kind: 'sdlc_test_execution_preparation_row', scheduleRef: 'test-schedule://data-mapper/sbt-test', moduleName: 'cdme-core-tests', testClassId: 'CoreSpec', testcaseIds: ['TC-DM-001'], command: 'sbt test', workingDirectory: manifest.productMaterialization.selectedOutputRoot, frameworkRef: 'framework://scalatest', shardId: 'test-shard-01-cdme-core', sourceTestFileRefs: [`workspace://${testRelative}`], requirementIds: requirementObligationIds, status: 'prepared', evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`] }], evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`], summary: 'prepared data_mapper ScalaTest execution surface' };",
       "  const projection = manifest.targetCarrierProjection;",
       "  if (projection === undefined || projection === null) return payload;",
       "  return { kind: projection.outputCarrierKind, targetAssetType: manifest.targetAssetType, edgeRef: manifest.edgeName, contractRef: projection.targetCarrierContractRef, contractDigest: projection.targetCarrierContractDigest, payload, evidenceRefs: payload.evidenceRefs };",
@@ -5408,6 +5410,180 @@ test("T-104 test-run archive closure depends on cited execution-result truth", (
   assert.equal(postflight.status, "passed");
 });
 
+test("T-102 test-run archive validates execution evidence against source edge shards", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const baseExecutionManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: executionContract.edgeName,
+    vectorIndex: 17,
+    contract: executionContract,
+    projectConstraints: constraints,
+    runId: "t102-source-shard-schedule"
+  });
+  const baseShard = baseExecutionManifest.productMaterialization.executionShards[0];
+  const preparedShard = Object.freeze({
+    ...baseShard,
+    shardId: `${baseShard.shardId}-tests`,
+    moduleName: `${baseShard.moduleName}_tests`
+  });
+  const executionManifest = Object.freeze({
+    ...baseExecutionManifest,
+    productMaterialization: Object.freeze({
+      ...baseExecutionManifest.productMaterialization,
+      executionShards: Object.freeze([preparedShard])
+    })
+  });
+  writeHandoffFiles(executionManifest);
+  const executionOutput = writeOutputSurface(
+    executionManifest,
+    "test_execution_result_surface"
+  );
+  const executionReportPath = path.join(executionManifest.archiveRoot, "junit-report.xml");
+  writeFileSync(
+    executionReportPath,
+    '<testsuite tests="1" failures="0"><testcase classname="HelloWorldTest" name="runs"/></testsuite>\n',
+    "utf8"
+  );
+  writeFileSync(
+    executionManifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          executionManifest.fpEvaluateResultFile
+        ).href,
+        graphFunctionName: executionManifest.graphFunctionName,
+        edgeName: executionManifest.edgeName,
+        targetAssetType: executionManifest.targetAssetType,
+        outputFile: executionManifest.outputFile,
+        digest: executionOutput.digest,
+        summary: "admitted execution-result dependency with source-edge shard schedule",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: {
+          kind: "sdlc_worker_execution_evidence",
+          lane: "test",
+          command: executionManifest.productMaterialization.testExecutionContract,
+          status: "succeeded",
+          reportRefs: [`file://${executionReportPath}`],
+          testsObserved: 1,
+          passedCount: 1,
+          failedCount: 0,
+          shardEvidence: [
+            {
+              kind: "sdlc_worker_execution_shard_evidence",
+              shardId: preparedShard.shardId,
+              moduleName: preparedShard.moduleName,
+              lane: "test",
+              command: preparedShard.command,
+              status: "succeeded",
+              reportRefs: [`file://${executionReportPath}`],
+              testsObserved: 1,
+              passedCount: 1,
+              failedCount: 0
+            }
+          ]
+        },
+        obligationAssessments: executionManifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [`file://${executionManifest.outputFile}`, `file://${executionReportPath}`],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const executionReport = readWorkerResultReport(executionManifest);
+  assert.equal(
+    evaluateWorkerResultPostflight({
+      manifest: executionManifest,
+      report: executionReport
+    }).status,
+    "passed"
+  );
+
+  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
+  const archiveManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 18,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-archive-source-shard-schedule"
+  });
+  assert.notEqual(
+    archiveManifest.productMaterialization.executionShards[0].shardId,
+    preparedShard.shardId
+  );
+  writeHandoffFiles(archiveManifest);
+  const content = [
+    "# test_run_archive_surface",
+    "",
+    "Archived dependencies:",
+    ...archiveManifest.inputAssetTypes.map((assetType) => `- ${assetType}`),
+    "Requirement trace: REQ-T066-001"
+  ].join("\n");
+  const artifact = `${content}\n`;
+  mkdirSync(dirname(archiveManifest.outputFile), { recursive: true });
+  writeFileSync(archiveManifest.outputFile, artifact, "utf8");
+  const outputRef = `file://${archiveManifest.outputFile}`;
+  writeFileSync(
+    archiveManifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          archiveManifest.fpEvaluateResultFile
+        ).href,
+        graphFunctionName: archiveManifest.graphFunctionName,
+        edgeName: archiveManifest.edgeName,
+        targetAssetType: archiveManifest.targetAssetType,
+        outputFile: archiveManifest.outputFile,
+        digest: sha256Text(artifact),
+        summary: "archive cites admitted execution-result dependency",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: null,
+        obligationAssessments: archiveManifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: obligation.obligationId ===
+              "source_asset:test_execution_result_surface"
+              ? [outputRef, `file://${executionManifest.reportFile}`, ...obligation.evidenceRefs]
+              : [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const archiveReport = readWorkerResultReport(archiveManifest);
+  const archivePostflight = evaluateWorkerResultPostflight({
+    manifest: archiveManifest,
+    report: archiveReport
+  });
+
+  assert.equal(archivePostflight.status, "passed");
+});
+
 test("T-102 post-close target-next same-vector projection falls through to overlay continuation", () => {
   assert.equal(
     normalizePostCloseContinuationVectorIndex({
@@ -5680,21 +5856,13 @@ test("T-094/T-095 test execution result rejects non-contract not-run status", ()
   const handoffFiles = writeHandoffFiles(manifest);
   const prompt = readFileSync(handoffFiles.promptPath, "utf8");
 
-  assert.match(prompt, /executionEvidence\.status MUST be one of: succeeded, failed, pending/);
-  assert.match(prompt, /Do not use status values such as not_run/);
-  assert.match(prompt, /executionEvidence\.lane MUST be exactly "test"/);
+  assert.match(prompt, /Framework-owned evaluation artifact/u);
   assert.match(
     prompt,
-    /executionEvidence\.testsObserved, passedCount, and failedCount MUST be numbers or null/
+    /The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier/u
   );
-  assert.match(
-    prompt,
-    /Pending evidence is a lawful non-closure carrier for triage or repricing/
-  );
-  assert.match(
-    prompt,
-    /do not present a not-run document as release closure evidence/
-  );
+  assert.doesNotMatch(prompt, /executionEvidence\.status MUST/u);
+  assert.doesNotMatch(prompt, /not_run/u);
 
   const output = writeOutputSurface(manifest, "test_execution_result_surface");
   const outputRef = `file://${manifest.outputFile}`;
@@ -6084,7 +6252,7 @@ test("T-115 failed execution evidence with zero observed tests is admitted for r
   );
 });
 
-test("T-115 execution-result prompt keeps compile failure repair inside edge", () => {
+test("T-115 execution-result prompt delegates execution evidence to installed operator", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
@@ -6102,28 +6270,17 @@ test("T-115 execution-result prompt keeps compile failure repair inside edge", (
 
   assert.equal(
     manifest.allowedWriteRoots.includes(manifest.productMaterialization.tenantRoot),
-    true
+    false
   );
+  assert.match(prompt, /Framework-owned evaluation artifact/u);
   assert.match(
     prompt,
-    /Use pending only when execution did not run or external evidence is still unavailable/u
+    /The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier/u
   );
-  assert.match(
-    prompt,
-    /Product materialization is execution-repair scoped for this edge/u
-  );
-  assert.match(
-    prompt,
-    /repair the product source\/test\/build files within allowed write roots/u
-  );
-  assert.match(
-    prompt,
-    /productMaterialization\.executionShards exactly/u
-  );
-  assert.match(
-    prompt,
-    /Do not emit failed execution evidence merely for a repairable compile, discovery, or test failure/u
-  );
+  assert.doesNotMatch(prompt, /Product materialization is execution-repair scoped/u);
+  assert.doesNotMatch(prompt, /repair the product source\/test\/build files/u);
+  assert.doesNotMatch(prompt, /productMaterialization\.executionShards exactly/u);
+  assert.doesNotMatch(prompt, /Do not emit failed execution evidence/u);
   assert.doesNotMatch(
     prompt,
     /exits non-zero during compile, discovery, or test phases, record failed, not pending/u
@@ -6134,7 +6291,7 @@ test("T-115 execution-result prompt keeps compile failure repair inside edge", (
   );
 });
 
-test("T-102 execution-result postflight admits execution-repair tenant edits", () => {
+test("T-102 execution-result postflight rejects tenant product edits", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
@@ -6183,7 +6340,7 @@ test("T-102 execution-result postflight admits execution-repair tenant edits", (
   writeReport({
     manifest,
     digest: output.digest,
-    summary: "execution-repair scoped product edit with successful test evidence",
+    summary: "execution-result evaluator attempted a tenant product edit",
     materializedFiles,
     executionEvidence: {
       kind: "sdlc_worker_execution_evidence",
@@ -6201,11 +6358,209 @@ test("T-102 execution-result postflight admits execution-repair tenant edits", (
   const report = readWorkerResultReport(manifest);
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
 
+  assert.equal(postflight.status, "blocked");
   assert.equal(
     postflight.blockingReasons.includes("unexpected_product_materialization_for_surface_edge"),
+    true,
+    JSON.stringify(postflight.blockingReasons)
+  );
+});
+
+test("T-102 cross-archive report discovery rejects unstamped projections", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const operatorRunsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const unstampedRunRoot = path.join(operatorRunsRoot, "prior-unstamped");
+  const stampedRunRoot = path.join(operatorRunsRoot, "prior-stamped");
+  mkdirSync(unstampedRunRoot, { recursive: true });
+  mkdirSync(stampedRunRoot, { recursive: true });
+  const basePriorReport = {
+    kind: "odd_sdlc.worker_result_report",
+    graphFunctionName: "derive_test_execution_result_surface",
+    edgeName: "derive_test_execution_result_surface",
+    targetAssetType: "test_execution_result_surface",
+    outputFile: path.join(stampedRunRoot, "test_execution_result_surface.md"),
+    digest: "sha256:prior",
+    summary: "prior execution result",
+    unresolvedReasons: [],
+    materializedFiles: [],
+    executionEvidence: null,
+    executionEvidenceErrors: [],
+    obligationAssessments: []
+  };
+  writeFileSync(
+    path.join(unstampedRunRoot, "worker_result_report.json"),
+    stableJsonForTest(basePriorReport),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(stampedRunRoot, "worker_result_report.json"),
+    stableJsonForTest({
+      ...basePriorReport,
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(
+        path.join(stampedRunRoot, "fp_evaluate_result.json")
+      ).href
+    }),
+    "utf8"
+  );
+
+  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 31,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-cross-archive-projection-contract"
+  });
+  const sourceAsset = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationId === "source_asset:test_execution_result_surface"
+  );
+
+  assert(sourceAsset);
+  assert(
+    sourceAsset.evidenceRefs.some((ref) => ref.includes("prior-stamped"))
+  );
+  assert.equal(
+    sourceAsset.evidenceRefs.some((ref) => ref.includes("prior-unstamped")),
     false
   );
-  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
+test("T-102 postflight rejects worker-asserted out-of-scope obligation", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_requirement_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 32,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-out-of-scope-obligation"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "requirement_surface");
+  const outputRef = pathToFileURL(manifest.outputFile).href;
+  writeFileSync(
+    manifest.reportFile,
+    stableJsonForTest({
+      kind: "odd_sdlc.worker_result_report",
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(
+        manifest.fpEvaluateResultFile
+      ).href,
+      graphFunctionName: manifest.graphFunctionName,
+      edgeName: manifest.edgeName,
+      targetAssetType: manifest.targetAssetType,
+      outputFile: manifest.outputFile,
+      digest: output.digest,
+      summary: "worker asserted an undeclared obligation",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      obligationAssessments: [
+        ...manifest.traversalObligationContext.obligations.map((obligation) => ({
+          kind: "sdlc_worker_obligation_assessment",
+          obligationId: obligation.obligationId,
+          fulfillmentStatus: "fulfilled",
+          evidenceRefs: [outputRef],
+          blockingReasons: []
+        })),
+        {
+          kind: "sdlc_worker_obligation_assessment",
+          obligationId: "requirement:REQ-T102-OUT-OF-SCOPE",
+          fulfillmentStatus: "fulfilled",
+          evidenceRefs: [outputRef],
+          blockingReasons: []
+        }
+      ]
+    }),
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(
+    postflight.blockingReasons.some((reason) =>
+      reason.startsWith("obligation_assessment_extra:")
+    ),
+    true,
+    JSON.stringify(postflight.blockingReasons)
+  );
+});
+
+test("T-102 postflight rejects worker-asserted fulfillment without evidence", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_requirement_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 33,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-fulfilled-without-evidence"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "requirement_surface");
+  const outputRef = pathToFileURL(manifest.outputFile).href;
+  const requirementObligation =
+    manifest.traversalObligationContext.obligations.find(
+      (obligation) => obligation.obligationKind === "requirement"
+    );
+
+  assert(requirementObligation);
+  writeFileSync(
+    manifest.reportFile,
+    stableJsonForTest({
+      kind: "odd_sdlc.worker_result_report",
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(
+        manifest.fpEvaluateResultFile
+      ).href,
+      graphFunctionName: manifest.graphFunctionName,
+      edgeName: manifest.edgeName,
+      targetAssetType: manifest.targetAssetType,
+      outputFile: manifest.outputFile,
+      digest: output.digest,
+      summary: "worker asserted fulfillment without evidence",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      obligationAssessments: manifest.traversalObligationContext.obligations.map(
+        (obligation) => ({
+          kind: "sdlc_worker_obligation_assessment",
+          obligationId: obligation.obligationId,
+          fulfillmentStatus: "fulfilled",
+          evidenceRefs:
+            obligation.obligationId === requirementObligation.obligationId
+              ? []
+              : [outputRef],
+          blockingReasons: []
+        })
+      )
+    }),
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(
+    postflight.blockingReasons.some((reason) =>
+      reason.startsWith("obligation_fulfilled_without_output_coverage:")
+    ),
+    true,
+    JSON.stringify(postflight.blockingReasons)
+  );
 });
 
 test("B-072 malformed transform execution result evidence becomes typed invalid blocker", () => {
@@ -6819,7 +7174,10 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       registerKind: "component_depth_register",
       carrierKind: "sdlc_component_depth_register",
       registerVersion: "ts-component-depth-v1",
-      rowDirective: /payload\.componentRealizationRows/u
+      frameworkOwned: true,
+      publisherDirective:
+        /The installed operator publishes the component_realization_qualification_surface carrier/u,
+      forbiddenDirectives: [/payload\.componentRealizationRows/u]
     },
     {
       edgeName: "qualify_component_test_execution_surface",
@@ -6827,11 +7185,13 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       registerKind: "component_depth_register",
       carrierKind: "sdlc_component_depth_register",
       registerVersion: "ts-component-depth-v1",
-      rowDirective: /payload\.componentTestQualificationRows/u,
-      extraDirectives: [
+      frameworkOwned: true,
+      publisherDirective:
+        /The installed operator publishes the component_test_qualification_surface carrier/u,
+      forbiddenDirectives: [
+        /payload\.componentTestQualificationRows/u,
         /literal field name status/u,
-        /passed, failed, blocked, pending, or unproven/u,
-        /do not emit qualificationStatus or verdict as a substitute for status/u
+        /passed, failed, blocked, pending, or unproven/u
       ]
     },
     {
@@ -6882,18 +7242,36 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
         "u"
       );
 
-    assert.match(prompt, envelopePattern);
+    if (promptCase.frameworkOwned === true) {
+      assert.match(prompt, promptCase.publisherDirective);
+      assert.match(prompt, /Framework-owned evaluation artifact/u);
+      for (const forbiddenDirective of promptCase.forbiddenDirectives ?? []) {
+        assert.doesNotMatch(prompt, forbiddenDirective);
+      }
+      assert.equal(
+        invocationPackage.outcomeDirectives.some((directive) =>
+          /Framework-owned evaluation artifact/u.test(directive)
+        ),
+        true
+      );
+    } else {
+      assert.match(prompt, envelopePattern);
+    }
     assert.match(prompt, /Do not inspect odd_sdlc framework source code/u);
-    assert.match(prompt, promptCase.rowDirective);
+    if (promptCase.rowDirective !== undefined) {
+      assert.match(prompt, promptCase.rowDirective);
+    }
     for (const extraDirective of promptCase.extraDirectives ?? []) {
       assert.match(prompt, extraDirective);
     }
-    assert.equal(
-      invocationPackage.outcomeDirectives.some((directive) =>
-        envelopePattern.test(directive)
-      ),
-      true
-    );
+    if (promptCase.frameworkOwned !== true) {
+      assert.equal(
+        invocationPackage.outcomeDirectives.some((directive) =>
+          envelopePattern.test(directive)
+        ),
+        true
+      );
+    }
     if (promptCase.targetAssetType === "test_execution_surface") {
       assert.notEqual(
         invocationPackage.targetCarrierProjection.constructionTemplate
@@ -7132,7 +7510,7 @@ test("T-066 installed operator rejects unexpected product materialization before
   });
 
   assert.equal(result.status, "postflight_failed");
-  assert.equal(result.assuranceSatisfaction?.status ?? "retry_same_edge", "retry_same_edge");
+  assert.equal(result.assuranceSatisfaction?.status ?? "close_allowed", "close_allowed");
   assert.equal(result.postflight.status, "blocked");
   assert.equal(
     result.postflight.blockingReasons.includes("unexpected_product_materialization_for_surface_edge"),
@@ -7216,7 +7594,7 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
   assert.deepEqual(report.materializedFiles, []);
 });
 
-test("T-066 installed operator rejects product edge when traversal obligations are unassessed", async () => {
+test("T-066 installed operator rejects product edge when requirement lineage is unobservable", async () => {
   const workspace = makeWorkspace();
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
@@ -7231,14 +7609,26 @@ test("T-066 installed operator rejects product edge when traversal obligations a
   assert.equal(result.status, "postflight_failed");
   assert.equal(result.postflight.status, "blocked");
   assert.equal(
+    result.postflight.blockingReasons.includes("materialized_product_files_missing"),
+    true,
+    JSON.stringify(result.postflight.blockingReasons, null, 2)
+  );
+  assert.equal(
+    result.postflight.blockingReasons.includes(
+      "materialized_product_role_missing:source"
+    ),
+    true,
+    JSON.stringify(result.postflight.blockingReasons, null, 2)
+  );
+  assert.equal(
     result.postflight.blockingReasons.some((reason) =>
       reason.startsWith("obligation_unassessed:")
     ),
-    true
+    false
   );
   assert.equal(
-    result.gapDossier.reasons.some((reason) =>
-      reason.reason.startsWith("obligation_unassessed:")
+    result.gapDossier.reasons.some(
+      (reason) => reason.reason === "materialized_product_files_missing"
     ),
     true
   );
@@ -7410,6 +7800,42 @@ function makeT102PromptSweepWorkspace() {
   return root;
 }
 
+function makeT102NodeExecutionWorkspace() {
+  const root = makeWorkspace();
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t102_node_execution",
+      "active_tenant: typescript",
+      "selected_output_root: build_tenants/typescript",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  typescript:",
+      "    output_dir: build_tenants/typescript/",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: root });
+  const tenantRoot = path.join(root, "build_tenants/typescript");
+  mkdirSync(path.join(tenantRoot, "test"), { recursive: true });
+  writeFileSync(
+    path.join(tenantRoot, "test/hello.test.js"),
+    [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('hello world', () => {",
+      "  assert.equal('hello'.toUpperCase(), 'HELLO');",
+      "});"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  return root;
+}
+
 function t102FullBreadthTraversalAttemptEnvelope(edgeName) {
   return Object.freeze({
     strategyDirectiveRef: `strategy://t102/full-breadth/${edgeName}`,
@@ -7418,9 +7844,20 @@ function t102FullBreadthTraversalAttemptEnvelope(edgeName) {
   });
 }
 
+function stableJsonForTest(payload) {
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
 test("T-102 all published edge transform prompts exclude evaluator work", () => {
   const workspace = makeT102PromptSweepWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const installedOperatorOwnedTargets = new Set([
+    "component_realization_qualification_surface",
+    "test_execution_result_surface",
+    "component_test_qualification_surface",
+    "component_repair_schedule_surface",
+    "release_depth_parity_surface"
+  ]);
   const forbiddenPromptPatterns = [
     /^- report surface:/mu,
     /Satisfy evaluator contract/u,
@@ -7428,7 +7865,19 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     /obligationAssessments/u,
     /unresolvedReasons/u,
     /requiredSchema/u,
-    /resultReportSchema/u
+    /resultReportSchema/u,
+    /proof-binding checks may execute/u,
+    /Generated tests must execute/u
+  ];
+  const forbiddenInstalledOperatorOwnedPatterns = [
+    /Emit payload\.componentTestQualificationRows/u,
+    /Emit payload\.componentRepairSchedule/u,
+    /Emit payload\.releaseDepthParity/u,
+    /Emit sdlc_worker_execution_evidence JSON/u,
+    /pass\/fail counts/u,
+    /obligation ledgers/u,
+    /gap ledgers/u,
+    /next-tranche selectors/u
   ];
 
   for (const [index, contract] of constructSdlcHookContractCatalog().entries()) {
@@ -7491,6 +7940,20 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     for (const pattern of forbiddenPromptPatterns) {
       assert.doesNotMatch(prompt, pattern, label);
     }
+    if (installedOperatorOwnedTargets.has(contract.targetAssetType)) {
+      assert.equal(
+        manifest.allowedWriteRoots.some(
+          (root) =>
+            resolve(root) === resolve(manifest.productMaterialization.tenantRoot)
+        ),
+        false,
+        label
+      );
+      assert.match(prompt, /The installed operator .*publishes/u, label);
+      for (const pattern of forbiddenInstalledOperatorOwnedPatterns) {
+        assert.doesNotMatch(prompt, pattern, label);
+      }
+    }
     const resultReportLines = prompt
       .split("\n")
       .filter((line) => line.includes("worker_result_report.json"));
@@ -7502,6 +7965,209 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
       `${label}: ${JSON.stringify(resultReportLines)}`
     );
   }
+});
+
+test("T-102 installed operator interface writes execution evidence carrier", () => {
+  const workspace = makeT102NodeExecutionWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: contract.edgeName,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-installed-operator-execution-evidence"
+  });
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  const priorRunRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/t102-prepared-execution-surface"
+  );
+  const priorOutputFile = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/assets/t102-prepared/test_execution_surface.md"
+  );
+  const priorSurface = stableJsonForTest({
+    kind: "sdlc_test_execution_surface_register",
+    registerVersion: "ts-test-execution-v1",
+    targetAssetType: "test_execution_surface",
+    testExecutionPreparationRows: [
+      {
+        kind: "sdlc_test_execution_preparation_row",
+        scheduleRef: "test-schedule://t102/hello",
+        moduleName: "hello-tests",
+        testClassId: "hello.test.js",
+        testcaseIds: ["TC-HELLO-001"],
+        command: "node --test test/hello.test.js",
+        workingDirectory: "build_tenants/typescript",
+        frameworkRef: "framework://node-test",
+        shardId: "test-shard-hello",
+        sourceTestFileRefs: ["workspace://build_tenants/typescript/test/hello.test.js"],
+        requirementIds: ["REQ-T102-HELLO"],
+        status: "prepared",
+        evidenceRefs: ["workspace://build_tenants/typescript/test/hello.test.js"]
+      }
+    ],
+    evidenceRefs: ["workspace://build_tenants/typescript/test/hello.test.js"],
+    summary: "prepared T-102 node execution"
+  });
+  mkdirSync(dirname(priorOutputFile), { recursive: true });
+  mkdirSync(priorRunRoot, { recursive: true });
+  writeFileSync(priorOutputFile, priorSurface, "utf8");
+  writeFileSync(
+    path.join(priorRunRoot, "worker_result_report.json"),
+    stableJsonForTest({
+      kind: "odd_sdlc.worker_result_report",
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(
+        path.join(priorRunRoot, "fp_evaluate_result.json")
+      ).href,
+      graphFunctionName: "prepare_test_execution_surface",
+      edgeName: "prepare_test_execution_surface",
+      targetAssetType: "test_execution_surface",
+      outputFile: priorOutputFile,
+      digest: sha256Text(priorSurface),
+      summary: "prior prepared execution surface",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      obligationAssessments: []
+    }),
+    "utf8"
+  );
+
+  const previousNodeTestContext = process.env["NODE_TEST_CONTEXT"];
+  process.env["NODE_TEST_CONTEXT"] = "1";
+  try {
+    assert.equal(
+      writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
+      manifest.outputFile
+    );
+  } finally {
+    if (previousNodeTestContext === undefined) {
+      delete process.env["NODE_TEST_CONTEXT"];
+    } else {
+      process.env["NODE_TEST_CONTEXT"] = previousNodeTestContext;
+    }
+  }
+
+  const payload = JSON.parse(readFileSync(manifest.outputFile, "utf8"));
+  assert.equal(payload.kind, "sdlc_worker_execution_evidence");
+  assert.equal(payload.lane, "test");
+  assert.equal(payload.status, "succeeded");
+  assert.equal(payload.testsObserved, 1);
+  assert.equal(payload.passedCount, 1);
+  assert.equal(payload.failedCount, 0);
+  assert.equal(payload.shardEvidence.length, 1);
+  assert.equal(payload.shardEvidence[0].shardId, "test-shard-hello");
+  assert.equal(payload.shardEvidence[0].moduleName, "hello-tests");
+  assert.equal(payload.shardEvidence[0].command, "node --test test/hello.test.js");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  assert.equal(report.executionEvidence.status, "succeeded");
+  assert.equal(report.executionEvidence.shardEvidence[0].status, "succeeded");
+});
+
+test("T-102 installed operator interface derives repair schedule carrier", () => {
+  const workspace = makeT102NodeExecutionWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const tenantRoot = path.join(workspace, "build_tenants/typescript");
+  const qualificationPath = path.join(
+    tenantRoot,
+    "design/component_test_qualification_surface.md"
+  );
+  mkdirSync(dirname(qualificationPath), { recursive: true });
+  const failureRow = {
+    kind: "sdlc_component_execution_failure_row",
+    failureId: "failure:hello-test:unsharded",
+    shardId: "unsharded",
+    moduleName: "component-test",
+    testClassId: "hello-test",
+    testcaseIds: ["TC-HELLO-001"],
+    componentIds: ["hello-component"],
+    requirementIds: ["REQ-T102-HELLO"],
+    failureKind: "assertion_failure",
+    repairTarget: "component_code",
+    lawfulReentryPoint: "repair_worker_output",
+    attributionConfidence: "medium",
+    sourceRefs: ["component:hello-component"],
+    testRefs: [pathToFileURL(path.join(tenantRoot, "test/hello.test.js")).href],
+    evidenceRefs: ["artifact://t102/failing-test"]
+  };
+  writeFileSync(
+    qualificationPath,
+    stableJsonForTest({
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_test_qualification_surface",
+      componentTopologyRows: [],
+      componentRealizationRows: [],
+      testComponentTopologyRows: [],
+      componentTestRows: [
+        {
+          kind: "sdlc_component_test_realization_row",
+          testClassId: "hello-test",
+          relativePath: "test/hello.test.js",
+          testcaseIds: ["TC-HELLO-001"],
+          componentIds: ["hello-component"],
+          requirementIds: ["REQ-T102-HELLO"],
+          shardId: null
+        }
+      ],
+      componentTestQualificationRows: [
+        {
+          kind: "sdlc_component_test_qualification_row",
+          testClassId: "hello-test",
+          testcaseIds: ["TC-HELLO-001"],
+          componentIds: ["hello-component"],
+          requirementIds: ["REQ-T102-HELLO"],
+          status: "failed",
+          evidenceRefs: ["artifact://t102/failing-test"]
+        }
+      ],
+      componentExecutionFailureRegister: {
+        kind: "component_execution_failure_register",
+        registerVersion: "ts-component-depth-v1",
+        failureRows: [failureRow]
+      },
+      componentRepairSchedule: null,
+      releaseDepthParity: null
+    }),
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_repair_schedule_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: contract.edgeName,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    projectConstraints: constraints,
+    runId: "t102-installed-operator-repair-schedule"
+  });
+
+  assert.equal(
+    writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
+    manifest.outputFile
+  );
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_repair_schedule_surface",
+    outputFile: manifest.outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(
+    admission.register.componentRepairSchedule.scheduleStatus,
+    "repair_required"
+  );
+  assert.equal(admission.register.componentRepairSchedule.repairRows.length, 1);
+  assert.equal(
+    admission.register.componentRepairSchedule.repairRows[0].failureId,
+    failureRow.failureId
+  );
 });
 
 test("T-102 axiomatic construction algebra sweep maps fold dispositions to next-action law", () => {
@@ -7662,10 +8328,10 @@ test("T-102 axiomatic construction algebra sweep separates evidence admission fr
       executionShards: false
     },
     {
-      className: "execution-repair scoped",
+      className: "execution-evidence owned",
       edgeName: "derive_test_execution_result_surface",
       required: false,
-      tenantWritable: true,
+      tenantWritable: false,
       executionShards: true
     }
   ];

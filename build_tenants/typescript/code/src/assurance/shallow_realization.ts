@@ -22,8 +22,12 @@ function hasPlaceholder(content: string): boolean {
   return /\b(todo|placeholder|stub|not implemented)\b/i.test(content);
 }
 
-function hasConstantSuccess(content: string): boolean {
+function hasSourceConstantSuccess(content: string): boolean {
   return /\breturn\s+true\b/.test(content) || /\bassert\s*\(\s*true\s*\)/.test(content);
+}
+
+function hasTestConstantSuccess(content: string): boolean {
+  return /\bassert\s*\(\s*true\s*\)/.test(content);
 }
 
 function hasIdentityOnlyTransform(content: string): boolean {
@@ -55,8 +59,8 @@ export function deriveShallowRealizationAssuranceLedger(input: {
       );
     }
     if (
-      (surface.role === "source" || surface.role === "test") &&
-      hasConstantSuccess(surface.content)
+      (surface.role === "source" && hasSourceConstantSuccess(surface.content)) ||
+      (surface.role === "test" && hasTestConstantSuccess(surface.content))
     ) {
       surfaceReasons.push(
         assuranceReason({

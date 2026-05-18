@@ -4,7 +4,7 @@
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
-- `.ai-workspace/tickets/active/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md`
+- `.ai-workspace/tickets/completed/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md`
 - `.ai-workspace/tickets/active/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`
 - `specification/requirements/16-edge-gain-closure-contract.md`
 - `specification/requirements/17-target-carrier-contracts.md`
@@ -18,6 +18,13 @@ traversals. ABG owns runtime admission, event truth, projection, replay,
 continuation, and fold mechanics. `odd_sdlc` owns SDLC domain meaning,
 semantic evaluator rows, target-carrier interpretation, and product-specific
 proof interpretation.
+
+The workspace editor axiom is absolute: `F_P.transform` is the only `F_P`
+process that may edit the workspace, and only within the active edge permission
+class. Every other `F_P` process is read-only over workspace state. It returns
+typed findings, parameters, or semantic rows to the installed operator
+typed-carrier interface. The installed operator owns deterministic carrier
+publication, ledger writes, runtime events, projection, fold, and continuation.
 
 The algebra is:
 
@@ -45,25 +52,30 @@ construction, admission, evaluation, projection, closure, and continuation.
   execution observation, or carrier envelope enters runtime truth
 - AC-3: `F_D` may reject malformed or impossible evidence, but must not replace
   requirement-by-requirement `F_P` semantic judgment
-- AC-4: `F_P.evaluate` produces semantic rows over admitted evidence refs,
-  publishes `fp_evaluate_result.json`, and does not allow the worker to close
-  the edge by assertion
+- AC-4: `F_P.evaluate` reads admitted evidence refs and returns semantic rows
+  to the installed operator typed-carrier interface; the installed operator
+  publishes `fp_evaluate_result.json`, and the worker may not close the edge by
+  assertion
 - AC-5: `ABG.project` derives fulfillment, materialization, gap, retry, and
   continuation pressure from admitted events and ledgers
 - AC-6: `ABG.fold` alone decides `close`, `retry`, `repair`, `yield`, `block`,
   or `reprice`, and projects the next lawful action
-- AC-7: every published worker-backed edge keeps evaluator, postflight,
-  closure, result-report, ledger, and runtime-event work out of the
-  `F_P.transform` prompt and worker-facing construction obligations
+- AC-7: every published worker-backed edge keeps evaluator payloads,
+  postflight, closure, result-report, ledger, runtime-event, projection, and
+  fold work out of the `F_P.transform` prompt and worker-facing construction
+  obligations
 - AC-8: the typed F_P stage carriers are the single governing runtime surface
   for the transform/evaluate boundary; any `worker_result_report.json` archive
   is a derived projection and must carry `projectionRole:
   typed_fp_stage_projection` plus `authoritativeStageResultRef` resolving to
   the published `fp_evaluate_result.json` for the same archive root
-- AC-9: fulfillment ledgers shall carry the `F_P.evaluate` result as the
-  evaluation admission/predecessor fact; `F_P.transform` may carry transform
-  output and runtime evidence, but must not stand in for the evaluation ledger
-  fact
+- AC-9: fulfillment ledgers shall carry the installed-operator-published
+  `F_P.evaluate` result as the evaluation admission/predecessor fact;
+  `F_P.transform` may carry transform output and runtime evidence, but must not
+  stand in for the evaluation ledger fact
+- AC-10: no `F_P` process other than `F_P.transform` may write workspace files;
+  all non-transform `F_P` stages are read-only and pass typed values through the
+  installed operator typed-carrier interface for deterministic write/admission
 
 ### REQ-F-ODDSDLC-075 - continuation follows fold disposition and vector relation
 
@@ -122,12 +134,12 @@ not re-run tests or emit fresh execution evidence.
 - AC-1: test execution evidence is admitted only on execution-result edges
 - AC-2: test-run archive and release surfaces consume admitted execution truth
   and do not emit fresh execution evidence
-- AC-3: compile, discovery, and test non-zero exits inside an execution-result
-  edge are execution-repair pressure inside that edge until success or a hard
-  external blocker
-- AC-4: execution-repair scoped edits may touch tenant product source, test, or
-  build files only to make the declared test execution contract compile and
-  pass
+- AC-3: compile, discovery, and test non-zero exits observed by an
+  execution-result edge are admitted as execution evidence and routed as repair,
+  retry, block, or reprice pressure; the execution-result evaluator does not
+  edit tenant product files
+- AC-4: repairs required by execution evidence re-enter through a constructive
+  `F_P.transform` edge with an explicit materialization permission class
 - AC-5: non-execution, non-materialization edges must not write product files
 - AC-6: shard evidence identity is copied from the schedule-declared shard
   register; ad hoc shard ids are inadmissible
@@ -141,13 +153,14 @@ Each edge shall declare and enforce its construction permission class.
   framework archive artifacts
 - AC-2: materialization-required edges may write declared product file targets
   and must admit the resulting materialization evidence
-- AC-3: execution-repair scoped edges may write tenant product source, test, or
-  build files only when the target asset admits execution evidence and the write
-  is needed to make the declared execution contract pass
+- AC-3: repair scoped workspace edits may write tenant product source, test, or
+  build files only when the active edge is an `F_P.transform` materialization
+  edge carrying admitted execution-repair pressure
 - AC-4: postflight rejects product-file writes outside the effective permission
   class with typed non-close diagnostics
 - AC-5: worker prompts and handoff manifests expose the active permission class
-  without giving the worker closure authority
+  without giving the worker closure, evaluator-payload, or installed-operator
+  carrier-publication authority
 - AC-6: product-materialization lineage is role-sensitive: required source and
   test product files carry requirement lineage, while auxiliary build or tool
   config files may be admitted when they are within the declared build/execution

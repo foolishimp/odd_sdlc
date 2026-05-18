@@ -80,6 +80,18 @@ function manifestForLargeSurface() {
   });
 }
 
+function manifestForWorkspaceSpecSurface(edgeName) {
+  const contract = hookContractByEdgeName(edgeName);
+  return deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceWithLargeRequirementSurface(),
+    graphFunctionName: edgeName,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: `t118-${edgeName}`
+  });
+}
+
 function writeDeclaredProductFileTargetSurface(workspaceRoot) {
   writeFileSync(
     path.join(workspaceRoot, "specification/PRODUCT.md"),
@@ -351,6 +363,26 @@ test("T-118 prompt points workers to the compact package before the forensic man
   assert.doesNotMatch(prompt, /"kind": "sdlc_worker_invocation_package"/u);
   assert.doesNotMatch(prompt, /sdlc_worker_prompt_pressure_projection/u);
   assert.doesNotMatch(prompt, /workerInvocationPackage\.retryRepairInstructions is non-empty/u);
+});
+
+test("T-118 workspace spec prompts derive missing outputs from current authority", () => {
+  const manifest = manifestForWorkspaceSpecSurface("derive_uat_testcases_surface");
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+  const invocationPackage = JSON.parse(
+    readFileSync(files.invocationPackagePath, "utf8")
+  );
+  const directiveSurface = [
+    ...invocationPackage.transformAxioms,
+    ...invocationPackage.outcomeDirectives
+  ].join("\n");
+
+  assert.match(
+    directiveSurface,
+    /Current-workspace authority refs and the selected construction template are sufficient when this output is absent/u
+  );
+  assert.match(directiveSurface, /without mining prior generated examples/u);
+  assert.match(prompt, /Read boundary: stay under the current workspace/u);
 });
 
 test("T-002 worker package and prompt carry declared product file targets", () => {

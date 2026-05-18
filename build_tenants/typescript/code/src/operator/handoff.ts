@@ -9,6 +9,7 @@
 // Implements: REQ-F-ODDSDLC-064
 
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -49,6 +50,8 @@ import {
   parseStringList
 } from "../shared/validation.js";
 import { admitExactContractEnum } from "../shared/fd_admission.js";
+import { admitDesignDepthRegisterFromArtifact } from "./design_depth_register.js";
+import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
 import {
   admitSdlcBlockingReason,
   canonicalSdlcPriorGapReasonCode,
@@ -99,8 +102,17 @@ import type {
   SdlcPostflightGapReason,
   SdlcPostflightGapReasonClass,
   SdlcFpEvaluateResult,
+  SdlcComponentDepthRegister,
+  SdlcComponentExecutionFailureRegister,
+  SdlcComponentExecutionFailureRow,
+  SdlcComponentRealizationRow,
   SdlcComponentRepairReentryPlan,
+  SdlcComponentRepairSchedule,
   SdlcComponentRepairScheduleRow,
+  SdlcComponentTestQualificationRow,
+  SdlcComponentTestRealizationRow,
+  SdlcDesignDepthRegister,
+  SdlcTestExecutionSurfaceRegister,
   SdlcProductMaterializationContract,
   SdlcAuthorityIndexCategory,
   SdlcAuthorityIndexEntry,
@@ -371,6 +383,16 @@ function materializationRolesForTarget(
 
 function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
   return targetAssetType === "test_execution_result_surface";
+}
+
+function installedOperatorOwnsEvaluationOutput(targetAssetType: string): boolean {
+  return (
+    targetAssetType === "component_realization_qualification_surface" ||
+    targetAssetType === "test_execution_result_surface" ||
+    targetAssetType === "component_test_qualification_surface" ||
+    targetAssetType === "component_repair_schedule_surface" ||
+    targetAssetType === "release_depth_parity_surface"
+  );
 }
 
 function declaredExecutionContract(input: string): boolean {
@@ -1880,7 +1902,7 @@ function executionCommandMatchesContract(input: {
   ) {
     return true;
   }
-  const shards = input.manifest.productMaterialization.executionShards;
+  const shards = installedOperatorExecutionShards(input.manifest);
   return (
     shards.length === 1 &&
     observedCommand === shards[0]?.command.trim().replace(/\s+/gu, " ")
@@ -4081,11 +4103,11 @@ function priorWorkerResultReportRefsForSourceAsset(input: {
       continue;
     }
     try {
-      const payload: unknown = JSON.parse(readFileSync(reportPath, "utf8"));
-      const record = objectRecord(payload);
+      const record = readArchivedWorkerResultReportRecord({
+        filePath: reportPath,
+        label: "PriorWorkerResultReport"
+      });
       if (
-        record !== null &&
-        record["kind"] === "odd_sdlc.worker_result_report" &&
         record["targetAssetType"] === input.assetType
       ) {
         refs.push(pathToFileURL(reportPath).href);
@@ -4534,23 +4556,26 @@ export function deriveWorkerHandoffManifest(input: {
   );
   const outputFileIsWorkspaceLocal =
     workspaceLocalSdlcSurfaceRelativePath(input.contract.targetAssetType) !== null;
-  const executionRepairMaterializationAllowed =
-    targetAdmitsTestExecutionEvidence(input.contract.targetAssetType);
-  const baseAllowedWriteRoots =
-    materialization.required ||
-    outputFileIsTenantLocal ||
-    executionRepairMaterializationAllowed
-      ? Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot])
-      : outputFileIsWorkspaceLocal
-        ? Object.freeze([outputRoot, archiveRoot, dirname(outputFile)])
-        : input.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY
-          ? Object.freeze([
-              outputRoot,
-              archiveRoot,
-              join(input.workspaceRoot, ".ai-workspace", "context"),
-              join(input.workspaceRoot, "specification")
-            ])
-          : Object.freeze([outputRoot, archiveRoot]);
+  const baseAllowedWriteRoots = (() => {
+    if (installedOperatorOwnsEvaluationOutput(input.contract.targetAssetType)) {
+      return Object.freeze([outputRoot, archiveRoot]);
+    }
+    if (materialization.required || outputFileIsTenantLocal) {
+      return Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot]);
+    }
+    if (outputFileIsWorkspaceLocal) {
+      return Object.freeze([outputRoot, archiveRoot, dirname(outputFile)]);
+    }
+    if (input.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY) {
+      return Object.freeze([
+        outputRoot,
+        archiveRoot,
+        join(input.workspaceRoot, ".ai-workspace", "context"),
+        join(input.workspaceRoot, "specification")
+      ]);
+    }
+    return Object.freeze([outputRoot, archiveRoot]);
+  })();
   const traversalObligationContext = deriveTraversalObligationContext({
     workspaceRoot: input.workspaceRoot,
     contract: input.contract,
@@ -5567,21 +5592,15 @@ function compactComponentDepthDirective(
       }
       return `${envelopeDirective} ${componentRealizationRowsDirective} For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier. Preserve source component boundaries from the composite implementation design authority.`;
     case "component_realization_qualification_surface":
-      return `${envelopeDirective} ${componentRealizationRowsDirective} Emit realization qualification with realized, missing, collapsed, and affected requirement ids.`;
+      return "Qualification edge worker role: read admitted component realization evidence and return bounded observations. The installed operator publishes the component_realization_qualification_surface carrier.";
     case "component_test_surface":
       return `${envelopeDirective} Emit payload.componentTestRows and preserve testClassId/testcase allocation from the composite test design authority.`;
     case "component_test_qualification_surface":
-      return (
-        `${envelopeDirective} Emit payload.componentTestQualificationRows with each row carrying ` +
-        `kind, testClassId, testcaseIds, componentIds, requirementIds, status, and evidenceRefs. ` +
-        `Use the literal field name status with one of passed, failed, blocked, pending, or unproven; ` +
-        `do not emit qualificationStatus or verdict as a substitute for status. ` +
-        `Failed rows must carry payload.componentExecutionFailureRegister evidence.`
-      );
+      return "Qualification edge worker role: read admitted component-test and test-execution evidence and return bounded observations. The installed operator publishes the component_test_qualification_surface carrier.";
     case "component_repair_schedule_surface":
-      return `${envelopeDirective} Emit payload.componentRepairSchedule from admitted failure rows only; repair rows must bind testcaseId, componentId, and requirementId.`;
+      return "Repair-schedule edge worker role: read admitted component execution failure evidence and return bounded observations. The installed operator publishes the component_repair_schedule_surface carrier.";
     case "release_depth_parity_surface":
-      return `${envelopeDirective} Emit payload.releaseDepthParity as met, blocked, or repriced from component topology, realization, test, repair, and execution evidence.`;
+      return "Release-depth edge worker role: read admitted realization, test, repair, archive, and execution evidence and return bounded observations. The installed operator publishes the release_depth_parity_surface carrier.";
     default:
       return null;
   }
@@ -5640,6 +5659,7 @@ function compactWorkspaceSpecSurfaceDirective(
   return [
     `Write the graph-owned workspace specification surface at \`${workspacePath}\`; do not treat this as conformance output.`,
     "Use workerInvocationPackage.targetCarrierProjection.constructionTemplate to organize content rows and preserve stable row refs.",
+    "Current-workspace authority refs and the selected construction template are sufficient when this output is absent; derive the surface from those refs without mining prior generated examples.",
     "The construction template is GTL typed construction shape for F_P clarity; it is not an assurance gate and does not close product meaning.",
     manifest.targetAssetType === "requirement_surface"
       ? "For requirement_surface, derive requirement rows from imported authority and current intent/product/goal pressure."
@@ -5679,6 +5699,12 @@ function compactExecutionEvidenceDirective(
   }
   if (!manifestAdmitsTestExecutionEvidence(manifest)) {
     return null;
+  }
+  if (manifest.targetAssetType === "test_execution_result_surface") {
+    return [
+      "Execution-result edge worker role: read the declared test execution contract and current workspace state for installed-operator execution.",
+      "The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier."
+    ].join(" ");
   }
   return [
     "Emit sdlc_worker_execution_evidence JSON for the declared test execution contract; executable product materialization must run or explicitly fail/pending its test contract before closure.",
@@ -5743,7 +5769,12 @@ function outcomeDirectivesForWorker(
 ): readonly string[] {
   const directives: string[] = [
     `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
-    `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
+    ...(installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)
+      ? [
+          `Framework-owned evaluation artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
+          "The installed operator derives and writes the selected evaluation artifact after this process exits."
+        ]
+      : [`Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`]),
     `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`,
     `Target carrier contract: ${manifest.targetCarrierProjection.targetCarrierContractRef}.`,
     `Target carrier digest: ${manifest.targetCarrierProjection.targetCarrierContractDigest}.`,
@@ -5769,7 +5800,7 @@ function outcomeDirectivesForWorker(
   const productFileTargets =
     productMaterializationAuthority.declaredProductFileTargets;
   const executionRepairMaterialization =
-    manifestAdmitsTestExecutionEvidence(manifest);
+    productMaterializationRequiresTestExecutionEvidence(manifest);
   if (!manifest.productMaterialization.required) {
     if (executionRepairMaterialization) {
       directives.push(
@@ -5777,6 +5808,11 @@ function outcomeDirectivesForWorker(
         "Do not add unrelated product scope; keep repairs limited to compile, discovery, or test failures observed by this execution edge.",
         `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}.`,
         `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`
+      );
+    } else if (installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)) {
+      directives.push(
+        "Product materialization is not part of this edge.",
+        "Worker role is observation over the selected evaluation inputs."
       );
     } else {
       directives.push(
@@ -5889,7 +5925,8 @@ function outcomeDirectivesForWorker(
         directives.push(
           "When declared product file targets are empty, derive the product source target set from admitted composite implementation design authority and materialize source files at payload.componentRealizationRows[].relativePath.",
           "Exclude role=test fileTargetRows, validator/proof-test component topology rows, and any test/ path from component_code_surface componentRealizationRows; those targets are consumed by component_test_surface.",
-          "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization."
+          "Build config files alone never satisfy required role source for component_code_surface; create source-role product files first, then add build/project files only as supporting materialization declared by admitted design authority.",
+          "For JavaScript .js source under an existing nearest package.json with type=module, emit module-compatible source syntax or use an extension path declared by admitted design authority."
         );
       }
     }
@@ -5898,8 +5935,8 @@ function outcomeDirectivesForWorker(
         "For component_test_surface, materialize developer test files for each declared test class/file and record Component Test Register evidence.",
         "When declared product file targets are empty, derive test product file targets from admitted composite test design and materialize them under selected output root; for node/javascript use test/<testClassId>.test.js unless admitted design names another tenant-root test path, and for other stacks choose a framework-discoverable test path under selected output root.",
         "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
-        "Generated tests must execute from the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; do not assume the workspace root is the process cwd unless the shard declares it.",
-        "For node/javascript tests, derive tenant and workspace paths from import.meta.url or process.cwd() plus the shard workingDirectory; proof-binding checks may execute workspace-root product paths by setting cwd explicitly, not by assuming the test runner cwd.",
+        "Generated test files are authored for the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; the installed operator executes the declared shard command after this transform returns.",
+        "For node/javascript tests, derive tenant and workspace paths inside the generated test from import.meta.url or process.cwd() plus the shard workingDirectory; keep module compatibility inside declared source/test files or admitted design-declared support files.",
         "Materialized tests must preserve declared testClassId; avoid local identifiers that collide with matcher words; prefer shouldEqual or parenthesized shouldBe RHS."
       );
     }
@@ -6652,7 +6689,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
           )}; outputRoot=${manifest.productMaterialization.selectedOutputRoot}; roles=${listForPrompt(
             effectiveProductMaterializationRequiredRoles(manifest)
           )}`
-        : manifestAdmitsTestExecutionEvidence(manifest)
+        : productMaterializationRequiresTestExecutionEvidence(manifest)
           ? `execution-repair scoped; tenant=${workerFacingPath(
               manifest,
               manifest.productMaterialization.tenantRoot
@@ -6698,7 +6735,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     manifest.productMaterialization.required
       ? "Product materialization is REQUIRED for this edge."
-      : manifestAdmitsTestExecutionEvidence(manifest)
+      : productMaterializationRequiresTestExecutionEvidence(manifest)
         ? "Product materialization is execution-repair scoped for this edge."
         : "Product materialization is not required for this edge.",
     "The framework writes reports, evidence carriers, ledgers, and closure after this process exits."
@@ -6853,6 +6890,44 @@ function admitAuthoritativeStageResultRef(input: {
     );
   }
   return ref;
+}
+
+function expectedArchivedFpEvaluateResultRef(reportFile: string): string {
+  return pathToFileURL(join(dirname(reportFile), "fp_evaluate_result.json")).href;
+}
+
+function readArchivedWorkerResultReportRecord(input: {
+  readonly filePath: string;
+  readonly label: string;
+}): Record<string, unknown> {
+  const record = parseClosedRecord(
+    JSON.parse(readFileSync(input.filePath, "utf8")),
+    input.label,
+    REPORT_FIELDS
+  );
+  const kind = parseNonEmptyString(record["kind"], `${input.label}.kind`);
+  if (kind !== "odd_sdlc.worker_result_report") {
+    throw new TypeError(`${input.label}.kind: unexpected report kind`);
+  }
+  const projectionRole = parseNonEmptyString(
+    record["projectionRole"],
+    `${input.label}.projectionRole`
+  );
+  if (projectionRole !== "typed_fp_stage_projection") {
+    throw new TypeError(
+      `${input.label}.projectionRole: expected typed_fp_stage_projection`
+    );
+  }
+  const authoritativeStageResultRef = parseNonEmptyString(
+    record["authoritativeStageResultRef"],
+    `${input.label}.authoritativeStageResultRef`
+  );
+  if (authoritativeStageResultRef !== expectedArchivedFpEvaluateResultRef(input.filePath)) {
+    throw new TypeError(
+      `${input.label}.authoritativeStageResultRef: expected same-archive fp_evaluate_result.json`
+    );
+  }
+  return record;
 }
 
 function parseArray<T>(
@@ -7650,30 +7725,79 @@ function filePathFromEvidenceRef(ref: string): string | null {
   return isAbsolute(ref) ? ref : null;
 }
 
+function isSdlcWorkerHandoffManifest(
+  value: unknown
+): value is SdlcWorkerHandoffManifest {
+  const record = objectRecord(value);
+  return (
+    record !== null &&
+    record["kind"] === "sdlc_worker_handoff_manifest" &&
+    typeof record["reportFile"] === "string" &&
+    typeof record["targetAssetType"] === "string" &&
+    objectRecord(record["productMaterialization"]) !== null
+  );
+}
+
+function readArchivedWorkerHandoffManifestForReport(input: {
+  readonly reportFile: string;
+  readonly label: string;
+}): SdlcWorkerHandoffManifest {
+  const manifestPath = join(dirname(input.reportFile), "handoff_manifest.json");
+  if (!existsSync(manifestPath) || !statSync(manifestPath).isFile()) {
+    throw new TypeError(`${input.label}.handoffManifest: missing sibling handoff_manifest.json`);
+  }
+  const parsed = parseJsonCandidate(readFileSync(manifestPath, "utf8"));
+  if (!parsed.ok) {
+    throw new TypeError(`${input.label}.handoffManifest: invalid JSON`);
+  }
+  const record = objectRecord(parsed.value);
+  if (record === null) {
+    throw new TypeError(`${input.label}.handoffManifest: expected object`);
+  }
+  if (!isSdlcWorkerHandoffManifest(parsed.value)) {
+    throw new TypeError(
+      `${input.label}.handoffManifest: expected sdlc worker handoff manifest shape`
+    );
+  }
+  const kind = parseNonEmptyString(
+    record["kind"],
+    `${input.label}.handoffManifest.kind`
+  );
+  if (kind !== "sdlc_worker_handoff_manifest") {
+    throw new TypeError(
+      `${input.label}.handoffManifest.kind: expected sdlc_worker_handoff_manifest`
+    );
+  }
+  const reportFile = parseNonEmptyString(
+    record["reportFile"],
+    `${input.label}.handoffManifest.reportFile`
+  );
+  if (resolve(reportFile) !== resolve(input.reportFile)) {
+    throw new TypeError(
+      `${input.label}.handoffManifest.reportFile: expected same-archive worker_result_report.json`
+    );
+  }
+  return parsed.value;
+}
+
 function readExecutionResultEvidenceFromReportRef(ref: string): {
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+  readonly sourceManifest: SdlcWorkerHandoffManifest | null;
   readonly error: string | null;
 } {
   const filePath = filePathFromEvidenceRef(ref);
   if (filePath === null || !existsSync(filePath) || !statSync(filePath).isFile()) {
     return Object.freeze({
       executionEvidence: null,
+      sourceManifest: null,
       error: "not a readable file evidence ref"
     });
   }
   try {
-    const payload: unknown = JSON.parse(readFileSync(filePath, "utf8"));
-    const record = parseClosedRecord(payload, "SourceWorkerResultReport", REPORT_FIELDS);
-    const kind = parseNonEmptyString(
-      record["kind"],
-      "SourceWorkerResultReport.kind"
-    );
-    if (kind !== "odd_sdlc.worker_result_report") {
-      return Object.freeze({
-        executionEvidence: null,
-        error: "unexpected report kind"
-      });
-    }
+    const record = readArchivedWorkerResultReportRecord({
+      filePath,
+      label: "SourceWorkerResultReport"
+    });
     const targetAssetType = parseNonEmptyString(
       record["targetAssetType"],
       "SourceWorkerResultReport.targetAssetType"
@@ -7681,7 +7805,19 @@ function readExecutionResultEvidenceFromReportRef(ref: string): {
     if (targetAssetType !== "test_execution_result_surface") {
       return Object.freeze({
         executionEvidence: null,
+        sourceManifest: null,
         error: `unexpected source target ${targetAssetType}`
+      });
+    }
+    const sourceManifest = readArchivedWorkerHandoffManifestForReport({
+      reportFile: filePath,
+      label: "SourceWorkerResultReport"
+    });
+    if (sourceManifest.targetAssetType !== "test_execution_result_surface") {
+      return Object.freeze({
+        executionEvidence: null,
+        sourceManifest: null,
+        error: `source manifest target mismatch ${sourceManifest.targetAssetType}`
       });
     }
     const executionEvidence = admitOptionalWorkerExecutionEvidence(
@@ -7695,15 +7831,17 @@ function readExecutionResultEvidenceFromReportRef(ref: string): {
       );
       return Object.freeze({
         executionEvidence: null,
+        sourceManifest: null,
         error: executionEvidenceErrors.length > 0
           ? `execution evidence invalid: ${executionEvidenceErrors.join("; ")}`
           : "execution evidence missing"
       });
     }
-    return Object.freeze({ executionEvidence, error: null });
+    return Object.freeze({ executionEvidence, sourceManifest, error: null });
   } catch (error) {
     return Object.freeze({
       executionEvidence: null,
+      sourceManifest: null,
       error: error instanceof Error ? error.message : String(error)
     });
   }
@@ -7723,6 +7861,11 @@ function archiveSourceExecutionResultDependencyError(input: {
       continue;
     }
     const executionEvidence = readResult.executionEvidence;
+    const sourceManifest = readResult.sourceManifest;
+    if (sourceManifest === null) {
+      attempts.push(`${ref}: source handoff manifest missing`);
+      continue;
+    }
     const blockers: SdlcBlockingReason[] = [];
     const evidenceRefs: string[] = [];
     if (executionEvidence.lane !== "test") {
@@ -7736,7 +7879,7 @@ function archiveSourceExecutionResultDependencyError(input: {
     }
     if (
       !executionCommandMatchesContract({
-        manifest: input.manifest,
+        manifest: sourceManifest,
         command: executionEvidence.command
       })
     ) {
@@ -7777,7 +7920,7 @@ function archiveSourceExecutionResultDependencyError(input: {
       );
     }
     evaluateExecutionShardEvidence({
-      manifest: input.manifest,
+      manifest: sourceManifest,
       executionEvidence,
       blockingReasonCarriers: blockers,
       evidenceRefs
@@ -7852,6 +7995,14 @@ function isExecutionByproductPath(relativePath: string): boolean {
     normalized === ".bsp" ||
     normalized.startsWith(".bsp/") ||
     normalized.includes("/.bsp/")
+  );
+}
+
+function isExecutionGeneratedBuildPropertiesPath(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  return (
+    normalized === "project/build.properties" ||
+    normalized.endsWith("/project/build.properties")
   );
 }
 
@@ -8406,8 +8557,21 @@ function priorAdmittedMaterializedFileForObservedPath(input: {
 function priorAdmittedMaterializedFileForObservedProductLineage(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly file: SdlcObservedProductFileSnapshot;
+  readonly postflightStatus?: "blocked" | "passed";
 }): PriorAdmittedObservedMaterializedFileLookup {
+  const expectedPostflightStatus = input.postflightStatus ?? "passed";
   for (const archiveRoot of productMaterializationReplayArchives(input.manifest)) {
+    const replayStatus = replayArchivePostflightStatus(archiveRoot);
+    if (
+      expectedPostflightStatus === "passed" &&
+      replayStatus !== "passed" &&
+      replayStatus !== "absent"
+    ) {
+      continue;
+    }
+    if (expectedPostflightStatus === "blocked" && replayStatus !== "blocked") {
+      continue;
+    }
     const manifestFile = join(archiveRoot, "product_materialization_manifest.json");
     if (!existsSync(manifestFile) || !statSync(manifestFile).isFile()) {
       continue;
@@ -8490,7 +8654,9 @@ function observeProductMaterializationDeltaWithDiagnostics(input: {
     }
     if (
       targetIgnoresExecutionByproducts(input.manifest.targetAssetType) &&
-      isExecutionByproductPath(file.relativePath)
+      (isExecutionByproductPath(file.relativePath) ||
+        (targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType) &&
+          isExecutionGeneratedBuildPropertiesPath(file.relativePath)))
     ) {
       continue;
     }
@@ -8527,6 +8693,27 @@ function observeProductMaterializationDeltaWithDiagnostics(input: {
     }
     if (priorAdmitted.kind === "diagnostic") {
       for (const diagnostic of priorAdmitted.diagnostics) {
+        diagnosticsByKey.set(
+          `${diagnostic.code}\n${diagnostic.detail}\n${diagnostic.evidenceRefs.join("\n")}`,
+          diagnostic
+        );
+      }
+      continue;
+    }
+    const priorRejected =
+      !input.manifest.productMaterialization.required && !changed
+        ? priorAdmittedMaterializedFileForObservedProductLineage({
+            manifest: input.manifest,
+            file,
+            postflightStatus: "blocked"
+          })
+        : Object.freeze({ kind: "none" as const });
+    if (priorRejected.kind === "file") {
+      observedByPath.set(file.relativePath, priorRejected.file);
+      continue;
+    }
+    if (priorRejected.kind === "diagnostic") {
+      for (const diagnostic of priorRejected.diagnostics) {
         diagnosticsByKey.set(
           `${diagnostic.code}\n${diagnostic.detail}\n${diagnostic.evidenceRefs.join("\n")}`,
           diagnostic
@@ -8792,6 +8979,775 @@ function extractExecutionEvidenceFromTransformArtifact(input: {
     executionEvidence: null,
     errors: Object.freeze(evidenceErrors)
   });
+}
+
+function writeStableJsonFile(filePath: string, payload: unknown): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, stableOperatorJson(payload), "utf8");
+}
+
+function componentDepthSurfaceFile(
+  manifest: SdlcWorkerHandoffManifest,
+  targetAssetType: string
+): string | null {
+  const relativePath = tenantLocalSdlcSurfaceRelativePath(targetAssetType);
+  if (relativePath === null) {
+    return null;
+  }
+  return join(manifest.productMaterialization.tenantRoot, relativePath);
+}
+
+function readAdmittedComponentDepthSurface(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly targetAssetType: string;
+}): SdlcComponentDepthRegister | null {
+  const outputFile = componentDepthSurfaceFile(
+    input.manifest,
+    input.targetAssetType
+  );
+  if (outputFile === null || !existsSync(outputFile)) {
+    return null;
+  }
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: input.targetAssetType,
+    outputFile
+  });
+  return admission.status === "admitted" ? admission.register : null;
+}
+
+function readAdmittedImplementationDesign(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcDesignDepthRegister | null {
+  const outputFile = componentDepthSurfaceFile(
+    manifest,
+    "implementation_design_surface"
+  );
+  if (outputFile === null || !existsSync(outputFile)) {
+    return null;
+  }
+  const admission = admitDesignDepthRegisterFromArtifact({
+    targetAssetType: "implementation_design_surface",
+    outputFile,
+    archiveRoot: manifest.archiveRoot
+  });
+  return admission.status === "admitted" ? admission.register : null;
+}
+
+function baseComponentDepthRegister(input: {
+  readonly targetAssetType: string;
+  readonly componentTopologyRows?: readonly SdlcComponentDepthRegister["componentTopologyRows"][number][];
+  readonly componentRealizationRows?: readonly SdlcComponentRealizationRow[];
+  readonly componentTestRows?: readonly SdlcComponentTestRealizationRow[];
+  readonly componentTestQualificationRows?: readonly SdlcComponentTestQualificationRow[];
+  readonly componentExecutionFailureRegister?: SdlcComponentExecutionFailureRegister | null;
+  readonly componentRepairSchedule?: SdlcComponentRepairSchedule | null;
+  readonly releaseDepthParity?: SdlcComponentDepthRegister["releaseDepthParity"];
+}): SdlcComponentDepthRegister {
+  return Object.freeze({
+    kind: "sdlc_component_depth_register" as const,
+    registerVersion: "ts-component-depth-v1" as const,
+    targetAssetType: input.targetAssetType,
+    componentTopologyRows: Object.freeze([
+      ...(input.componentTopologyRows ?? [])
+    ]),
+    componentRealizationRows: Object.freeze([
+      ...(input.componentRealizationRows ?? [])
+    ]),
+    testComponentTopologyRows: Object.freeze([]),
+    componentTestRows: Object.freeze([...(input.componentTestRows ?? [])]),
+    componentTestQualificationRows: Object.freeze([
+      ...(input.componentTestQualificationRows ?? [])
+    ]),
+    componentExecutionFailureRegister:
+      input.componentExecutionFailureRegister ?? null,
+    componentRepairSchedule: input.componentRepairSchedule ?? null,
+    releaseDepthParity: input.releaseDepthParity ?? null
+  });
+}
+
+function latestExecutionResultReportRefs(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  const operatorRunsRoot = join(
+    manifest.workspaceRoot,
+    deriveSdlcConformProjectProfileFromWorkspace(manifest.workspaceRoot)
+      .runtimeLayout.operatorRunRoot
+  );
+  if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
+    return Object.freeze([]);
+  }
+  const reports: { readonly filePath: string; readonly mtimeMs: number }[] = [];
+  for (const runId of readdirSync(operatorRunsRoot)) {
+    const filePath = join(operatorRunsRoot, runId, "worker_result_report.json");
+    if (
+      resolve(filePath) === resolve(manifest.reportFile) ||
+      !existsSync(filePath) ||
+      !statSync(filePath).isFile()
+    ) {
+      continue;
+    }
+    try {
+      const record = readArchivedWorkerResultReportRecord({
+        filePath,
+        label: "LatestExecutionResultReport"
+      });
+      if (
+        record["targetAssetType"] === "test_execution_result_surface"
+      ) {
+        reports.push(Object.freeze({ filePath, mtimeMs: statSync(filePath).mtimeMs }));
+      }
+    } catch {
+      continue;
+    }
+  }
+  return Object.freeze(
+    reports
+      .sort((left, right) => right.mtimeMs - left.mtimeMs)
+      .map((report) => pathToFileURL(report.filePath).href)
+  );
+}
+
+function latestAdmittedExecutionEvidence(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcWorkerExecutionEvidence | null {
+  for (const ref of latestExecutionResultReportRefs(manifest)) {
+    const readResult = readExecutionResultEvidenceFromReportRef(ref);
+    if (readResult.executionEvidence !== null) {
+      return readResult.executionEvidence;
+    }
+  }
+  return null;
+}
+
+function sanitizedCarrierId(input: string): string {
+  const sanitized = input
+    .trim()
+    .replace(/[^A-Za-z0-9_.:-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+  return sanitized.length > 0 ? sanitized : "unnamed";
+}
+
+function testRefForRow(
+  manifest: SdlcWorkerHandoffManifest,
+  row: SdlcComponentTestRealizationRow
+): string {
+  return pathToFileURL(join(manifest.productMaterialization.tenantRoot, row.relativePath))
+    .href;
+}
+
+function failureKindForExecutionEvidence(
+  evidence: SdlcWorkerExecutionEvidence | null
+): SdlcComponentExecutionFailureRow["failureKind"] {
+  if (evidence === null || evidence.status === "pending") {
+    return "execution_evidence_missing";
+  }
+  if ((evidence.failedCount ?? 0) > 0) {
+    return "assertion_failure";
+  }
+  return evidence.status === "failed" ? "runtime_exception" : "triage_gap";
+}
+
+function failureRowsForComponentTests(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
+  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+}): readonly SdlcComponentExecutionFailureRow[] {
+  if (
+    input.executionEvidence?.status === "succeeded" &&
+    (input.executionEvidence.failedCount ?? 0) === 0 &&
+    (input.executionEvidence.testsObserved ?? 0) > 0
+  ) {
+    return Object.freeze([]);
+  }
+  const evidenceRefs =
+    input.executionEvidence?.reportRefs ??
+    Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
+  const failureKind = failureKindForExecutionEvidence(input.executionEvidence);
+  const rows =
+    input.componentTestRows.length > 0
+      ? input.componentTestRows
+      : Object.freeze([
+          {
+            kind: "sdlc_component_test_realization_row" as const,
+            testClassId: "component-test-surface-missing",
+            relativePath: "design/component_test_surface.md",
+            testcaseIds: Object.freeze([]),
+            componentIds: Object.freeze([]),
+            requirementIds: Object.freeze([]),
+            shardId: null
+          }
+        ]);
+  return Object.freeze(
+    rows.map((row, index) => {
+      const shardId =
+        row.shardId ??
+        input.executionEvidence?.shardEvidence[index]?.shardId ??
+        input.executionEvidence?.shardEvidence[0]?.shardId ??
+        "unsharded";
+      return Object.freeze({
+        kind: "sdlc_component_execution_failure_row" as const,
+        failureId: `failure:${sanitizedCarrierId(row.testClassId)}:${sanitizedCarrierId(shardId)}`,
+        shardId,
+        moduleName:
+          input.executionEvidence?.shardEvidence.find(
+            (shard) => shard.shardId === shardId
+          )?.moduleName ?? "component-test",
+        testClassId: row.testClassId,
+        testcaseIds: row.testcaseIds,
+        componentIds: row.componentIds,
+        requirementIds: row.requirementIds,
+        failureKind,
+        repairTarget:
+          failureKind === "execution_evidence_missing"
+            ? "test_execution_surface"
+            : "component_code",
+        lawfulReentryPoint: "repair_worker_output",
+        attributionConfidence: "medium" as const,
+        sourceRefs: Object.freeze(row.componentIds.map((id) => `component:${id}`)),
+        testRefs: Object.freeze([testRefForRow(input.manifest, row)]),
+        evidenceRefs
+      });
+    })
+  );
+}
+
+function qualificationRowsForComponentTests(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
+  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+}): readonly SdlcComponentTestQualificationRow[] {
+  const status: SdlcComponentTestQualificationRow["status"] =
+    input.executionEvidence === null
+      ? "unproven"
+      : input.executionEvidence.status === "pending"
+        ? "pending"
+        : input.executionEvidence.status === "failed"
+          ? "failed"
+          : (input.executionEvidence.failedCount ?? 0) === 0 &&
+              (input.executionEvidence.testsObserved ?? 0) > 0
+            ? "passed"
+            : "blocked";
+  const evidenceRefs =
+    input.executionEvidence?.reportRefs ??
+    Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
+  return Object.freeze(
+    input.componentTestRows.map((row) =>
+      Object.freeze({
+        kind: "sdlc_component_test_qualification_row" as const,
+        testClassId: row.testClassId,
+        testcaseIds: row.testcaseIds,
+        componentIds: row.componentIds,
+        requirementIds: row.requirementIds,
+        status,
+        evidenceRefs
+      })
+    )
+  );
+}
+
+function repairScheduleForFailures(
+  failureRows: readonly SdlcComponentExecutionFailureRow[],
+  evidenceRefs: readonly string[]
+): SdlcComponentRepairSchedule {
+  return Object.freeze({
+    kind: "sdlc_component_repair_schedule" as const,
+    registerVersion: "ts-component-depth-v1" as const,
+    scheduleStatus:
+      failureRows.length > 0 ? "repair_required" as const : "no_repair_required" as const,
+    repairRows: Object.freeze(
+      failureRows.map((row) =>
+        Object.freeze({
+          kind: "sdlc_component_repair_schedule_row" as const,
+          scheduleId: `repair:${sanitizedCarrierId(row.failureId)}`,
+          failureId: row.failureId,
+          repairTarget: row.repairTarget,
+          lawfulReentryPoint: row.lawfulReentryPoint,
+          attributionConfidence: row.attributionConfidence,
+          testcaseIds: row.testcaseIds,
+          componentIds: row.componentIds,
+          requirementIds: row.requirementIds,
+          sourceRefs: row.sourceRefs,
+          testRefs: row.testRefs,
+          evidenceRefs: row.evidenceRefs
+        })
+      )
+    ),
+    evidenceRefs: uniqueSorted([
+      ...evidenceRefs,
+      ...failureRows.flatMap((row) => row.evidenceRefs)
+    ])
+  });
+}
+
+function latestAdmittedTestExecutionSurfaceRegister(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcTestExecutionSurfaceRegister | null {
+  const operatorRunsRoot = join(
+    manifest.workspaceRoot,
+    deriveSdlcConformProjectProfileFromWorkspace(manifest.workspaceRoot)
+      .runtimeLayout.operatorRunRoot
+  );
+  if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
+    return null;
+  }
+  const reports: { readonly filePath: string; readonly mtimeMs: number }[] = [];
+  for (const runId of readdirSync(operatorRunsRoot)) {
+    const filePath = join(operatorRunsRoot, runId, "worker_result_report.json");
+    if (
+      resolve(filePath) === resolve(manifest.reportFile) ||
+      !existsSync(filePath) ||
+      !statSync(filePath).isFile()
+    ) {
+      continue;
+    }
+    try {
+      const record = readArchivedWorkerResultReportRecord({
+        filePath,
+        label: "PriorTestExecutionSurfaceReport"
+      });
+      if (record["targetAssetType"] === "test_execution_surface") {
+        reports.push(Object.freeze({ filePath, mtimeMs: statSync(filePath).mtimeMs }));
+      }
+    } catch {
+      continue;
+    }
+  }
+  for (const report of reports.sort((left, right) => right.mtimeMs - left.mtimeMs)) {
+    try {
+      const record = readArchivedWorkerResultReportRecord({
+        filePath: report.filePath,
+        label: "PriorTestExecutionSurfaceReport"
+      });
+      const outputFile = parseNonEmptyString(
+        record["outputFile"],
+        "PriorTestExecutionSurfaceReport.outputFile"
+      );
+      const admission = admitTestExecutionSurfaceRegisterFromArtifact({
+        targetAssetType: "test_execution_surface",
+        outputFile
+      });
+      if (admission.status === "admitted") {
+        return admission.register;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function resolvePreparedExecutionWorkingDirectory(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly workingDirectory: string;
+}): string {
+  if (isAbsolute(input.workingDirectory)) {
+    return input.workingDirectory;
+  }
+  return resolve(input.manifest.workspaceRoot, input.workingDirectory);
+}
+
+function installedOperatorExecutionShards(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcProductMaterializationContract["executionShards"] {
+  if (manifest.targetAssetType !== "test_execution_result_surface") {
+    return manifest.productMaterialization.executionShards;
+  }
+  const register = latestAdmittedTestExecutionSurfaceRegister(manifest);
+  const preparedRows =
+    register?.testExecutionPreparationRows.filter((row) => row.status === "prepared") ??
+    Object.freeze([]);
+  if (preparedRows.length === 0) {
+    return manifest.productMaterialization.executionShards;
+  }
+  return Object.freeze(
+    preparedRows.map((row, index) =>
+      Object.freeze({
+        kind: "sdlc_execution_shard" as const,
+        shardId:
+          row.shardId ??
+          `test-shard-${String(index + 1).padStart(2, "0")}-${shardIdPart(row.moduleName)}`,
+        lane: "test" as const,
+        moduleName: row.moduleName,
+        command: row.command,
+        workingDirectory: resolvePreparedExecutionWorkingDirectory({
+          manifest,
+          workingDirectory: row.workingDirectory
+        }),
+        timeoutMs: DEFAULT_EXECUTION_SHARD_TIMEOUT_MS,
+        inactivityTimeoutMs: DEFAULT_EXECUTION_SHARD_INACTIVITY_TIMEOUT_MS,
+        expectedReportRefs: Object.freeze([row.scheduleRef]),
+        allowedByproductGlobs: Object.freeze(["target/**", ".bsp/**"]),
+        requiredEvidenceKind: "sdlc_worker_execution_evidence" as const,
+        retryPolicy: "same_shard_then_triage" as const
+      })
+    )
+  );
+}
+
+function installedOperatorShardTimeoutMs(shardTimeoutMs: number): number {
+  const override = Number.parseInt(
+    process.env["ODD_SDLC_INSTALLED_OPERATOR_SHARD_TIMEOUT_MS"] ?? "",
+    10
+  );
+  const cap = Number.isFinite(override) && override > 0 ? override : 15000;
+  return Math.min(shardTimeoutMs, cap);
+}
+
+const INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE = `
+const { spawn } = require("node:child_process");
+const input = JSON.parse(process.argv[1]);
+const child = spawn(input.command, {
+  cwd: input.cwd,
+  shell: true,
+  detached: true,
+  stdio: ["ignore", "pipe", "pipe"],
+  env: input.env
+});
+let stdout = "";
+let stderr = "";
+let timedOut = false;
+let settled = false;
+function killGroup(signal) {
+  try {
+    process.kill(-child.pid, signal);
+  } catch {}
+}
+function finish(result) {
+  if (settled) return;
+  settled = true;
+  clearTimeout(timeoutTimer);
+  clearTimeout(forceKillTimer);
+  clearTimeout(forceFinishTimer);
+  process.stdout.write(JSON.stringify({ ...result, stdout, stderr }));
+}
+const timeoutTimer = setTimeout(() => {
+  timedOut = true;
+  killGroup("SIGTERM");
+}, input.timeoutMs);
+const forceKillTimer = setTimeout(() => {
+  if (timedOut) killGroup("SIGKILL");
+}, input.timeoutMs + 1000);
+const forceFinishTimer = setTimeout(() => {
+  finish({ status: null, signal: "SIGKILL", error: "timeout", timedOut: true });
+}, input.timeoutMs + 3000);
+child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+child.on("error", (error) => {
+  finish({ status: null, signal: null, error: error.message, timedOut });
+});
+child.on("close", (status, signal) => {
+  finish({ status, signal, error: null, timedOut });
+});
+`;
+
+function runInstalledOperatorShardCommand(input: {
+  readonly command: string;
+  readonly cwd: string;
+  readonly timeoutMs: number;
+}): {
+  readonly status: number | null;
+  readonly signal: string | null;
+  readonly error: string | null;
+  readonly timedOut: boolean;
+  readonly stdout: string;
+  readonly stderr: string;
+} {
+  const env = installedOperatorShardEnvironment();
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE,
+      JSON.stringify({
+        command: input.command,
+        cwd: input.cwd,
+        timeoutMs: input.timeoutMs,
+        env
+      })
+    ],
+    {
+      encoding: "utf8",
+      env,
+      maxBuffer: 1024 * 1024 * 20,
+      timeout: input.timeoutMs + 5000
+    }
+  );
+  const raw = result.stdout?.trim() ?? "";
+  if (raw.length > 0) {
+    try {
+      const record = parseOpenRecord(JSON.parse(raw), "InstalledOperatorShardRun");
+      return Object.freeze({
+        status:
+          typeof record["status"] === "number" ? record["status"] : null,
+        signal:
+          typeof record["signal"] === "string" ? record["signal"] : null,
+        error:
+          typeof record["error"] === "string" ? record["error"] : null,
+        timedOut: record["timedOut"] === true,
+        stdout: typeof record["stdout"] === "string" ? record["stdout"] : "",
+        stderr: typeof record["stderr"] === "string" ? record["stderr"] : ""
+      });
+    } catch {
+      // Fall through to the wrapper-level result below.
+    }
+  }
+  return Object.freeze({
+    status: result.status,
+    signal: result.signal,
+    error: result.error instanceof Error ? result.error.message : null,
+    timedOut: result.error?.name === "TimeoutError",
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? ""
+  });
+}
+
+function installedOperatorShardEnvironment(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    if (key === "NODE_TEST_CONTEXT") {
+      continue;
+    }
+    env[key] = value;
+  }
+  return env;
+}
+
+function writeInstalledOperatorExecutionEvidence(
+  manifest: SdlcWorkerHandoffManifest
+): void {
+  const shards = installedOperatorExecutionShards(manifest);
+  const reportRefs: string[] = [];
+  const shardEvidence: SdlcWorkerExecutionShardEvidence[] = [];
+  for (const shard of shards) {
+    const result = runInstalledOperatorShardCommand({
+      command: shard.command,
+      cwd: shard.workingDirectory,
+      timeoutMs: installedOperatorShardTimeoutMs(shard.timeoutMs)
+    });
+    const shardRoot = `installed_operator_execution/${sanitizedCarrierId(shard.shardId)}`;
+    const stdoutPath = writeOperatorArchiveFile({
+      archiveRoot: manifest.archiveRoot,
+      relativePath: `${shardRoot}.stdout.log`,
+      payload: result.stdout ?? ""
+    });
+    const stderrPath = writeOperatorArchiveFile({
+      archiveRoot: manifest.archiveRoot,
+      relativePath: `${shardRoot}.stderr.log`,
+      payload: result.stderr ?? ""
+    });
+    const summaryPath = writeOperatorArchiveFile({
+      archiveRoot: manifest.archiveRoot,
+      relativePath: `${shardRoot}.summary.json`,
+      payload: {
+        kind: "sdlc_installed_operator_execution_shard_summary",
+        shardId: shard.shardId,
+        command: shard.command,
+        workingDirectory: shard.workingDirectory,
+        status: result.status,
+        signal: result.signal,
+        error: result.error,
+        timedOut: result.timedOut
+      }
+    });
+    const refs = Object.freeze([
+      pathToFileURL(summaryPath).href,
+      pathToFileURL(stdoutPath).href,
+      pathToFileURL(stderrPath).href
+    ]);
+    reportRefs.push(...refs);
+    const status: SdlcWorkerExecutionShardEvidence["status"] =
+      result.status === 0 ? "succeeded" : "failed";
+    shardEvidence.push(
+      Object.freeze({
+        kind: "sdlc_worker_execution_shard_evidence" as const,
+        shardId: shard.shardId,
+        moduleName: shard.moduleName,
+        lane: "test" as const,
+        command: shard.command,
+        status,
+        reportRefs: refs,
+        testsObserved: 1,
+        passedCount: status === "succeeded" ? 1 : 0,
+        failedCount: status === "succeeded" ? 0 : 1
+      })
+    );
+  }
+  const aggregate = aggregateShardExecutionEvidence(shardEvidence);
+  const status: SdlcWorkerExecutionEvidence["status"] =
+    shards.length === 0
+      ? "pending"
+      : shardEvidence.every((shard) => shard.status === "succeeded")
+        ? "succeeded"
+        : "failed";
+  if (shards.length === 0) {
+    const summaryPath = writeOperatorArchiveFile({
+      archiveRoot: manifest.archiveRoot,
+      relativePath: "installed_operator_execution/pending.summary.json",
+      payload: {
+        kind: "sdlc_installed_operator_execution_summary",
+        status: "pending",
+        reason: "no declared execution shards"
+      }
+    });
+    reportRefs.push(pathToFileURL(summaryPath).href);
+  }
+  const declaredCommand =
+    declaredExecutionContract(manifest.productMaterialization.testExecutionContract)
+      ? manifest.productMaterialization.testExecutionContract
+      : shardEvidence.map((shard) => shard.command).join(" && ") || "undeclared";
+  const executionEvidence: SdlcWorkerExecutionEvidence = Object.freeze({
+    kind: "sdlc_worker_execution_evidence" as const,
+    lane: "test" as const,
+    command: declaredCommand,
+    status,
+    reportRefs: uniqueSorted(reportRefs),
+    testsObserved: aggregate?.testsObserved ?? null,
+    passedCount: aggregate?.passedCount ?? null,
+    failedCount: aggregate?.failedCount ?? null,
+    shardEvidence: Object.freeze(shardEvidence)
+  });
+  writeStableJsonFile(manifest.outputFile, executionEvidence);
+}
+
+function writeInstalledOperatorComponentEvaluation(
+  manifest: SdlcWorkerHandoffManifest
+): void {
+  const artifactRef = pathToFileURL(manifest.outputFile).href;
+  if (manifest.targetAssetType === "component_realization_qualification_surface") {
+    const componentCode = readAdmittedComponentDepthSurface({
+      manifest,
+      targetAssetType: "component_code_surface"
+    });
+    const implementationDesign = readAdmittedImplementationDesign(manifest);
+    writeStableJsonFile(
+      manifest.outputFile,
+      baseComponentDepthRegister({
+        targetAssetType: manifest.targetAssetType,
+        componentTopologyRows:
+          componentCode?.componentTopologyRows ??
+          implementationDesign?.componentTopologyRows ??
+          Object.freeze([]),
+        componentRealizationRows:
+          componentCode?.componentRealizationRows ??
+          implementationDesign?.componentRealizationRows ??
+          Object.freeze([])
+      })
+    );
+    return;
+  }
+  if (manifest.targetAssetType === "component_test_qualification_surface") {
+    const componentTest = readAdmittedComponentDepthSurface({
+      manifest,
+      targetAssetType: "component_test_surface"
+    });
+    const componentTestRows = componentTest?.componentTestRows ?? Object.freeze([]);
+    const executionEvidence = latestAdmittedExecutionEvidence(manifest);
+    const failureRows = failureRowsForComponentTests({
+      manifest,
+      componentTestRows,
+      executionEvidence
+    });
+    writeStableJsonFile(
+      manifest.outputFile,
+      baseComponentDepthRegister({
+        targetAssetType: manifest.targetAssetType,
+        componentTestRows,
+        componentTestQualificationRows: qualificationRowsForComponentTests({
+          manifest,
+          componentTestRows,
+          executionEvidence
+        }),
+        componentExecutionFailureRegister:
+          failureRows.length === 0
+            ? null
+            : Object.freeze({
+                kind: "component_execution_failure_register" as const,
+                registerVersion: "ts-component-depth-v1" as const,
+                failureRows
+              })
+      })
+    );
+    return;
+  }
+  if (manifest.targetAssetType === "component_repair_schedule_surface") {
+    const qualification = readAdmittedComponentDepthSurface({
+      manifest,
+      targetAssetType: "component_test_qualification_surface"
+    });
+    const failureRows =
+      qualification?.componentExecutionFailureRegister?.failureRows ??
+      Object.freeze([]);
+    writeStableJsonFile(
+      manifest.outputFile,
+      baseComponentDepthRegister({
+        targetAssetType: manifest.targetAssetType,
+        componentTestRows: qualification?.componentTestRows ?? Object.freeze([]),
+        componentTestQualificationRows:
+          qualification?.componentTestQualificationRows ?? Object.freeze([]),
+        componentExecutionFailureRegister:
+          qualification?.componentExecutionFailureRegister ?? null,
+        componentRepairSchedule: repairScheduleForFailures(failureRows, [
+          componentDepthSurfaceFile(
+            manifest,
+            "component_test_qualification_surface"
+          ) ?? artifactRef
+        ].map((ref) => ref.startsWith("file://") ? ref : pathToFileURL(ref).href))
+      })
+    );
+    return;
+  }
+  if (manifest.targetAssetType === "release_depth_parity_surface") {
+    const repairRegister = readAdmittedComponentDepthSurface({
+      manifest,
+      targetAssetType: "component_repair_schedule_surface"
+    });
+    const schedule = repairRegister?.componentRepairSchedule ?? null;
+    const blockingReasons =
+      schedule === null
+        ? Object.freeze(["component_repair_schedule_missing"])
+        : schedule.scheduleStatus === "repair_required" ||
+            schedule.scheduleStatus === "triage_gap" ||
+            schedule.repairRows.length > 0
+          ? Object.freeze(schedule.repairRows.map((row) => row.failureId))
+          : Object.freeze([]);
+    writeStableJsonFile(
+      manifest.outputFile,
+      baseComponentDepthRegister({
+        targetAssetType: manifest.targetAssetType,
+        componentRepairSchedule: schedule,
+        releaseDepthParity: Object.freeze({
+          kind: "sdlc_release_depth_parity_assessment" as const,
+          status: blockingReasons.length === 0 ? "met" as const : "blocked" as const,
+          summary:
+            blockingReasons.length === 0
+              ? "Release depth parity is met by admitted component repair evidence."
+              : "Release depth parity is blocked by admitted component repair evidence.",
+          blockingReasons,
+          evidenceRefs: uniqueSorted([
+            artifactRef,
+            ...(schedule?.evidenceRefs ?? [])
+          ])
+        })
+      })
+    );
+  }
+}
+
+export function writeInstalledOperatorOwnedEvaluationArtifact(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): string | null {
+  if (!installedOperatorOwnsEvaluationOutput(input.manifest.targetAssetType)) {
+    return null;
+  }
+  if (input.manifest.targetAssetType === "test_execution_result_surface") {
+    writeInstalledOperatorExecutionEvidence(input.manifest);
+  } else {
+    writeInstalledOperatorComponentEvaluation(input.manifest);
+  }
+  return input.manifest.outputFile;
 }
 
 function requirementIdForObligation(obligationId: string): string | null {
@@ -9628,6 +10584,33 @@ function productMaterializationReplayArchives(
   );
 }
 
+function replayArchivePostflightStatus(
+  archiveRoot: string
+): "absent" | "blocked" | "invalid" | "passed" {
+  const postflightFile = join(archiveRoot, "postflight.json");
+  if (!existsSync(postflightFile) || !statSync(postflightFile).isFile()) {
+    return "absent";
+  }
+  try {
+    const postflight = parseOpenRecord(
+      JSON.parse(readFileSync(postflightFile, "utf8")),
+      "productMaterializationReplay.postflight"
+    );
+    return postflight["status"] === "passed"
+      ? "passed"
+      : postflight["status"] === "blocked"
+        ? "blocked"
+        : "invalid";
+  } catch {
+    return "invalid";
+  }
+}
+
+function replayArchivePostflightPassedOrAbsent(archiveRoot: string): boolean {
+  const status = replayArchivePostflightStatus(archiveRoot);
+  return status === "absent" || status === "passed";
+}
+
 type ProductMaterializationReplayManifestRead =
   | {
       readonly kind: "manifest";
@@ -9650,6 +10633,9 @@ function readProductMaterializationReplayManifest(input: {
 }): ProductMaterializationReplayManifestRead {
   const manifestFile = join(input.archiveRoot, "product_materialization_manifest.json");
   if (!existsSync(manifestFile) || !statSync(manifestFile).isFile()) {
+    return Object.freeze({ kind: "absent" as const });
+  }
+  if (!replayArchivePostflightPassedOrAbsent(input.archiveRoot)) {
     return Object.freeze({ kind: "absent" as const });
   }
   const manifestRef = pathToFileURL(manifestFile).href;
@@ -10033,7 +11019,7 @@ function evaluateMaterializedProductFiles(input: {
     }
   }
   const executionRepairMaterializationAllowed =
-    manifestAdmitsTestExecutionEvidence(input.manifest);
+    productMaterializationRequiresTestExecutionEvidence(input.manifest);
   if (
     !contract.required &&
     reportedProductFiles.length > 0 &&
@@ -10475,7 +11461,7 @@ function evaluateExecutionShardEvidence(input: {
   readonly blockingReasonCarriers: SdlcBlockingReason[];
   readonly evidenceRefs: string[];
 }): void {
-  const expectedShards = input.manifest.productMaterialization.executionShards;
+  const expectedShards = installedOperatorExecutionShards(input.manifest);
   if (expectedShards.length === 0) {
     return;
   }
@@ -10889,7 +11875,13 @@ export function evaluateWorkerResultPostflight(input: {
       })
     );
   }
-  if (!input.manifest.allowedWriteRoots.some((root) => pathIsInside(outputFile, root))) {
+  const frameworkOwnedEvaluationOutput =
+    installedOperatorOwnsEvaluationOutput(input.manifest.targetAssetType) &&
+    outputFile === resolve(input.manifest.outputFile);
+  if (
+    !frameworkOwnedEvaluationOutput &&
+    !input.manifest.allowedWriteRoots.some((root) => pathIsInside(outputFile, root))
+  ) {
     blockingReasonCarriers.push(
       makeSdlcBlockingReason({
         code: "output_file_outside_allowed_root",

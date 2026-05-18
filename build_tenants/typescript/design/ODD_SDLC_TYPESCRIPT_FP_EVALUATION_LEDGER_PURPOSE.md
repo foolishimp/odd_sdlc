@@ -15,9 +15,9 @@ admitted records of evaluator findings over a declared basis:
 
 ```text
 ABG calls plugin.odd_sdlc.<eval_role>.F_P
-plugin returns odd_sdlc findings
+plugin reads workspace state and returns odd_sdlc findings
 ABG/F_D admits or rejects those findings
-odd_sdlc records the admitted result in the owning ledger/register/projection
+the installed operator records the admitted result in the owning ledger/register/projection
 ```
 
 The event log records that calls, findings, admissions, observations, and
@@ -37,6 +37,11 @@ ConstructionIntent = admitted action intent
 
 No `F_P` eval writes authority directly. No ledger/register selects the next
 action by itself.
+
+`F_P.transform` is the only `F_P` role with workspace edit authority. Every
+other `F_P` role is read-only over workspace state and passes typed findings or
+parameters to the installed operator typed-carrier interface for deterministic
+write/admission.
 
 ## Evaluation Record Rule
 

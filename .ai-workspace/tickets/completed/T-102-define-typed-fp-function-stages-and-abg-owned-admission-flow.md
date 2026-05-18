@@ -18,8 +18,9 @@
 - review_status: closed_stdo_single_surface_no_debt
 - governing_requirements: `specification/requirements/18-typed-construction-algebra.md`
 - governing_design: `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_DETERMINISTIC_TRAVERSAL_STATE_MACHINE.md`
-- live_proof_workspace: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test81.TS.cl`
-- accepted_live_archive: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test81.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T093751760Z_pid4465`
+- live_proof_workspace: `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T114036171Z_pid75297/workspace`
+- accepted_live_archive: `/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T114036171Z_pid75297/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T124656017Z_pid75297`
+- motivating_data_mapper_archive: `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test81.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T093751760Z_pid4465`
 
 ## STDO Triage
 
@@ -39,8 +40,10 @@ through the full STDO stack:
 - TypeScript realization: the installed operator, handoff, postflight,
   blocking-reason, replay, and carrier-admission code implement the typed stage
   split and fold law.
-- Proof: deterministic tests and the accepted `data_mapper.test81.TS.cl` archive
-  prove the construction algebra computationally and axiomatically.
+- Proof: deterministic tests and the accepted post-fix T-132 hello-world live
+  archive prove the typed-stage authority shape computationally and
+  axiomatically. The earlier `data_mapper.test81.TS.cl` archive remains the
+  motivating failure archive, not the accepted T-102 proof archive.
 
 ## Single Surface
 
@@ -90,10 +93,12 @@ not a second report contract, and not deferred debt for another ticket.
   the just-admitted next-action projection before falling back to archive state.
 - `installed_operator.ts`, `blocking_reason.ts`, and `retry_forensics.ts` type
   output-token limit failures as same-edge retry or repair pressure.
-- `handoff.ts` keeps compile, discovery, and test non-zero exits inside the
-  execution-result edge until success or a hard blocker.
-- `handoff.ts` admits execution-repair scoped tenant source/test/build edits only
-  for execution-result edges.
+- `handoff.ts` delegates `test_execution_result_surface` execution-evidence
+  publication to the installed operator and rejects tenant product edits from
+  that evaluator-owned edge.
+- execution failure evidence routes repair pressure back through a constructive
+  `F_P.transform` materialization edge rather than letting the evaluator edit
+  product files.
 - `handoff.ts` preserves current observed product bytes and digests over stale
   replay manifest bytes while retaining replay lineage.
 - `handoff.ts` enforces role-sensitive product lineage: source/test product
@@ -130,8 +135,14 @@ Associated carrier-admission fixes retained under this ticket:
   - construction algebra sweep maps dispositions to next-action law
   - construction algebra sweep preserves vector relation law
   - construction algebra sweep separates evidence admission from edge permission
+  - cross-archive worker-report discovery rejects unstamped projections
+  - worker-asserted extra obligations and fulfillment without evidence are
+    rejected by postflight
+  - installed operator executes admitted `test_execution_surface` schedule rows
+    for `test_execution_result_surface`
   - stale replay/current bytes and auxiliary build config lineage regressions
-  - execution-repair containment regressions
+  - execution-result tenant-edit rejection and installed-operator evidence
+    publication regressions
 - `test_t058_spec_method_entrypoint.test.mjs`
   - closed graph-function targets resume archived post-close successors
   - later same-overlay successors are selected on re-entry
@@ -152,9 +163,9 @@ Associated carrier-admission fixes retained under this ticket:
 
 ## Live Proof
 
-Accepted archive:
+Accepted post-fix archive:
 
-`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test81.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T093751760Z_pid4465`
+`/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T114036171Z_pid75297/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T124656017Z_pid75297`
 
 Observed summary:
 
@@ -164,16 +175,29 @@ Observed summary:
 - `blockingReasons`: `[]`
 - `nextLawfulAction`: `disposition://close`
 
-The live proof closes T-102's construction-stage authority defect. T-171 remains
-the broader full test35 parity/refactor lane; it is not a deferral for T-102's
-typed stage authority.
+Typed-stage proof observed in that archive:
+
+- `worker_result_report.projectionRole`: `typed_fp_stage_projection`
+- `worker_result_report.authoritativeStageResultRef`: same-archive
+  `fp_evaluate_result.json`
+- `worker_result_report.fpTransformStatusSnapshot`: `returned`
+- `fp_evaluate_result.stageAuthority`: `typed_fp_stage_carriers`
+- `fp_evaluate_result.workerReportProjectionRef`: same-archive
+  `worker_result_report.json`
+- `sdlc_edge_fulfillment_ledger.admissionRefs` and `predecessorRefs` include
+  the same-archive `fp_evaluate_result.json`
+
+The earlier `data_mapper.test81.TS.cl` archive remains attached as the
+motivating archive for the defect. It predates the typed-stage carrier shape and
+does not prove T-102 closure. T-171 remains the broader full test35
+parity/refactor lane; it is not a deferral for T-102's typed stage authority.
 
 ## Verification
 
 - `npm run build:semantic` passed.
-- focused T-064 T-102 projection/output-limit lane passed `3/3`.
+- focused T-066 T-102 construction-algebra lane passed `13/13`.
 - `test_t064_installed_operator_ux.test.mjs` passed `14/14`.
-- `test_t066_product_materialization_contract.test.mjs` passed `85/85`.
+- `test_t066_product_materialization_contract.test.mjs` passed `90/90`.
 - focused T-093/T-101 installed retry/schedule lane passed `4/4`.
 - `npm run lint:semantic` passed.
 - `npm run lint:test-harness` passed.

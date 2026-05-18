@@ -1,0 +1,115 @@
+{
+  "kind": "odd_sdlc_t132_hello_world_live_rc3_proof_summary",
+  "scenarioArchiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330",
+  "workspace": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace",
+  "resumedFromArchiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T180931138Z_pid74330",
+  "repairedArchiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T182231248Z_pid42414",
+  "terminalArchiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T183009792Z_pid42414",
+  "terminalStatus": "converged",
+  "compressedEdges": [
+    "derive_intent_surface",
+    "derive_product_surface",
+    "derive_goal_surface",
+    "derive_requirement_surface",
+    "derive_uat_testcases_surface",
+    "derive_testcase_authority_surface",
+    "derive_feature_decomp_surface",
+    "derive_design_surface",
+    "derive_scenario_surface",
+    "derive_implementation_design_surface",
+    "derive_component_code_surface",
+    "qualify_component_realization_surface",
+    "derive_code_surface",
+    "derive_test_design_surface",
+    "derive_component_test_surface",
+    "prepare_test_execution_surface",
+    "derive_test_execution_result_surface",
+    "qualify_component_test_execution_surface",
+    "derive_component_repair_schedule_surface",
+    "derive_test_run_archive_surface",
+    "derive_release_depth_parity_surface",
+    "prepare_release_surface"
+  ],
+  "finalRows": [
+    {
+      "run": "20260518T175730448Z_pid74330",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T175730448Z_pid74330",
+      "edgeName": "derive_test_execution_result_surface",
+      "targetAssetType": "test_execution_result_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "admitted_with_open_obligations",
+      "postflightStatus": "passed"
+    },
+    {
+      "run": "20260518T180110721Z_pid74330",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T180110721Z_pid74330",
+      "edgeName": "qualify_component_test_execution_surface",
+      "targetAssetType": "component_test_qualification_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "passed",
+      "postflightStatus": "passed"
+    },
+    {
+      "run": "20260518T180627114Z_pid74330",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T180627114Z_pid74330",
+      "edgeName": "derive_component_repair_schedule_surface",
+      "targetAssetType": "component_repair_schedule_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "passed",
+      "postflightStatus": "passed"
+    },
+    {
+      "run": "20260518T180931138Z_pid74330",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T180931138Z_pid74330",
+      "edgeName": "derive_test_run_archive_surface",
+      "targetAssetType": "test_run_archive_surface",
+      "closureDisposition": "retry",
+      "fpEvaluateStatus": "blocked",
+      "postflightStatus": "blocked"
+    },
+    {
+      "run": "20260518T181301005Z_pid74330",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T181301005Z_pid74330",
+      "edgeName": "derive_test_run_archive_surface",
+      "targetAssetType": "test_run_archive_surface",
+      "closureDisposition": null,
+      "fpEvaluateStatus": null,
+      "postflightStatus": null
+    },
+    {
+      "run": "20260518T182231248Z_pid42414",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T182231248Z_pid42414",
+      "edgeName": "derive_test_run_archive_surface",
+      "targetAssetType": "test_run_archive_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "passed",
+      "postflightStatus": "passed"
+    },
+    {
+      "run": "20260518T182635841Z_pid42414",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T182635841Z_pid42414",
+      "edgeName": "derive_release_depth_parity_surface",
+      "targetAssetType": "release_depth_parity_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "admitted_with_open_obligations",
+      "postflightStatus": "passed"
+    },
+    {
+      "run": "20260518T183009792Z_pid42414",
+      "archiveRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260518T171756257Z_pid74330/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T183009792Z_pid42414",
+      "edgeName": "prepare_release_surface",
+      "targetAssetType": "release_surface",
+      "closureDisposition": "close",
+      "fpEvaluateStatus": "passed",
+      "postflightStatus": "passed"
+    }
+  ],
+  "verification": [
+    "npm run build:semantic",
+    "npm run lint:semantic",
+    "npm run lint:test-harness",
+    "node --test test_env/tests/test_t038_rc_qualification.test.mjs test_env/tests/test_t064_installed_operator_ux.test.mjs test_env/tests/test_t077_t083_assurance_ledgers.test.mjs test_env/tests/test_t118_worker_invocation_package.test.mjs test_env/tests/test_t168_design_consumer_test_pipeline.test.mjs",
+    "node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
+    "git diff --check"
+  ]
+}

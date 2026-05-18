@@ -114,11 +114,11 @@ import {
   deriveWorkerHandoffManifest,
   evaluateWorkerResultPostflight,
   readPostflightGapDossierRef,
-  readWorkerResultReport,
   operatorRunId,
   snapshotProductMaterializationRoot,
   stableOperatorJson,
   workerResultReportWithFpStageRefs,
+  writeInstalledOperatorOwnedEvaluationArtifact,
   writeHandoffFiles,
   writeFpEvaluateResult,
   writeOperatorArchiveFile,
@@ -2517,12 +2517,13 @@ function traversalConsequenceEvidenceRefs(input: {
 function fpEvaluateResultRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
-  if (
-    state.workerReport === null ||
-    state.postflight === null ||
-    !existsSync(state.manifest.fpEvaluateResultFile)
-  ) {
+  if (state.workerReport === null || state.postflight === null) {
     return Object.freeze([]);
+  }
+  if (!existsSync(state.manifest.fpEvaluateResultFile)) {
+    throw new TypeError(
+      "fp_evaluate_result.json missing for admitted worker report; ledger predecessor invariant violated"
+    );
   }
   return Object.freeze([pathToFileURL(state.manifest.fpEvaluateResultFile).href]);
 }
@@ -5196,50 +5197,54 @@ function compactRuntimeEventArchivePayload(
           reason: failurePostflight.blockingReasons.join(",")
         });
       }
+      const frameworkOwnedEvaluationArtifact =
+        writeInstalledOperatorOwnedEvaluationArtifact({ manifest });
+      if (frameworkOwnedEvaluationArtifact !== null) {
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "installed_operator_evaluation_artifact.json",
+          payload: {
+            kind: "sdlc_installed_operator_evaluation_artifact",
+            writerInterface: "writeInstalledOperatorOwnedEvaluationArtifact",
+            targetAssetType: manifest.targetAssetType,
+            outputFile: frameworkOwnedEvaluationArtifact
+          }
+        });
+      }
       let workerReport: SdlcWorkerResultReport | null = null;
       try {
-        workerReport = readWorkerResultReport(manifest);
-      } catch (error: unknown) {
-        let reportAdmissionError = error;
-        if (!existsSync(manifest.reportFile)) {
-          try {
-            workerReport = buildPostTransformWorkerResultReport({
-              manifest,
-              before: beforeMaterialization
-            });
-            writeOperatorArchiveFile({
-              archiveRoot: manifest.archiveRoot,
-              relativePath: "worker_result_report.json",
-              payload: workerReport
-            });
-            writeOperatorArchiveFile({
-              archiveRoot: manifest.archiveRoot,
-              relativePath: "post_transform_observation.json",
-              payload: {
-                kind: "sdlc_post_transform_observation",
-                sourceFunction: "worker.F_P.transform",
-                generatedFunction: "ABG.events",
-                previousReportAdmissionError:
-                  error instanceof Error ? error.message : "worker_report_missing",
-                materializedFileCount: workerReport.materializedFiles.length,
-                outputFile: workerReport.outputFile,
-                digest: workerReport.digest
-              }
-            });
-          } catch (postTransformError: unknown) {
-            reportAdmissionError = postTransformError;
+        workerReport = buildPostTransformWorkerResultReport({
+          manifest,
+          before: beforeMaterialization
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: workerReport
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "post_transform_observation.json",
+          payload: {
+            kind: "sdlc_post_transform_observation",
+            sourceFunction: "worker.F_P.transform",
+            generatedFunction:
+              frameworkOwnedEvaluationArtifact === null
+                ? "buildPostTransformWorkerResultReport"
+                : "installed_operator.writeInstalledOperatorOwnedEvaluationArtifact",
+            previousReportAdmissionError: null,
+            materializedFileCount: workerReport.materializedFiles.length,
+            outputFile: workerReport.outputFile,
+            digest: workerReport.digest
           }
-        }
+        });
+      } catch (error: unknown) {
         if (workerReport === null) {
           const rejectionPostflight = workerReportAdmissionPostflight({
             manifest,
             workerRun,
             reason:
-              reportAdmissionError instanceof Error
-                ? reportAdmissionError.message
-                : error instanceof Error
-                  ? error.message
-                  : "worker_report_rejected"
+              error instanceof Error ? error.message : "worker_report_rejected"
           });
           writeOperatorArchiveFile({
             archiveRoot: manifest.archiveRoot,
@@ -5276,8 +5281,8 @@ function compactRuntimeEventArchivePayload(
               ...rejectionPostflight.evidenceRefs,
               consequence.nextActionProjection.nextActionProjectionRef
             ]),
-              reason: rejectionPostflight.blockingReasons.join(",")
-            });
+            reason: rejectionPostflight.blockingReasons.join(",")
+          });
         }
       }
       if (workerReport === null) {
