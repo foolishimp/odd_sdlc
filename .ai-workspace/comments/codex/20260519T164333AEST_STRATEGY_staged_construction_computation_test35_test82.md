@@ -95,6 +95,47 @@ gap. Each residual belongs to its own subsurface, and closure should only fold
 when the residual ambiguity in that subsurface is proportional to the next
 lawful computation.
 
+## Operational Admission Shape
+
+The proportional residual axiom becomes enforceable when each abstraction
+surface emits a measured decomposition summary.
+
+Recommended carrier shape:
+
+```json
+{
+  "decompositionSummary": {
+    "stage": "requirements_to_designs",
+    "upstreamKind": "requirement",
+    "downstreamKind": "design",
+    "upstreamCount": 77,
+    "downstreamCount": 23,
+    "fanoutRatio": 3.35,
+    "maxAllowedFanoutRatio": 5,
+    "maxOwnedUpstreamPerDownstream": 8,
+    "overloadedDownstreamIds": [],
+    "underDecomposedDownstreamIds": [],
+    "unresolvedResidualCount": 0,
+    "residualRefs": []
+  }
+}
+```
+
+The exact thresholds belong on the selected product construction profile or
+edge assurance contract. The evaluator reads those thresholds and rejects the
+surface when:
+
+- fan-out exceeds the profile bound
+- one downstream object owns too many upstream obligations
+- a downstream object has no public boundary for the obligations it owns
+- residual ambiguity is carried outside the subsurface that owns it
+- a later materialization edge tries to compensate for a missing
+  decomposition summary
+
+This keeps the rule replayable. The evaluator does not need to guess whether a
+surface "feels shallow"; it checks admitted counts, ownership rows, boundary
+rows, and residual refs.
+
 ## What test35 Preserved
 
 test35 preserved the abstraction ladder.
@@ -121,6 +162,13 @@ been computed at a higher abstraction level.
 This is why test35 got deeper code. The important difference was not only that
 test35 had more files. It had a prior stage whose output made those files
 lawful and necessary.
+
+The test35 component names are evidence, not law. `TypeResolver`,
+`CastRegistry`, `RunReplayService`, `MorphismExecutor`, and
+`FidelityInvariantEngine` show that data_mapper's requirement set naturally
+decomposes below module-level facades. They should seed comparison ratios and
+review examples, but a current run must derive its component set from current
+requirements and design rather than copy test35 filenames into runtime policy.
 
 ## What test82 Proved
 
@@ -359,8 +407,9 @@ The staged computation model needs admission rules, not just prompt language.
 
 Recommended evaluator checks:
 
-1. Production code materialization requires an admitted module decomposition
-   unless the product is explicitly classified as trivial.
+1. Production code materialization requires an admitted module decomposition.
+   Trivial products still publish a one-module / one-component decomposition;
+   there is no escape hatch that bypasses decomposition admission.
 2. A component-code surface fails if a high-density requirement set is carried
    only by module-level facade files.
 3. A module decomposition surface fails if separable public responsibilities are
@@ -379,6 +428,27 @@ Recommended evaluator checks:
 
 These rules make the missing computation visible. A worker cannot close a
 later edge by compensating for a missing earlier abstraction stage.
+
+Measurable predicate sketch:
+
+- requirement density =
+  `ownedRequirementCount / max(1, substantiveComponentCount)`
+- high-density component =
+  `ownedRequirementCount > maxOwnedRequirementsPerComponent` or
+  `requirementDensity > maxRequirementDensityPerComponent`
+- substantive component =
+  a component row with a public boundary, owned requirement ids, admitted file
+  or package target, and at least one behavior-bearing implementation/test
+  responsibility
+- facade row =
+  a row or file with high owned requirement count and no public boundary, no
+  exported behavior-bearing symbol, or only package/re-export/rollup/status
+  wrapper content
+- under-decomposed module =
+  a module whose high-density requirements are carried by facade rows and no
+  admitted child component rows
+
+The numbers are profile data. The predicates are runtime law.
 
 ## Data Mapper Optimal Path
 
@@ -410,6 +480,22 @@ The target is not to recreate test35 by file count. The target is to recreate
 test35's computational boundary: abstract topology first, bounded
 materialization second.
 
+## T-171 Consequence
+
+This post does not invalidate the test82 RC4 runtime proof. It narrows what the
+proof can claim.
+
+test82 stands as evidence that T-171 closed the TypeScript runtime-authority
+defect: typed F_P stage authority, evaluator-owned admission, execution
+evidence, release ledgers, and closure projection all ran through the installed
+operator.
+
+test82 should not be cited as test35-depth product parity. If T-171 requires
+like-for-like code/test depth with test35, then T-171 remains open on that
+specific proof gate. If T-171 is scoped to runtime closure law, this staged
+computation work should be the next design-reframe ticket rather than hidden
+inside the RC4 closure narrative.
+
 ## Proposed Runtime Shape
 
 The TypeScript graph should make these surfaces explicit or strengthen existing
@@ -434,6 +520,11 @@ derive_test_execution_result_surface
 derive_test_run_archive_surface
 qualify_testcase_authority_surface
 ```
+
+`select_test_stack_profile` is intentionally a selection stage, not a plain
+derivation stage: it chooses among admitted evidence strategies and build
+tenant capabilities. If this distinction is not preserved in code, it should be
+renamed into the same carrier convention as the other stages.
 
 Steel-thread build and parallel build are traversal methods selected by the
 evaluator action over admitted dependency carriers. They are not separate target
@@ -462,6 +553,24 @@ The fix should remain under the single-surface rule:
 - do not encode data_mapper-specific file names into generic runtime law
 - do make staged computation, dependency isolation, and test lifecycle topology
   first-class admitted carriers
+
+## Realization Sequence
+
+The implementation should be staged so the runtime does not absorb all of this
+as one broad refactor:
+
+1. Add decomposition summaries and evaluator checks to the existing
+   implementation-design, component-code, testcase-authority, and component-test
+   carriers.
+2. Add or strengthen module dependency and test dependency carriers, then make
+   evaluator actions choose steel-thread or parallel traversal from those
+   admitted dependency maps.
+3. Make test stack profile selection explicit and admit defaulting only when the
+   selected evidence classes are satisfied by the implementation tenant.
+4. Add materialization admission checks for high-density/facade/under-decomposed
+   modules.
+5. Re-run data_mapper after those predicates exist; use test35 as comparison
+   evidence for ratios and depth, not as a filename template.
 
 ## Bottom Line
 
