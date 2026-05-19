@@ -577,10 +577,8 @@ derive_intent_surface
 -> derive_product_surface
 -> derive_goal_surface
 -> derive_requirement_surface
--> Eval_Action.zoom_or_continue(requirements_to_designs)
 -> derive_feature_decomp_surface
 -> derive_design_surface
--> Eval_Action.zoom_or_continue(designs_to_modules)
 -> derive_implementation_module_surface
 -> derive_module_dependency_map_surface
 -> Eval_Action.select_steel_thread_or_parallel_build_traversal
@@ -591,7 +589,6 @@ derive_intent_surface
 derive_requirement_surface
 -> derive_uat_testcases_surface
 -> derive_testcase_authority_surface
--> Eval_Action.zoom_or_continue(testcases_to_test_design)
 -> derive_test_design_surface
 -> select_test_stack_profile
 -> derive_test_module_surface
@@ -645,10 +642,12 @@ Stage justification:
 | `derive_release_depth_parity_surface` | parity/depth rollup over code, test, execution, and topology evidence | checks release depth against the selected profile and comparison target |
 | `prepare_release_surface` | release closure projection | closes only after upstream topology, materialization, execution, and parity evidence are admitted |
 
-## Zoom Function
+## Backlog Zoom Function
 
 `Eval_Action.zoom_or_continue` is the future traversal evaluator hook that
-prevents the graph from being fixed too coarsely.
+prevents the graph from being fixed too coarsely. It is split out of the active
+staged-graph work and belongs to backlog ticket
+`.ai-workspace/tickets/backlog/T-173-define-evaluator-zoom-admission-from-obligation-output-ratios.md`.
 
 After any abstraction stage, the evaluator compares input obligations to output
 entities:
@@ -691,7 +690,6 @@ TypeScript runtime must make explicit:
 ```text
 derive_requirement_surface
 derive_design_surface
-Eval_Action.zoom_or_continue
 derive_implementation_module_surface
 derive_module_dependency_map_surface
 Eval_Action.select_steel_thread_or_parallel_build_traversal
