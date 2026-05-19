@@ -39,6 +39,33 @@ should not jump from broad requirement/design pressure to coarse materialized
 files. It should compute topology, dependency, steel-thread order, and test
 topology before code and test construction begin.
 
+## Disambiguation Axiom
+
+The SDLC is a disambiguation pipeline.
+
+Each stage reduces the ambiguity carried by the prior stage:
+
+```text
+Req ambiguity
+-> design commitments
+-> module/component topology
+-> dependency ordering
+-> evaluator-selected traversal
+-> bounded source/test/build materialization
+-> deterministic code
+```
+
+Deterministic code is the highest level of disambiguation. It is where the
+remaining ambiguity has either been resolved into executable structure or
+preserved as an explicit defect, TODO, failing test, blocked obligation, or
+re-entry pressure.
+
+This is why collapsing abstraction stages into code generation is unsafe. It
+asks the final disambiguation stage to perform upstream ambiguity resolution
+while also materializing the deterministic artifact. That can produce compiling
+code, but it hides whether the ambiguity was actually resolved at the right
+level.
+
 ## What test35 Preserved
 
 test35 preserved the abstraction ladder.
