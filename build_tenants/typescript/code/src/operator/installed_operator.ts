@@ -4045,6 +4045,8 @@ function deriveInstalledTraversalConsequence(input: {
     ...inheritedPressure.downstreamTargetBindingRefs
   ]);
   const postActionBlockingReasonCarriers =
+    input.state.manifest.graphFunctionName ===
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
     fulfillmentProjection.nonConvergedReasonRefs.length === 0
       ? postProductMaterializationGraphTrackBlockingReasons({
           module,
@@ -4419,8 +4421,14 @@ function workerRunRateLimited(workerRun: SdlcWorkerRunResult): boolean {
     readOptionalWorkerTextPath(workerRun.stdoutPath),
     readOptionalWorkerTextPath(workerRun.stderrPath)
   ].join("\n");
-  return /rate_limit_event|api_error_status["']?\s*:?\s*429|monthly usage limit|rate limit|rate_limit/u.test(
-    text
+  return (
+    /api_error_status["']?\s*:?\s*429/u.test(text) ||
+    /monthly usage limit|quota exhausted|quota exceeded|rate limit exceeded|rate[- ]limited/u.test(
+      text
+    ) ||
+    /"type"\s*:\s*"rate_limit_event"[\s\S]*"rate_limit_info"\s*:\s*\{[\s\S]*"status"\s*:\s*"rejected"/u.test(
+      text
+    )
   );
 }
 

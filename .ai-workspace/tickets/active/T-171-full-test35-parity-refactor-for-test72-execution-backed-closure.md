@@ -9,7 +9,7 @@ priority: critical
 owner: odd_sdlc
 build_tenant: typescript
 created_at: 2026-05-17
-updated_at: 2026-05-18
+updated_at: 2026-05-19
 triaged_at: 2026-05-17
 activated_at: 2026-05-17
 goal: restore-test35-behavior-in-typescript-through-execution-backed-fp-closure
@@ -27,6 +27,9 @@ test35_surface_loading_policy: TS must load the target workspace's existing sour
 legacy_decommission_policy: every legacy TypeScript feature touched by this refactor must be classified as retain, derive, replace, or delete; unmapped appendages are non-closure
 current_closure_blocker: latest hello-world lifecycle run reached release closure but retried on framework-owned rollup/repair surfaces. Because hello-world is the simplest lifecycle lane, any framework-induced retry is a release-blocking defect. T-171 remains open on a fresh zero-retry hello-world lifecycle proof, the live data_mapper/test72 successor proof, and the test35 comparison.
 closure_acceptance_policy: T-171 closes only when a TS.t171 successor run supports a like-for-like lifecycle comparison against data_mapper.test35 and matches or improves the test35 behavior. The run must traverse the full graph through active generated tests, admit concrete test execution results, review failures, preserve residual pressure, perform bug-fix continuation when needed, and close only from execution-backed evidence.
+accepted_data_mapper_test82_workspace: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl
+accepted_data_mapper_test82_final_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T045221059Z_pid80159
+accepted_data_mapper_test82_execution_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T042607954Z_pid80159
 open_proof_gates:
   - live hello-world full graph run through derive_test_design_surface, derive_component_test_surface, prepare_test_execution_surface, derive_test_execution_result_surface, derive_test_run_archive_surface, release-depth parity, and prepare_release_surface with zero framework-induced retry or repair
   - live data_mapper test72 successor run admitting derive_test_execution_result_surface-class evidence with concrete pass/fail counts before release-level close
@@ -408,7 +411,7 @@ Unclassified legacy code is non-closure.
 - [ ] Postflight conformance is positioned as admission/diagnostic support, not product-content closure.
 - [x] Deterministic test proves closure on an execution-required edge fails when execution evidence is absent.
 - [x] Test execution result is a first-class graph/evidence product required before product close.
-- [ ] Live data_mapper successor run admits at least one `derive_test_execution_result_surface`-class event with concrete pass/fail counts and runtime command evidence before release-level close.
+- [x] Live data_mapper successor run admits at least one `derive_test_execution_result_surface`-class event with concrete pass/fail counts and runtime command evidence before release-level close.
 - [x] UAT testcase generation and testcase authority qualification are present or explicitly consolidated while preserving the invariant that test pressure exists before design construction.
 - [x] Test implementation, execution preparation, run archive, and execution result are present or explicitly consolidated while preserving the invariant that execution result evidence is admitted before product closure.
 - [x] Implementation module, stack/profile selection, product materialization, and release preparation surfaces are present or explicitly consolidated while preserving implementation replay visibility and release wait-for-execution invariants.
@@ -422,7 +425,7 @@ Unclassified legacy code is non-closure.
 - [x] Retry classification treats framework carrier/parser/prompt shape drift as failure.
 - [ ] Hello-world no-op path has no framework-induced retry.
 - [ ] Live hello-world full-graph scenario drives past component-code materialization into generated test design, component tests, test execution preparation, execution result admission, test run archive, release-depth parity, and release preparation without framework-induced retry or repair.
-- [ ] Data_mapper test72 successor run admits execution result evidence and can be compared against test35 edge by edge.
+- [x] Data_mapper test72 successor run admits execution result evidence and can be compared against test35 edge by edge.
 - [ ] TS.t171/data_mapper lifecycle comparison shows the TypeScript run matches or improves test35 on edge sequence, active test execution, result review, residual pressure, bug-fix continuation, and final release closure evidence.
 - [ ] Superseded closure and prompt paths are deleted, not retained as compatibility debt.
 - [ ] Superseded T-170-era closure and prompt helpers are no longer imported by active runtime paths.
@@ -475,6 +478,77 @@ The audit must include:
 - the analyzer markdown and JSON paths
 - the test35-to-test72 edge/timing/prompt/ledger/artifact comparison update
 - a statement that no compatibility bridge remains for the superseded T-168/T-169/T-170 behavior
+
+## 2026-05-19 Data Mapper Test82 Live Proof
+
+Workspace:
+`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl`.
+
+Command:
+
+```sh
+cd /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl
+node /Users/jim/src/apps/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.js start --workspace . --target next --until converged --worker 'process://claude?model=sonnet&effort=xhigh'
+```
+
+Final archive:
+`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T045221059Z_pid80159`.
+
+Result: terminal status `converged`, final edge `prepare_release_surface`,
+`sdlc_edge_closure_decision.disposition = close`,
+`targetCarrierAdmissionStatus = admitted`, and no reason/gap/residual refs.
+The final fulfillment ledger has `admitted = true`,
+`targetCertificationPassed = true`, `fulfillmentConverged = true`,
+`carryConverged = true`, `fdRecheckPassed = true`,
+`edgeConverged = true`, and counts `expected = 1048`,
+`fulfilled = 1048`, `partial = 0`, `blocked = 0`, `missing = 0`,
+`extra = 0`.
+
+Execution evidence archive:
+`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T042607954Z_pid80159`.
+
+`derive_test_execution_result_surface` closed with
+`targetCarrierAdmissionStatus = admitted`; its fulfillment ledger has
+`edgeConverged = true`, `fdRecheckPassed = true`, counts
+`expected = 437`, `fulfilled = 437`, and zero residual pressure. All seven
+installed-operator execution shards succeeded with `status = 0` and
+`timedOut = false`: `test-shard-01-cdme-compiler`,
+`test-shard-02-cdme-assurance`, `test-shard-03-cdme-executor`,
+`test-shard-04-cdme-adjoint`, `test-shard-05-cdme-accounting`,
+`test-shard-06-cdme-fidelity`, and `test-shard-07-cdme-engine`.
+
+Downstream proof edges also closed:
+`qualify_component_test_execution_surface`
+(`20260519T043817048Z_pid80159`, counts `932/932`),
+`derive_component_repair_schedule_surface`
+(`20260519T044158522Z_pid80159`, counts `932/932`),
+`derive_test_run_archive_surface`
+(`20260519T044538672Z_pid80159`, counts `1052/1052`),
+`derive_release_depth_parity_surface`
+(`20260519T044848013Z_pid80159`, counts `1/1`), and
+`prepare_release_surface`
+(`20260519T045221059Z_pid80159`, counts `1048/1048`).
+
+Fixes proven by this run:
+
+- installed-operator shard execution honors the manifest shard timeout by default instead of applying the former 15s cap
+- `derive_test_execution_result_surface` no longer inherits the post-materialization graph-track blocking reason that forced `fdRecheckPassed = false`
+- execution-result closure is backed by operator-admitted shard evidence before release-level close
+- the release-depth parity prompt leak observed in this run was corrected immediately after the proof by marking the tenant-local path as a framework-owned current replay/admission path and explicitly saying not to write it
+
+RC4 release cut:
+`.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4`.
+
+RC4 proof summary:
+`.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4/t171-data-mapper-test82-rc4-proof-summary.json`.
+
+RC4 deterministic gates:
+
+- `npm run test:semantic` passed: `643/643`
+- `npm run lint:semantic` passed
+- `npm run lint:test-harness` passed
+- `git diff --check` passed
+- `odd-sdlc-ts release-cut --archive-root .ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4` passed
 
 ## Gate Audit Notes
 
@@ -998,9 +1072,9 @@ required framework-induced retry/repair. A valid hello-world lifecycle RC gate
 must reach generated test design, component test materialization, test execution
 preparation, execution-result admission with concrete pass/fail counts, test-run
 archive, release-depth parity, and release preparation with zero framework
-retry. This is not a final release and does not close T-171: the zero-retry
-hello-world proof, data_mapper/test72 successor proof, and test35 comparison
-remain open.
+retry. This is not a final release and does not close T-171: the accepted
+data_mapper `test82` proof is recorded above, while the zero-retry hello-world
+proof and test35 comparison remain open.
 
 The fast default lane may use local-spawn; the separate PTY preconfigured lane
 must also remain available as a live regression guard.

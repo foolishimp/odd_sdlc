@@ -241,8 +241,8 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
   assert.equal(outcome.postflight.status, "blocked");
   assert(
-    outcome.postflight.blockingReasons.some((reason) =>
-      reason.startsWith("obligation_unassessed:")
+    outcome.postflight.blockingReasonCarriers.some(
+      (reason) => reason.code.startsWith("materialized_product_")
     )
   );
   assert(outcome.traversalConsequence);

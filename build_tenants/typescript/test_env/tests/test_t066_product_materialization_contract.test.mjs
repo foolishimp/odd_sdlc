@@ -6252,7 +6252,7 @@ test("T-115 failed execution evidence with zero observed tests is admitted for r
   );
 });
 
-test("T-115 execution-result prompt delegates execution evidence to installed operator", () => {
+test("T-115 execution-result prompt allows repair while delegating evidence to installed operator", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
@@ -6262,6 +6262,10 @@ test("T-115 execution-result prompt delegates execution evidence to installed op
     edgeName: contract.edgeName,
     vectorIndex: 26,
     contract,
+    conformedProject: {
+      ...deriveSdlcConformProjectProfileFromWorkspace(workspace),
+      testExecutionContract: "sbt test"
+    },
     projectConstraints: constraints,
     runId: "t115-executed-compile-failure-prompt"
   });
@@ -6270,15 +6274,15 @@ test("T-115 execution-result prompt delegates execution evidence to installed op
 
   assert.equal(
     manifest.allowedWriteRoots.includes(manifest.productMaterialization.tenantRoot),
-    false
+    true
   );
   assert.match(prompt, /Framework-owned evaluation artifact/u);
   assert.match(
     prompt,
     /The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier/u
   );
-  assert.doesNotMatch(prompt, /Product materialization is execution-repair scoped/u);
-  assert.doesNotMatch(prompt, /repair the product source\/test\/build files/u);
+  assert.match(prompt, /Product materialization is execution-repair scoped/u);
+  assert.match(prompt, /may edit product source\/test\/build files/u);
   assert.doesNotMatch(prompt, /productMaterialization\.executionShards exactly/u);
   assert.doesNotMatch(prompt, /Do not emit failed execution evidence/u);
   assert.doesNotMatch(
@@ -6291,7 +6295,7 @@ test("T-115 execution-result prompt delegates execution evidence to installed op
   );
 });
 
-test("T-102 execution-result postflight rejects tenant product edits", () => {
+test("T-102 execution-result postflight admits scoped tenant repair edits", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
@@ -6301,6 +6305,10 @@ test("T-102 execution-result postflight rejects tenant product edits", () => {
     edgeName: contract.edgeName,
     vectorIndex: 26,
     contract,
+    conformedProject: {
+      ...deriveSdlcConformProjectProfileFromWorkspace(workspace),
+      testExecutionContract: "sbt test"
+    },
     projectConstraints: constraints,
     runId: "t102-execution-repair-materialization"
   });
@@ -6358,10 +6366,10 @@ test("T-102 execution-result postflight rejects tenant product edits", () => {
   const report = readWorkerResultReport(manifest);
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
 
-  assert.equal(postflight.status, "blocked");
+  assert.equal(postflight.status, "passed");
   assert.equal(
     postflight.blockingReasons.includes("unexpected_product_materialization_for_surface_edge"),
-    true,
+    false,
     JSON.stringify(postflight.blockingReasons)
   );
 });
@@ -7321,8 +7329,11 @@ test("T-100 component-test postflight admits materialized tests before execution
 
   assert.match(prompt, /For component_test_surface, materialize developer test files/);
   assert.match(prompt, /payload\.componentTestRows/u);
+  assert.match(prompt, /componentTestRows\[\]\.requirementIds is the carrier field/u);
+  assert.match(prompt, /must be a string array/u);
   assert.match(prompt, /payload\.componentTestRows\[\]\.relativePath must name/);
   assert.match(prompt, /evidence archives, not product test files/);
+  assert.match(prompt, /On schema-local re-entry, repair the rejected component_depth_register fields first/u);
   assert.match(prompt, /Materialized tests must preserve declared testClassId/);
   assert.match(prompt, /avoid local identifiers that collide with matcher words/u);
   assert.match(prompt, /prefer shouldEqual or parenthesized shouldBe RHS/u);
@@ -7877,16 +7888,23 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     /pass\/fail counts/u,
     /obligation ledgers/u,
     /gap ledgers/u,
-    /next-tranche selectors/u
+    /next-tranche selectors/u,
+    /Worker-fillable target carrier fields/u,
+    /tenant-local SDLC surface artifact path/u
   ];
 
   for (const [index, contract] of constructSdlcHookContractCatalog().entries()) {
+    const conformedProject = deriveSdlcConformProjectProfileFromWorkspace(workspace);
     const manifest = deriveWorkerHandoffManifest({
       workspaceRoot: workspace,
       graphFunctionName: contract.edgeName,
       edgeName: contract.edgeName,
       vectorIndex: index,
       contract,
+      conformedProject:
+        contract.targetAssetType === "test_execution_result_surface"
+          ? { ...conformedProject, testExecutionContract: "sbt test" }
+          : conformedProject,
       projectConstraints: constraints,
       traversalAttemptEnvelope: t102FullBreadthTraversalAttemptEnvelope(
         contract.edgeName
@@ -7946,10 +7964,25 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
           (root) =>
             resolve(root) === resolve(manifest.productMaterialization.tenantRoot)
         ),
-        false,
+        contract.targetAssetType === "test_execution_result_surface",
         label
       );
       assert.match(prompt, /The installed operator .*publishes/u, label);
+      if (contract.targetAssetType === "release_depth_parity_surface") {
+        assert.match(
+          prompt,
+          /Framework-owned tenant-local SDLC surface path for current replay\/admission/u,
+          label
+        );
+        assert.match(prompt, /do not write this path/u, label);
+        assert.equal(
+          invocationPackage.outcomeDirectives.some((directive) =>
+            /do not write this path/u.test(directive)
+          ),
+          true,
+          label
+        );
+      }
       for (const pattern of forbiddenInstalledOperatorOwnedPatterns) {
         assert.doesNotMatch(prompt, pattern, label);
       }
@@ -8328,22 +8361,27 @@ test("T-102 axiomatic construction algebra sweep separates evidence admission fr
       executionShards: false
     },
     {
-      className: "execution-evidence owned",
+      className: "execution-repair scoped",
       edgeName: "derive_test_execution_result_surface",
       required: false,
-      tenantWritable: false,
+      tenantWritable: true,
       executionShards: true
     }
   ];
 
   for (const row of permissionRows) {
     const contract = hookContractByEdgeName(row.edgeName);
+    const conformedProject = deriveSdlcConformProjectProfileFromWorkspace(workspace);
     const manifest = deriveWorkerHandoffManifest({
       workspaceRoot: workspace,
       graphFunctionName: "bootstrap_release_self_test",
       edgeName: contract.edgeName,
       vectorIndex: 26,
       contract,
+      conformedProject:
+        contract.targetAssetType === "test_execution_result_surface"
+          ? { ...conformedProject, testExecutionContract: "sbt test" }
+          : conformedProject,
       projectConstraints: constraints,
       runId: `t102-permission-${row.className.replaceAll(/[^a-z]+/gu, "-")}`
     });
@@ -8363,6 +8401,21 @@ test("T-102 axiomatic construction algebra sweep separates evidence admission fr
       row.className
     );
   }
+});
+
+test("T-171 installed-operator shard runner honors manifest timeout unless explicitly capped", () => {
+  const handoffSource = readFileSync(
+    resolve(PACKAGE_ROOT, "code/src/operator/handoff.ts"),
+    "utf8"
+  );
+  const start = handoffSource.indexOf("function installedOperatorShardTimeoutMs");
+  const end = handoffSource.indexOf("const INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE", start);
+  assert(start >= 0, "installedOperatorShardTimeoutMs must remain visible in handoff source");
+  assert(end > start, "installedOperatorShardTimeoutMs source slice must be bounded");
+  const timeoutPolicySource = handoffSource.slice(start, end);
+  assert.match(timeoutPolicySource, /Math\.min\(shardTimeoutMs, override\)/);
+  assert.match(timeoutPolicySource, /return shardTimeoutMs;/);
+  assert.doesNotMatch(timeoutPolicySource, /15000/);
 });
 
 test("T-066 installed data_mapper successor materializes source and behavioral test inventory", async () => {

@@ -409,12 +409,30 @@ function declaredExecutionContract(input: string): boolean {
 function productMaterializationRequiresTestExecutionEvidence(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
+  return productMaterializationHasExecutionRepairScope({
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    productMaterialization: manifest.productMaterialization
+  });
+}
+
+function productMaterializationHasExecutionRepairScope(input: {
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+  readonly productMaterialization: SdlcProductMaterializationContract;
+}): boolean {
+  if (
+    input.targetAssetType === "test_execution_result_surface" &&
+    declaredExecutionContract(input.productMaterialization.testExecutionContract)
+  ) {
+    return true;
+  }
   return (
-    (manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
-    manifest.targetAssetType === "component_code_surface" &&
-    manifest.productMaterialization.required &&
-    declaredExecutionContract(manifest.productMaterialization.testExecutionContract)
+    (input.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
+      input.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
+    input.targetAssetType === "component_code_surface" &&
+    input.productMaterialization.required &&
+    declaredExecutionContract(input.productMaterialization.testExecutionContract)
   );
 }
 
@@ -4557,6 +4575,15 @@ export function deriveWorkerHandoffManifest(input: {
   const outputFileIsWorkspaceLocal =
     workspaceLocalSdlcSurfaceRelativePath(input.contract.targetAssetType) !== null;
   const baseAllowedWriteRoots = (() => {
+    if (
+      productMaterializationHasExecutionRepairScope({
+        edgeName: input.edgeName,
+        targetAssetType: input.contract.targetAssetType,
+        productMaterialization: materialization
+      })
+    ) {
+      return Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot]);
+    }
     if (installedOperatorOwnsEvaluationOutput(input.contract.targetAssetType)) {
       return Object.freeze([outputRoot, archiveRoot]);
     }
@@ -5590,11 +5617,24 @@ function compactComponentDepthDirective(
       if (manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET) {
         return "No component-depth schema is required for declared-product materialization; close over observed product files, requirement trace evidence, and traversal consequence.";
       }
-      return `${envelopeDirective} ${componentRealizationRowsDirective} For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier. Preserve source component boundaries from the composite implementation design authority.`;
+      return [
+        envelopeDirective,
+        componentRealizationRowsDirective,
+        "For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier.",
+        "Preserve source component boundaries from the composite implementation design authority.",
+        "On re-entry with Current evaluated gaps, make the listed blocker the first materialization target: inspect the cited product file and its nearest dependency authority, perform the minimal source repair, then update the component_depth_register evidence for that repaired row.",
+        "Bounded repair order: before the first edit, read at most worker_construction_brief plus the cited gap evidence file, the target source file, and one directly imported dependency file when needed."
+      ].join(" ");
     case "component_realization_qualification_surface":
       return "Qualification edge worker role: read admitted component realization evidence and return bounded observations. The installed operator publishes the component_realization_qualification_surface carrier.";
     case "component_test_surface":
-      return `${envelopeDirective} Emit payload.componentTestRows and preserve testClassId/testcase allocation from the composite test design authority.`;
+      return [
+        envelopeDirective,
+        "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` and fields testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId.",
+        "componentTestRows[].requirementIds is the carrier field and must be a string array; product-file materialization records may use requirementTraceObligationIds, but componentTestRows must not.",
+        "Preserve testClassId/testcase allocation from the composite test design authority.",
+        "On schema-local re-entry, repair the rejected component_depth_register fields first, then update only the affected test-file tags or register rows named by Current evaluated gaps."
+      ].join(" ");
     case "component_test_qualification_surface":
       return "Qualification edge worker role: read admitted component-test and test-execution evidence and return bounded observations. The installed operator publishes the component_test_qualification_surface carrier.";
     case "component_repair_schedule_surface":
@@ -5675,9 +5715,12 @@ function compactDesignDepthDirective(
   switch (manifest.targetAssetType) {
     case "implementation_design_surface":
       return [
-        "Apply workerInvocationPackage.targetCarrierProjection.constructionTemplate as the authoritative implementation-design carrier shape.",
+        "Apply worker_construction_brief.targetCarrierProjection.constructionTemplate as the authoritative implementation-design carrier shape; do not read worker_invocation_package for this shape unless worker_construction_brief is missing the field.",
         "Emit a fenced `json design_depth_register` carrier that conforms to constructionTemplate.payloadTemplate and constructionTemplate.rowTemplates; do not learn the schema from F_D retries.",
         "Treat the construction template as shape and disambiguation only; content quality is evaluated from requirement, design, obligation, and assurance evidence.",
+        "Write the ADR incrementally: create the file skeleton first, then append bounded sections. Do not draft the whole ADR or JSON carrier in assistant reasoning before a file write.",
+        "Hard output bound: keep the Markdown artifact under 450 lines, keep each write/edit payload under 180 lines, and use compact rows with source refs rather than copying upstream authority text.",
+        "Hard carrier bound: emit at most 8 implementationModuleRows, 8 componentTopologyRows, 12 componentRealizationRows, 16 fileTargetRows, 3 entities per moduleSchemaFragments item, and 1 state diagram per module. Preserve breadth by module family and requirement refs, not by one row per requirement.",
         "Use canonical row kinds including sdlc_stack_profile_row, sdlc_implementation_module_row, sdlc_aggregate_domain_model_row, sdlc_module_schema_fragment, sdlc_module_state_diagram_fragment, sdlc_sunny_day_sequence_row, sdlc_component_topology_row, sdlc_component_realization_row, and sdlc_file_target_row.",
         "componentTopologyRows[].componentId/moduleName/relativePath/publicBoundary/concernRole are required string fields on each component topology row.",
         "Keep the carrier proportional to immediate implementation structure: identify only the stack, modules, entities, operations, component/file targets, and realization rows needed to materialize the declared product surface from current source assets.",
@@ -5767,12 +5810,16 @@ function retryDefectDirectivesForWorker(
 function outcomeDirectivesForWorker(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
+  const frameworkOwnedEvaluationOutput = installedOperatorOwnsEvaluationOutput(
+    manifest.targetAssetType
+  );
   const directives: string[] = [
     `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
-    ...(installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)
+    ...(frameworkOwnedEvaluationOutput
       ? [
           `Framework-owned evaluation artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
-          "The installed operator derives and writes the selected evaluation artifact after this process exits."
+          "The installed operator derives and writes the selected evaluation artifact after this process exits.",
+          "Return after any allowed repair checks; do not fill target-carrier payload, summary, or evidence fields for this framework-owned artifact."
         ]
       : [`Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`]),
     `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`,
@@ -5781,8 +5828,12 @@ function outcomeDirectivesForWorker(
     `Target carrier kind: ${manifest.targetCarrierProjection.outputCarrierKind}; nested payload path: ${manifest.targetCarrierProjection.nestedPayloadPath}.`,
     `Target carrier required fields: ${manifest.targetCarrierProjection.requiredFieldRefs.join(", ")}.`,
     `Target carrier fixed protocol fields: ${manifest.targetCarrierProjection.fixedProtocolFieldRefs.join(", ")}.`,
-    `Worker-fillable target carrier fields: ${manifest.targetCarrierProjection.workerFillableFieldRefs.join(", ")}.`,
-    `Target carrier construction template: workerInvocationPackage.targetCarrierProjection.constructionTemplate (${manifest.targetCarrierProjection.constructionTemplateRef}).`
+    ...(frameworkOwnedEvaluationOutput
+      ? []
+      : [
+          `Worker-fillable target carrier fields: ${manifest.targetCarrierProjection.workerFillableFieldRefs.join(", ")}.`
+        ]),
+    `Target carrier construction template: worker_construction_brief.targetCarrierProjection.constructionTemplate (${manifest.targetCarrierProjection.constructionTemplateRef}).`
   ];
   directives.push(...retryDefectDirectivesForWorker(manifest));
   if (manifest.featureScope.mode === "full_breadth") {
@@ -5821,9 +5872,15 @@ function outcomeDirectivesForWorker(
       );
     }
     if (tenantOutputArtifact !== null) {
-      directives.push(
-        `tenant-local SDLC surface artifact path: ${tenantOutputArtifact}; do not list it in materializedFiles.`
-      );
+      if (frameworkOwnedEvaluationOutput) {
+        directives.push(
+          `Framework-owned tenant-local SDLC surface path for current replay/admission: ${tenantOutputArtifact}; do not write this path and do not list it in materializedFiles.`
+        );
+      } else {
+        directives.push(
+          `tenant-local SDLC surface artifact path: ${tenantOutputArtifact}; do not list it in materializedFiles.`
+        );
+      }
       if (tenantOutputArtifact.startsWith("design/adrs/")) {
         directives.push(
           "ADR/design output must carry Status:, Implements:, Derives from:, Supersedes:, Superseded by:, and retained-special-case fields."
@@ -6665,7 +6722,13 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   const outcomeSummary = [
     `edge=${manifest.edgeName}`,
     `target=${manifest.targetAssetType}`,
-    `materialization=${manifest.productMaterialization.required ? "required" : "not_required"}`,
+    `materialization=${
+      manifest.productMaterialization.required
+        ? "required"
+        : productMaterializationRequiresTestExecutionEvidence(manifest)
+          ? "execution_repair_scoped"
+          : "not_required"
+    }`,
     `output=${workerFacingPath(manifest, manifest.outputFile)}`
   ].join("; ");
   const outcomeDirectives = outcomeDirectivesForWorker(manifest).map(
@@ -9389,8 +9452,10 @@ function installedOperatorShardTimeoutMs(shardTimeoutMs: number): number {
     process.env["ODD_SDLC_INSTALLED_OPERATOR_SHARD_TIMEOUT_MS"] ?? "",
     10
   );
-  const cap = Number.isFinite(override) && override > 0 ? override : 15000;
-  return Math.min(shardTimeoutMs, cap);
+  if (Number.isFinite(override) && override > 0) {
+    return Math.min(shardTimeoutMs, override);
+  }
+  return shardTimeoutMs;
 }
 
 const INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE = `
@@ -11020,6 +11085,7 @@ function evaluateMaterializedProductFiles(input: {
   }
   const executionRepairMaterializationAllowed =
     productMaterializationRequiresTestExecutionEvidence(input.manifest);
+  const tenantRoot = resolve(contract.tenantRoot);
   if (
     !contract.required &&
     reportedProductFiles.length > 0 &&
@@ -11033,6 +11099,28 @@ function evaluateMaterializedProductFiles(input: {
     );
   }
   if (!contract.required) {
+    if (executionRepairMaterializationAllowed) {
+      for (const file of reportedProductFiles) {
+        const absolutePath = resolve(file.absolutePath);
+        if (!pathIsInside(absolutePath, tenantRoot)) {
+          input.blockingReasonCarriers.push(
+            makeSdlcBlockingReason({
+              code: "materialized_product_file_outside_tenant_root",
+              evidenceRefs: [pathToFileURL(absolutePath).href]
+            })
+          );
+        }
+        if (!["source", "test", "build_config"].includes(file.role)) {
+          input.blockingReasonCarriers.push(
+            makeSdlcBlockingReason({
+              code: "materialized_product_file_unbound_to_declared_target",
+              detail: `${file.relativePath}: execution repair scope admits source, test, and build_config roles only`,
+              evidenceRefs: [pathToFileURL(absolutePath).href]
+            })
+          );
+        }
+      }
+    }
     return;
   }
   if (
@@ -11084,7 +11172,6 @@ function evaluateMaterializedProductFiles(input: {
       );
     }
   }
-  const tenantRoot = resolve(contract.tenantRoot);
   const requirementDisplayIds =
     requirementDisplayIdByObligationId(input.manifest);
   const equivalentRequirementIdsByCanonical =
@@ -11325,6 +11412,7 @@ function evaluateExecutionEvidence(input: {
     return;
   }
   const executableProductMaterialization =
+    input.manifest.productMaterialization.required &&
     productMaterializationRequiresTestExecutionEvidence(input.manifest);
   input.evidenceRefs.push(...executionEvidence.reportRefs);
   if (executionEvidence.lane !== "test") {

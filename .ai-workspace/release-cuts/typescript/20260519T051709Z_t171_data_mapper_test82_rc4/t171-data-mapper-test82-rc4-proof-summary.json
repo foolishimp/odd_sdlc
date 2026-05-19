@@ -1,0 +1,130 @@
+{
+  "kind": "odd_sdlc_t171_data_mapper_test82_rc4_proof_summary",
+  "workspace": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl",
+  "sourceTemplate": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template",
+  "liveCommand": "node /Users/jim/src/apps/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.js start --workspace . --target next --until converged --worker 'process://claude?model=sonnet&effort=xhigh'",
+  "terminalStatus": "converged",
+  "finalArchiveRoot": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T045221059Z_pid80159",
+  "executionResultArchiveRoot": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T042607954Z_pid80159",
+  "releaseCutArchiveRoot": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4",
+  "releaseCutTarball": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4/package/pack-dwdQfY/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+  "acceptedFinalSegment": [
+    {
+      "run": "20260519T042607954Z_pid80159",
+      "edgeName": "derive_test_execution_result_surface",
+      "targetAssetType": "test_execution_result_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 437,
+        "fulfilled": 437,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "run": "20260519T043817048Z_pid80159",
+      "edgeName": "qualify_component_test_execution_surface",
+      "targetAssetType": "component_test_qualification_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 932,
+        "fulfilled": 932,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "run": "20260519T044158522Z_pid80159",
+      "edgeName": "derive_component_repair_schedule_surface",
+      "targetAssetType": "component_repair_schedule_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 932,
+        "fulfilled": 932,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "run": "20260519T044538672Z_pid80159",
+      "edgeName": "derive_test_run_archive_surface",
+      "targetAssetType": "test_run_archive_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 1052,
+        "fulfilled": 1052,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "run": "20260519T044848013Z_pid80159",
+      "edgeName": "derive_release_depth_parity_surface",
+      "targetAssetType": "release_depth_parity_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 1,
+        "fulfilled": 1,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "run": "20260519T045221059Z_pid80159",
+      "edgeName": "prepare_release_surface",
+      "targetAssetType": "release_surface",
+      "closureDisposition": "close",
+      "postflightStatus": "passed",
+      "edgeConverged": true,
+      "counts": {
+        "expected": 1048,
+        "fulfilled": 1048,
+        "partial": 0,
+        "blocked": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    }
+  ],
+  "executionShards": [
+    "test-shard-01-cdme-compiler",
+    "test-shard-02-cdme-assurance",
+    "test-shard-03-cdme-executor",
+    "test-shard-04-cdme-adjoint",
+    "test-shard-05-cdme-accounting",
+    "test-shard-06-cdme-fidelity",
+    "test-shard-07-cdme-engine"
+  ],
+  "verification": [
+    "npm run test:semantic - 643/643 passed",
+    "npm run lint:semantic - passed",
+    "npm run lint:test-harness - passed",
+    "git diff --check - passed",
+    "odd-sdlc-ts release-cut --archive-root .ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4 - passed"
+  ],
+  "notes": [
+    "The test82 workspace was intentionally continued rather than restarted.",
+    "Earlier failed attempts in the same sandbox remain forensic evidence; the accepted final segment starts at derive_test_execution_result_surface archive 20260519T042607954Z_pid80159 and closes through prepare_release_surface.",
+    "A release-depth prompt leak observed during the live proof was fixed after the proof and guarded by deterministic prompt tests before this release cut."
+  ]
+}

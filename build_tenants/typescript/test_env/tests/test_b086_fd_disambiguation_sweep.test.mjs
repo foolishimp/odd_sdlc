@@ -1063,6 +1063,7 @@ test("B-086 archive F_D accepts admitted execution-result refs and rejects prose
     executionManifest,
     "# test_execution_result_surface\n"
   );
+  writeHandoffFiles(executionManifest);
   writeReportPayload(
     executionManifest,
     executionReportPayload(
@@ -1080,6 +1081,7 @@ test("B-086 archive F_D accepts admitted execution-result refs and rejects prose
   );
 
   const archiveManifest = manifest(root, "derive_test_run_archive_surface", 18);
+  writeHandoffFiles(archiveManifest);
   const archiveOutput = writeOutput(
     archiveManifest,
     [

@@ -101,6 +101,21 @@ function makeWorkspace() {
     "# Tenant Registry\n\n- tenant: typescript\n",
     "utf8"
   );
+  mkdirSync(path.join(root, "build_tenants/typescript"), { recursive: true });
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/package.json"),
+    `${JSON.stringify(
+      {
+        type: "module",
+        scripts: {
+          test: "node --test \"api/test/*.test.ts\""
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   return root;
 }
 

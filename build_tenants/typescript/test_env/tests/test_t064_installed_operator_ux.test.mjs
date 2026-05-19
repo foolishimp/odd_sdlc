@@ -841,6 +841,68 @@ test("T-064 worker provider rate limits stay inside same-edge retry law", () => 
   assert(postflight.evidenceRefs.includes(pathToFileURL(finalOutputPath).href));
 });
 
+test("T-171 allowed rate-limit telemetry does not mask socket failures", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 25,
+    contract,
+    runId: "t171-worker-socket-failure"
+  });
+  writeHandoffFiles(manifest);
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(
+    stdoutPath,
+    JSON.stringify({
+      type: "rate_limit_event",
+      rate_limit_info: { status: "allowed", rateLimitType: "five_hour" }
+    }),
+    "utf8"
+  );
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    finalOutputPath,
+    "API Error: The socket connection was closed unexpectedly.\n",
+    "utf8"
+  );
+  const workerRun = {
+    kind: "sdlc_worker_run_result",
+    command: "claude",
+    args: [],
+    cwd: workspace,
+    outcome: { kind: "exited", status: 1 },
+    executorProfile: "pty-terminal",
+    streamModel: "terminal-transcript",
+    finalOutputRef: pathToFileURL(finalOutputPath).href,
+    status: 1,
+    signal: null,
+    elapsedMs: 935425,
+    timedOut: false,
+    stdoutByteCount: 88,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath: null,
+    error: null
+  };
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun
+  });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_process_failed");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "inspect_worker_archive"
+  );
+});
+
 test("T-102 worker output limits stay inside same-edge retry law", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("prepare_test_execution_surface");

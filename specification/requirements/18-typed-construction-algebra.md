@@ -134,12 +134,13 @@ not re-run tests or emit fresh execution evidence.
 - AC-1: test execution evidence is admitted only on execution-result edges
 - AC-2: test-run archive and release surfaces consume admitted execution truth
   and do not emit fresh execution evidence
-- AC-3: compile, discovery, and test non-zero exits observed by an
-  execution-result edge are admitted as execution evidence and routed as repair,
-  retry, block, or reprice pressure; the execution-result evaluator does not
-  edit tenant product files
-- AC-4: repairs required by execution evidence re-enter through a constructive
-  `F_P.transform` edge with an explicit materialization permission class
+- AC-3: compile, discovery, and test non-zero exits belong to the
+  execution-result edge; `F_P.transform` may perform bounded tenant
+  source/test/build repair under the edge's execution-repair permission class,
+  while evaluators remain read-only over workspace state
+- AC-4: the installed operator runs the declared execution shards after
+  `F_P.transform` returns and owns publication of the execution evidence
+  carrier; transform-local test runs are repair checks, not admitted evidence
 - AC-5: non-execution, non-materialization edges must not write product files
 - AC-6: shard evidence identity is copied from the schedule-declared shard
   register; ad hoc shard ids are inadmissible
@@ -154,8 +155,8 @@ Each edge shall declare and enforce its construction permission class.
 - AC-2: materialization-required edges may write declared product file targets
   and must admit the resulting materialization evidence
 - AC-3: repair scoped workspace edits may write tenant product source, test, or
-  build files only when the active edge is an `F_P.transform` materialization
-  edge carrying admitted execution-repair pressure
+  build files only when the active edge is an `F_P.transform` edge carrying an
+  explicit execution-repair permission class
 - AC-4: postflight rejects product-file writes outside the effective permission
   class with typed non-close diagnostics
 - AC-5: worker prompts and handoff manifests expose the active permission class

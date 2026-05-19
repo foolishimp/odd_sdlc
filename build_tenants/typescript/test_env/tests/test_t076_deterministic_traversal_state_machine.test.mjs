@@ -312,7 +312,8 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "}",
       "const designRegister = designDepthRegister();",
       "const componentRegister = componentDepthRegister();",
-      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`];",
+      "const requirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
+      "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`, '', '## Requirement Trace', ...(requirementTags.length > 0 ? requirementTags.map((tag) => `// Implements: ${tag}`) : ['// no requirement obligations'])];",
       "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",
       "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
@@ -325,9 +326,9 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "  const productPath = path.join(manifest.productMaterialization.tenantRoot, tenantRelative);",
       "  mkdirSync(dirname(productPath), { recursive: true });",
       "  const capabilityMarkers = manifest.conformedProject.capabilityContracts.map((contract) => `${contract.name} ${contract.value}`).join(' ');",
-      "  const requirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
       "  const traceLines = requirementTags.map((tag) => `// Implements: ${tag}`).join('\\n');",
-      "  const source = `${traceLines}\\n${role === 'test' ? 'package cdme\\nclass CoreSpec\\n' : `package cdme\\nobject Core { val retryClosed = ${hasPriorGap}; val capabilityMarkers = \"${capabilityMarkers}\" }\\n`}`;",
+      "  const productTraceLines = manifest.targetAssetType === 'component_code_surface' && !hasPriorGap ? '' : traceLines;",
+      "  const source = `${productTraceLines}\\n${role === 'test' ? 'package cdme\\nclass CoreSpec\\n' : `package cdme\\nobject Core { val retryClosed = ${hasPriorGap}; val capabilityMarkers = \"${capabilityMarkers}\" }\\n`}`;",
       "  writeFileSync(productPath, source, 'utf8');",
       "  const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
       "  const relativePath = manifest.targetAssetType === 'component_code_surface' && !hasPriorGap ? path.relative(manifest.workspaceRoot, productPath) : tenantRelative;",
@@ -457,7 +458,9 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
       assert.equal(start.manifest.graphFunctionName, "derive_component_code_surface");
       assert.equal(start.manifest.targetAssetType, "component_code_surface");
       assert.equal(
-        start.postflight.blockingReasons.includes("materialized_product_relative_path_mismatch"),
+        start.postflight.blockingReasons.includes(
+          "materialized_product_requirement_lineage_missing"
+        ),
         true
       );
       blockedMaterialization = start;
@@ -512,7 +515,8 @@ test("T-076 installed data_mapper successor re-enters failed code edge from even
   assert.equal(priorGap.targetAssetType, "component_code_surface");
   assert.equal(
     priorGap.reasons.some(
-      (reason) => reason.reason === "materialized_product_relative_path_mismatch"
+      (reason) =>
+        reason.reason === "materialized_product_requirement_lineage_missing"
     ),
     true
   );
