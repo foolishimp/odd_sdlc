@@ -66,6 +66,35 @@ while also materializing the deterministic artifact. That can produce compiling
 code, but it hides whether the ambiguity was actually resolved at the right
 level.
 
+## Proportional Residual Axiom
+
+Residual disambiguation is measured inside the next smaller subsurface.
+
+Each stage should reduce ambiguity with a bounded, roughly proportional fan-out:
+
+```text
+requirements <-n1 designs
+designs      <-n2 modules
+modules      <-n3 functions
+functions    <-n4 code lines
+```
+
+The exact values are product-specific, but the ratios matter. A stage should
+not collapse many unresolved requirements into one coarse downstream object,
+and it should not explode one upstream object into an ungoverned swarm of
+downstream work.
+
+The proportionality rule protects attention. It keeps each worker or evaluator
+inside a bounded surface where the local ambiguity can be seen, measured, and
+resolved. If `n1`, `n2`, `n3`, or `n4` becomes too large for its stage, the
+pipeline needs another abstraction/dependency stage before materialization.
+
+This gives residual pressure a meaningful scale. A requirement-to-design gap is
+not measured the same way as a module-to-function gap or a function-to-code-line
+gap. Each residual belongs to its own subsurface, and closure should only fold
+when the residual ambiguity in that subsurface is proportional to the next
+lawful computation.
+
 ## What test35 Preserved
 
 test35 preserved the abstraction ladder.
