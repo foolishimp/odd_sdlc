@@ -10,9 +10,22 @@ Scope:
 - prior RC4 analysis: `.ai-workspace/comments/codex/20260519T160359AEST_ANALYSIS_data_mapper_test82_vs_test35_rc4_depth.md`
 - divergent-surface analysis: `.ai-workspace/comments/codex/20260519T162932AEST_ANALYSIS_data_mapper_test82_vs_test35_divergent_construction_surface.md`
 
+Applicability:
+- data_mapper is the worked example and proof pressure, not the boundary of the
+  method
+- the staged disambiguation and proportional residual rules apply to all
+  solution construction
+- trivial solutions are the degenerate case: they still publish admitted
+  decomposition, but that decomposition may lawfully be one requirement, one
+  design, one module, one component, one function, and one executable surface
+
 ## Thesis
 
 The test35 vs test82 gap is a computation problem.
+
+The general SDLC problem is also a computation problem. Every solution must
+reduce ambiguity through staged surfaces before deterministic code can be a
+trustworthy closure point.
 
 test35 did not merely produce more code because it had more runtime or a better
 model. It split the construction problem into smaller abstract computations
@@ -450,10 +463,12 @@ Measurable predicate sketch:
 
 The numbers are profile data. The predicates are runtime law.
 
-## Data Mapper Optimal Path
+## Data Mapper Proof Path
 
-For data_mapper, the next optimal path is not "run another full graph and hope
-for depth." It is to insert the missing staged computations and then run.
+For data_mapper, the next proof path is not "run another full graph and hope
+for depth." It is to insert the missing staged computations and then run. This
+is the immediate proof target for the general method, not a data_mapper-only
+special case.
 
 Recommended data_mapper path:
 
@@ -569,8 +584,9 @@ as one broad refactor:
    selected evidence classes are satisfied by the implementation tenant.
 4. Add materialization admission checks for high-density/facade/under-decomposed
    modules.
-5. Re-run data_mapper after those predicates exist; use test35 as comparison
-   evidence for ratios and depth, not as a filename template.
+5. Re-run data_mapper as the reference proof after those predicates exist; use
+   test35 as comparison evidence for ratios and depth, not as a filename
+   template.
 
 ## Bottom Line
 
@@ -578,12 +594,12 @@ test35 was deeper because it computed abstraction before detail.
 
 test82 was stronger in runtime law but shallower in construction topology.
 
-The next line should combine both:
+The next line should generalize both:
 
 ```text
 test82 authority and ledgers
 + test35 staged construction computation
-= governed runtime closure over deeper product realization
+= governed runtime closure over deeper product realization for every solution
 ```
 
 That means reviewing every current surface for whether it owns a real
