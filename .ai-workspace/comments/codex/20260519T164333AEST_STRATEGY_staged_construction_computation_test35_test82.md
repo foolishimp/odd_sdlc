@@ -127,8 +127,7 @@ Req
 -> Design.to_fulfill_Req
 -> Implementation_Module_Decomposition.to_fulfill_Design
 -> Module_Dependency_Map
--> Steel_Thread_Build_Plan
--> Parallel_Module_Build_Plan
+-> Eval_Action.selects_steel_thread_or_parallel_build_traversal
 -> Component_Code_Surface
 -> Component_Qualification_Surface
 -> Code_Rollup_Surface
@@ -159,17 +158,15 @@ Each stage has a distinct computational job.
 - determines what can be built independently
 - distinguishes steel-thread dependencies from parallelizable work
 
-`Steel_Thread_Build_Plan`:
+`Eval_Action.selects_steel_thread_or_parallel_build_traversal`:
 
-- chooses the smallest vertical path that proves the architecture can execute
-- binds required source files, test files, build targets, and execution command
-- prevents premature broad generation when the execution spine is not proven
-
-`Parallel_Module_Build_Plan`:
-
-- partitions the remaining components after the steel thread is lawful
-- assigns bounded surfaces to parallel workers
-- prevents workers from editing across dependency boundaries
+- reads the admitted module dependency map
+- chooses the smallest vertical path when the architecture needs an execution
+  spine before broad construction
+- chooses dependency-isolated parallel traversal after the steel thread is
+  lawful or when the dependency map already proves independent work surfaces
+- binds the selected traversal to source files, test files, build targets, and
+  execution command without creating a second product carrier
 
 `Component_Code_Surface`:
 
@@ -194,9 +191,8 @@ Req
 -> Test_Design.to_cover_Behavior
 -> Test_Module_Decomposition.to_fulfill_Test_Design
 -> Test_Dependency_Map
--> Test_Steel_Thread_Plan
 -> Test_Build_Tenant_Profile
--> Parallel_Test_Build_Plan
+-> Eval_Action.selects_test_steel_thread_or_parallel_test_traversal
 -> Component_Test_Surface
 -> Test_Execution_Preparation
 -> Test_Execution_Result
@@ -236,6 +232,15 @@ Req
 - may differ from the implementation build tenant
 - should not silently default when requirement evidence needs a different test
   substrate
+
+`Eval_Action.selects_test_steel_thread_or_parallel_test_traversal`:
+
+- reads testcase authority, test design, test module decomposition, test
+  dependency map, and selected test stack profile
+- chooses the first executable test steel thread when runtime evidence is not
+  yet established
+- chooses dependency-isolated parallel test traversal after the test spine is
+  lawful or when the dependency map proves shard independence
 
 The testing stack is a product decision over evidence, not a convenience
 default. A Scala Spark implementation may need ScalaTest for unit behavior,
@@ -304,9 +309,10 @@ Recommended evaluator checks:
    only by module-level facade files.
 3. A module decomposition surface fails if separable public responsibilities are
    merged without an explicit design reason.
-4. A dependency map must exist before parallel build scheduling.
-5. A steel-thread plan must identify source, test, build, and execution
-   evidence for the first vertical slice.
+4. A dependency map must exist before the evaluator selects steel-thread or
+   parallel-build traversal.
+5. The evaluator-selected traversal must identify source, test, build, and
+   execution evidence for the selected vertical slice or parallel partition.
 6. Component tests require admitted testcase authority, test design, and test
    module decomposition.
 7. Test stack profile selection is explicit; defaulting to the implementation
@@ -358,8 +364,6 @@ derive_requirement_surface
 derive_design_surface
 derive_implementation_module_surface
 derive_module_dependency_map_surface
-derive_steel_thread_build_plan_surface
-derive_parallel_build_plan_surface
 derive_component_code_surface
 qualify_component_realization_surface
 
@@ -368,14 +372,17 @@ derive_test_design_surface
 select_test_stack_profile
 derive_test_module_surface
 derive_test_dependency_map_surface
-derive_test_steel_thread_plan_surface
-derive_parallel_test_build_plan_surface
 derive_component_test_surface
 prepare_test_execution_surface
 derive_test_execution_result_surface
 derive_test_run_archive_surface
 qualify_testcase_authority_surface
 ```
+
+Steel-thread build and parallel build are traversal methods selected by the
+evaluator action over admitted dependency carriers. They are not separate target
+carrier surfaces. The same applies to test steel-thread and parallel test
+traversal.
 
 Some of these may already exist under different names. The review should not
 start by adding names. It should start by checking whether the current carrier
