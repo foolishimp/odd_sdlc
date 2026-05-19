@@ -511,16 +511,190 @@ specific proof gate. If T-171 is scoped to runtime closure law, this staged
 computation work should be the next design-reframe ticket rather than hidden
 inside the RC4 closure narrative.
 
+## Current RC Full Graph Review
+
+The accepted data_mapper test82 RC4 analyzer reports 36 operator-run rows over
+this 22-edge graph sequence:
+
+```text
+derive_intent_surface
+-> derive_product_surface
+-> derive_goal_surface
+-> derive_requirement_surface
+-> derive_uat_testcases_surface
+-> derive_testcase_authority_surface
+-> derive_feature_decomp_surface
+-> derive_design_surface
+-> derive_scenario_surface
+-> derive_implementation_design_surface
+-> derive_component_code_surface
+-> qualify_component_realization_surface
+-> derive_code_surface
+-> derive_test_design_surface
+-> derive_component_test_surface
+-> prepare_test_execution_surface
+-> derive_test_execution_result_surface
+-> qualify_component_test_execution_surface
+-> derive_component_repair_schedule_surface
+-> derive_test_run_archive_surface
+-> derive_release_depth_parity_surface
+-> prepare_release_surface
+```
+
+The graph closed the runtime proof surface:
+
+- final closure: `close`
+- operator-run count: 36
+- same-edge retries: 4
+- repair attempts: 5
+- blocked attempts: 6
+- aborted attempts: 3
+- total wall-clock: 17,465.6s
+- final edge: `prepare_release_surface`
+- final accepted execution evidence: `derive_test_execution_result_surface`
+
+The graph also exposes the staged-computation gap. It jumps from
+`derive_implementation_design_surface` to `derive_component_code_surface`
+without an admitted implementation-module decomposition or module dependency
+map. The accepted component-code edge carried 885 obligations into 9 source
+files. It also jumps from `derive_test_design_surface` to
+`derive_component_test_surface` without admitted test-module decomposition or a
+test dependency map. The accepted component-test edge carried 1126 obligations
+into 7 test files.
+
+That is the functional divergence. The RC graph is strong on runtime authority,
+execution admission, repair continuation, and release closure. It is weak on
+the intermediate computations that determine whether the next surface is
+properly bounded before materialization.
+
+## Proposed Staged Graph
+
+The next graph should preserve the RC graph's runtime authority and add the
+missing intermediate disambiguation stages.
+
+```text
+derive_intent_surface
+-> derive_product_surface
+-> derive_goal_surface
+-> derive_requirement_surface
+-> Eval_Action.zoom_or_continue(requirements_to_designs)
+-> derive_feature_decomp_surface
+-> derive_design_surface
+-> Eval_Action.zoom_or_continue(designs_to_modules)
+-> derive_implementation_module_surface
+-> derive_module_dependency_map_surface
+-> Eval_Action.select_steel_thread_or_parallel_build_traversal
+-> derive_component_code_surface
+-> qualify_component_realization_surface
+-> derive_code_surface
+
+derive_requirement_surface
+-> derive_uat_testcases_surface
+-> derive_testcase_authority_surface
+-> Eval_Action.zoom_or_continue(testcases_to_test_design)
+-> derive_test_design_surface
+-> select_test_stack_profile
+-> derive_test_module_surface
+-> derive_test_dependency_map_surface
+-> Eval_Action.select_test_steel_thread_or_parallel_test_traversal
+-> derive_component_test_surface
+-> prepare_test_execution_surface
+-> derive_test_execution_result_surface
+-> qualify_component_test_execution_surface
+-> derive_component_repair_schedule_surface
+-> derive_test_run_archive_surface
+-> derive_release_depth_parity_surface
+-> prepare_release_surface
+```
+
+The two displayed branches are one governed graph. They are shown separately
+only to make the implementation and test lifecycles legible. The test branch
+depends on requirements and design evidence, and the implementation branch
+depends on testcase pressure where executable behavior is part of product
+closure.
+
+Stage justification:
+
+| Stage | What It Computes | Why It Exists |
+|---|---|---|
+| `derive_intent_surface` | product direction and purpose | fixes the top-level ambiguity before product claims are generated |
+| `derive_product_surface` | product boundary and usable product identity | prevents requirements from being interpreted against the wrong product |
+| `derive_goal_surface` | current work-wave focus | bounds which product pressure is active in this traversal |
+| `derive_requirement_surface` | canonical obligations and residual requirement ambiguity | creates the upstream obligation set for every downstream computation |
+| `derive_feature_decomp_surface` | behavior/feature clusters from requirements | groups requirement pressure before design and scenario work |
+| `derive_design_surface` | design commitments to fulfill requirements | turns requirement ambiguity into architecture and behavior commitments |
+| `derive_implementation_module_surface` | module/component topology, public boundaries, owned requirements, package/file targets | prevents component-code from inferring topology while materializing code |
+| `derive_module_dependency_map_surface` | allowed dependencies, cycles, steel-thread candidates, parallel partitions | lets the evaluator choose traversal order without creating a second product carrier |
+| `Eval_Action.select_steel_thread_or_parallel_build_traversal` | traversal method over the admitted dependency map | chooses a bounded vertical slice or dependency-isolated parallel work |
+| `derive_component_code_surface` | source/build materialization for admitted component topology | writes deterministic implementation inside a bounded surface |
+| `qualify_component_realization_surface` | realization admission against topology, lineage, and build contract | prevents source files from closing merely because they exist |
+| `derive_code_surface` | code rollup projection over admitted component realization | summarizes realized code without owning new topology authority |
+| `derive_uat_testcases_surface` | user/acceptance behavior obligations from requirements | creates behavior evidence pressure before test design |
+| `derive_testcase_authority_surface` | canonical testcase authority and testcase ids | prevents tests from being invented only by implementation workers |
+| `derive_test_design_surface` | evidence strategy, fixture strategy, and test classes of evidence | decides what kinds of tests prove the requirements |
+| `select_test_stack_profile` | testing build tenant and test stack choice | treats the test stack as an evidence/product decision, not a default |
+| `derive_test_module_surface` | test modules/classes/shards mapped to testcases and implementation components | prevents one broad test file from standing in for many behaviors |
+| `derive_test_dependency_map_surface` | test dependencies, fixtures, module prerequisites, shard parallelism | lets the evaluator choose test steel-thread or parallel test traversal |
+| `Eval_Action.select_test_steel_thread_or_parallel_test_traversal` | traversal method over admitted test dependency map | chooses first executable test spine or parallel test shards |
+| `derive_component_test_surface` | materialized tests for admitted test topology | writes deterministic test artifacts inside bounded evidence surfaces |
+| `prepare_test_execution_surface` | declared execution command, shard plan, environment, and prerequisite checks | prepares execution without pretending preparation is execution evidence |
+| `derive_test_execution_result_surface` | observed runtime pass/fail evidence from declared commands | records execution facts that can clear or preserve residual pressure |
+| `qualify_component_test_execution_surface` | admission of execution evidence against test topology | prevents release closure from using raw execution output without evaluation |
+| `derive_component_repair_schedule_surface` | repair plan from admitted failures or residual pressure | routes failed execution back into bounded component/test work |
+| `derive_test_run_archive_surface` | durable execution archive | preserves replayable execution evidence |
+| `derive_release_depth_parity_surface` | parity/depth rollup over code, test, execution, and topology evidence | checks release depth against the selected profile and comparison target |
+| `prepare_release_surface` | release closure projection | closes only after upstream topology, materialization, execution, and parity evidence are admitted |
+
+## Zoom Function
+
+`Eval_Action.zoom_or_continue` is the future traversal evaluator hook that
+prevents the graph from being fixed too coarsely.
+
+After any abstraction stage, the evaluator compares input obligations to output
+entities:
+
+```text
+input obligations -> output rows
+fanout ratio
+max owned inputs per output
+residual refs per output
+public boundary count
+substantive downstream responsibility count
+```
+
+If the ratio is proportional and residuals are scoped, traversal continues. If
+the ratio is too large, the evaluator does not ask the next materialization
+edge to absorb the ambiguity. It inserts or selects an intermediate zoom
+traversal for that subsurface.
+
+Examples:
+
+- requirements -> designs is overloaded, so zoom through feature or requirement
+  cluster decomposition before design closure
+- designs -> modules is overloaded, so zoom through implementation-module
+  decomposition before component code
+- modules -> functions is overloaded, so zoom through component/function
+  boundary decomposition before source materialization
+- testcases -> test modules is overloaded, so zoom through test-module
+  decomposition before test file generation
+
+The zoom action is not a compatibility path and not a second closure law. It is
+the evaluator selecting the next lawful disambiguation computation from the
+current obligation/output ratio.
+
 ## Proposed Runtime Shape
 
-The TypeScript graph should make these surfaces explicit or strengthen existing
-ones to carry the same authority:
+The proposed staged graph above is the controlling graph shape. This compact
+list names the new or strengthened authority surfaces and evaluator actions the
+TypeScript runtime must make explicit:
 
 ```text
 derive_requirement_surface
 derive_design_surface
+Eval_Action.zoom_or_continue
 derive_implementation_module_surface
 derive_module_dependency_map_surface
+Eval_Action.select_steel_thread_or_parallel_build_traversal
 derive_component_code_surface
 qualify_component_realization_surface
 
@@ -529,10 +703,10 @@ derive_test_design_surface
 select_test_stack_profile
 derive_test_module_surface
 derive_test_dependency_map_surface
+Eval_Action.select_test_steel_thread_or_parallel_test_traversal
 derive_component_test_surface
 prepare_test_execution_surface
 derive_test_execution_result_surface
-derive_test_run_archive_surface
 qualify_testcase_authority_surface
 ```
 
