@@ -2038,11 +2038,15 @@ type DeclaredProductTargetSeed = Pick<
 function materializedProductFileRoleFromText(
   input: string
 ): SdlcMaterializedProductFileRole | null {
-  const normalized = input.toLowerCase();
+  const normalized = input.trim().toLowerCase().replace(/[-\s]+/gu, "_");
   switch (normalized) {
     case "source":
+      return "source";
     case "test":
+      return "test";
     case "build_config":
+    case "build_plugin":
+      return "build_config";
     case "design":
     case "documentation":
     case "other":
@@ -2057,7 +2061,7 @@ function explicitRoleFromTargetText(input: string): {
   readonly requiredRole: SdlcMaterializedProductFileRole | null;
 } {
   const roleMatch =
-    /\brole\s*[:=]\s*`?(source|test|build_config|design|documentation|other)\b`?/iu.exec(
+    /\brole\s*[:=]\s*`?(source|test|build[-_\s]config|build[-_\s]plugin|design|documentation|other)\b`?/iu.exec(
       input
     );
   const requiredRole =
@@ -2066,7 +2070,7 @@ function explicitRoleFromTargetText(input: string): {
       : materializedProductFileRoleFromText(roleMatch[1]);
   const value = input
     .replace(
-      /\s*(?:[|;,]\s*)?\(?\s*\brole\s*[:=]\s*`?(?:source|test|build_config|design|documentation|other)\b`?\s*\)?/iu,
+      /\s*(?:[|;,]\s*)?\(?\s*\brole\s*[:=]\s*`?(?:source|test|build[-_\s]config|build[-_\s]plugin|design|documentation|other)\b`?\s*\)?/iu,
       ""
     )
     .trim();
@@ -2839,7 +2843,7 @@ function componentCodeSurfaceConsumesDesignFileTargetRole(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly role: string;
 }): boolean {
-  const normalizedRole = input.role.trim().toLowerCase();
+  const normalizedRole = materializedProductFileRoleFromText(input.role);
   if (normalizedRole === "source" || normalizedRole === "build_config") {
     return true;
   }
@@ -8260,7 +8264,12 @@ function declaredBuildConfigRoleForObservedFile(input: {
   const lower = input.normalizedRelativePath.toLowerCase();
   if (
     declaredTechnologyIncludes(input.manifest, "sbt") &&
-    (lower === "build.sbt" || lower.endsWith("/build.sbt"))
+    (lower === "build.sbt" ||
+      lower.endsWith("/build.sbt") ||
+      ((lower === "project" ||
+        lower.startsWith("project/") ||
+        lower.includes("/project/")) &&
+        lower.endsWith(".sbt")))
   ) {
     return "build_config";
   }
@@ -8975,15 +8984,28 @@ function fileWithMaterializationProvenance(input: {
     manifest: input.manifest,
     relativePath: input.file.relativePath
   });
+  const buildConfigRole = declaredBuildConfigRoleForObservedFile({
+    manifest: input.manifest,
+    normalizedRelativePath: normalizedRelativePath(input.file.relativePath)
+  });
+  const authorityRole = buildConfigRole ?? targetContract?.requiredRole ?? null;
+  const effectiveRole =
+    input.file.role === "other" && authorityRole !== null
+      ? authorityRole
+      : input.file.role;
   const rolePolicyRef =
     input.materializationSource === "replay"
-      ? input.file.rolePolicyRef
+      ? effectiveRole === input.file.role
+        ? input.file.rolePolicyRef ??
+          targetContract?.policyRef ??
+          rolePolicyRefForMaterializedRole(effectiveRole)
+        : targetContract?.policyRef ?? rolePolicyRefForMaterializedRole(effectiveRole)
       : input.file.rolePolicyRef ??
         targetContract?.policyRef ??
-        rolePolicyRefForMaterializedRole(input.file.role);
+        rolePolicyRefForMaterializedRole(effectiveRole);
   return Object.freeze({
     kind: input.file.kind,
-    role: input.file.role,
+    role: effectiveRole,
     relativePath: input.file.relativePath,
     absolutePath: input.file.absolutePath,
     digest: input.file.digest,
@@ -9789,8 +9811,17 @@ function testRefForRow(
   manifest: SdlcWorkerHandoffManifest,
   row: SdlcComponentTestRealizationRow
 ): string {
-  return pathToFileURL(join(manifest.productMaterialization.tenantRoot, row.relativePath))
-    .href;
+  const normalizedRelativePath = path.normalize(row.relativePath);
+  const selectedOutputRoot = path.normalize(
+    manifest.productMaterialization.selectedOutputRoot
+  );
+  const absolutePath = isAbsolute(normalizedRelativePath)
+    ? normalizedRelativePath
+    : normalizedRelativePath === selectedOutputRoot ||
+        normalizedRelativePath.startsWith(`${selectedOutputRoot}${path.sep}`)
+      ? join(manifest.workspaceRoot, normalizedRelativePath)
+      : join(manifest.productMaterialization.tenantRoot, normalizedRelativePath);
+  return pathToFileURL(absolutePath).href;
 }
 
 function failureKindForExecutionEvidence(
@@ -9820,6 +9851,15 @@ function failureRowsForComponentTests(input: {
   const evidenceRefs =
     input.executionEvidence?.reportRefs ??
     Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
+  const sharedBuildConfigurationFailure = sharedSbtBuildConfigurationFailureRow({
+    manifest: input.manifest,
+    componentTestRows: input.componentTestRows,
+    executionEvidence: input.executionEvidence,
+    evidenceRefs
+  });
+  if (sharedBuildConfigurationFailure !== null) {
+    return Object.freeze([sharedBuildConfigurationFailure]);
+  }
   const failureKind = failureKindForExecutionEvidence(input.executionEvidence);
   const rows =
     input.componentTestRows.length > 0
@@ -9867,6 +9907,77 @@ function failureRowsForComponentTests(input: {
       });
     })
   );
+}
+
+function fileTextForEvidenceRef(ref: string): string | null {
+  const filePath = filePathForEvidenceRef({ workspaceRoot: "", ref });
+  if (filePath === null || !existsSync(filePath) || !statSync(filePath).isFile()) {
+    return null;
+  }
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function sharedSbtBuildConfigurationFailureRow(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
+  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
+  readonly evidenceRefs: readonly string[];
+}): SdlcComponentExecutionFailureRow | null {
+  const executionEvidence = input.executionEvidence;
+  if (
+    executionEvidence === null ||
+    executionEvidence.status !== "failed" ||
+    executionEvidence.shardEvidence.length === 0 ||
+    !executionEvidence.shardEvidence.every((shard) => shard.status === "failed")
+  ) {
+    return null;
+  }
+  const stderrTexts = executionEvidence.reportRefs
+    .filter((ref) => ref.endsWith(".stderr.log"))
+    .map(fileTextForEvidenceRef)
+    .filter((text): text is string => text !== null && text.trim().length > 0);
+  if (stderrTexts.length === 0) {
+    return null;
+  }
+  const buildSbtErrorRefs = uniqueSorted(
+    stderrTexts.flatMap((text) =>
+      [...text.matchAll(/(^|\n)(?<file>\/[^\n:]+\/build\.sbt):\d+:\s+error:/gu)]
+        .map((match) => match.groups?.["file"] ?? "")
+        .filter((file) => file.length > 0)
+        .map((file) => pathToFileURL(file).href)
+    )
+  );
+  const allObservedErrorsAreBuildDefinitionErrors = stderrTexts.every((text) =>
+    /\/build\.sbt:\d+:\s+error:/u.test(text)
+  );
+  if (
+    buildSbtErrorRefs.length === 0 ||
+    !allObservedErrorsAreBuildDefinitionErrors
+  ) {
+    return null;
+  }
+  const rows = input.componentTestRows;
+  return Object.freeze({
+    kind: "sdlc_component_execution_failure_row" as const,
+    failureId: "failure:sbt-build-definition:all-shards",
+    shardId: "all-shards",
+    moduleName: input.manifest.productMaterialization.activeTenant,
+    testClassId: "sbt-build-definition",
+    testcaseIds: uniqueSorted(rows.flatMap((row) => row.testcaseIds)),
+    componentIds: uniqueSorted(rows.flatMap((row) => row.componentIds)),
+    requirementIds: uniqueSorted(rows.flatMap((row) => row.requirementIds)),
+    failureKind: "test_compile_error" as const,
+    repairTarget: "component_code" as const,
+    lawfulReentryPoint: "repair_worker_output",
+    attributionConfidence: "high" as const,
+    sourceRefs: buildSbtErrorRefs,
+    testRefs: uniqueSorted(rows.map((row) => testRefForRow(input.manifest, row))),
+    evidenceRefs: uniqueSorted([...input.evidenceRefs, ...buildSbtErrorRefs])
+  });
 }
 
 function qualificationRowsForComponentTests(input: {
@@ -10511,18 +10622,37 @@ function writeInstalledOperatorComponentEvaluation(
       manifest,
       targetAssetType: "component_test_qualification_surface"
     });
-    const failureRows =
+    const componentTestRows = qualification?.componentTestRows ?? Object.freeze([]);
+    const executionEvidence = latestAdmittedExecutionEvidence(manifest);
+    const derivedFailureRows =
+      executionEvidence === null
+        ? Object.freeze([])
+        : failureRowsForComponentTests({
+            manifest,
+            componentTestRows,
+            executionEvidence
+          });
+    const qualifiedFailureRows =
       qualification?.componentExecutionFailureRegister?.failureRows ??
       Object.freeze([]);
+    const failureRows =
+      executionEvidence === null ? qualifiedFailureRows : derivedFailureRows;
+    const componentExecutionFailureRegister =
+      failureRows.length === 0
+        ? null
+        : Object.freeze({
+            kind: "component_execution_failure_register" as const,
+            registerVersion: "ts-component-depth-v1" as const,
+            failureRows
+          });
     writeStableJsonFile(
       manifest.outputFile,
       baseComponentDepthRegister({
         targetAssetType: manifest.targetAssetType,
-        componentTestRows: qualification?.componentTestRows ?? Object.freeze([]),
+        componentTestRows,
         componentTestQualificationRows:
           qualification?.componentTestQualificationRows ?? Object.freeze([]),
-        componentExecutionFailureRegister:
-          qualification?.componentExecutionFailureRegister ?? null,
+        componentExecutionFailureRegister,
         componentRepairSchedule: repairScheduleForFailures(failureRows, [
           componentDepthSurfaceFile(
             manifest,

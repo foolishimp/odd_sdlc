@@ -108,6 +108,7 @@ import type {
   SdlcWorkerProcessStartedContext,
   SdlcWorkerProcessSummary,
   SdlcWorkerRetryContext,
+  SdlcWorkerExecutionEvidence,
   SdlcWorkerResultReport,
   SdlcWorkerRunResult,
   SdlcDecompositionSummary,
@@ -3614,6 +3615,46 @@ function postActionCandidateFor(input: {
   });
 }
 
+function postRepairGraphFunctionCandidateForPlan(input: {
+  readonly plan: ReturnType<typeof componentRepairReentryPlansForGapDossier>[number];
+  readonly runRef: string;
+}): OddSdlcEvaluateNextActionInput {
+  const graphFunctionRef = input.plan.targetEdgeName;
+  const graphVectorRef = input.plan.targetEdgeName;
+  const publishedTraversalTargetRef = sdlcPublishedTraversalTargetRef({
+    graphFunctionRef,
+    graphVectorRef
+  });
+  const targetOutcomeRef = sdlcTargetOutcomeRef({
+    graphFunctionRef,
+    targetNodeRef: `node:odd_sdlc:${input.plan.targetAssetType}`
+  });
+  return Object.freeze({
+    actionRef: [
+      "construction-action://odd-sdlc/post-action",
+      graphFunctionRef,
+      "post_repair_reentry",
+      graphVectorRef,
+      encodeURIComponent(input.runRef)
+    ].join("/"),
+    actionKind: "reenter_graph_span" as const,
+    graphFunctionRef,
+    graphVectorRef,
+    publishedTraversalTargetRef,
+    targetOutcomeRef,
+    inputAssetRefs: Object.freeze([]),
+    expectedOutputAssetRefs: Object.freeze([targetOutcomeRef]),
+    requiredAuthorityRefs: Object.freeze([publishedTraversalTargetRef]),
+    eligibleReasonRefs: Object.freeze([
+      "evaluate_next_post_repair_reentry",
+      `repair_plan:${input.plan.planId}`,
+      `source_edge:${input.plan.sourceEdgeName}`,
+      `target_edge:${input.plan.targetEdgeName}`,
+      `failure:${input.plan.failureId}`
+    ])
+  });
+}
+
 export function deriveSdlcPostCloseOverlayContinuationActionInput(input: {
   readonly module: Module;
   readonly overlayRef: string | null;
@@ -4001,6 +4042,43 @@ function postActionCandidates(input: {
     ]);
   }
   if (input.closureDecisionDisposition === "repair") {
+    const repairReentryPlans =
+      input.state.gapDossier === null
+        ? Object.freeze([])
+        : componentRepairReentryPlansForGapDossier({
+            manifest: input.state.manifest,
+            dossier: input.state.gapDossier
+          });
+    const repairReentryVectorIndexes = repairReentryPlans
+      .map((plan) =>
+        vectorIndexByEdgeName({
+          basis: input.basis,
+          edgeName: plan.targetEdgeName
+        })
+      )
+      .filter(
+        (index): index is number =>
+          index !== null && index <= input.state.manifest.vectorIndex
+      );
+    if (repairReentryVectorIndexes.length > 0) {
+      return Object.freeze([
+        postActionCandidateFor({
+          basis: input.basis,
+          vectorIndex: Math.min(...repairReentryVectorIndexes),
+          basisKind: "post_repair_reentry",
+          actionKind: "reenter_graph_span"
+        })
+      ]);
+    }
+    const firstRepairReentryPlan = repairReentryPlans[0];
+    if (firstRepairReentryPlan !== undefined) {
+      return Object.freeze([
+        postRepairGraphFunctionCandidateForPlan({
+          plan: firstRepairReentryPlan,
+          runRef: input.runRef
+        })
+      ]);
+    }
     return Object.freeze([
       postActionCandidateFor({
         basis: input.basis,
@@ -4063,7 +4141,24 @@ function postProductMaterializationGraphTrackBlockingReasons(input: {
     : Object.freeze([]);
 }
 
-function edgeAssuranceEvidenceCandidatesFor(input: {
+function executionEvidenceClosesExecutionResultSource(input: {
+  readonly state: SdlcAbgOwnedFpDispatchState;
+  readonly executionEvidence: SdlcWorkerExecutionEvidence;
+}): boolean {
+  if (input.executionEvidence.reportRefs.length === 0) {
+    return false;
+  }
+  if (input.state.manifest.targetAssetType === "test_execution_result_surface") {
+    return input.executionEvidence.status !== "pending";
+  }
+  return (
+    input.executionEvidence.status === "succeeded" &&
+    (input.executionEvidence.testsObserved ?? 0) > 0 &&
+    (input.executionEvidence.failedCount ?? 0) === 0
+  );
+}
+
+export function edgeAssuranceEvidenceCandidatesFor(input: {
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly obligationIds: readonly string[];
 }): readonly SdlcEdgeEvidenceCandidate[] {
@@ -4089,9 +4184,10 @@ function edgeAssuranceEvidenceCandidatesFor(input: {
   const executionEvidence = input.state.workerReport?.executionEvidence ?? null;
   const executionCandidates =
     executionEvidence !== null &&
-    executionEvidence.status === "succeeded" &&
-    (executionEvidence.testsObserved ?? 0) > 0 &&
-    (executionEvidence.failedCount ?? 0) === 0
+    executionEvidenceClosesExecutionResultSource({
+      state: input.state,
+      executionEvidence
+    })
       ? executionEvidence.reportRefs.map((evidenceRef) =>
           Object.freeze({
             kind: "sdlc_edge_evidence_candidate" as const,

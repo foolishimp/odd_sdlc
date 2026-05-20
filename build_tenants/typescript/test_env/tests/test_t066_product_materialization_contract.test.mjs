@@ -40,10 +40,14 @@ import {
   constructSdlcNextActionProjection,
   constructorResultFromWorkerOutput,
   declaredProductFileTargets,
+  admitSdlcEdgeEvidence,
   deriveComponentDepthAssuranceLedger,
   deriveShallowRealizationAssuranceLedger,
+  deriveSdlcEdgeAssuranceCloseDecision,
   deriveSdlcEdgeClosureDecision,
+  deriveSdlcEdgeObligations,
   deriveSdlcOperatorAssuranceGate,
+  deriveSdlcEdgeResidualPressure,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcPostCloseOverlayContinuationActionInput,
   deriveSdlcProductLineageYieldResumeBasis,
@@ -53,6 +57,7 @@ import {
   deriveSdlcSourceInput,
   deriveWorkerHandoffManifest,
   executeInstalledOperatorStart,
+  edgeAssuranceEvidenceCandidatesFor,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
@@ -63,6 +68,7 @@ import {
   installOddSdlcTypescript,
   materializeSdlcProjectConformance,
   makeSdlcBlockingReason,
+  measureSdlcEdgeGain,
   evalSdlcGapFromReplay,
   normalizePostCloseContinuationVectorIndex,
   projectSdlcQueryDomain,
@@ -70,6 +76,7 @@ import {
   publicStartOnce,
   readOddSdlcRuntimeEvents,
   readWorkerResultReport,
+  resolveSdlcEdgeGainClosureContract,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
   sha256Text,
   snapshotProductMaterializationRoot,
@@ -6573,6 +6580,569 @@ test("T-115 failed execution evidence with zero observed tests is admitted for r
       (reason) => reason.code === "test_execution_zero_tests_observed"
     ),
     false
+  );
+});
+
+test("T-083 failed execution-result evidence closes the execution source for downstream repair", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const hookContract = hookContractByEdgeName("derive_test_execution_result_surface");
+  const edgeGainContract = resolveSdlcEdgeGainClosureContract(
+    "derive_test_execution_result_surface"
+  );
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: hookContract.edgeName,
+    vectorIndex: 26,
+    contract: hookContract,
+    projectConstraints: constraints,
+    runId: "t083-failed-execution-source-admitted"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "test_execution_result_surface");
+  const outputRef = `file://${manifest.outputFile}`;
+  const shard = manifest.productMaterialization.executionShards[0];
+  const report = {
+    kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile,
+    digest: output.digest,
+    summary: "framework-owned execution evidence observed a failed shard",
+    unresolvedReasons: [],
+    materializedFiles: [],
+    executionEvidence: {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command: manifest.productMaterialization.testExecutionContract,
+      status: "failed",
+      reportRefs: [outputRef],
+      testsObserved: 0,
+      passedCount: 0,
+      failedCount: 0,
+      shardEvidence: [
+        {
+          kind: "sdlc_worker_execution_shard_evidence",
+          shardId: shard.shardId,
+          moduleName: shard.moduleName,
+          lane: "test",
+          command: shard.command,
+          status: "failed",
+          reportRefs: [outputRef],
+          testsObserved: 0,
+          passedCount: 0,
+          failedCount: 0
+        }
+      ]
+    },
+    obligationAssessments: []
+  };
+  const executionResultObligation =
+    manifest.traversalObligationContext.obligations[0];
+  assert(executionResultObligation);
+  const obligationIds = [executionResultObligation.obligationId];
+  const candidates = edgeAssuranceEvidenceCandidatesFor({
+    state: { manifest, workerReport: report },
+    obligationIds
+  });
+  assert.equal(
+    candidates.some((candidate) => candidate.sourceKind === "execution_result"),
+    true
+  );
+
+  const obligations = deriveSdlcEdgeObligations({
+    contract: edgeGainContract,
+    obligationRefs: obligationIds
+  });
+  const admission = admitSdlcEdgeEvidence({
+    contract: edgeGainContract,
+    obligations,
+    candidates
+  });
+  const gain = measureSdlcEdgeGain({
+    contract: edgeGainContract,
+    obligations,
+    admittedEvidence: admission.admittedEvidence,
+    ledgerInputs: edgeGainContract.ledgerInputKinds.map((ledgerInputKind) => ({
+      kind: "sdlc_edge_ledger_input_ref",
+      ledgerInputKind,
+      ledgerRef: `ledger://t083/${ledgerInputKind}`
+    })),
+    requiredEvidenceSourceKinds: ["execution_result"]
+  });
+  const residualPressure = deriveSdlcEdgeResidualPressure(gain);
+  const closeDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain,
+    residualPressure
+  });
+
+  assert.equal(residualPressure.clear, true);
+  assert.equal(closeDecision.disposition, "close");
+});
+
+test("T-083 repair schedule classifies shared sbt build definition failures as high confidence", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const tenantRoot = path.join(workspace, "build_tenants/scala_spark");
+  const designRoot = path.join(tenantRoot, "design");
+  mkdirSync(designRoot, { recursive: true });
+  const componentTestRows = [
+    {
+      kind: "sdlc_component_test_realization_row",
+      testClassId: "cdme.compiler.CompilerSpec",
+      relativePath:
+        "build_tenants/scala_spark/src/test/scala/cdme/compiler/CompilerSpec.scala",
+      testcaseIds: ["testcase://cdme-compiler/TC-COMPILER-001"],
+      componentIds: ["comp-compiler"],
+      requirementIds: ["REQ-T083-COMPILER"],
+      shardId: "test-shard-01-cdme-compiler"
+    },
+    {
+      kind: "sdlc_component_test_realization_row",
+      testClassId: "cdme.engine.EngineIntegrationSpec",
+      relativePath:
+        "build_tenants/scala_spark/src/test/scala/cdme/engine/EngineIntegrationSpec.scala",
+      testcaseIds: ["testcase://cdme-engine/TC-ENGINE-001"],
+      componentIds: ["comp-engine"],
+      requirementIds: ["REQ-T083-ENGINE"],
+      shardId: "test-shard-07-cdme-engine"
+    }
+  ];
+  writeFileSync(
+    path.join(designRoot, "component_test_surface.md"),
+    stableJsonForTest({
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_test_surface",
+      componentTopologyRows: [],
+      componentRealizationRows: [],
+      testComponentTopologyRows: [],
+      componentTestRows,
+      componentTestQualificationRows: [],
+      componentExecutionFailureRegister: null,
+      componentRepairSchedule: null,
+      releaseDepthParity: null
+    }),
+    "utf8"
+  );
+
+  const executionContract = hookContractByEdgeName(
+    "derive_test_execution_result_surface"
+  );
+  const executionManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: executionContract.edgeName,
+    vectorIndex: 26,
+    contract: executionContract,
+    projectConstraints: constraints,
+    runId: "t083-sbt-build-failure"
+  });
+  writeHandoffFiles(executionManifest);
+  const executionRoot = path.join(
+    executionManifest.archiveRoot,
+    "installed_operator_execution"
+  );
+  mkdirSync(executionRoot, { recursive: true });
+  const stderrPath = path.join(
+    executionRoot,
+    "test-shard-01-cdme-compiler.stderr.log"
+  );
+  writeFileSync(
+    stderrPath,
+    [
+      `${path.join(tenantRoot, "build.sbt")}:13: error: not found: value assembly`,
+      "assembly / assemblyMergeStrategy := {",
+      "^",
+      `${path.join(tenantRoot, "build.sbt")}:14: error: not found: value MergeStrategy`,
+      "  case PathList(\"META-INF\", xs @ _*) => MergeStrategy.discard"
+    ].join("\n"),
+    "utf8"
+  );
+  const summaryPath = path.join(
+    executionRoot,
+    "test-shard-01-cdme-compiler.summary.json"
+  );
+  writeFileSync(
+    summaryPath,
+    stableJsonForTest({
+      kind: "sdlc_installed_operator_execution_shard_summary",
+      shardId: "test-shard-01-cdme-compiler",
+      command: 'sbt "cdme-compiler/test"',
+      workingDirectory: tenantRoot,
+      status: 1,
+      signal: null,
+      error: null,
+      timedOut: false
+    }),
+    "utf8"
+  );
+  const fpEvaluatePath = executionManifest.fpEvaluateResultFile;
+  writeFileSync(fpEvaluatePath, "{}\n", "utf8");
+  writeFileSync(
+    executionManifest.reportFile,
+    stableJsonForTest({
+      kind: "odd_sdlc.worker_result_report",
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(fpEvaluatePath).href,
+      graphFunctionName: "derive_test_execution_result_surface",
+      edgeName: "derive_test_execution_result_surface",
+      targetAssetType: "test_execution_result_surface",
+      outputFile: executionManifest.outputFile,
+      digest: "sha256:t083",
+      summary: "framework-owned execution evidence observed sbt build definition failure",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      executionEvidence: {
+        kind: "sdlc_worker_execution_evidence",
+        lane: "test",
+        command: "sbt test",
+        status: "failed",
+        reportRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href],
+        testsObserved: 0,
+        passedCount: 0,
+        failedCount: 0,
+        shardEvidence: componentTestRows.map((row) => ({
+          kind: "sdlc_worker_execution_shard_evidence",
+          shardId: row.shardId,
+          moduleName: row.componentIds[0],
+          lane: "test",
+          command: `sbt "${row.componentIds[0]}/test"`,
+          status: "failed",
+          reportRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href],
+          testsObserved: 0,
+          passedCount: 0,
+          failedCount: 0
+        }))
+      },
+      obligationAssessments: []
+    }),
+    "utf8"
+  );
+
+  const qualificationContract = hookContractByEdgeName(
+    "qualify_component_test_execution_surface"
+  );
+  const qualificationManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: qualificationContract.edgeName,
+    vectorIndex: 27,
+    contract: qualificationContract,
+    projectConstraints: constraints,
+    runId: "t083-sbt-build-failure-qualification"
+  });
+  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: qualificationManifest });
+  writeFileSync(
+    qualificationManifest.outputFile,
+    stableJsonForTest({
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_test_qualification_surface",
+      componentTopologyRows: [],
+      componentRealizationRows: [],
+      testComponentTopologyRows: [],
+      componentTestRows,
+      componentTestQualificationRows: [],
+      componentExecutionFailureRegister: {
+        kind: "component_execution_failure_register",
+        registerVersion: "ts-component-depth-v1",
+        failureRows: componentTestRows.map((row) => ({
+          kind: "sdlc_component_execution_failure_row",
+          failureId: `failure:${row.testClassId}:${row.shardId}`,
+          shardId: row.shardId,
+          moduleName: row.componentIds[0],
+          testClassId: row.testClassId,
+          testcaseIds: row.testcaseIds,
+          componentIds: row.componentIds,
+          requirementIds: row.requirementIds,
+          failureKind: "assertion_failure",
+          repairTarget: "component_code",
+          lawfulReentryPoint: "repair_worker_output",
+          attributionConfidence: "medium",
+          sourceRefs: row.componentIds.map((id) => `component:${id}`),
+          testRefs: [pathToFileURL(path.join(tenantRoot, row.relativePath)).href],
+          evidenceRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href]
+        }))
+      },
+      componentRepairSchedule: null,
+      releaseDepthParity: null
+    }),
+    "utf8"
+  );
+
+  const scheduleContract = hookContractByEdgeName(
+    "derive_component_repair_schedule_surface"
+  );
+  const scheduleManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: scheduleContract.edgeName,
+    vectorIndex: 28,
+    contract: scheduleContract,
+    projectConstraints: constraints,
+    runId: "t083-sbt-build-failure-schedule"
+  });
+  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: scheduleManifest });
+  const register = JSON.parse(readFileSync(scheduleManifest.outputFile, "utf8"));
+  const repairRows = register.componentRepairSchedule.repairRows;
+
+  assert.equal(repairRows.length, 1);
+  assert.equal(repairRows[0].failureId, "failure:sbt-build-definition:all-shards");
+  assert.equal(repairRows[0].repairTarget, "component_code");
+  assert.equal(repairRows[0].attributionConfidence, "high");
+  assert(
+    repairRows[0].sourceRefs.some((ref) => ref.endsWith("/build.sbt"))
+  );
+  assert(
+    repairRows[0].testRefs.some((ref) =>
+      ref.endsWith("/build_tenants/scala_spark/src/test/scala/cdme/compiler/CompilerSpec.scala")
+    )
+  );
+});
+
+test("T-083 component-code admits sbt build plugin targets declared by implementation design", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
+  register.fileTargetRows = [
+    ...register.fileTargetRows,
+    {
+      kind: "sdlc_file_target_row",
+      relativePath: "build_tenants/scala_spark/build.sbt",
+      role: "build-config"
+    },
+    {
+      kind: "sdlc_file_target_row",
+      relativePath: "build_tenants/scala_spark/project/assembly.sbt",
+      role: "build-plugin"
+    }
+  ];
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(register, null, 2)}\n`,
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 22,
+    contract,
+    projectConstraints: constraints,
+    runId: "t083-sbt-build-plugin-target"
+  });
+
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/scala_spark/build.sbt",
+    "build_tenants/scala_spark/project/assembly.sbt",
+    "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala"
+  ]);
+
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeOutputSurface(manifest, "component_code_surface");
+  const files = new Map([
+    [
+      "build.sbt",
+      [
+        'name := "cdme"',
+        'scalaVersion := "2.13.12"',
+        "assembly / assemblyMergeStrategy := {",
+        '  case PathList("META-INF", xs @ _*) => MergeStrategy.discard',
+        "}"
+      ].join("\n") + "\n"
+    ],
+    [
+      "project/assembly.sbt",
+      'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.0")\n'
+    ],
+    [
+      "src/main/scala/generated/DataMapper.scala",
+      [
+        "// Implements: reqref://t066/default",
+        "package generated",
+        "object DataMapper"
+      ].join("\n") + "\n"
+    ]
+  ]);
+  for (const [relativePath, content] of files.entries()) {
+    const absolutePath = path.join(
+      manifest.productMaterialization.tenantRoot,
+      relativePath
+    );
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, content, "utf8");
+  }
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const assemblyFile = report.materializedFiles.find(
+    (file) => file.relativePath === "project/assembly.sbt"
+  );
+  assert(assemblyFile);
+  assert.equal(assemblyFile.role, "build_config");
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(
+    postflight.blockingReasons.includes(
+      "materialized_product_file_unbound_to_declared_target"
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+  );
+});
+
+test("T-083 replay reclassifies legacy sbt plugin without rewriting source roles", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
+  register.fileTargetRows = [
+    ...register.fileTargetRows,
+    {
+      kind: "sdlc_file_target_row",
+      relativePath: "build_tenants/scala_spark/project/assembly.sbt",
+      role: "build-plugin"
+    }
+  ];
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(register, null, 2)}\n`,
+    "utf8"
+  );
+
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 22,
+    contract,
+    projectConstraints: constraints,
+    runId: "t083-legacy-sbt-plugin-predecessor"
+  });
+  writeHandoffFiles(firstManifest);
+  const sourcePath = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/DataMapper.scala"
+  );
+  const assemblyPath = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    "project/assembly.sbt"
+  );
+  const sourceContent = [
+    "// Implements: reqref://t066/default",
+    "package generated",
+    "object DataMapper"
+  ].join("\n") + "\n";
+  const assemblyContent =
+    'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.2.0")\n';
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  mkdirSync(dirname(assemblyPath), { recursive: true });
+  writeFileSync(sourcePath, sourceContent, "utf8");
+  writeFileSync(assemblyPath, assemblyContent, "utf8");
+  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), {
+    recursive: true
+  });
+  writeFileSync(
+    firstManifest.productMaterialization.manifestFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_product_materialization_manifest",
+        contract: firstManifest.productMaterialization,
+        files: [
+          {
+            kind: "sdlc_materialized_product_file",
+            role: "source",
+            rolePolicyRef: "target-role-policy://odd-sdlc/implementation-design/source",
+            relativePath: "src/main/scala/generated/DataMapper.scala",
+            absolutePath: sourcePath,
+            digest: sha256Text(sourceContent),
+            byteCount: Buffer.byteLength(sourceContent, "utf8"),
+            requirementTraceObligationIds: requirementObligationIds(firstManifest)
+          },
+          {
+            kind: "sdlc_materialized_product_file",
+            role: "other",
+            rolePolicyRef: "target-role-policy://odd-sdlc/reported-other",
+            relativePath: "project/assembly.sbt",
+            absolutePath: assemblyPath,
+            digest: sha256Text(assemblyContent),
+            byteCount: Buffer.byteLength(assemblyContent, "utf8")
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 22,
+    contract,
+    projectConstraints: constraints,
+    runId: "t083-legacy-sbt-plugin-replay"
+  });
+  const before = snapshotProductMaterializationRoot(
+    repairManifest.productMaterialization
+  );
+  writeHandoffFiles(repairManifest);
+  writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
+
+  const report = buildPostTransformWorkerResultReport({
+    manifest: repairManifest,
+    before
+  });
+  const sourceFile = report.materializedFiles.find(
+    (file) => file.relativePath === "src/main/scala/generated/DataMapper.scala"
+  );
+  const assemblyFile = report.materializedFiles.find(
+    (file) => file.relativePath === "project/assembly.sbt"
+  );
+  assert(sourceFile);
+  assert(assemblyFile);
+  assert.equal(sourceFile.role, "source");
+  assert.equal(
+    sourceFile.rolePolicyRef,
+    "target-role-policy://odd-sdlc/implementation-design/source"
+  );
+  assert.equal(assemblyFile.role, "build_config");
+  assert.equal(
+    assemblyFile.rolePolicyRef,
+    "target-role-policy://odd-sdlc/implementation-design/build_config"
+  );
+  const postflight = evaluateWorkerResultPostflight({ manifest: repairManifest, report });
+  assert.equal(
+    postflight.blockingReasons.includes(
+      "materialized_product_role_policy_ref_mismatch"
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+  );
+  assert.equal(
+    postflight.blockingReasons.includes(
+      "materialized_product_file_unbound_to_declared_target"
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
 

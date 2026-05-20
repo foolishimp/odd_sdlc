@@ -1486,6 +1486,17 @@ function replayNextActionFromOutcome(
   });
 }
 
+function replayNextActionRequiresFreshTargetTraversal(input: {
+  readonly latestOutcome: SdlcInstalledOperatorStartOutcome;
+  readonly replayNextAction: NonNullable<Parameters<typeof startOutcomeFor>[1]>;
+}): boolean {
+  return (
+    input.replayNextAction.selectedActionRef.includes("/post_repair_reentry/") &&
+    input.replayNextAction.nextGraphFunctionRef !==
+      input.latestOutcome.summary.graphFunctionName
+  );
+}
+
 function basisIdValue(event: RuntimeEvent): string | null {
   const value: unknown = Reflect.get(event, "basisId");
   return typeof value === "string" ? value : null;
@@ -1776,6 +1787,12 @@ async function installedStartPayloadFor(
         replayEvents:
           refreshedStart.executionContract === null
             ? Object.freeze([])
+            : replayNextAction !== undefined &&
+                replayNextActionRequiresFreshTargetTraversal({
+                  latestOutcome,
+                  replayNextAction
+                })
+              ? EMPTY_RUNTIME_EVENTS
             : replayEventsForBasis(
               refreshedStart.executionContract.basis,
               refreshedEvents

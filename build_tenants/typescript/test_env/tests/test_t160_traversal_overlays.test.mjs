@@ -957,3 +957,16 @@ test("T-160 spec-method replay preserves overlay target identity", () => {
     /overlayRef: selectedNextGraphFunction\.overlayRef/
   );
 });
+
+test("T-160 cross-graph repair reentry does not replay already-closed target basis", () => {
+  const source = readFileSync(
+    new URL("../../code/src/spec_method/entry.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /function replayNextActionRequiresFreshTargetTraversal/);
+  assert.match(source, /selectedActionRef\.includes\("\/post_repair_reentry\/"\)/);
+  assert.match(source, /latestOutcome\.summary\.graphFunctionName/);
+  assert.match(source, /replayNextActionRequiresFreshTargetTraversal\(/);
+  assert.match(source, /EMPTY_RUNTIME_EVENTS/);
+});
