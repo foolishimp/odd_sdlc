@@ -480,7 +480,7 @@ test("T-164 overlay matrix covers every current overlay-selected vector", () => 
     catalog.overlays.flatMap((overlay) => overlay.graphVectorRefs)
   );
 
-  assert.equal(catalog.overlays.length, 4);
+  assert.equal(catalog.overlays.length, 5);
   assert.equal(overlayVectorUnion.length, 32);
 
   for (const overlay of catalog.overlays) {

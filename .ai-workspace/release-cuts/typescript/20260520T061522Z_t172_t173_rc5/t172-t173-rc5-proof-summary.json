@@ -1,0 +1,42 @@
+{
+  "kind": "odd_sdlc_rc_proof_summary",
+  "rc": "v2.0.0-rc.5",
+  "release_cut": ".ai-workspace/release-cuts/typescript/20260520T061522Z_t172_t173_rc5",
+  "package_artifact": ".ai-workspace/release-cuts/typescript/20260520T061522Z_t172_t173_rc5/package/pack-zkfN9D/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+  "release_manifest": ".ai-workspace/release-cuts/typescript/20260520T061522Z_t172_t173_rc5/release-cut-manifest.json",
+  "scope": [
+    "T-172 staged disambiguation graph and decomposition admission repairs",
+    "T-173 complexity-admitted Min(F_P) traversal-selection repairs",
+    "no-dispatch evaluator-owned edge execution repair",
+    "generic npm test command synthesis for tenants without npm workspaces",
+    "semantic regression repair for T-064, T-093, T-101, T-147, T-151, and T-158"
+  ],
+  "verification": [
+    {
+      "command": "npm run lint:semantic",
+      "cwd": "build_tenants/typescript",
+      "status": "passed"
+    },
+    {
+      "command": "npm run lint:test-harness",
+      "cwd": "build_tenants/typescript",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "cwd": ".",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:semantic",
+      "cwd": "build_tenants/typescript",
+      "status": "passed",
+      "observed": {
+        "tests": 715,
+        "passed": 715,
+        "failed": 0
+      }
+    }
+  ],
+  "rc_boundary": "This is an RC package release cut. It is not a final release and does not close T-172 or T-173 live-proof gates by itself."
+}

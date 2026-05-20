@@ -136,12 +136,53 @@ function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
   const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
   const helloWorldJavascript =
     constraints.selectedOutputRoot.endsWith("hello_world_javascript");
+  const helloWorldRust =
+    constraints.selectedOutputRoot.includes("hello_world_rust");
   const sourceRelative = helloWorldJavascript
     ? "src/hello.js"
+    : helloWorldRust
+      ? "src/main.rs"
     : "src/main/scala/generated/DataMapper.scala";
   const testRelative = helloWorldJavascript
     ? "test/hello.test.js"
+    : helloWorldRust
+      ? "tests/main.test.rs"
     : "src/test/scala/generated/DataMapperSpec.scala";
+  const stackLanguage = helloWorldJavascript
+    ? "javascript"
+    : helloWorldRust
+      ? "rust"
+      : "scala";
+  const stackBuildTool = helloWorldJavascript
+    ? "node"
+    : helloWorldRust
+      ? "cargo"
+      : "sbt";
+  const fileTargetRows = helloWorldRust
+    ? [
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: "Cargo.toml",
+          role: "build_config"
+        },
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: sourceRelative,
+          role: "source"
+        }
+      ]
+    : [
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: sourceRelative,
+          role: "source"
+        },
+        {
+          kind: "sdlc_file_target_row",
+          relativePath: testRelative,
+          role: "test"
+        }
+      ];
   const implementationDesignFile = path.join(
     tenantRoot,
     "design/adrs/ADR-002-implementation-design-surface.md"
@@ -162,8 +203,8 @@ function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
           {
             kind: "sdlc_stack_profile_row",
             stackRef: "stack://t066/scala-sbt",
-            language: "scala",
-            buildTool: "sbt"
+            language: stackLanguage,
+            buildTool: stackBuildTool
           }
         ],
         implementationModuleRows: [
@@ -192,18 +233,7 @@ function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
           }
         ],
         componentRealizationRows: [],
-        fileTargetRows: [
-          {
-            kind: "sdlc_file_target_row",
-            relativePath: sourceRelative,
-            role: "source"
-          },
-          {
-            kind: "sdlc_file_target_row",
-            relativePath: testRelative,
-            role: "test"
-          }
-        ],
+        fileTargetRows,
         designCompletenessVerdict: null
       },
       null,
@@ -347,6 +377,7 @@ function makeCapabilityWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  writeAdmittedStagedAuthoritySurfaces(root);
   return root;
 }
 
@@ -468,8 +499,8 @@ function writePlaceholderWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const sourceRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
-      "const testRelative = 'cdme-core/src/test/scala/cdme/CoreSpec.scala';",
+      "const sourceRelative = 'src/main/scala/generated/DataMapper.scala';",
+      "const testRelative = 'src/test/scala/generated/DataMapperSpec.scala';",
       "function designCompletenessVerdict() {",
       "  const axis = (name) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis: name, status: 'satisfied', reasons: [], evidenceRefs: [`file://${manifest.outputFile}`] });",
       "  return { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') };",
@@ -549,8 +580,8 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
-      "const sourceRelative = 'cdme-core/src/main/scala/cdme/Core.scala';",
-      "const testRelative = 'cdme-core/src/test/scala/cdme/CoreSpec.scala';",
+      "const sourceRelative = 'src/main/scala/generated/DataMapper.scala';",
+      "const testRelative = 'src/test/scala/generated/DataMapperSpec.scala';",
       "function componentDepthRegister() {",
       "  const base = { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType };",
       "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', requirementIds: ['REQ-DM-001'], sourceAssetRefs: ['fixture://data_mapper'] };",
@@ -563,6 +594,11 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "  if (manifest.targetAssetType === 'component_repair_schedule_surface') return { ...base, componentRepairSchedule: repairSchedule };",
       "  if (manifest.targetAssetType === 'release_depth_parity_surface') return { ...base, releaseDepthParity: { kind: 'sdlc_release_depth_parity_assessment', status: 'met', summary: 'component depth parity met for fixture worker', blockingReasons: [], evidenceRefs: [`file://${manifest.outputFile}`] } };",
       "  return null;",
+      "}",
+      "function testDesignRegister() {",
+      "  if (manifest.targetAssetType !== 'test_design_surface') return null;",
+      "  const testCase = { kind: 'sdlc_test_case_row', testCaseRef: 'TC-DM-001', caseKind: 'uat', executionLane: 'integration', sourceDesignObligationRefs: requirementObligationIds, testcaseAuthorityRefs: ['testcase-authority://t066/TC-DM-001'], expectedBehavior: 'DataMapper generated source is exercised by DataMapperSpec' };",
+      "  return { kind: 'sdlc_test_design_register', registerVersion: 'ts-test-design-v1', targetAssetType: 'test_design_surface', designConsumptionRows: [{ kind: 'sdlc_design_consumption_contract', contractRef: 'design-consumption://t066/capability-test-design', sourceDesignObligationRefs: requirementObligationIds, authorityBasisRefs: manifest.inputAssetTypes.map((assetType) => `asset-type://${assetType}`), consumerGraphFunctionRefs: ['derive_component_test_surface', 'prepare_test_execution_surface', 'derive_test_execution_result_surface'] }], uatTestcaseRows: [testCase], testcaseAuthorityRows: [testCase], testStackProfileRows: [{ kind: 'sdlc_test_stack_profile_row', stackRef: 'stack://t066/scala-sbt-test', frameworkRef: 'framework://scalatest', buildTool: 'sbt' }], testModuleRows: [{ kind: 'sdlc_test_module_row', moduleName: 'generated-tests', moduleRef: 'module://t066/generated-tests', testRoot: 'src/test/scala' }], testComponentTopologyRows: [{ kind: 'sdlc_test_component_topology_row', testClassId: 'DataMapperSpec', relativePath: testRelative, testcaseIds: ['TC-DM-001'], componentIds: ['cdme-core'], requirementIds: ['REQ-DM-001'], shardId: 'test-shard-01-cdme-core' }], testDataBindings: [{ kind: 'sdlc_test_data_binding', testDataRef: 'test-data://t066/default', testCaseRef: 'TC-DM-001', inputFixtureRefs: ['fixture://t066/default'], generationPolicyRef: 'generation-policy://t066/static', expectedResultRef: 'expected-result://t066/TC-DM-001', sourceDesignObligationRefs: requirementObligationIds }], expectedResultBindings: [{ kind: 'sdlc_expected_result_binding', expectedResultRef: 'expected-result://t066/TC-DM-001', testCaseRef: 'TC-DM-001', assertionRefs: ['assertion://t066/DataMapperSpec'], expectedResultSummary: 'DataMapperSpec passes', verificationPolicyRef: 'verification-policy://t066/scalatest' }], uatIntegrationBindings: [{ kind: 'sdlc_uat_integration_binding', uatTestCaseRef: 'TC-DM-001', integrationTestCaseRef: 'TC-DM-001', executionLane: 'integration' }], testExecutionScheduleRows: [{ kind: 'sdlc_test_execution_schedule_row', scheduleRef: 'test-schedule://t066/capability', testCaseRefs: ['TC-DM-001'], command: 'sbt test', frameworkRef: 'framework://scalatest', shardId: 'test-shard-01-cdme-core' }] };",
       "}",
       "const register = componentDepthRegister();",
       "function currentRequirementTraceIds() {",
@@ -580,6 +616,8 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "const outputLines = [`# ${manifest.targetAssetType}`];",
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
+      "const testRegister = testDesignRegister();",
+      "if (testRegister !== null) outputLines.push('', '```test_design_register', JSON.stringify(testRegister, null, 2), '```');",
       "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
@@ -827,7 +865,10 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  materializedFiles.push({ kind: 'sdlc_materialized_product_file', role, relativePath: tenantRelative, absolutePath: productPath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8'), requirementTraceObligationIds: requirementObligationIds });",
       "  if (role === 'test') {",
       "    const buildPath = path.join(manifest.productMaterialization.tenantRoot, 'build.sbt');",
-      "    const buildConfig = `${requirementObligationIds.map((id) => `// ${id}`).join('\\n')}\\nThisBuild / scalaVersion := \"2.12.18\"\\nlibraryDependencies += \"org.scalatest\" %% \"scalatest\" % \"3.2.19\" % Test\\nlazy val root = project.in(file(\".\")).settings(name := \"cdme-core\")\\n`; ",
+      "    const moduleNames = manifest.productMaterialization.declaredModuleNames.length > 0 ? manifest.productMaterialization.declaredModuleNames : ['cdme-compiler'];",
+      "    const moduleProjects = moduleNames.map((moduleName) => `lazy val \\`${moduleName}\\` = project.in(file(\"${moduleName}\"))`).join('\\n');",
+      "    const aggregateRefs = moduleNames.map((moduleName) => `\\`${moduleName}\\``).join(', ');",
+      "    const buildConfig = `${requirementObligationIds.map((id) => `// ${id}`).join('\\n')}\\nThisBuild / scalaVersion := \"2.12.18\"\\nThisBuild / libraryDependencies += \"org.scalatest\" %% \"scalatest\" % \"3.2.19\" % Test\\n${moduleProjects}\\nlazy val root = project.in(file(\".\")).aggregate(${aggregateRefs})\\n`; ",
       "    writeFileSync(buildPath, buildConfig, 'utf8');",
       "    const buildDigest = `sha256:${createHash('sha256').update(buildConfig, 'utf8').digest('hex')}`;",
       "    materializedFiles.push({ kind: 'sdlc_materialized_product_file', role: 'build_config', relativePath: 'build.sbt', absolutePath: buildPath, digest: buildDigest, byteCount: Buffer.byteLength(buildConfig, 'utf8'), requirementTraceObligationIds: requirementObligationIds });",
@@ -1445,10 +1486,10 @@ test("T-159 product materialization blocks cited source without requirement line
   });
   writeHandoffFiles(manifest);
   const output = writeOutputSurface(manifest, "component_code_surface");
-  const sourceContent = ["package generated", "", "object Main"].join("\n");
+  const sourceContent = ["package generated", "", "object DataMapper"].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1502,11 +1543,11 @@ test("T-159 product materialization blocks source row without requirement lineag
     ...requirementIds.map((id) => `// Implements: ${id}`),
     "package generated",
     "",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1568,6 +1609,8 @@ test("T-159 product materialization blocks source row without requirement lineag
 
 test("T-171 product materialization permits auxiliary build config without requirement lineage", () => {
   const workspace = makeWorkspace();
+  declareScalaSbtTestRunner(workspace);
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -1587,11 +1630,11 @@ test("T-171 product materialization permits auxiliary build config without requi
     ...requirementTraceLines(manifest),
     "package generated",
     "",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1667,11 +1710,11 @@ test("T-159 product materialization blocks lineage outside current obligations",
     `// Implements: ${unrelatedId}`,
     "package generated",
     "",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1770,11 +1813,11 @@ test("T-159 product materialization admits source with requirement lineage in fi
     ...requirementTags.map((tag) => `// Implements: ${tag}`),
     "package generated",
     "",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1853,7 +1896,7 @@ test("T-159 product materialization canonicalizes duplicate requirement authorit
       "# Product",
       "",
       "- requirement authority preserves every keyed REQ-T066-00x identifier",
-      "- declared source file: build_tenants/scala_spark/src/main/scala/generated/Main.scala"
+      "- declared source file: build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala"
     ].join("\n"),
     "utf8"
   );
@@ -1888,11 +1931,11 @@ test("T-159 product materialization canonicalizes duplicate requirement authorit
     ...invocationPackage.requirementTraceObligationIds.map((id) => `// ${id}`),
     "package generated",
     "",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${sourceContent}\n`, "utf8");
@@ -1975,12 +2018,12 @@ test("T-164 post-transform closes duplicate requirement aliases from canonical t
   writeOutputSurface(manifest, "component_code_surface");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const source = [
     ...invocationPackage.requirementTraceObligationIds.map((id) => `// ${id}`),
     "package generated",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${source}\n`, "utf8");
@@ -2041,12 +2084,12 @@ test("T-164 product lineage admits full requirement set beyond prompt slice", ()
   const output = writeOutputSurface(manifest, "component_code_surface");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/Main.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const source = [
     ...allRequirementIds.map((id) => `// ${id}`),
     "package generated",
-    "object Main"
+    "object DataMapper"
   ].join("\n");
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${source}\n`, "utf8");
@@ -2670,7 +2713,7 @@ test("T-004 tenant-local surface output is not counted as product source materia
   ].join("\n");
   const productFile = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/TenantSurfacePlacement.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   mkdirSync(dirname(productFile), { recursive: true });
   writeFileSync(productFile, `${productContent}\n`, "utf8");
@@ -2684,7 +2727,7 @@ test("T-004 tenant-local surface output is not counted as product source materia
   );
   assert.deepStrictEqual(
     report.materializedFiles.map((file) => file.relativePath),
-    ["src/main/scala/generated/TenantSurfacePlacement.scala"]
+    ["src/main/scala/generated/DataMapper.scala"]
   );
   assert.equal(report.materializedFiles[0].role, "source");
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
@@ -2693,6 +2736,8 @@ test("T-004 tenant-local surface output is not counted as product source materia
 
 test("T-002 component-code materialization ignores build execution byproducts", () => {
   const workspace = makeWorkspace();
+  declareScalaSbtTestRunner(workspace);
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -2709,7 +2754,7 @@ test("T-002 component-code materialization ignores build execution byproducts", 
   );
   writeHandoffFiles(manifest);
   writeOutputSurface(manifest, "component_code_surface");
-  const sourceRelativePath = "src/main/scala/generated/Generated.scala";
+  const sourceRelativePath = "src/main/scala/generated/DataMapper.scala";
   const sourcePath = path.join(
     manifest.productMaterialization.tenantRoot,
     sourceRelativePath
@@ -2760,7 +2805,7 @@ test("T-002 component-code materialization ignores build execution byproducts", 
     report.materializedFiles.map((file) => file.relativePath),
     [sbtProjectRelativePath, sourceRelativePath]
   );
-  assert.equal(report.materializedFiles[0].role, "other");
+  assert.equal(report.materializedFiles[0].role, "build_config");
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
@@ -2783,6 +2828,27 @@ test("T-159 post-transform assessments do not flatten every requirement onto eve
   });
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const implementationDesignRegister = JSON.parse(
+    readFileSync(implementationDesignFile, "utf8")
+  );
+  implementationDesignRegister.fileTargetRows = [
+    ...implementationDesignRegister.fileTargetRows,
+    {
+      kind: "sdlc_file_target_row",
+      relativePath: "src/main/scala/generated/Helper.scala",
+      role: "source"
+    }
+  ];
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
+    "utf8"
+  );
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -2803,14 +2869,14 @@ test("T-159 post-transform assessments do not flatten every requirement onto eve
   );
   writeHandoffFiles(manifest);
   writeOutputSurface(manifest, "component_code_surface");
-  const mainRelativePath = "src/main/scala/generated/Main.scala";
+  const mainRelativePath = "src/main/scala/generated/DataMapper.scala";
   const helperRelativePath = "src/main/scala/generated/Helper.scala";
   const mainPath = path.join(manifest.productMaterialization.tenantRoot, mainRelativePath);
   const helperPath = path.join(
     manifest.productMaterialization.tenantRoot,
     helperRelativePath
   );
-  const mainContent = [`// ${mainRequirement}`, "package generated", "object Main"].join("\n");
+  const mainContent = [`// ${mainRequirement}`, "package generated", "object DataMapper"].join("\n");
   const helperContent = [
     `// ${helperRequirement}`,
     "package generated",
@@ -2888,7 +2954,8 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     runId: "t004-adr-field-validation"
   });
   writeHandoffFiles(manifest);
-  const incomplete = writeOutputSurface(manifest, "implementation_design_surface");
+  const incompleteContent = readFileSync(manifest.outputFile, "utf8");
+  const incomplete = { digest: sha256Text(incompleteContent) };
   writeReport({
     manifest,
     digest: incomplete.digest,
@@ -2899,7 +2966,7 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     manifest,
     report: readWorkerResultReport(manifest)
   });
-  assert.equal(advisory.status, "passed");
+  assert.equal(advisory.status, "passed", JSON.stringify(advisory.blockingReasons));
   assert.equal(
     advisory.blockingReasons.includes("adr_output_required_field_missing:Status"),
     false
@@ -2923,7 +2990,11 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     "",
     "## Decision",
     "",
-    "Write the implementation design decision into the tenant ADR folder."
+    "Write the implementation design decision into the tenant ADR folder.",
+    "",
+    "```design_depth_register",
+    incompleteContent,
+    "```"
   ].join("\n");
   writeFileSync(manifest.outputFile, `${adr}\n`, "utf8");
   writeReport({
@@ -2993,7 +3064,7 @@ test("T-158 product materialization repair replays prior same-edge manifest", ()
   const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
   const sourcePath = path.join(
     firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const firstRequirementIds = requirementObligationIds(firstManifest);
   assert(firstRequirementIds.length > 0);
@@ -3015,7 +3086,7 @@ test("T-158 product materialization repair replays prior same-edge manifest", ()
       {
         kind: "sdlc_materialized_product_file",
         role: "source",
-        relativePath: "src/main/scala/Example.scala",
+        relativePath: "src/main/scala/generated/DataMapper.scala",
         absolutePath: sourcePath,
         digest: sha256Text(`${sourceContent}\n`),
         byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
@@ -3103,7 +3174,7 @@ test("T-171 product materialization repair admits current bytes over stale repla
   const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
   const sourcePath = path.join(
     firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const requirementIds = requirementObligationIds(firstManifest);
   assert(requirementIds.length > 0);
@@ -3125,7 +3196,7 @@ test("T-171 product materialization repair admits current bytes over stale repla
       {
         kind: "sdlc_materialized_product_file",
         role: "source",
-        relativePath: "src/main/scala/Example.scala",
+        relativePath: "src/main/scala/generated/DataMapper.scala",
         absolutePath: sourcePath,
         digest: sha256Text(firstSourceContent),
         byteCount: Buffer.byteLength(firstSourceContent, "utf8"),
@@ -3888,7 +3959,7 @@ test("T-158 replay preserves predecessor role policy instead of synthesizing it"
   writeHandoffFiles(firstManifest);
   const sourcePath = path.join(
     firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const requirementIds = requirementObligationIds(firstManifest);
   assert(requirementIds.length > 0);
@@ -3912,7 +3983,7 @@ test("T-158 replay preserves predecessor role policy instead of synthesizing it"
           {
             kind: "sdlc_materialized_product_file",
             role: "source",
-            relativePath: "src/main/scala/Example.scala",
+            relativePath: "src/main/scala/generated/DataMapper.scala",
             absolutePath: sourcePath,
             digest: sha256Text(`${sourceContent}\n`),
             byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
@@ -3977,7 +4048,7 @@ test("T-158 observed unchanged repair files keep prior admitted role policy befo
   });
   writeHandoffFiles(firstManifest);
   const firstOutput = writeOutputSurface(firstManifest, "component_test_surface");
-  const testRelativePath = "src/main/scala/Example.scala";
+  const testRelativePath = "src/main/scala/generated/DataMapper.scala";
   const testPath = path.join(
     firstManifest.productMaterialization.tenantRoot,
     testRelativePath
@@ -4115,7 +4186,7 @@ test("T-158 mismatched predecessor materialization cannot satisfy repair", () =>
   const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
   const sourcePath = path.join(
     firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const sourceContent = "package example\nobject Example\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -4128,7 +4199,7 @@ test("T-158 mismatched predecessor materialization cannot satisfy repair", () =>
       {
         kind: "sdlc_materialized_product_file",
         role: "source",
-        relativePath: "src/main/scala/Example.scala",
+        relativePath: "src/main/scala/generated/DataMapper.scala",
         absolutePath: sourcePath,
         digest: sha256Text(sourceContent),
         byteCount: Buffer.byteLength(sourceContent, "utf8")
@@ -4242,7 +4313,7 @@ test("T-158 replay keeps diagnostics when an older predecessor can replay", () =
   assert(requirementIds.length > 0);
   const sourcePath = path.join(
     validManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const sourceContent = [
     ...requirementIds.map((id) => `// Implements: ${id}`),
@@ -4259,7 +4330,7 @@ test("T-158 replay keeps diagnostics when an older predecessor can replay", () =
       {
         kind: "sdlc_materialized_product_file",
         role: "source",
-        relativePath: "src/main/scala/Example.scala",
+        relativePath: "src/main/scala/generated/DataMapper.scala",
         absolutePath: sourcePath,
         digest: sha256Text(`${sourceContent}\n`),
         byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
@@ -4342,7 +4413,7 @@ test("T-158 unchanged observed files cannot bypass corrupt predecessor replay di
 
   const sourcePath = path.join(
     firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const sourceContent = "package example\nobject ExistingExample\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -4428,8 +4499,9 @@ test("T-158 unchanged observed diagnostics block even when current files satisfy
   writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
   const changedPath = path.join(
     repairManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Changed.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
+  mkdirSync(dirname(changedPath), { recursive: true });
   writeFileSync(
     changedPath,
     "// Implements: REQ-T066-001\npackage example\nobject Changed\n",
@@ -4473,7 +4545,8 @@ test("T-158 non-materialization surface edges ignore empty product replay manife
   });
   assert.equal(firstManifest.productMaterialization.required, false);
   writeHandoffFiles(firstManifest);
-  const firstOutput = writeOutputSurface(firstManifest, "implementation_design_surface");
+  const firstOutputContent = readFileSync(firstManifest.outputFile, "utf8");
+  const firstOutput = { digest: sha256Text(firstOutputContent) };
   writeReport({
     manifest: firstManifest,
     digest: firstOutput.digest,
@@ -4509,7 +4582,6 @@ test("T-158 non-materialization surface edges ignore empty product replay manife
   const before = snapshotProductMaterializationRoot(
     repairManifest.productMaterialization
   );
-  writeOutputSurface(repairManifest, "implementation_design_surface_repair");
 
   const repairReport = buildPostTransformWorkerResultReport({
     manifest: repairManifest,
@@ -4546,7 +4618,7 @@ test("T-158 replay materialized file carrier requires predecessor lineage refs",
   const output = writeOutputSurface(manifest, "component_code_surface");
   const sourcePath = path.join(
     manifest.productMaterialization.tenantRoot,
-    "src/main/scala/Example.scala"
+    "src/main/scala/generated/DataMapper.scala"
   );
   const sourceContent = "// Implements: REQ-T066-001\npackage example\nobject Example\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -4569,7 +4641,7 @@ test("T-158 replay materialized file carrier requires predecessor lineage refs",
           {
             kind: "sdlc_materialized_product_file",
             role: "source",
-            relativePath: "src/main/scala/Example.scala",
+            relativePath: "src/main/scala/generated/DataMapper.scala",
             absolutePath: sourcePath,
             digest: sha256Text(sourceContent),
             byteCount: Buffer.byteLength(sourceContent, "utf8"),
@@ -7146,6 +7218,65 @@ test("T-083 replay reclassifies legacy sbt plugin without rewriting source roles
   );
 });
 
+test("T-083 component-code carries test-design requirements downstream", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const testDesignFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "design/adrs/ADR-003-test-design-surface.md"
+  );
+  writeFileSync(
+    testDesignFile,
+    `${readFileSync(testDesignFile, "utf8")}\nREQ-ENGINE-002: Test design owns dry-run assurance behavior.\n`,
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 22,
+    contract,
+    projectConstraints: constraints,
+    runId: "t083-test-design-requirement-downstream"
+  });
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  writeOutputSurface(manifest, "component_code_surface");
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/DataMapper.scala"
+  );
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(
+    sourcePath,
+    [
+      "// Implements: reqref://t066/default",
+      "package generated",
+      "object DataMapper"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const testRequirementAssessment = report.obligationAssessments.find(
+    (assessment) =>
+      assessment.obligationId.includes(
+        "build_tenants_scala_spark_design_adrs_adr_003_test_design_surface.req_engine_002"
+      )
+  );
+  assert(testRequirementAssessment);
+  assert.equal(testRequirementAssessment.fulfillmentStatus, "partial");
+  assert(
+    sdlcAssessmentCarriesRequirementForDownstreamClosure(
+      testRequirementAssessment
+    )
+  );
+});
+
 test("T-115 execution-result prompt allows repair while delegating evidence to installed operator", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -7889,7 +8020,7 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
   assert.equal(archivePostflight.status, "passed");
 });
 
-test("B-080 silent execution-result recovery carries shard identity", async () => {
+test("B-080 execution-result recovery carries shard identity into repair blockers", async () => {
   const workspace = makeWorkspace();
   writeFileSync(
     path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
@@ -7933,90 +8064,48 @@ test("B-080 silent execution-result recovery carries shard identity", async () =
       )
     });
 
-    assert.equal(result.status, "worker_failed");
+    assert.equal(result.status, "postflight_failed");
     assert.equal(result.postflight.status, "blocked");
-    assert.equal(
-      result.postflight.blockingReasonCarriers[0].code,
-      "worker_hard_timeout"
+    const assuranceCarriers = result.postflight.blockingReasonCarriers.filter(
+      (carrier) => carrier.code === "assurance_ledger_reason"
     );
     assert.equal(
-      result.postflight.blockingReasonCarriers[0].lawfulReentryPoint,
-      "triage_gap"
-    );
-    const executionShardIds = result.manifest.productMaterialization.executionShards
-      .map((shard) => shard.shardId)
-      .join(",");
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      new RegExp(`executionShardIds=${executionShardIds}`, "u")
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /signalSequence=SIGTERM@\d+ms/u
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessAuthority=abiogenesis_runtime_liveness_observer_projection/u
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessProjectionRef=file:.*runtime_liveness_observer_projection\.json/u
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /runtimeLivenessLeaseState=externally_interrupted/u
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /priorSilentAttempts=1/u
-    );
-    assert.match(
-      result.postflight.blockingReasonCarriers[0].detail,
-      /processSummaryRef=file:.*worker_process_summary\.json/u
+      assuranceCarriers.length > 0,
+      true,
+      JSON.stringify(result.postflight.blockingReasonCarriers, null, 2)
     );
     assert.equal(
-      result.postflight.evidenceRefs.some((ref) =>
-        ref.includes("worker_process_started_context.json")
+      assuranceCarriers.every(
+        (carrier) => carrier.lawfulReentryPoint === "repair_worker_output"
+      ),
+      true
+    );
+    const assuranceEvidenceRefs = assuranceCarriers.flatMap(
+      (carrier) => carrier.evidenceRefs
+    );
+    assert.equal(
+      assuranceEvidenceRefs.some((ref) =>
+        ref.includes("test-shard-01-cdme-compiler.summary.json")
       ),
       true
     );
     assert.equal(
-      result.postflight.evidenceRefs.some((ref) =>
-        ref.includes("worker_process_summary.json")
+      assuranceEvidenceRefs.some((ref) =>
+        ref.includes("test-shard-02-cdme-engine.summary.json")
       ),
       true
     );
-    assert.deepStrictEqual(
-      result.manifest.productMaterialization.declaredModuleNames,
-      ["cdme-compiler", "cdme-engine"]
-    );
     assert.equal(
-      result.manifest.traversalStrategyDecision.selectedStrategy,
-      "full_breadth"
-    );
-    assert.equal(result.manifest.featureScope.mode, "full_breadth");
-    assert.deepStrictEqual(
-      result.manifest.featureScope.includedModuleNames,
-      ["cdme-compiler", "cdme-engine"]
-    );
-    assert.deepStrictEqual(
-      result.manifest.featureScope.deferredModuleNames,
-      []
-    );
-    assert.deepStrictEqual(
-      result.manifest.productMaterialization.executionShards.map(
-        (shard) => shard.moduleName
+      result.gapDossier.reasons.some((reason) =>
+        reason.reason.startsWith("component_repair_schedule_")
       ),
-      result.manifest.featureScope.includedModuleNames
+      true,
+      JSON.stringify(result.gapDossier.reasons, null, 2)
     );
-    assert.equal(result.manifest.retryContext.priorGapDossiers.length, 1);
-    assert.equal(result.gapDossier.reasons.length, 1);
-    assert.match(
-      result.gapDossier.reasons[0].reason,
-      /worker_hard_timeout|silent_worker_inactivity/u
-    );
-    assert.deepStrictEqual(result.gapDossier.nextLawfulActions, ["triage_gap"]);
-    assert.equal(result.gapDossier.retryEligible, false);
+    assert.deepStrictEqual(result.gapDossier.nextLawfulActions, [
+      "repair_worker_output"
+    ]);
+    assert.equal(result.gapDossier.retryEligible, true);
   } finally {
     if (previousTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
@@ -8402,7 +8491,7 @@ test("T-066 installed operator rejects shallow source through assurance fold bef
   assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), false);
 });
 
-test("T-066 installed operator rejects unexpected product materialization before capability evidence", async () => {
+test("T-066 installed operator rejects source-only output on component-test materialization", async () => {
   const workspace = makeCapabilityWorkspace();
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
@@ -8411,20 +8500,20 @@ test("T-066 installed operator rejects unexpected product materialization before
     workspaceRoot: workspace,
     start,
     workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
+    replayEvents: preclosedEventsBeforeEdge(basis, "derive_test_design_surface")
   });
 
   assert.equal(result.status, "postflight_failed");
   assert.equal(result.assuranceSatisfaction?.status ?? "close_allowed", "close_allowed");
   assert.equal(result.postflight.status, "blocked");
   assert.equal(
-    result.postflight.blockingReasons.includes("unexpected_product_materialization_for_surface_edge"),
+    result.postflight.blockingReasons.includes("materialized_product_role_missing:test"),
     true,
     JSON.stringify(result.postflight.blockingReasons, null, 2)
   );
   assert.equal(
     result.gapDossier.reasons[0].reason,
-    "unexpected_product_materialization_for_surface_edge"
+    "materialized_product_files_missing"
   );
 });
 
@@ -8445,7 +8534,7 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
     priorManifest.productMaterialization.tenantRoot,
     "src/Main.scala"
   );
-  const sourceContent = "object Main extends App { println(\"Hello\") }\n";
+  const sourceContent = "object DataMapper extends App { println(\"Hello\") }\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
   writeFileSync(sourcePath, sourceContent, "utf8");
   const priorOutput = writeOutputSurface(priorManifest, "component_code_surface");

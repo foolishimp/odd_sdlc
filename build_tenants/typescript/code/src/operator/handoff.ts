@@ -3288,6 +3288,65 @@ function shellToken(input: string): string {
   return `'${input.replace(/'/gu, "'\\''")}'`;
 }
 
+function npmWorkspacePatterns(input: unknown): readonly string[] {
+  if (Array.isArray(input)) {
+    return Object.freeze(
+      input.filter((value): value is string => typeof value === "string")
+    );
+  }
+  const record = objectRecord(input);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  const packages = record["packages"];
+  return Array.isArray(packages)
+    ? Object.freeze(
+        packages.filter((value): value is string => typeof value === "string")
+      )
+    : Object.freeze([]);
+}
+
+function npmWorkspacePatternMatchesModule(input: {
+  readonly pattern: string;
+  readonly moduleName: string;
+}): boolean {
+  const pattern = input.pattern.trim();
+  const moduleName = input.moduleName.trim();
+  return (
+    pattern === moduleName ||
+    pattern === `./${moduleName}` ||
+    pattern === `${moduleName}/` ||
+    pattern === `${moduleName}/**` ||
+    pattern === "*/**" ||
+    (pattern.endsWith("/*") &&
+      moduleName.startsWith(`${pattern.slice(0, -2)}/`))
+  );
+}
+
+function tenantDeclaresNpmWorkspace(input: {
+  readonly tenantRoot: string;
+  readonly moduleName: string;
+}): boolean {
+  const packageJsonPath = join(input.tenantRoot, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return false;
+  }
+  try {
+    const record = objectRecord(JSON.parse(readFileSync(packageJsonPath, "utf8")));
+    if (record === null) {
+      return false;
+    }
+    return npmWorkspacePatterns(record["workspaces"]).some((pattern) =>
+      npmWorkspacePatternMatchesModule({
+        pattern,
+        moduleName: input.moduleName
+      })
+    );
+  } catch {
+    return false;
+  }
+}
+
 function executionShardCommand(input: {
   readonly moduleName: string;
   readonly tenantRoot: string;
@@ -3307,7 +3366,12 @@ function executionShardCommand(input: {
     return `sbt "${sbtProjectSelector(moduleName)}/test"`;
   }
   if (/^npm(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
-    return `npm test --workspace ${shellToken(moduleName)}`;
+    return tenantDeclaresNpmWorkspace({
+      tenantRoot: input.tenantRoot,
+      moduleName
+    })
+      ? `npm test --workspace ${shellToken(moduleName)}`
+      : contract;
   }
   if (/^pnpm(?:\s|$)/u.test(contract) && /\btest\b/u.test(contract)) {
     return `pnpm --filter ${shellToken(moduleName)} test`;
@@ -8266,6 +8330,8 @@ function declaredBuildConfigRoleForObservedFile(input: {
     declaredTechnologyIncludes(input.manifest, "sbt") &&
     (lower === "build.sbt" ||
       lower.endsWith("/build.sbt") ||
+      lower === "project/build.properties" ||
+      lower.endsWith("/project/build.properties") ||
       ((lower === "project" ||
         lower.startsWith("project/") ||
         lower.includes("/project/")) &&
@@ -8512,7 +8578,7 @@ function manifestCapabilityValue(
   name: string
 ): string | null {
   return (
-    manifest.conformedProject.capabilityContracts.find(
+    manifest.conformedProject.capabilityContracts?.find(
       (contract) => contract.name === name
     )?.value ?? null
   );
@@ -8700,8 +8766,11 @@ function evaluateImplementationDesignProducerAuthority(input: {
     manifest: input.manifest,
     targetAssetType: "implementation_design_surface"
   });
-  const register = readAdmittedImplementationDesign(input.manifest);
-  if (register === null) {
+  const outputFile = componentDepthSurfaceFile(
+    input.manifest,
+    "implementation_design_surface"
+  );
+  if (outputFile === null || !existsSync(outputFile)) {
     pushStagedTopologyBlockingReason({
       blockingReasonCarriers: input.blockingReasonCarriers,
       code: "staged_authority_missing",
@@ -8710,6 +8779,24 @@ function evaluateImplementationDesignProducerAuthority(input: {
     });
     return;
   }
+  const admission = admitDesignDepthRegisterFromArtifact({
+    targetAssetType: "implementation_design_surface",
+    outputFile,
+    archiveRoot: input.manifest.archiveRoot
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    pushStagedTopologyBlockingReason({
+      blockingReasonCarriers: input.blockingReasonCarriers,
+      code: "staged_decomposition_rejected",
+      detail:
+        admission.blockingReasons.length === 0
+          ? "implementation_design_surface_admission_rejected"
+          : admission.blockingReasons.join("; "),
+      evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
+    });
+    return;
+  }
+  const register = admission.register;
   const authority = deriveSdlcStagedImplementationTopologyAuthority({
     register,
     requireTrivialDegenerateProduct:
@@ -8739,8 +8826,11 @@ function evaluateTestDesignProducerAuthority(input: {
     manifest: input.manifest,
     targetAssetType: "test_design_surface"
   });
-  const register = readAdmittedTestDesign(input.manifest);
-  if (register === null) {
+  const outputFile = componentDepthSurfaceFile(
+    input.manifest,
+    "test_design_surface"
+  );
+  if (outputFile === null || !existsSync(outputFile)) {
     pushStagedTopologyBlockingReason({
       blockingReasonCarriers: input.blockingReasonCarriers,
       code: "staged_authority_missing",
@@ -8749,6 +8839,23 @@ function evaluateTestDesignProducerAuthority(input: {
     });
     return;
   }
+  const admission = admitTestDesignRegisterFromArtifact({
+    targetAssetType: "test_design_surface",
+    outputFile
+  });
+  if (admission.status !== "admitted" || admission.register === null) {
+    pushStagedTopologyBlockingReason({
+      blockingReasonCarriers: input.blockingReasonCarriers,
+      code: "staged_decomposition_rejected",
+      detail:
+        admission.blockingReasons.length === 0
+          ? "test_design_surface_admission_rejected"
+          : admission.blockingReasons.join("; "),
+      evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
+    });
+    return;
+  }
+  const register = admission.register;
   const authority = deriveSdlcStagedTestTopologyAuthority({
     register,
     requireTrivialDegenerateProduct:
@@ -8996,9 +9103,7 @@ function fileWithMaterializationProvenance(input: {
   const rolePolicyRef =
     input.materializationSource === "replay"
       ? effectiveRole === input.file.role
-        ? input.file.rolePolicyRef ??
-          targetContract?.policyRef ??
-          rolePolicyRefForMaterializedRole(effectiveRole)
+        ? input.file.rolePolicyRef
         : targetContract?.policyRef ?? rolePolicyRefForMaterializedRole(effectiveRole)
       : input.file.rolePolicyRef ??
         targetContract?.policyRef ??
@@ -11055,6 +11160,27 @@ function materializedFileRequirementLineage(input: {
   );
 }
 
+function requirementObligationBelongsToDownstreamSurface(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly obligation: SdlcTraversalObligation;
+}): boolean {
+  if (
+    input.manifest.targetAssetType !== "component_code_surface" ||
+    input.obligation.obligationKind !== "requirement"
+  ) {
+    return false;
+  }
+  return input.obligation.payload.sourceRefs.some((ref) => {
+    const lower = ref.toLowerCase();
+    return (
+      lower.includes("adr-003-test-design-surface.md") ||
+      lower.includes("/component_test_surface.md") ||
+      lower.includes("/component_test_") ||
+      lower.includes("test-design-surface")
+    );
+  });
+}
+
 function productMaterializationRequirementLineageRequired(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
@@ -11164,11 +11290,19 @@ function postTransformObligationAssessments(input: {
         const carriesNonMaterializedRequirementForward =
           !input.manifest.productMaterialization.required &&
           !recordsRequirementSurfaceOnly;
+        const carriesDownstreamSurfaceRequirement =
+          !observed &&
+          requirementObligationBelongsToDownstreamSurface({
+            manifest: input.manifest,
+            obligation
+          });
         const fulfillmentStatus =
           observed && recordsRequirementSurfaceOnly
             ? "partial"
             : observed
               ? "fulfilled"
+              : carriesDownstreamSurfaceRequirement
+                ? "partial"
               : carriesAuthorityRequirementForward ||
                   carriesNonMaterializedRequirementForward
                 ? "partial"
@@ -11185,6 +11319,8 @@ function postTransformObligationAssessments(input: {
                   carriesAuthorityRequirementForward
                     ? `requirement_carried_for_downstream_closure:${requirementId}`
                     : carriesNonMaterializedRequirementForward
+                    ? `requirement_carried_for_downstream_closure:${requirementId}`
+                    : carriesDownstreamSurfaceRequirement
                     ? `requirement_carried_for_downstream_closure:${requirementId}`
                     : observed
                     ? `requirement_recorded_for_future_closure:${requirementId}`

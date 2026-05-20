@@ -36,6 +36,132 @@ function graphTrackRefs(graphFunctionName) {
   });
 }
 
+function writeImplementationDesignAuthority(workspaceRoot) {
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const requirementIds = ["REQ-T158-001"];
+  const sourceRelative = "src/main/scala/generated/Core.scala";
+  const axis = (name) => ({
+    kind: "sdlc_design_completeness_axis_verdict",
+    axis: name,
+    status: "satisfied",
+    reasons: [],
+    evidenceRefs: [`file://${outputFile}`]
+  });
+  const attribute = {
+    kind: "sdlc_domain_attribute",
+    attributeId: "attr:t158.core.value",
+    name: "value",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: requirementIds
+  };
+  const entity = {
+    kind: "sdlc_domain_entity",
+    entityId: "entity:t158.core",
+    moduleName: "generated",
+    ownership: "owned",
+    attributes: [attribute],
+    invariants: ["core value is transformed"],
+    sourceAssetRefs: ["fixture://t158"]
+  };
+  const operation = {
+    kind: "sdlc_domain_operation",
+    operationId: "operation:t158.transform",
+    moduleName: "generated",
+    inputEntityIds: [entity.entityId],
+    outputEntityIds: [entity.entityId],
+    requiredAttributeIds: [attribute.attributeId]
+  };
+  mkdirSync(dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t158/scala-sbt",
+            language: "scala",
+            buildTool: "sbt"
+          }
+        ],
+        implementationModuleRows: [
+          {
+            kind: "sdlc_implementation_module_row",
+            moduleName: "generated",
+            moduleRef: "module://t158/generated"
+          }
+        ],
+        aggregateDomainModelRows: [
+          {
+            kind: "sdlc_aggregate_domain_model_row",
+            modelRef: "model://t158/generated"
+          }
+        ],
+        moduleSchemaFragments: [
+          {
+            kind: "sdlc_module_schema_fragment",
+            moduleName: "generated",
+            entities: [entity],
+            operations: [operation],
+            requirementIds,
+            sourceAssetRefs: ["fixture://t158"]
+          }
+        ],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: {
+          kind: "sdlc_aggregate_domain_model",
+          modelVersion: "ts-design-depth-v1",
+          entities: [
+            {
+              kind: "sdlc_aggregate_domain_entity",
+              entityId: entity.entityId,
+              ownerModuleName: "generated",
+              attributes: [attribute],
+              sourceModuleNames: ["generated"]
+            }
+          ],
+          operations: [operation],
+          crossModuleReferences: [],
+          evidenceRefs: [`file://${outputFile}`]
+        },
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: [
+          {
+            kind: "sdlc_component_topology_row",
+            componentId: "generated-core",
+            moduleName: "generated",
+            relativePath: sourceRelative,
+            publicBoundary: "generated.Core",
+            concernRole: "other",
+            requirementIds,
+            sourceAssetRefs: ["fixture://t158"]
+          }
+        ],
+        componentRealizationRows: [],
+        fileTargetRows: [],
+        designCompletenessVerdict: {
+          kind: "sdlc_design_completeness_verdict",
+          verdictVersion: "ts-design-depth-v1",
+          entity: axis("entity"),
+          attribute: axis("attribute"),
+          flow: axis("flow")
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t158-"));
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
@@ -71,6 +197,7 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  writeImplementationDesignAuthority(root);
   return root;
 }
 
@@ -654,13 +781,13 @@ test("T-158 installed operator admits non-close consequence before dispatch retu
   );
   const publishMarkers =
     source.match(/const consequence = publishDispatchState\(current\);/gu) ?? [];
-  assert.equal(publishMarkers.length, 6);
+  assert.equal(publishMarkers.length, 7);
 
   for (const branchStatus of [
     'status: "worker_failed"',
     'status: "worker_report_rejected"',
     'status: "postflight_failed"',
-    'status:\n            assuranceGate.satisfaction.status === "fp_escalation"',
+    'assuranceGate.satisfaction.status === "fp_escalation"',
     'status: "worker_invoked"'
   ]) {
     const branchIndex = source.indexOf(branchStatus);

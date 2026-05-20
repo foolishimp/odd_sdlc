@@ -25,6 +25,132 @@ function sha256Text(text) {
   return `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;
 }
 
+function writeImplementationDesignAuthority(workspaceRoot) {
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const requirementIds = ["REQ-T151-001"];
+  const sourceRelative = "src/main/scala/generated/Core.scala";
+  const axis = (name) => ({
+    kind: "sdlc_design_completeness_axis_verdict",
+    axis: name,
+    status: "satisfied",
+    reasons: [],
+    evidenceRefs: [`file://${outputFile}`]
+  });
+  const attribute = {
+    kind: "sdlc_domain_attribute",
+    attributeId: "attr:t151.core.value",
+    name: "value",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: requirementIds
+  };
+  const entity = {
+    kind: "sdlc_domain_entity",
+    entityId: "entity:t151.core",
+    moduleName: "generated",
+    ownership: "owned",
+    attributes: [attribute],
+    invariants: ["core value is transformed"],
+    sourceAssetRefs: ["fixture://t151"]
+  };
+  const operation = {
+    kind: "sdlc_domain_operation",
+    operationId: "operation:t151.transform",
+    moduleName: "generated",
+    inputEntityIds: [entity.entityId],
+    outputEntityIds: [entity.entityId],
+    requiredAttributeIds: [attribute.attributeId]
+  };
+  mkdirSync(dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t151/scala-sbt",
+            language: "scala",
+            buildTool: "sbt"
+          }
+        ],
+        implementationModuleRows: [
+          {
+            kind: "sdlc_implementation_module_row",
+            moduleName: "generated",
+            moduleRef: "module://t151/generated"
+          }
+        ],
+        aggregateDomainModelRows: [
+          {
+            kind: "sdlc_aggregate_domain_model_row",
+            modelRef: "model://t151/generated"
+          }
+        ],
+        moduleSchemaFragments: [
+          {
+            kind: "sdlc_module_schema_fragment",
+            moduleName: "generated",
+            entities: [entity],
+            operations: [operation],
+            requirementIds,
+            sourceAssetRefs: ["fixture://t151"]
+          }
+        ],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: {
+          kind: "sdlc_aggregate_domain_model",
+          modelVersion: "ts-design-depth-v1",
+          entities: [
+            {
+              kind: "sdlc_aggregate_domain_entity",
+              entityId: entity.entityId,
+              ownerModuleName: "generated",
+              attributes: [attribute],
+              sourceModuleNames: ["generated"]
+            }
+          ],
+          operations: [operation],
+          crossModuleReferences: [],
+          evidenceRefs: [`file://${outputFile}`]
+        },
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: [
+          {
+            kind: "sdlc_component_topology_row",
+            componentId: "generated-core",
+            moduleName: "generated",
+            relativePath: sourceRelative,
+            publicBoundary: "generated.Core",
+            concernRole: "other",
+            requirementIds,
+            sourceAssetRefs: ["fixture://t151"]
+          }
+        ],
+        componentRealizationRows: [],
+        fileTargetRows: [],
+        designCompletenessVerdict: {
+          kind: "sdlc_design_completeness_verdict",
+          verdictVersion: "ts-design-depth-v1",
+          entity: axis("entity"),
+          attribute: axis("attribute"),
+          flow: axis("flow")
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t151-"));
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
@@ -60,6 +186,7 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  writeImplementationDesignAuthority(root);
   return root;
 }
 

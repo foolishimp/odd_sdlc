@@ -882,7 +882,7 @@ test("T-143 build-only files do not satisfy component source materialization", (
 
   assert.deepEqual(
     materialized.map((file) => `${file.role}:${file.relativePath}`).sort(),
-    ["build_config:build.sbt", "other:project/build.properties"]
+    ["build_config:build.sbt", "build_config:project/build.properties"]
   );
   assert.equal(materialized.some((file) => file.role === "source"), false);
 });

@@ -1213,18 +1213,24 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
 
   assert.equal(start.status, "ok");
   assert.equal(
-    existsSync(path.join(start.payload.archiveRoot, "assurance_postflight.json")),
+    existsSync(path.join(start.payload.archiveRoot, "postflight.json")),
     true
   );
   const evaluateResult = JSON.parse(
     readFileSync(path.join(start.payload.archiveRoot, "fp_evaluate_result.json"), "utf8")
   );
+  const postflight = JSON.parse(
+    readFileSync(path.join(start.payload.archiveRoot, "postflight.json"), "utf8")
+  );
   assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
   assert.equal(evaluateResult.status, "blocked");
   assert.equal(evaluateResult.postflightStatus, "blocked");
-  assert.match(evaluateResult.postflightRef, /assurance_postflight\.json$/u);
+  assert.match(evaluateResult.postflightRef, /postflight\.json$/u);
   assert.match(
-    evaluateResult.blockingReasons.join(","),
+    [
+      ...evaluateResult.blockingReasons,
+      ...postflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
+    ].join(","),
     /design_depth_register_invalid/u
   );
 });

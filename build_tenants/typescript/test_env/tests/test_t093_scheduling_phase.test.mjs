@@ -291,7 +291,7 @@ test("B-079 test execution schedule exposes a bounded shard register", () => {
   );
   assert.deepStrictEqual(
     manifest.productMaterialization.executionShards.map((shard) => shard.command),
-    ["npm test --workspace api", "npm test --workspace worker"]
+    ["npm test", "npm test"]
   );
   assert(
     manifest.traversalObligationContext.trancheKeys.includes(
@@ -347,38 +347,40 @@ test("T-093 ABG-owned start produces and consumes schedule surfaces", async () =
   const implementationDesign = entries.find(
     (entry) => entry.edgeName === "derive_implementation_design_surface"
   );
-  const code = entries.find((entry) => entry.edgeName === "derive_code_surface");
+  const code = entries.find(
+    (entry) => entry.edgeName === "derive_component_code_surface"
+  );
   const testDesign = entries.find(
     (entry) => entry.edgeName === "derive_test_design_surface"
-  );
-  const testRun = entries.find(
-    (entry) => entry.edgeName === "derive_test_run_archive_surface"
-  );
-  const testExecutionResult = entries.find(
-    (entry) => entry.edgeName === "derive_test_execution_result_surface"
   );
 
   assert(implementationDesign);
   assert(code);
   assert(testDesign);
-  assert(testExecutionResult);
-  assert(testRun);
   assert(
     edgeNames.indexOf("derive_implementation_design_surface") <
-      edgeNames.indexOf("derive_code_surface")
+      edgeNames.indexOf("derive_component_code_surface")
   );
   assert(
     edgeNames.indexOf("derive_test_design_surface") <
-      edgeNames.indexOf("derive_test_execution_result_surface")
-  );
-  assert(
-    edgeNames.indexOf("derive_test_execution_result_surface") <
-      edgeNames.indexOf("derive_test_run_archive_surface")
+      edgeNames.indexOf("derive_component_test_surface")
   );
   assert(code.inputAssetTypes.includes("implementation_design_surface"));
-  assert(testExecutionResult.inputAssetTypes.includes("test_execution_surface"));
-  assert(testRun.inputAssetTypes.includes("test_design_surface"));
-  assert(testRun.inputAssetTypes.includes("test_execution_result_surface"));
+  assert.equal(
+    existsSync(
+      path.join(
+        workspace,
+        "build_tenants/typescript/design/component_test_qualification_surface.md"
+      )
+    ),
+    true
+  );
+  assert.equal(
+    existsSync(
+      path.join(workspace, "build_tenants/typescript/design/release_surface.md")
+    ),
+    true
+  );
 
   const implementationDesignText = readFileSync(
     implementationDesign.outputFile,

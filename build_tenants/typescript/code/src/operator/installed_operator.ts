@@ -3439,6 +3439,34 @@ export function sdlcAssessmentCarriesRequirementForDownstreamClosure(
   );
 }
 
+function manifestRequirementObligationBelongsToDownstreamSurface(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcWorkerObligationAssessment;
+}): boolean {
+  if (
+    input.manifest.targetAssetType !== "component_code_surface" ||
+    !input.manifest.productMaterialization.required
+  ) {
+    return false;
+  }
+  const obligation =
+    input.manifest.traversalObligationContext.obligations.find(
+      (candidate) => candidate.obligationId === input.assessment.obligationId
+    ) ?? null;
+  if (obligation === null || obligation.obligationKind !== "requirement") {
+    return false;
+  }
+  return obligation.payload.sourceRefs.some((ref) => {
+    const lower = ref.toLowerCase();
+    return (
+      lower.includes("adr-003-test-design-surface.md") ||
+      lower.includes("/component_test_surface.md") ||
+      lower.includes("/component_test_") ||
+      lower.includes("test-design-surface")
+    );
+  });
+}
+
 function edgeFulfillmentProjectionFor(input: {
   readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
@@ -3453,15 +3481,22 @@ function edgeFulfillmentProjectionFor(input: {
           input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
           !input.state.manifest.productMaterialization.required &&
           assessment.obligationId.startsWith("requirement:");
+        const carriesDownstreamRequirement =
+          sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment) &&
+          (!input.state.manifest.productMaterialization.required ||
+            manifestRequirementObligationBelongsToDownstreamSurface({
+              manifest: input.state.manifest,
+              assessment
+            }));
         const carriesRequirementTransformationSet =
           assessment.obligationId.startsWith("requirement:") &&
-          !input.state.manifest.productMaterialization.required &&
-          (authorityRequirementInduction ||
-            sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment) ||
-            (input.state.manifest.targetAssetType === "requirement_surface" &&
-              assessment.blockingReasons.some((reason) =>
-                reason.startsWith("requirement_recorded_for_future_closure:")
-              )));
+          (carriesDownstreamRequirement ||
+            (!input.state.manifest.productMaterialization.required &&
+              (authorityRequirementInduction ||
+                (input.state.manifest.targetAssetType === "requirement_surface" &&
+                  assessment.blockingReasons.some((reason) =>
+                    reason.startsWith("requirement_recorded_for_future_closure:")
+                  )))));
         return Object.freeze({
           obligationId: assessment.obligationId,
           fulfillmentStatus: assessment.fulfillmentStatus,
@@ -4630,21 +4665,24 @@ function deriveInstalledTraversalConsequence(input: {
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
-  const yieldResumeBasis = deriveSdlcProductLineageYieldResumeBasis({
-    runRef,
-    edgeRef: ledger.edgeRef,
-    blockingReasonCarriers: input.state.blockingReasonCarriers,
-    productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
-    livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
-  });
+  const currentEdgeLawful =
+    input.state.status !== "worker_report_rejected" &&
+    repriceReasonRefs.length === 0;
+  const yieldResumeBasis = currentEdgeLawful
+    ? deriveSdlcProductLineageYieldResumeBasis({
+        runRef,
+        edgeRef: ledger.edgeRef,
+        blockingReasonCarriers: input.state.blockingReasonCarriers,
+        productEvidenceRefs: worksiteEvidence.productEvidenceRefs,
+        livenessProjectionRefs: worksiteEvidence.livenessProjectionRefs
+      })
+    : null;
   const closureDecision = deriveSdlcEdgeClosureDecision({
     decisionRef: closureDecisionRef,
     ledger,
     edgeClosureFunctionRef: edgeAssuranceContract.closureFunctionRef,
     edgeAssuranceCloseDecision,
-    currentEdgeLawful:
-      input.state.status !== "worker_report_rejected" &&
-      repriceReasonRefs.length === 0,
+    currentEdgeLawful,
     retryReasonRefs,
     repairReasonRefs,
     repriceReasonRefs,
@@ -5267,7 +5305,39 @@ function runtimeEventArchiveStringArray(
   event: RuntimeEvent,
   key: string
 ): readonly string[] | undefined {
-  const value = (event as unknown as Record<string, unknown>)[key];
+  switch (key) {
+    case "affectedFieldRefs":
+      return "affectedFieldRefs" in event
+        ? compactRuntimeEventStringArray(event.affectedFieldRefs)
+        : undefined;
+    case "consumedFieldRefs":
+      return "consumedFieldRefs" in event
+        ? compactRuntimeEventStringArray(event.consumedFieldRefs)
+        : undefined;
+    case "pressureRefs":
+      return "pressureRefs" in event
+        ? compactRuntimeEventStringArray(event.pressureRefs)
+        : undefined;
+    case "diagnosticRefs":
+      return "diagnosticRefs" in event
+        ? compactRuntimeEventStringArray(event.diagnosticRefs)
+        : undefined;
+    case "evidenceRefs":
+      return "evidenceRefs" in event
+        ? compactRuntimeEventStringArray(event.evidenceRefs)
+        : undefined;
+    case "causationEventRefs":
+      return "causationEventRefs" in event
+        ? compactRuntimeEventStringArray(event.causationEventRefs)
+        : undefined;
+    default:
+      return undefined;
+  }
+}
+
+function compactRuntimeEventStringArray(
+  value: unknown
+): readonly string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }

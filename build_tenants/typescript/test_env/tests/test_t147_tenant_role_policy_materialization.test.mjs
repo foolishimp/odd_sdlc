@@ -91,6 +91,133 @@ function writeProductFile(manifest, relativePath, content = "declared product fi
   };
 }
 
+function writeImplementationDesignAuthority(manifest, input) {
+  const outputFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const requirementIds = input.requirementIds.length > 0
+    ? input.requirementIds
+    : ["requirement:t147/declared-source"];
+  const axis = (name) => ({
+    kind: "sdlc_design_completeness_axis_verdict",
+    axis: name,
+    status: "satisfied",
+    reasons: [],
+    evidenceRefs: [`file://${outputFile}`]
+  });
+  const attribute = {
+    kind: "sdlc_domain_attribute",
+    attributeId: "attr:t147.widget.content",
+    name: "content",
+    valueType: "string",
+    cardinality: "one",
+    invariantRefs: requirementIds
+  };
+  const entity = {
+    kind: "sdlc_domain_entity",
+    entityId: "entity:t147.widget",
+    moduleName: "custom-runtime",
+    ownership: "owned",
+    attributes: [attribute],
+    invariants: ["declared source is materialized"],
+    sourceAssetRefs: ["fixture://t147"]
+  };
+  const operation = {
+    kind: "sdlc_domain_operation",
+    operationId: "operation:t147.publishWidget",
+    moduleName: "custom-runtime",
+    inputEntityIds: [entity.entityId],
+    outputEntityIds: [entity.entityId],
+    requiredAttributeIds: [attribute.attributeId]
+  };
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t147/custom-runtime",
+            language: "custom",
+            buildTool: "custom"
+          }
+        ],
+        implementationModuleRows: [
+          {
+            kind: "sdlc_implementation_module_row",
+            moduleName: "custom-runtime",
+            moduleRef: "module://t147/custom-runtime"
+          }
+        ],
+        aggregateDomainModelRows: [
+          {
+            kind: "sdlc_aggregate_domain_model_row",
+            modelRef: "model://t147/custom-runtime"
+          }
+        ],
+        moduleSchemaFragments: [
+          {
+            kind: "sdlc_module_schema_fragment",
+            moduleName: "custom-runtime",
+            entities: [entity],
+            operations: [operation],
+            requirementIds,
+            sourceAssetRefs: ["fixture://t147"]
+          }
+        ],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: {
+          kind: "sdlc_aggregate_domain_model",
+          modelVersion: "ts-design-depth-v1",
+          entities: [
+            {
+              kind: "sdlc_aggregate_domain_entity",
+              entityId: entity.entityId,
+              ownerModuleName: "custom-runtime",
+              attributes: [attribute],
+              sourceModuleNames: ["custom-runtime"]
+            }
+          ],
+          operations: [operation],
+          crossModuleReferences: [],
+          evidenceRefs: [`file://${outputFile}`]
+        },
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: [
+          {
+            kind: "sdlc_component_topology_row",
+            componentId: "custom-runtime-widget",
+            moduleName: "custom-runtime",
+            relativePath: "app.widget",
+            publicBoundary: "app.widget",
+            concernRole: "other",
+            requirementIds,
+            sourceAssetRefs: ["fixture://t147"]
+          }
+        ],
+        componentRealizationRows: [],
+        fileTargetRows: [],
+        designCompletenessVerdict: {
+          kind: "sdlc_design_completeness_verdict",
+          verdictVersion: "ts-design-depth-v1",
+          entity: axis("entity"),
+          attribute: axis("attribute"),
+          flow: axis("flow")
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function writeReport(input) {
   const output = writeOutputSurface(input.manifest);
   const materializedRefs = input.materializedFiles.map(
@@ -139,14 +266,39 @@ test("T-147 declared unknown file family satisfies product source role by policy
   const workspace = makeWorkspace({
     productTargets: ["build_tenants/custom_runtime/app.widget role=source"]
   });
+  mkdirSync(path.join(workspace, "specification/requirements"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(workspace, "specification/requirements/01-runtime-widget.md"),
+    [
+      "# Runtime Widget Requirements",
+      "",
+      "REQ-T147-001: The custom runtime product publishes app.widget as its declared source."
+    ].join("\n"),
+    "utf8"
+  );
   const manifest = materializationManifest(workspace);
+  const requirementTraceObligationIds =
+    manifest.traversalObligationContext.obligations
+      .filter((obligation) => obligation.obligationId.startsWith("requirement:"))
+      .map((obligation) => obligation.obligationId);
+  assert.notEqual(requirementTraceObligationIds.length, 0);
+  writeImplementationDesignAuthority(manifest, {
+    requirementIds: requirementTraceObligationIds
+  });
   const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
   const invocationPackage = constructWorkerInvocationPackage({ manifest });
   const prompt = promptForHandoff(manifest);
   const productFile = writeProductFile(
     manifest,
     "app.widget",
-    "custom runtime product source\n"
+    [
+      ...requirementTraceObligationIds.map(
+        (obligationId) => `// requirement-trace: ${obligationId}`
+      ),
+      "custom runtime product source"
+    ].join("\n") + "\n"
   );
   const report = writeReport({
     manifest,
@@ -157,7 +309,8 @@ test("T-147 declared unknown file family satisfies product source role by policy
         relativePath: "app.widget",
         absolutePath: productFile.absolutePath,
         digest: productFile.digest,
-        byteCount: productFile.byteCount
+        byteCount: productFile.byteCount,
+        requirementTraceObligationIds
       }
     ]
   });
