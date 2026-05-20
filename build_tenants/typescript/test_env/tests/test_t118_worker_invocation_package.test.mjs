@@ -279,6 +279,22 @@ test("T-118 writes a compact worker invocation package while preserving the full
   assert(invocationPackage.omittedObligationCount > 100);
   assert.equal(workerBrief.kind, "sdlc_worker_brief");
   assert.equal(constructionBrief.kind, "sdlc_worker_construction_brief");
+  assert.equal(
+    constructionBrief.targetCarrierProjection.kind,
+    "sdlc_worker_target_carrier_prompt_projection"
+  );
+  assert.equal(
+    "constructionTemplate" in constructionBrief.targetCarrierProjection,
+    false
+  );
+  assert.equal(
+    invocationPackage.targetCarrierProjection.kind,
+    "sdlc_worker_target_carrier_prompt_projection"
+  );
+  assert.equal(
+    "constructionTemplate" in invocationPackage.targetCarrierProjection,
+    false
+  );
   assert(constructionBrief.currentState.authorityRefs.length > 0);
   assert(constructionBrief.currentState.authorityIndex.length > 0);
   assert(
@@ -302,9 +318,51 @@ test("T-118 writes a compact worker invocation package while preserving the full
     escapedWorkspaceRoot
   );
   assert.doesNotMatch(readFileSync(files.workerBriefPath, "utf8"), escapedWorkspaceRoot);
+  assert.doesNotMatch(
+    readFileSync(files.constructionBriefPath, "utf8"),
+    /"constructionTemplate"/u
+  );
+  assert.doesNotMatch(
+    readFileSync(files.constructionBriefPath, "utf8"),
+    /"rowTemplates"/u
+  );
 });
 
-test("T-118 prompt points workers to the compact package before the forensic manifest", () => {
+test("T-118 construction brief omits escaped runtime basis refs from worker prompt state", () => {
+  const manifest = manifestForLargeSurface();
+  const gapDossierRef = `file://${path.join(manifest.archiveRoot, "gap_dossier.json")}`;
+  const runtimeBasisRef = `manifest:fp_retry:${JSON.stringify({
+    basisId: `execution_basis:${JSON.stringify({
+      workspaceRoot: manifest.workspaceRoot,
+      graphCallId: "graph-call://t118",
+      padding: "x".repeat(1024)
+    })}`,
+    attemptIndex: 1
+  })}`;
+  const manifestWithPriorRefs = {
+    ...manifest,
+    traversalObligationContext: {
+      ...manifest.traversalObligationContext,
+      priorEdgeRefs: [gapDossierRef, runtimeBasisRef]
+    }
+  };
+  const files = writeHandoffFiles(manifestWithPriorRefs);
+  const constructionBriefContent = readFileSync(
+    files.constructionBriefPath,
+    "utf8"
+  );
+  const constructionBrief = JSON.parse(constructionBriefContent);
+
+  assert.deepEqual(constructionBrief.currentState.priorEdgeRefs, [
+    "workspace://.ai-workspace/runtime/odd_sdlc/operator-runs/t118-worker-invocation-package/gap_dossier.json"
+  ]);
+  assert.equal(constructionBrief.currentState.omittedPriorEdgeRefCount, 1);
+  assert.doesNotMatch(constructionBriefContent, /manifest:fp_retry/u);
+  assert.doesNotMatch(constructionBriefContent, /execution_basis/u);
+  assert(Buffer.byteLength(constructionBriefContent, "utf8") < 16 * 1024);
+});
+
+test("T-118 prompt points workers to the construction brief and not forensic packages", () => {
   const manifest = manifestForLargeSurface();
   const files = writeHandoffFiles(manifest);
   const prompt = readFileSync(files.promptPath, "utf8");
@@ -319,13 +377,15 @@ test("T-118 prompt points workers to the compact package before the forensic man
   assert.match(prompt, /graph function: bootstrap_release_self_test/u);
   assert.match(prompt, /selected target carrier: kind=/u);
   assert.match(prompt, /This section is the core F_P transform/u);
-  assert.match(prompt, /worker_invocation_package\.json/u);
-  assert.match(prompt, /worker_brief\.json/u);
-  assert.match(prompt, /forensic manifest only when a package ref requires it/u);
+  assert.match(prompt, /worker_construction_brief\.json/u);
+  assert.match(prompt, /current authority refs listed by the construction brief/u);
+  assert.doesNotMatch(prompt, /worker_invocation_package\.json/u);
+  assert.doesNotMatch(prompt, /worker_brief\.json/u);
+  assert.doesNotMatch(prompt, /forensic manifest only when a package ref requires it/u);
   assert.match(prompt, /Terse axioms:/u);
   assert.match(
     prompt,
-    /Apply workerInvocationPackage\.transformAxioms through the construction brief projection/u
+    /Apply the transform axioms projected in this launch contract and construction brief/u
   );
   assert.match(prompt, /Read boundary: stay under the current workspace/u);
   assert.match(prompt, /Control boundary: do not run `odd-sdlc-ts`/u);
@@ -345,9 +405,9 @@ test("T-118 prompt points workers to the compact package before the forensic man
     )
   );
   assert.doesNotMatch(prompt, /This invocation is F_P\.transform only/u);
-  assert.match(prompt, /outcomeDirectives/u);
+  assert.match(prompt, /Construction brief fields to apply:/u);
   assert.doesNotMatch(prompt, /Read the full handoff manifest before writing output/u);
-  assert.match(prompt, /Use workerInvocationPackage\.requirementTraceObligationIds/u);
+  assert.match(prompt, /obligations\.requirementTraceObligationIds/u);
   assert(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].some(
       (entry) => entry.includes("audit context")
@@ -415,7 +475,7 @@ test("T-002 worker package and prompt carry declared product file targets", () =
   assert.doesNotMatch(prompt, /README\.md/u);
 });
 
-test("T-118 design-depth worker package carries a typed construction template", () => {
+test("T-118 design-depth manifest carries a typed construction template by ref", () => {
   const manifest = manifestForImplementationDesignSurface();
   const files = writeHandoffFiles(manifest);
   const invocationPackage = JSON.parse(
@@ -424,7 +484,7 @@ test("T-118 design-depth worker package carries a typed construction template", 
   const prompt = readFileSync(files.promptPath, "utf8");
   const outcomeDirectives = invocationPackage.outcomeDirectives.join("\n");
   const constructionTemplate =
-    invocationPackage.targetCarrierProjection.constructionTemplate;
+    manifest.targetCarrierProjection.constructionTemplate;
   const payloadTemplate = constructionTemplate.payloadTemplate;
   const topologyTemplate = constructionTemplate.rowTemplates.find((template) =>
     template.templateRef.endsWith("/row/component-topology")
@@ -447,7 +507,11 @@ test("T-118 design-depth worker package carries a typed construction template", 
   );
   assert.equal(
     constructionTemplate.templateRef,
-    invocationPackage.targetCarrierProjection.constructionTemplateRef
+    manifest.targetCarrierProjection.constructionTemplateRef
+  );
+  assert.equal(
+    "constructionTemplate" in invocationPackage.targetCarrierProjection,
+    false
   );
   assert.equal(payloadTemplate.kind, "sdlc_worker_target_carrier_object_template");
   assert.deepEqual(payloadTemplate.requiredFields, [
@@ -496,15 +560,17 @@ test("T-118 design-depth worker package carries a typed construction template", 
     aggregateTemplate.example.operations[0].requiredAttributeIds,
     [aggregateTemplate.example.entities[0].attributes[0].attributeId]
   );
-  assert.match(outcomeDirectives, /targetCarrierProjection\.constructionTemplate/u);
-  assert.match(outcomeDirectives, /Keep the carrier proportional to immediate implementation structure/u);
-  assert.match(outcomeDirectives, /Do not flatten requirement obligations/u);
+  assert.match(outcomeDirectives, /framework evaluator derives and publishes the design-depth register/u);
+  assert.match(outcomeDirectives, /Keep the ADR proportional to immediate implementation structure/u);
+  assert.match(outcomeDirectives, /A substantive implementation design must preserve decomposition proportionality/u);
   assert.match(outcomeDirectives, /For a single-file or script product/u);
-  assert.match(outcomeDirectives, /do not create one entity or stateless diagram row per requirement/u);
+  assert.match(outcomeDirectives, /Component_code_surface realization rows own source and implementation files/u);
+  assert.doesNotMatch(outcomeDirectives, /Emit a fenced `json design_depth_register` carrier/u);
   assert.doesNotMatch(outcomeDirectives, /Each `moduleSchemaFragments` item/u);
   assert.doesNotMatch(outcomeDirectives, /\{"kind":"sdlc_module_schema_fragment"/u);
   assert.doesNotMatch(outcomeDirectives, /design_depth_module_schema_fragment/u);
-  assert.match(prompt, /targetCarrierProjection\.constructionTemplate/u);
+  assert.match(prompt, /Target carrier construction template ref:/u);
+  assert.doesNotMatch(prompt, /targetCarrierProjection\.constructionTemplate/u);
 });
 
 test("T-118 implementation design handoff carries nested predecessor authority as targeted retrieval hints", () => {
@@ -559,8 +625,9 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
     readFileSync(files.invocationPackagePath, "utf8")
   );
   const directives = invocationPackage.outcomeDirectives.join("\n");
+  const manifest = JSON.parse(readFileSync(files.manifestPath, "utf8"));
   const constructionTemplate =
-    invocationPackage.targetCarrierProjection.constructionTemplate;
+    manifest.targetCarrierProjection.constructionTemplate;
   const rowTemplateRefs = constructionTemplate.rowTemplates.map(
     (template) => template.templateRef
   );
@@ -580,11 +647,11 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
   assert.equal(new Set(rowTemplateRefs).size, rowTemplateRefs.length);
   assert.match(
     directives,
-    /construction template as shape and disambiguation only/u
+    /framework evaluator derives and publishes the design-depth register/u
   );
   assert.match(
     directives,
-    /content quality is evaluated from requirement, design, obligation, and assurance evidence/u
+    /Evaluator-owned outputs stay with the framework/u
   );
   assert.doesNotMatch(directives, /targetAssetType:"implementation_design_surface"/u);
   assert.doesNotMatch(
@@ -594,7 +661,7 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
   assert.doesNotMatch(directives, /"axis":"entity"/u);
 });
 
-test("T-157 product materialization prompt carries first-pass execution closure law", () => {
+test("T-157 product materialization prompt leaves execution evidence to evaluator surfaces", () => {
   const manifest = manifestForDeclaredProductMaterialization();
   const files = writeHandoffFiles(manifest);
   const invocationPackage = JSON.parse(
@@ -611,17 +678,7 @@ test("T-157 product materialization prompt carries first-pass execution closure 
     /Declared product file targets are the exact product surface/u
   );
   assert.match(outcomeDirectives, /Cargo\.lock, target\//u);
-  assert.match(
-    outcomeDirectives,
-    /Use this exact closed carrier shape: \{"kind":"sdlc_worker_execution_evidence"/u
-  );
-  assert.match(
-    outcomeDirectives,
-    /shardEvidence\[\]\.kind MUST be exactly "sdlc_worker_execution_shard_evidence"/u
-  );
-  assert.match(
-    outcomeDirectives,
-    /testsObserved MUST be greater than zero/u
-  );
+  assert.doesNotMatch(outcomeDirectives, /sdlc_worker_execution_evidence/u);
+  assert.doesNotMatch(outcomeDirectives, /shardEvidence/u);
   assert.doesNotMatch(outcomeDirectives, /Prior defect:/u);
 });

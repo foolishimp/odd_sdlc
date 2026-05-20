@@ -203,6 +203,21 @@ declares it as deterministic, projection-only, or no-close. Otherwise, missing
 `F_P` construction is non-close pressure, even when all deterministic checks
 pass.
 
+Prompt-bearing generic edges project the selected work boundary; they do not
+own a separate prompt-template constitution. The prompt carries admitted
+authority refs, traversal intent, target contract, tenant stack, read/write
+roots, current obligation pressure, and local transform scope. Evaluator-owned
+admission, ledger, closure, and carrier truth remain enforced by evaluator and
+runtime surfaces.
+
+The worker-facing construction brief is an intent probe, not a dump of runtime
+internals. It inlines the current edge intent, target summary, local obligation
+pressure, and bounded read/write surface, while enforceable details remain cited
+by authority refs, contract refs, and digests. Expanded forensic packages,
+construction templates, row templates, ledgers, and evaluator carriers remain
+archive or evaluator surfaces unless a current gap explicitly cites one for
+diagnosis.
+
 This boundary prevents `F_D` from becoming a hidden shortcut around the generic
 product definition. Deterministic work can make the generic `F_P` path cheaper,
 narrower, more replayable, and easier to close; it cannot stand in for the
@@ -275,6 +290,7 @@ The generic construction order is:
 ```text
 requirements
 -> design commitments
+-> admitted tenant technology-stack description
 -> module/component topology
 -> dependency map
 -> evaluator-selected traversal
@@ -299,6 +315,28 @@ Dependency maps are authority surfaces for traversal selection. Steel-thread
 and parallel build are evaluator-selected traversal methods over admitted
 dependency maps; they are not target carrier surfaces and not prompt-only
 strategy labels.
+
+Tenant technology-stack descriptions are authority surfaces for executable
+materialization. Bootstrap derives one for each active build tenant when the
+initial source names stack-specific construction pressure. The surface declares
+language/runtime, build tool, build-config targets, source/test roots,
+build/test/proof commands, tool install/use assumptions, evidence expectations,
+and cleanup rules. If the stack description is undefined or contradictory, the
+evaluator blocks or zooms back to the owning bootstrap/design surface. If it is
+sufficiently defined, `F_P.transform` may make bounded implementation
+assumptions inside that tenant surface and preserve them in the artifact or
+evidence. Core SDLC consumes these declarations generically; ecosystem-specific
+file names such as `build.sbt`, `Cargo.toml`, `package.json`, `pyproject.toml`,
+`pom.xml`, or `build.gradle` are tenant-spec data, not generic SDLC law.
+
+The minimum tenant stack description includes a testing technology-stack
+section, either in `TECH_STACK.*` or an explicit `TESTING_TECH_STACK.*`
+authority surface. Testing is its own construction lifecycle: it may use the
+same build tenant as implementation or a different test tenant, but the choice
+must be declared. The testing section declares test runtime/language, framework
+or runner, test source roots, test build/config targets, fixture/data strategy,
+proof commands, execution environment assumptions, returned evidence format,
+and cleanup rules.
 
 The evaluator may select a smaller traversal only from admitted complexity
 evidence. `single_hop`, `dual_hop`, `staged`, `zoom_required`, and `blocked`

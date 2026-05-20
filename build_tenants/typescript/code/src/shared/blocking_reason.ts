@@ -17,6 +17,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "adr_output_status_invalid",
   "worker_report_unresolved_reasons_present",
   "worker_authority_read_outside_workspace",
+  "worker_runtime_source_read",
   "unexpected_product_materialization_for_surface_edge",
   "materialized_product_file_is_output_artifact",
   "materialized_product_files_missing",
@@ -51,6 +52,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "test_execution_zero_tests_observed",
   "test_execution_failures_present",
   "test_execution_report_refs_missing",
+  "worker_execution_evidence_for_non_execution_edge",
   "test_materialization_not_discoverable",
   "worker_report_admission_failed",
   "silent_worker_inactivity",
@@ -70,6 +72,8 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "target_unavailable",
   "stale_query_domain",
   "target_carrier_admission_missing",
+  "tenant_stack_authority_missing",
+  "tenant_stack_authority_invalid",
   "staged_authority_missing",
   "staged_decomposition_rejected",
   "staged_dependency_map_missing",
@@ -172,6 +176,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "adr_output_status_invalid",
   "worker_report_admission_failed",
   "worker_authority_read_outside_workspace",
+  "worker_runtime_source_read",
   "test_execution_lane_mismatch",
   "test_execution_command_mismatch",
   "test_execution_evidence_invalid",
@@ -180,6 +185,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "test_execution_shard_evidence_mismatch",
   "test_execution_not_succeeded",
   "test_execution_failures_present",
+  "worker_execution_evidence_for_non_execution_edge",
   "silent_worker_inactivity",
   "worker_process_summary_missing",
   "worker_process_summary_invalid",
@@ -291,6 +297,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Governed test execution evidence does not satisfy the traversal contract."
     });
   }
+  if (code === "worker_execution_evidence_for_non_execution_edge") {
+    return Object.freeze({
+      reasonClass: "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Worker transform artifact carried typed execution evidence for an edge whose execution evidence is evaluator-owned downstream."
+    });
+  }
   if (code === "worker_report_unresolved_reasons_present") {
     return Object.freeze({
       reasonClass: "worker_unresolved",
@@ -311,6 +325,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Worker consumed readable state outside the active workspace authority boundary."
+    });
+  }
+  if (code === "worker_runtime_source_read") {
+    return Object.freeze({
+      reasonClass: "authority_to_code",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "Worker consumed installed runtime source instead of project authority surfaces."
     });
   }
   if (
@@ -366,6 +388,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Target carrier envelope evidence is missing for the selected contract."
+    });
+  }
+  if (code.startsWith("tenant_stack_")) {
+    return Object.freeze({
+      reasonClass: "authority_to_code",
+      lawfulReentryPoint: "reprice_requirement_or_design",
+      message:
+        "Tenant technology-stack authority is missing or invalid for executable materialization."
     });
   }
   if (code.startsWith("staged_")) {

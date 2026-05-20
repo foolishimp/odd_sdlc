@@ -1,0 +1,21 @@
+{
+  "kind": "sdlc_tenant_technology_stack_description",
+  "language": "Rust",
+  "buildTool": "cargo",
+  "crateType": "binary",
+  "buildConfigTargets": [
+    "Cargo.toml"
+  ],
+  "testingTechStack": {
+    "testMode": "local_http_service_smoke",
+    "testBuildConfigTargets": [
+      "Cargo.toml"
+    ],
+    "evidenceFormat": "process-exit-plus-http-response"
+  },
+  "dependencyPolicy": "no_external_runtime_crates",
+  "runtime": {
+    "bindAddress": "127.0.0.1",
+    "portEnvVar": "HELLO_SERVICE_PORT"
+  }
+}

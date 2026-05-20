@@ -21,6 +21,44 @@ The package exists to make the traversal's gain function explicit: where the
 edge starts, where it is trying to land, what authority constrains the move,
 what evaluators will judge it, and what prior gap pressure must remain visible.
 
+## Prompt Projection Discipline
+
+Prompt assembly follows the shared method boundary:
+
+- `SPEC_METHOD.md` defines the probabilistic work boundary: the framework
+  declares input/output contract, required context, evaluator regime,
+  provenance, and lawful control states while the worker owns internal HOW
+  inside that boundary
+- `WRITING_GUIDE.md` prefers direct positive statements and current-surface
+  truth over narrated transition or contrast framing
+- `DESIGN_MODULE_METHOD.md` rejects prompt, report, or read-model surfaces that
+  become hidden strategy doctrine or admission logic
+- `TICKET_METHOD.md` requires prompts to assemble from admitted work law rather
+  than raw phrasing
+
+The TypeScript prompt is therefore a bounded construction projection over:
+
+- the traversal intent package
+- selected edge contract
+- target carrier or artifact contract
+- authority refs and obligation pressure
+- tenant stack and execution boundary when applicable
+- allowed read/write roots
+- evaluator-owned evidence and admission expectations
+
+`worker_construction_brief.json` is the canonical worker-facing intent probe.
+It carries compact target-carrier prompt projection, authority refs, current
+obligation pressure, tenant stack summary, and bounded read/write state. It does
+not carry the expanded target-carrier construction template or row templates.
+`worker_invocation_package.json`, `handoff_manifest.json`, and runtime ledgers
+remain archived forensic/evaluator surfaces. Prompts do not list them as
+ordinary first-read inputs.
+
+Prior-failure wording is not prompt authority. When a failure exposes missing
+system behavior, the repair lands in requirement, design, evaluator/runtime
+admission, or deterministic proof. The prompt may project the repaired boundary
+only as current work truth.
+
 ## Carrier
 
 `SdlcTraversalIntentPackage` is embedded in `SdlcWorkerHandoffManifest` and archived as `traversal_intent_package.json`.

@@ -168,6 +168,13 @@ uses the same decomposition predicates as implementation topology: high-density
 rows, facade rows, under-decomposed parents, out-of-scope residual refs, and
 missing trivial-product decomposition all block downstream materialization.
 
+The test stack profile cites the tenant testing technology-stack authority. The
+minimum tenant spec declares the test runtime/language when distinct from
+implementation, framework or runner, test roots, fixture/data strategy, test
+build/config targets, proof commands, execution environment assumptions,
+evidence format, and cleanup. Same-stack testing is lawful only when the tenant
+spec declares that testing reuses the implementation tenant.
+
 `derive_component_test_surface` consumes that admitted test authority. Its
 prompt may request materialized test files for bounded rows, but it must not
 ask the worker to choose the testcase authority, invent the test dependency

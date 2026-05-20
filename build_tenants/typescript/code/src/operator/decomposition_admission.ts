@@ -326,11 +326,10 @@ function blockingReasons(input: {
       row !== undefined &&
       (row.publicBoundaryCount > 0 || row.materializationTargetRefs.length > 0);
     if (
-      input.upstreamCount !== 1 ||
       input.downstreamCount !== 1 ||
       !hasExecutableBoundary
     ) {
-      reasons.push("decomposition_trivial_product_not_explicit_1x1");
+      reasons.push("decomposition_trivial_product_not_single_component");
     }
   }
   return uniqueSorted(reasons);

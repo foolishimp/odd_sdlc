@@ -61,7 +61,6 @@ import {
 import {
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
-  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   admitSdlcTargetCarrierCandidate,
   constructSdlcGtlModule,
@@ -4236,30 +4235,10 @@ export function edgeAssuranceEvidenceCandidatesFor(input: {
   return Object.freeze([...assessmentCandidates, ...executionCandidates]);
 }
 
-function declaredExecutionContract(input: string): boolean {
-  const contract = input.trim().toLowerCase();
-  return (
-    contract.length > 0 &&
-    contract !== "undeclared" &&
-    contract !== "none" &&
-    contract !== "n/a" &&
-    contract !== "not_applicable"
-  );
-}
-
 function stateRequiresExecutionEvidence(
   state: SdlcAbgOwnedFpDispatchState
 ): boolean {
-  return (
-    state.manifest.targetAssetType === "test_execution_result_surface" ||
-    ((state.manifest.edgeName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET ||
-      state.manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE) &&
-      state.manifest.targetAssetType === "component_code_surface" &&
-      state.manifest.productMaterialization.required &&
-      declaredExecutionContract(
-        state.manifest.productMaterialization.testExecutionContract
-      ))
-  );
+  return state.manifest.targetAssetType === "test_execution_result_surface";
 }
 
 function requiredEvidenceSourceKindsForState(

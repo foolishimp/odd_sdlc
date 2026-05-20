@@ -76,13 +76,16 @@ affected_boundary:
   tests:
     - build_tenants/typescript/test_env/tests
     - build_tenants/typescript/test_env/live
-target_truth: odd_sdlc construction is a staged disambiguation pipeline for every solution. Requirements must reduce through bounded design, module/component, dependency, traversal, code, and test subsurfaces before deterministic code or release closure can claim product completeness. The evaluator admits measured decomposition summaries and selects steel-thread or parallel traversal from admitted dependency maps before materialization. The selected graph itself is admitted: every retained edge must account for unique construction pressure or be deleted, merged, replaced, conditionalized, or reclassified as projection/no-close.
+target_truth: odd_sdlc construction is a staged disambiguation pipeline for every solution. Requirements must reduce through bounded design, admitted tenant technology-stack description, module/component, dependency, traversal, code, and test subsurfaces before deterministic code or release closure can claim product completeness. The evaluator admits measured decomposition summaries and tenant stack sufficiency, then selects steel-thread or parallel traversal from admitted dependency maps before materialization. The selected graph itself is admitted: every retained edge must account for unique construction pressure or be deleted, merged, replaced, conditionalized, or reclassified as projection/no-close.
 superseded_truth: A full graph can close product depth by carrying many obligations directly into broad component-code or component-test materialization so long as every declared row has evidence and the runtime ledgers close, while retaining inherited rollup or transition edges without proving they own unique construction pressure.
-closure_law: This ticket closes only when the TypeScript graph and evaluator admit staged decomposition summaries, enforce proportional residual predicates, select steel-thread/parallel traversal from admitted dependency maps, account for every selected executive edge, and prove that code/test materialization cannot close from under-decomposed module or test topology. Any edge that cannot account for unique pressure must be deleted from the selected graph, merged into its owning edge, replaced by a staged authority edge, conditionalized, or reclassified as projection/no-close. data_mapper remains the reference proof, but the rule applies to all solution construction including trivial degenerate products.
+closure_law: This ticket closes only when the TypeScript graph and evaluator admit staged decomposition summaries and tenant technology-stack sufficiency, enforce proportional residual predicates, select steel-thread/parallel traversal from admitted dependency maps, account for every selected executive edge, and prove that code/test materialization cannot close from under-decomposed module/test topology or undefined/contradictory tenant stack authority. Any edge that cannot account for unique pressure must be deleted from the selected graph, merged into its owning edge, replaced by a staged authority edge, conditionalized, or reclassified as projection/no-close. data_mapper remains the reference proof, but the rule applies to all solution construction including trivial degenerate products.
 evaluation_criteria:
   - requirements/design state that SDLC construction is staged disambiguation ending in deterministic code
+  - bootstrap derives tenant technology-stack descriptions with explicit implementation and testing sections, and evaluator admission classifies them as undefined, sufficient, or contradictory before executable materialization
+  - TypeScript handoff consumes declared tenant stack targets/commands generically instead of hard-coding SBT, Cargo, Maven, Gradle, Node, Python, or other ecosystem grammar as SDLC law
   - target-carrier contracts define SdlcDecompositionSummary or equivalent measured compression/expansion carrier rows
   - evaluator predicates reject high-density/facade/under-decomposed/exploded/unowned module and test topology
+  - F_P implementation-design workers write ADR/design artifact content only; evaluator code derives the design-depth register, decomposition summary, and module dependency map as framework-owned admission evidence
   - trivial products publish admitted one-module/one-component decomposition instead of bypassing decomposition admission
   - module dependency and test dependency carriers exist or existing carriers are strengthened to carry equivalent authority
   - evaluator actions select steel-thread or parallel traversal over admitted dependency maps
@@ -111,6 +114,8 @@ non_closure_conditions:
   - a component-test edge can still close with broad module-level tests and no admitted test-module dependency map
   - steel-thread or parallel-build is represented as a target carrier surface instead of an evaluator-selected traversal method
   - trivial products bypass decomposition admission entirely
+  - component-code or component-test materialization proceeds when the active tenant technology-stack description is undefined or contradictory
+  - stack-specific build manifest names or write roots are embedded as core handoff law instead of admitted tenant-spec data
   - any selected executive graph edge lacks an accounting row
   - an edge identified as unneeded remains close-capable instead of being deleted, merged, replaced, conditionalized, or projection/no-close
   - analyzer observes worker dispatch for any edge whose accounting row declares `workerDispatchAllowed: false`
@@ -158,6 +163,8 @@ T-172 realizes the staged graph described in:
 Required intermediate authority:
 
 - implementation module decomposition after design and before component code
+- admitted tenant technology-stack description before executable
+  materialization
 - module dependency map before evaluator-selected build traversal
 - test module decomposition after test design and before component tests
 - test dependency map before evaluator-selected test traversal
@@ -193,6 +200,7 @@ right row family.
 
 | Stage | Existing Carrier | T-172 Disposition |
 |---|---|---|
+| tenant technology-stack description | conformed project profile and project constraints carry partial language/tool/test-runner data; product/requirements may name build config and proof commands | add or elevate tenant-local spec carrier(s) under `build_tenants/<tenant>/spec/` and admit sufficiency before executable materialization |
 | implementation-module decomposition | `SdlcComponentTopologyRow`, `SdlcComponentRealizationRow`, `componentTopologyRows`, `componentRealizationRows` in `build_tenants/typescript/code/src/operator/carriers.ts` | strengthen existing implementation-design/component-depth carriers with `SdlcDecompositionSummary` and admission predicates |
 | module dependency map | no standalone admitted dependency carrier | add `SdlcModuleDependencyMap` or equivalent authority section before component-code traversal selection |
 | test-module decomposition | `SdlcTestModuleRow`, `SdlcTestComponentTopologyRow`, `componentTestRows` in `carriers.ts` and `test_design_register.ts` | strengthen existing test-design/component-test carriers with `SdlcDecompositionSummary` and admission predicates |
@@ -203,6 +211,55 @@ This is the implementation rule for the proposed staged graph: new authority
 may be a new carrier section on an existing edge when ordering and admission
 are explicit. A new graph edge is required only when the stage cannot be
 admitted before the downstream materialization edge using existing carriers.
+
+## Tenant Technology-Stack Description
+
+T-172 treats stack semantics as tenant authority, not handoff heuristics. The
+bootstrap traversal may derive tenant-local spec surfaces from the initial
+document, for example:
+
+```text
+{ initial document }
+-> bootstrap
+-> INTENT.md
+-> PRODUCT.md
+-> GOALS.md
+-> requirements/*
+-> build_tenants/<tenant>/spec/TECH_STACK.*
+-> build_tenants/<tenant>/spec/TESTING_TECH_STACK.*
+-> build_tenants/<tenant>/spec/PRODUCT_TARGETS.*
+-> build_tenants/<tenant>/spec/EXECUTION_CONTRACT.*
+```
+
+The exact file names may be consolidated into one typed carrier, but the
+minimum tenant spec must cover these sections:
+
+- Implementation technology stack: language/runtime, build tool, required
+  build/config targets, implementation source roots, build commands,
+  tool install/use assumptions, and implementation byproduct cleanup rules.
+- Testing technology stack: test language/runtime when different from
+  implementation, test framework or runner, test source roots, fixture/data
+  strategy, test build/config targets, proof commands, execution environment
+  assumptions, returned evidence format, and test byproduct cleanup rules.
+- Stack relationship: whether testing uses the implementation build tenant or
+  a distinct test tenant. Defaulting to same-stack testing is lawful only when
+  the tenant spec declares that relationship.
+- Execution contract: which declared commands or validators produce admissible
+  evidence and which outputs the evaluator may read.
+
+Admission classifies each active tenant stack surface:
+
+| Class | Meaning | Lawful Action |
+|---|---|---|
+| `undefined` | The tenant spec does not define enough executable construction truth. | Block or zoom back to bootstrap/design before materialization. |
+| `sufficient` | The tenant spec defines enough stack truth to build while leaving implementation choices open. | `F_P.transform` may make bounded assumptions inside the tenant surface and preserve them in artifacts/evidence. |
+| `contradictory` | Product, design, and tenant spec conflict. | Block or reprice the owning authority surface before materialization. |
+
+This replaces embedded SBT/Rust/Node/Python-style handoff branches. Core SDLC
+may consume declared build-config targets and execution commands, run declared
+validators, and admit returned evidence. It does not own ecosystem manifest
+grammar such as `build.sbt`, `Cargo.toml`, `package.json`, `pyproject.toml`,
+`pom.xml`, or `build.gradle`.
 
 ## Decomposition Summary Schema
 
@@ -341,7 +398,7 @@ for merge, replacement, or deletion.
 | G2 edge accounting | selected full traversal edges are all accounted, with merge/delete/projection/conditional disposition reported | deterministic edge-accounting tests compile |
 | G3 evaluator admission | compression, explosion, high-density, facade, under-decomposed, unowned-row, invalid-ref, and residual-scope predicates reject invalid carriers | deterministic negative tests fail close before materialization |
 | G4 graph/handoff/analyzer | code/test prompts consume admitted topology; analyzer reports ratios, traversal selection, edge-accounting disposition, and observed worker-dispatch violations for no-dispatch rows; runtime dispatch consults the register before live closure | focused staged-graph tests plus archive analysis rejecting observed no-dispatch worker runs |
-| G5 live proof | hello-world successor run closes as the degenerate one-requirement case, and data_mapper successor run closes with admitted substantive topology depth before code/test materialization and no unaccounted selected edges | live archives plus analyzer reports |
+| G5 live proof | hello-world successor run closes as the degenerate one-component case with bounded upstream product requirement refs, and data_mapper successor run closes with admitted substantive topology depth before code/test materialization and no unaccounted selected edges | live archives plus analyzer reports |
 
 ## Work Plan
 
@@ -366,8 +423,9 @@ for merge, replacement, or deletion.
 9. Tests: add deterministic negative tests for unaccounted edges,
    under-decomposed code/test carriers, and positive tests for trivial
    one-component decomposition.
-10. Live proof: rerun hello-world as the degenerate proportionality proof, then
-    rerun data_mapper as the reference substantive staged-construction proof.
+10. Live proof: rerun hello-world as the degenerate proportionality proof, run
+    the Rust hello service as the bounded non-JS service proof, then rerun
+    data_mapper as the reference substantive staged-construction proof.
 
 ## Proof Plan
 
@@ -381,6 +439,9 @@ Focused proof:
 - `test:t171:hello-world-lifecycle-live` proves the minimal product profile does
   not inflate one requirement into separate runtime/source/test/execution
   obligations and still closes through admitted degenerate topology.
+- `test:t164:rust-service-live` proves a bounded service product can generate
+  Rust/Cargo product files and close through runtime HTTP execution evidence
+  without promoting the proof to data_mapper-scale topology.
 - `test_t172_decomposition_admission.test.mjs` rejects compressed,
   high-density, exploded, unowned, invalid-reference, and facade component-code
   carriers.
@@ -426,6 +487,13 @@ Live/archive proof:
   `outcomeClass: framework_smoke`, `hopClass: single_hop`,
   `zoomDisposition: continue`, and pressure preservation through
   `outcome_class_graph_variant`.
+- The Rust hello service live lane is the bounded service proof. It starts from
+  `build_tenants/typescript/test_env/fixtures/t164_rust_hello_service_lite`,
+  generates `build_tenants/hello_world_rust_service/Cargo.toml` and
+  `build_tenants/hello_world_rust_service/src/main.rs`, then proves execution
+  by running `cargo run --quiet` and `curl --fail --silent` against `GET /`.
+  This proof strengthens tenant/build-tool generality and runtime execution
+  evidence, but it does not replace the data_mapper substantive-topology proof.
 - The existing `data_mapper.test82` RC4 archive remains motivating evidence for
   T-171/T-102, not T-172 closure proof. The T-172 analyzer rejects it because
   it observes worker dispatch on rows now declared `workerDispatchAllowed:
@@ -433,7 +501,14 @@ Live/archive proof:
   qualification, repair-schedule, archive, release-depth, and release-prep
   rows. A successor archive must be produced after the G4 runtime-dispatch
   change.
-- run a data_mapper successor after G0-G3 pass
+- The data_mapper successor proof starts from
+  `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template`.
+  That template, not a test harness patch, must carry the active
+  `scala_spark` build-tenant definition under
+  `build_tenants/scala_spark/spec/TECH_STACK.json` and
+  `build_tenants/scala_spark/spec/TESTING_TECH_STACK.json`, including declared
+  sbt build-config targets such as `build.sbt` and `project/`.
+- run a data_mapper successor after G0-G4 pass
 - archive the analyzer output for the same run
 - compare topology depth against test82 RC4 and test35 evidence without
   hard-coding test35 filenames as runtime law
@@ -446,5 +521,7 @@ Live/archive proof:
   dependency maps.
 - Every selected full traversal edge is accounted; unneeded edges are deleted,
   merged, replaced, conditionalized, or projection/no-close before closure.
+- Rust hello service proves bounded non-JS service construction and execution
+  evidence without weakening data_mapper's required substantive-topology role.
 - data_mapper proves the staged graph reaches execution and release closure
   with topology depth admitted before code/test materialization.

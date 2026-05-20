@@ -1540,6 +1540,30 @@ export interface SdlcWorkerTargetCarrierProjection {
   readonly testCaseGenerationRef: string;
 }
 
+export interface SdlcWorkerTargetCarrierPromptProjection {
+  readonly kind: "sdlc_worker_target_carrier_prompt_projection";
+  readonly targetCarrierContractRef: string;
+  readonly targetCarrierContractDigest: string;
+  readonly targetCarrierTemplateRef: string;
+  readonly constructionDepthRole:
+    | "none"
+    | "staged_authority_producer"
+    | "staged_materialization_consumer";
+  readonly producedStagedAuthorityRefs: readonly string[];
+  readonly requiredStagedAuthorityRefs: readonly string[];
+  readonly outputCarrierKind: string;
+  readonly nestedPayloadPath: string;
+  readonly requiredFieldRefs: readonly string[];
+  readonly fixedProtocolFieldRefs: readonly string[];
+  readonly workerFillableFieldRefs: readonly string[];
+  readonly literalDomainRefs: readonly string[];
+  readonly schemaRef: string;
+  readonly handoffProjectionRef: string;
+  readonly constructionTemplateRef: string;
+  readonly closurePreconditionRef: string;
+  readonly testCaseGenerationRef: string;
+}
+
 export interface SdlcProductMaterializationAuthorityTarget {
   readonly kind: "sdlc_product_materialization_authority_target";
   readonly path: string;
@@ -1550,7 +1574,8 @@ export interface SdlcProductMaterializationAuthorityTarget {
     | "context_expected_files"
     | "design_asset_authority"
     | "product_authority"
-    | "requirement_authority";
+    | "requirement_authority"
+    | "tenant_stack_authority";
   readonly sourceRef: string;
 }
 
@@ -1560,11 +1585,13 @@ export interface SdlcProductMaterializationAuthorityReconciliation {
   readonly selectedOutputRoot: string;
   readonly contextExpectedFileTargets: readonly string[];
   readonly designAssetAuthorityTargets: readonly string[];
+  readonly tenantStackAuthorityTargets: readonly string[];
   readonly requirementAuthorityTargets: readonly string[];
   readonly productAuthorityTargets: readonly string[];
   readonly declaredProductFileTargets: readonly string[];
   readonly contextExpectedTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly designAssetAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
+  readonly tenantStackAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly requirementAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly productAuthorityTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
   readonly declaredProductTargetContracts: readonly SdlcProductMaterializationAuthorityTarget[];
@@ -1579,7 +1606,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly edgeAssuranceContractDigest?: string;
   readonly targetCarrierContractRef?: string;
   readonly targetCarrierContractDigest?: string;
-  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierPromptProjection;
   readonly graphFunctionName: string;
   readonly edgeName: string;
   readonly vectorIndex: number;
@@ -1633,7 +1660,7 @@ export interface SdlcWorkerConstructionBrief {
   readonly vectorIndex: number;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
-  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierPromptProjection;
   readonly canonicalPromptCarrierPath: string;
   readonly promptSourcePolicyRef: string;
   readonly packageDispositions: readonly SdlcWorkerConstructionBriefPackageDisposition[];
@@ -1643,7 +1670,9 @@ export interface SdlcWorkerConstructionBrief {
     readonly authorityRefs: readonly string[];
     readonly authorityIndex: readonly SdlcAuthorityIndexEntry[];
     readonly priorEdgeRefs: readonly string[];
+    readonly omittedPriorEdgeRefCount: number;
     readonly runtimeContextRefs: readonly string[];
+    readonly omittedRuntimeContextRefCount: number;
   };
   readonly targetState: {
     readonly outputFile: string;

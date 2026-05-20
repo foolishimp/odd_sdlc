@@ -1,6 +1,6 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..082
+**Family**: REQ-F-ODDSDLC-074..083
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
@@ -9,10 +9,15 @@
 - `.ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md`
 - `specification/requirements/16-edge-gain-closure-contract.md`
 - `specification/requirements/17-target-carrier-contracts.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/SPEC_METHOD.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/WRITING_GUIDE.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/DESIGN_MODULE_METHOD.md`
+- `/Users/jim/src/apps/specification_methodology/specification/standards/TICKET_METHOD.md`
 **Authoring Design**:
 - `build_tenants/typescript/design/ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_FP_EVALUATION_LEDGER_PURPOSE.md`
 - `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`
+- `build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_INTENT_PACKAGE.md`
 
 This family defines the construction algebra for typed `odd_sdlc.TS`
 traversals. ABG owns runtime admission, event truth, projection, replay,
@@ -219,23 +224,29 @@ claim product completeness.
 
 **Acceptance Criteria**:
 - AC-1: the generic construction order is requirements, design commitments,
-  module/component topology, dependency map, evaluator-selected traversal,
-  bounded source/test/build materialization, execution evidence, and release
-  qualification
+  admitted tenant technology-stack description, module/component topology,
+  dependency map, evaluator-selected traversal, bounded source/test/build
+  materialization, execution evidence, and release qualification
 - AC-2: deterministic code and deterministic tests are the highest
   disambiguation surfaces; they may close product content only after upstream
   ambiguity has been reduced into admitted intermediate surfaces or preserved
   as explicit residual pressure
 - AC-3: implementation materialization requires admitted implementation
   topology and decomposition summary evidence before component code closure
+- AC-3a: F_P implementation-design workers produce the candidate design
+  artifact only; evaluator/runtime code derives and publishes the
+  design-depth register, decomposition summary, dependency map, and admission
+  truth from the artifact, source authority, product file targets, requirement
+  lineage, and post-transform evidence
 - AC-4: test materialization requires admitted testcase authority, test
   topology, test stack/profile evidence, and decomposition summary evidence
   before component test closure
 - AC-5: every solution, including trivial products, publishes admitted
   decomposition evidence; a product profile may declare a trivial product
   class, but that class is admitted only as a degenerate
-  one-requirement/one-design/one-module/one-component decomposition, not as a
-  bypass or as fan-out into execution-detail obligations
+  one-design/one-module/one-component decomposition with bounded upstream
+  product requirement refs, not as a bypass, an exact one-requirement fiction,
+  or fan-out into execution-detail obligations
 - AC-6: decomposition summaries measure input obligation count, output row
   count, upstream-per-downstream compression ratio, downstream-per-upstream
   expansion ratio, max owned inputs per output, max downstream rows per input,
@@ -252,6 +263,27 @@ claim product completeness.
 - AC-9: steel-thread and parallel build are evaluator-selected traversal
   methods over admitted dependency maps; they are not target carrier surfaces
   and not prompt-only strategy labels
+- AC-10: bootstrap derives per-tenant technology-stack descriptions as
+  authority surfaces when the initial document names or implies stack-specific
+  construction pressure; these surfaces declare language/runtime, build tool,
+  required build/config targets, source/test roots, build/test/proof commands,
+  tool install/use assumptions, evidence expectations, and byproduct cleanup
+  rules
+- AC-10a: every minimum tenant technology-stack description carries an explicit
+  testing technology-stack section. The section declares test language/runtime
+  when different from implementation, test framework or runner, test source
+  roots, fixture/data strategy, test build/config targets, proof commands,
+  execution environment assumptions, evidence formats, and cleanup rules
+- AC-11: tenant technology-stack sufficiency is evaluator-admitted before
+  materialization. `undefined` or contradictory stack descriptions block or
+  zoom back to the owning bootstrap/design surface; sufficiently defined stack
+  descriptions allow `F_P.transform` to make bounded implementation
+  assumptions inside the declared tenant surface and preserve those assumptions
+  in the emitted artifact/evidence
+- AC-12: TypeScript handoff consumes admitted tenant technology-stack
+  descriptions generically. Ecosystem file names or grammars such as SBT,
+  Cargo, Maven, Gradle, Node, or Python build manifests are tenant-spec data,
+  not hidden SDLC core law
 
 ### REQ-F-ODDSDLC-081 - executive graph edges are retained only by accounted construction pressure
 
@@ -316,3 +348,38 @@ closure pressure remains owned, visible, and replayable.
   as replay-visible operator-run carriers and cited by a typed runtime event;
   analyzer output must consume those archived carriers before deriving any
   fallback projection
+
+### REQ-F-ODDSDLC-083 - prompt-bearing handoffs project admitted work law
+
+TypeScript worker prompts shall project admitted work law for the current edge.
+They shall not become independent policy, admission, closure, or historical
+failure surfaces.
+
+**Acceptance Criteria**:
+- AC-1: every prompt-bearing handoff derives from one traversal intent package,
+  selected edge contract, target carrier or artifact contract, admitted
+  authority refs, current obligation pressure, tenant stack when applicable,
+  and declared read/write roots
+- AC-2: prompt prose is a projection over that typed basis and not an
+  independent authority surface
+- AC-3: prompt directives state the current work surface, local
+  disambiguation, boundary, evidence expectation, and artifact contract in
+  positive terms wherever possible
+- AC-4: evaluator-owned admission, carrier publication, ledger, closure,
+  decomposition, dependency, and traversal-selection truth is enforced by
+  evaluator/runtime code and typed proof, then projected into the prompt only
+  as ownership context for the worker
+- AC-5: prompt text shall not carry prior-failure negations unless the
+  restriction is still necessary to define the current edge's read/write,
+  safety, tenant-execution, or artifact boundary
+- AC-6: if a prior-failure phrase is removed from a prompt, the owning
+  requirement, design, evaluator, runtime, or deterministic test must enforce
+  the systemic fix or the missing enforcement remains open pressure
+- AC-7: prompt tests assert the selected typed basis, authority refs, target
+  contract, and positive local work shape; they do not derive expected behavior
+  from broad negation phrases or prior-run scars
+- AC-8: `worker_construction_brief.json` is the canonical prompt-source carrier.
+  Worker-facing prompts and briefs shall not inline expanded forensic runtime
+  packages, full handoff manifests, target-carrier construction templates, row
+  templates, ledgers, closure carriers, or evaluator-owned publication truth.
+  They cite those surfaces by ref/digest when enforceable detail is needed.

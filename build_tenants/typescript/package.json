@@ -136,6 +136,7 @@
     "test:t173:complexity-selection": "npm run build:semantic && node --test test_env/tests/test_t173_complexity_selection.test.mjs",
     "test:t173:min-fp-pressure-preservation": "npm run build:semantic && node --test test_env/tests/test_t173_min_fp_pressure_preservation.test.mjs",
     "test:t173:zoom-admission": "npm run build:semantic && node --test test_env/tests/test_t173_zoom_admission.test.mjs",
+    "test:t173:rust-hello-service-live": "npm run test:scenario:t164-rust-hello-service-live",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",

@@ -200,26 +200,8 @@ test("T-172 admits residuals owned by an explicit stage upstream universe", () =
   assert.deepEqual(admittedWithUniverse.residualOutsideSubsurfaceRefs, []);
 });
 
-test("T-172 admits trivial products only through an explicit 1x1 decomposition", () => {
+test("T-172 admits trivial products only through an explicit single-component decomposition", () => {
   const admitted = summary(
-    [
-      row({
-        downstreamId: "component://hello-world",
-        parentId: null,
-        ownedUpstreamRefs: ["REQ-HELLO-001"],
-        publicBoundaryRefs: ["src/index.js"],
-        substantiveResponsibilityRefs: ["function://hello"],
-        materializationTargetRefs: ["src/index.js"]
-      })
-    ],
-    { requireTrivialDegenerateProduct: true }
-  );
-
-  assert.equal(admitted.admissionDecision, "admit");
-  assert.equal(admitted.upstreamCount, 1);
-  assert.equal(admitted.downstreamCount, 1);
-
-  const rejected = summary(
     [
       row({
         downstreamId: "component://hello-world",
@@ -233,10 +215,36 @@ test("T-172 admits trivial products only through an explicit 1x1 decomposition",
     { requireTrivialDegenerateProduct: true }
   );
 
+  assert.equal(admitted.admissionDecision, "admit");
+  assert.equal(admitted.upstreamCount, 2);
+  assert.equal(admitted.downstreamCount, 1);
+
+  const rejected = summary(
+    [
+      row({
+        downstreamId: "component://hello-world",
+        parentId: null,
+        ownedUpstreamRefs: ["REQ-HELLO-001"],
+        publicBoundaryRefs: ["src/index.js"],
+        substantiveResponsibilityRefs: ["function://hello"],
+        materializationTargetRefs: ["src/index.js"]
+      }),
+      row({
+        downstreamId: "component://hello-world-proof",
+        parentId: null,
+        ownedUpstreamRefs: ["REQ-HELLO-002"],
+        publicBoundaryRefs: ["test/hello.test.js"],
+        substantiveResponsibilityRefs: ["function://proof"],
+        materializationTargetRefs: ["test/hello.test.js"]
+      })
+    ],
+    { requireTrivialDegenerateProduct: true }
+  );
+
   assert.equal(rejected.admissionDecision, "reject");
   assert.ok(
     rejected.blockingReasons.includes(
-      "decomposition_trivial_product_not_explicit_1x1"
+      "decomposition_trivial_product_not_single_component"
     )
   );
 });

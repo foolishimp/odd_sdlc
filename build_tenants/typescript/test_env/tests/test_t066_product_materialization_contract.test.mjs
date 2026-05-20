@@ -134,6 +134,7 @@ function makeWorkspace() {
 function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
   const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
+  writeTenantTechnologyStackSpec(workspaceRoot);
   const helloWorldJavascript =
     constraints.selectedOutputRoot.endsWith("hello_world_javascript");
   const helloWorldRust =
@@ -402,6 +403,65 @@ function declareScalaSbtTestRunner(workspaceRoot) {
   materializeSdlcProjectConformance({ workspaceRoot });
 }
 
+function writeTenantTechnologyStackSpec(
+  workspaceRoot,
+  options = { buildConfigTargets: [] }
+) {
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
+  const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
+  const stackSpecFile = path.join(tenantRoot, "spec/TECH_STACK.json");
+  const buildConfigTargets = options.buildConfigTargets ?? [];
+  if (buildConfigTargets.length === 0 && existsSync(stackSpecFile)) {
+    return;
+  }
+  const helloWorldJavascript =
+    constraints.selectedOutputRoot.endsWith("hello_world_javascript");
+  const helloWorldRust =
+    constraints.selectedOutputRoot.includes("hello_world_rust");
+  const language = helloWorldJavascript
+    ? "JavaScript"
+    : helloWorldRust
+      ? "Rust"
+      : "Scala";
+  const buildTool = helloWorldJavascript
+    ? "node"
+    : helloWorldRust
+      ? "cargo"
+      : "sbt";
+  const testRunner = helloWorldJavascript
+    ? "node --test"
+    : helloWorldRust
+      ? "cargo test"
+      : "sbt test";
+  mkdirSync(dirname(stackSpecFile), { recursive: true });
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language,
+        buildTool,
+        ...(buildConfigTargets.length > 0 ? { buildConfigTargets } : {}),
+        testingTechStack: {
+          testRunner,
+          testRoots: [
+            helloWorldJavascript
+              ? "test/"
+              : helloWorldRust
+                ? "tests/"
+                : "src/test/scala/"
+          ],
+          proofCommands: [testRunner],
+          evidenceFormat: "process-exit"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function makeStart(workspaceRoot) {
   const module = constructSdlcGtlModule();
   const ingressReport = deriveSdlcWorkspaceIngressReport({
@@ -543,10 +603,20 @@ function writePlaceholderWorkerScript(workspaceRoot) {
       "const requirementIds = requirementObligationIds.map((id) => id.replace(/^requirement:/, '')).filter((id) => id.startsWith('REQ-')).join(', ') || 'none';",
       "const activeRequirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
       "const requirementTraceHeader = [...requirementObligationIds.map((id) => `// ${id}`), ...activeRequirementTags.map((tag) => `// Validates: ${tag}`)].join('\\n');",
+      "function appendImplementationDesignAdr(lines) {",
+      "  if (manifest.targetAssetType !== 'implementation_design_surface') return;",
+      "  const requirementForTable = requirementIds === 'none' ? 'REQ-ENG-001' : requirementIds.split(', ')[0];",
+      "  lines.push('', '## Context', '', 'Tenant-local implementation design must live under design/adrs and declare product file targets for evaluator admission.');",
+      "  lines.push('', '## Decision', '', 'The implementation surface is a single cdme-core module with one source realization file for the current fixture pressure.');",
+      "  lines.push('', '## Module Boundary', '', '- Module: `cdme-core`', '- Public boundary: `Core.retryClosed`', '- Component: `cdme-core`');",
+      "  lines.push('', '## Product File Targets', '', '| Path | Role |', '| ---- | ---- |', `| ${sourceRelative} | source |`);",
+      "  lines.push('', '## Requirement Lineage', '', '| Requirement | Owning Component | Realization File |', '| ----------- | ---------------- | ---------------- |', `| ${requirementForTable} | cdme-core | ${sourceRelative} |`);",
+      "  lines.push('', '## Consequences', '', '- The evaluator derives design-depth register, decomposition summary, and dependency map from this ADR.', '- Test execution and proof evidence remain downstream pressure.');",
+      "}",
       "const outputLines = [`# ${manifest.targetAssetType}`];",
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
-      "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",
+      "appendImplementationDesignAdr(outputLines);",
       "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
@@ -714,6 +784,25 @@ function freshDataMapperWorkspace() {
       force: true
     });
   }
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
+  assert.equal(
+    existsSync(
+      path.join(workspaceRoot, constraints.selectedOutputRoot, "spec/TECH_STACK.json")
+    ),
+    true,
+    "data_mapper template must provide tenant technology stack authority"
+  );
+  assert.equal(
+    existsSync(
+      path.join(
+        workspaceRoot,
+        constraints.selectedOutputRoot,
+        "spec/TESTING_TECH_STACK.json"
+      )
+    ),
+    true,
+    "data_mapper template must provide testing technology stack authority"
+  );
   return workspaceRoot;
 }
 
@@ -832,6 +921,16 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "const requirementIds = requirementObligationIds.map((id) => id.replace(/^requirement:/, '')).filter((id) => id.startsWith('REQ-')).join(', ') || 'none';",
       "const activeRequirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
       "const requirementTraceHeader = [...requirementObligationIds.map((id) => `// ${id}`), ...activeRequirementTags.map((tag) => `// Validates: ${tag}`)].join('\\n');",
+      "function appendImplementationDesignAdr(lines) {",
+      "  if (manifest.targetAssetType !== 'implementation_design_surface') return;",
+      "  const requirementForTable = requirementIds === 'none' ? 'REQ-ENG-001' : requirementIds.split(', ')[0];",
+      "  lines.push('', '## Context', '', 'The data_mapper Scala/Spark tenant stack is declared by build_tenants/scala_spark/spec and this ADR declares the implementation decomposition that the evaluator admits.');",
+      "  lines.push('', '## Decision', '', 'Use cdme-core as the first implementation module, with Core.retryClosed as the bounded public boundary and Core.scala as the source file target.');",
+      "  lines.push('', '## Module Boundary', '', '- Module: `cdme-core`', '- Public boundary: `Core.retryClosed`', '- Component: `cdme-core`');",
+      "  lines.push('', '## Product File Targets', '', '| Path | Role |', '| ---- | ---- |', `| ${sourceRelative} | source |`);",
+      "  lines.push('', '## Requirement Lineage', '', '| Requirement | Owning Component | Realization File |', '| ----------- | ---------------- | ---------------- |', `| ${requirementForTable} | cdme-core | ${sourceRelative} |`);",
+      "  lines.push('', '## Consequences', '', '- The evaluator derives the design-depth register, decomposition summary, and dependency map from this ADR and tenant stack authority.', '- Test design, component tests, execution evidence, and release rollup remain downstream surfaces.');",
+      "}",
       "function testExecutionSurfaceRegister() {",
       "  if (manifest.targetAssetType !== 'test_execution_surface') return null;",
       "  const payload = { kind: 'sdlc_test_execution_surface_register', registerVersion: 'ts-test-execution-v1', targetAssetType: 'test_execution_surface', testExecutionPreparationRows: [{ kind: 'sdlc_test_execution_preparation_row', scheduleRef: 'test-schedule://data-mapper/sbt-test', moduleName: 'cdme-core-tests', testClassId: 'CoreSpec', testcaseIds: ['TC-DM-001'], command: 'sbt test', workingDirectory: manifest.productMaterialization.selectedOutputRoot, frameworkRef: 'framework://scalatest', shardId: 'test-shard-01-cdme-core', sourceTestFileRefs: [`workspace://${testRelative}`], requirementIds: requirementObligationIds, status: 'prepared', evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`] }], evidenceRefs: [`file://${manifest.outputFile}`, `workspace://${testRelative}`], summary: 'prepared data_mapper ScalaTest execution surface' };",
@@ -843,7 +942,7 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "const outputLines = [`# ${manifest.targetAssetType}`];",
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
-      "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",
+      "appendImplementationDesignAdr(outputLines);",
       "if (testRegister !== null) outputLines.push('', '```test_design_register', JSON.stringify(testRegister, null, 2), '```');",
       "if (testExecutionRegister !== null) outputLines.push('', '```json test_execution_surface_register', JSON.stringify(testExecutionRegister, null, 2), '```');",
       "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
@@ -872,6 +971,12 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "    writeFileSync(buildPath, buildConfig, 'utf8');",
       "    const buildDigest = `sha256:${createHash('sha256').update(buildConfig, 'utf8').digest('hex')}`;",
       "    materializedFiles.push({ kind: 'sdlc_materialized_product_file', role: 'build_config', relativePath: 'build.sbt', absolutePath: buildPath, digest: buildDigest, byteCount: Buffer.byteLength(buildConfig, 'utf8'), requirementTraceObligationIds: requirementObligationIds });",
+      "    const projectBuildPropertiesPath = path.join(manifest.productMaterialization.tenantRoot, 'project/build.properties');",
+      "    mkdirSync(dirname(projectBuildPropertiesPath), { recursive: true });",
+      "    const projectBuildProperties = 'sbt.version=1.9.9\\n';",
+      "    writeFileSync(projectBuildPropertiesPath, projectBuildProperties, 'utf8');",
+      "    const projectBuildPropertiesDigest = `sha256:${createHash('sha256').update(projectBuildProperties, 'utf8').digest('hex')}`;",
+      "    materializedFiles.push({ kind: 'sdlc_materialized_product_file', role: 'build_config', relativePath: 'project/build.properties', absolutePath: projectBuildPropertiesPath, digest: projectBuildPropertiesDigest, byteCount: Buffer.byteLength(projectBuildProperties, 'utf8'), requirementTraceObligationIds: requirementObligationIds });",
       "  }",
       "}",
       "const declaredExecutionContract = typeof manifest.productMaterialization.testExecutionContract === 'string' && !['', 'undeclared', 'none', 'n/a', 'not_applicable'].includes(manifest.productMaterialization.testExecutionContract.trim().toLowerCase());",
@@ -1471,6 +1576,62 @@ test("T-164 worker read-boundary still blocks outside workspace tool input reads
   assert.match(authorityReason ?? "", /worker_authority_read_outside_workspace/u);
 });
 
+test("T-172 worker read-boundary blocks installed odd_sdlc runtime source reads", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_scenario_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "derive_scenario_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t172-worker-read-boundary-installed-runtime-source"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(manifest, "scenario_surface");
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "scenario surface",
+    materializedFiles: []
+  });
+  const runtimeSourcePath = path.join(
+    workspace,
+    ".abiogenesis/odd_sdlc/typescript/package-extract/code/src/operator/handoff.ts"
+  );
+  mkdirSync(dirname(runtimeSourcePath), { recursive: true });
+  writeFileSync(runtimeSourcePath, "// installed runtime source fixture\n", "utf8");
+  writeFileSync(
+    path.join(manifest.archiveRoot, "worker_stdout.log"),
+    JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [
+          {
+            type: "tool_use",
+            id: "toolu_boundary_runtime_source_read",
+            name: "Read",
+            input: {
+              file_path: runtimeSourcePath
+            }
+          }
+        ]
+      }
+    }) + "\n",
+    "utf8"
+  );
+
+  const report = readWorkerResultReport(manifest);
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const runtimeSourceReason = postflight.blockingReasons.find((reason) =>
+    reason.startsWith("worker_runtime_source_read:")
+  );
+
+  assert.equal(postflight.status, "blocked");
+  assert.match(runtimeSourceReason ?? "", /worker_runtime_source_read/u);
+  assert.match(runtimeSourceReason ?? "", /\.abiogenesis\/odd_sdlc/u);
+});
+
 test("T-159 product materialization blocks cited source without requirement lineage", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -1611,6 +1772,9 @@ test("T-171 product materialization permits auxiliary build config without requi
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["project/"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -2309,6 +2473,9 @@ test("T-171 non-materialized F_P surfaces carry unobserved requirement pressure 
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["Cargo.toml"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_intent_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -2738,6 +2905,9 @@ test("T-002 component-code materialization ignores build execution byproducts", 
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["project/"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -2992,9 +3162,25 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     "",
     "Write the implementation design decision into the tenant ADR folder.",
     "",
-    "```design_depth_register",
-    incompleteContent,
-    "```"
+    "## Module Boundary",
+    "",
+    "- Module: `scala_spark`",
+    "- Public boundary: `src/main/scala/generated/App.scala`",
+    "- Component: `scala_spark.app`",
+    "",
+    "## Product File Targets",
+    "",
+    "| Path | Role |",
+    "| ---- | ---- |",
+    "| `build_tenants/scala_spark/src/main/scala/generated/App.scala` | source |",
+    "",
+    "## Requirement Lineage",
+    "",
+    "| Requirement | Owning Component | Realization File |",
+    "| ----------- | ---------------- | ---------------- |",
+    "| REQ-T066-001 | scala_spark.app | `build_tenants/scala_spark/src/main/scala/generated/App.scala` |",
+    "",
+    `Prior skeleton digest: ${sha256Text(incompleteContent)}`
   ].join("\n");
   writeFileSync(manifest.outputFile, `${adr}\n`, "utf8");
   writeReport({
@@ -3348,6 +3534,9 @@ test("T-158 replay completeness follows declared product targets, not role-only 
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["Cargo.toml"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const firstManifest = deriveWorkerHandoffManifest({
@@ -3489,6 +3678,627 @@ test("T-158 replay completeness follows declared product targets, not role-only 
   assert.equal(currentSource.role, "source");
 });
 
+test("T-172 tenant stack spec owns build-config targets without ecosystem handoff branches", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "- active tenant: fake_service",
+      "- selected output root: build_tenants/fake_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/fake_service/Stackfile.fake`",
+      "- `build_tenants/fake_service/src/main.fake`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t172_fake_stack_spec",
+      "active_tenant: fake_service",
+      "selected_output_root: build_tenants/fake_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  fake_service:",
+      "    output_dir: build_tenants/fake_service",
+      "    language: FakeLang",
+      "    build_tool: fakebuild",
+      "    test_runner: fake-test",
+      "    module_structure:",
+      "      - fake_service"
+    ].join("\n"),
+    "utf8"
+  );
+  const stackSpecFile = path.join(
+    workspace,
+    "build_tenants/fake_service/spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(stackSpecFile), { recursive: true });
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "FakeLang",
+        buildTool: "fakebuild",
+        buildConfigTargets: ["Stackfile.fake"],
+        testingBuildConfigTargets: ["TopLevelTestHarness.fake"],
+        testingTechStack: {
+          testRunner: "fake-test",
+          testRoots: ["test/"],
+          proofCommands: ["fake-test --report json"],
+          evidenceFormat: "json-report"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const testingStackSpecFile = path.join(
+    workspace,
+    "build_tenants/fake_service/spec/TESTING_TECH_STACK.json"
+  );
+  writeFileSync(
+    testingStackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_testing_technology_stack_description",
+        testRunner: "fake-test",
+        testRoots: ["test/"],
+        testingBuildConfigTargets: ["TestHarness.fake"],
+        proofCommands: ["fake-test --report json"],
+        evidenceFormat: "json-report"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260520T103000000Z_pid172"
+  });
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  const stackTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) => target.path === "build_tenants/fake_service/Stackfile.fake"
+    );
+  const testingStackTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) => target.path === "build_tenants/fake_service/TestHarness.fake"
+    );
+  const topLevelTestingStackTarget =
+    invocationPackage.outputContract.declaredProductTargetContracts.find(
+      (target) =>
+        target.path === "build_tenants/fake_service/TopLevelTestHarness.fake"
+    );
+  const tenantStackAuthorityTargets =
+    invocationPackage.productMaterializationAuthority
+      .tenantStackAuthorityTargetContracts;
+  const stackAuthorityTarget = tenantStackAuthorityTargets.find(
+    (target) => target.path === "build_tenants/fake_service/Stackfile.fake"
+  );
+  const topLevelTestingStackAuthorityTarget = tenantStackAuthorityTargets.find(
+    (target) =>
+      target.path === "build_tenants/fake_service/TopLevelTestHarness.fake"
+  );
+  const testingStackAuthorityTarget = tenantStackAuthorityTargets.find(
+    (target) => target.path === "build_tenants/fake_service/TestHarness.fake"
+  );
+  assert.notEqual(stackTarget, undefined);
+  assert.equal(testingStackTarget, undefined);
+  assert.equal(topLevelTestingStackTarget, undefined);
+  assert.notEqual(stackAuthorityTarget, undefined);
+  assert.notEqual(topLevelTestingStackAuthorityTarget, undefined);
+  assert.notEqual(testingStackAuthorityTarget, undefined);
+  assert.equal(stackTarget.requiredRole, "build_config");
+  assert.equal(testingStackAuthorityTarget.requiredRole, "build_config");
+  assert.equal(topLevelTestingStackAuthorityTarget.requiredRole, "build_config");
+  assert.ok(stackAuthorityTarget.sourceRef.endsWith("/TECH_STACK.json"));
+  assert.ok(
+    topLevelTestingStackAuthorityTarget.sourceRef.endsWith("/TECH_STACK.json")
+  );
+  assert.ok(
+    testingStackAuthorityTarget.sourceRef.endsWith("/TESTING_TECH_STACK.json")
+  );
+  assert.deepStrictEqual(
+    invocationPackage.productMaterializationAuthority.tenantStackAuthorityTargets,
+    [
+      "build_tenants/fake_service/Stackfile.fake",
+      "build_tenants/fake_service/TestHarness.fake",
+      "build_tenants/fake_service/TopLevelTestHarness.fake"
+    ].sort()
+  );
+  assert.ok(
+    invocationPackage.productMaterializationAuthority.reasonRefs.includes(
+      "tenant_stack_materialization_targets"
+    )
+  );
+});
+
+test("T-164 observed product roles follow explicit design targets before generic fallback inference", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust_service",
+      "- selected output root: build_tenants/hello_world_rust_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust_service/Cargo.toml`",
+      "- `build_tenants/hello_world_rust_service/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t164_rust_service_explicit_source_target",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  const stackSpecFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(stackSpecFile), { recursive: true });
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Rust",
+        buildTool: "cargo",
+        buildConfigTargets: ["Cargo.toml"],
+        testingTechStack: {
+          testRunner: "cargo test",
+          testRoots: ["tests/"],
+          proofCommands: ["cargo test"],
+          evidenceFormat: "process-exit"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const implementationDesignRegister = JSON.parse(
+    readFileSync(implementationDesignFile, "utf8")
+  );
+  implementationDesignRegister.fileTargetRows =
+    implementationDesignRegister.fileTargetRows.map((row) =>
+      row.relativePath === "Cargo.toml" ? { ...row, role: "source" } : row
+    );
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
+    "utf8"
+  );
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260520T090000000Z_pid164"
+  });
+  writeHandoffFiles(manifest);
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeOutputSurface(manifest, "component_code_surface");
+  const requirementIds = requirementObligationIds(manifest);
+  assert(requirementIds.length > 0);
+  const cargoPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "Cargo.toml"
+  );
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main.rs"
+  );
+  const cargoContent = [
+    ...requirementIds.map((id) => `# ${id}`),
+    "",
+    "[package]",
+    'name = "hello_world_rust_service"',
+    'version = "0.1.0"',
+    'edition = "2021"'
+  ].join("\n");
+  const sourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("helloworld");',
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(cargoPath), { recursive: true });
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({
+    manifest,
+    before
+  });
+  const cargoRow = report.materializedFiles.find(
+    (file) => file.relativePath === "Cargo.toml"
+  );
+  assert.notEqual(cargoRow, undefined);
+  assert.equal(cargoRow.role, "source");
+
+  const postflight = evaluateWorkerResultPostflight({
+    manifest,
+    report
+  });
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
+test("T-164 design manifest role normalizes to build_config product materialization", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust_service",
+      "- selected output root: build_tenants/hello_world_rust_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust_service/Cargo.toml`",
+      "- `build_tenants/hello_world_rust_service/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t164_rust_service_manifest_alias",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: cargo test",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  const curlRunnerStackSpecFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(curlRunnerStackSpecFile), { recursive: true });
+  writeFileSync(
+    curlRunnerStackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Rust",
+        buildTool: "cargo",
+        buildConfigTargets: ["Cargo.toml"],
+        testingTechStack: {
+          testRunner: "cargo test",
+          testRoots: ["tests/"],
+          proofCommands: ["cargo test"],
+          evidenceFormat: "process-exit"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const implementationDesignRegister = JSON.parse(
+    readFileSync(implementationDesignFile, "utf8")
+  );
+  implementationDesignRegister.fileTargetRows =
+    implementationDesignRegister.fileTargetRows.map((row) =>
+      row.relativePath === "Cargo.toml" ? { ...row, role: "manifest" } : row
+    );
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
+    "utf8"
+  );
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260520T090500000Z_pid164"
+  });
+  writeHandoffFiles(manifest);
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeOutputSurface(manifest, "component_code_surface");
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/hello_world_rust_service/Cargo.toml",
+    "build_tenants/hello_world_rust_service/src/main.rs"
+  ]);
+
+  const requirementIds = requirementObligationIds(manifest);
+  const cargoPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "Cargo.toml"
+  );
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main.rs"
+  );
+  const cargoContent = [
+    ...requirementIds.map((id) => `# ${id}`),
+    "",
+    "[package]",
+    'name = "hello_world_rust_service"',
+    'version = "0.1.0"',
+    'edition = "2021"'
+  ].join("\n");
+  const sourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("helloworld");',
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(cargoPath), { recursive: true });
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({
+    manifest,
+    before
+  });
+  const cargoRow = report.materializedFiles.find(
+    (file) => file.relativePath === "Cargo.toml"
+  );
+  assert.notEqual(cargoRow, undefined);
+  assert.equal(cargoRow.role, "build_config");
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
+test("T-164 component-code rejects worker execution evidence even with concrete runner invocation", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "Build Tool: cargo",
+      "",
+      "- active tenant: hello_world_rust_service",
+      "- selected output root: build_tenants/hello_world_rust_service",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_rust_service/src/main.rs`"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t164_rust_service_curl_runner",
+      "active_tenant: hello_world_rust_service",
+      "selected_output_root: build_tenants/hello_world_rust_service",
+      "ambiguity_risk_appetite: low",
+      "build_tenants:",
+      "  hello_world_rust_service:",
+      "    output_dir: build_tenants/hello_world_rust_service",
+      "    language: Rust",
+      "    build_tool: cargo",
+      "    test_runner: curl",
+      "    test_execution_contract: curl",
+      "    module_structure:",
+      "      - hello_world_rust_service"
+    ].join("\n"),
+    "utf8"
+  );
+  const shardEvidenceStackSpecFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
+  );
+  mkdirSync(dirname(shardEvidenceStackSpecFile), { recursive: true });
+  writeFileSync(
+    shardEvidenceStackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Rust",
+        buildTool: "cargo",
+        buildConfigTargets: ["Cargo.toml"],
+        testingTechStack: {
+          testRunner: "cargo test",
+          testRoots: ["tests/"],
+          proofCommands: ["cargo test"],
+          evidenceFormat: "process-exit"
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    "build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const implementationDesignRegister = JSON.parse(
+    readFileSync(implementationDesignFile, "utf8")
+  );
+  implementationDesignRegister.fileTargetRows =
+    implementationDesignRegister.fileTargetRows.filter(
+      (row) => row.relativePath === "src/main.rs"
+    );
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
+    "utf8"
+  );
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "lite_design_module_implementation",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260520T091000000Z_pid164"
+  });
+  writeHandoffFiles(manifest);
+  assert.equal(manifest.productMaterialization.executionShards.length, 1);
+  const output = writeOutputSurface(manifest, "component_code_surface");
+  const requirementIds = requirementObligationIds(manifest);
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main.rs"
+  );
+  const cargoPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "Cargo.toml"
+  );
+  const cargoContent = [
+    ...requirementIds.map((id) => `# ${id}`),
+    "",
+    "[package]",
+    'name = "hello_world_rust_service"',
+    'version = "0.1.0"',
+    'edition = "2021"'
+  ].join("\n");
+  const sourceContent = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "fn main() {",
+    '    println!("helloworld");',
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(cargoPath), { recursive: true });
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
+  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
+  const command =
+    "HELLO_SERVICE_PORT=18182 cargo run --quiet & curl --fail --silent http://127.0.0.1:18182/";
+  writeReport({
+    manifest,
+    digest: output.digest,
+    summary: "curl proof uses concrete curl invocation",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "build_config",
+        relativePath: "Cargo.toml",
+        absolutePath: cargoPath,
+        digest: sha256Text(`${cargoContent}\n`),
+        byteCount: Buffer.byteLength(`${cargoContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds
+      },
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: "src/main.rs",
+        absolutePath: sourcePath,
+        digest: sha256Text(`${sourceContent}\n`),
+        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
+        requirementTraceObligationIds: requirementIds
+      }
+    ],
+    executionEvidence: {
+      kind: "sdlc_worker_execution_evidence",
+      lane: "test",
+      command,
+      status: "succeeded",
+      reportRefs: [pathToFileURL(sourcePath).href],
+      testsObserved: 1,
+      passedCount: 1,
+      failedCount: 0,
+      shardEvidence: [
+        {
+          kind: "sdlc_worker_execution_shard_evidence",
+          shardId: manifest.productMaterialization.executionShards[0].shardId,
+          moduleName: manifest.productMaterialization.executionShards[0].moduleName,
+          lane: "test",
+          command,
+          status: "succeeded",
+          reportRefs: [pathToFileURL(sourcePath).href],
+          testsObserved: 1,
+          passedCount: 1,
+          failedCount: 0
+        }
+      ]
+    }
+  });
+
+  assert.throws(
+    () => readWorkerResultReport(manifest),
+    /target asset type does not admit execution evidence/u
+  );
+});
+
 test("T-164 replay empty predecessor is superseded by later admitted product rows", () => {
   const workspace = makeWorkspace();
   writeFileSync(
@@ -3529,6 +4339,9 @@ test("T-164 replay empty predecessor is superseded by later admitted product row
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["Cargo.toml"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
 
@@ -3821,6 +4634,9 @@ test("T-158 product materialization target contracts prefer requirement authorit
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   writeAdmittedStagedAuthoritySurfaces(workspace);
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["Cargo.toml"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -5374,7 +6190,7 @@ test("T-066 test execution result postflight rejects missing execution evidence"
   assert.match(missingReason.detail, /No sdlc_worker_execution_evidence block/);
 });
 
-test("T-170 lite component-code postflight requires declared execution evidence", () => {
+test("T-170 lite component-code defers execution evidence to graph test-execution result", () => {
   const workspace = makeWorkspace();
   writeFileSync(
     path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
@@ -5432,11 +6248,16 @@ test("T-170 lite component-code postflight requires declared execution evidence"
   );
   writeHandoffFiles(manifest);
   const output = writeOutputSurface(manifest, "component_code_surface");
+  const requirementIds = requirementObligationIds(manifest);
+  assert(requirementIds.length > 0);
   const sourcePath = path.join(
     workspace,
     "build_tenants/hello_world_javascript/src/hello.js"
   );
-  const source = "console.log('Hello, world!');\n";
+  const source = [
+    ...requirementIds.map((id) => `// ${id}`),
+    "console.log('Hello, world!');"
+  ].join("\n") + "\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
   writeFileSync(sourcePath, source, "utf8");
   writeReport({
@@ -5450,7 +6271,8 @@ test("T-170 lite component-code postflight requires declared execution evidence"
         relativePath: "src/hello.js",
         absolutePath: sourcePath,
         digest: sha256Text(source),
-        byteCount: Buffer.byteLength(source, "utf8")
+        byteCount: Buffer.byteLength(source, "utf8"),
+        requirementTraceObligationIds: requirementIds
       }
     ]
   });
@@ -5459,11 +6281,12 @@ test("T-170 lite component-code postflight requires declared execution evidence"
   writeProductMaterializationManifest({ manifest, report });
   const postflight = evaluateWorkerResultPostflight({ manifest, report });
 
-  assert.equal(postflight.status, "blocked");
-  assert(
+  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+  assert.equal(
     postflight.blockingReasonCarriers.some(
       (reason) => reason.code === "test_execution_evidence_missing"
-    )
+    ),
+    false
   );
 });
 
@@ -8137,11 +8960,11 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       carrierKind: "sdlc_design_depth_register",
       registerVersion: "ts-design-depth-v1",
       envelopePattern:
-        /Emit a fenced `json design_depth_register` carrier that conforms to constructionTemplate\.payloadTemplate and constructionTemplate\.rowTemplates/u,
-      rowDirective: /componentTopologyRows/u,
+        /The framework evaluator derives and publishes the design-depth register/u,
+      rowDirective: /requirement-lineage table/u,
       extraDirectives: [
-        /componentRealizationRows are source\/implementation realization rows only/u,
-        /Graph-generated tests are declared as fileTargetRows with role=test/u
+        /Product File Targets section/u,
+        /Evaluator-owned outputs stay with the framework/u
       ]
     },
     {
@@ -8265,17 +9088,17 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
     }
     if (promptCase.targetAssetType === "test_execution_surface") {
       assert.notEqual(
-        invocationPackage.targetCarrierProjection.constructionTemplate
+        manifest.targetCarrierProjection.constructionTemplate
           .payloadTemplate,
         null
       );
       assert.equal(
-        invocationPackage.targetCarrierProjection.constructionTemplate
+        manifest.targetCarrierProjection.constructionTemplate
           .payloadTemplate.fieldTypes.testExecutionPreparationRows,
         "sdlc_test_execution_preparation_row[]"
       );
       assert.equal(
-        invocationPackage.targetCarrierProjection.constructionTemplate.rowTemplates
+        manifest.targetCarrierProjection.constructionTemplate.rowTemplates
           .length,
         1
       );
@@ -8576,11 +9399,7 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
   );
   const report = buildPostTransformWorkerResultReport({
     manifest: surfaceManifest,
-    before: {
-      kind: "sdlc_product_materialization_snapshot",
-      tenantRoot: surfaceManifest.productMaterialization.tenantRoot,
-      files: []
-    }
+    before: snapshotProductMaterializationRoot(surfaceManifest.productMaterialization)
   });
 
   assert.equal(surfaceManifest.productMaterialization.required, false);

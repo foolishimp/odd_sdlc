@@ -120,6 +120,49 @@ function implementationDesignRegister(componentTopologyRows) {
   };
 }
 
+function implementationDesignAdr(componentTopologyRows) {
+  const fileTargets = [
+    ...new Map(
+      componentTopologyRows.map((row) => [
+        row.relativePath,
+        `| \`${row.relativePath}\` | source |`
+      ])
+    ).values()
+  ];
+  const lineageRows = componentTopologyRows.flatMap((row) =>
+    row.requirementIds.map(
+      (requirementId) =>
+        `| ${requirementId} | ${row.componentId} | \`${row.relativePath}\` |`
+    )
+  );
+  return [
+    "# ADR-002 Implementation Design Surface",
+    "",
+    "## Decision",
+    "",
+    "The implementation uses the declared module and component boundaries.",
+    "",
+    "## Module Boundary",
+    "",
+    "- Module: `app`",
+    "- Public boundary: `src/hello.js`",
+    "- Component: `hello`",
+    "",
+    "## Product File Targets",
+    "",
+    "| Path | Role |",
+    "| ---- | ---- |",
+    ...fileTargets,
+    "",
+    "## Requirement Lineage",
+    "",
+    "| Requirement | Owning Component | Realization File |",
+    "| ----------- | ---------------- | ---------------- |",
+    ...lineageRows,
+    ""
+  ].join("\n");
+}
+
 function componentTopologyRow(overrides = {}) {
   return {
     kind: "sdlc_component_topology_row",
@@ -428,9 +471,17 @@ test("T-172 handoff projection carries staged authority refs into the worker pac
         "surface://module-dependency-map"
       ]
     );
+    assert.equal(
+      invocationPackage.targetCarrierProjection.kind,
+      "sdlc_worker_target_carrier_prompt_projection"
+    );
+    assert.equal(
+      "constructionTemplate" in invocationPackage.targetCarrierProjection,
+      false
+    );
     assert.deepEqual(
-      invocationPackage.targetCarrierProjection,
-      manifest.targetCarrierProjection
+      invocationPackage.targetCarrierProjection.requiredStagedAuthorityRefs,
+      manifest.targetCarrierProjection.requiredStagedAuthorityRefs
     );
     assert.match(
       outcomeDirectives,
@@ -458,13 +509,220 @@ test("T-172 implementation-design prompt preserves proportional topology capacit
 
     assert.match(
       prompt,
-      /up to 16 componentTopologyRows when needed to keep every topology row at or below 8 owned requirement refs/u
+      /The framework evaluator derives and publishes the design-depth register/u
     );
-    assert.match(
-      prompt,
-      /no componentTopologyRows row should own more than 8 requirement refs/u
-    );
+    assert.match(prompt, /no component should own more than 8 requirement refs/u);
+    assert.match(prompt, /Product File Targets section/u);
+    assert.match(prompt, /requirement-lineage table/u);
+    assert.doesNotMatch(prompt, /Emit a fenced `json design_depth_register` carrier/u);
+    assert.doesNotMatch(prompt, /componentTopologyRows\[\]/u);
     assert.doesNotMatch(prompt, /8 componentTopologyRows, 12 componentRealizationRows/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 trivial implementation-design prompt keeps single-file topology collapsed to one owned component", () => {
+  const workspaceRoot = makeWorkspace({ trivialProduct: true });
+  try {
+    const contract = hookContractByEdgeName("derive_implementation_design_surface");
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot,
+      graphFunctionName: "derive_implementation_design_surface",
+      edgeName: contract.edgeName,
+      vectorIndex: 0,
+      contract,
+      runId: "t172-trivial-implementation-design-prompt"
+    });
+    const files = writeHandoffFiles(manifest);
+    const prompt = readFileSync(files.promptPath, "utf8");
+
+    assert.match(prompt, /Trivial product profile is active/u);
+    assert.match(prompt, /one implementation component topology row/u);
+    assert.match(prompt, /Map build-config, source, runtime, and proof-subject requirement refs/u);
+    assert.match(prompt, /One source file remains one component row/u);
+    assert.doesNotMatch(prompt, /Emit a fenced `json design_depth_register` carrier/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 implementation-design producer derives topology from ADR instead of worker register", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-implementation-design-derived-from-adr"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const outputContent = implementationDesignAdr([
+      componentTopologyRow({
+        componentId: "hello",
+        requirementIds: ["REQ-T172-001"]
+      })
+    ]);
+    writeFileSync(
+      manifest.outputFile,
+      outputContent,
+      "utf8"
+    );
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 implementation-design evaluator derives Rust tenant topology from generic ADR tables", () => {
+  const workspaceRoot = makeWorkspace({ trivialProduct: true });
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-rust-tenant-topology-derived-from-adr"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const outputContent = [
+      "# ADR-002 Implementation Design Surface",
+      "",
+      "## Decision",
+      "",
+      "The implementation uses a single Rust binary service.",
+      "",
+      "## Stack Profile",
+      "",
+      "| field | value |",
+      "| ----- | ----- |",
+      "| language | Rust |",
+      "| build tool | cargo |",
+      "",
+      "## Module Boundary",
+      "",
+      "| module | public boundary | owns |",
+      "| ------ | --------------- | ---- |",
+      "| hello_world_rust_service | `cargo run` entry point; `GET /` responder | fixed response |",
+      "",
+      "## Component Topology",
+      "",
+      "| component | kind | depends on | exposes |",
+      "| --------- | ---- | ---------- | ------- |",
+      "| hello_world_rust_service | binary entry point | std::net | local HTTP socket |",
+      "",
+      "## Product File Targets",
+      "",
+      "| file_target_id | path | role | owning_component |",
+      "| -------------- | ---- | ---- | ---------------- |",
+      "| ft_cargo_manifest | build_tenants/hello_world_rust_service/Cargo.toml | build_config | cmp_hello_world_rust_service |",
+      "| ft_main_rs | build_tenants/hello_world_rust_service/src/main.rs | source | cmp_hello_world_rust_service |",
+      "",
+      "## Requirement Lineage",
+      "",
+      "| requirement_id | obligation | owning_component | realization_locus |",
+      "| -------------- | ---------- | ---------------- | ----------------- |",
+      "| req_t164_rust_svc_001 | Cargo manifest exists | cmp_hello_world_rust_service | ft_cargo_manifest |",
+      "| req_t164_rust_svc_002 | Rust source exists | cmp_hello_world_rust_service | ft_main_rs |",
+      "| req_t164_rust_svc_003 | HTTP bind exists | cmp_hello_world_rust_service | ft_main_rs |",
+      "| req_t164_rust_svc_005 | Live smoke proof | residual: test_design_surface / live HTTP smoke | cargo run + curl |",
+      ""
+    ].join("\n");
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+    const derivedRegister = JSON.parse(
+      readFileSync(
+        path.join(manifest.archiveRoot, "design_depth_evaluator_derived_register.json"),
+        "utf8"
+      )
+    );
+
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+    assert.deepEqual(
+      derivedRegister.fileTargetRows.map((row) => row.relativePath),
+      [
+        "build_tenants/hello_world_rust_service/Cargo.toml",
+        "build_tenants/hello_world_rust_service/src/main.rs"
+      ]
+    );
+    assert.equal(
+      derivedRegister.componentTopologyRows[0].componentId,
+      "cmp_hello_world_rust_service"
+    );
+    assert.equal(
+      derivedRegister.componentTopologyRows[0].moduleName,
+      "hello_world_rust_service"
+    );
+    assert.deepEqual(derivedRegister.componentTopologyRows[0].requirementIds, [
+      "req_t164_rust_svc_001",
+      "req_t164_rust_svc_002",
+      "req_t164_rust_svc_003",
+      "req_t164_rust_svc_005"
+    ]);
+    assert.equal(
+      derivedRegister.componentTopologyRows[0].relativePath,
+      "build_tenants/hello_world_rust_service/src/main.rs"
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 implementation-design producer rejects worker-emitted design-depth register in ADR", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-implementation-design-worker-register-rejected"
+    );
+    const outputContent = [
+      "# ADR-002 Implementation Design Surface",
+      "",
+      "```json design_depth_register",
+      JSON.stringify(
+        implementationDesignRegister([
+          componentTopologyRow({
+            componentId: "hello",
+            requirementIds: ["REQ-T172-001"]
+          })
+        ]),
+        null,
+        2
+      ),
+      "```",
+      ""
+    ].join("\n");
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+    assert.equal(postflight.status, "blocked");
+    assert(
+      postflight.blockingReasonCarriers.some(
+        (reason) =>
+          reason.code === "staged_decomposition_rejected" &&
+          reason.detail.includes("design_depth_worker_emitted_register_forbidden")
+      ),
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
@@ -628,7 +886,7 @@ test("T-172 component-code postflight consumes admitted implementation topology"
   }
 });
 
-test("T-172 trivial implementation-design producer rejects non-degenerate topology", () => {
+test("T-172 trivial implementation-design producer rejects multi-component topology", () => {
   const workspaceRoot = makeWorkspace({ trivialProduct: true });
   try {
     const manifest = manifestForEdge(
@@ -642,6 +900,11 @@ test("T-172 trivial implementation-design producer rejects non-degenerate topolo
         componentTopologyRow({
           componentId: "hello",
           requirementIds: ["REQ-T172-001", "REQ-T172-002"]
+        }),
+        componentTopologyRow({
+          componentId: "hello-proof",
+          relativePath: "test/hello.test.js",
+          requirementIds: ["REQ-T172-003"]
         })
       ])
     );
@@ -654,7 +917,7 @@ test("T-172 trivial implementation-design producer rejects non-degenerate topolo
       postflight.blockingReasonCarriers.some(
         (reason) =>
           reason.code === "staged_decomposition_rejected" &&
-          reason.detail.includes("decomposition_trivial_product_not_explicit_1x1")
+          reason.detail.includes("decomposition_trivial_product_not_single_component")
       ),
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)
     );
@@ -663,7 +926,7 @@ test("T-172 trivial implementation-design producer rejects non-degenerate topolo
   }
 });
 
-test("T-172 trivial implementation-design producer admits explicit 1x1 topology", () => {
+test("T-172 trivial implementation-design producer admits single-component topology with bounded requirements", () => {
   const workspaceRoot = makeWorkspace({ trivialProduct: true });
   try {
     const manifest = manifestForEdge(
@@ -676,7 +939,7 @@ test("T-172 trivial implementation-design producer admits explicit 1x1 topology"
       implementationDesignRegister([
         componentTopologyRow({
           componentId: "hello",
-          requirementIds: ["REQ-T172-001"]
+          requirementIds: ["REQ-T172-001", "REQ-T172-002"]
         })
       ])
     );
@@ -728,7 +991,7 @@ test("T-172 trivial test-design producer rejects non-degenerate topology", () =>
       postflight.blockingReasonCarriers.some(
         (reason) =>
           reason.code === "staged_decomposition_rejected" &&
-          reason.detail.includes("decomposition_trivial_product_not_explicit_1x1")
+          reason.detail.includes("decomposition_trivial_product_not_single_component")
       ),
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)
     );
@@ -765,7 +1028,7 @@ test("T-172 trivial test-design producer admits UAT/integration dual-hop over on
   }
 });
 
-test("T-172 trivial test-design producer admits explicit 1x1 topology", () => {
+test("T-172 trivial test-design producer admits explicit single-row topology", () => {
   const workspaceRoot = makeWorkspace({ trivialProduct: true });
   try {
     const manifest = manifestForEdge(

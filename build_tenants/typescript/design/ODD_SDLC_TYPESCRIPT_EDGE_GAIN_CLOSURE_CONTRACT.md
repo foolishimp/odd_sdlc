@@ -71,6 +71,7 @@ pipeline:
 ```text
 requirements
 -> design commitments
+-> admitted tenant technology-stack description
 -> module/component topology
 -> dependency map
 -> evaluator-selected traversal
@@ -107,6 +108,36 @@ and trivial products that try to bypass decomposition. When the conformed produc
 only as a degenerate one-requirement/one-module/one-component decomposition;
 execution-detail facts may not be inflated into separate implementation or test
 obligations.
+
+Tenant technology-stack description is the authority surface for executable
+materialization details. The bootstrap traversal derives tenant-local stack
+surfaces such as `build_tenants/<tenant>/spec/TECH_STACK.*`,
+`TESTING_TECH_STACK.*`, `PRODUCT_TARGETS.*`, or `EXECUTION_CONTRACT.*` from the
+initial document and conformed project profile. Admission classifies each
+tenant stack surface as:
+
+- `undefined`: materialization cannot proceed; traversal blocks or zooms back
+  to bootstrap/design to derive the missing tenant spec.
+- `sufficient`: `F_P.transform` may make bounded implementation assumptions
+  inside the declared language/runtime/build/proof surface and must preserve
+  those assumptions in emitted artifacts or evidence.
+- `contradictory`: materialization cannot proceed until the product, design,
+  and tenant spec conflict is resolved.
+
+The minimum tenant stack spec has distinct implementation and testing sections.
+Implementation declares language/runtime, build tool, build-config targets,
+source roots, build commands, tool-use assumptions, and byproduct cleanup.
+Testing declares test runtime/language when distinct, framework or runner, test
+roots, fixture/data strategy, test build/config targets, proof commands,
+execution environment assumptions, evidence format, and cleanup. Testing may
+reuse the implementation tenant only when the tenant spec declares that
+relationship; otherwise it is a distinct test-stack authority.
+
+The installed operator consumes admitted tenant stack declarations as data:
+build-config targets, source/test roots, build/test/proof commands,
+tool-install assumptions, evidence expectations, and cleanup rules. It does not
+encode SBT, Cargo, Maven, Gradle, Node, Python, or other ecosystem manifest
+grammar as core SDLC law.
 
 Thresholds are product-profile or edge-contract data. The TypeScript default
 profile publishes concrete limits, currently `8:1` for aggregate compression,

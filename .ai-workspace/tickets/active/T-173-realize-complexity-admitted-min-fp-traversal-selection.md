@@ -195,6 +195,22 @@ For hello-world, lawful Min(F_P) mechanisms may include:
 - projection-only rollups over admitted execution evidence
 - a framework-smoke graph variant selected by admitted outcome class
 
+## Rust Hello Service Bounded Case
+
+The Rust hello service is the reference bounded service product.
+
+It is larger than the JavaScript hello-world degenerate case because it
+materializes a Rust/Cargo service, starts a local HTTP server, and proves the
+behavior with `curl`. It is still not the data_mapper counterexample: its
+requirements are bounded, its module topology is intentionally small, and its
+execution proof is one service behavior.
+
+The Rust service proof should classify as a bounded low-complexity or small
+staged traversal depending on the admitted decomposition summary. It must not
+be admitted by filename, language, or fixture label. It must be admitted by the
+same proportionality and pressure-preservation carriers used for JavaScript
+hello-world and data_mapper.
+
 ## data_mapper Counterexample
 
 data_mapper is the reference substantive product.
@@ -331,8 +347,9 @@ projection.
    where admitted carriers/events already own the truth.
 6. Analyzer: report current graph, selected graph, hop class, outcome class,
    pressure-preservation mechanism, zoom metrics, and rejected alternatives.
-7. Tests: prove low-complexity hello-world selection, substantive data_mapper
-   staged selection, projection-only rollups, and overloaded zoom/block paths.
+7. Tests: prove low-complexity hello-world selection, bounded Rust service
+   selection, substantive data_mapper staged selection, projection-only
+   rollups, and overloaded zoom/block paths.
 8. Audit: archive proportionality and hop-selection carriers and cite them from
    typed runtime events so decisions can be replayed from the event stream plus
    operator-run archive.
@@ -348,8 +365,12 @@ Focused deterministic proof:
 
 Integration proof:
 
-  - hello-world lifecycle selects single-hop or dual-hop and still admits
+- `npm run test:t173:rust-hello-service-live`
+- hello-world lifecycle selects single-hop or dual-hop and still admits
   execution evidence
+- Rust hello service lifecycle proves bounded service construction, non-JS
+  build-tool execution, and HTTP behavior through the same admitted
+  proportionality and Min(F_P) decision carriers
 - data_mapper successor run selects staged traversal unless admitted metrics
   prove a smaller path
 - analyzer output shows selected hop class, selected outcome class, and
@@ -403,11 +424,14 @@ Observed proof:
 
 ## Closure Test
 
-T-173 closes when hello-world and data_mapper demonstrate opposite sides of the
-same law:
+T-173 closes when hello-world, Rust hello service, and data_mapper demonstrate
+the same law across three product sizes:
 
 - hello-world proves simple products can use a small admitted traversal without
   losing SDLC authority
+- Rust hello service proves a bounded non-JS service can use the selected
+  traversal only when proportionality and pressure-preservation decisions are
+  archived and replay-visible
 - data_mapper proves substantive products still require staged decomposition or
   zoom when obligation pressure exceeds the next materialization surface
 

@@ -193,9 +193,17 @@ test("T-169 handoff manifests project the selected target carrier contract", () 
     manifest.traversalIntentPackage.targetCarrierProjection.requiredFieldRefs,
     row.requiredFieldRefs
   );
-  assert.deepEqual(
-    invocationPackage.targetCarrierProjection,
-    manifest.targetCarrierProjection
+  assert.equal(
+    invocationPackage.targetCarrierProjection.kind,
+    "sdlc_worker_target_carrier_prompt_projection"
+  );
+  assert.equal(
+    "constructionTemplate" in invocationPackage.targetCarrierProjection,
+    false
+  );
+  assert.equal(
+    invocationPackage.targetCarrierProjection.targetCarrierContractRef,
+    manifest.targetCarrierProjection.targetCarrierContractRef
   );
   assertTraversalIntentPackagePressure(manifest);
 

@@ -23,7 +23,6 @@ import {
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveWorkerHandoffManifest,
   declaredProductFileTargets,
-  constructWorkerInvocationPackage,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
@@ -430,8 +429,6 @@ build_tenants:
       contract,
       runId: `t171-${edgeName}`
     });
-    const invocationPackage = constructWorkerInvocationPackage({ manifest });
-
     assert.equal(manifest.outputFile.endsWith(expectedOutput), true, edgeName);
     assert.equal(
       manifest.allowedWriteRoots.some((root) =>
@@ -441,12 +438,12 @@ build_tenants:
       edgeName
     );
     assert.equal(
-      invocationPackage.targetCarrierProjection.constructionTemplate.payloadTemplate !== null,
+      manifest.targetCarrierProjection.constructionTemplate.payloadTemplate !== null,
       true,
       edgeName
     );
     assert.equal(
-      invocationPackage.targetCarrierProjection.constructionTemplate.rowTemplates.length,
+      manifest.targetCarrierProjection.constructionTemplate.rowTemplates.length,
       1,
       edgeName
     );

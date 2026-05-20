@@ -68,10 +68,10 @@ using the port supplied in the `HELLO_SERVICE_PORT` environment variable.
 The service shall respond to `GET /` with exactly `helloworld` after trimming
 trailing whitespace.
 
-### REQ-T164-RUST-SVC-005 Curl Proof
+### REQ-T164-RUST-SVC-005 HTTP Smoke Proof
 
-The live proof shall verify the generated service by starting it with
-`cargo run --quiet` and calling it with `curl --fail --silent`.
+The live proof shall verify the generated service by starting the Rust binary
+through Cargo and making a local HTTP request to `GET /`.
 
 ## Technology Stack
 
@@ -84,7 +84,7 @@ The live proof shall verify the generated service by starting it with
   in the generated artifact or work report
 - bind address: `127.0.0.1`
 - port source: `HELLO_SERVICE_PORT`
-- proof client: `curl`
+- proof client: command-line HTTP client
 - test mode: local process start plus HTTP call
 
 ## Generated File Contract
@@ -98,18 +98,11 @@ build_tenants/hello_world_rust_service/src/main.rs
 
 The traversal must create them as product evidence.
 
-## Proof Command
+## Proof Shape
 
-The proof command shape is:
-
-```bash
-cd build_tenants/hello_world_rust_service
-HELLO_SERVICE_PORT=18081 cargo run --quiet
-curl --fail --silent http://127.0.0.1:18081/
-```
-
-The live sandbox test may choose a different local port, but it must set
-`HELLO_SERVICE_PORT` and call `GET /` with `curl`.
+The live sandbox test may choose the concrete local port and shell command
+shape, but it must set `HELLO_SERVICE_PORT`, start the generated Rust service
+through Cargo, and verify `GET /` through a local HTTP request.
 
 ## Closure Expectations
 
@@ -117,6 +110,6 @@ The service is closed only when:
 
 - both generated files exist under the selected output root;
 - materialization ledger evidence references both generated files;
-- `cargo run --quiet` starts the service;
-- `curl --fail --silent http://127.0.0.1:<port>/` returns `helloworld`;
+- Cargo can start the service with the configured local port;
+- a local HTTP request to `GET /` returns `helloworld`;
 - the latest traversal archive records a clean overlay segment completion.

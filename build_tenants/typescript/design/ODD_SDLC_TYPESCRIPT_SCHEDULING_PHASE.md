@@ -107,9 +107,9 @@ controller shape.
 
 ## Prompt Pressure Projection
 
-The worker prompt shall not be the only authority carrier. It shall point to
-the full handoff manifest and traversal intent package, then inline only the
-local pressure needed to start the edge:
+The worker prompt shall not be the only authority carrier. It shall point to the
+canonical `worker_construction_brief.json`, then inline only the local pressure
+needed to start the edge:
 
 - authority index entries with digest-backed refs
 - tranche keys derived from source assets, target asset, declared modules, and
@@ -117,6 +117,10 @@ local pressure needed to start the edge:
 - compact obligation summaries for target, evaluator, source/module, prior-gap,
   and bounded requirement obligations
 - retrieval hints that map authority refs back to obligation ids
+
+The full handoff manifest, traversal intent package, invocation package, and
+ledgers remain archive/evaluator surfaces. They are not ordinary worker
+first-read inputs unless current gap evidence explicitly cites them.
 
 The worker may open referenced authority documents when the local slice is
 insufficient. The evaluator still judges the worker report against the complete

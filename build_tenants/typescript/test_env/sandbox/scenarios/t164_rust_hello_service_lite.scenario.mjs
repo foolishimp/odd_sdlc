@@ -15,7 +15,8 @@ const FIXTURE_ROOT = resolve(HERE, "../../fixtures/t164_rust_hello_service_lite"
 export const T164_RUST_HELLO_SERVICE_LITE_FIXTURE_ROOT = FIXTURE_ROOT;
 export const T164_RUST_HELLO_SERVICE_LITE_SOURCE_FILES = Object.freeze([
   "bootstrap.md",
-  ".ai-workspace/context/project_constraints.yml"
+  ".ai-workspace/context/project_constraints.yml",
+  "build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
 ]);
 
 export const T164_RUST_HELLO_SERVICE_REQUIREMENT_IDS = Object.freeze([
@@ -78,13 +79,11 @@ export function t164RustHelloServiceLiteLiveScenario({
       handoffEdgeSequencePrefix: [
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
-        "derive_lite_module_surface",
         "derive_lite_component_code_surface"
       ],
       edgeAssuranceArchiveSequencePrefix: [
         "derive_intent_surface",
         "derive_lite_design_adr_surface",
-        "derive_lite_module_surface",
         "derive_lite_component_code_surface"
       ],
       processChecks: [
