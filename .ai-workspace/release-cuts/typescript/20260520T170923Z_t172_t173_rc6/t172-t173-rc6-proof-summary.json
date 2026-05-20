@@ -1,0 +1,79 @@
+{
+  "kind": "odd_sdlc_rc_proof_summary",
+  "rc": "v2.0.0-rc.6",
+  "release_cut": ".ai-workspace/release-cuts/typescript/20260520T170923Z_t172_t173_rc6",
+  "package_artifact": ".ai-workspace/release-cuts/typescript/20260520T170923Z_t172_t173_rc6/package/pack-zEbBHu/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+  "release_manifest": ".ai-workspace/release-cuts/typescript/20260520T170923Z_t172_t173_rc6/release-cut-manifest.json",
+  "base_checkpoint": "76d9893 Checkpoint staged traversal admission",
+  "scope": [
+    "T-172 staged disambiguation and decomposition-admission checkpoint",
+    "T-173 complexity-admitted Min(F_P) traversal-selection checkpoint",
+    "generic tenant technology-stack admission for Rust hello service fixture",
+    "component-code execution-evidence boundary repair",
+    "compact worker invocation package projection without full construction-template payload"
+  ],
+  "verification": [
+    {
+      "command": "npm run build:semantic",
+      "cwd": "build_tenants/typescript",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:t172",
+      "cwd": "build_tenants/typescript",
+      "status": "passed",
+      "observed": {
+        "tests": 47,
+        "passed": 47,
+        "failed": 0
+      }
+    },
+    {
+      "command": "npm run test:t173",
+      "cwd": "build_tenants/typescript",
+      "status": "passed",
+      "observed": {
+        "tests": 19,
+        "passed": 19,
+        "failed": 0
+      }
+    },
+    {
+      "command": "node --test test_env/tests/test_t066_product_materialization_contract.test.mjs test_env/tests/test_t143_product_materialization_authority_targets.test.mjs test_env/tests/test_t118_worker_invocation_package.test.mjs test_env/tests/test_t169_target_carrier_contracts.test.mjs test_env/tests/test_t068_conform_project_profile.test.mjs",
+      "cwd": "build_tenants/typescript",
+      "status": "passed",
+      "observed": {
+        "tests": 149,
+        "passed": 149,
+        "failed": 0
+      }
+    },
+    {
+      "command": "npm run lint:semantic",
+      "cwd": "build_tenants/typescript",
+      "status": "passed"
+    },
+    {
+      "command": "npm run lint:test-harness",
+      "cwd": "build_tenants/typescript",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "cwd": ".",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:t173:rust-hello-service-live",
+      "cwd": "build_tenants/typescript",
+      "status": "passed",
+      "archive": "build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260520T164020908Z_pid91022",
+      "observed": {
+        "tests": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    }
+  ],
+  "rc_boundary": "This is an RC package release cut. It is not a final release and does not close T-172 or T-173 data_mapper successor live-proof gates by itself."
+}
