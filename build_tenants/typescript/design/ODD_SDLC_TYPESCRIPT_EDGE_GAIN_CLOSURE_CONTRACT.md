@@ -1,11 +1,11 @@
 # ODD SDLC TypeScript Edge Gain And Closure Contract
 
-**Status**: Active design for T-171, derived from T-164
+**Status**: Active design for T-171 and T-172, derived from T-164
 **Date**: 2026-05-14
-**Owner Ticket**: `.ai-workspace/tickets/active/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`
+**Owner Tickets**: `.ai-workspace/tickets/completed/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`, `.ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md`
 **Origin Ticket**: `.ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md`
-**Implements**: REQ-F-GFUNC-006, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064, REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-067, REQ-F-ODDSDLC-068
-**Derives From**: `specification/PRODUCT.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/14-odd-sdlc-installed-product-contract.md`, `specification/requirements/16-edge-gain-closure-contract.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`, `ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md`
+**Implements**: REQ-F-GFUNC-006, REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064, REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-067, REQ-F-ODDSDLC-068, REQ-F-ODDSDLC-080, REQ-F-ODDSDLC-081
+**Derives From**: `specification/PRODUCT.md`, `specification/requirements/02-graph-functions.md`, `specification/requirements/03-runtime-governance.md`, `specification/requirements/10-odd-sdlc-software-domain-buildout.md`, `specification/requirements/14-odd-sdlc-installed-product-contract.md`, `specification/requirements/16-edge-gain-closure-contract.md`, `specification/requirements/18-typed-construction-algebra.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`, `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`, `ODD_SDLC_TYPESCRIPT_REUSABLE_GRAPH_FUNCTION_LIBRARY.md`
 
 ## STDO Re-Triage
 
@@ -59,6 +59,79 @@ Executable code and executable test edges add one more declared evidence
 dimension: admitted execution evidence. Materialized files and well-formed
 target carriers are necessary evidence for those edges, but they are
 insufficient when the edge contract declares executable behavior.
+
+## Staged Disambiguation And Edge Accounting
+
+T-172 strengthens the edge-gain contract with two runtime-admitted dimensions:
+construction-depth admission and selected-graph accounting.
+
+Construction-depth admission treats solution construction as a disambiguation
+pipeline:
+
+```text
+requirements
+-> design commitments
+-> module/component topology
+-> dependency map
+-> evaluator-selected traversal
+-> bounded materialization
+-> execution evidence
+-> release qualification
+```
+
+Code and tests are deterministic closure surfaces only after upstream ambiguity
+has been reduced into admitted topology, dependency, and traversal carriers or
+preserved as residual pressure. The evaluator owns the admitted
+`SdlcDecompositionSummary`; worker-emitted topology rows are evidence, not final
+authority.
+
+The summary measures:
+
+- upstream obligation count;
+- downstream row count;
+- upstream-per-downstream compression ratio;
+- downstream-per-upstream expansion ratio;
+- max owned upstream refs per downstream row;
+- max downstream rows per upstream ref;
+- max owned upstream refs without a public boundary;
+- public boundary count;
+- substantive downstream responsibility count;
+- materialization target refs;
+- residual refs.
+
+Admission rejects high-density rows, compression collapse, downstream explosion,
+downstream rows without upstream basis, invalid reference values, facade rows,
+under-decomposed parents, residual refs carried outside the owning subsurface,
+and trivial products that try to bypass decomposition. When the conformed product profile declares
+`capability_contracts.trivial_product: true`, the evaluator admits the stage
+only as a degenerate one-requirement/one-module/one-component decomposition;
+execution-detail facts may not be inflated into separate implementation or test
+obligations.
+
+Thresholds are product-profile or edge-contract data. The TypeScript default
+profile publishes concrete limits, currently `8:1` for aggregate compression,
+`8` downstream rows per upstream ref, `8` owned upstream refs per downstream
+row, and `1` owned upstream ref without a public boundary. These are independent
+profile levers; a product profile may tighten or relax any of them, but prompt
+text and worker-local judgement do not set them.
+
+The selected executive graph is also admitted. Each selected edge has an
+accounting row with one disposition:
+
+| Disposition | Meaning |
+| --- | --- |
+| `required` | Produces new authority or closure evidence and remains close-capable. |
+| `conditional` | Produces authority only when named failure, capability, or operational pressure exists. |
+| `projection_no_close` | Rolls up admitted carriers/events without owning fresh product judgement. |
+| `merge_required` | Pressure belongs to another retained edge and this edge must be merged before closure. |
+| `replace_required` | Pressure belongs to a staged authority edge that replaces this inherited edge. |
+| `delete_required` | No unique construction pressure remains and the edge must leave the selected graph. |
+
+Rows with `workerDispatchAllowed: false` are deterministic evaluator or
+projection edges. The installed operator executes them without dispatching
+`F_P.transform`, without `worker_run.json`, and without F_P transform refs.
+Analyzer admission rejects any live or archived run that observes worker
+dispatch on those rows.
 
 ## Irreducible Carrier Set
 

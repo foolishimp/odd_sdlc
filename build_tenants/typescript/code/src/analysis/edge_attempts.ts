@@ -372,6 +372,7 @@ export function deriveEdgeAttempt(
     handoffBytes: carriers.fileSizes.handoffManifest,
     stdoutBytes: carriers.fileSizes.workerStdout,
     eventBytes,
+    workerDispatched: workerRun !== null,
     workerStatus: operatorSummary?.status ?? null
   });
 }

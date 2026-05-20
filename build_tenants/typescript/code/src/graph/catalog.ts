@@ -47,6 +47,8 @@ export const FG_SOLUTION_ARCHITECTURE_EXECUTIVE =
   "solution_architecture" as const;
 export const FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE =
   "lite_design_module_implementation" as const;
+export const FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE =
+  "framework_smoke_min_fp" as const;
 export const FG_DERIVE_LITE_DESIGN_ADR_SURFACE =
   "derive_lite_design_adr_surface" as const;
 export const FG_DERIVE_LITE_COMPONENT_CODE_SURFACE =
@@ -69,6 +71,11 @@ export const SOLUTION_ARCHITECTURE_EXECUTIVE_STEPS = Object.freeze([
 ] as const);
 
 export const LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS = Object.freeze([
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+] as const);
+
+export const FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS = Object.freeze([
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
 ] as const);

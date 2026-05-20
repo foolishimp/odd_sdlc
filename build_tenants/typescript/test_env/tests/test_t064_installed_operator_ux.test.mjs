@@ -127,6 +127,24 @@ function writeWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function writeEnvEchoWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t064_env_echo_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import { dirname } from 'node:path';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "process.stdout.write(`NODE_TEST_CONTEXT=${process.env.NODE_TEST_CONTEXT ?? ''}\\n`);",
+      "const content = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', 'REQ-T064-001'].join('\\n');",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
 function writeSecondEdgeFailingWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t064_loop_worker.mjs");
   writeFileSync(
@@ -475,6 +493,67 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
   });
   assert.equal(json.status, 0, json.stderr);
   assert.equal(JSON.parse(json.stdout).kind, "odd_sdlc_spec_method_result");
+});
+
+test("T-173 installed operator strips Node test runner context from worker process env", async () => {
+  const workspace = makeWorkspace();
+  const module = constructSdlcGtlModule();
+  const ingressReport = deriveSdlcWorkspaceIngressReport({
+    workspaceRootUri: `file://${workspace}`,
+    projectConstraints: admitSdlcProjectConstraints({
+      projectSlug: "t064_fixture",
+      activeTenant: "typescript",
+      selectedOutputRoot: "build_tenants/typescript",
+      ambiguityRiskAppetite: "medium",
+      capabilityContracts: []
+    }),
+    sourceInputs: []
+  });
+  const queryDomain = projectSdlcQueryDomain({ module, ingressReport });
+  const conformedProject =
+    deriveSdlcConformProjectProfileFromWorkspace(workspace);
+  const start = publicStartOnce({
+    request: {
+      kind: "sdlc_public_start_request",
+      workspaceRoot: workspace,
+      target: {
+        kind: "graph_function",
+        handle: "bootstrap_release_self_test"
+      },
+      until: "first_traversal",
+      defaultRegime: "F_P"
+    },
+    module,
+    queryDomain,
+    conformedProject,
+    workerAttachment: projectSdlcWorkerAttachment({
+      transportContract: "process://node"
+    })
+  });
+  assert.equal(start.kind, "sdlc_public_start_projected");
+  const workerScript = writeEnvEchoWorkerScript(workspace);
+  const previousNodeTestContext = process.env["NODE_TEST_CONTEXT"];
+  process.env["NODE_TEST_CONTEXT"] = "child-v8";
+  try {
+    const result = await executeInstalledOperatorStart({
+      workspaceRoot: workspace,
+      start,
+      workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
+      replayEvents: []
+    });
+    assert.equal(result.status, "worker_invoked");
+    assert.notEqual(result.workerRun, null);
+    assert.equal(
+      readFileSync(result.workerRun.stdoutPath, "utf8"),
+      "NODE_TEST_CONTEXT=\n"
+    );
+  } finally {
+    if (previousNodeTestContext === undefined) {
+      delete process.env["NODE_TEST_CONTEXT"];
+    } else {
+      process.env["NODE_TEST_CONTEXT"] = previousNodeTestContext;
+    }
+  }
 });
 
 test("B-078 typed ABG hard timeout outranks legacy silent inactivity", async () => {

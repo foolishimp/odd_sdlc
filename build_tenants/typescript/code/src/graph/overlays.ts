@@ -9,6 +9,7 @@ import {
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   OPERATIONAL_FUNCTION_CATALOG,
   OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
@@ -32,6 +33,7 @@ import {
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
@@ -52,6 +54,7 @@ export {
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
   SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_PROFILE_OVERLAY_STRATEGY_VALUES,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
@@ -324,6 +327,11 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
     FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
     FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
   ]);
+  const frameworkSmokeMinFpGraphFunctionNames = Object.freeze([
+    FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+    FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+    FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+  ]);
   return [
     {
       overlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
@@ -357,6 +365,29 @@ function overlayDefinitions(): readonly OverlayDefinition[] {
           assetType: "retrofit_plan_surface",
           defaultPath: "runtime/retrofit_plan_surface.md",
           producerGraphFunctionName: "release_operational_cycle",
+          terminalRole: "terminal_asset"
+        }
+      ])
+    },
+    {
+      overlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+      aliases: Object.freeze([
+        "overlay://odd-sdlc/min-fp",
+        "overlay://odd-sdlc/framework-smoke"
+      ] as const),
+      name: "framework_smoke_min_fp",
+      intent: "Complexity-admitted Min(F_P) traversal for framework-smoke products whose pressure is proportional and preserved.",
+      graphFunctionNames: frameworkSmokeMinFpGraphFunctionNames,
+      publicStartTargets: Object.freeze([FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]),
+      defaultStartTarget: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+      terminalAssetTypes: Object.freeze(["component_code_surface"]),
+      terminalGraphFunctionNames: Object.freeze([FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]),
+      lawfulStopDispositions: Object.freeze(["product_converged", "blocked"]),
+      assetTemplates: Object.freeze([
+        {
+          assetType: "component_code_surface",
+          defaultPath: "build_tenants/hello_world_javascript/src/hello.js",
+          producerGraphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
           terminalRole: "terminal_asset"
         }
       ])

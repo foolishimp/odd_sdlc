@@ -1088,6 +1088,14 @@ function canonicalProjectConstraints(profile: SdlcConformProjectProfile): string
       : "    test_execution_contract: undeclared",
     "    module_structure:",
     ...profile.declaredModuleNames.map((moduleName) => `      - ${moduleName}`),
+    ...(profile.capabilityContracts.length > 0
+      ? [
+          "    capability_contracts:",
+          ...profile.capabilityContracts.map(
+            (contract) => `      ${contract.name}: ${contract.value}`
+          )
+        ]
+      : []),
     ""
   ].join("\n");
 }

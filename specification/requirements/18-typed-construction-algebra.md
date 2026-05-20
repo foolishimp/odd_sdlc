@@ -1,11 +1,12 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..079
+**Family**: REQ-F-ODDSDLC-074..082
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
 - `.ai-workspace/tickets/completed/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md`
 - `.ai-workspace/tickets/active/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`
+- `.ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md`
 - `specification/requirements/16-edge-gain-closure-contract.md`
 - `specification/requirements/17-target-carrier-contracts.md`
 **Authoring Design**:
@@ -25,6 +26,21 @@ class. Every other `F_P` process is read-only over workspace state. It returns
 typed findings, parameters, or semantic rows to the installed operator
 typed-carrier interface. The installed operator owns deterministic carrier
 publication, ledger writes, runtime events, projection, fold, and continuation.
+
+The construction-depth axiom is also absolute: deterministic code and tests are
+not lawful substitutes for unresolved upstream ambiguity. Every solution must
+reduce ambiguity through admitted intermediate subsurfaces before materialized
+source, materialized tests, execution evidence, or release closure can claim
+product completeness. A trivial product is the degenerate case of that same
+law, not an escape from it.
+
+The graph-edge accounting axiom is equally binding: no edge remains in the
+executive graph by inheritance, ceremony, or local precedent. Every retained
+edge must account for the construction pressure it owns, the authority surface
+it produces, the predecessor/successor pressure it preserves, and why that
+pressure is not already owned by another retained edge. An edge that cannot
+make that claim is deleted, merged into its owning edge, or reclassified as a
+projection/no-close view.
 
 The algebra is:
 
@@ -194,3 +210,109 @@ algebra, not only computational coverage from successful live runs.
 - AC-9: the sweep includes the live-run regressions for stale replay digest
   versus current product bytes, auxiliary build config without requirement
   lineage, and output-limit process-fact classification
+
+### REQ-F-ODDSDLC-080 - solution construction admits staged disambiguation before materialization
+
+Solution construction shall reduce ambiguity through admitted intermediate
+subsurfaces before broad source, test, execution, or release materialization can
+claim product completeness.
+
+**Acceptance Criteria**:
+- AC-1: the generic construction order is requirements, design commitments,
+  module/component topology, dependency map, evaluator-selected traversal,
+  bounded source/test/build materialization, execution evidence, and release
+  qualification
+- AC-2: deterministic code and deterministic tests are the highest
+  disambiguation surfaces; they may close product content only after upstream
+  ambiguity has been reduced into admitted intermediate surfaces or preserved
+  as explicit residual pressure
+- AC-3: implementation materialization requires admitted implementation
+  topology and decomposition summary evidence before component code closure
+- AC-4: test materialization requires admitted testcase authority, test
+  topology, test stack/profile evidence, and decomposition summary evidence
+  before component test closure
+- AC-5: every solution, including trivial products, publishes admitted
+  decomposition evidence; a product profile may declare a trivial product
+  class, but that class is admitted only as a degenerate
+  one-requirement/one-design/one-module/one-component decomposition, not as a
+  bypass or as fan-out into execution-detail obligations
+- AC-6: decomposition summaries measure input obligation count, output row
+  count, upstream-per-downstream compression ratio, downstream-per-upstream
+  expansion ratio, max owned inputs per output, max downstream rows per input,
+  residual refs per output, public boundary count, and substantive downstream
+  responsibility count
+- AC-7: product profiles or edge assurance contracts own the decomposition
+  thresholds; prompt text and worker-local judgment do not supply the governing
+  thresholds
+- AC-8: evaluator admission rejects high-density downstream rows, downstream
+  explosion from one upstream input, downstream rows without upstream basis,
+  invalid reference values, facade rows, under-decomposed parents, residual
+  refs carried outside the owning subsurface, and missing trivial-product
+  decomposition
+- AC-9: steel-thread and parallel build are evaluator-selected traversal
+  methods over admitted dependency maps; they are not target carrier surfaces
+  and not prompt-only strategy labels
+
+### REQ-F-ODDSDLC-081 - executive graph edges are retained only by accounted construction pressure
+
+Every edge in an executive graph shall be accounted as required, conditional,
+projection/no-close, merged, replaced, or deleted. Unaccounted edges are active
+non-closure pressure.
+
+**Acceptance Criteria**:
+- AC-1: the TypeScript full traversal graph publishes an edge-accounting
+  register covering every selected executive edge
+- AC-2: each retained close-capable edge cites the construction pressure it
+  owns, its target authority surface, predecessor edge pressure, successor edge
+  pressure, closure evidence, and why no other retained edge already owns that
+  pressure
+- AC-3: an edge that cannot account for unique construction pressure is removed
+  from the selected executive graph, merged into the owning edge, replaced by a
+  staged authority edge, or reclassified as projection/no-close
+- AC-4: projection and rollup edges may remain only when their inputs are
+  admitted carriers/events and the edge does not dispatch an `F_P.transform`
+  worker for fresh product judgment
+- AC-5: conditional operational edges may remain outside the selected full
+  construction graph only when they cite their capability gate and are reported
+  separately from required construction closure
+- AC-6: analyzer output reports missing edge-accounting rows, extra accounting
+  rows, delete/merge candidates, projection-only edges, and conditional edges
+- AC-7: T-172 closure is blocked while any selected executive edge is
+  unaccounted, while any unneeded edge remains close-capable, or while an edge
+  is retained only because a previous graph version contained it
+
+### REQ-F-ODDSDLC-082 - traversal depth is selected from admitted complexity evidence
+
+The TypeScript construction evaluator shall select the smallest lawful
+construction traversal only after admitted complexity evidence proves that
+closure pressure remains owned, visible, and replayable.
+
+**Acceptance Criteria**:
+- AC-1: traversal selection records outcome class, hop class, selected graph
+  variant, zoom disposition, pressure-preservation mechanism, rejected
+  alternatives, blocking reasons, and evidence refs
+- AC-2: hop class values are `single_hop`, `dual_hop`, `staged`,
+  `zoom_required`, and `blocked`
+- AC-3: outcome class defaults to `domain_product`; `framework_smoke` and
+  `tutorial_example` require admitted pressure-preservation evidence before
+  selecting a smaller traversal
+- AC-4: Min(F_P) pressure may be preserved only by typed-template direct
+  materialization, replay-visible projection, bundled F_P output, or an
+  outcome-class graph variant
+- AC-5: projection-only rollups may skip F_P dispatch only when admitted
+  carrier/event refs preserve the skipped edge pressure; analyzer labels alone
+  cannot authorize the skip
+- AC-6: low-complexity products may select `single_hop` or `dual_hop` only
+  when admitted decomposition evidence is within the selected profile limits
+  and residual ambiguity is not carried outside the owning surface
+- AC-7: substantive products select staged traversal unless admitted
+  complexity evidence proves a smaller path lawful without pressure loss
+- AC-8: overloaded or disproportionate admitted metrics select
+  `zoom_required`; missing or ambiguous pressure ownership selects `blocked`
+- AC-9: analyzer output reports traversal selection as a read-only projection
+  and blocks when no admitted complexity evidence or pressure-preservation
+  evidence exists
+- AC-10: proportionality summaries and traversal-hop selections are archived
+  as replay-visible operator-run carriers and cited by a typed runtime event;
+  analyzer output must consume those archived carriers before deriving any
+  fallback projection

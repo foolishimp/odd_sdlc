@@ -1,6 +1,8 @@
 // Implements: T-161
 
 import type { SdlcBlockingReason } from "../shared/blocking_reason.js";
+import type { SdlcExecutiveEdgeAccountingAudit } from "../graph/edge_accounting.js";
+import type { SdlcTraversalHopSelection } from "../operator/carriers.js";
 
 export const SDLC_FD_RUN_ANALYSIS_KIND = "sdlc_fd_run_analysis" as const;
 export const SDLC_FD_RUN_ANALYSIS_VERSION = 1 as const;
@@ -203,6 +205,7 @@ export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly handoffBytes: number;
   readonly stdoutBytes: number;
   readonly eventBytes: number;
+  readonly workerDispatched: boolean;
   readonly workerStatus: string | null;
 }
 
@@ -346,6 +349,8 @@ export interface SdlcFdRunAnalysisResult {
   readonly bloatAndSlopeAnalysis: SdlcFdRunAnalysisBloatAndSlope;
   readonly retryForensics: readonly SdlcFdRunAnalysisRetryForensic[];
   readonly conceptualStageCoverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[];
+  readonly edgeAccounting: SdlcExecutiveEdgeAccountingAudit;
+  readonly traversalHopSelection: SdlcTraversalHopSelection;
   readonly summaryDrift: SdlcFdRunAnalysisSummaryDriftReport;
   readonly evidenceIndex: readonly string[];
 }

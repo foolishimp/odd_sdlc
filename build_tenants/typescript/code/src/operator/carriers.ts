@@ -362,6 +362,219 @@ export interface SdlcComponentTestRealizationRow {
   readonly shardId: string | null;
 }
 
+export type SdlcDecompositionUpstreamKind =
+  | "requirement"
+  | "design"
+  | "module"
+  | "component"
+  | "testcase";
+
+export type SdlcDecompositionDownstreamKind =
+  | "design"
+  | "module"
+  | "component"
+  | "function"
+  | "test_module"
+  | "test_class";
+
+export type SdlcDecompositionAdmissionDecision = "admit" | "reject";
+
+export interface SdlcDecompositionSummaryThresholds {
+  readonly kind: "sdlc_decomposition_summary_thresholds";
+  readonly profileRef: string;
+  readonly maxUpstreamPerDownstreamRatio: number;
+  readonly maxDownstreamPerUpstream: number;
+  readonly maxOwnedUpstreamPerDownstream: number;
+  readonly maxOwnedUpstreamWithoutBoundary: number;
+}
+
+export interface SdlcDecompositionSummaryRow {
+  readonly downstreamId: string;
+  readonly parentId: string | null;
+  readonly ownedUpstreamRefs: readonly string[];
+  readonly ownedUpstreamCount: number;
+  readonly publicBoundaryRefs: readonly string[];
+  readonly publicBoundaryCount: number;
+  readonly substantiveResponsibilityRefs: readonly string[];
+  readonly substantiveResponsibilityCount: number;
+  readonly materializationTargetRefs: readonly string[];
+  readonly residualRefs: readonly string[];
+}
+
+export interface SdlcDecompositionSummary {
+  readonly kind: "sdlc_decomposition_summary";
+  readonly stageId: string;
+  readonly upstreamKind: SdlcDecompositionUpstreamKind;
+  readonly downstreamKind: SdlcDecompositionDownstreamKind;
+  readonly thresholdProfileRef: string;
+  readonly stageUpstreamUniverseRefs: readonly string[];
+  readonly upstreamCount: number;
+  readonly downstreamCount: number;
+  readonly upstreamPerDownstreamRatio: number;
+  readonly downstreamPerUpstreamRatio: number;
+  readonly maxUpstreamPerDownstreamRatio: number;
+  readonly maxDownstreamPerUpstream: number;
+  readonly maxOwnedUpstreamPerDownstream: number;
+  readonly maxOwnedUpstreamWithoutBoundary: number;
+  readonly rows: readonly SdlcDecompositionSummaryRow[];
+  readonly overloadedDownstreamIds: readonly string[];
+  readonly explosionUpstreamRefs: readonly string[];
+  readonly unownedDownstreamIds: readonly string[];
+  readonly facadeDownstreamIds: readonly string[];
+  readonly underDecomposedParentIds: readonly string[];
+  readonly residualRefs: readonly string[];
+  readonly residualOutsideSubsurfaceRefs: readonly string[];
+  readonly invalidReferenceFields: readonly string[];
+  readonly blockingReasons: readonly string[];
+  readonly admissionDecision: SdlcDecompositionAdmissionDecision;
+}
+
+export interface SdlcDependencyMapNode {
+  readonly nodeId: string;
+  readonly predecessorNodeIds: readonly string[];
+  readonly successorNodeIds: readonly string[];
+  readonly ownedRequirementRefs: readonly string[];
+  readonly materializationTargetRefs: readonly string[];
+}
+
+export interface SdlcModuleDependencyMap {
+  readonly kind: "sdlc_module_dependency_map";
+  readonly mapRef: string;
+  readonly summaryRef: string;
+  readonly nodes: readonly SdlcDependencyMapNode[];
+  readonly steelThreadCandidateNodeIds: readonly string[];
+  readonly parallelPartitionRefs: readonly string[];
+  readonly cycleRefs: readonly string[];
+}
+
+export interface SdlcTestDependencyMap {
+  readonly kind: "sdlc_test_dependency_map";
+  readonly mapRef: string;
+  readonly summaryRef: string;
+  readonly nodes: readonly SdlcDependencyMapNode[];
+  readonly steelThreadCandidateNodeIds: readonly string[];
+  readonly parallelShardRefs: readonly string[];
+  readonly cycleRefs: readonly string[];
+}
+
+export type SdlcDependencyTraversalMethod =
+  | "steel_thread"
+  | "parallel"
+  | "serial"
+  | "blocked";
+
+export interface SdlcDependencyTraversalSelection {
+  readonly kind: "sdlc_dependency_traversal_selection";
+  readonly selectionRef: string;
+  readonly dependencyMapRef: string;
+  readonly dependencyMapKind:
+    | SdlcModuleDependencyMap["kind"]
+    | SdlcTestDependencyMap["kind"];
+  readonly selectedMethod: SdlcDependencyTraversalMethod;
+  readonly selectedNodeIds: readonly string[];
+  readonly parallelGroupRefs: readonly string[];
+  readonly blockingReasons: readonly string[];
+  readonly basisRefs: readonly string[];
+}
+
+export type SdlcTraversalOutcomeClass =
+  | "domain_product"
+  | "framework_smoke"
+  | "tutorial_example";
+
+export type SdlcTraversalHopClass =
+  | "single_hop"
+  | "dual_hop"
+  | "staged"
+  | "zoom_required"
+  | "blocked";
+
+export type SdlcZoomAdmissionDisposition =
+  | "continue"
+  | "zoom_required"
+  | "blocked";
+
+export type SdlcMinFpPressurePreservationMechanism =
+  | "none"
+  | "typed_template"
+  | "replay_visible_projection"
+  | "bundled_fp_output"
+  | "outcome_class_graph_variant";
+
+export interface SdlcTraversalComplexityThresholds {
+  readonly kind: "sdlc_traversal_complexity_thresholds";
+  readonly profileRef: string;
+  readonly maxSingleHopInputObligations: number;
+  readonly maxSingleHopOutputRows: number;
+  readonly maxSingleHopUpstreamPerDownstreamRatio: number;
+  readonly maxSingleHopDownstreamPerUpstreamRatio: number;
+  readonly maxDualHopInputObligations: number;
+  readonly maxDualHopOutputRows: number;
+  readonly maxDualHopUpstreamPerDownstreamRatio: number;
+  readonly maxDualHopDownstreamPerUpstreamRatio: number;
+  readonly maxResidualRefsForSmallHop: number;
+  readonly maxResidualOutsideSubsurfaceRefsForSmallHop: number;
+}
+
+export interface SdlcTraversalComplexityAssessment {
+  readonly kind: "sdlc_traversal_complexity_assessment";
+  readonly assessmentRef: string;
+  readonly outcomeClass: SdlcTraversalOutcomeClass;
+  readonly thresholdProfileRef: string;
+  readonly decompositionSummaryRef: string | null;
+  readonly inputObligationCount: number;
+  readonly outputRowCount: number;
+  readonly upstreamPerDownstreamRatio: number;
+  readonly downstreamPerUpstreamRatio: number;
+  readonly maxOwnedInputsPerOutput: number;
+  readonly residualRefCount: number;
+  readonly residualOutsideSubsurfaceRefCount: number;
+  readonly publicBoundaryCount: number;
+  readonly substantiveDownstreamResponsibilityCount: number;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface SdlcOutcomeClassSelection {
+  readonly kind: "sdlc_outcome_class_selection";
+  readonly selectionRef: string;
+  readonly outcomeClass: SdlcTraversalOutcomeClass;
+  readonly basisRefs: readonly string[];
+  readonly blockingReasons: readonly string[];
+  readonly admissionDecision: SdlcDecompositionAdmissionDecision;
+}
+
+export interface SdlcZoomAdmissionDecision {
+  readonly kind: "sdlc_zoom_admission_decision";
+  readonly disposition: SdlcZoomAdmissionDisposition;
+  readonly reasonRefs: readonly string[];
+  readonly selectedZoomStageRef: string | null;
+}
+
+export interface SdlcMinFpPressurePreservationDecision {
+  readonly kind: "sdlc_min_fp_pressure_preservation_decision";
+  readonly mechanism: SdlcMinFpPressurePreservationMechanism;
+  readonly preservedPressureRefs: readonly string[];
+  readonly skippedEdgeRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly admissionDecision: SdlcDecompositionAdmissionDecision;
+  readonly blockingReasons: readonly string[];
+}
+
+export interface SdlcTraversalHopSelection {
+  readonly kind: "sdlc_traversal_hop_selection";
+  readonly selectionRef: string;
+  readonly outcomeClass: SdlcTraversalOutcomeClass;
+  readonly hopClass: SdlcTraversalHopClass;
+  readonly selectedGraphVariantRef: string;
+  readonly complexityAssessment: SdlcTraversalComplexityAssessment;
+  readonly zoomAdmission: SdlcZoomAdmissionDecision;
+  readonly pressurePreservation: SdlcMinFpPressurePreservationDecision;
+  readonly rejectedAlternativeRefs: readonly string[];
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
 export type SdlcComponentTestExecutionStatus =
   | "passed"
   | "failed"
@@ -1307,6 +1520,12 @@ export interface SdlcWorkerTargetCarrierProjection {
   readonly targetCarrierContractRef: string;
   readonly targetCarrierContractDigest: string;
   readonly targetCarrierTemplateRef: string;
+  readonly constructionDepthRole:
+    | "none"
+    | "staged_authority_producer"
+    | "staged_materialization_consumer";
+  readonly producedStagedAuthorityRefs: readonly string[];
+  readonly requiredStagedAuthorityRefs: readonly string[];
   readonly outputCarrierKind: string;
   readonly nestedPayloadPath: string;
   readonly requiredFieldRefs: readonly string[];
@@ -1414,6 +1633,7 @@ export interface SdlcWorkerConstructionBrief {
   readonly vectorIndex: number;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
+  readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
   readonly canonicalPromptCarrierPath: string;
   readonly promptSourcePolicyRef: string;
   readonly packageDispositions: readonly SdlcWorkerConstructionBriefPackageDisposition[];

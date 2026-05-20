@@ -45,6 +45,12 @@ export interface SdlcTargetCarrierContractRow {
   readonly graphVectorRef: string;
   readonly edgeRef: string;
   readonly targetAssetType: string;
+  readonly constructionDepthRole:
+    | "none"
+    | "staged_authority_producer"
+    | "staged_materialization_consumer";
+  readonly producedStagedAuthorityRefs: readonly string[];
+  readonly requiredStagedAuthorityRefs: readonly string[];
   readonly targetNodeRef: string;
   readonly targetSchemaRef: string;
   readonly targetCarrierContractRef: string;
@@ -241,6 +247,56 @@ function payloadRequiredFieldRefsForTarget(
     return Object.freeze(["payload.testExecutionPreparationRows"]);
   }
   return Object.freeze([]);
+}
+
+function constructionDepthRoleForEdge(edgeRef: string): SdlcTargetCarrierContractRow["constructionDepthRole"] {
+  switch (edgeRef) {
+    case "derive_implementation_design_surface":
+    case "derive_test_design_surface":
+      return "staged_authority_producer";
+    case "derive_component_code_surface":
+    case "derive_component_test_surface":
+      return "staged_materialization_consumer";
+    default:
+      return "none";
+  }
+}
+
+function producedStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] {
+  switch (edgeRef) {
+    case "derive_implementation_design_surface":
+      return Object.freeze([
+        "surface://implementation-decomposition-summary",
+        "surface://module-dependency-map"
+      ]);
+    case "derive_test_design_surface":
+      return Object.freeze([
+        "surface://test-stack-profile",
+        "surface://test-decomposition-summary",
+        "surface://test-dependency-map"
+      ]);
+    default:
+      return Object.freeze([]);
+  }
+}
+
+function requiredStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] {
+  switch (edgeRef) {
+    case "derive_component_code_surface":
+      return Object.freeze([
+        "surface://implementation-decomposition-summary",
+        "surface://module-dependency-map"
+      ]);
+    case "derive_component_test_surface":
+      return Object.freeze([
+        "surface://testcase-authority",
+        "surface://test-stack-profile",
+        "surface://test-decomposition-summary",
+        "surface://test-dependency-map"
+      ]);
+    default:
+      return Object.freeze([]);
+  }
 }
 
 function workerFillableFieldRefsForTarget(
@@ -475,6 +531,13 @@ export function constructSdlcTargetCarrierContractRow(input: {
     graphVectorRef: input.vector.name,
     edgeRef: input.contract.edgeRef,
     targetAssetType: input.contract.targetAssetType,
+    constructionDepthRole: constructionDepthRoleForEdge(input.contract.edgeRef),
+    producedStagedAuthorityRefs: producedStagedAuthorityRefsForEdge(
+      input.contract.edgeRef
+    ),
+    requiredStagedAuthorityRefs: requiredStagedAuthorityRefsForEdge(
+      input.contract.edgeRef
+    ),
     targetNodeRef: binding.targetNodeRef,
     targetSchemaRef: binding.schemaRef,
     targetCarrierContractRef: binding.contractRef,

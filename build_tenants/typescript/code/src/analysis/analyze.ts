@@ -22,6 +22,13 @@ import { deriveRetryForensics } from "./retry_forensics.js";
 import { deriveSummaryDrift } from "./summary_drift.js";
 import { buildDiagnostics, type DiagnosticDraft } from "./diagnostics.js";
 import { resolveSdlcFdRunAnalysisProfile } from "./profiles.js";
+import { deriveSdlcExecutiveEdgeAccountingAudit } from "../graph/edge_accounting.js";
+import { deriveSdlcTraversalHopSelection } from "../operator/traversal_complexity.js";
+import type {
+  SdlcDecompositionSummary,
+  SdlcTraversalHopSelection,
+  SdlcTraversalOutcomeClass
+} from "../operator/carriers.js";
 import type {
   SdlcFdRunAnalysisConceptualStageCoverage,
   SdlcFdRunAnalysisCurrentStateTelemetry,
@@ -157,6 +164,24 @@ function uniqueGraphEdgeSequence(
   const out: string[] = [];
   for (const attempt of attempts) {
     const name = attempt.graphFunctionName;
+    if (typeof name === "string" && name.length > 0 && !seen.has(name)) {
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return Object.freeze(out);
+}
+
+function observedWorkerDispatchedEdgeNames(
+  attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
+): readonly string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const attempt of attempts) {
+    if (!attempt.workerDispatched) {
+      continue;
+    }
+    const name = attempt.graphVectorRef ?? attempt.graphFunctionName;
     if (typeof name === "string" && name.length > 0 && !seen.has(name)) {
       seen.add(name);
       out.push(name);
@@ -329,6 +354,74 @@ function maxRequirementObligationCount(
   return max;
 }
 
+function outcomeClassForAnalysisProfile(
+  profile: SdlcFdRunAnalysisProfile
+): SdlcTraversalOutcomeClass {
+  return profile === "hello_world" ? "framework_smoke" : "domain_product";
+}
+
+function loadedDecompositionSummary(
+  carrier: OperatorRunCarriers
+): SdlcDecompositionSummary | null {
+  if (carrier.decompositionSummary.status === "present") {
+    return carrier.decompositionSummary.data;
+  }
+  if (carrier.testDecompositionSummary.status === "present") {
+    return carrier.testDecompositionSummary.data;
+  }
+  if (carrier.implementationDecompositionSummary.status === "present") {
+    return carrier.implementationDecompositionSummary.data;
+  }
+  return null;
+}
+
+function archivedTraversalSelection(
+  carriers: readonly OperatorRunCarriers[]
+): SdlcTraversalHopSelection | null {
+  let fallback: SdlcTraversalHopSelection | null = null;
+  for (let index = carriers.length - 1; index >= 0; index -= 1) {
+    const carrier = carriers[index];
+    if (carrier?.traversalHopSelection.status !== "present") {
+      continue;
+    }
+    const selection = carrier.traversalHopSelection.data;
+    fallback = fallback ?? selection;
+    if (
+      selection.hopClass !== "blocked" ||
+      selection.complexityAssessment.decompositionSummaryRef !== null
+    ) {
+      return selection;
+    }
+  }
+  return fallback;
+}
+
+function deriveTraversalSelectionForAnalysis(input: {
+  readonly carriers: readonly OperatorRunCarriers[];
+  readonly profile: SdlcFdRunAnalysisProfile;
+}): SdlcTraversalHopSelection {
+  const archived = archivedTraversalSelection(input.carriers);
+  if (archived !== null) {
+    return archived;
+  }
+  let summary: SdlcDecompositionSummary | null = null;
+  for (let index = input.carriers.length - 1; index >= 0; index -= 1) {
+    const candidate = input.carriers[index];
+    if (candidate === undefined) {
+      continue;
+    }
+    summary = loadedDecompositionSummary(candidate);
+    if (summary !== null) {
+      break;
+    }
+  }
+  return deriveSdlcTraversalHopSelection({
+    selectionRef: "analysis://odd-sdlc/traversal-hop-selection",
+    outcomeClass: outcomeClassForAnalysisProfile(input.profile),
+    decompositionSummary: summary
+  });
+}
+
 export function analyzeSdlcFdRunArchive(
   options: SdlcFdRunAnalysisOptions
 ): SdlcFdRunAnalysisResult {
@@ -364,6 +457,9 @@ export function analyzeSdlcFdRunArchive(
   });
   const retry = deriveRetryForensics({ carriers, attempts });
   const conceptualStageCoverage = deriveConceptualStageCoverage(attempts);
+  const edgeAccounting = deriveSdlcExecutiveEdgeAccountingAudit({
+    observedDispatchedEdgeNames: observedWorkerDispatchedEdgeNames(attempts)
+  });
   const requirementObligationCount = maxRequirementObligationCount(attempts);
   const productFileCount = aggregateProductFileCount(carriers);
   const bloat = deriveBloatAndSlope({
@@ -378,6 +474,10 @@ export function analyzeSdlcFdRunArchive(
     thresholds: profileSpec.thresholds
   });
   const summaryDrift = deriveSummaryDrift({ carriers, attempts });
+  const traversalHopSelection = deriveTraversalSelectionForAnalysis({
+    carriers,
+    profile
+  });
   const allDiagnosticDrafts: readonly DiagnosticDraft[] = Object.freeze([
     ...runtimeGaps.diagnostics,
     ...lineageOutcome.diagnostics,
@@ -430,6 +530,8 @@ export function analyzeSdlcFdRunArchive(
     bloatAndSlopeAnalysis: bloat.bloat,
     retryForensics: retry.forensics,
     conceptualStageCoverage,
+    edgeAccounting,
+    traversalHopSelection,
     summaryDrift: summaryDrift.report,
     evidenceIndex: evidenceIndexFromCarriers(carriers)
   });

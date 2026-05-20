@@ -649,6 +649,32 @@ test("T-083 shallow realization ledger rejects constant-success logic", () => {
   ]);
 });
 
+test("T-083 shallow realization ledger admits guarded invariant success paths", () => {
+  const ledger = deriveShallowRealizationAssuranceLedger({
+    synthesisRequired: false,
+    executableProofRequired: false,
+    surfaces: [
+      {
+        kind: "sdlc_realization_text_surface",
+        role: "source",
+        ref: "file://FidelityContract.scala",
+        content: [
+          "object FidelityContract {",
+          "  def evaluate(actualCount: Long, expectedCount: Long): Boolean = {",
+          "    if (actualCount == 0L && expectedCount == 0L) return true",
+          "    if (expectedCount == 0L) return false",
+          "    val ratio = actualCount.toDouble / expectedCount.toDouble",
+          "    ratio >= 0.95 && ratio <= 1.05",
+          "  }",
+          "}"
+        ].join("\n")
+      }
+    ]
+  });
+
+  assert.equal(ledger.verdict, "satisfied");
+});
+
 test("T-083 shallow realization ledger admits test double return values", () => {
   const ledger = deriveShallowRealizationAssuranceLedger({
     synthesisRequired: false,

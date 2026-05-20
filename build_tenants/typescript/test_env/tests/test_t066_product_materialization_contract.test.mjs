@@ -55,6 +55,7 @@ import {
   executeInstalledOperatorStart,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   evaluateWorkerResultPostflight,
   FG_CONFORM_PROJECT,
@@ -119,7 +120,201 @@ function makeWorkspace() {
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: root });
+  writeAdmittedStagedAuthoritySurfaces(root);
   return root;
+}
+
+function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
+  const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
+  const helloWorldJavascript =
+    constraints.selectedOutputRoot.endsWith("hello_world_javascript");
+  const sourceRelative = helloWorldJavascript
+    ? "src/hello.js"
+    : "src/main/scala/generated/DataMapper.scala";
+  const testRelative = helloWorldJavascript
+    ? "test/hello.test.js"
+    : "src/test/scala/generated/DataMapperSpec.scala";
+  const implementationDesignFile = path.join(
+    tenantRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const testDesignFile = path.join(
+    tenantRoot,
+    "design/adrs/ADR-003-test-design-surface.md"
+  );
+  mkdirSync(dirname(implementationDesignFile), { recursive: true });
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t066/scala-sbt",
+            language: "scala",
+            buildTool: "sbt"
+          }
+        ],
+        implementationModuleRows: [
+          {
+            kind: "sdlc_implementation_module_row",
+            moduleName: "generated",
+            moduleRef: "module://t066/generated"
+          }
+        ],
+        aggregateDomainModelRows: [],
+        moduleSchemaFragments: [],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: null,
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: [
+          {
+            kind: "sdlc_component_topology_row",
+            componentId: "generated-data-mapper",
+            moduleName: "generated",
+            relativePath: sourceRelative,
+            publicBoundary: "DataMapper",
+            concernRole: "mapper",
+            requirementIds: ["reqref://t066/default"],
+            sourceAssetRefs: ["fixture://t066"]
+          }
+        ],
+        componentRealizationRows: [],
+        fileTargetRows: [
+          {
+            kind: "sdlc_file_target_row",
+            relativePath: sourceRelative,
+            role: "source"
+          },
+          {
+            kind: "sdlc_file_target_row",
+            relativePath: testRelative,
+            role: "test"
+          }
+        ],
+        designCompletenessVerdict: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  mkdirSync(dirname(testDesignFile), { recursive: true });
+  writeFileSync(
+    testDesignFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_test_design_register",
+        registerVersion: "ts-test-design-v1",
+        targetAssetType: "test_design_surface",
+        designConsumptionRows: [
+          {
+            kind: "sdlc_design_consumption_contract",
+            contractRef: "design-consumption://t066/default",
+            sourceDesignObligationRefs: ["reqref://t066/default"],
+            authorityBasisRefs: ["file://specification/requirements/01-fixture.md"],
+            consumerGraphFunctionRefs: ["derive_component_test_surface"]
+          }
+        ],
+        uatTestcaseRows: [
+          {
+            kind: "sdlc_test_case_row",
+            testCaseRef: "TC-T066-001",
+            caseKind: "positive",
+            executionLane: "unit",
+            sourceDesignObligationRefs: ["reqref://t066/default"],
+            testcaseAuthorityRefs: ["testcase-authority://t066/default"],
+            expectedBehavior: "Generated mapper compiles and exposes a data value."
+          }
+        ],
+        testcaseAuthorityRows: [
+          {
+            kind: "sdlc_test_case_row",
+            testCaseRef: "TC-T066-001",
+            caseKind: "positive",
+            executionLane: "unit",
+            sourceDesignObligationRefs: ["reqref://t066/default"],
+            testcaseAuthorityRefs: ["testcase-authority://t066/default"],
+            expectedBehavior: "Generated mapper compiles and exposes a data value."
+          }
+        ],
+        testStackProfileRows: [
+          {
+            kind: "sdlc_test_stack_profile_row",
+            stackRef: "stack://t066/scalatest",
+            frameworkRef: "framework://scalatest",
+            buildTool: "sbt"
+          }
+        ],
+        testModuleRows: [
+          {
+            kind: "sdlc_test_module_row",
+            moduleName: "generated-tests",
+            moduleRef: "module://t066/generated-tests",
+            testRoot: "src/test/scala"
+          }
+        ],
+        testComponentTopologyRows: [
+          {
+            kind: "sdlc_test_component_topology_row",
+            testClassId: "DataMapperSpec",
+            relativePath: testRelative,
+            testcaseIds: ["TC-T066-001"],
+            componentIds: ["generated-data-mapper"],
+            requirementIds: ["reqref://t066/default"],
+            shardId: "test-shard-01-generated"
+          }
+        ],
+        testDataBindings: [
+          {
+            kind: "sdlc_test_data_binding",
+            testDataRef: "test-data://t066/default",
+            testCaseRef: "TC-T066-001",
+            inputFixtureRefs: ["fixture://t066/default"],
+            generationPolicyRef: "generation-policy://t066/static",
+            expectedResultRef: "expected-result://t066/default",
+            sourceDesignObligationRefs: ["reqref://t066/default"]
+          }
+        ],
+        expectedResultBindings: [
+          {
+            kind: "sdlc_expected_result_binding",
+            expectedResultRef: "expected-result://t066/default",
+            testCaseRef: "TC-T066-001",
+            assertionRefs: ["assertion://t066/generated"],
+            expectedResultSummary: "Generated mapper result is observable.",
+            verificationPolicyRef: "verification-policy://t066/scalatest"
+          }
+        ],
+        uatIntegrationBindings: [
+          {
+            kind: "sdlc_uat_integration_binding",
+            uatTestCaseRef: "TC-T066-001",
+            integrationTestCaseRef: "TC-T066-001",
+            executionLane: "unit"
+          }
+        ],
+        testExecutionScheduleRows: [
+          {
+            kind: "sdlc_test_execution_schedule_row",
+            scheduleRef: "test-schedule://t066/default",
+            testCaseRefs: ["TC-T066-001"],
+            command: "sbt test",
+            frameworkRef: "framework://scalatest",
+            shardId: "test-shard-01-generated"
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }
 
 function makeCapabilityWorkspace() {
@@ -860,6 +1055,89 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
   assert.deepStrictEqual(constructorResult.generatedAssetContract.diagnostics, [
     "materialized_product_file_count:1"
   ]);
+});
+
+test("T-172 no-dispatch surface postflight admits replayed materialization lineage", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("qualify_component_realization_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "qualify_component_realization_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t172-no-dispatch-replay-lineage"
+  });
+  writeHandoffFiles(manifest);
+  const output = writeOutputSurface(
+    manifest,
+    "component_realization_qualification_surface"
+  );
+  const productContent = [
+    "// requirement:REQ-T066-001",
+    "package generated",
+    "final case class DataMapper(value: String)"
+  ].join("\n") + "\n";
+  const productFile = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/DataMapper.scala"
+  );
+  mkdirSync(dirname(productFile), { recursive: true });
+  writeFileSync(productFile, productContent, "utf8");
+  const outputRef = pathToFileURL(manifest.outputFile).href;
+  const report = {
+    kind: "odd_sdlc.worker_result_report",
+    projectionRole: "typed_fp_stage_projection",
+    authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    targetAssetType: manifest.targetAssetType,
+    outputFile: manifest.outputFile,
+    digest: output.digest,
+    summary: "framework no-dispatch qualification over replayed materialization lineage",
+    unresolvedReasons: [],
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: path.relative(manifest.productMaterialization.tenantRoot, productFile),
+        absolutePath: productFile,
+        digest: sha256Text(productContent),
+        byteCount: Buffer.byteLength(productContent, "utf8"),
+        materializationSource: "replay",
+        sourceManifestRef: "file:///prior/product_materialization_manifest.json",
+        sourceHandoffManifestRef: "file:///prior/handoff_manifest.json",
+        sourceAttemptRef: "attempt://prior-component-code",
+        rolePolicyRef: "target-role-policy://odd-sdlc/implementation-design/source"
+      }
+    ],
+    materializationDiagnostics: [],
+    executionEvidence: null,
+    executionEvidenceErrors: [],
+    obligationAssessments: manifest.traversalObligationContext.obligations.map(
+      (obligation) => ({
+        kind: "sdlc_worker_obligation_assessment",
+        obligationId: obligation.obligationId,
+        fulfillmentStatus: "fulfilled",
+        evidenceRefs: [outputRef],
+        blockingReasons: []
+      })
+    ),
+    fpTransformRequestRef: null,
+    fpTransformResultRef: null,
+    fpTransformStatusSnapshot: null,
+    fpEvaluateResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href
+  };
+
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasons.includes(
+      "unexpected_product_materialization_for_surface_edge"
+    ),
+    false
+  );
 });
 
 test("T-158 postflight blocks worker reads outside active workspace", () => {
@@ -1980,6 +2258,7 @@ test("T-171 non-materialized F_P surfaces carry unobserved requirement pressure 
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_intent_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -2990,6 +3269,7 @@ test("T-158 replay completeness follows declared product targets, not role-only 
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const firstManifest = deriveWorkerHandoffManifest({
@@ -3170,6 +3450,7 @@ test("T-164 replay empty predecessor is superseded by later admitted product row
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
 
@@ -3461,6 +3742,7 @@ test("T-158 product materialization target contracts prefer requirement authorit
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -3544,6 +3826,7 @@ test("T-158 product materialization reports stale product targets but follows re
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -4592,6 +4875,7 @@ test("T-160 product materialization authority admits plain Product Files section
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_lite_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -4607,6 +4891,44 @@ test("T-160 product materialization authority admits plain Product Files section
   assert.deepStrictEqual(declaredProductFileTargets(manifest), [
     "build_tenants/hello_world_javascript/src/hello.js"
   ]);
+});
+
+test("T-173 framework-smoke Min(F_P) component-code consumes implementation-design source and test file targets", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+    edgeName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+    vectorIndex: 1,
+    contract,
+    projectConstraints: constraints,
+    runId: "t173-framework-smoke-min-fp-targets"
+  });
+
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala",
+    "build_tenants/scala_spark/src/test/scala/generated/DataMapperSpec.scala"
+  ]);
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+  assert.deepStrictEqual(
+    invocationPackage.productMaterializationAuthority.declaredProductFileTargets,
+    [
+      "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala",
+      "build_tenants/scala_spark/src/test/scala/generated/DataMapperSpec.scala"
+    ]
+  );
+  assert.ok(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes("For framework-smoke Min(F_P) component_code_surface")
+    )
+  );
+  assert.ok(
+    invocationPackage.outcomeDirectives.some((directive) =>
+      directive.includes("package.json with type=module")
+    )
+  );
 });
 
 test("T-102 post-transform observation admits existing discoverable test files", () => {
@@ -5006,6 +5328,7 @@ test("T-170 lite component-code postflight requires declared execution evidence"
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const conformedProject = {
     ...deriveSdlcConformProjectProfileFromWorkspace(workspace),
@@ -5088,6 +5411,7 @@ test("T-171 full component-code defers execution evidence to graph test-executio
     "utf8"
   );
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const conformedProject = {
     ...deriveSdlcConformProjectProfileFromWorkspace(workspace),

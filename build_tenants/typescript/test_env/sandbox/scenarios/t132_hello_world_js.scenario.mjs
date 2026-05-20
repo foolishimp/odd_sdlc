@@ -6,8 +6,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
   FG_CONFORM_PROJECT,
-  SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
 } from "../../../build/semantic/code/src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -19,11 +21,7 @@ export const T132_HELLO_WORLD_JS_SOURCE_FILES = Object.freeze([
   ".ai-workspace/context/project_constraints.yml"
 ]);
 export const T132_HELLO_WORLD_JS_REQUIREMENT_IDS = Object.freeze([
-  "REQ-T132-001",
-  "REQ-T132-002",
-  "REQ-T132-003",
-  "REQ-T132-004",
-  "REQ-T132-005"
+  "REQ-T132-001"
 ]);
 
 export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
@@ -51,6 +49,11 @@ export const T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES = Object.freeze([
   "prepare_release_surface"
 ]);
 
+export const T132_HELLO_WORLD_JS_MIN_FP_EDGES = Object.freeze([
+  FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
+]);
+
 export const t132HelloWorldJsScenario = Object.freeze({
   scenarioId: "scenario_t132_hello_world_js",
   installedPackageName: "odd-sdlc-scenario-t132-hello-world-js",
@@ -75,8 +78,7 @@ export const t132HelloWorldJsScenario = Object.freeze({
 
 export function t132HelloWorldJsLiveScenario({
   worker,
-  maxAdvances = 24,
-  startUntil = "first_traversal"
+  startUntil = "converged"
 }) {
   if (typeof worker !== "string" || worker.length === 0) {
     throw new Error("t132HelloWorldJsLiveScenario requires a worker URI");
@@ -87,36 +89,74 @@ export function t132HelloWorldJsLiveScenario({
     installedPackageName: "odd-sdlc-scenario-t132-hello-world-js-live",
     expectations: {
       ...t132HelloWorldJsScenario.expectations,
-      requirementIds: T132_HELLO_WORLD_JS_REQUIREMENT_IDS,
+      archiveArtifacts: [],
       workspaceFiles: [
-        "specification/INTENT.md",
-        "specification/PRODUCT.md",
-        "specification/GOALS.md",
-        "specification/requirements/10-generated-bootstrap.md",
-        "specification/scenarios/20-generated-uat-testcases.md",
-        "specification/scenarios/30-generated-testcase-authority.md",
-        "build_tenants/hello_world_javascript/src/hello.js"
+        "build_tenants/hello_world_javascript/src/hello.js",
+        "build_tenants/hello_world_javascript/test/hello.test.js"
       ],
       materializationEvidenceWorkspaceFiles: [
-        "specification/requirements/10-generated-bootstrap.md",
-        "specification/scenarios/20-generated-uat-testcases.md",
-        "specification/scenarios/30-generated-testcase-authority.md",
-        "build_tenants/hello_world_javascript/src/hello.js"
+        "build_tenants/hello_world_javascript/src/hello.js",
+        "build_tenants/hello_world_javascript/test/hello.test.js"
       ],
-      handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
-      edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
-      firstHandoffOverlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+      exactHandoffEdgeSequence: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+      handoffEdgeSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+      edgeAssuranceArchiveSequencePrefix: T132_HELLO_WORLD_JS_MIN_FP_EDGES,
+      firstHandoffOverlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
+      latestArchiveArtifacts: [
+        "sdlc_decomposition_summary.json",
+        "sdlc_implementation_decomposition_summary.json",
+        "sdlc_module_dependency_map.json",
+        "sdlc_module_dependency_traversal_selection.json",
+        "sdlc_traversal_hop_selection.json",
+        "worker_result_report.json"
+      ],
+      latestArchiveJsonAssertions: [
+        {
+          file: "sdlc_decomposition_summary.json",
+          equals: {
+            kind: "sdlc_decomposition_summary",
+            admissionDecision: "admit",
+            upstreamCount: 1,
+            downstreamCount: 1,
+            upstreamPerDownstreamRatio: 1,
+            downstreamPerUpstreamRatio: 1,
+            blockingReasons: []
+          }
+        },
+        {
+          file: "sdlc_traversal_hop_selection.json",
+          equals: {
+            kind: "sdlc_traversal_hop_selection",
+            outcomeClass: "framework_smoke",
+            hopClass: "single_hop",
+            blockingReasons: [],
+            "complexityAssessment.inputObligationCount": 1,
+            "complexityAssessment.outputRowCount": 1,
+            "complexityAssessment.upstreamPerDownstreamRatio": 1,
+            "complexityAssessment.downstreamPerUpstreamRatio": 1,
+            "pressurePreservation.admissionDecision": "admit",
+            "pressurePreservation.mechanism": "outcome_class_graph_variant"
+          }
+        },
+        {
+          file: "worker_result_report.json",
+          equals: {
+            "executionEvidence.status": "succeeded",
+            "executionEvidence.failedCount": 0
+          },
+          atLeast: {
+            "executionEvidence.testsObserved": 1,
+            "executionEvidence.passedCount": 1
+          }
+        }
+      ],
       processChecks: []
     },
     liveWorker: worker,
-    startTargetSequence: [
-      "next",
-      "graph_function:bootstrap_release_self_test"
-    ],
     startTarget: "next",
     startUntil,
-    maxAdvances,
-    continueOnEdgeConverge: true,
+    maxAdvances: 1,
+    stopAfterGraphClose: true,
     stopAfterWorkspaceFilesExist: false
   });
 }

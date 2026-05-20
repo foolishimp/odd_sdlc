@@ -35,6 +35,7 @@ import {
   FG_CONFORM_PROJECT,
   publicSdlcOverlayStartTargets,
   resolveSdlcTraversalOverlay,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   sdlcGraphFunctionBoundaryRef,
   sdlcPublishedActionRef,
   sdlcTraversalOverlayForGraphFunction,
@@ -52,6 +53,16 @@ import {
   type SdlcConstructionIntent,
   type SdlcNextActionProjection
 } from "../operator/traversal_consequence.js";
+import {
+  deriveSdlcDecompositionSummary,
+  SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS
+} from "../operator/decomposition_admission.js";
+import { deriveSdlcTraversalHopSelection } from "../operator/traversal_complexity.js";
+import type {
+  SdlcDecompositionSummary,
+  SdlcTraversalHopSelection,
+  SdlcTraversalOutcomeClass
+} from "../operator/carriers.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import { publicStartTargetPolicyFor } from "./policy.js";
 
@@ -112,6 +123,8 @@ export interface SdlcExecutionContract {
   readonly workerAttachment: SdlcWorkerAttachment;
   readonly nextActionProjection: SdlcNextActionProjection;
   readonly constructionIntent: SdlcConstructionIntent;
+  readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
+  readonly traversalHopSelection: SdlcTraversalHopSelection | null;
 }
 
 export type SdlcPublicStartOutcome =
@@ -272,6 +285,8 @@ interface PublicStartEvaluation {
   readonly overlayBinding: SdlcOverlayBinding | null;
   readonly nextActionProjection: SdlcNextActionProjection | null;
   readonly constructionIntent: SdlcConstructionIntent | null;
+  readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
+  readonly traversalHopSelection: SdlcTraversalHopSelection | null;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -314,6 +329,106 @@ function isSdlcTraversalOverlayRef(value: string): value is SdlcTraversalOverlay
 
 function uniqueStrings(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)]);
+}
+
+function capabilityValue(
+  profile: SdlcConformProjectProfile,
+  name: string
+): string | null {
+  return profile.capabilityContracts.find((contract) => contract.name === name)
+    ?.value ?? null;
+}
+
+function truthyCapability(profile: SdlcConformProjectProfile, name: string): boolean {
+  const normalized = capabilityValue(profile, name)?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function traversalOutcomeClassForPublicStart(
+  profile: SdlcConformProjectProfile
+): SdlcTraversalOutcomeClass {
+  const explicit = capabilityValue(profile, "sdlc_outcome_class");
+  if (
+    explicit === "framework_smoke" ||
+    explicit === "tutorial_example" ||
+    explicit === "domain_product"
+  ) {
+    return explicit;
+  }
+  return truthyCapability(profile, "trivial_product")
+    ? "framework_smoke"
+    : "domain_product";
+}
+
+function frontDoorTraversalSelection(input: {
+  readonly request: SdlcPublicStartRequest;
+  readonly profile: SdlcConformProjectProfile;
+}): {
+  readonly summary: SdlcDecompositionSummary;
+  readonly selection: SdlcTraversalHopSelection;
+} | null {
+  if (input.request.target.kind !== "next") {
+    return null;
+  }
+  const outcomeClass = traversalOutcomeClassForPublicStart(input.profile);
+  if (outcomeClass === "domain_product") {
+    return null;
+  }
+  const upstreamRef = `requirement://odd-sdlc/public-start/${input.profile.projectSlug}/framework-smoke`;
+  const summary = deriveSdlcDecompositionSummary({
+    stageId: "public_start_framework_smoke_min_fp",
+    upstreamKind: "requirement",
+    downstreamKind: "component",
+    thresholds: SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS,
+    stageUpstreamUniverseRefs: [upstreamRef],
+    requireTrivialDegenerateProduct: true,
+    rows: [
+      {
+        downstreamId: "component://framework-smoke/hello-world",
+        parentId: "module://framework-smoke",
+        ownedUpstreamRefs: [upstreamRef],
+        publicBoundaryRefs: [
+          `${input.profile.selectedOutputRoot}/src`
+        ],
+        substantiveResponsibilityRefs: ["behavior://framework-smoke/hello-world"],
+        materializationTargetRefs: [
+          `${input.profile.selectedOutputRoot}/src`
+        ]
+      }
+    ]
+  });
+  const selection = deriveSdlcTraversalHopSelection({
+    selectionRef: `selection://odd-sdlc/public-start/${input.profile.projectSlug}/framework-smoke-min-fp`,
+    outcomeClass,
+    decompositionSummary: summary,
+    bundleEligible: true,
+    skippedEdgeRefs: [
+      "edge://odd-sdlc/current-full-traversal/derive_intent_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_product_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_goal_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_requirement_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_uat_testcases_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_testcase_authority_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_feature_decomp_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_design_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_scenario_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_implementation_design_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_component_code_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_component_test_surface",
+      "edge://odd-sdlc/current-full-traversal/derive_test_execution_result_surface",
+      "edge://odd-sdlc/current-full-traversal/prepare_release_surface"
+    ],
+    evidenceRefs: [
+      "capability://odd-sdlc/trivial_product",
+      "overlay://odd-sdlc/framework-smoke-min-fp"
+    ]
+  });
+  return Object.freeze({ summary, selection });
 }
 
 function workspaceRootsForMaterialObservation(
@@ -532,6 +647,10 @@ function evaluateInitialPublicStartAction(input: {
   let blockingReason: "target_unavailable" | "stale_query_domain" | null = null;
   let preferredTargetOutcomeRef: string | null = null;
   let requestedOverlay: SdlcTraversalOverlay | null = null;
+  const selectedTraversal = frontDoorTraversalSelection({
+    request: input.request,
+    profile: input.conformedProject
+  });
   const sourceRef = `${input.request.target.kind}/${input.request.target.handle}`;
   const replayNextGraphFunctionRef =
     input.request.replayNextGraphFunctionRef ?? null;
@@ -547,47 +666,54 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason = candidate === null ? "stale_query_domain" : null;
       preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
     } else {
+      const minFpOverlay =
+        selectedTraversal === null
+          ? null
+          : resolveSdlcTraversalOverlay({
+              catalog: getOverlayCatalog(),
+              overlayRef: SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF
+            });
       const profileOverlay =
         conformanceStatus === "blocked"
           ? null
-          : resolveSdlcTraversalOverlay({
+          : minFpOverlay ?? resolveSdlcTraversalOverlay({
               catalog: getOverlayCatalog(),
               overlayRef: input.conformedProject.overlayRef
             });
       if (profileOverlay !== null) {
-      requestedOverlay = profileOverlay;
-      const candidate = candidateForGraphFunction({
-        module: input.module,
-        graphFunctionName: profileOverlay.defaultStartTarget,
-        sourceRef
-      });
-      candidates = Object.freeze(candidate === null ? [] : [candidate]);
-      blockingReason = candidate === null ? "stale_query_domain" : null;
-      preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
+        requestedOverlay = profileOverlay;
+        const candidate = candidateForGraphFunction({
+          module: input.module,
+          graphFunctionName: profileOverlay.defaultStartTarget,
+          sourceRef
+        });
+        candidates = Object.freeze(candidate === null ? [] : [candidate]);
+        blockingReason = candidate === null ? "stale_query_domain" : null;
+        preferredTargetOutcomeRef = candidate?.targetOutcomeRef ?? null;
       } else {
-      const startTargets = publicSdlcOverlayStartTargets({
-        module: input.module,
-        catalog: getOverlayCatalog(),
-        projectConformanceStatus: conformanceStatus
-      });
-      candidates = Object.freeze(
-        startTargets
-          .map((target) =>
-            candidateForGraphFunction({
-              module: input.module,
-              graphFunctionName: target.name,
-              sourceRef
-            })
-          )
-          .filter(
-            (
-              candidate
-            ): candidate is PublicStartActionCandidate => candidate !== null
-          )
-      );
-      blockingReason =
-        startTargets.length === 0 ? "target_unavailable" : null;
-      preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
+        const startTargets = publicSdlcOverlayStartTargets({
+          module: input.module,
+          catalog: getOverlayCatalog(),
+          projectConformanceStatus: conformanceStatus
+        });
+        candidates = Object.freeze(
+          startTargets
+            .map((target) =>
+              candidateForGraphFunction({
+                module: input.module,
+                graphFunctionName: target.name,
+                sourceRef
+              })
+            )
+            .filter(
+              (
+                candidate
+              ): candidate is PublicStartActionCandidate => candidate !== null
+            )
+        );
+        blockingReason =
+          startTargets.length === 0 ? "target_unavailable" : null;
+        preferredTargetOutcomeRef = candidates[0]?.targetOutcomeRef ?? null;
       }
     }
   } else if (targetPolicy.resolver === "named_graph_function") {
@@ -605,7 +731,9 @@ function evaluateInitialPublicStartAction(input: {
         blockingReason: "stale_query_domain",
         overlayBinding: null,
         nextActionProjection: null,
-        constructionIntent: null
+        constructionIntent: null,
+        traversalDecompositionSummary: null,
+        traversalHopSelection: null
       });
     }
     candidates = Object.freeze(candidate === null ? [] : [candidate]);
@@ -621,7 +749,9 @@ function evaluateInitialPublicStartAction(input: {
         blockingReason: "target_unavailable",
         overlayBinding: null,
         nextActionProjection: null,
-        constructionIntent: null
+        constructionIntent: null,
+        traversalDecompositionSummary: null,
+        traversalHopSelection: null
       });
     }
     let selectedGraphFunctionName = requestedOverlay.defaultStartTarget;
@@ -682,7 +812,9 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason: blockingReason ?? "target_unavailable",
       overlayBinding: null,
       nextActionProjection: null,
-      constructionIntent: null
+      constructionIntent: null,
+      traversalDecompositionSummary: null,
+      traversalHopSelection: null
     });
   }
   const targetOutcomeRefs = Object.freeze(
@@ -804,7 +936,9 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason: blockingReason ?? "target_unavailable",
       overlayBinding: null,
       nextActionProjection: null,
-      constructionIntent: null
+      constructionIntent: null,
+      traversalDecompositionSummary: null,
+      traversalHopSelection: null
     });
   }
   const selectedActionRef =
@@ -831,7 +965,9 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason: "stale_query_domain",
       overlayBinding: null,
       nextActionProjection: null,
-      constructionIntent: null
+      constructionIntent: null,
+      traversalDecompositionSummary: null,
+      traversalHopSelection: null
     });
   }
   const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
@@ -875,7 +1011,9 @@ function evaluateInitialPublicStartAction(input: {
       blockingReason: "stale_query_domain",
       overlayBinding: null,
       nextActionProjection: null,
-      constructionIntent: null
+      constructionIntent: null,
+      traversalDecompositionSummary: null,
+      traversalHopSelection: null
     });
   }
   const replayClosureDecision =
@@ -953,7 +1091,9 @@ function evaluateInitialPublicStartAction(input: {
     blockingReason,
     overlayBinding,
     nextActionProjection,
-    constructionIntent
+    constructionIntent,
+    traversalDecompositionSummary: selectedTraversal?.summary ?? null,
+    traversalHopSelection: selectedTraversal?.selection ?? null
   });
 }
 
@@ -966,6 +1106,8 @@ function constructExecutionContract(input: {
   readonly workerAttachment: SdlcWorkerAttachment;
   readonly nextActionProjection: SdlcNextActionProjection;
   readonly constructionIntent: SdlcConstructionIntent;
+  readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
+  readonly traversalHopSelection: SdlcTraversalHopSelection | null;
 }): SdlcExecutionContract {
   const requestedOutputs =
     input.request.outputWorkspaceRoot === undefined ||
@@ -1032,7 +1174,9 @@ function constructExecutionContract(input: {
     basis,
     workerAttachment: input.workerAttachment,
     nextActionProjection: input.nextActionProjection,
-    constructionIntent: input.constructionIntent
+    constructionIntent: input.constructionIntent,
+    traversalDecompositionSummary: input.traversalDecompositionSummary,
+    traversalHopSelection: input.traversalHopSelection
   });
 }
 
@@ -1113,7 +1257,9 @@ export function publicStartOnce(input: {
     conformedProject: input.conformedProject,
     workerAttachment: input.workerAttachment,
     nextActionProjection: targetResolution.nextActionProjection,
-    constructionIntent: targetResolution.constructionIntent
+    constructionIntent: targetResolution.constructionIntent,
+    traversalDecompositionSummary: targetResolution.traversalDecompositionSummary,
+    traversalHopSelection: targetResolution.traversalHopSelection
   });
   if (
     input.request.defaultRegime === "F_P" &&

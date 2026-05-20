@@ -23,6 +23,7 @@ import {
   FG_CONFORM_PROJECT,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_DERIVE_LITE_DESIGN_ADR_SURFACE,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
   projectSdlcQueryDomain,
@@ -31,6 +32,7 @@ import {
   publicStartOnce,
   SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF,
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+  SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
   SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
   withSdlcOverlayBindingPostActionEvidence
@@ -67,7 +69,7 @@ function startContext(workspaceRoot = "/workspace/t160") {
   return { module, queryDomain, conformedProject, workspaceRoot };
 }
 
-test("T-160 publishes four governed traversal overlays with boundary refs", () => {
+test("T-160 publishes governed traversal overlays with boundary refs", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
   const overlays = new Map(catalog.overlays.map((overlay) => [overlay.overlayRef, overlay]));
@@ -76,6 +78,7 @@ test("T-160 publishes four governed traversal overlays with boundary refs", () =
     catalog.overlays.map((overlay) => overlay.overlayRef),
     [
       SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,
+      SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF,
       SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
       SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF,
       SDLC_BOOTSTRAP_REQUIREMENTS_OVERLAY_REF
@@ -111,6 +114,10 @@ test("T-160 publishes four governed traversal overlays with boundary refs", () =
       overlay.overlayRef
     );
   }
+  assert.deepStrictEqual(
+    overlays.get(SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF).publicStartTargets,
+    [FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE]
+  );
   assert.deepStrictEqual(
     overlays.get(SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF).publicStartTargets,
     [FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE]

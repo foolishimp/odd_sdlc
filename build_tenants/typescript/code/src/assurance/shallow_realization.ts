@@ -22,8 +22,27 @@ function hasPlaceholder(content: string): boolean {
   return /\b(todo|placeholder|stub|not implemented)\b/i.test(content);
 }
 
+function sourceWithoutLineComments(content: string): string {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\/\/.*$/, ""))
+    .join("\n");
+}
+
 function hasSourceConstantSuccess(content: string): boolean {
-  return /\breturn\s+true\b/.test(content) || /\bassert\s*\(\s*true\s*\)/.test(content);
+  const normalized = sourceWithoutLineComments(content).replace(/\s+/g, " ");
+  return (
+    /\bdef\s+[A-Za-z_$][\w$]*[^=]*=\s*(?:\{\s*)?(?:return\s+)?true\s*;?\s*\}?/.test(
+      normalized
+    ) ||
+    /\bfunction\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{\s*return\s+true\s*;?\s*\}/.test(
+      normalized
+    ) ||
+    /(?:^|[=(:,]\s*)\([^)]*\)\s*=>\s*(?:\{\s*return\s+true\s*;?\s*\}|true\b)/.test(
+      normalized
+    ) ||
+    /\bassert\s*\(\s*true\s*\)/.test(normalized)
+  );
 }
 
 function hasTestConstantSuccess(content: string): boolean {

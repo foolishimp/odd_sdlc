@@ -36,6 +36,10 @@ The project must deliver:
 - an iterative SDLC operating model where partial waves are lawful, but
   unresolved live requirements remain active closure pressure across future
   waves until they are realized, withdrawn, or superseded
+- a staged construction model where requirements reduce through admitted
+  design, module/component topology, dependency, traversal, code, test,
+  execution, and release evidence before deterministic code or release closure
+  can claim product completeness
 - a homeostatic renewal path where observation and gap analysis lawfully
   re-enter the constitutional chain instead of collapsing directly into ambient
   repair
@@ -63,6 +67,13 @@ The project is constrained by these rules:
 - unresolved live requirements must not disappear after a partial wave,
   deferment, or scoped iteration; they remain binding constitutional pressure
   until they are explicitly realized, withdrawn, or superseded
+- code and test materialization must not absorb unresolved upstream ambiguity
+  that belongs to an admitted intermediate subsurface; every solution,
+  including trivial solutions, must publish the decomposition evidence needed
+  to prove that the selected construction depth is lawful
+- selected SDLC graph edges must not persist by inertia; every retained edge
+  must account for the pressure it owns, or be deleted, merged, replaced, or
+  reclassified as projection/no-close
 - homeostatic renewal must remain explicit: observation, triage, route
   selection, and constitutional repricing are distinct lawful acts rather than
   hidden control flow

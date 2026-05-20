@@ -171,6 +171,25 @@ export function scenarioWorkspaceFileStopSatisfied(input) {
   );
 }
 
+export function scenarioGraphCloseStopSatisfied(workspace) {
+  const archiveRoot = latestOperatorRunRoot(workspace);
+  if (archiveRoot === null) return false;
+  const summary = readJsonFile(path.join(archiveRoot, "operator_summary.json"));
+  const nextAction = readJsonFile(
+    path.join(archiveRoot, "sdlc_next_action_projection.json")
+  );
+  const closure = readJsonFile(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json")
+  );
+  return (
+    summary?.currentEdge === null &&
+    summary?.nextLawfulAction === "disposition://close" &&
+    nextAction?.selectedActionRef === null &&
+    nextAction?.choosesNextTraversal === false &&
+    closure?.disposition === "close"
+  );
+}
+
 function operatorRunRoots(workspace) {
   const runsRoot = path.join(
     workspace,
@@ -343,6 +362,35 @@ function assertArrayEquals(observed, expected, label) {
   if (JSON.stringify(observed) !== JSON.stringify(expected)) {
     throw new Error(
       `${label} mismatch — expected ${JSON.stringify(expected)}, saw ${JSON.stringify(observed)}`
+    );
+  }
+}
+
+function valueAtDottedPath(payload, dottedPath) {
+  return dottedPath.split(".").reduce((current, segment) => {
+    if (current === null || typeof current !== "object") return undefined;
+    return current[segment];
+  }, payload);
+}
+
+function assertJsonFieldEquals(input) {
+  const observed = valueAtDottedPath(input.payload, input.field);
+  if (JSON.stringify(observed) !== JSON.stringify(input.expected)) {
+    throw new Error(
+      `${input.label} ${input.field} mismatch — expected ${JSON.stringify(input.expected)}, saw ${JSON.stringify(observed)}`
+    );
+  }
+}
+
+function assertJsonFieldAtLeast(input) {
+  const observed = valueAtDottedPath(input.payload, input.field);
+  if (
+    typeof observed !== "number" ||
+    typeof input.expected !== "number" ||
+    observed < input.expected
+  ) {
+    throw new Error(
+      `${input.label} ${input.field} below minimum — expected at least ${JSON.stringify(input.expected)}, saw ${JSON.stringify(observed)}`
     );
   }
 }
@@ -694,6 +742,12 @@ export async function runScenarioSandbox(scenario, options = {}) {
       break;
     }
     if (isStopStatus(lastStatus, stopStatuses)) break;
+    if (
+      scenario.stopAfterGraphClose === true &&
+      scenarioGraphCloseStopSatisfied(workspace)
+    ) {
+      break;
+    }
   }
 
   return {
@@ -820,6 +874,15 @@ export function assertScenarioExpectations(result, scenario) {
       }
     });
   }
+  if (Array.isArray(expectations.exactHandoffEdgeSequence)) {
+    const observed = observedHandoffEdgeSequence(result.workspace);
+    const expected = expectations.exactHandoffEdgeSequence;
+    if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+      throw new Error(
+        `${scenario.scenarioId}: exact handoff edge sequence mismatch — expected ${expected.join(" -> ")}, saw ${observed.join(" -> ")}`
+      );
+    }
+  }
   if (expectations.firstHandoffOverlayRef !== undefined) {
     const manifest = firstHandoffManifest(result.workspace);
     const overlayRef = manifest?.overlayRef;
@@ -906,6 +969,53 @@ export function assertScenarioExpectations(result, scenario) {
       const abs = path.join(archiveRoot, rel);
       if (!existsSync(abs)) {
         throw new Error(`${scenario.scenarioId}: expected latest archive artifact ${rel} missing`);
+      }
+    }
+  }
+  if (Array.isArray(expectations.latestArchiveJsonAssertions)) {
+    const archiveRoot = latestOperatorRunRoot(result.workspace);
+    if (archiveRoot === null) {
+      throw new Error(`${scenario.scenarioId}: no operator archive root observed`);
+    }
+    for (const assertion of expectations.latestArchiveJsonAssertions) {
+      const rel = assertion?.file;
+      if (typeof rel !== "string" || rel.length === 0) {
+        throw new Error(`${scenario.scenarioId}: latest archive JSON assertion missing file`);
+      }
+      const abs = path.join(archiveRoot, rel);
+      const payload = readRequiredJsonFile(
+        abs,
+        `${scenario.scenarioId}: latest archive JSON assertion ${rel}`
+      );
+      const equals = assertion.equals;
+      if (equals === null || typeof equals !== "object" || Array.isArray(equals)) {
+        throw new Error(`${scenario.scenarioId}: latest archive JSON assertion ${rel} missing equals object`);
+      }
+      for (const [field, expected] of Object.entries(equals)) {
+        assertJsonFieldEquals({
+          payload,
+          field,
+          expected,
+          label: `${scenario.scenarioId}: latest archive JSON assertion ${rel}`
+        });
+      }
+      const atLeast = assertion.atLeast;
+      if (atLeast !== undefined) {
+        if (
+          atLeast === null ||
+          typeof atLeast !== "object" ||
+          Array.isArray(atLeast)
+        ) {
+          throw new Error(`${scenario.scenarioId}: latest archive JSON assertion ${rel} has invalid atLeast object`);
+        }
+        for (const [field, expected] of Object.entries(atLeast)) {
+          assertJsonFieldAtLeast({
+            payload,
+            field,
+            expected,
+            label: `${scenario.scenarioId}: latest archive JSON assertion ${rel}`
+          });
+        }
       }
     }
   }

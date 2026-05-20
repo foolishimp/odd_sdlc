@@ -9,6 +9,10 @@ import {
   type LoadedJson,
   type LoadedJsonl
 } from "./archive_reader.js";
+import type {
+  SdlcDecompositionSummary,
+  SdlcTraversalHopSelection
+} from "../operator/carriers.js";
 
 export interface OperatorSummaryRecord {
   readonly kind: "sdlc_operator_summary";
@@ -206,6 +210,10 @@ export interface OperatorRunCarriers {
   readonly runtimeEvents: LoadedJson<RuntimeEventsArchiveRecord>;
   readonly workerResultReport: LoadedJson<WorkerResultReportRecord>;
   readonly workerConstructionBrief: LoadedJson<WorkerConstructionBriefRecord>;
+  readonly decompositionSummary: LoadedJson<SdlcDecompositionSummary>;
+  readonly implementationDecompositionSummary: LoadedJson<SdlcDecompositionSummary>;
+  readonly testDecompositionSummary: LoadedJson<SdlcDecompositionSummary>;
+  readonly traversalHopSelection: LoadedJson<SdlcTraversalHopSelection>;
   readonly runPerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly edgePerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly fileSizes: OperatorRunFileSizes;
@@ -234,6 +242,10 @@ export interface OperatorRunFileSizes {
   readonly sdlcEdgeGain: number;
   readonly sdlcEdgeResidualPressure: number;
   readonly sdlcNextActionProjection: number;
+  readonly sdlcDecompositionSummary: number;
+  readonly sdlcImplementationDecompositionSummary: number;
+  readonly sdlcTestDecompositionSummary: number;
+  readonly sdlcTraversalHopSelection: number;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -306,6 +318,12 @@ const WORKER_RESULT_REPORT_GUARD: (value: unknown) => value is WorkerResultRepor
 const WORKER_CONSTRUCTION_BRIEF_GUARD: (value: unknown) => value is WorkerConstructionBriefRecord =
   guardKind<WorkerConstructionBriefRecord>("sdlc_worker_construction_brief");
 
+const DECOMPOSITION_SUMMARY_GUARD: (value: unknown) => value is SdlcDecompositionSummary =
+  guardKind<SdlcDecompositionSummary>("sdlc_decomposition_summary");
+
+const TRAVERSAL_HOP_SELECTION_GUARD: (value: unknown) => value is SdlcTraversalHopSelection =
+  guardKind<SdlcTraversalHopSelection>("sdlc_traversal_hop_selection");
+
 const PERF_SUMMARY_GUARD: (value: unknown) => value is RunPerformanceSummaryRecord =
   guardKinds<RunPerformanceSummaryRecord>([
     "sdlc_run_performance_summary",
@@ -337,7 +355,13 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     sdlcEdgeFulfillmentLedger: sizeOf("sdlc_edge_fulfillment_ledger.json"),
     sdlcEdgeGain: sizeOf("sdlc_edge_gain.json"),
     sdlcEdgeResidualPressure: sizeOf("sdlc_edge_residual_pressure.json"),
-    sdlcNextActionProjection: sizeOf("sdlc_next_action_projection.json")
+    sdlcNextActionProjection: sizeOf("sdlc_next_action_projection.json"),
+    sdlcDecompositionSummary: sizeOf("sdlc_decomposition_summary.json"),
+    sdlcImplementationDecompositionSummary: sizeOf(
+      "sdlc_implementation_decomposition_summary.json"
+    ),
+    sdlcTestDecompositionSummary: sizeOf("sdlc_test_decomposition_summary.json"),
+    sdlcTraversalHopSelection: sizeOf("sdlc_traversal_hop_selection.json")
   });
   return Object.freeze({
     operatorRunRoot,
@@ -400,6 +424,22 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     workerConstructionBrief: loadJsonFile<WorkerConstructionBriefRecord>(
       path.join(operatorRunRoot, "worker_construction_brief.json"),
       WORKER_CONSTRUCTION_BRIEF_GUARD
+    ),
+    decompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
+      path.join(operatorRunRoot, "sdlc_decomposition_summary.json"),
+      DECOMPOSITION_SUMMARY_GUARD
+    ),
+    implementationDecompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
+      path.join(operatorRunRoot, "sdlc_implementation_decomposition_summary.json"),
+      DECOMPOSITION_SUMMARY_GUARD
+    ),
+    testDecompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
+      path.join(operatorRunRoot, "sdlc_test_decomposition_summary.json"),
+      DECOMPOSITION_SUMMARY_GUARD
+    ),
+    traversalHopSelection: loadJsonFile<SdlcTraversalHopSelection>(
+      path.join(operatorRunRoot, "sdlc_traversal_hop_selection.json"),
+      TRAVERSAL_HOP_SELECTION_GUARD
     ),
     runPerformanceSummary: loadJsonFile<RunPerformanceSummaryRecord>(
       path.join(operatorRunRoot, "run_performance_summary.json"),

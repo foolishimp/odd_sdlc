@@ -89,6 +89,70 @@ function makeWorkspace() {
   return root;
 }
 
+function writeAdmittedImplementationDesignSurface(workspaceRoot) {
+  const sourceRelative = "cdme-core/src/main/scala/cdme/Core.scala";
+  const outputFile = path.join(
+    workspaceRoot,
+    "build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  mkdirSync(dirname(outputFile), { recursive: true });
+  writeFileSync(
+    outputFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t076/scala-sbt",
+            language: "scala",
+            buildTool: "sbt"
+          }
+        ],
+        implementationModuleRows: [
+          {
+            kind: "sdlc_implementation_module_row",
+            moduleName: "cdme-core",
+            moduleRef: "module://t076/cdme-core"
+          }
+        ],
+        aggregateDomainModelRows: [],
+        moduleSchemaFragments: [],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: null,
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: [
+          {
+            kind: "sdlc_component_topology_row",
+            componentId: "cdme-core",
+            moduleName: "cdme-core",
+            relativePath: sourceRelative,
+            publicBoundary: "Core.retryClosed",
+            concernRole: "mapper",
+            requirementIds: ["REQ-T076-001"],
+            sourceAssetRefs: ["fixture://t076"]
+          }
+        ],
+        componentRealizationRows: [],
+        fileTargetRows: [
+          {
+            kind: "sdlc_file_target_row",
+            relativePath: sourceRelative,
+            role: "source"
+          }
+        ],
+        designCompletenessVerdict: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function freshDataMapperWorkspace() {
   assert.equal(
     existsSync(DATA_MAPPER_TEMPLATE_ROOT),
@@ -358,6 +422,7 @@ test("T-076 component-code materialization closes under current path admission",
   );
   assert(codeIndex > 0);
   const preclosedEvents = preclosedEventsBeforeEdge(basis, "derive_component_code_surface");
+  writeAdmittedImplementationDesignSurface(workspace);
   const workerScript = writeRetryAwareWorkerScript(workspace);
   const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
 

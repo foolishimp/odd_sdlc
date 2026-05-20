@@ -156,6 +156,47 @@ The fold result is total:
 | `blocked` | emit typed blocked gap pressure |
 | `reprice_required` | emit typed reprice pressure |
 
+## Complexity-Admitted Traversal Selection
+
+Traversal selection is an evaluator consequence over admitted complexity
+evidence. It is not edge deletion by label and not an analyzer-owned skip.
+
+The evaluator records:
+
+- outcome class: `domain_product`, `framework_smoke`, or `tutorial_example`
+- hop class: `single_hop`, `dual_hop`, `staged`, `zoom_required`, or `blocked`
+- upstream-per-downstream compression ratio
+- downstream-per-upstream expansion ratio
+- residual ownership and public-boundary measures
+- selected graph variant
+- Min(F_P) pressure-preservation mechanism
+- rejected alternatives and blocking reasons
+
+The operator-run archive is the audit surface for those decisions. When staged
+topology evidence is available, the operator writes
+`sdlc_decomposition_summary.json` plus the implementation/test-specific
+summary and dependency-map carriers. When traversal depth is evaluated, the
+operator writes `sdlc_traversal_hop_selection.json` and emits an ABG-typed
+`fd_authority_outcome_admitted` runtime event whose evidence refs cite the
+selection carrier and its proportionality inputs. The event stream carries the
+auditable pointer; the carrier holds the full measured decision.
+
+Min(F_P) may reduce probabilistic worker invocations only when skipped or
+collapsed pressure is preserved by one of four admitted mechanisms:
+
+- typed-template direct materialization
+- replay-visible projection over admitted carriers/events
+- bundled F_P output for coupled pressure
+- outcome-class graph variant
+
+Projection-only rollups can avoid `F_P.transform` dispatch only when the
+projection cites admitted carrier/event refs that preserve the skipped pressure.
+When no admitted complexity or pressure-preservation evidence exists, analyzer
+output must report `blocked`; the analyzer does not create traversal authority.
+Analyzer output first reads archived traversal-hop selections and
+decomposition-summary carriers. It derives a fallback projection only when no
+archived decision exists.
+
 ## ABG-Owned Retry And Continuation Closure
 
 Worker report admission failure is not success, but it is also not terminal

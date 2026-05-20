@@ -11,12 +11,20 @@
 
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import {
   admitGraphSpanAssessment,
   constructEnginePluginContract,
   constructGraphReentryAppliedEvent,
   constructGraphReentryPlannedEvent,
+  constructFdAuthorityOutcomeAdmittedEvent,
   constructGraphSpanAssessedEvent,
   constructGraphSpanEvaluationScheduledEvent,
   constructGraphSpanFoldbackEvaluatedEvent,
@@ -67,10 +75,12 @@ import {
   sdlcGraphVectorBoundaryRef,
   sdlcPublishedActionRef,
   sdlcPublishedTraversalTargetRef,
+  sdlcExecutiveEdgeAccountingRowFor,
   sdlcTraversalOverlayAllowsProductConvergence,
   sdlcTraversalOverlayNextGraphContinuation,
   sdlcTargetOutcomeRef,
   withSdlcOverlayBindingPostActionEvidence,
+  type SdlcExecutiveEdgeAccountingRow,
   type SdlcTargetCarrierCandidateAdmission,
   type SdlcTargetCarrierContractRow
 } from "../graph/index.js";
@@ -100,6 +110,9 @@ import type {
   SdlcWorkerRetryContext,
   SdlcWorkerResultReport,
   SdlcWorkerRunResult,
+  SdlcDecompositionSummary,
+  SdlcTraversalHopSelection,
+  SdlcTraversalOutcomeClass,
   SdlcWorkerTransportContract
 } from "./carriers.js";
 import {
@@ -111,6 +124,7 @@ import {
   buildPostTransformWorkerResultReport,
   componentRepairReentryPlansForGapDossier,
   constructorResultFromWorkerOutput,
+  deriveSdlcStagedConstructionAuditCarriers,
   deriveWorkerHandoffManifest,
   evaluateWorkerResultPostflight,
   readPostflightGapDossierRef,
@@ -126,6 +140,7 @@ import {
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest
 } from "./handoff.js";
+import { deriveSdlcTraversalHopSelection } from "./traversal_complexity.js";
 import {
   admitWorkerTransport,
   parserForWorkerTransport,
@@ -1382,6 +1397,287 @@ function runtimeFailureArtifact(input: {
   });
 }
 
+function writeInstalledOperatorNoDispatchArtifact(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow;
+}): string {
+  const content = [
+    `# ${input.manifest.targetAssetType}`,
+    "",
+    `graph_function: ${input.manifest.graphFunctionName}`,
+    `edge: ${input.manifest.edgeName}`,
+    "source_function: installed_operator.deterministic_edge",
+    "worker_dispatch_allowed: false",
+    `edge_accounting_disposition: ${input.edgeAccountingRow.disposition}`,
+    `edge_accounting_rationale: ${input.edgeAccountingRow.rationale}`,
+    "",
+    "## Authority Outputs",
+    "",
+    ...input.edgeAccountingRow.authorityOutputRefs.map((ref) => `- ${ref}`),
+    "",
+    "## Closure Evidence",
+    "",
+    ...(input.edgeAccountingRow.closureEvidenceRefs.length === 0
+      ? ["- projection/no-close"]
+      : input.edgeAccountingRow.closureEvidenceRefs.map((ref) => `- ${ref}`)),
+    "",
+    "## Source Authority",
+    "",
+    ...input.manifest.traversalObligationContext.authorityRefs.map((ref) => `- ${ref}`)
+  ].join("\n");
+  mkdirSync(dirname(input.manifest.outputFile), { recursive: true });
+  writeFileSync(input.manifest.outputFile, content, "utf8");
+  return input.manifest.outputFile;
+}
+
+function noDispatchReport(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: SdlcWorkerResultReport;
+}): SdlcWorkerResultReport {
+  return Object.freeze({
+    ...input.report,
+    summary:
+      "framework-generated deterministic no-dispatch report from observed artifacts",
+    fpTransformRequestRef: null,
+    fpTransformResultRef: null,
+    fpTransformStatusSnapshot: null
+  });
+}
+
+function manifestCapabilityValue(
+  manifest: SdlcWorkerHandoffManifest,
+  name: string
+): string | null {
+  return (
+    manifest.conformedProject.capabilityContracts.find(
+      (contract) => contract.name === name
+    )?.value ?? null
+  );
+}
+
+function truthyCapabilityValue(value: string | null): boolean {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function traversalOutcomeClassForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcTraversalOutcomeClass {
+  const explicit = manifestCapabilityValue(manifest, "sdlc_outcome_class");
+  if (
+    explicit === "framework_smoke" ||
+    explicit === "tutorial_example" ||
+    explicit === "domain_product"
+  ) {
+    return explicit;
+  }
+  return truthyCapabilityValue(manifestCapabilityValue(manifest, "trivial_product"))
+    ? "framework_smoke"
+    : "domain_product";
+}
+
+function canonicalSummaryForManifest(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly carriers: ReturnType<typeof deriveSdlcStagedConstructionAuditCarriers>;
+}): SdlcDecompositionSummary | null {
+  const summaries = input.carriers
+    .filter(
+      (carrier): carrier is {
+        readonly relativePath: string;
+        readonly payload: SdlcDecompositionSummary;
+      } => carrier.payload.kind === "sdlc_decomposition_summary"
+    );
+  const preferTest =
+    input.manifest.targetAssetType.includes("test") ||
+    input.manifest.targetCarrierProjection.requiredStagedAuthorityRefs.some((ref) =>
+      ref.includes("test")
+    );
+  const preferred = summaries.find((carrier) =>
+    preferTest
+      ? carrier.relativePath.includes("test")
+      : carrier.relativePath.includes("implementation")
+  );
+  return preferred?.payload ?? summaries[0]?.payload ?? null;
+}
+
+function traversalAuditRoutingDecision(
+  selection: SdlcTraversalHopSelection
+): "continue" | "block" | "preserve_pressure" | "route_to_fp" {
+  if (selection.hopClass === "blocked") {
+    return "block";
+  }
+  if (
+    selection.hopClass === "zoom_required" ||
+    selection.pressurePreservation.mechanism !== "none"
+  ) {
+    return "preserve_pressure";
+  }
+  return "continue";
+}
+
+function writeTraversalSelectionAudit(input: {
+  readonly basis: ExecutionBasis;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly postflight: SdlcPostflightResult;
+  readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow | null;
+}): RuntimeEvent | null {
+  const auditCarriers = deriveSdlcStagedConstructionAuditCarriers(input.manifest);
+  const writtenRefs: string[] = [];
+  for (const carrier of auditCarriers) {
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: carrier.relativePath,
+      payload: carrier.payload
+    });
+    writtenRefs.push(
+      pathToFileURL(join(input.manifest.archiveRoot, carrier.relativePath)).href
+    );
+  }
+  const canonicalSummary = canonicalSummaryForManifest({
+    manifest: input.manifest,
+    carriers: auditCarriers
+  });
+  if (canonicalSummary !== null) {
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "sdlc_decomposition_summary.json",
+      payload: canonicalSummary
+    });
+    writtenRefs.push(
+      pathToFileURL(join(input.manifest.archiveRoot, "sdlc_decomposition_summary.json")).href
+    );
+  }
+
+  const projectionOnlyEligible =
+    input.edgeAccountingRow?.disposition === "projection_no_close";
+  const evidenceRefs = uniqueSorted([
+    ...input.postflight.evidenceRefs,
+    ...writtenRefs,
+    ...(projectionOnlyEligible ? [pathToFileURL(input.manifest.outputFile).href] : [])
+  ]);
+  if (
+    canonicalSummary === null &&
+    !projectionOnlyEligible &&
+    input.manifest.targetCarrierProjection.constructionDepthRole === "none"
+  ) {
+    return null;
+  }
+  const selection = deriveSdlcTraversalHopSelection({
+    selectionRef: `selection://odd-sdlc/${manifestRefSegment(input.manifest)}/traversal-hop`,
+    outcomeClass: traversalOutcomeClassForManifest(input.manifest),
+    decompositionSummary: canonicalSummary,
+    projectionOnlyEligible,
+    bundleEligible:
+      traversalOutcomeClassForManifest(input.manifest) !== "domain_product" &&
+      canonicalSummary !== null,
+    evidenceRefs
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_traversal_hop_selection.json",
+    payload: selection
+  });
+  const selectionRef = pathToFileURL(
+    join(input.manifest.archiveRoot, "sdlc_traversal_hop_selection.json")
+  ).href;
+  return constructFdAuthorityOutcomeAdmittedEvent({
+    basis: input.basis,
+    vectorIndex: input.manifest.vectorIndex,
+    status: selection.hopClass === "blocked" ? "blocked" : "accepted",
+    severityClass: selection.hopClass === "blocked" ? "construction_context_invalid" : null,
+    routingDecision: traversalAuditRoutingDecision(selection),
+    affectedFieldRefs: Object.freeze([
+      "sdlc_traversal_hop_selection.hopClass",
+      "sdlc_traversal_hop_selection.pressurePreservation.mechanism"
+    ]),
+    consumedFieldRefs: Object.freeze([
+      ...(canonicalSummary === null
+        ? []
+        : ["sdlc_decomposition_summary"]),
+      "sdlc_operator_postflight_result"
+    ]),
+    pressureRefs: selection.blockingReasons,
+    diagnosticRefs: selection.blockingReasons,
+    evidenceRefs: uniqueSorted([selectionRef, ...selection.evidenceRefs]),
+    causationEventRefs: input.postflight.evidenceRefs,
+    correlationId: [
+      "odd-sdlc-traversal-hop-selection",
+      input.basis.id,
+      String(input.manifest.vectorIndex)
+    ].join(":")
+  });
+}
+
+function writeFrontDoorTraversalSelectionAudit(input: {
+  readonly basis: ExecutionBasis;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly summary: SdlcDecompositionSummary | null;
+  readonly selection: SdlcTraversalHopSelection | null;
+}): RuntimeEvent | null {
+  if (
+    input.manifest.vectorIndex !== 0 ||
+    input.summary === null ||
+    input.selection === null
+  ) {
+    return null;
+  }
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_frontdoor_decomposition_summary.json",
+    payload: input.summary
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "sdlc_frontdoor_traversal_hop_selection.json",
+    payload: input.selection
+  });
+  const summaryRef = pathToFileURL(
+    join(input.manifest.archiveRoot, "sdlc_frontdoor_decomposition_summary.json")
+  ).href;
+  const selectionRef = pathToFileURL(
+    join(input.manifest.archiveRoot, "sdlc_frontdoor_traversal_hop_selection.json")
+  ).href;
+  return constructFdAuthorityOutcomeAdmittedEvent({
+    basis: input.basis,
+    vectorIndex: input.manifest.vectorIndex,
+    status: input.selection.hopClass === "blocked" ? "blocked" : "accepted",
+    severityClass:
+      input.selection.hopClass === "blocked"
+        ? "construction_context_invalid"
+        : null,
+    routingDecision: traversalAuditRoutingDecision(input.selection),
+    affectedFieldRefs: Object.freeze([
+      "sdlc_public_start.executionContract.targetGraphFunction",
+      "sdlc_public_start.executionContract.overlayRef",
+      "sdlc_traversal_hop_selection.hopClass",
+      "sdlc_traversal_hop_selection.pressurePreservation.mechanism"
+    ]),
+    consumedFieldRefs: Object.freeze([
+      "sdlc_public_start_request",
+      "sdlc_conform_project_profile.capabilityContracts",
+      "sdlc_decomposition_summary"
+    ]),
+    pressureRefs: input.selection.pressurePreservation.preservedPressureRefs,
+    diagnosticRefs: input.selection.blockingReasons,
+    evidenceRefs: uniqueSorted([
+      summaryRef,
+      selectionRef,
+      ...input.selection.evidenceRefs
+    ]),
+    causationEventRefs: Object.freeze([]),
+    correlationId: [
+      "odd-sdlc-frontdoor-traversal-hop-selection",
+      input.basis.id,
+      String(input.manifest.vectorIndex)
+    ].join(":")
+  });
+}
+
 function workerFailureRuntimeFailureClass(
   postflight: SdlcPostflightResult
 ): RuntimeFailureClass {
@@ -1455,6 +1751,20 @@ function environmentPolicyForTransport(
     });
   }
   return Object.freeze({ prefixes: Object.freeze([]) });
+}
+
+function installedOperatorChildProcessEnvironment(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    if (key === "NODE_TEST_CONTEXT") {
+      continue;
+    }
+    env[key] = value;
+  }
+  return env;
 }
 
 const DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 30;
@@ -2224,7 +2534,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       args: processLaunch.args,
       cwd: input.manifest.workspaceRoot,
       environment: {
-        ...process.env,
+        ...installedOperatorChildProcessEnvironment(),
         ODD_SDLC_OPERATOR_MANIFEST: input.manifestPath,
         ODD_SDLC_OPERATOR_REPORT: input.manifest.reportFile,
         ODD_SDLC_OPERATOR_OUTPUT: input.manifest.outputFile,
@@ -2359,10 +2669,44 @@ function fulfillmentArtifact(input: {
   });
 }
 
+function deterministicFulfillmentArtifact(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly basis: ExecutionBasis;
+  readonly expectedAssessmentIds: readonly string[];
+  readonly fulfillmentStatus: "fulfilled" | "partial" | "blocked" | "unfulfilled";
+  readonly fulfillmentDetail: string;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}): Readonly<Record<string, unknown>> {
+  const assessmentIds =
+    input.expectedAssessmentIds.length === 0
+      ? Object.freeze(["runtime_fulfilled"])
+      : input.expectedAssessmentIds;
+  return Object.freeze({
+    edge: input.manifest.edgeName,
+    actor: "installed_operator",
+    fulfillment_assessments: assessmentIds.map((id) =>
+      Object.freeze({
+        id,
+        evaluator: id,
+        fulfillment_status: input.fulfillmentStatus,
+        fulfillment_detail: input.fulfillmentDetail,
+        blocking_reasons: input.blockingReasons,
+        evidence_refs: input.evidenceRefs
+      })
+    ),
+    selected_worker_id: null,
+    selected_backend: "installed_operator_deterministic_edge",
+    role_id: "role://odd-sdlc/installed-operator",
+    assignment_source: "edge_accounting.worker_dispatch_disallowed",
+    resolved_runtime_ref: input.basis.runtimeIdentity.resolvedRuntimeRef
+  });
+}
+
 interface SdlcAbgOwnedFpDispatchState {
   readonly status: SdlcInstalledOperatorStatus;
   readonly manifest: SdlcWorkerHandoffManifest;
-  readonly workerRun: SdlcWorkerRunResult;
+  readonly workerRun: SdlcWorkerRunResult | null;
   readonly workerReport: SdlcWorkerResultReport | null;
   readonly postflight: SdlcPostflightResult | null;
   readonly assuranceSatisfaction: SdlcInstalledOperatorStartOutcome["assuranceSatisfaction"];
@@ -2433,10 +2777,42 @@ function workerReportAdmissionPostflight(input: {
   });
 }
 
+function deterministicReportAdmissionPostflight(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly reason: string;
+}): SdlcPostflightResult {
+  const evidenceRefs = Object.freeze([
+    pathToFileURL(input.manifest.reportFile).href,
+    ...workerProcessEvidenceRefs({
+      manifest: input.manifest,
+      workerRun: null
+    })
+  ]);
+  const carrier = makeSdlcBlockingReason({
+    code: "worker_report_admission_failed",
+    detail: input.reason,
+    evidenceRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_operator_postflight_result" as const,
+    status: "blocked" as const,
+    blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+    blockingReasonCarriers: Object.freeze([carrier]),
+    evidenceRefs
+  });
+}
+
 function workerProcessEvidenceRefs(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
-  readonly workerRun: SdlcWorkerRunResult;
+  readonly workerRun: SdlcWorkerRunResult | null;
 }): readonly string[] {
+  if (input.workerRun === null) {
+    return Object.freeze([
+      pathToFileURL(join(input.manifest.archiveRoot, "handoff_manifest.json")).href,
+      pathToFileURL(join(input.manifest.archiveRoot, "worker_construction_brief.json")).href,
+      pathToFileURL(join(input.manifest.archiveRoot, "traversal_intent_package.json")).href
+    ]);
+  }
   return Object.freeze([
     pathToFileURL(join(input.manifest.archiveRoot, "worker_run.json")).href,
     workerProcessStartedContextRef(input.manifest),
@@ -4006,22 +4382,27 @@ function deriveInstalledTraversalConsequence(input: {
     replayEvents: input.admittedAssetEvents ?? input.replayEvents,
     emittedEvents: input.emittedEvents
   });
+  const processEventRefs = workerProcessEvidenceRefs({
+    manifest: input.state.manifest,
+    workerRun: input.state.workerRun
+  });
   const worksiteEvidence = constructSdlcWorksiteEvidence({
     evidenceBundleRef: `evidence://odd-sdlc/${runRef}/worksite`,
     intentRef: constructionIntent.intentRef,
-    invocationRef: processStartedRef(input.state.manifest),
-    processEventRefs: workerProcessEvidenceRefs({
-      manifest: input.state.manifest,
-      workerRun: input.state.workerRun
-    }),
+    invocationRef:
+      input.state.workerRun === null
+        ? pathToFileURL(join(input.state.manifest.archiveRoot, "handoff_manifest.json")).href
+        : processStartedRef(input.state.manifest),
+    processEventRefs,
     productEvidenceRefs: Object.freeze([
       ...(input.state.workerReport?.materializedFiles.map(materializedFileRef) ??
         [])
     ]),
     admittedProgressRefs: evidenceRefs,
-    livenessProjectionRefs: Object.freeze([
-      runtimeLivenessProjectionRef(input.state.manifest)
-    ]),
+    livenessProjectionRefs:
+      input.state.workerRun === null
+        ? Object.freeze([])
+        : Object.freeze([runtimeLivenessProjectionRef(input.state.manifest)]),
     predecessorRefs: Object.freeze([
       constructionIntent.intentRef,
       constructionIntent.nextActionProjectionRef
@@ -4773,9 +5154,29 @@ function runtimeEventArchiveScalar(
       return "reason" in event
         ? compactRuntimeEventScalar(event.reason)
         : undefined;
+    case "routingDecision":
+      return "routingDecision" in event
+        ? compactRuntimeEventScalar(event.routingDecision)
+        : undefined;
+    case "correlationId":
+      return "correlationId" in event
+        ? compactRuntimeEventScalar(event.correlationId)
+        : undefined;
     default:
       return undefined;
   }
+}
+
+function runtimeEventArchiveStringArray(
+  event: RuntimeEvent,
+  key: string
+): readonly string[] | undefined {
+  const value = (event as unknown as Record<string, unknown>)[key];
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const strings = value.filter((item): item is string => typeof item === "string");
+  return Object.freeze(strings);
 }
 
 function compactRuntimeEventArchivePayload(
@@ -4793,7 +5194,17 @@ function compactRuntimeEventArchivePayload(
     "graphFunctionName",
     "targetAssetType",
     "status",
-    "reason"
+    "reason",
+    "routingDecision",
+    "correlationId"
+  ];
+  const projectedArrayKeys = [
+    "affectedFieldRefs",
+    "consumedFieldRefs",
+    "pressureRefs",
+    "diagnosticRefs",
+    "evidenceRefs",
+    "causationEventRefs"
   ];
   const projectedEvents = events.map((event, index) => {
     const projected: Record<string, unknown> = {
@@ -4802,6 +5213,12 @@ function compactRuntimeEventArchivePayload(
     };
     for (const key of projectedKeys) {
       const value = runtimeEventArchiveScalar(event, key);
+      if (value !== undefined) {
+        projected[key] = value;
+      }
+    }
+    for (const key of projectedArrayKeys) {
+      const value = runtimeEventArchiveStringArray(event, key);
       if (value !== undefined) {
         projected[key] = value;
       }
@@ -5040,7 +5457,11 @@ function compactRuntimeEventArchivePayload(
     });
   }
 
-  if (input.workerTransport === null) {
+  const transitionEdgeAccountingRow =
+    transition.edge === null ? null : sdlcExecutiveEdgeAccountingRowFor(transition.edge);
+  const transitionWorkerDispatchAllowed =
+    transitionEdgeAccountingRow?.workerDispatchAllowed ?? true;
+  if (input.workerTransport === null && transitionWorkerDispatchAllowed) {
     return terminalOutcome({
       workspaceRoot: input.workspaceRoot,
       status: "blocked",
@@ -5065,7 +5486,8 @@ function compactRuntimeEventArchivePayload(
     });
   }
 
-  const transport = admitWorkerTransport(input.workerTransport);
+  const transport =
+    input.workerTransport === null ? null : admitWorkerTransport(input.workerTransport);
   const executionContract = input.start.executionContract;
   const dispatchState: { current: SdlcAbgOwnedFpDispatchState | null } = {
     current: null
@@ -5141,6 +5563,462 @@ function compactRuntimeEventArchivePayload(
         manifest.productMaterialization
       );
       const handoffFiles = writeHandoffFiles(manifest);
+      const frontDoorTraversalAuditEvent = writeFrontDoorTraversalSelectionAudit({
+        basis,
+        manifest,
+        summary: executionContract.traversalDecompositionSummary,
+        selection: executionContract.traversalHopSelection
+      });
+      if (frontDoorTraversalAuditEvent !== null) {
+        emitted.push(frontDoorTraversalAuditEvent);
+      }
+      const expectedAssessmentIds =
+        pluginInput.expectedAssessmentIds.length === 0
+          ? vectorEvaluatorNames({ basis, vectorIndex: pluginInput.vectorIndex })
+          : pluginInput.expectedAssessmentIds;
+      const fulfillmentFor = (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly fulfillmentStatus: "fulfilled" | "partial" | "blocked" | "unfulfilled";
+        readonly fulfillmentDetail: string;
+        readonly blockingReasons: readonly string[];
+        readonly evidenceRefs: readonly string[];
+      }): Readonly<Record<string, unknown>> => {
+        if (input.workerRun === null) {
+          return deterministicFulfillmentArtifact({
+            manifest,
+            basis,
+            expectedAssessmentIds,
+            fulfillmentStatus: input.fulfillmentStatus,
+            fulfillmentDetail: input.fulfillmentDetail,
+            blockingReasons: input.blockingReasons,
+            evidenceRefs: input.evidenceRefs
+          });
+        }
+        if (transport === null) {
+          throw new TypeError("worker fulfillment requires admitted worker transport");
+        }
+        return fulfillmentArtifact({
+          manifest,
+          transport,
+          basis,
+          expectedAssessmentIds,
+          fulfillmentStatus: input.fulfillmentStatus,
+          fulfillmentDetail: input.fulfillmentDetail,
+          blockingReasons: input.blockingReasons,
+          evidenceRefs: input.evidenceRefs
+        });
+      };
+      const completeReportDispatch = (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly workerReport: SdlcWorkerResultReport;
+        readonly hookWorkerContractRef: string;
+        readonly passedFulfillmentDetail: string;
+      }) => {
+        writeProductMaterializationManifest({
+          manifest,
+          report: input.workerReport
+        });
+        const postflight = evaluateWorkerResultPostflight({
+          manifest,
+          report: input.workerReport
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "postflight.json",
+          payload: postflight
+        });
+        writeFpEvaluateResult({ manifest, report: input.workerReport, postflight });
+        const traversalAuditEvent = writeTraversalSelectionAudit({
+          basis,
+          manifest,
+          postflight,
+          edgeAccountingRow
+        });
+        if (traversalAuditEvent !== null) {
+          emitted.push(traversalAuditEvent);
+        }
+        if (postflight.status !== "passed") {
+          const gapDossier = constructPostflightGapDossier({
+            manifest,
+            postflight
+          });
+          writePostflightGapDossier({ manifest, gapDossier });
+          const current: SdlcAbgOwnedFpDispatchState = {
+            status: "postflight_failed",
+            manifest,
+            workerRun: input.workerRun,
+            workerReport: input.workerReport,
+            postflight,
+            assuranceSatisfaction: null,
+            gapDossier,
+            hookOutcome: null,
+            blockingReason: postflight.blockingReasons.join(","),
+            blockingReasonCarriers: postflight.blockingReasonCarriers,
+            currentEdge: pluginInput.edge
+          };
+          const consequence = publishDispatchState(current);
+          return constructFpDispatchOutcome({
+            status: "dispatched",
+            resultRef: gapDossier.currentGapDossierRef,
+            attachedResultArtifact: fulfillmentFor({
+              workerRun: input.workerRun,
+              fulfillmentStatus: "partial",
+              fulfillmentDetail: postflight.blockingReasons.join(","),
+              blockingReasons: postflight.blockingReasons,
+              evidenceRefs: postflight.evidenceRefs
+            }),
+            evidenceRefs: uniqueSorted([
+              ...postflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason: postflight.blockingReasons.join(",")
+          });
+        }
+
+        const assuranceGate = deriveSdlcOperatorAssuranceGate({
+          manifest,
+          report: input.workerReport,
+          postflight
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "assurance_satisfaction.json",
+          payload: assuranceGate.satisfaction
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "assurance_ledgers.json",
+          payload: assuranceGate.ledgers
+        });
+        if (assuranceGate.blockingPostflight !== null) {
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "assurance_postflight.json",
+            payload: assuranceGate.blockingPostflight
+          });
+          writeFpEvaluateResult({
+            manifest,
+            report: input.workerReport,
+            postflight: assuranceGate.blockingPostflight,
+            postflightRef: pathToFileURL(
+              join(manifest.archiveRoot, "assurance_postflight.json")
+            ).href
+          });
+          const gapDossier = constructPostflightGapDossier({
+            manifest,
+            postflight: assuranceGate.blockingPostflight
+          });
+          writePostflightGapDossier({ manifest, gapDossier });
+          const current: SdlcAbgOwnedFpDispatchState = {
+            status:
+              assuranceGate.satisfaction.status === "fp_escalation"
+                ? "fp_escalation"
+                : "postflight_failed",
+            manifest,
+            workerRun: input.workerRun,
+            workerReport: input.workerReport,
+            postflight: assuranceGate.blockingPostflight,
+            assuranceSatisfaction: assuranceGate.satisfaction,
+            gapDossier,
+            hookOutcome: null,
+            blockingReason: assuranceGate.blockingPostflight.blockingReasons.join(","),
+            blockingReasonCarriers:
+              assuranceGate.blockingPostflight.blockingReasonCarriers,
+            currentEdge: pluginInput.edge
+          };
+          const consequence = publishDispatchState(current);
+          if (assuranceGate.satisfaction.status === "reprice_required") {
+            return constructFpDispatchOutcome({
+              status: "blocked",
+              resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+              attachedResultArtifact: null,
+              evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs,
+              reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
+            });
+          }
+          return constructFpDispatchOutcome({
+            status: "dispatched",
+            resultRef: gapDossier.currentGapDossierRef,
+            attachedResultArtifact: fulfillmentFor({
+              workerRun: input.workerRun,
+              fulfillmentStatus: "partial",
+              fulfillmentDetail:
+                assuranceGate.blockingPostflight.blockingReasons.join(","),
+              blockingReasons: assuranceGate.blockingPostflight.blockingReasons,
+              evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs
+            }),
+            evidenceRefs: uniqueSorted([
+              ...assuranceGate.blockingPostflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
+          });
+        }
+
+        const constructorResult = constructorResultFromWorkerOutput({
+          manifest,
+          report: input.workerReport,
+          operationType: defaultOperationForTarget(contract.targetAssetType)
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "constructor_result.json",
+          payload: constructorResult
+        });
+        const hookOutcome = runSdlcHookTurn({
+          contract,
+          invocation: minimalSdlcHookInvocationForContract({
+            contract,
+            targetAssetId: constructorResult.outputIdentity.assetId,
+            fpWorkerContractRef: input.hookWorkerContractRef
+          }),
+          constructorResult
+        });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "hook_outcome.json",
+          payload: hookOutcome
+        });
+        if (hookOutcome.postflight?.status !== "passed") {
+          const hookBlockingReasonCarriers = Object.freeze(
+            hookOutcome.postflight === null || hookOutcome.postflight === undefined
+              ? [
+                  makeSdlcBlockingReason({
+                    code: "hook_postflight_missing",
+                    evidenceRefs: [
+                      pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
+                    ]
+                  })
+                ]
+              : hookOutcome.postflight.blockingReasons.map((reason) =>
+                  makeSdlcBlockingReason({
+                    code: "hook_postflight_failed",
+                    detail: reason,
+                    evidenceRefs: hookOutcome.postflight?.evidenceRefs ?? []
+                  })
+                )
+          );
+          const hookPostflight = Object.freeze({
+            kind: "sdlc_operator_postflight_result" as const,
+            status: "blocked" as const,
+            blockingReasons: Object.freeze(
+              hookBlockingReasonCarriers.map(legacyBlockingReasonCode)
+            ),
+            blockingReasonCarriers: hookBlockingReasonCarriers,
+            evidenceRefs: Object.freeze([...(hookOutcome.postflight?.evidenceRefs ?? [])])
+          });
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "hook_postflight.json",
+            payload: hookPostflight
+          });
+          writeFpEvaluateResult({
+            manifest,
+            report: input.workerReport,
+            postflight: hookPostflight,
+            postflightRef: pathToFileURL(
+              join(manifest.archiveRoot, "hook_postflight.json")
+            ).href
+          });
+          const gapDossier = constructPostflightGapDossier({
+            manifest,
+            postflight: hookPostflight
+          });
+          writePostflightGapDossier({ manifest, gapDossier });
+          const current: SdlcAbgOwnedFpDispatchState = {
+            status: "postflight_failed",
+            manifest,
+            workerRun: input.workerRun,
+            workerReport: input.workerReport,
+            postflight: hookPostflight,
+            assuranceSatisfaction: assuranceGate.satisfaction,
+            gapDossier,
+            hookOutcome,
+            blockingReason: hookPostflight.blockingReasons.join(","),
+            blockingReasonCarriers: hookPostflight.blockingReasonCarriers,
+            currentEdge: pluginInput.edge
+          };
+          const consequence = publishDispatchState(current);
+          return constructFpDispatchOutcome({
+            status: "dispatched",
+            resultRef: gapDossier.currentGapDossierRef,
+            attachedResultArtifact: fulfillmentFor({
+              workerRun: input.workerRun,
+              fulfillmentStatus: "partial",
+              fulfillmentDetail: hookPostflight.blockingReasons.join(","),
+              blockingReasons: hookPostflight.blockingReasons,
+              evidenceRefs: hookPostflight.evidenceRefs
+            }),
+            evidenceRefs: uniqueSorted([
+              ...hookPostflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason: hookPostflight.blockingReasons.join(",")
+          });
+        }
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_invoked",
+          manifest,
+          workerRun: input.workerRun,
+          workerReport: input.workerReport,
+          postflight,
+          assuranceSatisfaction: assuranceGate.satisfaction,
+          gapDossier: null,
+          hookOutcome,
+          blockingReason: null,
+          blockingReasonCarriers: Object.freeze([]),
+          currentEdge: null
+        };
+        const consequence = publishDispatchState(current);
+        if (consequence.edgeClosureDecision.disposition === "block") {
+          return constructFpDispatchOutcome({
+            status: "blocked",
+            resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+            attachedResultArtifact: null,
+            evidenceRefs: uniqueSorted([
+              ...postflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason:
+              consequence.edgeClosureDecision.reasonRefs.join(",") ||
+              "post_action_blocked"
+          });
+        }
+        return constructFpDispatchOutcome({
+          status: "dispatched",
+          resultRef: dispatchResultRef(manifest),
+          attachedResultArtifact: fulfillmentFor({
+            workerRun: input.workerRun,
+            fulfillmentStatus: "fulfilled",
+            fulfillmentDetail: input.passedFulfillmentDetail,
+            blockingReasons: Object.freeze([]),
+            evidenceRefs: postflight.evidenceRefs
+          }),
+          evidenceRefs: uniqueSorted([
+            ...postflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ])
+        });
+      };
+      const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(pluginInput.edge);
+      const workerDispatchAllowed = edgeAccountingRow?.workerDispatchAllowed ?? true;
+      if (!workerDispatchAllowed) {
+        const frameworkOwnedEvaluationArtifact =
+          writeInstalledOperatorOwnedEvaluationArtifact({ manifest });
+        if (frameworkOwnedEvaluationArtifact === null) {
+          if (edgeAccountingRow === null) {
+            throw new TypeError(`missing edge accounting row for ${pluginInput.edge}`);
+          }
+          writeInstalledOperatorNoDispatchArtifact({
+            manifest,
+            edgeAccountingRow
+          });
+        } else {
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "installed_operator_evaluation_artifact.json",
+            payload: {
+              kind: "sdlc_installed_operator_evaluation_artifact",
+              writerInterface: "writeInstalledOperatorOwnedEvaluationArtifact",
+              targetAssetType: manifest.targetAssetType,
+              outputFile: frameworkOwnedEvaluationArtifact
+            }
+          });
+        }
+        let workerReport: SdlcWorkerResultReport | null = null;
+        try {
+          workerReport = noDispatchReport({
+            manifest,
+            report: buildPostTransformWorkerResultReport({
+              manifest,
+              before: beforeMaterialization
+            })
+          });
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "worker_result_report.json",
+            payload: workerReport
+          });
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "post_transform_observation.json",
+            payload: {
+              kind: "sdlc_post_transform_observation",
+              sourceFunction: "installed_operator.deterministic_edge",
+              generatedFunction:
+                frameworkOwnedEvaluationArtifact === null
+                  ? "writeInstalledOperatorNoDispatchArtifact"
+                  : "writeInstalledOperatorOwnedEvaluationArtifact",
+              previousReportAdmissionError: null,
+              materializedFileCount: workerReport.materializedFiles.length,
+              outputFile: workerReport.outputFile,
+              digest: workerReport.digest
+            }
+          });
+        } catch (error: unknown) {
+          const rejectionPostflight = deterministicReportAdmissionPostflight({
+            manifest,
+            reason:
+              error instanceof Error ? error.message : "worker_report_rejected"
+          });
+          writeOperatorArchiveFile({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "worker_report_admission_postflight.json",
+            payload: rejectionPostflight
+          });
+          const gapDossier = constructPostflightGapDossier({
+            manifest,
+            postflight: rejectionPostflight
+          });
+          writePostflightGapDossier({ manifest, gapDossier });
+          const current: SdlcAbgOwnedFpDispatchState = {
+            status: "worker_report_rejected",
+            manifest,
+            workerRun: null,
+            workerReport: null,
+            postflight: rejectionPostflight,
+            assuranceSatisfaction: null,
+            gapDossier,
+            hookOutcome: null,
+            blockingReason: rejectionPostflight.blockingReasons.join(","),
+            blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
+            currentEdge: pluginInput.edge
+          };
+          const consequence = publishDispatchState(current);
+          return constructFpDispatchOutcome({
+            status: "blocked",
+            resultRef: gapDossier.currentGapDossierRef,
+            attachedResultArtifact: runtimeFailureArtifact({
+              failureClass: "contract_failure",
+              detail: rejectionPostflight.blockingReasons.join(",")
+            }),
+            evidenceRefs: uniqueSorted([
+              ...rejectionPostflight.evidenceRefs,
+              consequence.nextActionProjection.nextActionProjectionRef
+            ]),
+            reason: rejectionPostflight.blockingReasons.join(",")
+          });
+        }
+        workerReport = workerResultReportWithFpStageRefs({
+          manifest,
+          report: workerReport
+        });
+        workerReport = noDispatchReport({ manifest, report: workerReport });
+        writeOperatorArchiveFile({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_result_report.json",
+          payload: workerReport
+        });
+        return completeReportDispatch({
+          workerRun: null,
+          workerReport,
+          hookWorkerContractRef: "worker-dispatch://installed-operator/no-dispatch",
+          passedFulfillmentDetail: "installed operator deterministic edge passed"
+        });
+      }
+      if (transport === null) {
+        throw new TypeError("worker dispatch requires admitted worker transport");
+      }
       const workerRun = await invokeWorkerThroughAbgProcessActor({
         transport,
         manifest,
@@ -5152,11 +6030,6 @@ function compactRuntimeEventArchivePayload(
           emitted.push(event);
         }
       });
-      const expectedAssessmentIds =
-        pluginInput.expectedAssessmentIds.length === 0
-          ? vectorEvaluatorNames({ basis, vectorIndex: pluginInput.vectorIndex })
-          : pluginInput.expectedAssessmentIds;
-
       if (workerRun.status !== 0) {
         const failurePostflight = constructWorkerProcessFailurePostflight({
           manifest,
@@ -5318,290 +6191,11 @@ function compactRuntimeEventArchivePayload(
           })
         );
       }
-      writeProductMaterializationManifest({ manifest, report: workerReport });
-      const postflight = evaluateWorkerResultPostflight({
-        manifest,
-        report: workerReport
-      });
-      writeOperatorArchiveFile({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "postflight.json",
-        payload: postflight
-      });
-      writeFpEvaluateResult({ manifest, report: workerReport, postflight });
-      if (postflight.status !== "passed") {
-        const gapDossier = constructPostflightGapDossier({
-          manifest,
-          postflight
-        });
-        writePostflightGapDossier({ manifest, gapDossier });
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status: "postflight_failed",
-          manifest,
-          workerRun,
-          workerReport,
-          postflight,
-          assuranceSatisfaction: null,
-          gapDossier,
-          hookOutcome: null,
-          blockingReason: postflight.blockingReasons.join(","),
-          blockingReasonCarriers: postflight.blockingReasonCarriers,
-          currentEdge: pluginInput.edge
-        };
-        const consequence = publishDispatchState(current);
-        return constructFpDispatchOutcome({
-          status: "dispatched",
-          resultRef: gapDossier.currentGapDossierRef,
-          attachedResultArtifact: fulfillmentArtifact({
-            manifest,
-            transport,
-            basis,
-            expectedAssessmentIds,
-            fulfillmentStatus: "partial",
-            fulfillmentDetail: postflight.blockingReasons.join(","),
-            blockingReasons: postflight.blockingReasons,
-            evidenceRefs: postflight.evidenceRefs
-          }),
-          evidenceRefs: uniqueSorted([
-            ...postflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason: postflight.blockingReasons.join(",")
-        });
-      }
-
-      const assuranceGate = deriveSdlcOperatorAssuranceGate({
-        manifest,
-        report: workerReport,
-        postflight
-      });
-      writeOperatorArchiveFile({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "assurance_satisfaction.json",
-        payload: assuranceGate.satisfaction
-      });
-      writeOperatorArchiveFile({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "assurance_ledgers.json",
-        payload: assuranceGate.ledgers
-      });
-      if (assuranceGate.blockingPostflight !== null) {
-        writeOperatorArchiveFile({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "assurance_postflight.json",
-          payload: assuranceGate.blockingPostflight
-        });
-        writeFpEvaluateResult({
-          manifest,
-          report: workerReport,
-          postflight: assuranceGate.blockingPostflight,
-          postflightRef: pathToFileURL(
-            join(manifest.archiveRoot, "assurance_postflight.json")
-          ).href
-        });
-        const gapDossier = constructPostflightGapDossier({
-          manifest,
-          postflight: assuranceGate.blockingPostflight
-        });
-        writePostflightGapDossier({ manifest, gapDossier });
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status:
-            assuranceGate.satisfaction.status === "fp_escalation"
-              ? "fp_escalation"
-              : "postflight_failed",
-          manifest,
-          workerRun,
-          workerReport,
-          postflight: assuranceGate.blockingPostflight,
-          assuranceSatisfaction: assuranceGate.satisfaction,
-          gapDossier,
-          hookOutcome: null,
-          blockingReason: assuranceGate.blockingPostflight.blockingReasons.join(","),
-          blockingReasonCarriers:
-            assuranceGate.blockingPostflight.blockingReasonCarriers,
-          currentEdge: pluginInput.edge
-        };
-        const consequence = publishDispatchState(current);
-        if (assuranceGate.satisfaction.status === "reprice_required") {
-          return constructFpDispatchOutcome({
-            status: "blocked",
-            resultRef: consequence.nextActionProjection.nextActionProjectionRef,
-            attachedResultArtifact: null,
-            evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs,
-            reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
-          });
-        }
-        return constructFpDispatchOutcome({
-          status: "dispatched",
-          resultRef: gapDossier.currentGapDossierRef,
-          attachedResultArtifact: fulfillmentArtifact({
-            manifest,
-            transport,
-            basis,
-            expectedAssessmentIds,
-            fulfillmentStatus: "partial",
-            fulfillmentDetail:
-              assuranceGate.blockingPostflight.blockingReasons.join(","),
-            blockingReasons: assuranceGate.blockingPostflight.blockingReasons,
-            evidenceRefs: assuranceGate.blockingPostflight.evidenceRefs
-          }),
-          evidenceRefs: uniqueSorted([
-            ...assuranceGate.blockingPostflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason: assuranceGate.blockingPostflight.blockingReasons.join(",")
-        });
-      }
-
-      const constructorResult = constructorResultFromWorkerOutput({
-        manifest,
-        report: workerReport,
-        operationType: defaultOperationForTarget(contract.targetAssetType)
-      });
-      writeOperatorArchiveFile({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "constructor_result.json",
-        payload: constructorResult
-      });
-      const hookOutcome = runSdlcHookTurn({
-        contract,
-        invocation: minimalSdlcHookInvocationForContract({
-          contract,
-          targetAssetId: constructorResult.outputIdentity.assetId,
-          fpWorkerContractRef: transport.raw
-        }),
-        constructorResult
-      });
-      writeOperatorArchiveFile({
-        archiveRoot: manifest.archiveRoot,
-        relativePath: "hook_outcome.json",
-        payload: hookOutcome
-      });
-      if (hookOutcome.postflight?.status !== "passed") {
-        const hookBlockingReasonCarriers = Object.freeze(
-          hookOutcome.postflight === null || hookOutcome.postflight === undefined
-            ? [
-                makeSdlcBlockingReason({
-                  code: "hook_postflight_missing",
-                  evidenceRefs: [
-                    pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
-                  ]
-                })
-              ]
-            : hookOutcome.postflight.blockingReasons.map((reason) =>
-                makeSdlcBlockingReason({
-                  code: "hook_postflight_failed",
-                  detail: reason,
-                  evidenceRefs: hookOutcome.postflight?.evidenceRefs ?? []
-                })
-              )
-        );
-        const hookPostflight = Object.freeze({
-          kind: "sdlc_operator_postflight_result" as const,
-          status: "blocked" as const,
-          blockingReasons: Object.freeze(
-            hookBlockingReasonCarriers.map(legacyBlockingReasonCode)
-          ),
-          blockingReasonCarriers: hookBlockingReasonCarriers,
-          evidenceRefs: Object.freeze([...(hookOutcome.postflight?.evidenceRefs ?? [])])
-        });
-        writeOperatorArchiveFile({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "hook_postflight.json",
-          payload: hookPostflight
-        });
-        writeFpEvaluateResult({
-          manifest,
-          report: workerReport,
-          postflight: hookPostflight,
-          postflightRef: pathToFileURL(
-            join(manifest.archiveRoot, "hook_postflight.json")
-          ).href
-        });
-        const gapDossier = constructPostflightGapDossier({
-          manifest,
-          postflight: hookPostflight
-        });
-        writePostflightGapDossier({ manifest, gapDossier });
-        const current: SdlcAbgOwnedFpDispatchState = {
-          status: "postflight_failed",
-          manifest,
-          workerRun,
-          workerReport,
-          postflight: hookPostflight,
-          assuranceSatisfaction: assuranceGate.satisfaction,
-          gapDossier,
-          hookOutcome,
-          blockingReason: hookPostflight.blockingReasons.join(","),
-          blockingReasonCarriers: hookPostflight.blockingReasonCarriers,
-          currentEdge: pluginInput.edge
-        };
-        const consequence = publishDispatchState(current);
-        return constructFpDispatchOutcome({
-          status: "dispatched",
-          resultRef: gapDossier.currentGapDossierRef,
-          attachedResultArtifact: fulfillmentArtifact({
-            manifest,
-            transport,
-            basis,
-            expectedAssessmentIds,
-            fulfillmentStatus: "partial",
-            fulfillmentDetail: hookPostflight.blockingReasons.join(","),
-            blockingReasons: hookPostflight.blockingReasons,
-            evidenceRefs: hookPostflight.evidenceRefs
-          }),
-          evidenceRefs: uniqueSorted([
-            ...hookPostflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason: hookPostflight.blockingReasons.join(",")
-        });
-      }
-      const current: SdlcAbgOwnedFpDispatchState = {
-        status: "worker_invoked",
-        manifest,
+      return completeReportDispatch({
         workerRun,
         workerReport,
-        postflight,
-        assuranceSatisfaction: assuranceGate.satisfaction,
-        gapDossier: null,
-        hookOutcome,
-        blockingReason: null,
-        blockingReasonCarriers: Object.freeze([]),
-        currentEdge: null
-      };
-      const consequence = publishDispatchState(current);
-      if (consequence.edgeClosureDecision.disposition === "block") {
-        return constructFpDispatchOutcome({
-          status: "blocked",
-          resultRef: consequence.nextActionProjection.nextActionProjectionRef,
-          attachedResultArtifact: null,
-          evidenceRefs: uniqueSorted([
-            ...postflight.evidenceRefs,
-            consequence.nextActionProjection.nextActionProjectionRef
-          ]),
-          reason:
-            consequence.edgeClosureDecision.reasonRefs.join(",") ||
-            "post_action_blocked"
-        });
-      }
-      return constructFpDispatchOutcome({
-        status: "dispatched",
-        resultRef: dispatchResultRef(manifest),
-        attachedResultArtifact: fulfillmentArtifact({
-          manifest,
-          transport,
-          basis,
-          expectedAssessmentIds,
-          fulfillmentStatus: "fulfilled",
-          fulfillmentDetail: "installed operator postflight passed",
-          blockingReasons: Object.freeze([]),
-          evidenceRefs: postflight.evidenceRefs
-        }),
-        evidenceRefs: uniqueSorted([
-          ...postflight.evidenceRefs,
-          consequence.nextActionProjection.nextActionProjectionRef
-        ])
+        hookWorkerContractRef: transport.raw,
+        passedFulfillmentDetail: "installed operator postflight passed"
       });
     }
   });

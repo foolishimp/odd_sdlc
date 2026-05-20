@@ -266,6 +266,70 @@ declares the edge deterministic, projection-only, or no-close. The overlay
 aggregates route-level progress; the edge-local gain and close functions remain
 the decisive computation for each close-capable traversal.
 
+## Staged Construction Boundary
+
+`odd_sdlc` treats solution construction as a staged disambiguation pipeline.
+
+The generic construction order is:
+
+```text
+requirements
+-> design commitments
+-> module/component topology
+-> dependency map
+-> evaluator-selected traversal
+-> bounded source/test/build materialization
+-> execution evidence
+-> release qualification
+```
+
+Deterministic code is the highest disambiguation surface. It may close product
+content only after the upstream ambiguity has been reduced into admitted
+intermediate surfaces or preserved as explicit residual pressure.
+
+The TypeScript product line must therefore publish evaluator-owned
+decomposition summaries before broad code or test materialization can claim
+closure. The summaries measure input obligations, output rows,
+upstream-per-downstream compression, downstream-per-upstream expansion,
+owned-input density, downstream rows per upstream input, public boundaries,
+substantive responsibilities, and residual refs. Product profiles or edge
+contracts own the thresholds.
+
+Dependency maps are authority surfaces for traversal selection. Steel-thread
+and parallel build are evaluator-selected traversal methods over admitted
+dependency maps; they are not target carrier surfaces and not prompt-only
+strategy labels.
+
+The evaluator may select a smaller traversal only from admitted complexity
+evidence. `single_hop`, `dual_hop`, `staged`, `zoom_required`, and `blocked`
+are selected hop classes, not prompt instructions. Any Min(F_P) reduction must
+preserve skipped pressure through a typed template, replay-visible projection,
+bundled F_P output, or outcome-class graph variant.
+
+The proportionality and Min(F_P) decisions are auditable product facts. The
+operator-run archive carries the full decomposition summary and traversal-hop
+selection payloads; the runtime event stream carries typed
+`fd_authority_outcome_admitted` pointers to those carriers. Analyzer output is
+a read-only projection over that archive/event truth.
+
+The construction graph itself is subject to the same admission discipline. No
+edge remains in the selected graph by historical carry-forward. Each retained
+edge must account for the pressure it owns and its authority output, or be
+deleted, merged into the owning edge, replaced by a staged authority edge, or
+reclassified as a projection/no-close view over admitted carriers.
+
+Trivial products do not bypass this law. A product profile may declare a
+trivial product class, but the runtime admits that class only through a
+degenerate one-requirement, one-design, one-module, one-component, one-function
+decomposition when that is the proportional construction depth for the product.
+Runtime, source, test, and execution facts remain facets of the one trivial
+requirement unless the product authority declares separate product obligations.
+
+Min(F_P) optimization happens after staged construction authority exists. A
+future traversal may reduce probabilistic worker calls only when skipped or
+collapsed pressure is preserved as an admitted typed template, replay-visible
+projection, bundled `F_P` output, or outcome-class graph variant.
+
 ## Product Terms
 
 ### Outcome-Driven Development

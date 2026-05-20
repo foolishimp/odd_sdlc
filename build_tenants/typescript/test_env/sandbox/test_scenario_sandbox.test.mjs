@@ -16,6 +16,7 @@ import path from "node:path";
 import {
   assertScenarioExpectations,
   runScenarioSandbox,
+  scenarioGraphCloseStopSatisfied,
   scenarioStartTargetForStep,
   scenarioWorkspaceFileStopSatisfied
 } from "./scenario_sandbox.mjs";
@@ -29,7 +30,7 @@ import {
   t131OddChatScenario
 } from "./scenarios/t131_odd_chat.scenario.mjs";
 import {
-  T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES,
+  T132_HELLO_WORLD_JS_MIN_FP_EDGES,
   t132HelloWorldJsLiveScenario,
   t132HelloWorldJsScenario
 } from "./scenarios/t132_hello_world_js.scenario.mjs";
@@ -213,15 +214,34 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     helloWorldRustMinimumInductionLiveScenario({ worker }).maxAdvances >= 16
   );
   const jsLive = t132HelloWorldJsLiveScenario({ worker });
-  assert(jsLive.maxAdvances >= T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES.length);
+  assert.equal(jsLive.maxAdvances, 1);
   assert.deepEqual(jsLive.startTarget, "next");
+  assert.deepEqual(jsLive.startUntil, "converged");
+  assert.equal(Array.isArray(jsLive.startTargetSequence), false);
+  assert.equal(jsLive.continueOnEdgeConverge, undefined);
+  assert.equal(jsLive.stopAfterGraphClose, true);
+  assert.deepEqual(jsLive.expectations.exactHandoffEdgeSequence, [
+    ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
+  ]);
+  assert.deepEqual(jsLive.expectations.latestArchiveArtifacts, [
+    "sdlc_decomposition_summary.json",
+    "sdlc_implementation_decomposition_summary.json",
+    "sdlc_module_dependency_map.json",
+    "sdlc_module_dependency_traversal_selection.json",
+    "sdlc_traversal_hop_selection.json",
+    "worker_result_report.json"
+  ]);
+  assert.equal(
+    jsLive.expectations.latestArchiveJsonAssertions[1].equals.hopClass,
+    "single_hop"
+  );
   assert.deepEqual(jsLive.expectations.handoffEdgeSequencePrefix, [
-    ...T132_HELLO_WORLD_JS_FULL_LIFECYCLE_EDGES
+    ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
   ]);
   assert.equal(jsLive.stopAfterWorkspaceFilesExist, false);
   assert.deepEqual(
     jsLive.expectations.firstHandoffOverlayRef,
-    "overlay://odd-sdlc/current-full-traversal"
+    "overlay://odd-sdlc/framework-smoke-min-fp"
   );
   assert(t133HelloWorldRustLiveScenario({ worker }).maxAdvances >= 16);
   const jsLite = t160HelloWorldJsLiteLiveScenario({ worker });
@@ -325,6 +345,55 @@ test("scenario sandbox: handoff sequence assertion tolerates same-edge retries",
         }
       }
     )
+  );
+});
+
+test("scenario sandbox: exact handoff sequence rejects post-close re-entry", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-exact-sequence-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  mkdirSync(runsRoot, { recursive: true });
+  [
+    ["20260512T000000000Z_pid1", "derive_intent_surface"],
+    ["20260512T000001000Z_pid1", "derive_product_surface"],
+    ["20260512T000002000Z_pid1", "prepare_release_surface"],
+    ["20260512T000003000Z_pid1", "derive_product_surface"]
+  ].forEach(([runId, edgeName]) => {
+    const runRoot = path.join(runsRoot, runId);
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      path.join(runRoot, "handoff_manifest.json"),
+      JSON.stringify({ edgeName }),
+      "utf8"
+    );
+  });
+
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          workspace,
+          advances: [
+            {
+              gaps: { payload: {} },
+              start: { payload: {} }
+            }
+          ]
+        },
+        {
+          scenarioId: "exact-sequence-regression",
+          expectations: {
+            exactHandoffEdgeSequence: [
+              "derive_intent_surface",
+              "derive_product_surface",
+              "prepare_release_surface"
+            ]
+          }
+        }
+      ),
+    /exact handoff edge sequence mismatch/
   );
 });
 
@@ -448,6 +517,115 @@ test("scenario sandbox: workspace file stop requires clean closure", () => {
       archiveRoot
     }),
     true
+  );
+});
+
+test("scenario sandbox: graph close stop requires no selected next action", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-graph-close-stop-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260512T000000000Z_pid1"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  writeJson(path.join(archiveRoot, "operator_summary.json"), {
+    currentEdge: null,
+    nextLawfulAction: "disposition://close"
+  });
+  writeJson(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), {
+    disposition: "close"
+  });
+  writeJson(path.join(archiveRoot, "sdlc_next_action_projection.json"), {
+    selectedActionRef: "construction-action://odd-sdlc/post-close/derive_goal_surface",
+    choosesNextTraversal: true
+  });
+
+  assert.equal(scenarioGraphCloseStopSatisfied(workspace), false);
+
+  writeJson(path.join(archiveRoot, "sdlc_next_action_projection.json"), {
+    selectedActionRef: null,
+    choosesNextTraversal: false
+  });
+
+  assert.equal(scenarioGraphCloseStopSatisfied(workspace), true);
+});
+
+test("scenario sandbox: latest archive JSON assertions audit runtime decisions", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-latest-json-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260512T000000000Z_pid1"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  writeJson(path.join(archiveRoot, "sdlc_traversal_hop_selection.json"), {
+    kind: "sdlc_traversal_hop_selection",
+    hopClass: "single_hop",
+    complexityAssessment: {
+      inputObligationCount: 1,
+      outputRowCount: 1
+    },
+    pressurePreservation: {
+      admissionDecision: "admit"
+    }
+  });
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: "latest-json-regression",
+        expectations: {
+          latestArchiveJsonAssertions: [
+            {
+              file: "sdlc_traversal_hop_selection.json",
+              equals: {
+                kind: "sdlc_traversal_hop_selection",
+                hopClass: "single_hop",
+                "complexityAssessment.inputObligationCount": 1,
+                "complexityAssessment.outputRowCount": 1,
+                "pressurePreservation.admissionDecision": "admit"
+              }
+            }
+          ]
+        }
+      }
+    )
+  );
+
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          workspace,
+          advances: [
+            {
+              gaps: { payload: {} },
+              start: { payload: {} }
+            }
+          ]
+        },
+        {
+          scenarioId: "latest-json-negative-regression",
+          expectations: {
+            latestArchiveJsonAssertions: [
+              {
+                file: "sdlc_traversal_hop_selection.json",
+                equals: {
+                  hopClass: "dual_hop"
+                }
+              }
+            ]
+          }
+        }
+      ),
+    /hopClass mismatch/
   );
 });
 
@@ -634,18 +812,13 @@ test(
 const T132_LIVE_ENABLED = process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE"] === "1";
 const T132_LIVE_WORKER =
   process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_WORKER"] ?? "process://claude";
-const T132_LIVE_MAX_ADVANCES = Number.parseInt(
-  process.env["ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_MAX_ADVANCES"] ?? "24",
-  10
-);
 
 test(
   "scenario sandbox: T-132 JavaScript hello-world live build loop (opt-in)",
   { skip: T132_LIVE_ENABLED ? false : "ODD_SDLC_TS_T132_HELLO_WORLD_JS_SCENARIO_LIVE=1 not set" },
   async () => {
     const scenario = t132HelloWorldJsLiveScenario({
-      worker: T132_LIVE_WORKER,
-      maxAdvances: T132_LIVE_MAX_ADVANCES
+      worker: T132_LIVE_WORKER
     });
     const result = await runScenarioSandbox(scenario);
     assertWorkspaceWasInstalled(result);

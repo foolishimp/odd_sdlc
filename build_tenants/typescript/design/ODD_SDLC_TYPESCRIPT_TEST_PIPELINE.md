@@ -1,9 +1,10 @@
 # ODD SDLC TypeScript Design-Consumer Test Pipeline
 
-**Status**: Active design input for T-171 lifecycle parity
+**Status**: Active design input for T-171 lifecycle parity and T-172 staged test construction
 **Date**: 2026-05-15
-**Owner Ticket**:
-`.ai-workspace/tickets/active/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`
+**Owner Tickets**:
+`.ai-workspace/tickets/completed/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md`,
+`.ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md`
 **Superseded Ticket**:
 `.ai-workspace/tickets/completed/T-168-build-design-consumer-test-pipeline-for-co-affirming-implementation.md`
 **Superseding Strategy**:
@@ -14,11 +15,13 @@
 REQ-F-ODDSDLC-013, REQ-F-ODDSDLC-014, REQ-F-ODDSDLC-015,
 REQ-F-ODDSDLC-020, REQ-F-ODDSDLC-021, REQ-F-ODDSDLC-040,
 REQ-F-ODDSDLC-043, REQ-F-ODDSDLC-063, REQ-F-ODDSDLC-064,
-REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066
+REQ-F-ODDSDLC-065, REQ-F-ODDSDLC-066, REQ-F-ODDSDLC-080,
+REQ-F-ODDSDLC-081
 **Derives From**: `specification/PRODUCT.md`,
 `specification/requirements/10-odd-sdlc-software-domain-buildout.md`,
 `specification/requirements/13-odd-sdlc-typescript-tenant.md`,
 `specification/requirements/16-edge-gain-closure-contract.md`,
+`specification/requirements/18-typed-construction-algebra.md`,
 `ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md`,
 `ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md`,
 `ODD_SDLC_TYPESCRIPT_TRAVERSAL_LEDGER_SOLUTION.md`,
@@ -75,6 +78,12 @@ Every test-pipeline phase must resolve to one of these forms:
 
 If a phase cannot be represented that way, the implementation must add the node
 or row type before claiming closure.
+
+T-172 adds a construction-depth rule for tests: component-test materialization
+may not infer testcase authority, test topology, test-stack selection, or test
+dependency ordering while writing test files. Those surfaces must already be
+admitted by `derive_test_design_surface` or by a later explicit staged
+authority edge before `derive_component_test_surface` can close.
 
 ## Graph Node And Edge Correlation
 
@@ -133,6 +142,48 @@ must name the row refs:
 If a later slice needs independent graph vectors for test data, expected
 results, or co-affirmation, that is a graph-publication change and must update
 the graph catalog, edge assurance matrix, overlay catalog, and tests together.
+
+## Staged Test Topology
+
+The test lifecycle mirrors implementation construction with test-specific
+authority:
+
+```text
+requirements
+-> testcase authority
+-> test design
+-> test module/component topology
+-> test dependency map
+-> test stack profile
+-> evaluator-selected traversal
+-> component test materialization
+-> declared execution
+-> observed execution result
+-> verification and release co-affirmation
+```
+
+`derive_test_design_surface` owns the admitted test topology rows,
+decomposition summary, dependency map, and stack/profile selection. The summary
+uses the same decomposition predicates as implementation topology: high-density
+rows, facade rows, under-decomposed parents, out-of-scope residual refs, and
+missing trivial-product decomposition all block downstream materialization.
+
+`derive_component_test_surface` consumes that admitted test authority. Its
+prompt may request materialized test files for bounded rows, but it must not
+ask the worker to choose the testcase authority, invent the test dependency
+map, or default the test stack outside admitted profile evidence.
+
+`prepare_test_execution_surface` is a projection/no-close transition. It writes
+the deterministic execution register from admitted test schedule and product
+constraints. It does not dispatch `F_P.transform` and does not own observed
+test results.
+
+`derive_test_execution_result_surface` owns execution observation and scoped
+repair pressure. `qualify_component_test_execution_surface`,
+`derive_test_run_archive_surface`, `derive_release_depth_parity_surface`, and
+`prepare_release_surface` are evaluator/projection surfaces over admitted code,
+test, execution, and ledger truth; when their edge-accounting rows declare
+`workerDispatchAllowed: false`, worker dispatch is a runtime rejection.
 
 ## Structural Flow
 

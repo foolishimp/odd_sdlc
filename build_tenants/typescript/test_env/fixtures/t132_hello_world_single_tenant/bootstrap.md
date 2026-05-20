@@ -36,6 +36,8 @@ Run `node --test test/hello.test.js` from `build_tenants/hello_world_javascript`
 the generated test must execute the product behavior and prove the exact stdout
 or exported behavior `Hello, world!`.
 
-Requirement markers: `REQ-T132-001` single tenant, `REQ-T132-002` Node runtime,
-`REQ-T132-003` source file, `REQ-T132-004` graph-generated test proves exact
-Hello World behavior, `REQ-T132-005` execution command evidence.
+Requirement marker: `REQ-T132-001` the generated JavaScript tenant materializes
+`src/hello.js` and `test/hello.test.js`, then `node --test test/hello.test.js`
+proves exact Hello World behavior. Runtime, source, test, and execution details
+are facets of this one trivial product requirement, not separate implementation
+obligations.

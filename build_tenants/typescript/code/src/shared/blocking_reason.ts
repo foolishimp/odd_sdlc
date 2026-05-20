@@ -70,6 +70,10 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "target_unavailable",
   "stale_query_domain",
   "target_carrier_admission_missing",
+  "staged_authority_missing",
+  "staged_decomposition_rejected",
+  "staged_dependency_map_missing",
+  "staged_dependency_traversal_blocked",
   "next_action_projection_graph_vector_missing",
   "legacy_graph_function_boundary_ref",
   "unknown_graph_function_boundary_ref",
@@ -362,6 +366,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Target carrier envelope evidence is missing for the selected contract."
+    });
+  }
+  if (code.startsWith("staged_")) {
+    return Object.freeze({
+      reasonClass: "topology",
+      lawfulReentryPoint: "reprice_requirement_or_design",
+      message:
+        "Staged construction authority does not admit the downstream materialization edge."
     });
   }
   if (

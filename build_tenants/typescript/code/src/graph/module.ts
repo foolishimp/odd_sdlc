@@ -20,9 +20,11 @@ import {
 import {
   BOOTSTRAP_RELEASE_FUNCTION_CATALOG,
   BOOTSTRAP_REQUIREMENTS_EXECUTIVE_STEPS,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE,
   FG_SOLUTION_ARCHITECTURE_EXECUTIVE,
+  FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
   LITE_FUNCTION_CATALOG,
   LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
   OPERATIONAL_FUNCTION_CATALOG,
@@ -569,6 +571,12 @@ export function constructSdlcGraphFunctionCatalog(): SdlcGraphFunctionCatalog {
         intent: "Lite traversal from composite implementation design to component implementation.",
         steps: LITE_DESIGN_MODULE_IMPLEMENTATION_EXECUTIVE_STEPS,
         outputs: ["component_code_surface"]
+      }),
+      executiveEntry({
+        name: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+        intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution pressure.",
+        steps: FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
+        outputs: ["component_code_surface"]
       })
     ])
   });
@@ -647,6 +655,16 @@ export function constructSdlcGtlModule(input: {
     ),
     outputs: ["component_code_surface"]
   });
+  const frameworkSmokeMinFpExecutive = constructExecutive({
+    name: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+    intent: "Complexity-admitted Min(F_P) framework-smoke traversal for trivial products with preserved execution pressure.",
+    functions: functionsByNames(
+      liteExecutiveFunctions,
+      FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE_STEPS,
+      FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
+    ),
+    outputs: ["component_code_surface"]
+  });
   const graphFunctions = Object.freeze([
     ...libraryFunctions,
     bootstrapExecutive,
@@ -654,6 +672,7 @@ export function constructSdlcGtlModule(input: {
     bootstrapRequirementsExecutive,
     solutionArchitectureExecutive,
     liteDesignModuleImplementationExecutive,
+    frameworkSmokeMinFpExecutive,
     ...bootstrapFunctions,
     ...liteFunctions,
     ...operationalFunctions,
@@ -681,7 +700,8 @@ export function constructSdlcGtlModule(input: {
       attr("function_catalog_size", scalarValue(String(SDLC_FUNCTION_CATALOG.length))),
       attr("executive_graph_functions", stringListValue([
         bootstrapExecutive.name,
-        operationalExecutive.name
+        operationalExecutive.name,
+        frameworkSmokeMinFpExecutive.name
       ]))
     ])
   });

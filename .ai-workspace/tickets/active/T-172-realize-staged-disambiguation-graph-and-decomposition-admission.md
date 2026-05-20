@@ -4,12 +4,12 @@ title: Realize staged disambiguation graph and decomposition admission
 type: feature
 ticket_category: design_reframe
 status: active
-proof_status: action_ready
+proof_status: g5_data_mapper_live_proof_pending
 priority: critical
 owner: odd_sdlc
 build_tenant: typescript
 created_at: 2026-05-19
-updated_at: 2026-05-19
+updated_at: 2026-05-20
 triaged_at: 2026-05-19
 activated_at: 2026-05-19
 goal: make every solution construction traverse through staged disambiguation before deterministic code closure
@@ -17,6 +17,7 @@ change_class: requirement_reprice
 re_entry_point: requirements
 first_missing_layer: requirements
 governance_scope: STDO Method / odd_sdlc TypeScript construction algebra
+current_closure_blocker: data_mapper successor live proof after G4 runtime-dispatch enforcement; hello-world degenerate proportionality proof is accepted
 source_documents:
   - specification/GOALS.md
   - specification/INTENT.md
@@ -75,20 +76,22 @@ affected_boundary:
   tests:
     - build_tenants/typescript/test_env/tests
     - build_tenants/typescript/test_env/live
-target_truth: odd_sdlc construction is a staged disambiguation pipeline for every solution. Requirements must reduce through bounded design, module/component, dependency, traversal, code, and test subsurfaces before deterministic code or release closure can claim product completeness. The evaluator admits measured decomposition summaries and selects steel-thread or parallel traversal from admitted dependency maps before materialization.
-superseded_truth: A full graph can close product depth by carrying many obligations directly into broad component-code or component-test materialization so long as every declared row has evidence and the runtime ledgers close.
-closure_law: This ticket closes only when the TypeScript graph and evaluator admit staged decomposition summaries, enforce proportional residual predicates, select steel-thread/parallel traversal from admitted dependency maps, and prove that code/test materialization cannot close from under-decomposed module or test topology. data_mapper remains the reference proof, but the rule applies to all solution construction including trivial degenerate products.
+target_truth: odd_sdlc construction is a staged disambiguation pipeline for every solution. Requirements must reduce through bounded design, module/component, dependency, traversal, code, and test subsurfaces before deterministic code or release closure can claim product completeness. The evaluator admits measured decomposition summaries and selects steel-thread or parallel traversal from admitted dependency maps before materialization. The selected graph itself is admitted: every retained edge must account for unique construction pressure or be deleted, merged, replaced, conditionalized, or reclassified as projection/no-close.
+superseded_truth: A full graph can close product depth by carrying many obligations directly into broad component-code or component-test materialization so long as every declared row has evidence and the runtime ledgers close, while retaining inherited rollup or transition edges without proving they own unique construction pressure.
+closure_law: This ticket closes only when the TypeScript graph and evaluator admit staged decomposition summaries, enforce proportional residual predicates, select steel-thread/parallel traversal from admitted dependency maps, account for every selected executive edge, and prove that code/test materialization cannot close from under-decomposed module or test topology. Any edge that cannot account for unique pressure must be deleted from the selected graph, merged into its owning edge, replaced by a staged authority edge, conditionalized, or reclassified as projection/no-close. data_mapper remains the reference proof, but the rule applies to all solution construction including trivial degenerate products.
 evaluation_criteria:
   - requirements/design state that SDLC construction is staged disambiguation ending in deterministic code
-  - target-carrier contracts define SdlcDecompositionSummary or equivalent measured fan-out carrier rows
-  - evaluator predicates reject high-density/facade/under-decomposed module and test topology
+  - target-carrier contracts define SdlcDecompositionSummary or equivalent measured compression/expansion carrier rows
+  - evaluator predicates reject high-density/facade/under-decomposed/exploded/unowned module and test topology
   - trivial products publish admitted one-module/one-component decomposition instead of bypassing decomposition admission
   - module dependency and test dependency carriers exist or existing carriers are strengthened to carry equivalent authority
   - evaluator actions select steel-thread or parallel traversal over admitted dependency maps
   - component-code prompts consume admitted topology and do not ask workers to infer topology while writing code
   - component-test prompts consume admitted test topology and do not ask workers to infer testcase authority while writing tests
-  - analyzer reports current graph, staged graph decisions, dependency-map traversal selection, and decomposition ratios
-  - deterministic tests prove rejection of under-decomposed component-code and component-test carriers
+  - edge-accounting register covers every selected full traversal edge and reports delete/merge/projection/conditional disposition
+  - unaccounted or unneeded edges cannot remain close-capable in the selected executive graph
+  - analyzer reports current graph, staged graph decisions, dependency-map traversal selection, and compression/expansion decomposition ratios
+  - deterministic tests prove rejection of under-decomposed, compressed, exploded, unowned, and invalid-reference component-code and component-test carriers
   - data_mapper successor run proves the staged graph reaches execution evidence and release closure with deeper topology than test82 RC4
 proof_surface:
   static:
@@ -96,7 +99,10 @@ proof_surface:
     - npm test
   focused:
     - npm run test:t172:decomposition-admission
-    - npm run test:t172:staged-graph
+    - npm run test:t172:edge-accounting
+    - npm run test:t172:staged-contracts
+    - npm run test:t172:run-analysis
+    - npm run test:t172
   live_or_archive:
     - npm run test:t171:data-mapper-lifecycle-live
     - odd-sdlc-ts analyze-run --workspace /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl --format markdown
@@ -105,6 +111,9 @@ non_closure_conditions:
   - a component-test edge can still close with broad module-level tests and no admitted test-module dependency map
   - steel-thread or parallel-build is represented as a target carrier surface instead of an evaluator-selected traversal method
   - trivial products bypass decomposition admission entirely
+  - any selected executive graph edge lacks an accounting row
+  - an edge identified as unneeded remains close-capable instead of being deleted, merged, replaced, conditionalized, or projection/no-close
+  - analyzer observes worker dispatch for any edge whose accounting row declares `workerDispatchAllowed: false`
   - data_mapper-specific file names or test35 source filenames become generic runtime law
   - release closure treats execution and ledger success as test35-depth parity without admitted topology-depth evidence
 ---
@@ -158,12 +167,22 @@ Required intermediate authority:
 Steel-thread and parallel build remain traversal methods selected by the
 evaluator over admitted dependency maps. They are not target carrier surfaces.
 
+The selected executive graph is also in scope. T-172 must account for the
+current full graph edge-by-edge. A retained edge needs a positive construction
+claim: owned pressure, authority output, predecessor/successor pressure,
+closure evidence, and a reason the pressure is not already owned elsewhere.
+Edges that cannot make that claim are not kept for ceremony; they are deleted
+from the selected graph, merged into the owning edge, replaced by a staged
+authority edge, conditionalized behind capability/failure pressure, or
+reclassified as projection/no-close over admitted carriers.
+
 ## Out Of Scope
 
-Dynamic zoom admission is split to backlog ticket
-`.ai-workspace/tickets/backlog/T-173-define-evaluator-zoom-admission-from-obligation-output-ratios.md`.
+Complexity-admitted traversal selection, including dynamic zoom admission and
+Min(F_P) pressure-preservation decisions, is split to active follow-on ticket
+`.ai-workspace/tickets/active/T-173-realize-complexity-admitted-min-fp-traversal-selection.md`.
 
-T-172 may record fan-out and residual metrics in decomposition summaries, but it
+T-172 may record compression, expansion, and residual metrics in decomposition summaries, but it
 does not implement evaluator insertion or selection of new intermediate stages.
 
 ## Implementation Decisions
@@ -207,17 +226,24 @@ interface SdlcDecompositionSummary {
     | "function"
     | "test_module"
     | "test_class";
+  readonly stageUpstreamUniverseRefs: readonly string[];
   readonly upstreamCount: number;
   readonly downstreamCount: number;
-  readonly fanoutRatio: number;
-  readonly maxAllowedFanoutRatio: number;
+  readonly upstreamPerDownstreamRatio: number;
+  readonly downstreamPerUpstreamRatio: number;
+  readonly maxUpstreamPerDownstreamRatio: number;
+  readonly maxDownstreamPerUpstream: number;
   readonly maxOwnedUpstreamPerDownstream: number;
   readonly maxOwnedUpstreamWithoutBoundary: number;
   readonly rows: readonly SdlcDecompositionSummaryRow[];
   readonly overloadedDownstreamIds: readonly string[];
+  readonly explosionUpstreamRefs: readonly string[];
+  readonly unownedDownstreamIds: readonly string[];
   readonly facadeDownstreamIds: readonly string[];
   readonly underDecomposedParentIds: readonly string[];
   readonly residualRefs: readonly string[];
+  readonly residualOutsideSubsurfaceRefs: readonly string[];
+  readonly invalidReferenceFields: readonly string[];
   readonly admissionDecision: "admit" | "reject";
 }
 
@@ -251,41 +277,97 @@ predicate names and required inputs are runtime law.
 
 | Predicate | Rejects When |
 |---|---|
-| high-density downstream row | `ownedUpstreamCount > maxOwnedUpstreamPerDownstream` or `fanoutRatio > maxAllowedFanoutRatio` |
+| compression collapse | `upstreamPerDownstreamRatio > maxUpstreamPerDownstreamRatio` |
+| high-density downstream row | `ownedUpstreamCount > maxOwnedUpstreamPerDownstream` |
+| downstream explosion | one upstream ref is owned by more than `maxDownstreamPerUpstream` downstream rows |
+| unowned downstream row | a downstream row owns no upstream refs |
+| invalid reference values | candidate row or stage-universe refs are empty or whitespace-padded |
 | facade row | `ownedUpstreamCount > maxOwnedUpstreamWithoutBoundary` and `publicBoundaryCount == 0`, or `ownedUpstreamCount > 0` and `substantiveResponsibilityCount == 0` |
-| under-decomposed parent | a module/test parent owns high-density obligations through facade rows and has no admitted child component/test rows |
-| residual outside subsurface | a residual ref belongs to a requirement/design/module/testcase not owned by the current stage |
+| under-decomposed parent | a module/test parent owns high-density obligations and all admitted child component/test rows are facade rows |
+| residual outside subsurface | a residual ref belongs to a requirement/design/module/testcase outside the explicit stage upstream universe; when no universe is supplied, the evaluator falls back to the owned upstream refs in the submitted rows |
 | trivial degenerate product | admitted only when the summary is explicitly 1 upstream / 1 downstream with one public or executable boundary; no product bypasses decomposition admission |
 
 The phrase "hundreds of obligations" is not a predicate. It is evidence of a
 probable high-density failure. Admission must use the measured counts and
 profile thresholds.
 
+## Edge Accounting Register
+
+T-172 adds an edge-accounting register for the selected TypeScript full
+traversal. The register is not a documentation appendix; it is a deterministic
+surface the analyzer and tests can inspect.
+
+Each row carries:
+
+```ts
+interface SdlcExecutiveEdgeAccountingRow {
+  readonly edgeName: string;
+  readonly disposition:
+    | "required"
+    | "conditional"
+    | "projection_no_close"
+    | "merge_required"
+    | "replace_required"
+    | "delete_required";
+  readonly ownedPressureRefs: readonly string[];
+  readonly authorityOutputRefs: readonly string[];
+  readonly predecessorEdgeNames: readonly string[];
+  readonly successorEdgeNames: readonly string[];
+  readonly closureEvidenceRefs: readonly string[];
+  readonly workerDispatchAllowed: boolean;
+  readonly rationale: string;
+}
+```
+
+Close-capable `required` rows must carry owned pressure and closure evidence.
+`projection_no_close`, `merge_required`, `replace_required`, and
+`delete_required` rows must not dispatch `F_P.transform` for fresh product
+judgment. Conditional rows must cite the capability, failure, or operational
+pressure that makes the edge lawful when present. The runtime dispatch path
+consumes the register: rows marked `workerDispatchAllowed: false` execute as
+deterministic evaluator/projection edges, and any observed live/archive worker
+dispatch on those rows is a G4 rejection.
+
+T-172 closure requires the register to cover every selected full traversal
+edge, report no missing rows, and either justify or remove every edge marked
+for merge, replacement, or deletion.
+
 ## Gate Register
 
 | Gate | Required Result | Proof Before Next Gate |
 |---|---|---|
-| G0 requirements/design | staged disambiguation, no-bypass trivial decomposition, and projection-vs-authority wording are ratified | requirement/design diff plus review |
-| G1 carrier schema | `SdlcDecompositionSummary`, module dependency map, and test dependency map shapes are declared | focused type/admission tests compile |
-| G2 evaluator admission | high-density, facade, under-decomposed, and residual-scope predicates reject invalid carriers | deterministic negative tests fail close before materialization |
-| G3 graph/handoff/analyzer | code/test prompts consume admitted topology; analyzer reports ratios and traversal selection | focused staged-graph tests |
-| G4 live proof | data_mapper successor run closes with admitted topology depth before code/test materialization | live archive plus analyzer report |
+| G0 requirements/design | staged disambiguation, graph-edge accounting/deletion, no-bypass trivial decomposition, and projection-vs-authority wording are ratified | requirement/design diff plus review |
+| G1 carrier schema | `SdlcDecompositionSummary`, module dependency map, and test dependency map shapes are declared with compression and expansion measures | focused type/admission tests compile |
+| G2 edge accounting | selected full traversal edges are all accounted, with merge/delete/projection/conditional disposition reported | deterministic edge-accounting tests compile |
+| G3 evaluator admission | compression, explosion, high-density, facade, under-decomposed, unowned-row, invalid-ref, and residual-scope predicates reject invalid carriers | deterministic negative tests fail close before materialization |
+| G4 graph/handoff/analyzer | code/test prompts consume admitted topology; analyzer reports ratios, traversal selection, edge-accounting disposition, and observed worker-dispatch violations for no-dispatch rows; runtime dispatch consults the register before live closure | focused staged-graph tests plus archive analysis rejecting observed no-dispatch worker runs |
+| G5 live proof | hello-world successor run closes as the degenerate one-requirement case, and data_mapper successor run closes with admitted substantive topology depth before code/test materialization and no unaccounted selected edges | live archives plus analyzer reports |
 
 ## Work Plan
 
-1. Requirements: add the staged disambiguation and proportional residual rule.
+1. Requirements: add the staged disambiguation, proportional residual, and
+   graph-edge accounting/deletion rules.
 2. Design: define decomposition summaries and density/facade predicates.
-3. Graph contracts: add or strengthen implementation-module, module-dependency,
+3. Edge register: account for every selected full traversal edge and delete,
+   merge, replace, conditionalize, or projection-classify edges that do not own
+   unique construction pressure.
+4. Graph contracts: add or strengthen implementation-module, module-dependency,
    test-module, and test-dependency surfaces.
-4. Evaluator: implement steel-thread/parallel traversal selection over admitted
+5. Evaluator: implement steel-thread/parallel traversal selection over admitted
    dependency maps.
-5. Handoff: make code/test prompts consume admitted topology rather than infer
+6. Handoff: make code/test prompts consume admitted topology rather than infer
    topology during materialization.
-6. Analyzer: report graph shape, decomposition ratios, dependency-map traversal
-   selection, and under-decomposition failures.
-7. Tests: add deterministic negative tests for under-decomposed code/test
-   carriers and positive tests for trivial one-component decomposition.
-8. Live proof: rerun data_mapper as the reference staged-construction proof.
+7. Analyzer: report graph shape, edge-accounting disposition, decomposition
+   compression/expansion ratios, dependency-map traversal selection, observed
+   no-dispatch worker violations, and under-decomposition failures.
+8. Runtime dispatch: make installed operator dispatch consult the edge
+   accounting register so rows marked `workerDispatchAllowed: false` execute as
+   deterministic evaluator/projection edges before live proof.
+9. Tests: add deterministic negative tests for unaccounted edges,
+   under-decomposed code/test carriers, and positive tests for trivial
+   one-component decomposition.
+10. Live proof: rerun hello-world as the degenerate proportionality proof, then
+    rerun data_mapper as the reference substantive staged-construction proof.
 
 ## Proof Plan
 
@@ -296,19 +378,61 @@ Static proof:
 
 Focused proof:
 
-- `test_t172_decomposition_admission.test.mjs` rejects high-density/facade
-  component-code carriers.
+- `test:t171:hello-world-lifecycle-live` proves the minimal product profile does
+  not inflate one requirement into separate runtime/source/test/execution
+  obligations and still closes through admitted degenerate topology.
+- `test_t172_decomposition_admission.test.mjs` rejects compressed,
+  high-density, exploded, unowned, invalid-reference, and facade component-code
+  carriers.
 - `test_t172_decomposition_admission.test.mjs` rejects broad module-level test
   carriers without admitted test-module decomposition.
 - `test_t172_decomposition_admission.test.mjs` admits a trivial one-component
   product only when it publishes an explicit decomposition summary.
-- `test_t172_staged_graph.test.mjs` proves dependency-map traversal selection is
-  evaluator-owned and not represented as a target carrier surface.
-- `test_t172_run_analysis.test.mjs` proves analyzer output reports
-  decomposition ratios, rejection reasons, and selected traversal method.
+- `test_t172_edge_accounting.test.mjs` proves every selected full traversal
+  edge has an accounting row and projection/merge/delete rows do not dispatch
+  `F_P.transform`.
+- `test_t172_edge_accounting.test.mjs` proves the installed operator executes
+  every `workerDispatchAllowed: false` accounting row without `worker_run.json`
+  and without F_P transform refs, including deterministic qualification,
+  projection, repair-schedule, release-depth, and release-preparation rows.
+- `test_t172_edge_accounting.test.mjs` proves the no-dispatch
+  `prepare_test_execution_surface` edge writes an admitted
+  `sdlc_test_execution_surface_register` target carrier before the execution
+  result edge owns test execution evidence.
+- `test_t172_edge_accounting.test.mjs` proves the no-dispatch
+  `derive_test_run_archive_surface` edge writes a framework-owned archive
+  projection over a prior typed `test_execution_result_surface` report rather
+  than dispatching F_P to rediscover execution truth.
+- `test_t172_staged_target_carrier_contract.test.mjs` proves implementation
+  and test materialization consume staged authority refs instead of inferring
+  topology during materialization.
+- `test_t172_run_analysis_edge_accounting.test.mjs` proves analyzer output reports
+  edge-accounting disposition for the selected full graph and rejects observed
+  worker dispatch on no-dispatch rows.
+- `test_t172_run_analysis_edge_accounting.test.mjs` proves rejected analyzer
+  output renders the blocking edge, dispatch policy, rationale, and typed
+  reason so archive triage does not require opening the source register.
 
 Live/archive proof:
 
+- The accepted hello-world degenerate proportionality proof is:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260519T191520211Z_pid70560/workspace`.
+  The run selected `framework_smoke_min_fp`, traversed only
+  `derive_lite_design_adr_surface` and `derive_lite_component_code_surface`,
+  reported same-edge retries `0`, repair attempts `0`, final closure `close`,
+  and execution evidence `2/2/0`. Its admitted decomposition summary records
+  one upstream obligation, one downstream row, compression ratio `1`, expansion
+  ratio `1`, and `admissionDecision: admit`. Its traversal selection records
+  `outcomeClass: framework_smoke`, `hopClass: single_hop`,
+  `zoomDisposition: continue`, and pressure preservation through
+  `outcome_class_graph_variant`.
+- The existing `data_mapper.test82` RC4 archive remains motivating evidence for
+  T-171/T-102, not T-172 closure proof. The T-172 analyzer rejects it because
+  it observes worker dispatch on rows now declared `workerDispatchAllowed:
+  false`: `derive_code_surface`, `prepare_test_execution_surface`,
+  qualification, repair-schedule, archive, release-depth, and release-prep
+  rows. A successor archive must be produced after the G4 runtime-dispatch
+  change.
 - run a data_mapper successor after G0-G3 pass
 - archive the analyzer output for the same run
 - compare topology depth against test82 RC4 and test35 evidence without
@@ -320,5 +444,7 @@ Live/archive proof:
 - Every solution, including trivial solutions, publishes admitted decomposition.
 - The evaluator chooses steel-thread or parallel traversal from admitted
   dependency maps.
+- Every selected full traversal edge is accounted; unneeded edges are deleted,
+  merged, replaced, conditionalized, or projection/no-close before closure.
 - data_mapper proves the staged graph reaches execution and release closure
   with topology depth admitted before code/test materialization.

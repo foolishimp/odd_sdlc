@@ -2,6 +2,8 @@ export type SdlcTraversalOverlayRef = `overlay://odd-sdlc/${string}`;
 
 export const SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF =
   "overlay://odd-sdlc/current-full-traversal" as const;
+export const SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF =
+  "overlay://odd-sdlc/framework-smoke-min-fp" as const;
 export const SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF =
   "overlay://odd-sdlc/lite-design-module-implementation" as const;
 export const SDLC_SOLUTION_ARCHITECTURE_OVERLAY_REF =
@@ -13,6 +15,7 @@ export const SDLC_DEFAULT_TRAVERSAL_OVERLAY_REF =
   SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF;
 
 export const SDLC_PROFILE_OVERLAY_STRATEGY_VALUES = Object.freeze([
+  "min_fp",
   "thread",
   "breadth",
   "full_lifecycle"
@@ -58,6 +61,7 @@ export function admitSdlcProfileOverlayStrategy(
 ): SdlcProfileOverlayStrategy {
   const normalized = value.trim();
   if (
+    normalized === "min_fp" ||
     normalized === "thread" ||
     normalized === "breadth" ||
     normalized === "full_lifecycle"
@@ -72,6 +76,9 @@ export function admitSdlcProfileOverlayStrategy(
 export function sdlcTraversalOverlayRefForStrategy(
   strategy: SdlcProfileOverlayStrategy
 ): SdlcTraversalOverlayRef {
+  if (strategy === "min_fp") {
+    return SDLC_FRAMEWORK_SMOKE_MIN_FP_OVERLAY_REF;
+  }
   if (strategy === "thread") {
     return SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF;
   }

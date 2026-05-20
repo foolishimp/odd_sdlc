@@ -12,6 +12,11 @@ import type {
   SdlcFdRunAnalysisRuntimeArtifactGap,
   SdlcFdRunAnalysisSummaryDriftReport
 } from "./types.js";
+import type { SdlcTraversalHopSelection } from "../operator/carriers.js";
+import {
+  sdlcExecutiveEdgeAccountingRowFor,
+  type SdlcExecutiveEdgeAccountingAudit
+} from "../graph/edge_accounting.js";
 
 function formatBytes(value: number | null): string {
   if (value === null) {
@@ -121,6 +126,67 @@ function renderConceptualStageCoverage(
       `| ${row.test35StageRef} | ${row.expectedEdgeName} | ${row.expectedTargetAssetType} | ${row.mappedEdgeName ?? "-"} | ${row.mappedTargetAssetType ?? "-"} | ${row.stageClass} | ${row.operatorRunRefs.length} |`
     );
   }
+  return lines.join("\n");
+}
+
+function renderEdgeAccounting(
+  accounting: SdlcExecutiveEdgeAccountingAudit
+): string {
+  const blockingEdgeNames = [
+    ...new Set([
+      ...accounting.missingEdgeNames,
+      ...accounting.extraEdgeNames,
+      ...accounting.workerDispatchViolationEdgeNames,
+      ...accounting.observedWorkerDispatchViolationEdgeNames,
+      ...accounting.closeCapableWithoutEvidenceEdgeNames
+    ])
+  ].sort();
+  const lines: string[] = [
+    "## Edge Accounting",
+    "",
+    `- admission: ${accounting.admissionDecision}`,
+    `- selected edges: ${accounting.selectedEdgeNames.length}`,
+    `- missing rows: ${accounting.missingEdgeNames.length}`,
+    `- extra rows: ${accounting.extraEdgeNames.length}`,
+    `- projection/no-close edges: ${accounting.projectionNoCloseEdgeNames.join(", ") || "none"}`,
+    `- conditional edges: ${accounting.conditionalEdgeNames.join(", ") || "none"}`,
+    `- merge-required edges: ${accounting.mergeRequiredEdgeNames.join(", ") || "none"}`,
+    `- replace-required edges: ${accounting.replaceRequiredEdgeNames.join(", ") || "none"}`,
+    `- delete-required edges: ${accounting.deleteRequiredEdgeNames.join(", ") || "none"}`,
+    `- observed no-dispatch worker runs: ${accounting.observedWorkerDispatchViolationEdgeNames.join(", ") || "none"}`,
+    `- blocking reasons: ${accounting.blockingReasons.join(", ") || "none"}`
+  ];
+  if (accounting.admissionDecision === "reject" && blockingEdgeNames.length > 0) {
+    lines.push(
+      "",
+      "| blocking edge | disposition | worker dispatch | rationale | reasons |",
+      "| - | - | - | - | - |"
+    );
+    for (const edgeName of blockingEdgeNames) {
+      const row = sdlcExecutiveEdgeAccountingRowFor(edgeName);
+      const reasons = accounting.blockingReasons.filter((reason) =>
+        reason.endsWith(`:${edgeName}`)
+      );
+      lines.push(
+        `| ${edgeName} | ${row?.disposition ?? "missing"} | ${row === null ? "unknown" : String(row.workerDispatchAllowed)} | ${row?.rationale ?? "no accounting row"} | ${reasons.join(", ") || "-"} |`
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderTraversalSelection(selection: SdlcTraversalHopSelection): string {
+  const lines: string[] = [
+    "## Traversal Selection",
+    "",
+    `- outcome class: ${selection.outcomeClass}`,
+    `- hop class: ${selection.hopClass}`,
+    `- graph variant: ${selection.selectedGraphVariantRef}`,
+    `- zoom disposition: ${selection.zoomAdmission.disposition}`,
+    `- pressure preservation: ${selection.pressurePreservation.mechanism}`,
+    `- rejected alternatives: ${selection.rejectedAlternativeRefs.join(", ") || "none"}`,
+    `- blocking reasons: ${selection.blockingReasons.join(", ") || "none"}`
+  ];
   return lines.join("\n");
 }
 
@@ -257,6 +323,10 @@ export function renderSdlcFdRunAnalysisMarkdown(result: SdlcFdRunAnalysisResult)
     renderPromptAndEvidence(result.edgeTraversal),
     "",
     renderConceptualStageCoverage(result.conceptualStageCoverage),
+    "",
+    renderEdgeAccounting(result.edgeAccounting),
+    "",
+    renderTraversalSelection(result.traversalHopSelection),
     "",
     renderLiveness(result.activeRunLiveness),
     "",

@@ -4,4 +4,5 @@ export * from "./module.js";
 export * from "./boundary_refs.js";
 export * from "./overlays.js";
 export * from "./edge_gain_closure_contracts.js";
+export * from "./edge_accounting.js";
 export * from "./target_carrier_contracts.js";

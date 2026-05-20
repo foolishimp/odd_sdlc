@@ -642,12 +642,14 @@ Stage justification:
 | `derive_release_depth_parity_surface` | parity/depth rollup over code, test, execution, and topology evidence | checks release depth against the selected profile and comparison target |
 | `prepare_release_surface` | release closure projection | closes only after upstream topology, materialization, execution, and parity evidence are admitted |
 
-## Backlog Zoom Function
+## Follow-On Complexity Selection
 
-`Eval_Action.zoom_or_continue` is the future traversal evaluator hook that
-prevents the graph from being fixed too coarsely. It is split out of the active
-staged-graph work and belongs to backlog ticket
-`.ai-workspace/tickets/backlog/T-173-define-evaluator-zoom-admission-from-obligation-output-ratios.md`.
+`Eval_Action.zoom_or_continue` is part of the future traversal evaluator hook
+that prevents the graph from being fixed too coarsely. The follow-on work also
+admits Min(F_P) outcome-class selection for low-complexity products such as
+hello-world. It is split out of the staged-graph work and belongs to active
+ticket
+`.ai-workspace/tickets/active/T-173-realize-complexity-admitted-min-fp-traversal-selection.md`.
 
 After any abstraction stage, the evaluator compares input obligations to output
 entities:
