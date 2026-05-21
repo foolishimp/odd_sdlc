@@ -18,6 +18,8 @@ import {
   type SdlcExecutiveEdgeAccountingAudit
 } from "../graph/edge_accounting.js";
 
+const DEFAULT_MARKDOWN_ROW_LIMIT = 60;
+
 function formatBytes(value: number | null): string {
   if (value === null) {
     return "n/a";
@@ -41,6 +43,58 @@ function formatMs(value: number | null): string {
   return `${(value / 1000).toFixed(1)}s`;
 }
 
+function boundedRows<T>(
+  rows: readonly T[],
+  limit: number = DEFAULT_MARKDOWN_ROW_LIMIT
+): {
+  readonly rows: readonly T[];
+  readonly omitted: number;
+  readonly headCount: number;
+  readonly tailCount: number;
+} {
+  if (rows.length <= limit) {
+    return Object.freeze({
+      rows,
+      omitted: 0,
+      headCount: rows.length,
+      tailCount: 0
+    });
+  }
+  const headCount = Math.floor(limit / 2);
+  const tailCount = limit - headCount;
+  return Object.freeze({
+    rows: Object.freeze([
+      ...rows.slice(0, headCount),
+      ...rows.slice(rows.length - tailCount)
+    ]),
+    omitted: rows.length - limit,
+    headCount,
+    tailCount
+  });
+}
+
+function boundedRowsLine(
+  label: string,
+  bounded: ReturnType<typeof boundedRows>
+): string | null {
+  if (bounded.omitted === 0) {
+    return null;
+  }
+  return `${label}: showing first ${bounded.headCount} and last ${bounded.tailCount}; omitted ${bounded.omitted}.`;
+}
+
+function boundedJoinedText(values: readonly string[], separator: string): string {
+  if (values.length === 0) {
+    return "none";
+  }
+  const bounded = boundedRows(values, 30);
+  const text = bounded.rows.join(separator);
+  if (bounded.omitted === 0) {
+    return text;
+  }
+  return `${text} (${bounded.omitted} omitted)`;
+}
+
 function renderTelemetry(telemetry: SdlcFdRunAnalysisCurrentStateTelemetry): string {
   const lines: string[] = [
     "## Current State Telemetry",
@@ -50,7 +104,7 @@ function renderTelemetry(telemetry: SdlcFdRunAnalysisCurrentStateTelemetry): str
     `- scenario: ${telemetry.scenarioName ?? "n/a"}`,
     `- profile: ${telemetry.profile}`,
     `- operator-run count: ${telemetry.operatorRunCount}`,
-    `- graph edge sequence: ${telemetry.graphEdgeSequence.join(" -> ") || "none"}`,
+    `- graph edge sequence: ${boundedJoinedText(telemetry.graphEdgeSequence, " -> ")}`,
     `- same-edge retries: ${telemetry.sameEdgeRetryCount}`,
     `- repair attempts: ${telemetry.repairAttemptCount}`,
     `- blocked attempts: ${telemetry.blockedAttemptCount}`,
@@ -72,13 +126,18 @@ function renderTelemetry(telemetry: SdlcFdRunAnalysisCurrentStateTelemetry): str
 }
 
 function renderEdgeTraversal(attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]): string {
+  const bounded = boundedRows(attempts);
   const lines: string[] = [
     "## Edge Traversal",
     "",
     "| # | edge | target | class | worker_ms | edge_ms | det_ms | pf | exec | exec_source | pressure | closure | retry | blocking | files | obligations | lineage |",
     "| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |"
   ];
-  for (const attempt of attempts) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const attempt of bounded.rows) {
     lines.push(
       `| ${attempt.attemptOrdinal} | ${attempt.graphVectorRef ?? attempt.graphFunctionName ?? "n/a"} | ${attempt.targetAssetType ?? "n/a"} | ${attempt.traversalClass} | ${formatMs(attempt.workerElapsedMs)} | ${formatMs(attempt.edgeWindowElapsedMs)} | ${formatMs(attempt.deterministicElapsedMs)} | ${attempt.postflightStatus ?? "n/a"} | ${attempt.executionEvidenceStatus ?? "-"} | ${attempt.executionEvidenceSource} | ${attempt.residualPressureTransition}:${attempt.residualPressureRefCount} | ${attempt.closureDisposition ?? "n/a"} | ${attempt.predecessorAttemptRef === null ? "-" : "yes"} | ${attempt.blockingReasonCodes.join(",") || "-"} | ${attempt.productFilesWritten.length + attempt.productFilesReplayed.length} | ${attempt.requirementObligationCount ?? "n/a"} | ${attempt.productLineageCount} |`
     );
@@ -90,13 +149,18 @@ function renderPromptAndEvidence(attempts: readonly SdlcFdRunAnalysisEdgeAttempt
   if (attempts.length === 0) {
     return "## Prompt And Evidence Sources\n\nnone";
   }
+  const bounded = boundedRows(attempts);
   const lines: string[] = [
     "## Prompt And Evidence Sources",
     "",
     "| # | edge | construction brief | brief digest | rendered prompt | prompt policy | execution | command | reports | shards | counts |",
     "| - | - | - | - | - | - | - | - | - | - | - |"
   ];
-  for (const attempt of attempts) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const attempt of bounded.rows) {
     const counts = [
       attempt.executionEvidenceTestsObserved ?? "n/a",
       attempt.executionEvidencePassedCount ?? "n/a",
@@ -216,13 +280,18 @@ function renderRuntimeArtifactGaps(gaps: readonly SdlcFdRunAnalysisRuntimeArtifa
   if (gaps.length === 0) {
     return "## Runtime Artifact Gaps\n\nnone";
   }
+  const bounded = boundedRows(gaps);
   const lines: string[] = [
     "## Runtime Artifact Gaps",
     "",
     "| operator-run | artifact | status | detail |",
     "| - | - | - | - |"
   ];
-  for (const gap of gaps) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const gap of bounded.rows) {
     lines.push(`| ${gap.operatorRunRef} | ${gap.artifact} | ${gap.status} | ${gap.detail ?? "-"} |`);
   }
   return lines.join("\n");
@@ -232,19 +301,25 @@ function renderDiagnostics(diagnostics: readonly SdlcFdRunAnalysisDiagnostic[]):
   if (diagnostics.length === 0) {
     return "## Diagnostics\n\nnone";
   }
+  const bounded = boundedRows(diagnostics);
   const lines: string[] = [
     "## Diagnostics",
     "",
     "| code | severity | edge | detail |",
     "| - | - | - | - |"
   ];
-  for (const diagnostic of diagnostics) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const diagnostic of bounded.rows) {
     lines.push(`| ${diagnostic.code} | ${diagnostic.severity} | ${diagnostic.edgeName ?? "-"} | ${diagnostic.detail} |`);
   }
   return lines.join("\n");
 }
 
 function renderBloatAndSlope(bloat: SdlcFdRunAnalysisBloatAndSlope): string {
+  const bounded = boundedRows(bloat.buckets);
   const lines: string[] = [
     "## Bloat And Slope",
     "",
@@ -260,7 +335,11 @@ function renderBloatAndSlope(bloat: SdlcFdRunAnalysisBloatAndSlope): string {
     "| # | edge | handoff | events | stdout | prompt/ctx |",
     "| - | - | - | - | - | - |"
   ];
-  for (const bucket of bloat.buckets) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const bucket of bounded.rows) {
     lines.push(
       `| ${bucket.edgeIndex} | ${bucket.edgeName} | ${formatBytes(bucket.handoffBytes)} | ${formatBytes(bucket.eventBytes)} | ${formatBytes(bucket.stdoutBytes)} | ${formatBytes(bucket.promptContextBytes)} |`
     );
@@ -272,13 +351,18 @@ function renderRetryForensics(forensics: readonly SdlcFdRunAnalysisRetryForensic
   if (forensics.length === 0) {
     return "## Retry Forensics\n\nnone";
   }
+  const bounded = boundedRows(forensics);
   const lines: string[] = [
     "## Retry Forensics",
     "",
     "| edge | attempt | predecessor | worker_s | blocking | lineage | outside_reads | schema_violations | cause |",
     "| - | - | - | - | - | - | - | - | - |"
   ];
-  for (const forensic of forensics) {
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const forensic of bounded.rows) {
     lines.push(
       `| ${forensic.edgeName} | ${forensic.attemptRef} | ${forensic.predecessorAttemptRef ?? "-"} | ${forensic.workerSecondsBefore ?? "n/a"} | ${forensic.blockingReasonCodes.join(",") || "-"} | ${forensic.lineageStatus} | ${forensic.outsideWorkspaceReadCount} | ${forensic.schemaViolationCount} | ${forensic.likelyCauseClass} |`
     );

@@ -167,13 +167,18 @@ function carriesDownstreamRequirementTransformationSet(input: {
   const authorityConformanceInducedRequirement =
     input.postflight.status === "passed" &&
     input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY;
+  const componentCodeCarriesDownstreamRequirement =
+    input.manifest.productMaterialization.required &&
+    input.manifest.targetAssetType === "component_code_surface" &&
+    requirementCarriedForDownstreamClosure;
   return (
-    !input.manifest.productMaterialization.required &&
     input.assessment.obligationId.startsWith("requirement:") &&
-    (requirementCarriedForDownstreamClosure ||
-      (input.manifest.targetAssetType === "requirement_surface" &&
-        requirementRecordedForFutureClosure) ||
-      authorityConformanceInducedRequirement)
+    (componentCodeCarriesDownstreamRequirement ||
+      (!input.manifest.productMaterialization.required &&
+        (requirementCarriedForDownstreamClosure ||
+          (input.manifest.targetAssetType === "requirement_surface" &&
+            requirementRecordedForFutureClosure) ||
+          authorityConformanceInducedRequirement)))
   );
 }
 

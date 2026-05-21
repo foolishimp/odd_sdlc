@@ -3,13 +3,14 @@ id: T-173
 title: Realize complexity-admitted Min(F_P) traversal selection
 type: feature
 ticket_category: design_reframe
-status: active
-proof_status: hello_world_live_green_data_mapper_pending
+status: completed
+proof_status: closed_data_mapper_test85_live
 priority: high
 owner: odd_sdlc
 build_tenant: typescript
 created_at: 2026-05-19
-updated_at: 2026-05-20
+updated_at: 2026-05-22
+completed_at: 2026-05-22
 triaged_at: 2026-05-19
 goal: select the smallest lawful construction traversal from admitted product complexity instead of fixed graph breadth or prompt discretion
 change_class: requirement_reprice
@@ -19,16 +20,27 @@ governance_scope: STDO Method / odd_sdlc TypeScript traversal evaluation
 source_documents:
   - .ai-workspace/comments/codex/20260517T082211Z_FOLLOWUP_edge_pruning_min_fp_review.md
   - .ai-workspace/comments/codex/20260519T164333AEST_STRATEGY_staged_construction_computation_test35_test82.md
-  - .ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
+  - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
   - specification/requirements/18-typed-construction-algebra.md
   - specification/requirements/16-edge-gain-closure-contract.md
   - specification/requirements/17-target-carrier-contracts.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_EDGE_GAIN_CLOSURE_CONTRACT.md
   - build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_TRAVERSAL_ASSURANCE_INTEGRATION.md
 related_tickets:
-  - .ai-workspace/tickets/active/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
+  - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
+  - .ai-workspace/tickets/backlog/T-174-publish-sdlc-feature-dependency-dag-to-abg-frontier.md
   - .ai-workspace/tickets/completed/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md
   - .ai-workspace/tickets/completed/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md
+accepted_data_mapper_test85_workspace: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl
+accepted_data_mapper_test85_final_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171514045Z_pid276
+accepted_data_mapper_test85_execution_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171129964Z_pid276
+accepted_data_mapper_test85_repair_schedule_surface: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/build_tenants/scala_spark/design/component_repair_schedule_surface.md
+closure_proof_gates:
+  - hello-world accepted as low-complexity framework-smoke proof
+  - Rust hello service accepted as bounded non-JS service proof
+  - data_mapper.test85 accepted as substantive staged traversal proof with final archive 20260521T171514045Z_pid276
+  - data_mapper execution evidence reported passedCount 7 and failedCount 0
+  - stale repair schedule was retired to no_repair_required with empty repairRows
 affected_boundary:
   requirements:
     - specification/requirements/16-edge-gain-closure-contract.md
@@ -68,7 +80,7 @@ evaluation_criteria:
   - proportionality and Min(F_P) decisions are replay-auditable through archived carriers plus typed runtime-event refs
   - public `start --target next` selects the graph variant from admitted proportionality and outcome class; live harnesses may start traversal but must not select each stage
   - deterministic tests cover continue, single-hop, dual-hop, projection, typed-template, bundle, zoom, and block outcomes
-abg_dependency_boundary: serial execution of selected plans is in odd_sdlc scope. True concurrent F_P dispatch is out of scope and requires ABG support for branch work identity, deterministic fan-out/fan-in event merge, retry isolation, resource caps, cancellation, and workspace write isolation.
+abg_dependency_boundary: odd_sdlc owns admitted product/stage complexity, dependency topology, and traversal-selection declarations. ABG 3.8 owns event-sourced saga frontier realization for bounded parallel branch identity, lease selection, deterministic fan-out/fan-in event merge, retry isolation, resource caps, cancellation, and replay-visible branch admission.
 non_closure_conditions:
   - Min(F_P) is implemented as edge deletion without admitted pressure-preservation evidence
   - zoom selection is implemented as prompt text without evaluator-owned consequence
@@ -264,7 +276,8 @@ or parallel partition and execute it serially while preserving replay evidence.
 That is enough to prove traversal selection and Min(F_P) pressure preservation.
 
 ABG support is required only when the runtime dispatches multiple F_P workers at
-the same time. That later support must include:
+the same time. Backlog T-174 owns that SDLC dependency-DAG to ABG frontier
+proof. That support must include:
 
 - branch work identity
 - deterministic fan-out/fan-in event merge
@@ -273,8 +286,9 @@ the same time. That later support must include:
 - cancellation and interruption semantics
 - workspace write isolation and merge admission
 
-Until those exist, parallel-build selection is an admitted plan, not concurrent
-workspace mutation.
+Until T-174 admits those surfaces, T-173 parallel-build selection is an admitted
+plan and deterministic proof shape, not an active live-operator concurrent
+workspace-mutation requirement.
 
 ## Required Runtime Surfaces
 
@@ -360,6 +374,8 @@ Focused deterministic proof:
 
 - `npm run test:t173:complexity-selection`
 - `npm run test:t173:min-fp-pressure-preservation`
+- `npm run test:t173:parallel-hello-world-frontier`
+- `npm run test:t173:saga-frontier-stress-sandbox`
 - `npm run test:t173:zoom-admission`
 - `npm run test:t173`
 
@@ -368,6 +384,9 @@ Integration proof:
 - `npm run test:t173:rust-hello-service-live`
 - hello-world lifecycle selects single-hop or dual-hop and still admits
   execution evidence
+- parallel hello-world lifecycle proves a minimal product with two independent
+  construction branches and one fan-in as deterministic/sandbox evidence; live
+  operator DAG publication is deferred to backlog T-174
 - Rust hello service lifecycle proves bounded service construction, non-JS
   build-tool execution, and HTTP behavior through the same admitted
   proportionality and Min(F_P) decision carriers
@@ -421,6 +440,125 @@ Observed proof:
 - analyzer projection reports `same-edge retries: 0`, `repair attempts: 0`,
   `Traversal Selection: framework_smoke / single_hop`, and `blocking reasons:
   none`
+
+## Accepted Rust Hello Service Live Proof
+
+The accepted bounded-service live proof is:
+
+`build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260521T135652992Z_pid67177/workspace`
+
+The live lane used the Rust service fixture, installed the current SDLC/ABG
+packages, admitted the implementation-design topology, materialized
+`Cargo.toml` and `src/main.rs`, then ran the product through Cargo and verified
+`GET /` with `curl`.
+
+Observed proof:
+
+- traversed overlay edges: `derive_lite_design_adr_surface`,
+  `derive_lite_component_code_surface`
+- design postflight: `passed`
+- component-code postflight: `passed`
+- product files: `build_tenants/hello_world_rust_service/Cargo.toml`,
+  `build_tenants/hello_world_rust_service/src/main.rs`
+- proportionality carrier:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T135951538Z_pid67177/sdlc_decomposition_summary.json`
+  records five upstream obligations, one downstream row,
+  `upstreamPerDownstreamRatio: 5`, `downstreamPerUpstreamRatio: 0.2`, and
+  `admissionDecision: admit`
+- Min(F_P) decision carrier:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T135951538Z_pid67177/sdlc_traversal_hop_selection.json`
+  records `outcomeClass: framework_smoke`, `hopClass: staged`,
+  `zoomAdmission.disposition: continue`, and
+  `pressurePreservation.admissionDecision: admit`
+- dependency traversal selection:
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T135951538Z_pid67177/sdlc_module_dependency_traversal_selection.json`
+  records `selectedMethod: steel_thread` over the single admitted module node
+
+## Accepted Data Mapper Live Proof
+
+The accepted substantive-product proof is:
+
+`/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl`
+
+The resumed live command returned `status: converged` at final archive:
+
+`.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171514045Z_pid276`
+
+Observed proof:
+
+- final graph function: `prepare_release_surface`
+- final next action: `disposition://close`
+- final closure decision: `disposition: close`,
+  `targetCarrierAdmissionStatus: admitted`, and no residual pressure refs
+- staged successor archives closed through component code, test design,
+  component tests, test execution, test qualification, repair schedule,
+  test-run archive, release-depth parity, and release preparation
+- execution evidence:
+  `.ai-workspace/runtime/odd_sdlc/assets/20260521T171129964Z_pid276/test_execution_result_surface.md`
+  records `passedCount: 7` and `failedCount: 0`
+- stale repair pressure was retired in
+  `build_tenants/scala_spark/design/component_repair_schedule_surface.md`
+  with `scheduleStatus: no_repair_required` and `repairRows: []`
+
+This closes the data_mapper counterexample for T-173: the substantive product
+did not inherit the hello-world route, and it reached release closure through
+the staged traversal selected from admitted decomposition and dependency
+evidence.
+
+## Parallel Hello-World Proof Lane
+
+The next RC proof lane adds a minimal product that is still parallelizable:
+
+- product behavior: one Node.js tenant returns `hello world`
+- independent branches: `src/hello.js` owns `hello`; `src/world.js` owns
+  `world`
+- fan-in: `src/index.js` composes the two branch outputs
+- proof: direct Node import of `src/index.js` returns `hello world`
+
+The deterministic synthetic proof is
+`npm run test:t173:parallel-hello-world-frontier`. It builds an admitted SDLC
+module dependency map with two disjoint partitions, asks T-173 to select the
+parallel traversal method, then passes those branch declarations into ABG 3.8's
+evented saga frontier. The accepted behavior is two disjoint branch leases in
+the first batch and the composition branch in the second batch, with replayable
+fan-in derived from emitted branch payload events.
+
+The versioned sandbox proof is
+`npm run test:t174:four-lane-frontier-sandbox`. It installs the existing
+T-174 parallel hello-world fixture into a fresh sandbox, imports the installed
+SDLC and ABG packages, and publishes a four-lane frontier: two dev lanes, two
+test lanes, and one fan-in. SDLC authority is the topology/proportionality
+declaration; ABG authority is evented saga frontier execution. The proof
+therefore records `parallelismControl: abg_branch_execution_policy`,
+`abgPolicyMaxConcurrency: 4`, and `abgSelectedFirstBatchLaneCount: 4` rather
+than claiming SDLC schedules the branches. The accepted projection also records
+`selectedMethod: parallel`, `parallelGroupCount: 4`, `batchSizes: [4, 1]`,
+`maxActive: 4`, `completedCount: 5`, `failedCount: 0`, and the observed
+`oddSdlcVersion` and `abgVersion` from the installed packages.
+
+The sandbox proof is `npm run test:t174`. It installs a fresh workspace from
+`build_tenants/typescript/test_env/fixtures/t174_parallel_hello_world_js`,
+bootstraps requirements, and verifies that the live lane has a corresponding
+fixture and opt-in live descriptor. This is supporting evidence only while
+T-174 is backlog.
+
+The live SDLC/ABG integration proof is split to
+`.ai-workspace/tickets/backlog/T-174-publish-sdlc-feature-dependency-dag-to-abg-frontier.md`.
+That ticket owns the stricter proof that odd_sdlc translates admitted ledger
+rows into `{ start_nodes[], DAG }`, records ABG-owned branch leases, and proves
+four live branches plus fan-in without the harness selecting each stage.
+
+## Saga Frontier Stress Sandbox
+
+The RC stress proof is `npm run test:t173:saga-frontier-stress-sandbox`. It
+installs a fresh SDLC sandbox from
+`build_tenants/typescript/test_env/fixtures/t173_saga_frontier_stress`, runs the
+bootstrap traversal, then executes `tools/run_t141_saga_frontier_stress.mjs`
+inside the installed workspace. The proof script imports the installed SDLC and
+ABG packages, publishes a 65-node SDLC module dependency map, selects parallel
+traversal, and reproduces ABG T-141's 50 root, 10 reducer, 5 leaf event-sourced
+saga frontier with batches `[50, 10, 5]`, 65 admitted payloads, 65 released
+leases, and no failed branches.
 
 ## Closure Test
 

@@ -11,9 +11,12 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
+  readSync,
   readFileSync,
   statSync,
   writeFileSync
@@ -414,7 +417,6 @@ function installedOperatorOwnsEvaluationOutput(targetAssetType: string): boolean
     targetAssetType === "test_execution_surface" ||
     targetAssetType === "test_execution_result_surface" ||
     targetAssetType === "component_test_qualification_surface" ||
-    targetAssetType === "component_repair_schedule_surface" ||
     targetAssetType === "test_run_archive_surface" ||
     targetAssetType === "release_depth_parity_surface"
   );
@@ -3028,6 +3030,13 @@ function tenantStackBuildConfigSeedsFromValues(input: {
       );
       continue;
     }
+    const prior = seeds.get(seed.path);
+    if (
+      prior?.stackSection === "implementation" &&
+      seed.stackSection === "testing"
+    ) {
+      continue;
+    }
     seeds.set(seed.path, seed);
   }
   return Object.freeze({
@@ -3074,6 +3083,13 @@ function tenantStackAuthorityFor(
       reasonRefs.add(reasonRef);
     }
     for (const seed of result.seeds) {
+      const prior = buildConfigSeeds.get(seed.path);
+      if (
+        prior?.stackSection === "implementation" &&
+        seed.stackSection === "testing"
+      ) {
+        continue;
+      }
       buildConfigSeeds.set(seed.path, seed);
     }
   }
@@ -3116,6 +3132,13 @@ function tenantStackTargetContractsFromSeeds(input: {
 }): readonly SdlcProductMaterializationAuthorityTarget[] {
   const targets = new Map<string, SdlcProductMaterializationAuthorityTarget>();
   for (const seed of input.seeds) {
+    const prior = targets.get(seed.path);
+    if (
+      prior?.policyRef?.includes("/tenant-stack/implementation/") &&
+      seed.stackSection === "testing"
+    ) {
+      continue;
+    }
     const rolePolicy = materializationRolePolicyForTarget({
       manifest: input.manifest,
       seed
@@ -6254,7 +6277,7 @@ function transformAxiomsForWorker(): readonly string[] {
     "Do not write ledgers, runtime events, closure decisions, evaluator projections, or framework result carriers.",
     "Do not run odd_sdlc, abiogenesis, genesis, start, gaps, analyze-run, install, traversal, or resume commands; the framework controls traversal after this worker exits.",
     "Do not spawn another worker or resume traversal; this process is the worker.",
-    "Use worker_construction_brief.json as the single prompt-source carrier; worker_brief, worker_invocation_package, traversal_intent_package, and handoff_manifest are derived or forensic projections only.",
+    "worker_construction_brief.json is the single prompt-source carrier. Archive package files are replay/audit projections for evaluator and analyzer surfaces.",
     "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_construction_brief.json carries the selected target contract and derived projections for this traversal.",
     "Read boundary: use only relative paths under the current workspace; do not glob, read, cite, or copy sibling sandboxes, historical test_runs, home memory, or absolute paths outside the active workspace.",
     "Temporary execution logs are workspace evidence: do not create, read, or write outside-workspace temporary files such as /tmp; write transient logs only under allowed write roots.",
@@ -6291,6 +6314,7 @@ function compactComponentDepthDirective(
         envelopeDirective,
         componentRealizationRowsDirective,
         "For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier.",
+        "Do not emit payload.componentRepairSchedule on component_code_surface. If Current evaluated gaps mention componentRepairSchedule on this target, remove the stale optional schedule from the component-code carrier; repair scheduling belongs only to component_repair_schedule_surface and release_depth_parity_surface.",
         "Materialize source only against the admitted implementation decomposition summary and module dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
         "Preserve source component boundaries from the composite implementation design authority.",
         "On re-entry with Current evaluated gaps, make the listed blocker the first materialization target: inspect the cited product file and its nearest dependency authority, perform the minimal source repair, then update the component_depth_register evidence for that repaired row.",
@@ -6310,7 +6334,14 @@ function compactComponentDepthDirective(
     case "component_test_qualification_surface":
       return "Qualification edge worker role: read admitted component-test and test-execution evidence and return bounded observations. The installed operator publishes the component_test_qualification_surface carrier.";
     case "component_repair_schedule_surface":
-      return "Repair-schedule edge worker role: read admitted component execution failure evidence and return bounded observations. The installed operator publishes the component_repair_schedule_surface carrier.";
+      return [
+        envelopeDirective,
+        "Emit payload.componentRepairSchedule with kind=sdlc_component_repair_schedule, registerVersion=ts-component-depth-v1, scheduleStatus, repairRows, and evidenceRefs.",
+        "Each repair row must carry kind=sdlc_component_repair_schedule_row, scheduleId, failureId, repairTarget, lawfulReentryPoint, attributionConfidence, testcaseIds, componentIds, requirementIds, sourceRefs, testRefs, and evidenceRefs.",
+        "Use admitted component test qualification rows, component execution failure rows, test execution evidence, and component realization evidence to bind each repair row to the smallest owned component/test/source subsurface.",
+        "Set attributionConfidence=high only when the row binds concrete failed testcaseIds, componentIds, requirementIds, sourceRefs or testRefs, and execution evidence refs. If that evidence is absent or contradictory, use scheduleStatus=triage_gap with evidenceRefs that name the missing authority instead of emitting medium-confidence repair rows.",
+        "Do not infer ecosystem-specific root cause as framework law. The schedule owns generic repair depth: failed executable obligation -> component/test/source ownership -> bounded repair target -> evidence refs."
+      ].join(" ");
     case "release_depth_parity_surface":
       return "Release-depth edge worker role: read admitted realization, test, repair, archive, and execution evidence and return bounded observations. The installed operator publishes the release_depth_parity_surface carrier.";
     default:
@@ -6328,8 +6359,10 @@ function compactTestDesignDirective(
     ? "Trivial product profile is active: emit the degenerate test topology only. Produce one test module row, one test component topology row, one testcase authority row, one execution schedule row, and one shard for the declared test command. Do not fan out runtime, source, assertion, or execution-evidence facts into separate test-owned obligations."
     : null;
   return [
+    `Materialize the target test-design ADR at ${workerFacingPath(manifest, manifest.outputFile)} with a bounded file-write or editor operation. Use the write/edit operation as the drafting surface; assistant-visible output is only compact progress.`,
     "Use worker_construction_brief.targetCarrierProjection construction refs and the row fields listed here as the authoritative test-design carrier shape; do not derive row field names from prose tables.",
     "Emit a fenced `json test_design_register` carrier with `kind:\"sdlc_test_design_register\"`, `registerVersion:\"ts-test-design-v1\"`, and `targetAssetType:\"test_design_surface\"`.",
+    "The fenced `sdlc_test_design_register` top-level field set is closed to the register fields named here: target-carrier envelope fields such as summary and evidenceRefs are outside the fenced register unless the top-level object is a selected target-carrier envelope with payload.kind=sdlc_test_design_register.",
     "Use one composite test design carrier with designConsumptionRows, uatTestcaseRows, testcaseAuthorityRows, testStackProfileRows, testModuleRows, testComponentTopologyRows, testDataBindings, expectedResultBindings, uatIntegrationBindings, and testExecutionScheduleRows.",
     "Bound the carrier for first-pass construction: do not duplicate every scenario row, every component row, or full source/design text. Preserve breadth by module and requirement family, carry sourceDesignObligationRefs/evidenceRefs to the complete upstream surfaces, and keep row counts small enough to fit in bounded write/edit payloads.",
     "Prefer one representative executable unit/integration case per module family plus UAT-to-integration bindings over a giant exhaustive register. Later graph edges and residual pressure may expand coverage; this edge must create the typed test-design authority without exhausting worker output.",
@@ -6382,6 +6415,7 @@ function compactWorkspaceSpecSurfaceDirective(
     "Use worker_construction_brief.targetCarrierProjection construction refs to organize content rows and preserve stable row refs.",
     "Current-workspace authority refs and the selected construction template are sufficient when this output is absent; derive the surface from those refs without mining prior generated examples.",
     "The construction template is GTL typed construction shape for F_P clarity; it is not an assurance gate and does not close product meaning.",
+    "Materialize the target file as the working surface after reading the listed authority refs. Use a bounded file-write command or editor operation for the Markdown surface, keep assistant-visible narration to compact progress notes, keep the Markdown artifact under 250 lines, and prefer compact tables with stable refs over copied authority text.",
     manifest.targetAssetType === "requirement_surface"
       ? "For requirement_surface, derive requirement rows from imported authority and current intent/product/goal pressure."
       : manifest.targetAssetType === "uat_testcases_surface"
@@ -6506,7 +6540,14 @@ function outcomeDirectivesForWorker(
           "The installed operator derives and writes the selected evaluation artifact after this process exits.",
           "Return after any allowed repair checks; do not fill target-carrier payload, summary, or evidence fields for this framework-owned artifact."
         ]
-      : [`Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`]),
+      : [
+          `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
+          ...(manifest.outputFile.toLowerCase().endsWith(".md")
+            ? [
+                "Markdown output artifact: materialize the target file with a bounded file-write command or editor operation. After reading the listed authority refs, make the file-write operation the next worker action. Keep assistant-visible narration to compact progress notes, and use compact tables/sections with stable refs instead of copied authority text."
+              ]
+            : [])
+        ]),
     `Do not write framework result report: ${workerFacingPath(manifest, manifest.reportFile)}.`,
     `Target carrier contract: ${manifest.targetCarrierProjection.targetCarrierContractRef}.`,
     `Target carrier digest: ${manifest.targetCarrierProjection.targetCarrierContractDigest}.`,
@@ -6672,7 +6713,7 @@ function outcomeDirectivesForWorker(
           ? "For framework-smoke Min(F_P) component_code_surface, materialize the declared source and test product files under the selected output root, run the declared test contract, and include execution evidence. Keep componentRealizationRows source-role only; test files are materialized execution-proof files for the trivial graph variant, not separate component-code topology rows."
           : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
           ? "For lite component_code_surface, materialize only the bounded implementation files declared by the lite composite implementation design authority. Do not expand into release or test-execution surfaces."
-          : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, or execution evidence on this edge."
+          : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, repair schedules, or execution evidence on this edge."
       );
       if (
         manifest.graphFunctionName !== FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
@@ -6693,6 +6734,7 @@ function outcomeDirectivesForWorker(
     if (manifest.targetAssetType === "component_test_surface") {
       directives.push(
         "For component_test_surface, materialize developer test files for each declared test class/file and record Component Test Register evidence.",
+        "On component_test_surface re-entry after partial materialization, first inventory existing framework-discoverable test files under the selected output root, then complete missing declared test classes and the component_test_surface carrier before broad source review.",
         "When declared product file targets are empty, derive test product file targets from admitted composite test design and materialize them under selected output root; for node/javascript use test/<testClassId>.test.js unless admitted design names another tenant-root test path, and for other stacks choose a framework-discoverable test path under selected output root.",
         "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
         "Generated test files are authored for the matching declared shard workingDirectory; the installed operator executes the declared shard command after this transform returns.",
@@ -6949,17 +6991,9 @@ export function constructWorkerBrief(input: {
 
 export function constructWorkerConstructionBrief(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
-  readonly manifestPath: string;
-  readonly workerInvocationPackagePath: string;
-  readonly workerBriefPath: string;
-  readonly traversalIntentPath: string;
-  readonly conformedProjectPath: string;
   readonly constructionBriefPath: string;
   readonly invocationPackage: SdlcWorkerInvocationPackage;
-  readonly workerBrief: SdlcWorkerBrief;
 }): SdlcWorkerConstructionBrief {
-  const manifestDigest = sha256Text(stableOperatorJson(input.manifest));
-  const workerBriefDigest = sha256Text(stableOperatorJson(input.workerBrief));
   const authorityRefs =
     input.manifest.traversalObligationContext.authorityRefs ??
     input.manifest.traversalIntentPackage.authorityRefs;
@@ -6974,46 +7008,6 @@ export function constructWorkerConstructionBrief(input: {
       digest: "<self>",
       disposition: "canonical" as const,
       role: "single prompt source carrier"
-    }),
-    Object.freeze({
-      kind: "sdlc_worker_construction_brief_package_disposition" as const,
-      packageName: "worker_invocation_package.json",
-      path: workerFacingPath(input.manifest, input.workerInvocationPackagePath),
-      digest: input.invocationPackage.packageDigest,
-      disposition: "derive" as const,
-      role: "structured invocation projection"
-    }),
-    Object.freeze({
-      kind: "sdlc_worker_construction_brief_package_disposition" as const,
-      packageName: "worker_brief.json",
-      path: workerFacingPath(input.manifest, input.workerBriefPath),
-      digest: workerBriefDigest,
-      disposition: "derive" as const,
-      role: "compact worker-facing projection"
-    }),
-    Object.freeze({
-      kind: "sdlc_worker_construction_brief_package_disposition" as const,
-      packageName: "traversal_intent_package.json",
-      path: workerFacingPath(input.manifest, input.traversalIntentPath),
-      digest: input.manifest.traversalIntentPackage.packageDigest,
-      disposition: "derive" as const,
-      role: "traversal pressure and obligation projection"
-    }),
-    Object.freeze({
-      kind: "sdlc_worker_construction_brief_package_disposition" as const,
-      packageName: "handoff_manifest.json",
-      path: workerFacingPath(input.manifest, input.manifestPath),
-      digest: manifestDigest,
-      disposition: "forensic" as const,
-      role: "operator archive manifest"
-    }),
-    Object.freeze({
-      kind: "sdlc_worker_construction_brief_package_disposition" as const,
-      packageName: "conformed_project.json",
-      path: workerFacingPath(input.manifest, input.conformedProjectPath),
-      digest: sha256Text(stableOperatorJson(input.manifest.conformedProject)),
-      disposition: "derive" as const,
-      role: "workspace conformance projection"
     })
   ]);
   const base = Object.freeze({
@@ -7517,7 +7511,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
-    "- Treat archived package files and manifests as derived or forensic projections, not worker input, unless a current evaluated gap explicitly cites one.",
+    "- Archive package files and manifests are replay/audit projections. Current evaluated gaps cite any diagnostic archive file that this transform needs.",
     "- Apply the transform axioms projected in this launch contract and construction brief.",
     "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; worker_construction_brief.json carries the selected target contract and derived projections for this traversal.",
     "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
@@ -7575,6 +7569,7 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   const promptPath = join(manifest.archiveRoot, "worker_prompt.md");
   const conformedProjectPath = join(manifest.archiveRoot, "conformed_project.json");
   const traversalIntentPath = join(manifest.archiveRoot, "traversal_intent_package.json");
+  const handoffReplayIndexPathForRun = handoffReplayIndexPath(manifest.archiveRoot);
   const invocationPackage = constructWorkerInvocationPackage({
     manifest,
     manifestPath,
@@ -7590,16 +7585,15 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
   });
   const constructionBrief = constructWorkerConstructionBrief({
     manifest,
-    manifestPath,
-    workerInvocationPackagePath: invocationPackagePath,
-    workerBriefPath,
-    traversalIntentPath,
-    conformedProjectPath,
     constructionBriefPath,
-    invocationPackage,
-    workerBrief
+    invocationPackage
   });
   writeFileSync(manifestPath, stableOperatorJson(manifest), "utf8");
+  writeFileSync(
+    handoffReplayIndexPathForRun,
+    stableOperatorJson(handoffReplayIndexForManifest(manifest)),
+    "utf8"
+  );
   writeFileSync(invocationPackagePath, stableOperatorJson(invocationPackage), "utf8");
   writeFileSync(workerBriefPath, stableOperatorJson(workerBrief), "utf8");
   writeFileSync(
@@ -9296,7 +9290,7 @@ function evaluateImplementationDesignProducerAuthority(input: {
   if (admission.status !== "admitted" || admission.register === null) {
     pushStagedTopologyBlockingReason({
       blockingReasonCarriers: input.blockingReasonCarriers,
-      code: "staged_decomposition_rejected",
+      code: "staged_authority_admission_invalid",
       detail:
         admission.blockingReasons.length === 0
           ? "implementation_design_surface_admission_rejected"
@@ -9355,7 +9349,7 @@ function evaluateTestDesignProducerAuthority(input: {
   if (admission.status !== "admitted" || admission.register === null) {
     pushStagedTopologyBlockingReason({
       blockingReasonCarriers: input.blockingReasonCarriers,
-      code: "staged_decomposition_rejected",
+      code: "staged_authority_admission_invalid",
       detail:
         admission.blockingReasons.length === 0
           ? "test_design_surface_admission_rejected"
@@ -10491,15 +10485,6 @@ function failureRowsForComponentTests(input: {
   const evidenceRefs =
     input.executionEvidence?.reportRefs ??
     Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
-  const sharedBuildConfigurationFailure = sharedSbtBuildConfigurationFailureRow({
-    manifest: input.manifest,
-    componentTestRows: input.componentTestRows,
-    executionEvidence: input.executionEvidence,
-    evidenceRefs
-  });
-  if (sharedBuildConfigurationFailure !== null) {
-    return Object.freeze([sharedBuildConfigurationFailure]);
-  }
   const failureKind = failureKindForExecutionEvidence(input.executionEvidence);
   const rows =
     input.componentTestRows.length > 0
@@ -10549,108 +10534,57 @@ function failureRowsForComponentTests(input: {
   );
 }
 
-function fileTextForEvidenceRef(ref: string): string | null {
-  const filePath = filePathForEvidenceRef({ workspaceRoot: "", ref });
-  if (filePath === null || !existsSync(filePath) || !statSync(filePath).isFile()) {
-    return null;
-  }
-  try {
-    return readFileSync(filePath, "utf8");
-  } catch {
-    return null;
-  }
-}
-
-function sharedSbtBuildConfigurationFailureRow(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
-  readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
-  readonly evidenceRefs: readonly string[];
-}): SdlcComponentExecutionFailureRow | null {
-  const executionEvidence = input.executionEvidence;
-  if (
-    executionEvidence === null ||
-    executionEvidence.status !== "failed" ||
-    executionEvidence.shardEvidence.length === 0 ||
-    !executionEvidence.shardEvidence.every((shard) => shard.status === "failed")
-  ) {
-    return null;
-  }
-  const stderrTexts = executionEvidence.reportRefs
-    .filter((ref) => ref.endsWith(".stderr.log"))
-    .map(fileTextForEvidenceRef)
-    .filter((text): text is string => text !== null && text.trim().length > 0);
-  if (stderrTexts.length === 0) {
-    return null;
-  }
-  const buildSbtErrorRefs = uniqueSorted(
-    stderrTexts.flatMap((text) =>
-      [...text.matchAll(/(^|\n)(?<file>\/[^\n:]+\/build\.sbt):\d+:\s+error:/gu)]
-        .map((match) => match.groups?.["file"] ?? "")
-        .filter((file) => file.length > 0)
-        .map((file) => pathToFileURL(file).href)
-    )
-  );
-  const allObservedErrorsAreBuildDefinitionErrors = stderrTexts.every((text) =>
-    /\/build\.sbt:\d+:\s+error:/u.test(text)
-  );
-  if (
-    buildSbtErrorRefs.length === 0 ||
-    !allObservedErrorsAreBuildDefinitionErrors
-  ) {
-    return null;
-  }
-  const rows = input.componentTestRows;
-  return Object.freeze({
-    kind: "sdlc_component_execution_failure_row" as const,
-    failureId: "failure:sbt-build-definition:all-shards",
-    shardId: "all-shards",
-    moduleName: input.manifest.productMaterialization.activeTenant,
-    testClassId: "sbt-build-definition",
-    testcaseIds: uniqueSorted(rows.flatMap((row) => row.testcaseIds)),
-    componentIds: uniqueSorted(rows.flatMap((row) => row.componentIds)),
-    requirementIds: uniqueSorted(rows.flatMap((row) => row.requirementIds)),
-    failureKind: "test_compile_error" as const,
-    repairTarget: "component_code" as const,
-    lawfulReentryPoint: "repair_worker_output",
-    attributionConfidence: "high" as const,
-    sourceRefs: buildSbtErrorRefs,
-    testRefs: uniqueSorted(rows.map((row) => testRefForRow(input.manifest, row))),
-    evidenceRefs: uniqueSorted([...input.evidenceRefs, ...buildSbtErrorRefs])
-  });
-}
-
 function qualificationRowsForComponentTests(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly componentTestRows: readonly SdlcComponentTestRealizationRow[];
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
 }): readonly SdlcComponentTestQualificationRow[] {
-  const status: SdlcComponentTestQualificationRow["status"] =
-    input.executionEvidence === null
+  function statusForEvidence(
+    evidence: SdlcWorkerExecutionEvidence | SdlcWorkerExecutionShardEvidence | null
+  ): SdlcComponentTestQualificationRow["status"] {
+    return evidence === null
       ? "unproven"
-      : input.executionEvidence.status === "pending"
+      : evidence.status === "pending"
         ? "pending"
-        : input.executionEvidence.status === "failed"
+        : evidence.status === "failed"
           ? "failed"
-          : (input.executionEvidence.failedCount ?? 0) === 0 &&
-              (input.executionEvidence.testsObserved ?? 0) > 0
+          : (evidence.failedCount ?? 0) === 0 &&
+              (evidence.testsObserved ?? 0) > 0
             ? "passed"
             : "blocked";
-  const evidenceRefs =
-    input.executionEvidence?.reportRefs ??
-    Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
+  }
+  function evidenceForRow(
+    row: SdlcComponentTestRealizationRow,
+    index: number
+  ): SdlcWorkerExecutionEvidence | SdlcWorkerExecutionShardEvidence | null {
+    if (input.executionEvidence === null) {
+      return null;
+    }
+    return (
+      input.executionEvidence.shardEvidence.find(
+        (shard) => row.shardId !== null && shard.shardId === row.shardId
+      ) ??
+      input.executionEvidence.shardEvidence[index] ??
+      input.executionEvidence
+    );
+  }
   return Object.freeze(
-    input.componentTestRows.map((row) =>
-      Object.freeze({
+    input.componentTestRows.map((row, index) => {
+      const evidence = evidenceForRow(row, index);
+      const evidenceRefs =
+        evidence?.reportRefs ??
+        input.executionEvidence?.reportRefs ??
+        Object.freeze([pathToFileURL(input.manifest.outputFile).href]);
+      return Object.freeze({
         kind: "sdlc_component_test_qualification_row" as const,
         testClassId: row.testClassId,
         testcaseIds: row.testcaseIds,
         componentIds: row.componentIds,
         requirementIds: row.requirementIds,
-        status,
+        status: statusForEvidence(evidence),
         evidenceRefs
-      })
-    )
+      });
+    })
   );
 }
 
@@ -11308,11 +11242,23 @@ function writeInstalledOperatorComponentEvaluation(
       manifest,
       targetAssetType: "component_repair_schedule_surface"
     });
-    const schedule = repairRegister?.componentRepairSchedule ?? null;
+    const executionEvidence = latestAdmittedExecutionEvidence(manifest);
+    const executionEvidencePassed =
+      executionEvidence?.status === "succeeded" &&
+      (executionEvidence.failedCount ?? 0) === 0 &&
+      (executionEvidence.testsObserved ?? 0) > 0;
+    const schedule = executionEvidencePassed
+      ? repairScheduleForFailures(
+          Object.freeze([]),
+          executionEvidence?.reportRefs ?? Object.freeze([])
+        )
+      : repairRegister?.componentRepairSchedule ?? null;
     const blockingReasons =
       schedule === null
         ? Object.freeze(["component_repair_schedule_missing"])
-        : schedule.scheduleStatus === "repair_required" ||
+        : executionEvidencePassed
+          ? Object.freeze([])
+          : schedule.scheduleStatus === "repair_required" ||
             schedule.scheduleStatus === "triage_gap" ||
             schedule.repairRows.length > 0
           ? Object.freeze(schedule.repairRows.map((row) => row.failureId))
@@ -11332,6 +11278,7 @@ function writeInstalledOperatorComponentEvaluation(
           blockingReasons,
           evidenceRefs: uniqueSorted([
             artifactRef,
+            ...(executionEvidence?.reportRefs ?? []),
             ...(schedule?.evidenceRefs ?? [])
           ])
         })
@@ -11704,6 +11651,15 @@ function requirementObligationBelongsToDownstreamSurface(input: {
     input.obligation.obligationKind !== "requirement"
   ) {
     return false;
+  }
+  const requirementText = [
+    input.obligation.summary,
+    ...input.obligation.payload.sourceSnippets
+  ]
+    .join("\n")
+    .toLowerCase();
+  if (/\b(?:test|uat|acceptance|execution\s+proof|smoke\s+proof)\b/u.test(requirementText)) {
+    return true;
   }
   return input.obligation.payload.sourceRefs.some((ref) => {
     const lower = ref.toLowerCase();
@@ -12114,31 +12070,168 @@ function priorMaterializationContractMatchesCurrent(input: {
   }
 }
 
+const HANDOFF_REPLAY_INDEX_FILE = "handoff_replay_index.json";
+const HANDOFF_REPLAY_INDEX_VERSION = "ts-handoff-replay-index-v1";
+const HANDOFF_REPLAY_MANIFEST_PREFIX_BYTES = 128 * 1024;
+
+interface SdlcHandoffReplayIndex {
+  readonly kind: "sdlc_handoff_replay_index";
+  readonly indexVersion: typeof HANDOFF_REPLAY_INDEX_VERSION;
+  readonly workspaceRoot: string;
+  readonly graphFunctionName: string;
+  readonly edgeName: string;
+  readonly vectorIndex: number;
+  readonly targetAssetType: string;
+}
+
+function handoffReplayIndexPath(archiveRoot: string): string {
+  return join(archiveRoot, HANDOFF_REPLAY_INDEX_FILE);
+}
+
+function handoffReplayIndexForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcHandoffReplayIndex {
+  return Object.freeze({
+    kind: "sdlc_handoff_replay_index" as const,
+    indexVersion: HANDOFF_REPLAY_INDEX_VERSION,
+    workspaceRoot: manifest.workspaceRoot,
+    graphFunctionName: manifest.graphFunctionName,
+    edgeName: manifest.edgeName,
+    vectorIndex: manifest.vectorIndex,
+    targetAssetType: manifest.targetAssetType
+  });
+}
+
+function readFilePrefix(filePath: string, maxBytes: number): string {
+  const fd = openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(maxBytes);
+    const bytesRead = readSync(fd, buffer, 0, maxBytes, 0);
+    return buffer.subarray(0, bytesRead).toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function topLevelJsonString(prefix: string, field: string): string | null {
+  const match = new RegExp(`"${field}"\\s*:\\s*"([^"]*)"`, "u").exec(prefix);
+  return match?.[1] ?? null;
+}
+
+function topLevelJsonNumber(prefix: string, field: string): number | null {
+  const match = new RegExp(`"${field}"\\s*:\\s*(-?\\d+)`, "u").exec(prefix);
+  if (match === null) {
+    return null;
+  }
+  const raw = match[1];
+  if (raw === undefined) {
+    return null;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function readHandoffReplayIndexFromManifestPrefix(
+  manifestFile: string
+): SdlcHandoffReplayIndex | null {
+  if (!existsSync(manifestFile) || !statSync(manifestFile).isFile()) {
+    return null;
+  }
+  const prefix = readFilePrefix(
+    manifestFile,
+    HANDOFF_REPLAY_MANIFEST_PREFIX_BYTES
+  );
+  if (topLevelJsonString(prefix, "kind") !== "sdlc_worker_handoff_manifest") {
+    return null;
+  }
+  const workspaceRoot = topLevelJsonString(prefix, "workspaceRoot");
+  const graphFunctionName = topLevelJsonString(prefix, "graphFunctionName");
+  const edgeName = topLevelJsonString(prefix, "edgeName");
+  const vectorIndex = topLevelJsonNumber(prefix, "vectorIndex");
+  const targetAssetType = topLevelJsonString(prefix, "targetAssetType");
+  if (
+    workspaceRoot === null ||
+    graphFunctionName === null ||
+    edgeName === null ||
+    vectorIndex === null ||
+    targetAssetType === null
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    kind: "sdlc_handoff_replay_index" as const,
+    indexVersion: HANDOFF_REPLAY_INDEX_VERSION,
+    workspaceRoot,
+    graphFunctionName,
+    edgeName,
+    vectorIndex,
+    targetAssetType
+  });
+}
+
+function readHandoffReplayIndex(
+  archiveRoot: string
+): SdlcHandoffReplayIndex | null {
+  const indexPath = handoffReplayIndexPath(archiveRoot);
+  if (existsSync(indexPath) && statSync(indexPath).isFile()) {
+    try {
+      const record = parseOpenRecord(
+        JSON.parse(readFileSync(indexPath, "utf8")),
+        "productMaterializationReplay.handoffReplayIndex"
+      );
+      if (
+        record["kind"] === "sdlc_handoff_replay_index" &&
+        record["indexVersion"] === HANDOFF_REPLAY_INDEX_VERSION
+      ) {
+        return Object.freeze({
+          kind: "sdlc_handoff_replay_index" as const,
+          indexVersion: HANDOFF_REPLAY_INDEX_VERSION,
+          workspaceRoot: parseNonEmptyString(
+            record["workspaceRoot"],
+            "productMaterializationReplay.handoffReplayIndex.workspaceRoot"
+          ),
+          graphFunctionName: parseNonEmptyString(
+            record["graphFunctionName"],
+            "productMaterializationReplay.handoffReplayIndex.graphFunctionName"
+          ),
+          edgeName: parseNonEmptyString(
+            record["edgeName"],
+            "productMaterializationReplay.handoffReplayIndex.edgeName"
+          ),
+          vectorIndex: parseNonNegativeInteger(
+            record["vectorIndex"],
+            "productMaterializationReplay.handoffReplayIndex.vectorIndex"
+          ),
+          targetAssetType: parseNonEmptyString(
+            record["targetAssetType"],
+            "productMaterializationReplay.handoffReplayIndex.targetAssetType"
+          )
+        });
+      }
+    } catch {
+      return null;
+    }
+  }
+  return readHandoffReplayIndexFromManifestPrefix(
+    join(archiveRoot, "handoff_manifest.json")
+  );
+}
+
 function priorHandoffManifestMatchesCurrent(input: {
   readonly archiveRoot: string;
   readonly currentManifest: SdlcWorkerHandoffManifest;
 }): boolean {
-  try {
-    const handoffManifest = parseOpenRecord(
-      JSON.parse(readFileSync(join(input.archiveRoot, "handoff_manifest.json"), "utf8")),
-      "productMaterializationReplay.handoffManifest"
-    );
-    return (
-      resolve(
-        parseNonEmptyString(
-          handoffManifest["workspaceRoot"],
-          "productMaterializationReplay.handoffManifest.workspaceRoot"
-        )
-      ) === resolve(input.currentManifest.workspaceRoot) &&
-      handoffManifest["graphFunctionName"] ===
-        input.currentManifest.graphFunctionName &&
-      handoffManifest["edgeName"] === input.currentManifest.edgeName &&
-      handoffManifest["vectorIndex"] === input.currentManifest.vectorIndex &&
-      handoffManifest["targetAssetType"] === input.currentManifest.targetAssetType
-    );
-  } catch {
+  const replayIndex = readHandoffReplayIndex(input.archiveRoot);
+  if (replayIndex === null) {
     return false;
   }
+  return (
+    resolve(replayIndex.workspaceRoot) === resolve(input.currentManifest.workspaceRoot) &&
+    replayIndex.graphFunctionName === input.currentManifest.graphFunctionName &&
+    replayIndex.edgeName === input.currentManifest.edgeName &&
+    replayIndex.vectorIndex === input.currentManifest.vectorIndex &&
+    replayIndex.targetAssetType === input.currentManifest.targetAssetType
+  );
 }
 
 function materializationReplayIsNeeded(input: {

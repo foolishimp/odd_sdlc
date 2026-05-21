@@ -32,7 +32,7 @@ function sourceWithoutLineComments(content: string): string {
 function hasSourceConstantSuccess(content: string): boolean {
   const normalized = sourceWithoutLineComments(content).replace(/\s+/g, " ");
   return (
-    /\bdef\s+[A-Za-z_$][\w$]*[^=]*=\s*(?:\{\s*)?(?:return\s+)?true\s*;?\s*\}?/.test(
+    /\bdef\s+[A-Za-z_$][\w$]*(?:\s*\[[^\]]*\])?\s*(?:\([^)]*\)\s*)*(?::\s*[^=]+)?=\s*(?:\{\s*)?(?:return\s+)?true\s*;?\s*\}?/.test(
       normalized
     ) ||
     /\bfunction\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{\s*return\s+true\s*;?\s*\}/.test(

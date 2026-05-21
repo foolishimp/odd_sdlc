@@ -292,8 +292,8 @@ const FULL_TRAVERSAL_EDGE_ACCOUNTING_SEEDS = Object.freeze([
     ownedPressureRefs: ["pressure://component-failure/repair-schedule"],
     authorityOutputRefs: ["surface://component-repair-schedule"],
     closureEvidenceRefs: ["evidence://repair-schedule-admission"],
-    workerDispatchAllowed: false,
-    rationale: "Owns repair schedule only when admitted failure pressure exists."
+    workerDispatchAllowed: true,
+    rationale: "Owns F_P repair scheduling depth only when admitted failure pressure exists."
   },
   {
     edgeName: "derive_test_run_archive_surface",

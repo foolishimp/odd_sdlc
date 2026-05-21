@@ -683,6 +683,283 @@ test("T-172 implementation-design evaluator derives Rust tenant topology from ge
   }
 });
 
+test("T-172 implementation-design evaluator does not infer components from lineage prose columns", () => {
+  const workspaceRoot = makeWorkspace({ trivialProduct: true });
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-rust-lineage-prose-does-not-split-components"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const outputContent = [
+      "# ADR-002 Implementation Design Surface",
+      "",
+      "## Decision",
+      "",
+      "Use one implementation module and one implementation component: `hello_world_rust_service.binary`.",
+      "",
+      "## Module Boundary",
+      "",
+      "| Module | Component | Boundary | Requirement refs |",
+      "| --- | --- | --- | --- |",
+      "| `hello_world_rust_service` | `hello_world_rust_service.binary` | Owns the complete one-binary product boundary. | `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_001`; `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_002`; `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_003`; `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_004`; `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_005` |",
+      "",
+      "## Product File Targets",
+      "",
+      "| File target | Role | Owning component | Source of declaration |",
+      "| --- | --- | --- | --- |",
+      "| `build_tenants/hello_world_rust_service/Cargo.toml` | build_config | `hello_world_rust_service.binary` | `TECH_STACK.json` |",
+      "| `build_tenants/hello_world_rust_service/src/main.rs` | source | `hello_world_rust_service.binary` | `bootstrap.md` |",
+      "",
+      "## Requirement Lineage",
+      "",
+      "| Obligation id | Requirement pressure | Owning design decision | Residual pressure |",
+      "| --- | --- | --- | --- |",
+      "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_001` | Provide one Cargo manifest at `build_tenants/hello_world_rust_service/Cargo.toml`. | Treat `Cargo.toml` as build configuration for `hello_world_rust_service.binary`. | Materialization must create the manifest. |",
+      "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_002` | Provide one Rust executable source at `build_tenants/hello_world_rust_service/src/main.rs`. | Treat `src/main.rs` as the only source realization for `hello_world_rust_service.binary`. | Materialization must create the source file. |",
+      "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_003` | Start an HTTP server bound to `127.0.0.1` using `HELLO_SERVICE_PORT`. | Assign bind address and port lookup to `hello_world_rust_service.binary`. | Runtime proof must verify live binding. |",
+      "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_004` | Respond to `GET /` with exactly `helloworld`. | Assign root route and response behavior to `hello_world_rust_service.binary`. | Runtime proof must verify exact body. |",
+      "| `requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_005` | Prove the service by starting it through Cargo and verifying `GET /`. | Keep the proof subject on the same single component. | Test/proof edge must execute Cargo and `curl`. |",
+      ""
+    ].join("\n");
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+    const derivedRegister = JSON.parse(
+      readFileSync(
+        path.join(manifest.archiveRoot, "design_depth_evaluator_derived_register.json"),
+        "utf8"
+      )
+    );
+
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.map((row) => row.componentId),
+      ["hello_world_rust_service.binary"]
+    );
+    assert.equal(
+      derivedRegister.componentTopologyRows[0].moduleName,
+      "hello_world_rust_service"
+    );
+    assert.deepEqual(derivedRegister.componentTopologyRows[0].requirementIds, [
+      "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_001",
+      "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_002",
+      "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_003",
+      "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_004",
+      "requirement:t164_rust_hello_service_lite.bootstrap.req_t164_rust_svc_005"
+    ]);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 implementation-design evaluator admits combined topology-lineage tables with plural requirement refs", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-combined-topology-lineage-table"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const outputContent = [
+      "# ADR-002 Implementation Design Surface",
+      "",
+      "## Decision",
+      "",
+      "Use explicit component rows for bounded ownership.",
+      "",
+      "## Module Boundary",
+      "",
+      "| Module | Public Boundary | Depends On |",
+      "| --- | --- | --- |",
+      "| `compiler` | `Compiler.compile` | none |",
+      "| `executor` | `Executor.run` | `compiler` |",
+      "",
+      "## Component Topology And Requirement Lineage",
+      "",
+      "| Component Ref | Module | Responsibility | Requirement Refs |",
+      "| --- | --- | --- | --- |",
+      "| `component://compiler.topology` | `compiler` | Compile topology and plans. | `REQ-T172-COMB-001`, `REQ-T172-COMB-002`, `REQ-T172-COMB-003`, `REQ-T172-COMB-004`, `REQ-T172-COMB-005` |",
+      "| `component://executor.runtime` | `executor` | Execute admitted plans. | `REQ-T172-COMB-006`, `REQ-T172-COMB-007`, `REQ-T172-COMB-008`, `REQ-T172-COMB-009`, `REQ-T172-COMB-010` |",
+      "",
+      "## Component Realization Targets",
+      "",
+      "| Component Ref | Later Source Target | Realization Notes |",
+      "| --- | --- | --- |",
+      "| `component://compiler.topology` | `build_tenants/app/compiler/src/main.scala` | Compiler source package. |",
+      "| `component://executor.runtime` | `build_tenants/app/executor/src/main.scala` | Executor source package. |",
+      "",
+      "## Product File Targets",
+      "",
+      "| Target | Role | Later Edge |",
+      "| --- | --- | --- |",
+      "| `build_tenants/app/build.sbt` | build_config | materialization |",
+      ""
+    ].join("\n");
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+    const derivedRegister = JSON.parse(
+      readFileSync(
+        path.join(manifest.archiveRoot, "design_depth_evaluator_derived_register.json"),
+        "utf8"
+      )
+    );
+
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.map((row) => row.componentId).sort(),
+      ["compiler.topology", "executor.runtime"]
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.map((row) => row.requirementIds.length),
+      [5, 5]
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.map((row) => row.moduleName).sort(),
+      ["compiler", "executor"]
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 implementation-design evaluator derives multi-component topology from ADR realization and lineage subsections", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_implementation_design_surface",
+      "t172-multi-component-adr-subsection-lineage"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const outputContent = [
+      "# ADR-002 Implementation Design Surface",
+      "",
+      "## Decision",
+      "",
+      "The implementation keeps branch source and fan-in composition as separate components.",
+      "",
+      "## Module Boundary",
+      "",
+      "| Module ref | Public boundary | Owned responsibility |",
+      "| ---------- | --------------- | -------------------- |",
+      "| `package_manifest` | Node.js package descriptor | declare package identity |",
+      "| `hello_branch` | exported hello function | return hello |",
+      "| `world_branch` | exported world function | return world |",
+      "| `composition` | exported composed phrase function | join branch outputs |",
+      "",
+      "## Component Topology",
+      "",
+      "| Edge (source → target) | Edge kind |",
+      "| ---------------------- | --------- |",
+      "| `hello_branch` → `composition` | import |",
+      "| `world_branch` → `composition` | import |",
+      "",
+      "## Component Realization",
+      "",
+      "| Component ref | Realization kind | Output path | Public symbol shape | Imports |",
+      "| ------------- | ---------------- | ----------- | ------------------- | ------- |",
+      "| `package_manifest` | JSON manifest | `build_tenants/app/package.json` | package identity | none |",
+      "| `hello_branch` | CommonJS source | `build_tenants/app/src/hello.js` | zero-arg hello function | none |",
+      "| `world_branch` | CommonJS source | `build_tenants/app/src/world.js` | zero-arg world function | none |",
+      "| `composition` | CommonJS source | `build_tenants/app/src/index.js` | composed phrase function | `./hello`, `./world` |",
+      "",
+      "## Product File Targets",
+      "",
+      "| File target ref | Role | Output path | Owning component |",
+      "| --------------- | ---- | ----------- | ---------------- |",
+      "| `file:pkg` | manifest | `build_tenants/app/package.json` | `package_manifest` |",
+      "| `file:hello` | source | `build_tenants/app/src/hello.js` | `hello_branch` |",
+      "| `file:world` | source | `build_tenants/app/src/world.js` | `world_branch` |",
+      "| `file:composition` | source | `build_tenants/app/src/index.js` | `composition` |",
+      "",
+      "## Requirement Lineage",
+      "",
+      "### Requirement Lineage — `package_manifest`",
+      "",
+      "- Owned requirement refs:",
+      "  - `REQ-T172-SUB-001`",
+      "",
+      "### Requirement Lineage — `hello_branch`",
+      "",
+      "- Owned requirement refs:",
+      "  - `REQ-T172-SUB-002`",
+      "",
+      "### Requirement Lineage — `world_branch`",
+      "",
+      "- Owned requirement refs:",
+      "  - `REQ-T172-SUB-003`",
+      "",
+      "### Requirement Lineage — `composition`",
+      "",
+      "- Owned requirement refs:",
+      "  - `REQ-T172-SUB-004`",
+      ""
+    ].join("\n");
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+    const derivedRegister = JSON.parse(
+      readFileSync(
+        path.join(manifest.archiveRoot, "design_depth_evaluator_derived_register.json"),
+        "utf8"
+      )
+    );
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.map((row) => row.componentId).sort(),
+      ["composition", "hello_branch", "package_manifest", "world_branch"]
+    );
+    assert.deepEqual(
+      derivedRegister.componentTopologyRows.find(
+        (row) => row.componentId === "composition"
+      ).requirementIds,
+      ["REQ-T172-SUB-004"]
+    );
+    assert.deepEqual(
+      derivedRegister.fileTargetRows.map((row) => row.relativePath),
+      [
+        "build_tenants/app/package.json",
+        "build_tenants/app/src/hello.js",
+        "build_tenants/app/src/world.js",
+        "build_tenants/app/src/index.js"
+      ]
+    );
+    assert.deepEqual(
+      derivedRegister.componentRealizationRows.find(
+        (row) => row.componentId === "composition"
+      ).upstreamComponentIds.sort(),
+      ["hello_branch", "world_branch"]
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-172 implementation-design producer rejects worker-emitted design-depth register in ADR", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -718,7 +995,7 @@ test("T-172 implementation-design producer rejects worker-emitted design-depth r
     assert(
       postflight.blockingReasonCarriers.some(
         (reason) =>
-          reason.code === "staged_decomposition_rejected" &&
+          reason.code === "staged_authority_admission_invalid" &&
           reason.detail.includes("design_depth_worker_emitted_register_forbidden")
       ),
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)
@@ -1047,6 +1324,137 @@ test("T-172 trivial test-design producer admits explicit single-row topology", (
     assert.equal(
       postflight.blockingReasonCarriers.some((reason) =>
         reason.code.startsWith("staged_")
+      ),
+      false,
+      JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-172 test-design admission normalizes common semantic carrier aliases", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_test_design_surface",
+      "t172-test-design-alias-normalization"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    const registerPayload = {
+      kind: "sdlc_test_design_register",
+      registerVersion: "ts-test-design-v1",
+      targetAssetType: "test_design_surface",
+      tenantRoot: "build_tenants/app",
+      designConsumptionRows: [
+        {
+          kind: "sdlc_design_consumption_contract",
+          contractRef: "design-consumption://t172/test",
+          sourceDesignObligationRefs: ["REQ-T172-ALIAS-001"],
+          authorityBasisRefs: ["asset://implementation-design"],
+          consumerGraphFunctionRefs: ["graph_function://odd_sdlc/derive_component_test_surface"]
+        }
+      ],
+      uatTestcaseRows: [
+        {
+          kind: "sdlc_test_case_row",
+          testCaseId: "testcase:t172.alias.uat",
+          caseKind: "uat",
+          executionLane: "terminal_fan_in",
+          requirementIds: ["REQ-T172-ALIAS-001"],
+          scenarioRefs: ["scenario:t172.alias.uat"],
+          expectedBehavior: "the composed live proof passes"
+        }
+      ],
+      testcaseAuthorityRows: [
+        {
+          kind: "sdlc_test_case_row",
+          testCaseId: "testcase:t172.alias.unit",
+          caseKind: "unit",
+          executionLane: "branch_unit",
+          requirementIds: ["REQ-T172-ALIAS-001"],
+          scenarioRefs: ["scenario:t172.alias.unit"],
+          expectedBehavior: "the branch unit proof passes"
+        }
+      ],
+      testStackProfileRows: [
+        {
+          kind: "sdlc_test_stack_profile_row",
+          stackProfileRef: "surface://test-stack-profile",
+          runtime: "node",
+          testRunner: "node:test"
+        }
+      ],
+      testModuleRows: [
+        {
+          kind: "sdlc_test_module_row",
+          testModuleKey: "hello_branch_test",
+          relativePath: "test/hello.test.js"
+        }
+      ],
+      testComponentTopologyRows: [
+        {
+          kind: "sdlc_test_component_topology_row",
+          testClassId: "test_class:t172.alias.hello",
+          relativePath: "test/hello.test.js",
+          testcaseIds: ["testcase:t172.alias.unit"],
+          componentIds: ["component:t172.alias.hello"]
+        }
+      ],
+      testDataBindings: [
+        {
+          kind: "sdlc_test_data_binding",
+          testCaseId: "testcase:t172.alias.unit",
+          inputFixtureRefs: ["fixture://empty"],
+          generationPolicyRef: "policy://odd-sdlc/test-data/literal-only"
+        }
+      ],
+      expectedResultBindings: [
+        {
+          kind: "sdlc_expected_result_binding",
+          testCaseId: "testcase:t172.alias.unit",
+          assertionRefs: ["assertion://strict-equal"],
+          expectedResultSummary: "unit result passes",
+          verificationPolicyRef: "policy://odd-sdlc/expected-result/strict"
+        }
+      ],
+      uatIntegrationBindings: [
+        {
+          kind: "sdlc_uat_integration_binding",
+          uatTestCaseRef: "testcase:t172.alias.uat",
+          integrationTestCaseRef: "testcase:t172.alias.unit"
+        }
+      ],
+      testExecutionScheduleRows: [
+        {
+          kind: "sdlc_test_execution_schedule_row",
+          scheduleRef: "schedule:t172.alias",
+          testCaseRefs: ["testcase:t172.alias.unit", "testcase:t172.alias.uat"],
+          command: "node --test test/hello.test.js",
+          frameworkRef: "framework://node-test"
+        }
+      ]
+    };
+    const outputContent = [
+      "# ADR-003 Test Design Surface",
+      "",
+      "```json test_design_register",
+      JSON.stringify({
+        kind: "sdlc_test_design_surface_target_carrier",
+        payload: registerPayload
+      }, null, 2),
+      "```",
+      ""
+    ].join("\n");
+    writeFileSync(manifest.outputFile, outputContent, "utf8");
+    const report = surfaceReport({ manifest, outputContent });
+
+    const postflight = evaluateWorkerResultPostflight({ manifest, report });
+
+    assert.equal(
+      postflight.blockingReasonCarriers.some((reason) =>
+        reason.code === "staged_authority_admission_invalid"
       ),
       false,
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)

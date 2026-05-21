@@ -5,10 +5,12 @@ import assert from "node:assert/strict";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   admitComponentDepthRegisterFromArtifact,
@@ -18,7 +20,8 @@ import {
   deriveSdlcOperatorAssuranceGate,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
-  sha256Text
+  sha256Text,
+  writeInstalledOperatorOwnedEvaluationArtifact
 } from "../../build/semantic/code/src/index.js";
 
 function workspace() {
@@ -388,6 +391,80 @@ test("T-115 routes unbound repair schedule rows back to worker-output repair", (
   assert.deepEqual(dossier.nextLawfulActions, ["repair_worker_output"]);
 });
 
+test("T-171 keeps medium-confidence repair schedules inside the F_P schedule retry loop", () => {
+  const root = workspace();
+  const handoff = manifest(root, "derive_component_repair_schedule_surface");
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_repair_schedule_surface",
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "repair_required",
+      repairRows: [
+        {
+          kind: "sdlc_component_repair_schedule_row",
+          scheduleId: "repair:cdme-executor:spark-imports",
+          failureId: "failure:execution-evidence:cdme-executor",
+          repairTarget: "component_code",
+          lawfulReentryPoint: "repair_component_realization",
+          attributionConfidence: "medium",
+          testcaseIds: ["TC-DM-EXEC-001"],
+          componentIds: ["cdme-executor"],
+          requirementIds: ["REQ-T115-001"],
+          sourceRefs: [
+            "build_tenants/scala_spark/cdme-executor/src/main/scala/cdme/executor/DataProfiler.scala"
+          ],
+          testRefs: [
+            "build_tenants/scala_spark/cdme-executor/src/test/scala/cdme/executor/DataProfilerSpec.scala"
+          ],
+          evidenceRefs: ["artifact://test-execution/cdme-executor"]
+        }
+      ],
+      evidenceRefs: ["artifact://component-repair-schedule"]
+    }
+  };
+  const output = writeRegister(handoff, register);
+  const outputRef = `file://${handoff.outputFile}`;
+  const gate = deriveSdlcOperatorAssuranceGate({
+    manifest: handoff,
+    report: {
+      ...reportFor(handoff, output),
+      obligationAssessments: fulfilledObligationAssessments(handoff, [outputRef])
+    },
+    postflight: {
+      kind: "sdlc_operator_postflight_result",
+      status: "passed",
+      blockingReasons: [],
+      blockingReasonCarriers: [],
+      evidenceRefs: [outputRef]
+    }
+  });
+
+  assert(gate.blockingPostflight);
+  const reason = gate.blockingPostflight.blockingReasonCarriers.find(
+    (carrier) =>
+      carrier.detail ===
+      "component_repair_schedule_not_high_confidence:repair:cdme-executor:spark-imports"
+  );
+  assert(reason);
+  assert.equal(reason.lawfulReentryPoint, "repair_worker_output");
+
+  const dossier = constructPostflightGapDossier({
+    manifest: handoff,
+    postflight: gate.blockingPostflight
+  });
+  assert.equal(dossier.retryEligible, true);
+  assert.deepEqual(dossier.nextLawfulActions, ["repair_worker_output"]);
+  assert.equal(
+    componentRepairReentryPlansForGapDossier({ manifest: handoff, dossier })
+      .length,
+    0,
+    "medium-confidence schedule rows must re-enter the schedule transform, not source/test repair"
+  );
+});
+
 test("T-115 admits repair schedule carrier with repair-target paths", () => {
   const root = workspace();
   const handoff = manifest(root, "derive_component_repair_schedule_surface");
@@ -735,4 +812,115 @@ test("B-085 release-depth parity consumes source repair schedule without duplica
     "fail.compiler.diagnostics.scalac.001"
   );
   assert.equal(sha256Text(scheduleOutput).length, 71);
+});
+
+test("T-173 release-depth parity retires stale repair schedule after newer passing execution", () => {
+  const root = workspace();
+  const scheduleHandoff = manifest(root, "derive_component_repair_schedule_surface");
+  writeRegister(scheduleHandoff, {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_repair_schedule_surface",
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "repair_required",
+      repairRows: [
+        {
+          kind: "sdlc_component_repair_schedule_row",
+          scheduleId: "schedule.compiler.diagnostics.scalac.001",
+          failureId: "fail.compiler.diagnostics.scalac.001",
+          repairTarget:
+            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala",
+          lawfulReentryPoint: "realization_refactor",
+          attributionConfidence: "high",
+          testcaseIds: ["TC-DM-DIAG-001"],
+          componentIds: ["cdme-diagnostics"],
+          requirementIds: ["REQ-T115-001"],
+          sourceRefs: [
+            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala"
+          ],
+          testRefs: [
+            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala"
+          ],
+          evidenceRefs: ["asset://test_execution_result_surface#stale-failure"]
+        }
+      ],
+      evidenceRefs: ["asset://test_execution_result_surface#stale-failure"]
+    }
+  });
+
+  const executionHandoff = manifest(root, "derive_test_execution_result_surface");
+  const executionEvidence = {
+    kind: "sdlc_worker_execution_evidence",
+    lane: "test",
+    command: "sbt test",
+    status: "succeeded",
+    reportRefs: [`file://${executionHandoff.archiveRoot}/installed_operator_execution/passed.summary.json`],
+    testsObserved: 1,
+    passedCount: 1,
+    failedCount: 0,
+    shardEvidence: [
+      {
+        kind: "sdlc_worker_execution_shard_evidence",
+        shardId: "test-shard-01-cdme-compiler",
+        moduleName: "cdme-compiler",
+        lane: "test",
+        command: "sbt \"cdme-compiler/test\"",
+        status: "succeeded",
+        reportRefs: [`file://${executionHandoff.archiveRoot}/installed_operator_execution/passed.summary.json`],
+        testsObserved: 1,
+        passedCount: 1,
+        failedCount: 0
+      }
+    ]
+  };
+  mkdirSync(path.dirname(executionHandoff.reportFile), { recursive: true });
+  writeFileSync(
+    path.join(executionHandoff.archiveRoot, "handoff_manifest.json"),
+    `${JSON.stringify(executionHandoff, null, 2)}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    executionHandoff.reportFile,
+    `${JSON.stringify({
+      ...reportFor(executionHandoff, "# test_execution_result_surface\n"),
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(executionHandoff.fpEvaluateResultFile).href,
+      executionEvidence,
+      executionEvidenceErrors: []
+    }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const releaseHandoff = manifest(root, "derive_release_depth_parity_surface");
+  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: releaseHandoff });
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: releaseHandoff.targetAssetType,
+    outputFile: releaseHandoff.outputFile
+  });
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentRepairSchedule.scheduleStatus, "no_repair_required");
+  assert.equal(admission.register.componentRepairSchedule.repairRows.length, 0);
+  assert.equal(admission.register.releaseDepthParity.status, "met");
+
+  const releaseOutput = readFileSync(releaseHandoff.outputFile, "utf8");
+  const gate = deriveSdlcOperatorAssuranceGate({
+    manifest: releaseHandoff,
+    report: {
+      ...reportFor(releaseHandoff, releaseOutput),
+      obligationAssessments: fulfilledObligationAssessments(releaseHandoff, [
+        `file://${releaseHandoff.outputFile}`
+      ])
+    },
+    postflight: {
+      kind: "sdlc_operator_postflight_result",
+      status: "passed",
+      blockingReasons: [],
+      blockingReasonCarriers: [],
+      evidenceRefs: [`file://${releaseHandoff.outputFile}`]
+    }
+  });
+  assert.equal(gate.blockingPostflight, null);
 });

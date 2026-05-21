@@ -32,7 +32,106 @@ const TEST_DESIGN_TARGETS = Object.freeze([
   "test_design_surface"
 ] as const);
 
+const TEST_DESIGN_SHAPE_ERROR_LIMIT = 40;
+
+const TEST_DESIGN_REGISTER_ROW_KEYS = Object.freeze({
+  designConsumptionRows: Object.freeze([
+    "kind",
+    "contractRef",
+    "sourceDesignObligationRefs",
+    "authorityBasisRefs",
+    "consumerGraphFunctionRefs"
+  ]),
+  uatTestcaseRows: Object.freeze([
+    "kind",
+    "testCaseRef",
+    "caseKind",
+    "executionLane",
+    "sourceDesignObligationRefs",
+    "testcaseAuthorityRefs",
+    "expectedBehavior"
+  ]),
+  testcaseAuthorityRows: Object.freeze([
+    "kind",
+    "testCaseRef",
+    "caseKind",
+    "executionLane",
+    "sourceDesignObligationRefs",
+    "testcaseAuthorityRefs",
+    "expectedBehavior"
+  ]),
+  testStackProfileRows: Object.freeze([
+    "kind",
+    "stackRef",
+    "frameworkRef",
+    "buildTool"
+  ]),
+  testModuleRows: Object.freeze([
+    "kind",
+    "moduleName",
+    "moduleRef",
+    "testRoot"
+  ]),
+  testComponentTopologyRows: Object.freeze([
+    "kind",
+    "testClassId",
+    "relativePath",
+    "testcaseIds",
+    "componentIds",
+    "requirementIds",
+    "shardId"
+  ]),
+  testDataBindings: Object.freeze([
+    "kind",
+    "testDataRef",
+    "testCaseRef",
+    "inputFixtureRefs",
+    "generationPolicyRef",
+    "expectedResultRef",
+    "sourceDesignObligationRefs"
+  ]),
+  expectedResultBindings: Object.freeze([
+    "kind",
+    "expectedResultRef",
+    "testCaseRef",
+    "assertionRefs",
+    "expectedResultSummary",
+    "verificationPolicyRef"
+  ]),
+  uatIntegrationBindings: Object.freeze([
+    "kind",
+    "uatTestCaseRef",
+    "integrationTestCaseRef",
+    "executionLane"
+  ]),
+  testExecutionScheduleRows: Object.freeze([
+    "kind",
+    "scheduleRef",
+    "testCaseRefs",
+    "command",
+    "frameworkRef",
+    "shardId"
+  ])
+} as const);
+
 type TestDesignTarget = (typeof TEST_DESIGN_TARGETS)[number];
+
+type TestDesignRegisterRowCollection =
+  keyof typeof TEST_DESIGN_REGISTER_ROW_KEYS;
+
+const TEST_DESIGN_REGISTER_ROW_COLLECTIONS: readonly TestDesignRegisterRowCollection[] =
+  Object.freeze([
+    "designConsumptionRows",
+    "uatTestcaseRows",
+    "testcaseAuthorityRows",
+    "testStackProfileRows",
+    "testModuleRows",
+    "testComponentTopologyRows",
+    "testDataBindings",
+    "expectedResultBindings",
+    "uatIntegrationBindings",
+    "testExecutionScheduleRows"
+  ]);
 
 function isTestDesignTarget(
   targetAssetType: string
@@ -398,6 +497,236 @@ function objectRecord(input: unknown): Record<string, unknown> | null {
   return Object.fromEntries(Object.entries(input));
 }
 
+function unknownArrayValue(input: unknown): readonly unknown[] {
+  if (!Array.isArray(input)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(input.map((item: unknown): unknown => item));
+}
+
+function pushUniqueCapped(errors: string[], error: string): void {
+  if (errors.includes(error)) {
+    return;
+  }
+  if (errors.length < TEST_DESIGN_SHAPE_ERROR_LIMIT) {
+    errors.push(error);
+    return;
+  }
+  const overflowIndex = errors.findIndex((item) =>
+    item.startsWith("test_design_register_additional_shape_errors:")
+  );
+  if (overflowIndex === -1) {
+    errors.push("test_design_register_additional_shape_errors:1");
+    return;
+  }
+  const overflowValue = errors[overflowIndex] ?? "";
+  const count = Number.parseInt(overflowValue.split(":")[1] ?? "0", 10);
+  errors[overflowIndex] = `test_design_register_additional_shape_errors:${count + 1}`;
+}
+
+function collectClosedObjectShapeErrors(input: {
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly allowedKeys: readonly string[];
+  readonly errors: string[];
+}): void {
+  const allowed = new Set(input.allowedKeys);
+  for (const key of Object.keys(input.record)) {
+    if (!allowed.has(key)) {
+      pushUniqueCapped(input.errors, `${input.label}.${key}: unexpected field`);
+    }
+  }
+  for (const key of input.allowedKeys) {
+    if (input.record[key] === undefined) {
+      pushUniqueCapped(input.errors, `${input.label}.${key}: missing field`);
+    }
+  }
+}
+
+function collectStringFieldShapeError(input: {
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly key: string;
+  readonly errors: string[];
+}): void {
+  const value = input.record[input.key];
+  if (value === undefined) {
+    return;
+  }
+  if (typeof value !== "string") {
+    pushUniqueCapped(
+      input.errors,
+      `${input.label}.${input.key}: expected string`
+    );
+    return;
+  }
+  if (value.length === 0) {
+    pushUniqueCapped(
+      input.errors,
+      `${input.label}.${input.key}: expected non-empty string`
+    );
+  }
+}
+
+function collectStringListFieldShapeError(input: {
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly key: string;
+  readonly errors: string[];
+}): void {
+  const value = input.record[input.key];
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    pushUniqueCapped(
+      input.errors,
+      `${input.label}.${input.key}: expected array`
+    );
+    return;
+  }
+  value.forEach((item, index) => {
+    if (typeof item !== "string") {
+      pushUniqueCapped(
+        input.errors,
+        `${input.label}.${input.key}[${index}]: expected string`
+      );
+      return;
+    }
+    if (item.length === 0) {
+      pushUniqueCapped(
+        input.errors,
+        `${input.label}.${input.key}[${index}]: expected non-empty string`
+      );
+    }
+  });
+}
+
+function collectEnumFieldShapeError<T extends string>(input: {
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly key: string;
+  readonly values: readonly T[];
+  readonly errors: string[];
+}): void {
+  const value = input.record[input.key];
+  if (value === undefined) {
+    return;
+  }
+  if (typeof value !== "string" || !input.values.some((item) => item === value)) {
+    pushUniqueCapped(
+      input.errors,
+      `${input.label}.${input.key}: expected one of ${input.values
+        .map((item) => JSON.stringify(item))
+        .join(", ")}`
+    );
+  }
+}
+
+function collectTestCaseRowShapeErrors(input: {
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly errors: string[];
+}): void {
+  collectStringFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "testCaseRef",
+    errors: input.errors
+  });
+  collectEnumFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "caseKind",
+    values: SDLC_TEST_CASE_KINDS,
+    errors: input.errors
+  });
+  collectEnumFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "executionLane",
+    values: SDLC_TEST_EXECUTION_LANES,
+    errors: input.errors
+  });
+  collectStringListFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "sourceDesignObligationRefs",
+    errors: input.errors
+  });
+  collectStringListFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "testcaseAuthorityRefs",
+    errors: input.errors
+  });
+  collectStringFieldShapeError({
+    record: input.record,
+    label: input.label,
+    key: "expectedBehavior",
+    errors: input.errors
+  });
+}
+
+function collectKnownRowShapeErrors(input: {
+  readonly collection: TestDesignRegisterRowCollection;
+  readonly record: Record<string, unknown>;
+  readonly label: string;
+  readonly errors: string[];
+}): void {
+  if (
+    input.collection === "uatTestcaseRows" ||
+    input.collection === "testcaseAuthorityRows"
+  ) {
+    collectTestCaseRowShapeErrors({
+      record: input.record,
+      label: input.label,
+      errors: input.errors
+    });
+  }
+}
+
+function testDesignRegisterShapeErrors(input: unknown): readonly string[] {
+  const record = objectRecord(input);
+  if (record?.["kind"] !== "sdlc_test_design_register") {
+    return Object.freeze([]);
+  }
+  const errors: string[] = [];
+  for (const collection of TEST_DESIGN_REGISTER_ROW_COLLECTIONS) {
+    const rows = record[collection];
+    const collectionLabel = `test_design_register.${collection}`;
+    if (rows === undefined) {
+      pushUniqueCapped(errors, `${collectionLabel}: missing field`);
+      continue;
+    }
+    if (!Array.isArray(rows)) {
+      pushUniqueCapped(errors, `${collectionLabel}: expected array`);
+      continue;
+    }
+    rows.forEach((item, index) => {
+      const rowLabel = `${collectionLabel}[${index}]`;
+      const rowRecord = objectRecord(item);
+      if (rowRecord === null) {
+        pushUniqueCapped(errors, `${rowLabel}: expected closed object`);
+        return;
+      }
+      collectClosedObjectShapeErrors({
+        record: rowRecord,
+        label: rowLabel,
+        allowedKeys: TEST_DESIGN_REGISTER_ROW_KEYS[collection],
+        errors
+      });
+      collectKnownRowShapeErrors({
+        collection,
+        record: rowRecord,
+        label: rowLabel,
+        errors
+      });
+    });
+  }
+  return Object.freeze(errors);
+}
+
 function testDesignCandidateRecord(input: Record<string, unknown>): unknown {
   if (input["test_design_register"] !== undefined) {
     return input["test_design_register"];
@@ -415,12 +744,292 @@ function testDesignCandidateRecord(input: Record<string, unknown>): unknown {
   return null;
 }
 
+function stringValue(input: unknown): string | null {
+  return typeof input === "string" && input.trim().length > 0
+    ? input.trim()
+    : null;
+}
+
+function stringListValue(input: unknown): readonly string[] {
+  if (!Array.isArray(input)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    input
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+  );
+}
+
+function slugRefPart(input: string): string {
+  return encodeURIComponent(
+    input
+      .trim()
+      .replace(/[^A-Za-z0-9]+/gu, "-")
+      .replace(/^-+|-+$/gu, "")
+      .toLowerCase() || "unnamed"
+  );
+}
+
+function normalizeTestCaseKind(input: unknown): string {
+  const value = stringValue(input)?.toLowerCase() ?? "";
+  if (SDLC_TEST_CASE_KINDS.some((candidate) => candidate === value)) {
+    return value;
+  }
+  if (value === "unit" || value === "smoke" || value === "happy_path") {
+    return "positive";
+  }
+  return "positive";
+}
+
+function normalizeExecutionLane(input: unknown): string {
+  const value = stringValue(input)?.toLowerCase() ?? "";
+  if (SDLC_TEST_EXECUTION_LANES.some((candidate) => candidate === value)) {
+    return value;
+  }
+  if (value.includes("uat") || value.includes("fan_in") || value.includes("terminal")) {
+    return "uat";
+  }
+  if (value.includes("integration") || value.includes("composition")) {
+    return "integration";
+  }
+  return "unit";
+}
+
+function testCaseRefFromRecord(record: Record<string, unknown>): string {
+  return (
+    stringValue(record["testCaseRef"]) ??
+    stringValue(record["testCaseId"]) ??
+    `testcase://odd-sdlc/${slugRefPart(JSON.stringify(record))}`
+  );
+}
+
+function normalizeTestCaseRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const testCaseRef = testCaseRefFromRecord(record);
+  const sourceDesignObligationRefs = stringListValue(
+    record["sourceDesignObligationRefs"] ?? record["requirementIds"]
+  );
+  const testcaseAuthorityRefs = stringListValue(
+    record["testcaseAuthorityRefs"] ?? record["scenarioRefs"]
+  );
+  return Object.freeze({
+    kind: "sdlc_test_case_row",
+    testCaseRef,
+    caseKind: normalizeTestCaseKind(record["caseKind"]),
+    executionLane: normalizeExecutionLane(record["executionLane"]),
+    sourceDesignObligationRefs,
+    testcaseAuthorityRefs,
+    expectedBehavior:
+      stringValue(record["expectedBehavior"]) ??
+      `Expected behavior for ${testCaseRef}`
+  });
+}
+
+function normalizeTestStackProfileRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const runner =
+    stringValue(record["frameworkRef"]) ??
+    stringValue(record["testRunner"]) ??
+    stringValue(record["runtime"]) ??
+    "test-runner";
+  return Object.freeze({
+    kind: "sdlc_test_stack_profile_row",
+    stackRef:
+      stringValue(record["stackRef"]) ??
+      stringValue(record["stackProfileRef"]) ??
+      `stack://test/${slugRefPart(runner)}`,
+    frameworkRef: runner.startsWith("framework://")
+      ? runner
+      : `framework://${slugRefPart(runner)}`,
+    buildTool:
+      stringValue(record["buildTool"]) ??
+      stringValue(record["testRunner"]) ??
+      stringValue(record["runtime"]) ??
+      "unspecified"
+  });
+}
+
+function normalizeTestModuleRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const moduleName =
+    stringValue(record["moduleName"]) ??
+    stringValue(record["testModuleKey"]) ??
+    stringValue(record["owningComponentId"]) ??
+    "test_module";
+  const rawRoot = stringValue(record["testRoot"]) ?? stringValue(record["relativePath"]);
+  return Object.freeze({
+    kind: "sdlc_test_module_row",
+    moduleName,
+    moduleRef:
+      stringValue(record["moduleRef"]) ?? `module://test/${slugRefPart(moduleName)}`,
+    testRoot: rawRoot ?? `runtime-evidence://${slugRefPart(moduleName)}`
+  });
+}
+
+function normalizeTestComponentTopologyRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const testClassId =
+    stringValue(record["testClassId"]) ??
+    stringValue(record["testClassRef"]) ??
+    stringValue(record["testModuleKey"]) ??
+    "test_class";
+  const rawPath = stringValue(record["relativePath"]);
+  return Object.freeze({
+    kind: "sdlc_test_component_topology_row",
+    testClassId,
+    relativePath: rawPath ?? `runtime-evidence://${slugRefPart(testClassId)}`,
+    testcaseIds: stringListValue(record["testcaseIds"] ?? record["testCaseRefs"]),
+    componentIds: stringListValue(record["componentIds"] ?? record["coversComponentIds"]),
+    requirementIds: stringListValue(record["requirementIds"]),
+    shardId: stringValue(record["shardId"])
+  });
+}
+
+function normalizeTestDataBinding(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const testCaseRef = testCaseRefFromRecord(record);
+  return Object.freeze({
+    kind: "sdlc_test_data_binding",
+    testDataRef:
+      stringValue(record["testDataRef"]) ??
+      `test-data://${slugRefPart(testCaseRef)}`,
+    testCaseRef,
+    inputFixtureRefs: stringListValue(record["inputFixtureRefs"]),
+    generationPolicyRef:
+      stringValue(record["generationPolicyRef"]) ??
+      "policy://odd-sdlc/test-data/default",
+    expectedResultRef:
+      stringValue(record["expectedResultRef"]) ??
+      `expected-result://${slugRefPart(testCaseRef)}`,
+    sourceDesignObligationRefs: stringListValue(
+      record["sourceDesignObligationRefs"] ?? record["requirementIds"]
+    )
+  });
+}
+
+function normalizeExpectedResultBinding(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  const testCaseRef = testCaseRefFromRecord(record);
+  return Object.freeze({
+    kind: "sdlc_expected_result_binding",
+    expectedResultRef:
+      stringValue(record["expectedResultRef"]) ??
+      `expected-result://${slugRefPart(testCaseRef)}`,
+    testCaseRef,
+    assertionRefs: stringListValue(record["assertionRefs"]),
+    expectedResultSummary:
+      stringValue(record["expectedResultSummary"]) ??
+      `Expected result for ${testCaseRef}`,
+    verificationPolicyRef:
+      stringValue(record["verificationPolicyRef"]) ??
+      "policy://odd-sdlc/expected-result/default"
+  });
+}
+
+function normalizeUatIntegrationBinding(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: "sdlc_uat_integration_binding",
+    uatTestCaseRef: stringValue(record["uatTestCaseRef"]) ?? "uat://default",
+    integrationTestCaseRef:
+      stringValue(record["integrationTestCaseRef"]) ?? "integration://default",
+    executionLane: normalizeExecutionLane(record["executionLane"] ?? "uat")
+  });
+}
+
+function normalizeTestExecutionScheduleRow(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record === null) {
+    return input;
+  }
+  return Object.freeze({
+    kind: "sdlc_test_execution_schedule_row",
+    scheduleRef:
+      stringValue(record["scheduleRef"]) ??
+      `schedule://test/${slugRefPart(JSON.stringify(record))}`,
+    testCaseRefs: stringListValue(record["testCaseRefs"]),
+    command: stringValue(record["command"]) ?? "node --test",
+    frameworkRef:
+      stringValue(record["frameworkRef"]) ?? "framework://test-runner",
+    shardId: stringValue(record["shardId"])
+  });
+}
+
+function normalizeRegisterCandidate(input: unknown): unknown {
+  const record = objectRecord(input);
+  if (record?.["kind"] !== "sdlc_test_design_register") {
+    return input;
+  }
+  return Object.freeze({
+    kind: "sdlc_test_design_register",
+    registerVersion: "ts-test-design-v1",
+    targetAssetType: stringValue(record["targetAssetType"]) ?? "test_design_surface",
+    designConsumptionRows: unknownArrayValue(record["designConsumptionRows"]),
+    uatTestcaseRows: Array.isArray(record["uatTestcaseRows"])
+      ? Object.freeze(record["uatTestcaseRows"].map(normalizeTestCaseRow))
+      : Object.freeze([]),
+    testcaseAuthorityRows: Array.isArray(record["testcaseAuthorityRows"])
+      ? Object.freeze(record["testcaseAuthorityRows"].map(normalizeTestCaseRow))
+      : Object.freeze([]),
+    testStackProfileRows: Array.isArray(record["testStackProfileRows"])
+      ? Object.freeze(record["testStackProfileRows"].map(normalizeTestStackProfileRow))
+      : Object.freeze([]),
+    testModuleRows: Array.isArray(record["testModuleRows"])
+      ? Object.freeze(record["testModuleRows"].map(normalizeTestModuleRow))
+      : Object.freeze([]),
+    testComponentTopologyRows: Array.isArray(record["testComponentTopologyRows"])
+      ? Object.freeze(
+          record["testComponentTopologyRows"].map(normalizeTestComponentTopologyRow)
+        )
+      : Object.freeze([]),
+    testDataBindings: Array.isArray(record["testDataBindings"])
+      ? Object.freeze(record["testDataBindings"].map(normalizeTestDataBinding))
+      : Object.freeze([]),
+    expectedResultBindings: Array.isArray(record["expectedResultBindings"])
+      ? Object.freeze(
+          record["expectedResultBindings"].map(normalizeExpectedResultBinding)
+        )
+      : Object.freeze([]),
+    uatIntegrationBindings: Array.isArray(record["uatIntegrationBindings"])
+      ? Object.freeze(record["uatIntegrationBindings"].map(normalizeUatIntegrationBinding))
+      : Object.freeze([]),
+    testExecutionScheduleRows: Array.isArray(record["testExecutionScheduleRows"])
+      ? Object.freeze(
+          record["testExecutionScheduleRows"].map(normalizeTestExecutionScheduleRow)
+        )
+      : Object.freeze([])
+  });
+}
+
 function normalizeCandidate(input: unknown): unknown {
   const record = objectRecord(input);
   if (record === null) {
     return input;
   }
-  return testDesignCandidateRecord(record) ?? input;
+  return normalizeRegisterCandidate(testDesignCandidateRecord(record) ?? input);
 }
 
 function jsonCandidates(content: string): readonly unknown[] {
@@ -531,9 +1140,10 @@ export function admitTestDesignRegisterFromArtifact(input: {
   const content = readFileSync(input.outputFile, "utf8");
   const errors: string[] = [];
   for (const candidate of jsonCandidates(content)) {
+    const normalizedCandidate = normalizeCandidate(candidate);
     try {
       const register = parseRegister(
-        normalizeCandidate(candidate),
+        normalizedCandidate,
         "test_design_register"
       );
       if (register.targetAssetType !== input.targetAssetType) {
@@ -560,7 +1170,13 @@ export function admitTestDesignRegisterFromArtifact(input: {
         evidenceRefs
       });
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      pushUniqueCapped(
+        errors,
+        error instanceof Error ? error.message : String(error)
+      );
+      for (const shapeError of testDesignRegisterShapeErrors(normalizedCandidate)) {
+        pushUniqueCapped(errors, shapeError);
+      }
     }
   }
   return Object.freeze({

@@ -603,7 +603,7 @@ export function compactSdlcPriorGapDossiersForRetryContext(
     return Object.freeze([...dossiers]);
   }
   const refs = uniqueSorted(dossiers.map((dossier) => dossier.currentGapDossierRef));
-  const latest = dossiers[dossiers.length - 1];
+  const latest = preferredWorkerFacingGapDossierForRetryContext(dossiers);
   if (latest === undefined) {
     return Object.freeze([]);
   }
@@ -643,6 +643,46 @@ export function compactSdlcPriorGapDossiersForRetryContext(
   ]);
 }
 
+function workerFacingGapDossierIsOnlyRuntimeProcessFailure(
+  dossier: SdlcPostflightGapDossier
+): boolean {
+  return (
+    dossier.reasons.length > 0 &&
+    dossier.reasons.every(
+      (reason) =>
+        reason.reasonClass === "worker_runtime" &&
+        (
+          reason.blockingReason.code === "worker_process_failed" ||
+          reason.blockingReason.code === "worker_hard_timeout" ||
+          reason.blockingReason.code === "silent_worker_inactivity" ||
+          reason.blockingReason.code === "worker_lost_terminal" ||
+          reason.blockingReason.code === "worker_process_error"
+        )
+    )
+  );
+}
+
+function preferredWorkerFacingGapDossierForRetryContext(
+  dossiers: readonly SdlcPostflightGapDossier[]
+): SdlcPostflightGapDossier | undefined {
+  const latest = dossiers[dossiers.length - 1];
+  if (
+    latest === undefined ||
+    !workerFacingGapDossierIsOnlyRuntimeProcessFailure(latest)
+  ) {
+    return latest;
+  }
+  return [...dossiers]
+    .reverse()
+    .find(
+      (dossier) =>
+        dossier.edgeName === latest.edgeName &&
+        dossier.targetAssetType === latest.targetAssetType &&
+        dossier.vectorIndex === latest.vectorIndex &&
+        !workerFacingGapDossierIsOnlyRuntimeProcessFailure(dossier)
+    ) ?? latest;
+}
+
 function retryContextFromRetryAttemptRefs(
   refs: RuntimeAggregateProjection["retryAttemptRefs"]
 ): SdlcWorkerRetryContext {
@@ -678,6 +718,18 @@ function decodedRefForScope(input: string): string {
   }
 }
 
+function decodedArchiveRefForScope(input: string): string {
+  let decoded = input;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const next = decodedRefForScope(decoded);
+    if (next === decoded) {
+      return decoded;
+    }
+    decoded = next;
+  }
+  return decoded;
+}
+
 function postActionProjectionHasExplicitFeatureScope(input: {
   readonly nextActionProjectionRef: string;
   readonly selectedActionRef: string;
@@ -700,6 +752,9 @@ function postActionProjectionCarriesRetryContext(input: {
 }): boolean {
   return (
     input.nextActionProjection.gapPressureRefs.length > 0 ||
+    (input.nextActionProjection.selectedActionRef?.includes(
+      "/post_repair_reentry/"
+    ) ?? false) ||
     postActionProjectionHasExplicitFeatureScope({
       nextActionProjectionRef: input.nextActionProjection.nextActionProjectionRef,
       selectedActionRef: input.nextActionProjection.selectedActionRef ?? ""
@@ -719,6 +774,18 @@ function postActionArchiveRefFromGapPressureRef(ref: string): string | null {
     return null;
   }
   const decoded = decodedRefForScope(remainder.slice(0, separator));
+  return decoded.startsWith("file://") ? decoded : null;
+}
+
+function postActionArchiveRefFromSelectedActionRef(ref: string | null): string | null {
+  if (ref === null || !ref.includes("/post_repair_reentry/")) {
+    return null;
+  }
+  const encodedArchiveRef = ref.split("/").at(-1);
+  if (encodedArchiveRef === undefined || encodedArchiveRef.length === 0) {
+    return null;
+  }
+  const decoded = decodedArchiveRefForScope(encodedArchiveRef);
   return decoded.startsWith("file://") ? decoded : null;
 }
 
@@ -744,6 +811,15 @@ function postActionGapDossiersFromProjection(input: {
   >["nextActionProjection"];
 }): readonly SdlcPostflightGapDossier[] {
   const byRef = new Map<string, SdlcPostflightGapDossier>();
+  const selectedArchiveRef = postActionArchiveRefFromSelectedActionRef(
+    input.nextActionProjection.selectedActionRef
+  );
+  if (selectedArchiveRef !== null) {
+    const dossier = gapDossierFromPostActionArchiveRef(selectedArchiveRef);
+    if (dossier !== null) {
+      byRef.set(dossier.currentGapDossierRef, dossier);
+    }
+  }
   for (const pressureRef of input.nextActionProjection.gapPressureRefs) {
     const archiveRef = postActionArchiveRefFromGapPressureRef(pressureRef);
     if (archiveRef === null) {
@@ -859,7 +935,7 @@ function latestRuntimeGapDossierForRetryContext(input: {
   if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
     return null;
   }
-  let latest: SdlcPostflightGapDossier | null = null;
+  const candidates: SdlcPostflightGapDossier[] = [];
   const runIds = readdirSync(operatorRunsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -873,13 +949,12 @@ function latestRuntimeGapDossierForRetryContext(input: {
       dossier !== null &&
       dossier.vectorIndex === input.vectorIndex &&
       dossier.edgeName === input.edgeName &&
-      dossier.targetAssetType === input.targetAssetType &&
-      dossier.retryEligible
+      dossier.targetAssetType === input.targetAssetType
     ) {
-      latest = dossier;
+      candidates.push(dossier);
     }
   }
-  return latest;
+  return preferredWorkerFacingGapDossierForRetryContext(candidates) ?? null;
 }
 
 export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
@@ -891,6 +966,16 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
 }): SdlcWorkerRetryContext {
   const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
   if (latestGapDossier === null) {
+    return input.projected;
+  }
+  if (
+    input.projected.priorGapDossiers.some((dossier) =>
+      dossier.reasons.some(
+        (reason) =>
+          reason.blockingReason.lawfulReentryPoint === "repair_worker_output"
+      )
+    )
+  ) {
     return input.projected;
   }
   const dossierByRef = new Map<string, SdlcPostflightGapDossier>();
@@ -923,14 +1008,50 @@ interface GraphContinuationReplayCursor {
   readonly cursorEvents: readonly RuntimeEvent[];
 }
 
+function replayEventVectorClosureKey(
+  event: RuntimeEvent
+): string | null {
+  if (event.kind !== "vector_closed") {
+    return null;
+  }
+  return JSON.stringify({
+    basisId: event.basisId,
+    graphCallId: event.graphCallId,
+    frameId: event.frameId,
+    vectorIndex: event.vectorIndex,
+    edge: event.edge
+  });
+}
+
+function replayEventsWithoutDuplicateVectorClosures(
+  replayEvents: readonly RuntimeEvent[]
+): readonly RuntimeEvent[] {
+  const seen = new Set<string>();
+  const filtered: RuntimeEvent[] = [];
+  for (const event of replayEvents) {
+    const key = replayEventVectorClosureKey(event);
+    if (key !== null) {
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+    }
+    filtered.push(event);
+  }
+  return filtered.length === replayEvents.length
+    ? replayEvents
+    : Object.freeze(filtered);
+}
+
 function replayEventsWithGraphContinuationCursor(input: {
   readonly basis: ExecutionBasis;
   readonly replayEvents: readonly RuntimeEvent[];
   readonly nextGraphVectorRef: string | null;
 }): GraphContinuationReplayCursor {
+  const replayEvents = replayEventsWithoutDuplicateVectorClosures(input.replayEvents);
   if (input.nextGraphVectorRef === null) {
     return Object.freeze({
-      replayEvents: input.replayEvents,
+      replayEvents,
       cursorEvents: Object.freeze([])
     });
   }
@@ -940,7 +1061,7 @@ function replayEventsWithGraphContinuationCursor(input: {
   });
   if (targetIndex === null || targetIndex <= 0) {
     return Object.freeze({
-      replayEvents: input.replayEvents,
+      replayEvents,
       cursorEvents: Object.freeze([])
     });
   }
@@ -948,12 +1069,12 @@ function replayEventsWithGraphContinuationCursor(input: {
   try {
     for (const vectorIndex of deriveRuntimeAggregateProjection(
       input.basis,
-      input.replayEvents
+      replayEvents
     ).closedVectorIndexes) {
       closedIndexes.add(vectorIndex);
     }
   } catch {
-    for (const event of input.replayEvents) {
+    for (const event of replayEvents) {
       if (event.kind !== "vector_closed") {
         continue;
       }
@@ -992,8 +1113,10 @@ function replayEventsWithGraphContinuationCursor(input: {
   return Object.freeze({
     replayEvents:
       cursorEvents.length === 0
-        ? input.replayEvents
-        : Object.freeze([...input.replayEvents, ...cursorEvents]),
+        ? replayEvents
+        : replayEventsWithoutDuplicateVectorClosures(
+            Object.freeze([...replayEvents, ...cursorEvents])
+          ),
     cursorEvents: Object.freeze(cursorEvents)
   });
 }
@@ -1950,6 +2073,31 @@ function workerRuntimeWatchdogPolicy(input: {
   });
 }
 
+const RUNTIME_LIVENESS_ARCHIVE_ACTIVITY_ROW_LIMIT = 12;
+
+function archivedRuntimeLivenessObserverProjection(
+  projection: RuntimeLivenessObserverProjection
+): Readonly<
+  RuntimeLivenessObserverProjection & {
+    readonly activityRowCount: number;
+    readonly omittedActivityRowCount: number;
+  }
+> {
+  const activityRows = projection.activityRows;
+  const omittedActivityRowCount = Math.max(
+    0,
+    activityRows.length - RUNTIME_LIVENESS_ARCHIVE_ACTIVITY_ROW_LIMIT
+  );
+  return Object.freeze({
+    ...projection,
+    activityRows: Object.freeze(
+      activityRows.slice(-RUNTIME_LIVENESS_ARCHIVE_ACTIVITY_ROW_LIMIT)
+    ),
+    activityRowCount: activityRows.length,
+    omittedActivityRowCount
+  });
+}
+
 function writeRuntimeLivenessObserverProjection(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly basis: ExecutionBasis;
@@ -1972,7 +2120,7 @@ function writeRuntimeLivenessObserverProjection(input: {
   writeOperatorArchiveFile({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "runtime_liveness_observer_projection.json",
-    payload: projection
+    payload: archivedRuntimeLivenessObserverProjection(projection)
   });
   return projection;
 }

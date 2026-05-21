@@ -1,0 +1,93 @@
+{
+  "kind": "odd_sdlc_rc_proof_summary",
+  "release": "v2.0.0-rc.7",
+  "releaseCut": ".ai-workspace/release-cuts/typescript/20260521T173625Z_t172_t173_rc7",
+  "releaseManifest": ".ai-workspace/release-cuts/typescript/20260521T173625Z_t172_t173_rc7/release-cut-manifest.json",
+  "packageArtifact": ".ai-workspace/release-cuts/typescript/20260521T173625Z_t172_t173_rc7/package/pack-RmpRdL/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+  "baseCheckpoint": {
+    "commit": "fbf0e90",
+    "tag": "v2.0.0-rc.6",
+    "subject": "Release odd_sdlc v2.0.0-rc.6"
+  },
+  "scope": [
+    "T-172 staged disambiguation graph and decomposition admission",
+    "T-173 complexity-admitted Min(F_P) traversal selection",
+    "data_mapper.test85 live closure proof",
+    "post-repair replay target freshness",
+    "release-depth stale repair schedule retirement after newer passing execution",
+    "duplicate vector-closure replay idempotence",
+    "component-code admission ignores stale inactive repair schedules",
+    "F_P-owned repair schedule worker-output retry boundary",
+    "stack-declared build config materialization coverage in installed data_mapper successor proof"
+  ],
+  "liveProof": {
+    "workspace": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl",
+    "finalArchive": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171514045Z_pid276",
+    "status": "converged",
+    "graphFunctionName": "prepare_release_surface",
+    "nextLawfulAction": "disposition://close",
+    "closureDecision": {
+      "disposition": "close",
+      "targetCarrierAdmissionStatus": "admitted",
+      "edgeResidualPressureRefs": []
+    },
+    "executionEvidence": {
+      "asset": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/assets/20260521T171129964Z_pid276/test_execution_result_surface.md",
+      "passedCount": 7,
+      "failedCount": 0
+    },
+    "componentRepairSchedule": {
+      "path": "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/build_tenants/scala_spark/design/component_repair_schedule_surface.md",
+      "scheduleStatus": "no_repair_required",
+      "repairRows": []
+    }
+  },
+  "ticketClosure": [
+    ".ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md",
+    ".ai-workspace/tickets/completed/T-173-realize-complexity-admitted-min-fp-traversal-selection.md"
+  ],
+  "qualification": [
+    {
+      "command": "npm run build:semantic",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:t172",
+      "status": "passed",
+      "tests": 52,
+      "passed": 52
+    },
+    {
+      "command": "npm run test:t173",
+      "status": "passed",
+      "tests": 22,
+      "passed": 22,
+      "notes": "21 node tests plus the T-173 saga frontier stress sandbox"
+    },
+    {
+      "command": "node --test test_env/tests/test_t066_product_materialization_contract.test.mjs",
+      "status": "passed",
+      "tests": 105,
+      "passed": 105
+    },
+    {
+      "command": "node --test test_env/tests/test_t113_component_depth_register_admission.test.mjs test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs test_env/tests/test_t160_traversal_overlays.test.mjs",
+      "status": "passed",
+      "tests": 38,
+      "passed": 38
+    },
+    {
+      "command": "npm run lint:semantic",
+      "status": "passed"
+    },
+    {
+      "command": "npm run lint:test-harness",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "createdAt": "2026-05-21T17:36:25Z"
+}

@@ -52,6 +52,17 @@ import {
   t164RustHelloServiceLiteScenario
 } from "./scenarios/t164_rust_hello_service_lite.scenario.mjs";
 import {
+  T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES,
+  T174_PARALLEL_HELLO_WORLD_LITE_EDGES,
+  t174ParallelHelloWorldJsFourLaneFrontierScenario,
+  t174ParallelHelloWorldJsFourLaneLiveScenario,
+  t174ParallelHelloWorldJsLiveScenario,
+  t174ParallelHelloWorldJsScenario
+} from "./scenarios/t174_parallel_hello_world_js.scenario.mjs";
+import {
+  t173SagaFrontierStressScenario
+} from "./scenarios/t173_saga_frontier_stress.scenario.mjs";
+import {
   mindforgeAiAssistantBaselineScenario,
   mindforgeAiAssistantLiveScenario,
   mindforgeAiAssistantScenarioFamily,
@@ -178,6 +189,26 @@ test("scenario sandbox: T-164 Rust hello service conformance bootstrap", async (
   assertScenarioExpectations(result, t164RustHelloServiceLiteScenario);
 });
 
+test("scenario sandbox: T-174 parallel hello-world JS conformance bootstrap", async () => {
+  const result = await runScenarioSandbox(t174ParallelHelloWorldJsScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t174ParallelHelloWorldJsScenario);
+});
+
+test("scenario sandbox: T-174 parallel hello-world JS four-lane frontier", async () => {
+  const result = await runScenarioSandbox(
+    t174ParallelHelloWorldJsFourLaneFrontierScenario
+  );
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t174ParallelHelloWorldJsFourLaneFrontierScenario);
+});
+
+test("scenario sandbox: T-173 ABG saga frontier 50-way stress", async () => {
+  const result = await runScenarioSandbox(t173SagaFrontierStressScenario);
+  assertWorkspaceWasInstalled(result);
+  assertScenarioExpectations(result, t173SagaFrontierStressScenario);
+});
+
 for (const scenario of t160HelloWorldJsOverlayScenarios) {
   test(`scenario sandbox: T-160 JavaScript hello-world overlay matrix ${scenario.startTarget}`, async () => {
     const result = await runScenarioSandbox(scenario);
@@ -273,6 +304,56 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
     rustServiceLive.expectations.processChecks[0].stdout,
     "helloworld"
   );
+  const parallelHelloLive = t174ParallelHelloWorldJsLiveScenario({ worker });
+  assert.deepEqual(
+    scenarioStartTargetForStep(parallelHelloLive, 0),
+    "overlay:bootstrap-requirements"
+  );
+  assert.deepEqual(
+    scenarioStartTargetForStep(parallelHelloLive, 1),
+    "overlay:bootstrap-requirements"
+  );
+  assert.deepEqual(
+    scenarioStartTargetForStep(parallelHelloLive, 2),
+    "overlay:lite-design-module-implementation"
+  );
+  assert(parallelHelloLive.maxAdvances >= 16);
+  assert.deepEqual(
+    parallelHelloLive.expectations.handoffEdgeSequencePrefix,
+    [...T174_PARALLEL_HELLO_WORLD_LITE_EDGES]
+  );
+  assert.deepEqual(
+    parallelHelloLive.expectations.edgeAssuranceArchiveSequencePrefix,
+    parallelHelloLive.expectations.handoffEdgeSequencePrefix
+  );
+  assert.deepEqual(
+    parallelHelloLive.expectations.workspaceFiles,
+    [...T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES]
+  );
+  const fourLaneLive = t174ParallelHelloWorldJsFourLaneLiveScenario({ worker });
+  assert.equal(
+    fourLaneLive.scenarioId,
+    "scenario_t174_parallel_hello_world_js_four_lane_live"
+  );
+  assert.deepEqual(
+    fourLaneLive.expectations.workspaceFiles,
+    [...T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES]
+  );
+  assert.equal(fourLaneLive.expectations.processChecks.length, 3);
+  assert.deepEqual(
+    fourLaneLive.expectations.liveFpParallelMaterializationFrontier.edgeName,
+    "derive_component_code_surface"
+  );
+  assert.deepEqual(
+    fourLaneLive.expectations.liveFpParallelMaterializationFrontier.equals
+      .executionAuthority,
+    "abg_evented_saga_frontier"
+  );
+  assert.equal(
+    fourLaneLive.expectations.liveFpParallelMaterializationFrontier
+      .requiredBranchRefs.length,
+    4
+  );
   const mindforgeLive = mindforgeAiAssistantLiveScenario({
     worker,
     variant: "third_party_model_variant"
@@ -302,6 +383,130 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.notDeepEqual(
     mindforgeAiAssistantBaselineScenario.expectedGovernanceOutput,
     mindforgeLive.expectedGovernanceOutput
+  );
+});
+
+test("scenario sandbox: live four-lane proof requires ABG-owned F_P branch frontier archive", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-live-frontier-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260521T000000000Z_pid1"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  writeJson(path.join(archiveRoot, "handoff_manifest.json"), {
+    edgeName: "derive_component_code_surface"
+  });
+  writeJson(
+    path.join(archiveRoot, "sdlc_live_fp_parallel_materialization_frontier.json"),
+    {
+      kind: "sdlc_live_fp_parallel_materialization_frontier",
+      edgeName: "derive_component_code_surface",
+      executionAuthority: "abg_evented_saga_frontier",
+      parallelismControl: "abg_branch_execution_policy",
+      selectedMethod: "parallel",
+      laneCount: 4,
+      devLaneCount: 2,
+      testLaneCount: 2,
+      fanInCount: 1,
+      maxActive: 4,
+      emittedEventKinds: [
+        "branch_lease_acquired",
+        "branch_payload_admitted",
+        "branch_fan_in_projected"
+      ],
+      branchRows: [
+        {
+          branchRef: "branch://odd-sdlc/t174/four-lane/dev-hello",
+          workerProcessRef: "worker-process://dev-hello",
+          writeTerritoryRefs: ["workspace://build_tenants/app/src/hello.js"]
+        },
+        {
+          branchRef: "branch://odd-sdlc/t174/four-lane/dev-world",
+          workerProcessRef: "worker-process://dev-world",
+          writeTerritoryRefs: ["workspace://build_tenants/app/src/world.js"]
+        },
+        {
+          branchRef: "branch://odd-sdlc/t174/four-lane/test-hello",
+          workerProcessRef: "worker-process://test-hello",
+          writeTerritoryRefs: ["workspace://build_tenants/app/test/hello.test.js"]
+        },
+        {
+          branchRef: "branch://odd-sdlc/t174/four-lane/test-world",
+          workerProcessRef: "worker-process://test-world",
+          writeTerritoryRefs: ["workspace://build_tenants/app/test/world.test.js"]
+        }
+      ],
+      fanInRows: [
+        {
+          branchRef: "branch://odd-sdlc/t174/four-lane/fan-in",
+          payloadDigest: "payload://four-lane/hello-world"
+        }
+      ]
+    }
+  );
+  const scenario = t174ParallelHelloWorldJsFourLaneLiveScenario({
+    worker: "process://codex?model=gpt-5.5&effort=high"
+  });
+
+  assert.doesNotThrow(() =>
+    assertScenarioExpectations(
+      {
+        scenarioId: scenario.scenarioId,
+        workspace,
+        advances: [
+          {
+            gaps: { payload: {} },
+            start: { payload: {} }
+          }
+        ]
+      },
+      {
+        scenarioId: scenario.scenarioId,
+        expectations: {
+          liveFpParallelMaterializationFrontier:
+            scenario.expectations.liveFpParallelMaterializationFrontier
+        }
+      }
+    )
+  );
+});
+
+test("scenario sandbox: standalone ABG process proof does not satisfy live F_P branch frontier", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-live-frontier-missing-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260521T000000000Z_pid1"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  writeJson(path.join(archiveRoot, "handoff_manifest.json"), {
+    edgeName: "derive_component_code_surface"
+  });
+  const scenario = t174ParallelHelloWorldJsFourLaneLiveScenario({
+    worker: "process://codex?model=gpt-5.5&effort=high"
+  });
+
+  assert.throws(
+    () =>
+      assertScenarioExpectations(
+        {
+          scenarioId: scenario.scenarioId,
+          workspace,
+          advances: [
+            {
+              gaps: { payload: {} },
+              start: { payload: {} }
+            }
+          ]
+        },
+        {
+          scenarioId: scenario.scenarioId,
+          expectations: {
+            liveFpParallelMaterializationFrontier:
+              scenario.expectations.liveFpParallelMaterializationFrontier
+          }
+        }
+      ),
+    /standalone ABG process checks or single-worker materialization do not satisfy this proof/
   );
 });
 
@@ -925,6 +1130,65 @@ test(
     const scenario = t164RustHelloServiceLiteLiveScenario({
       worker: T164_RUST_SERVICE_LIVE_WORKER,
       maxAdvances: T164_RUST_SERVICE_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T174_PARALLEL_HELLO_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T174_PARALLEL_HELLO_WORLD_JS_SCENARIO_LIVE"] === "1";
+const T174_PARALLEL_HELLO_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T174_PARALLEL_HELLO_WORLD_JS_SCENARIO_WORKER"] ??
+  "process://claude";
+const T174_PARALLEL_HELLO_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T174_PARALLEL_HELLO_WORLD_JS_SCENARIO_MAX_ADVANCES"] ??
+    "16",
+  10
+);
+
+test(
+  "scenario sandbox: T-174 parallel hello-world JS live build loop (opt-in)",
+  {
+    skip: T174_PARALLEL_HELLO_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T174_PARALLEL_HELLO_WORLD_JS_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t174ParallelHelloWorldJsLiveScenario({
+      worker: T174_PARALLEL_HELLO_LIVE_WORKER,
+      maxAdvances: T174_PARALLEL_HELLO_LIVE_MAX_ADVANCES
+    });
+    const result = await runScenarioSandbox(scenario);
+    assertWorkspaceWasInstalled(result);
+    assertScenarioExpectations(result, scenario);
+  }
+);
+
+const T174_FOUR_LANE_LIVE_ENABLED =
+  process.env["ODD_SDLC_TS_T174_FOUR_LANE_HELLO_WORLD_JS_SCENARIO_LIVE"] ===
+  "1";
+const T174_FOUR_LANE_LIVE_WORKER =
+  process.env["ODD_SDLC_TS_T174_FOUR_LANE_HELLO_WORLD_JS_SCENARIO_WORKER"] ??
+  "process://claude";
+const T174_FOUR_LANE_LIVE_MAX_ADVANCES = Number.parseInt(
+  process.env["ODD_SDLC_TS_T174_FOUR_LANE_HELLO_WORLD_JS_SCENARIO_MAX_ADVANCES"] ??
+    "16",
+  10
+);
+
+test(
+  "scenario sandbox: T-174 parallel hello-world JS four-lane live build loop (opt-in)",
+  {
+    skip: T174_FOUR_LANE_LIVE_ENABLED
+      ? false
+      : "ODD_SDLC_TS_T174_FOUR_LANE_HELLO_WORLD_JS_SCENARIO_LIVE=1 not set"
+  },
+  async () => {
+    const scenario = t174ParallelHelloWorldJsFourLaneLiveScenario({
+      worker: T174_FOUR_LANE_LIVE_WORKER,
+      maxAdvances: T174_FOUR_LANE_LIVE_MAX_ADVANCES
     });
     const result = await runScenarioSandbox(scenario);
     assertWorkspaceWasInstalled(result);

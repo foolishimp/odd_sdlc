@@ -237,3 +237,68 @@ test("T-171 admits test-design payload from selected target-carrier envelope", (
     "node --test test/hello.test.js"
   );
 });
+
+test("T-171 rejects malformed test-design rows with bounded aggregate shape feedback", () => {
+  const malformedRegister = {
+    kind: "sdlc_test_design_register",
+    registerVersion: "ts-test-design-v1",
+    targetAssetType: "test_design_surface",
+    designConsumptionRows: [],
+    uatTestcaseRows: [
+      {
+        kind: "sdlc_test_case_row",
+        caseId: "UAT-DM-001",
+        testCaseRef: 7,
+        caseKind: "authority",
+        executionLane: "cdme-compiler",
+        expectedBehavior: ""
+      }
+    ],
+    testcaseAuthorityRows: [
+      {
+        kind: "sdlc_test_case_row",
+        caseId: "AUTH-DM-001",
+        caseKind: "unit",
+        executionLane: "unit",
+        sourceDesignObligationRefs: ["REQ-DM-001"],
+        testcaseAuthorityRefs: ["REQ-DM-001"],
+        expectedBehavior: "authority row"
+      }
+    ],
+    testStackProfileRows: [],
+    testModuleRows: [],
+    testComponentTopologyRows: [],
+    testDataBindings: [],
+    expectedResultBindings: [],
+    uatIntegrationBindings: [],
+    testExecutionScheduleRows: []
+  };
+  const outputFile = writeArtifact([
+    "# Test Design Surface",
+    "",
+    "```json test_design_register",
+    JSON.stringify(malformedRegister, null, 2),
+    "```",
+    ""
+  ].join("\n"));
+
+  const admission = admitTestDesignRegisterFromArtifact({
+    targetAssetType: "test_design_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "rejected");
+  const reason = admission.blockingReasons.join("\n");
+  assert.match(reason, /uatTestcaseRows\[0\]\.caseId: unexpected field/);
+  assert.match(reason, /uatTestcaseRows\[0\]\.testCaseRef: expected string/);
+  assert.match(reason, /uatTestcaseRows\[0\]\.caseKind: expected one of/);
+  assert.match(reason, /uatTestcaseRows\[0\]\.executionLane: expected one of/);
+  assert.match(
+    reason,
+    /uatTestcaseRows\[0\]\.sourceDesignObligationRefs: missing field/
+  );
+  assert.match(
+    reason,
+    /testcaseAuthorityRows\[0\]\.testCaseRef: missing field/
+  );
+});

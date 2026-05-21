@@ -760,6 +760,52 @@ test("T-172 tenant stack markdown admits tenant-relative testing build-config ta
   assert.equal(target?.sourceRef.endsWith("/TESTING_TECH_STACK.md"), true);
 });
 
+test("T-172 combined tenant stack keeps implementation role when testing shares build-config target", () => {
+  const workspace = workspaceWithSingularDeclaredProductFileAuthority();
+  const stackSpecFile = path.join(
+    workspace,
+    "build_tenants/hello_world_javascript/spec/TECH_STACK.json"
+  );
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        buildConfigTargets: ["package.json"],
+        testingTechStack: {
+          testRunner: "node --test",
+          testRoots: ["test"],
+          testBuildConfigTargets: ["package.json"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const manifest = materializationManifest(workspace);
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const packageTarget = reconciliation.tenantStackAuthorityTargetContracts.find(
+    (target) =>
+      target.path === "build_tenants/hello_world_javascript/package.json"
+  );
+
+  assert.equal(reconciliation.status, "passed");
+  assert.notEqual(packageTarget, undefined);
+  assert.equal(packageTarget?.requiredRole, "build_config");
+  assert.equal(
+    packageTarget?.policyRef,
+    "target-role-policy://odd-sdlc/tenant-stack/implementation/build_config"
+  );
+  assert.equal(packageTarget?.sourceRef.endsWith("/TECH_STACK.json"), true);
+  assert.equal(
+    declaredProductFileTargets(manifest).includes(
+      "build_tenants/hello_world_javascript/package.json"
+    ),
+    true
+  );
+});
+
 test("T-143 derives product targets from conformed module structure", () => {
   const manifest = materializationManifest(
     workspaceWithModuleTargetProductAuthority()

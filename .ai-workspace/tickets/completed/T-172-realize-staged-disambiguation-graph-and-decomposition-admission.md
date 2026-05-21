@@ -3,13 +3,14 @@ id: T-172
 title: Realize staged disambiguation graph and decomposition admission
 type: feature
 ticket_category: design_reframe
-status: active
-proof_status: g5_data_mapper_live_proof_pending
+status: completed
+proof_status: closed_data_mapper_test85_live
 priority: critical
 owner: odd_sdlc
 build_tenant: typescript
 created_at: 2026-05-19
-updated_at: 2026-05-20
+updated_at: 2026-05-22
+completed_at: 2026-05-22
 triaged_at: 2026-05-19
 activated_at: 2026-05-19
 goal: make every solution construction traverse through staged disambiguation before deterministic code closure
@@ -17,7 +18,7 @@ change_class: requirement_reprice
 re_entry_point: requirements
 first_missing_layer: requirements
 governance_scope: STDO Method / odd_sdlc TypeScript construction algebra
-current_closure_blocker: data_mapper successor live proof after G4 runtime-dispatch enforcement; hello-world degenerate proportionality proof is accepted
+current_closure_blocker: none; data_mapper.test85 live proof accepted after G4 runtime-dispatch enforcement
 source_documents:
   - specification/GOALS.md
   - specification/INTENT.md
@@ -38,12 +39,23 @@ current_rc_reference:
   analyzer_command: node build_tenants/typescript/build/semantic/code/src/cli/main.js analyze-run --workspace /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl --format markdown
   final_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test82.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260519T045221059Z_pid80159
   release_cut: .ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4
+accepted_data_mapper_test85_workspace: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl
+accepted_data_mapper_test85_final_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171514045Z_pid276
+accepted_data_mapper_test85_execution_archive: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171129964Z_pid276
+accepted_data_mapper_test85_repair_schedule_surface: /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl/build_tenants/scala_spark/design/component_repair_schedule_surface.md
+closure_proof_gates:
+  - data_mapper.test85 successor run traversed staged design, code, test, execution, repair-schedule, archive, release-depth, and release-preparation surfaces
+  - final archive 20260521T171514045Z_pid276 returned status converged, graph_function prepare_release_surface, and nextLawfulAction disposition://close
+  - execution archive 20260521T171129964Z_pid276 reported passedCount 7 and failedCount 0
+  - component_repair_schedule_surface reports scheduleStatus no_repair_required and repairRows []
+  - focused odd_sdlc regression checks passed after the continuation and component-depth admission fixes
 related_tickets:
-  - .ai-workspace/tickets/active/T-161-read-only-fd-run-analysis-linter.md
-  - .ai-workspace/tickets/active/T-162-first-class-ticket-workflow-for-governed-change.md
+  - .ai-workspace/tickets/backlog/T-161-read-only-fd-run-analysis-linter.md
+  - .ai-workspace/tickets/backlog/T-162-first-class-ticket-workflow-for-governed-change.md
   - .ai-workspace/tickets/completed/T-102-define-typed-fp-function-stages-and-abg-owned-admission-flow.md
   - .ai-workspace/tickets/completed/T-164-declare-per-edge-gain-and-closure-functions-for-sdlc-traversals.md
   - .ai-workspace/tickets/completed/T-171-full-test35-parity-refactor-for-test72-execution-backed-closure.md
+  - .ai-workspace/tickets/completed/T-173-realize-complexity-admitted-min-fp-traversal-selection.md
 affected_boundary:
   requirements:
     - specification/requirements/10-odd-sdlc-software-domain-buildout.md
@@ -187,7 +199,7 @@ reclassified as projection/no-close over admitted carriers.
 
 Complexity-admitted traversal selection, including dynamic zoom admission and
 Min(F_P) pressure-preservation decisions, is split to active follow-on ticket
-`.ai-workspace/tickets/active/T-173-realize-complexity-admitted-min-fp-traversal-selection.md`.
+`.ai-workspace/tickets/completed/T-173-realize-complexity-admitted-min-fp-traversal-selection.md`.
 
 T-172 may record compression, expansion, and residual metrics in decomposition summaries, but it
 does not implement evaluator insertion or selection of new intermediate stages.
@@ -397,7 +409,7 @@ for merge, replacement, or deletion.
 | G1 carrier schema | `SdlcDecompositionSummary`, module dependency map, and test dependency map shapes are declared with compression and expansion measures | focused type/admission tests compile |
 | G2 edge accounting | selected full traversal edges are all accounted, with merge/delete/projection/conditional disposition reported | deterministic edge-accounting tests compile |
 | G3 evaluator admission | compression, explosion, high-density, facade, under-decomposed, unowned-row, invalid-ref, and residual-scope predicates reject invalid carriers | deterministic negative tests fail close before materialization |
-| G4 graph/handoff/analyzer | code/test prompts consume admitted topology; analyzer reports ratios, traversal selection, edge-accounting disposition, and observed worker-dispatch violations for no-dispatch rows; runtime dispatch consults the register before live closure | focused staged-graph tests plus archive analysis rejecting observed no-dispatch worker runs |
+| G4 graph/handoff/analyzer | code/test prompts consume admitted topology through compact intent probes; replay uses compact identity indexes and bounded liveness summaries on hot paths; analyzer reports ratios, traversal selection, edge-accounting disposition, and observed worker-dispatch violations for no-dispatch rows; runtime dispatch consults the register before live closure | focused staged-graph tests plus archive analysis rejecting observed no-dispatch worker runs and prompt/replay volume regressions |
 | G5 live proof | hello-world successor run closes as the degenerate one-component case with bounded upstream product requirement refs, and data_mapper successor run closes with admitted substantive topology depth before code/test materialization and no unaccounted selected edges | live archives plus analyzer reports |
 
 ## Work Plan
@@ -420,10 +432,14 @@ for merge, replacement, or deletion.
 8. Runtime dispatch: make installed operator dispatch consult the edge
    accounting register so rows marked `workerDispatchAllowed: false` execute as
    deterministic evaluator/projection edges before live proof.
-9. Tests: add deterministic negative tests for unaccounted edges,
+9. Handoff/replay projection: make worker-facing construction briefs expose only
+   the canonical intent probe plus refs/digests, and make replay/liveness hot
+   paths consume compact indexes or bounded summaries instead of reparsing full
+   forensic manifests and event streams.
+10. Tests: add deterministic negative tests for unaccounted edges,
    under-decomposed code/test carriers, and positive tests for trivial
    one-component decomposition.
-10. Live proof: rerun hello-world as the degenerate proportionality proof, run
+11. Live proof: rerun hello-world as the degenerate proportionality proof, run
     the Rust hello service as the bounded non-JS service proof, then rerun
     data_mapper as the reference substantive staged-construction proof.
 
@@ -467,6 +483,14 @@ Focused proof:
 - `test_t172_staged_target_carrier_contract.test.mjs` proves implementation
   and test materialization consume staged authority refs instead of inferring
   topology during materialization.
+- `test_t118_worker_invocation_package.test.mjs` proves the worker-facing
+  construction brief is the single prompt-source carrier and no longer advertises
+  expanded forensic package paths as worker input.
+- `test_t066_product_materialization_contract.test.mjs` proves replay can match
+  prior handoff identity through compact handoff replay indexes and bounded
+  prefix fallback instead of parsing full historical manifests.
+- `test_t064_installed_operator_ux.test.mjs` proves runtime liveness projection
+  remains replay-visible while the archived activity row set is bounded.
 - `test_t172_run_analysis_edge_accounting.test.mjs` proves analyzer output reports
   edge-accounting disposition for the selected full graph and rejects observed
   worker dispatch on no-dispatch rows.
@@ -492,6 +516,12 @@ Live/archive proof:
   generates `build_tenants/hello_world_rust_service/Cargo.toml` and
   `build_tenants/hello_world_rust_service/src/main.rs`, then proves execution
   by running `cargo run --quiet` and `curl --fail --silent` against `GET /`.
+  The accepted live archive is
+  `build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260521T135652992Z_pid67177/workspace`.
+  It proves that evaluator-derived ADR topology treats prose lineage as
+  lineage, not component authority; the admitted decomposition summary records
+  five upstream obligations, one downstream component row, compression ratio
+  `5`, expansion ratio `0.2`, and `admissionDecision: admit`.
   This proof strengthens tenant/build-tool generality and runtime execution
   evidence, but it does not replace the data_mapper substantive-topology proof.
 - The existing `data_mapper.test82` RC4 archive remains motivating evidence for
@@ -508,10 +538,31 @@ Live/archive proof:
   `build_tenants/scala_spark/spec/TECH_STACK.json` and
   `build_tenants/scala_spark/spec/TESTING_TECH_STACK.json`, including declared
   sbt build-config targets such as `build.sbt` and `project/`.
-- run a data_mapper successor after G0-G4 pass
-- archive the analyzer output for the same run
-- compare topology depth against test82 RC4 and test35 evidence without
-  hard-coding test35 filenames as runtime law
+- The accepted data_mapper successor proof is:
+  `/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.test85.TS.cl`.
+  The final archive is
+  `.ai-workspace/runtime/odd_sdlc/operator-runs/20260521T171514045Z_pid276`.
+  The resumed live command returned `status: converged`,
+  `graph_function: prepare_release_surface`, and
+  `next_action: disposition://close`.
+- The staged path closed these successor archives in order:
+  `derive_component_code_surface`,
+  `qualify_component_realization_surface`, `derive_code_surface`,
+  `derive_test_design_surface`, `derive_component_test_surface`,
+  `prepare_test_execution_surface`, `derive_test_execution_result_surface`,
+  `qualify_component_test_execution_surface`,
+  `derive_component_repair_schedule_surface`,
+  `derive_test_run_archive_surface`, `derive_release_depth_parity_surface`,
+  and `prepare_release_surface`.
+- The execution evidence archive
+  `.ai-workspace/runtime/odd_sdlc/assets/20260521T171129964Z_pid276/test_execution_result_surface.md`
+  reports `passedCount: 7` and `failedCount: 0`.
+- The repaired schedule in
+  `build_tenants/scala_spark/design/component_repair_schedule_surface.md`
+  reports `scheduleStatus: no_repair_required` and `repairRows: []`, retiring
+  the stale seven-row repair schedule.
+- The live run fixed product-local trace and repair-schedule defects without
+  hard-coding test35 filenames as runtime law.
 
 ## Acceptance
 

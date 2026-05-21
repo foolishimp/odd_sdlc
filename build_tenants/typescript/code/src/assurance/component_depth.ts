@@ -639,7 +639,7 @@ function releaseDepthParityReasons(input: {
 }): readonly SdlcAssuranceLedgerReason[] {
   const parity = input.register.releaseDepthParity;
   const sourceSchedule =
-    input.register.componentRepairSchedule === null
+    input.register.componentRepairSchedule === null && parity?.status !== "met"
       ? latestAdmittedComponentRepairSchedule({
           workspaceRoot: input.manifest.workspaceRoot
         })

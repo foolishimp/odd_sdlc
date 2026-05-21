@@ -366,6 +366,18 @@ function assertArrayEquals(observed, expected, label) {
   }
 }
 
+function assertArrayContainsAll(observed, expected, label) {
+  if (!Array.isArray(observed) || !Array.isArray(expected)) {
+    throw new Error(`${label} must compare arrays`);
+  }
+  const missing = expected.filter((value) => !observed.includes(value));
+  if (missing.length > 0) {
+    throw new Error(
+      `${label} missing ${JSON.stringify(missing)} from ${JSON.stringify(observed)}`
+    );
+  }
+}
+
 function valueAtDottedPath(payload, dottedPath) {
   return dottedPath.split(".").reduce((current, segment) => {
     if (current === null || typeof current !== "object") return undefined;
@@ -540,6 +552,126 @@ function assertEdgeAssuranceArchiveSequencePrefix(result, expected) {
     }
     assertEdgeAssuranceArchive(result.scenarioId, edgeName, selected.archiveRoot);
   });
+}
+
+function assertLiveFpParallelMaterializationFrontier(result, expectation) {
+  if (expectation === undefined || expectation === null) return;
+  const edgeName = assertNonEmptyString(
+    expectation.edgeName,
+    `${result.scenarioId}: live F_P parallel materialization edgeName`
+  );
+  const artifact =
+    typeof expectation.artifact === "string" && expectation.artifact.length > 0
+      ? expectation.artifact
+      : "sdlc_live_fp_parallel_materialization_frontier.json";
+  const candidates = operatorRunRoots(result.workspace)
+    .filter((archiveRoot) => {
+      const manifest = readJsonFile(path.join(archiveRoot, "handoff_manifest.json"));
+      return manifest?.edgeName === edgeName;
+    })
+    .filter((archiveRoot) => existsSync(path.join(archiveRoot, artifact)));
+  if (candidates.length === 0) {
+    throw new Error(
+      `${result.scenarioId}: expected live F_P parallel materialization frontier ${artifact} for edge ${edgeName}; standalone ABG process checks or single-worker materialization do not satisfy this proof`
+    );
+  }
+  const archiveRoot = candidates.at(-1);
+  const payload = readRequiredJsonFile(
+    path.join(archiveRoot, artifact),
+    `${result.scenarioId}: live F_P parallel materialization frontier ${artifact}`
+  );
+  const equals = expectation.equals;
+  if (equals !== null && typeof equals === "object" && !Array.isArray(equals)) {
+    for (const [field, expected] of Object.entries(equals)) {
+      assertJsonFieldEquals({
+        payload,
+        field,
+        expected,
+        label: `${result.scenarioId}: live F_P parallel materialization frontier ${artifact}`
+      });
+    }
+  }
+  const atLeast = expectation.atLeast;
+  if (atLeast !== null && typeof atLeast === "object" && !Array.isArray(atLeast)) {
+    for (const [field, expected] of Object.entries(atLeast)) {
+      assertJsonFieldAtLeast({
+        payload,
+        field,
+        expected,
+        label: `${result.scenarioId}: live F_P parallel materialization frontier ${artifact}`
+      });
+    }
+  }
+  const branchRows = Array.isArray(payload.branchRows) ? payload.branchRows : [];
+  const requiredBranchRefs = Array.isArray(expectation.requiredBranchRefs)
+    ? expectation.requiredBranchRefs
+    : [];
+  if (requiredBranchRefs.length > 0) {
+    assertArrayContainsAll(
+      branchRows.map((row) => row?.branchRef).filter((value) => typeof value === "string"),
+      requiredBranchRefs,
+      `${result.scenarioId}: live F_P parallel materialization branch refs`
+    );
+  }
+  const selectedBranchRows =
+    requiredBranchRefs.length > 0
+      ? branchRows.filter((row) => requiredBranchRefs.includes(row?.branchRef))
+      : branchRows;
+  if (expectation.requireBranchWorkerProcessRefs === true) {
+    for (const branchRef of requiredBranchRefs) {
+      const row = selectedBranchRows.find((candidate) => candidate?.branchRef === branchRef);
+      const workerProcessRef = row?.workerProcessRef;
+      if (typeof workerProcessRef !== "string" || workerProcessRef.length === 0) {
+        throw new Error(
+          `${result.scenarioId}: live F_P branch ${branchRef} missing workerProcessRef`
+        );
+      }
+    }
+  }
+  if (expectation.requireDisjointWriteTerritories === true) {
+    const ownersByTerritory = new Map();
+    for (const row of selectedBranchRows) {
+      const branchRef = row?.branchRef;
+      const territories = Array.isArray(row?.writeTerritoryRefs)
+        ? row.writeTerritoryRefs.filter((value) => typeof value === "string")
+        : [];
+      if (typeof branchRef !== "string" || territories.length === 0) {
+        throw new Error(
+          `${result.scenarioId}: live F_P branch ${branchRef} missing writeTerritoryRefs`
+        );
+      }
+      for (const territory of territories) {
+        const prior = ownersByTerritory.get(territory);
+        if (prior !== undefined && prior !== branchRef) {
+          throw new Error(
+            `${result.scenarioId}: write territory ${territory} is shared by ${prior} and ${branchRef}`
+          );
+        }
+        ownersByTerritory.set(territory, branchRef);
+      }
+    }
+  }
+  if (Array.isArray(expectation.requiredEventKinds)) {
+    const eventKinds = Array.isArray(payload.emittedEventKinds)
+      ? payload.emittedEventKinds
+      : [];
+    assertArrayContainsAll(
+      eventKinds,
+      expectation.requiredEventKinds,
+      `${result.scenarioId}: live F_P parallel materialization event kinds`
+    );
+  }
+  if (typeof expectation.requiredFanInPayloadDigest === "string") {
+    const fanInRows = Array.isArray(payload.fanInRows) ? payload.fanInRows : [];
+    const payloadDigests = fanInRows
+      .map((row) => row?.payloadDigest)
+      .filter((value) => typeof value === "string");
+    if (!payloadDigests.includes(expectation.requiredFanInPayloadDigest)) {
+      throw new Error(
+        `${result.scenarioId}: live F_P parallel materialization fan-in missing payload ${expectation.requiredFanInPayloadDigest}`
+      );
+    }
+  }
 }
 
 function assertProcessStdoutJson(input) {
@@ -898,6 +1030,10 @@ export function assertScenarioExpectations(result, scenario) {
       expectations.edgeAssuranceArchiveSequencePrefix
     );
   }
+  assertLiveFpParallelMaterializationFrontier(
+    result,
+    expectations.liveFpParallelMaterializationFrontier
+  );
   if (Array.isArray(expectations.processChecks)) {
     for (const check of expectations.processChecks) {
       const command = check?.command;

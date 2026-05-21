@@ -649,6 +649,28 @@ test("T-083 shallow realization ledger rejects constant-success logic", () => {
   ]);
 });
 
+test("T-083 shallow realization ledger does not treat Scala default true params as constant success", () => {
+  const ledger = deriveShallowRealizationAssuranceLedger({
+    synthesisRequired: false,
+    executableProofRequired: false,
+    surfaces: [
+      {
+        kind: "sdlc_realization_text_surface",
+        role: "source",
+        ref: "file://DataProfiler.scala",
+        content: [
+          "class DataProfiler {",
+          "  def profileDryRun(ds: Dataset[Row], dryRun: Boolean = true): DatasetProfile =",
+          "    if (dryRun) profile(ds.limit(10000)) else profile(ds)",
+          "}"
+        ].join("\n")
+      }
+    ]
+  });
+
+  assert.equal(ledger.verdict, "satisfied");
+});
+
 test("T-083 shallow realization ledger admits guarded invariant success paths", () => {
   const ledger = deriveShallowRealizationAssuranceLedger({
     synthesisRequired: false,

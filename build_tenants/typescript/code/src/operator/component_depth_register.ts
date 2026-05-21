@@ -505,6 +505,14 @@ function parseRegister(input: unknown, label: string): SdlcComponentDepthRegiste
     label: `${label}.registerVersion`,
     expected: "ts-component-depth-v1"
   });
+  const repairSchedule =
+    targetAssetType === "component_repair_schedule_surface" ||
+    targetAssetType === "release_depth_parity_surface"
+      ? parseComponentRepairSchedule(
+          record["componentRepairSchedule"] ?? record["component_repair_schedule"],
+          `${label}.componentRepairSchedule`
+        )
+      : null;
   return Object.freeze({
     kind: "sdlc_component_depth_register" as const,
     registerVersion: "ts-component-depth-v1" as const,
@@ -539,10 +547,7 @@ function parseRegister(input: unknown, label: string): SdlcComponentDepthRegiste
         record["component_execution_failure_register"],
       `${label}.componentExecutionFailureRegister`
     ),
-    componentRepairSchedule: parseComponentRepairSchedule(
-      record["componentRepairSchedule"] ?? record["component_repair_schedule"],
-      `${label}.componentRepairSchedule`
-    ),
+    componentRepairSchedule: repairSchedule,
     releaseDepthParity: parseReleaseDepthParity(
       record["releaseDepthParity"],
       `${label}.releaseDepthParity`

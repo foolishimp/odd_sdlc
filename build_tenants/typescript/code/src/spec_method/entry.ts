@@ -1002,7 +1002,10 @@ function selectedNextGraphFunctionFromArchive(input: {
     const closureRecord = jsonRecordFromFile(closurePath);
     const ledgerRecord = jsonRecordFromFile(ledgerPath);
     const decision = edgeClosureDecisionFromArchive(archiveRoot);
-    if (decision?.disposition !== "close") {
+    if (
+      decision === null ||
+      (decision.disposition !== "close" && decision.disposition !== "repair")
+    ) {
       continue;
     }
     const projectionPath = path.join(archiveRoot, "sdlc_next_action_projection.json");
@@ -1017,12 +1020,14 @@ function selectedNextGraphFunctionFromArchive(input: {
       stringField(record, "selectedActionRef") === null
     ) {
       const overlayContinuation =
-        selectedNextGraphFunctionFromOverlayCompletionArchive({
-          archiveRoot,
-          projectionRecord: record,
-          decision,
-          module: input.module
-        });
+        decision.disposition === "close"
+          ? selectedNextGraphFunctionFromOverlayCompletionArchive({
+              archiveRoot,
+              projectionRecord: record,
+              decision,
+              module: input.module
+            })
+          : null;
       if (overlayContinuation !== null) {
         return overlayContinuation;
       }
@@ -1491,9 +1496,21 @@ function replayNextActionRequiresFreshTargetTraversal(input: {
   readonly replayNextAction: NonNullable<Parameters<typeof startOutcomeFor>[1]>;
 }): boolean {
   return (
-    input.replayNextAction.selectedActionRef.includes("/post_repair_reentry/") &&
+    selectedActionRequiresFreshTargetTraversal(
+      input.replayNextAction.selectedActionRef
+    ) &&
     input.replayNextAction.nextGraphFunctionRef !==
       input.latestOutcome.summary.graphFunctionName
+  );
+}
+
+function selectedActionRequiresFreshTargetTraversal(
+  selectedActionRef: string | null
+): boolean {
+  return (
+    selectedActionRef?.includes("/post_repair_reentry/") === true ||
+    selectedActionRef?.includes("/post_repair/") === true ||
+    selectedActionRef?.includes("/post_close_overlay_continuation/") === true
   );
 }
 
@@ -1682,6 +1699,14 @@ function replayEventsForBasis(
   );
 }
 
+function startOutcomeRequiresFreshTargetTraversal(
+  start: ReturnType<typeof publicStartOnce>
+): boolean {
+  const selectedActionRef =
+    start.executionContract?.nextActionProjection.selectedActionRef ?? null;
+  return selectedActionRequiresFreshTargetTraversal(selectedActionRef);
+}
+
 function constructionPrioritySchemeForSpecMethodGaps(input: {
   readonly request: OddSdlcSpecMethodTraversalRequest;
   readonly basis: ExecutionBasis;
@@ -1761,6 +1786,8 @@ async function installedStartPayloadFor(
     replayEvents:
       start.executionContract === null
         ? Object.freeze([])
+        : startOutcomeRequiresFreshTargetTraversal(start)
+          ? EMPTY_RUNTIME_EVENTS
         : replayEventsForBasis(start.executionContract.basis, runtimeEvents),
     eventGraphEvents: runtimeEvents,
     requestedUntil: request.until,

@@ -383,3 +383,8 @@ failure surfaces.
   packages, full handoff manifests, target-carrier construction templates, row
   templates, ledgers, closure carriers, or evaluator-owned publication truth.
   They cite those surfaces by ref/digest when enforceable detail is needed.
+- AC-9: runtime replay and worker-facing state projection use compact identity
+  indexes, bounded summaries, refs, and digests on hot paths. Full manifests,
+  liveness activity streams, event archives, and forensic package payloads remain
+  archive truth for explicit diagnosis, not default worker input or replay scan
+  input.

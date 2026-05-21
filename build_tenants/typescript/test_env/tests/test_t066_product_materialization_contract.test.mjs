@@ -762,6 +762,76 @@ function writeSilentWorkerScript(workspaceRoot) {
   return workerPath;
 }
 
+function writeNoopWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t066_noop_worker.mjs");
+  writeFileSync(workerPath, "process.exit(0);\n", "utf8");
+  return workerPath;
+}
+
+function writeRepairScheduleWorkerScript(workspaceRoot) {
+  const workerPath = path.join(workspaceRoot, "t066_repair_schedule_worker.mjs");
+  writeFileSync(
+    workerPath,
+    [
+      "import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
+      "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "function findFile(root, basename) {",
+      "  if (!existsSync(root)) return null;",
+      "  for (const entry of readdirSync(root, { withFileTypes: true })) {",
+      "    const candidate = path.join(root, entry.name);",
+      "    if (entry.isFile() && entry.name === basename) return candidate;",
+      "    if (entry.isDirectory()) {",
+      "      const nested = findFile(candidate, basename);",
+      "      if (nested !== null) return nested;",
+      "    }",
+      "  }",
+      "  return null;",
+      "}",
+      "const operatorRunsRoot = path.join(manifest.workspaceRoot, '.ai-workspace/runtime/odd_sdlc/operator-runs');",
+      "const compilerSummary = findFile(operatorRunsRoot, 'test-shard-01-cdme-compiler.summary.json');",
+      "const engineSummary = findFile(operatorRunsRoot, 'test-shard-02-cdme-engine.summary.json');",
+      "const evidenceRefs = [compilerSummary, engineSummary].filter((file) => file !== null).map((file) => pathToFileURL(file).href);",
+      "function repairRow(input) {",
+      "  return {",
+      "    kind: 'sdlc_component_repair_schedule_row',",
+      "    scheduleId: `repair:${input.componentId}:medium-confidence`,",
+      "    failureId: `failure:${input.componentId}:execution`,",
+      "    repairTarget: 'component_code',",
+      "    lawfulReentryPoint: 'repair_component_realization',",
+      "    attributionConfidence: 'medium',",
+      "    testcaseIds: [`TC-${input.componentId}`],",
+      "    componentIds: [input.componentId],",
+      "    requirementIds: ['REQ-T066-001'],",
+      "    sourceRefs: [`build_tenants/scala_spark/${input.componentId}/src/main/scala/Core.scala`],",
+      "    testRefs: [`build_tenants/scala_spark/${input.componentId}/src/test/scala/CoreSpec.scala`],",
+      "    evidenceRefs: input.evidenceRefs",
+      "  };",
+      "}",
+      "const register = {",
+      "  kind: 'sdlc_component_depth_register',",
+      "  registerVersion: 'ts-component-depth-v1',",
+      "  targetAssetType: 'component_repair_schedule_surface',",
+      "  componentRepairSchedule: {",
+      "    kind: 'sdlc_component_repair_schedule',",
+      "    registerVersion: 'ts-component-depth-v1',",
+      "    scheduleStatus: 'repair_required',",
+      "    repairRows: [",
+      "      repairRow({ componentId: 'cdme-compiler', evidenceRefs: compilerSummary === null ? evidenceRefs : [pathToFileURL(compilerSummary).href] }),",
+      "      repairRow({ componentId: 'cdme-engine', evidenceRefs: engineSummary === null ? evidenceRefs : [pathToFileURL(engineSummary).href] })",
+      "    ],",
+      "    evidenceRefs",
+      "  }",
+      "};",
+      "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
+      "writeFileSync(manifest.outputFile, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');"
+    ].join("\n"),
+    "utf8"
+  );
+  return workerPath;
+}
+
 function freshDataMapperWorkspace() {
   assert.equal(
     existsSync(DATA_MAPPER_TEMPLATE_ROOT),
@@ -962,7 +1032,8 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  writeFileSync(productPath, source, 'utf8');",
       "  const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
       "  materializedFiles.push({ kind: 'sdlc_materialized_product_file', role, relativePath: tenantRelative, absolutePath: productPath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8'), requirementTraceObligationIds: requirementObligationIds });",
-      "  if (role === 'test') {",
+      "  const writesBuildConfig = role === 'test' || manifest.targetAssetType === 'component_code_surface';",
+      "  if (writesBuildConfig) {",
       "    const buildPath = path.join(manifest.productMaterialization.tenantRoot, 'build.sbt');",
       "    const moduleNames = manifest.productMaterialization.declaredModuleNames.length > 0 ? manifest.productMaterialization.declaredModuleNames : ['cdme-compiler'];",
       "    const moduleProjects = moduleNames.map((moduleName) => `lazy val \\`${moduleName}\\` = project.in(file(\"${moduleName}\"))`).join('\\n');",
@@ -5417,6 +5488,107 @@ test("T-158 non-materialization surface edges ignore empty product replay manife
   );
 });
 
+test("T-171 materialization replay uses compact handoff identity instead of parsing full historical manifests", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T001070000Z_pid158"
+  });
+  writeHandoffFiles(firstManifest);
+  const firstOutput = writeOutputSurface(
+    firstManifest,
+    "component_code_surface_replay_source"
+  );
+  const sourceContent = [
+    ...requirementTraceLines(firstManifest),
+    "package generated",
+    "",
+    "final case class ReplayedMapper(value: String)"
+  ].join("\n");
+  const sourceFile = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/ReplayedMapper.scala"
+  );
+  mkdirSync(dirname(sourceFile), { recursive: true });
+  writeFileSync(sourceFile, `${sourceContent}\n`, "utf8");
+  const materializedFiles = [
+    {
+      kind: "sdlc_materialized_product_file",
+      role: "source",
+      relativePath: path.relative(
+        firstManifest.productMaterialization.tenantRoot,
+        sourceFile
+      ),
+      absolutePath: sourceFile,
+      digest: sha256Text(`${sourceContent}\n`),
+      byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
+      requirementTraceObligationIds: requirementObligationIds(firstManifest)
+    }
+  ];
+  writeReport({
+    manifest: firstManifest,
+    digest: firstOutput.digest,
+    summary: "historical product source for compact replay",
+    materializedFiles
+  });
+  writeProductMaterializationManifest({
+    manifest: firstManifest,
+    report: readWorkerResultReport(firstManifest)
+  });
+
+  const replayIndexPath = path.join(
+    firstManifest.archiveRoot,
+    "handoff_replay_index.json"
+  );
+  assert.equal(existsSync(replayIndexPath), true);
+  rmSync(replayIndexPath);
+  writeFileSync(
+    path.join(firstManifest.archiveRoot, "handoff_manifest.json"),
+    `${readFileSync(path.join(firstManifest.archiveRoot, "handoff_manifest.json"), "utf8")}\nnot-json`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260511T001080000Z_pid158"
+  });
+  writeHandoffFiles(repairManifest);
+  const before = snapshotProductMaterializationRoot(
+    repairManifest.productMaterialization
+  );
+  const repairOutput = writeOutputSurface(
+    repairManifest,
+    "component_code_surface_replay_repair"
+  );
+  const repairReport = buildPostTransformWorkerResultReport({
+    manifest: repairManifest,
+    before
+  });
+
+  assert.equal(repairReport.digest, repairOutput.digest);
+  assert.equal(
+    repairReport.materializedFiles.some(
+      (file) =>
+        file.relativePath === "src/main/scala/generated/ReplayedMapper.scala" &&
+        file.materializationSource === "replay"
+    ),
+    true
+  );
+  assert.equal(repairReport.materializationDiagnostics.length, 0);
+});
+
 test("T-158 replay materialized file carrier requires predecessor lineage refs", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -7579,226 +7751,6 @@ test("T-083 failed execution-result evidence closes the execution source for dow
   assert.equal(closeDecision.disposition, "close");
 });
 
-test("T-083 repair schedule classifies shared sbt build definition failures as high confidence", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const tenantRoot = path.join(workspace, "build_tenants/scala_spark");
-  const designRoot = path.join(tenantRoot, "design");
-  mkdirSync(designRoot, { recursive: true });
-  const componentTestRows = [
-    {
-      kind: "sdlc_component_test_realization_row",
-      testClassId: "cdme.compiler.CompilerSpec",
-      relativePath:
-        "build_tenants/scala_spark/src/test/scala/cdme/compiler/CompilerSpec.scala",
-      testcaseIds: ["testcase://cdme-compiler/TC-COMPILER-001"],
-      componentIds: ["comp-compiler"],
-      requirementIds: ["REQ-T083-COMPILER"],
-      shardId: "test-shard-01-cdme-compiler"
-    },
-    {
-      kind: "sdlc_component_test_realization_row",
-      testClassId: "cdme.engine.EngineIntegrationSpec",
-      relativePath:
-        "build_tenants/scala_spark/src/test/scala/cdme/engine/EngineIntegrationSpec.scala",
-      testcaseIds: ["testcase://cdme-engine/TC-ENGINE-001"],
-      componentIds: ["comp-engine"],
-      requirementIds: ["REQ-T083-ENGINE"],
-      shardId: "test-shard-07-cdme-engine"
-    }
-  ];
-  writeFileSync(
-    path.join(designRoot, "component_test_surface.md"),
-    stableJsonForTest({
-      kind: "sdlc_component_depth_register",
-      registerVersion: "ts-component-depth-v1",
-      targetAssetType: "component_test_surface",
-      componentTopologyRows: [],
-      componentRealizationRows: [],
-      testComponentTopologyRows: [],
-      componentTestRows,
-      componentTestQualificationRows: [],
-      componentExecutionFailureRegister: null,
-      componentRepairSchedule: null,
-      releaseDepthParity: null
-    }),
-    "utf8"
-  );
-
-  const executionContract = hookContractByEdgeName(
-    "derive_test_execution_result_surface"
-  );
-  const executionManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: executionContract.edgeName,
-    vectorIndex: 26,
-    contract: executionContract,
-    projectConstraints: constraints,
-    runId: "t083-sbt-build-failure"
-  });
-  writeHandoffFiles(executionManifest);
-  const executionRoot = path.join(
-    executionManifest.archiveRoot,
-    "installed_operator_execution"
-  );
-  mkdirSync(executionRoot, { recursive: true });
-  const stderrPath = path.join(
-    executionRoot,
-    "test-shard-01-cdme-compiler.stderr.log"
-  );
-  writeFileSync(
-    stderrPath,
-    [
-      `${path.join(tenantRoot, "build.sbt")}:13: error: not found: value assembly`,
-      "assembly / assemblyMergeStrategy := {",
-      "^",
-      `${path.join(tenantRoot, "build.sbt")}:14: error: not found: value MergeStrategy`,
-      "  case PathList(\"META-INF\", xs @ _*) => MergeStrategy.discard"
-    ].join("\n"),
-    "utf8"
-  );
-  const summaryPath = path.join(
-    executionRoot,
-    "test-shard-01-cdme-compiler.summary.json"
-  );
-  writeFileSync(
-    summaryPath,
-    stableJsonForTest({
-      kind: "sdlc_installed_operator_execution_shard_summary",
-      shardId: "test-shard-01-cdme-compiler",
-      command: 'sbt "cdme-compiler/test"',
-      workingDirectory: tenantRoot,
-      status: 1,
-      signal: null,
-      error: null,
-      timedOut: false
-    }),
-    "utf8"
-  );
-  const fpEvaluatePath = executionManifest.fpEvaluateResultFile;
-  writeFileSync(fpEvaluatePath, "{}\n", "utf8");
-  writeFileSync(
-    executionManifest.reportFile,
-    stableJsonForTest({
-      kind: "odd_sdlc.worker_result_report",
-      projectionRole: "typed_fp_stage_projection",
-      authoritativeStageResultRef: pathToFileURL(fpEvaluatePath).href,
-      graphFunctionName: "derive_test_execution_result_surface",
-      edgeName: "derive_test_execution_result_surface",
-      targetAssetType: "test_execution_result_surface",
-      outputFile: executionManifest.outputFile,
-      digest: "sha256:t083",
-      summary: "framework-owned execution evidence observed sbt build definition failure",
-      unresolvedReasons: [],
-      materializedFiles: [],
-      executionEvidence: {
-        kind: "sdlc_worker_execution_evidence",
-        lane: "test",
-        command: "sbt test",
-        status: "failed",
-        reportRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href],
-        testsObserved: 0,
-        passedCount: 0,
-        failedCount: 0,
-        shardEvidence: componentTestRows.map((row) => ({
-          kind: "sdlc_worker_execution_shard_evidence",
-          shardId: row.shardId,
-          moduleName: row.componentIds[0],
-          lane: "test",
-          command: `sbt "${row.componentIds[0]}/test"`,
-          status: "failed",
-          reportRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href],
-          testsObserved: 0,
-          passedCount: 0,
-          failedCount: 0
-        }))
-      },
-      obligationAssessments: []
-    }),
-    "utf8"
-  );
-
-  const qualificationContract = hookContractByEdgeName(
-    "qualify_component_test_execution_surface"
-  );
-  const qualificationManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: qualificationContract.edgeName,
-    vectorIndex: 27,
-    contract: qualificationContract,
-    projectConstraints: constraints,
-    runId: "t083-sbt-build-failure-qualification"
-  });
-  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: qualificationManifest });
-  writeFileSync(
-    qualificationManifest.outputFile,
-    stableJsonForTest({
-      kind: "sdlc_component_depth_register",
-      registerVersion: "ts-component-depth-v1",
-      targetAssetType: "component_test_qualification_surface",
-      componentTopologyRows: [],
-      componentRealizationRows: [],
-      testComponentTopologyRows: [],
-      componentTestRows,
-      componentTestQualificationRows: [],
-      componentExecutionFailureRegister: {
-        kind: "component_execution_failure_register",
-        registerVersion: "ts-component-depth-v1",
-        failureRows: componentTestRows.map((row) => ({
-          kind: "sdlc_component_execution_failure_row",
-          failureId: `failure:${row.testClassId}:${row.shardId}`,
-          shardId: row.shardId,
-          moduleName: row.componentIds[0],
-          testClassId: row.testClassId,
-          testcaseIds: row.testcaseIds,
-          componentIds: row.componentIds,
-          requirementIds: row.requirementIds,
-          failureKind: "assertion_failure",
-          repairTarget: "component_code",
-          lawfulReentryPoint: "repair_worker_output",
-          attributionConfidence: "medium",
-          sourceRefs: row.componentIds.map((id) => `component:${id}`),
-          testRefs: [pathToFileURL(path.join(tenantRoot, row.relativePath)).href],
-          evidenceRefs: [pathToFileURL(stderrPath).href, pathToFileURL(summaryPath).href]
-        }))
-      },
-      componentRepairSchedule: null,
-      releaseDepthParity: null
-    }),
-    "utf8"
-  );
-
-  const scheduleContract = hookContractByEdgeName(
-    "derive_component_repair_schedule_surface"
-  );
-  const scheduleManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: scheduleContract.edgeName,
-    vectorIndex: 28,
-    contract: scheduleContract,
-    projectConstraints: constraints,
-    runId: "t083-sbt-build-failure-schedule"
-  });
-  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: scheduleManifest });
-  const register = JSON.parse(readFileSync(scheduleManifest.outputFile, "utf8"));
-  const repairRows = register.componentRepairSchedule.repairRows;
-
-  assert.equal(repairRows.length, 1);
-  assert.equal(repairRows[0].failureId, "failure:sbt-build-definition:all-shards");
-  assert.equal(repairRows[0].repairTarget, "component_code");
-  assert.equal(repairRows[0].attributionConfidence, "high");
-  assert(
-    repairRows[0].sourceRefs.some((ref) => ref.endsWith("/build.sbt"))
-  );
-  assert(
-    repairRows[0].testRefs.some((ref) =>
-      ref.endsWith("/build_tenants/scala_spark/src/test/scala/cdme/compiler/CompilerSpec.scala")
-    )
-  );
-});
 
 test("T-083 component-code admits sbt build plugin targets declared by implementation design", () => {
   const workspace = makeWorkspace();
@@ -8097,6 +8049,14 @@ test("T-083 component-code carries test-design requirements downstream", () => {
     sdlcAssessmentCarriesRequirementForDownstreamClosure(
       testRequirementAssessment
     )
+  );
+  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  assert.equal(
+    postflight.blockingReasons.some((reason) =>
+      reason.includes(testRequirementAssessment.obligationId)
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
 
@@ -8868,6 +8828,98 @@ test("B-080 execution-result recovery carries shard identity into repair blocker
   materializeSdlcProjectConformance({ workspaceRoot: workspace });
   const start = makeStart(workspace);
   const basis = start.executionContract.basis;
+  const executionWorkerScript = writeNoopWorkerScript(workspace);
+  const executionResult = await executeInstalledOperatorStart({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: `process://node?script=${encodeURIComponent(executionWorkerScript)}`,
+    replayEvents: preclosedEventsBeforeEdge(
+      basis,
+      "derive_test_execution_result_surface"
+    )
+  });
+  assert.notEqual(executionResult.status, "worker_failed");
+
+  const repairWorkerScript = writeRepairScheduleWorkerScript(workspace);
+  const result = await executeInstalledOperatorStart({
+    workspaceRoot: workspace,
+    start,
+    workerTransport: `process://node?script=${encodeURIComponent(repairWorkerScript)}`,
+    replayEvents: Object.freeze([
+      ...preclosedEventsBeforeEdge(basis, "derive_test_execution_result_surface"),
+      ...(await readOddSdlcRuntimeEvents(workspace))
+    ])
+  });
+
+  assert.equal(result.status, "postflight_failed");
+  assert.equal(result.postflight.status, "blocked");
+  const assuranceCarriers = result.postflight.blockingReasonCarriers.filter(
+    (carrier) => carrier.code === "assurance_ledger_reason"
+  );
+  assert.equal(
+    assuranceCarriers.length > 0,
+    true,
+    JSON.stringify(result.postflight.blockingReasonCarriers, null, 2)
+  );
+  assert.equal(
+    assuranceCarriers.every(
+      (carrier) => carrier.lawfulReentryPoint === "repair_worker_output"
+    ),
+    true
+  );
+  const assuranceEvidenceRefs = assuranceCarriers.flatMap(
+    (carrier) => carrier.evidenceRefs
+  );
+  assert.equal(
+    assuranceEvidenceRefs.some((ref) =>
+      ref.includes("test-shard-01-cdme-compiler.summary.json")
+    ),
+    true
+  );
+  assert.equal(
+    assuranceEvidenceRefs.some((ref) =>
+      ref.includes("test-shard-02-cdme-engine.summary.json")
+    ),
+    true
+  );
+  assert.equal(
+    result.gapDossier.reasons.some((reason) =>
+      reason.reason.startsWith("component_repair_schedule_")
+    ),
+    true,
+    JSON.stringify(result.gapDossier.reasons, null, 2)
+  );
+  assert.deepStrictEqual(result.gapDossier.nextLawfulActions, [
+    "repair_worker_output"
+  ]);
+  assert.equal(result.gapDossier.retryEligible, true);
+});
+
+test("B-080 silent repair schedule worker failures stop at runtime triage", async () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: b080_silent_repair_schedule_runtime",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - cdme-compiler",
+      "      - cdme-engine"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const start = makeStart(workspace);
+  const basis = start.executionContract.basis;
   const workerScript = writeSilentWorkerScript(workspace);
   const previousTimeout = process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
   const previousInactivityTimeout =
@@ -8883,52 +8935,20 @@ test("B-080 execution-result recovery carries shard identity into repair blocker
       workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
       replayEvents: preclosedEventsBeforeEdge(
         basis,
-        "derive_test_execution_result_surface"
+        "derive_component_repair_schedule_surface"
       )
     });
 
-    assert.equal(result.status, "postflight_failed");
-    assert.equal(result.postflight.status, "blocked");
-    const assuranceCarriers = result.postflight.blockingReasonCarriers.filter(
-      (carrier) => carrier.code === "assurance_ledger_reason"
-    );
+    assert.equal(result.status, "worker_failed");
     assert.equal(
-      assuranceCarriers.length > 0,
+      result.postflight.blockingReasonCarriers.some(
+        (carrier) =>
+          carrier.code === "worker_hard_timeout" &&
+          carrier.lawfulReentryPoint === "triage_gap"
+      ),
       true,
       JSON.stringify(result.postflight.blockingReasonCarriers, null, 2)
     );
-    assert.equal(
-      assuranceCarriers.every(
-        (carrier) => carrier.lawfulReentryPoint === "repair_worker_output"
-      ),
-      true
-    );
-    const assuranceEvidenceRefs = assuranceCarriers.flatMap(
-      (carrier) => carrier.evidenceRefs
-    );
-    assert.equal(
-      assuranceEvidenceRefs.some((ref) =>
-        ref.includes("test-shard-01-cdme-compiler.summary.json")
-      ),
-      true
-    );
-    assert.equal(
-      assuranceEvidenceRefs.some((ref) =>
-        ref.includes("test-shard-02-cdme-engine.summary.json")
-      ),
-      true
-    );
-    assert.equal(
-      result.gapDossier.reasons.some((reason) =>
-        reason.reason.startsWith("component_repair_schedule_")
-      ),
-      true,
-      JSON.stringify(result.gapDossier.reasons, null, 2)
-    );
-    assert.deepStrictEqual(result.gapDossier.nextLawfulActions, [
-      "repair_worker_output"
-    ]);
-    assert.equal(result.gapDossier.retryEligible, true);
   } finally {
     if (previousTimeout === undefined) {
       delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
@@ -8977,6 +8997,7 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       extraDirectives: [
         /componentRealizationRows must contain only source\/implementation rows/u,
         /Role=test targets, test\/ paths, proof-test targets, and execution evidence belong to component_test_surface/u,
+        /Do not emit payload\.componentRepairSchedule on component_code_surface/u,
         /source target set from admitted composite implementation design authority/u,
         /Exclude role=test fileTargetRows, validator\/proof-test component topology rows/u,
         /Build config files alone never satisfy required role source/u
@@ -9006,6 +9027,20 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
         /payload\.componentTestQualificationRows/u,
         /literal field name status/u,
         /passed, failed, blocked, pending, or unproven/u
+      ]
+    },
+    {
+      edgeName: "derive_component_repair_schedule_surface",
+      targetAssetType: "component_repair_schedule_surface",
+      registerKind: "component_depth_register",
+      carrierKind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      rowDirective: /payload\.componentRepairSchedule/u,
+      extraDirectives: [
+        /sdlc_component_repair_schedule_row/u,
+        /attributionConfidence=high only when/u,
+        /scheduleStatus=triage_gap/u,
+        /generic repair depth/u
       ]
     },
     {
@@ -9668,7 +9703,6 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     "component_realization_qualification_surface",
     "test_execution_result_surface",
     "component_test_qualification_surface",
-    "component_repair_schedule_surface",
     "release_depth_parity_surface"
   ]);
   const forbiddenPromptPatterns = [
@@ -9906,73 +9940,9 @@ test("T-102 installed operator interface writes execution evidence carrier", () 
   assert.equal(report.executionEvidence.shardEvidence[0].status, "succeeded");
 });
 
-test("T-102 installed operator interface derives repair schedule carrier", () => {
+test("T-171 repair schedule carrier is F_P-owned and ledger-evaluated", () => {
   const workspace = makeT102NodeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const tenantRoot = path.join(workspace, "build_tenants/typescript");
-  const qualificationPath = path.join(
-    tenantRoot,
-    "design/component_test_qualification_surface.md"
-  );
-  mkdirSync(dirname(qualificationPath), { recursive: true });
-  const failureRow = {
-    kind: "sdlc_component_execution_failure_row",
-    failureId: "failure:hello-test:unsharded",
-    shardId: "unsharded",
-    moduleName: "component-test",
-    testClassId: "hello-test",
-    testcaseIds: ["TC-HELLO-001"],
-    componentIds: ["hello-component"],
-    requirementIds: ["REQ-T102-HELLO"],
-    failureKind: "assertion_failure",
-    repairTarget: "component_code",
-    lawfulReentryPoint: "repair_worker_output",
-    attributionConfidence: "medium",
-    sourceRefs: ["component:hello-component"],
-    testRefs: [pathToFileURL(path.join(tenantRoot, "test/hello.test.js")).href],
-    evidenceRefs: ["artifact://t102/failing-test"]
-  };
-  writeFileSync(
-    qualificationPath,
-    stableJsonForTest({
-      kind: "sdlc_component_depth_register",
-      registerVersion: "ts-component-depth-v1",
-      targetAssetType: "component_test_qualification_surface",
-      componentTopologyRows: [],
-      componentRealizationRows: [],
-      testComponentTopologyRows: [],
-      componentTestRows: [
-        {
-          kind: "sdlc_component_test_realization_row",
-          testClassId: "hello-test",
-          relativePath: "test/hello.test.js",
-          testcaseIds: ["TC-HELLO-001"],
-          componentIds: ["hello-component"],
-          requirementIds: ["REQ-T102-HELLO"],
-          shardId: null
-        }
-      ],
-      componentTestQualificationRows: [
-        {
-          kind: "sdlc_component_test_qualification_row",
-          testClassId: "hello-test",
-          testcaseIds: ["TC-HELLO-001"],
-          componentIds: ["hello-component"],
-          requirementIds: ["REQ-T102-HELLO"],
-          status: "failed",
-          evidenceRefs: ["artifact://t102/failing-test"]
-        }
-      ],
-      componentExecutionFailureRegister: {
-        kind: "component_execution_failure_register",
-        registerVersion: "ts-component-depth-v1",
-        failureRows: [failureRow]
-      },
-      componentRepairSchedule: null,
-      releaseDepthParity: null
-    }),
-    "utf8"
-  );
   const contract = hookContractByEdgeName("derive_component_repair_schedule_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -9984,25 +9954,15 @@ test("T-102 installed operator interface derives repair schedule carrier", () =>
     runId: "t102-installed-operator-repair-schedule"
   });
 
-  assert.equal(
-    writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
-    manifest.outputFile
-  );
-  const admission = admitComponentDepthRegisterFromArtifact({
-    targetAssetType: "component_repair_schedule_surface",
-    outputFile: manifest.outputFile
-  });
+  assert.equal(writeInstalledOperatorOwnedEvaluationArtifact({ manifest }), null);
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(
-    admission.register.componentRepairSchedule.scheduleStatus,
-    "repair_required"
-  );
-  assert.equal(admission.register.componentRepairSchedule.repairRows.length, 1);
-  assert.equal(
-    admission.register.componentRepairSchedule.repairRows[0].failureId,
-    failureRow.failureId
-  );
+  const handoffFiles = writeHandoffFiles(manifest);
+  const prompt = readFileSync(handoffFiles.promptPath, "utf8");
+  assert.doesNotMatch(prompt, /Framework-owned evaluation artifact/u);
+  assert.match(prompt, /Emit payload\.componentRepairSchedule/u);
+  assert.match(prompt, /attributionConfidence=high only when/u);
+  assert.match(prompt, /scheduleStatus=triage_gap/u);
+  assert.match(prompt, /generic repair depth/u);
 });
 
 test("T-102 axiomatic construction algebra sweep maps fold dispositions to next-action law", () => {

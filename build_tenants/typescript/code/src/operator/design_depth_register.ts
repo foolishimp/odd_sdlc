@@ -1780,11 +1780,45 @@ function markdownSection(input: {
   readonly content: string;
   readonly heading: string;
 }): string {
-  const expression = new RegExp(
-    `^##+\\s+${escapedRegexLiteral(input.heading)}\\s*$([\\s\\S]*?)(?=^##+\\s+|(?![\\s\\S]))`,
-    "imu"
+  const headingWords = input.heading
+    .trim()
+    .split(/\s+/u)
+    .map(escapedRegexLiteral)
+    .join("\\s+");
+  const headingExpression = new RegExp(
+    `^(#{1,6})\\s+(?:\\d+(?:\\.\\d+)*\\.?\\s+)?(?:[^\\n]*?:\\s+)?${headingWords}\\s*$`,
+    "iu"
   );
-  return expression.exec(input.content)?.[1] ?? "";
+  const anyHeadingExpression = /^(#{1,6})\s+/u;
+  const lines = input.content.split(/\r?\n/u);
+  const startIndex = lines.findIndex((line) => headingExpression.test(line.trim()));
+  if (startIndex < 0) {
+    return "";
+  }
+  const headingMatch = headingExpression.exec(lines[startIndex]?.trim() ?? "");
+  const headingLevel = headingMatch?.[1]?.length ?? 6;
+  const selectedLines: string[] = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    const nextHeadingLevel = anyHeadingExpression.exec(line.trim())?.[1]?.length;
+    if (nextHeadingLevel !== undefined && nextHeadingLevel <= headingLevel) {
+      break;
+    }
+    selectedLines.push(line);
+  }
+  return selectedLines.join("\n");
+}
+
+function markdownSectionForHeadings(input: {
+  readonly content: string;
+  readonly headings: readonly string[];
+}): string {
+  for (const heading of input.headings) {
+    const section = markdownSection({ content: input.content, heading });
+    if (section.length > 0) {
+      return section;
+    }
+  }
+  return "";
 }
 
 function markdownTableCells(section: string): readonly (readonly string[])[] {
@@ -1834,6 +1868,21 @@ function markdownColumnIndex(input: {
   return input.fallback;
 }
 
+function markdownColumnIndexOrNull(input: {
+  readonly header: readonly string[];
+  readonly candidates: readonly string[];
+}): number | null {
+  for (const candidate of input.candidates.map(normalizedMarkdownHeader)) {
+    const index = input.header.findIndex(
+      (cell) => normalizedMarkdownHeader(cell) === candidate
+    );
+    if (index >= 0) {
+      return index;
+    }
+  }
+  return null;
+}
+
 function isRequirementAuthorityRef(input: string): boolean {
   return /^(?:REQ-[A-Z0-9][A-Z0-9_-]*|requirement:[^\s|]+|req_[A-Za-z0-9_]+)$/u.test(
     input
@@ -1878,10 +1927,6 @@ function uniqueRequirementRefs(values: readonly string[]): readonly string[] {
     }
   }
   return uniqueSorted([...byKey.values()]);
-}
-
-function requirementRefFromMarkdownCell(input: string): string | null {
-  return uniqueRequirementRefs(requirementRefMatches(input))[0] ?? null;
 }
 
 function firstMarkdownBulletValue(input: {
@@ -1930,7 +1975,14 @@ function parseFileTargetRowsFromMarkdown(content: string): readonly SdlcFileTarg
   );
   const pathColumn = markdownColumnIndex({
     header: table.header,
-    candidates: ["path", "relative path", "product file target"],
+    candidates: [
+      "path",
+      "relative path",
+      "output path",
+      "file path",
+      "target path",
+      "product file target"
+    ],
     fallback: 0
   });
   const roleColumn = markdownColumnIndex({
@@ -1956,13 +2008,369 @@ function parseFileTargetRowsFromMarkdown(content: string): readonly SdlcFileTarg
   );
 }
 
+type MarkdownComponentHint = {
+  readonly componentId: string;
+  readonly moduleName: string | null;
+  readonly relativePath: string | null;
+  readonly publicBoundary: string | null;
+  readonly upstreamComponentIds: readonly string[];
+};
+
+function componentRefFromMarkdownCell(input: string): string {
+  return cleanMarkdownCell(input)
+    .replace(/^component:\/\//iu, "")
+    .replace(/^module:\/\//iu, "")
+    .trim();
+}
+
+function runtimeEvidenceRefForComponent(componentId: string): string {
+  return `runtime-evidence://${slugPart(componentId)}`;
+}
+
+function normalizedNonePath(input: string, componentId: string): string {
+  const clean = cleanMarkdownCell(input);
+  return /^none(?:\b|\s|\()/iu.test(clean) || clean.length === 0
+    ? runtimeEvidenceRefForComponent(componentId)
+    : clean;
+}
+
+function parseComponentDependencyEdgesFromMarkdown(
+  content: string
+): ReadonlyMap<string, readonly string[]> {
+  const table = markdownTableWithHeader(
+    markdownSectionForHeadings({
+      content,
+      headings: [
+        "Component Topology",
+        "Component Topology And Requirement Lineage"
+      ]
+    })
+  );
+  const edgeColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["edge", "edge source target", "edge source to target"]
+  });
+  const sourceColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["source", "from", "predecessor"]
+  });
+  const targetColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["target", "to", "successor"]
+  });
+  const componentColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["component ref", "component", "component id"]
+  });
+  const dependsOnColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["depends on", "dependencies", "upstream components"]
+  });
+  const predecessorsByTarget = new Map<string, Set<string>>();
+  const addEdge = (source: string, target: string) => {
+    const cleanSource = componentRefFromMarkdownCell(source);
+    const cleanTarget = componentRefFromMarkdownCell(target);
+    if (cleanSource.length === 0 || cleanTarget.length === 0) {
+      return;
+    }
+    const predecessors = predecessorsByTarget.get(cleanTarget) ?? new Set<string>();
+    predecessors.add(cleanSource);
+    predecessorsByTarget.set(cleanTarget, predecessors);
+  };
+  if (
+    edgeColumn === null &&
+    (sourceColumn === null || targetColumn === null) &&
+    (componentColumn === null || dependsOnColumn === null)
+  ) {
+    return new Map();
+  }
+  for (const cells of table.rows) {
+    if (edgeColumn !== null) {
+      const edgeCell = cells[edgeColumn] ?? "";
+      const arrowParts = edgeCell.split(/\s*(?:->|→|=>)\s*/u);
+      if (arrowParts.length >= 2) {
+        addEdge(arrowParts[0] ?? "", arrowParts.slice(1).join(" "));
+        continue;
+      }
+    }
+    if (sourceColumn !== null && targetColumn !== null) {
+      addEdge(cells[sourceColumn] ?? "", cells[targetColumn] ?? "");
+      continue;
+    }
+    if (componentColumn !== null && dependsOnColumn !== null) {
+      const target = cells[componentColumn] ?? "";
+      for (const source of (cells[dependsOnColumn] ?? "").split(/[,;]|\band\b/iu)) {
+        if (!/^none$/iu.test(cleanMarkdownCell(source))) {
+          addEdge(source, target);
+        }
+      }
+    }
+  }
+  return new Map(
+    [...predecessorsByTarget.entries()].map(([target, predecessors]) => [
+      target,
+      uniqueSorted([...predecessors])
+    ])
+  );
+}
+
+function parseModuleBoundaryHintsFromMarkdown(
+  content: string
+): ReadonlyMap<string, MarkdownComponentHint> {
+  const table = markdownTableWithHeader(
+    markdownSection({ content, heading: "Module Boundary" })
+  );
+  const componentColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["component ref", "component", "component id"]
+  });
+  const moduleColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["module ref", "module", "module name"]
+  });
+  const boundaryColumn = markdownColumnIndex({
+    header: table.header,
+    candidates: ["public boundary", "boundary"],
+    fallback: 1
+  });
+  const hints = new Map<string, MarkdownComponentHint>();
+  if (componentColumn === null) {
+    return hints;
+  }
+  for (const cells of table.rows) {
+    const componentId = componentRefFromMarkdownCell(cells[componentColumn] ?? "");
+    if (componentId.length === 0) {
+      continue;
+    }
+    const moduleName =
+      moduleColumn === null
+        ? null
+        : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || null;
+    const publicBoundary = cleanMarkdownCell(cells[boundaryColumn] ?? "");
+    hints.set(
+      componentId,
+      Object.freeze({
+        componentId,
+        moduleName,
+        relativePath: null,
+        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
+        upstreamComponentIds: Object.freeze([])
+      })
+    );
+  }
+  return hints;
+}
+
+function parseComponentTopologyHintsFromMarkdown(
+  content: string
+): ReadonlyMap<string, MarkdownComponentHint> {
+  const table = markdownTableWithHeader(
+    markdownSectionForHeadings({
+      content,
+      headings: [
+        "Component Topology",
+        "Component Topology And Requirement Lineage"
+      ]
+    })
+  );
+  const componentColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["component ref", "component", "component id"]
+  });
+  if (componentColumn === null) {
+    return new Map();
+  }
+  const moduleColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["module ref", "module", "module name"]
+  });
+  const boundaryColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["public boundary", "public symbol shape", "boundary", "exposes"]
+  });
+  const dependencyEdges = parseComponentDependencyEdgesFromMarkdown(content);
+  const hints = new Map<string, MarkdownComponentHint>();
+  for (const cells of table.rows) {
+    const componentId = componentRefFromMarkdownCell(cells[componentColumn] ?? "");
+    if (componentId.length === 0) {
+      continue;
+    }
+    const publicBoundary =
+      boundaryColumn === null ? "" : cleanMarkdownCell(cells[boundaryColumn] ?? "");
+    const moduleName =
+      moduleColumn === null
+        ? componentId
+        : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || componentId;
+    hints.set(
+      componentId,
+      Object.freeze({
+        componentId,
+        moduleName,
+        relativePath: null,
+        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
+        upstreamComponentIds: dependencyEdges.get(componentId) ?? Object.freeze([])
+      })
+    );
+  }
+  return hints;
+}
+
+function parseComponentRealizationHintsFromMarkdown(
+  content: string
+): ReadonlyMap<string, MarkdownComponentHint> {
+  const table = markdownTableWithHeader(
+    markdownSectionForHeadings({
+      content,
+      headings: ["Component Realization", "Component Realization Targets"]
+    })
+  );
+  const dependencyEdges = parseComponentDependencyEdgesFromMarkdown(content);
+  const componentColumn = markdownColumnIndex({
+    header: table.header,
+    candidates: ["component ref", "component", "component id"],
+    fallback: 0
+  });
+  const pathColumn = markdownColumnIndex({
+    header: table.header,
+    candidates: [
+      "output path",
+      "path",
+      "relative path",
+      "realization file",
+      "later source target",
+      "source target"
+    ],
+    fallback: 2
+  });
+  const moduleColumn = markdownColumnIndexOrNull({
+    header: table.header,
+    candidates: ["module ref", "module", "module name"]
+  });
+  const boundaryColumn = markdownColumnIndex({
+    header: table.header,
+    candidates: ["public boundary", "public symbol shape", "boundary"],
+    fallback: 3
+  });
+  const hints = new Map<string, MarkdownComponentHint>();
+  for (const cells of table.rows) {
+    const componentId = componentRefFromMarkdownCell(cells[componentColumn] ?? "");
+    if (componentId.length === 0) {
+      continue;
+    }
+    const relativePath = normalizedNonePath(cells[pathColumn] ?? "", componentId);
+    const publicBoundary = cleanMarkdownCell(cells[boundaryColumn] ?? "");
+    hints.set(
+      componentId,
+      Object.freeze({
+        componentId,
+        moduleName:
+          moduleColumn === null
+            ? null
+            : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || null,
+        relativePath,
+        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
+        upstreamComponentIds: dependencyEdges.get(componentId) ?? Object.freeze([])
+      })
+    );
+  }
+  return hints;
+}
+
+function mergeComponentHints(
+  ...hintMaps: readonly ReadonlyMap<string, MarkdownComponentHint>[]
+): ReadonlyMap<string, MarkdownComponentHint> {
+  const merged = new Map<string, MarkdownComponentHint>();
+  for (const hintMap of hintMaps) {
+    for (const hint of hintMap.values()) {
+      const prior = merged.get(hint.componentId);
+      merged.set(
+        hint.componentId,
+        Object.freeze({
+          componentId: hint.componentId,
+          moduleName: hint.moduleName ?? prior?.moduleName ?? null,
+          relativePath: hint.relativePath ?? prior?.relativePath ?? null,
+          publicBoundary: hint.publicBoundary ?? prior?.publicBoundary ?? null,
+          upstreamComponentIds: uniqueSorted([
+            ...(prior?.upstreamComponentIds ?? []),
+            ...hint.upstreamComponentIds
+          ])
+        })
+      );
+    }
+  }
+  return merged;
+}
+
+function parseRequirementLineageSubsectionRows(input: {
+  readonly content: string;
+  readonly componentHints: ReadonlyMap<string, MarkdownComponentHint>;
+}): readonly {
+  readonly requirementId: string;
+  readonly componentId: string;
+  readonly relativePath: string;
+}[] {
+  const section = markdownSection({ content: input.content, heading: "Requirement Lineage" });
+  if (section.length === 0) {
+    return Object.freeze([]);
+  }
+  const lines = section.split(/\r?\n/u);
+  const rows: {
+    readonly requirementId: string;
+    readonly componentId: string;
+    readonly relativePath: string;
+  }[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = /^#{3,6}\s+Requirement\s+Lineage\s*(?:[-—:]\s*)?(.+)$/iu.exec(
+      lines[index]?.trim() ?? ""
+    );
+    if (heading === null) {
+      continue;
+    }
+    const componentId = componentRefFromMarkdownCell(heading[1] ?? "");
+    if (componentId.length === 0) {
+      continue;
+    }
+    const blockLines: string[] = [];
+    for (const line of lines.slice(index + 1)) {
+      if (/^#{3,6}\s+/u.test(line.trim())) {
+        break;
+      }
+      blockLines.push(line);
+    }
+    const hint = input.componentHints.get(componentId);
+    const relativePath =
+      hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId);
+    for (const requirementId of requirementIdsFromText(blockLines.join("\n"))) {
+      rows.push(
+        Object.freeze({
+          requirementId,
+          componentId,
+          relativePath
+        })
+      );
+    }
+  }
+  return Object.freeze(rows);
+}
+
 function parseLineageRowsFromMarkdown(content: string): readonly {
   readonly requirementId: string;
   readonly componentId: string;
   readonly relativePath: string;
 }[] {
+  const componentHints = mergeComponentHints(
+    parseModuleBoundaryHintsFromMarkdown(content),
+    parseComponentTopologyHintsFromMarkdown(content),
+    parseComponentRealizationHintsFromMarkdown(content)
+  );
   const table = markdownTableWithHeader(
-    markdownSection({ content, heading: "Requirement Lineage" })
+    markdownSectionForHeadings({
+      content,
+      headings: [
+        "Requirement Lineage",
+        "Component Topology And Requirement Lineage"
+      ]
+    })
   );
   const requirementColumn = markdownColumnIndex({
     header: table.header,
@@ -1970,16 +2378,18 @@ function parseLineageRowsFromMarkdown(content: string): readonly {
       "obligation id",
       "requirement id",
       "requirement ref",
+      "requirement refs",
+      "requirement ids",
+      "requirement references",
       "requirement"
     ],
     fallback: 0
   });
-  const componentColumn = markdownColumnIndex({
+  const componentColumn = markdownColumnIndexOrNull({
     header: table.header,
-    candidates: ["owning component", "owned by", "component", "owner component"],
-    fallback: 1
+    candidates: ["owning component", "owning component ref", "owned by", "component", "component ref", "owner component"]
   });
-  const pathColumn = markdownColumnIndex({
+  const pathColumn = markdownColumnIndexOrNull({
     header: table.header,
     candidates: [
       "realization file",
@@ -1988,38 +2398,50 @@ function parseLineageRowsFromMarkdown(content: string): readonly {
       "source file",
       "realization locus",
       "closure mechanism"
-    ],
-    fallback: 2
+    ]
   });
   const candidateRows = table.rows
-    .map((cells) => {
-      const requirementId =
-        requirementRefFromMarkdownCell(cells[requirementColumn] ?? "") ?? "";
-      const componentId = cells[componentColumn] ?? "";
-      const relativePath = cells[pathColumn] ?? "";
+    .flatMap((cells) => {
+      const requirementIds = requirementIdsFromText(cells[requirementColumn] ?? "");
+      const componentId = componentColumn === null
+        ? ""
+        : componentRefFromMarkdownCell(cells[componentColumn] ?? "");
+      const hint = componentHints.get(componentId);
+      const relativePath =
+        pathColumn === null
+          ? hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId)
+          : cleanMarkdownCell(cells[pathColumn] ?? "") ||
+            (hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId));
       if (
-        !isRequirementAuthorityRef(requirementId) ||
+        requirementIds.length === 0 ||
         componentId.length === 0 ||
         relativePath.length === 0
       ) {
-        return null;
+        return [];
       }
-      return Object.freeze({ requirementId, componentId, relativePath });
+      return requirementIds.map((requirementId) =>
+        Object.freeze({ requirementId, componentId, relativePath })
+      );
     })
     .filter((row): row is {
       readonly requirementId: string;
       readonly componentId: string;
       readonly relativePath: string;
     } => row !== null);
+  const subsectionRows = parseRequirementLineageSubsectionRows({
+    content,
+    componentHints
+  });
+  const mergedRows = [...candidateRows, ...subsectionRows];
   const concreteComponentIds = uniqueSorted(
-    candidateRows
+    mergedRows
       .map((row) => row.componentId)
       .filter((componentId) => !/^residual\b:?/iu.test(componentId))
   );
   const residualOwner =
     concreteComponentIds.length === 1 ? concreteComponentIds[0] : null;
   return Object.freeze(
-    candidateRows
+    mergedRows
       .map((row) => {
         if (!/^residual\b:?/iu.test(row.componentId)) {
           return row;
@@ -2084,6 +2506,11 @@ function deriveRegisterFromMarkdownArtifact(input: {
 }): SdlcDesignDepthRegister | null {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   const fileTargetRows = parseFileTargetRowsFromMarkdown(input.content);
+  const componentHints = mergeComponentHints(
+    parseModuleBoundaryHintsFromMarkdown(input.content),
+    parseComponentTopologyHintsFromMarkdown(input.content),
+    parseComponentRealizationHintsFromMarkdown(input.content)
+  );
   const lineageRows = parseLineageRowsFromMarkdown(input.content);
   const allRequirementIds = requirementIdsFromText(input.content);
   const primarySourcePath =
@@ -2117,13 +2544,17 @@ function deriveRegisterFromMarkdownArtifact(input: {
     `module:${moduleName}`;
   const componentIds = uniqueSorted(
     lineageRows.length === 0
-      ? [`${moduleName}.main`]
+      ? componentHints.size === 0
+        ? [`${moduleName}.main`]
+        : [...componentHints.keys()]
       : lineageRows.map((row) => row.componentId)
   );
   const componentTopologyRows = Object.freeze(
     componentIds.map((componentId) => {
       const ownedRows = lineageRows.filter((row) => row.componentId === componentId);
+      const componentHint = componentHints.get(componentId);
       const relativePath =
+        componentHint?.relativePath ??
         primarySourcePath ??
         ownedRows[0]?.relativePath ??
         `${moduleName}/main`;
@@ -2132,14 +2563,20 @@ function deriveRegisterFromMarkdownArtifact(input: {
           ? allRequirementIds
           : ownedRows.map((row) => row.requirementId)
       );
-      const selectedModuleName = moduleNameFromComponentId(componentId, moduleName);
+      const selectedModuleName =
+        componentHint?.moduleName ?? moduleNameFromComponentId(componentId, moduleName);
+      const selectedPublicBoundary =
+        componentHint?.publicBoundary ?? publicBoundary;
       return Object.freeze({
         kind: "sdlc_component_topology_row" as const,
         componentId,
         moduleName: selectedModuleName,
         relativePath,
-        publicBoundary,
-        concernRole: concernRoleFromBoundary({ publicBoundary, relativePath }),
+        publicBoundary: selectedPublicBoundary,
+        concernRole: concernRoleFromBoundary({
+          publicBoundary: selectedPublicBoundary,
+          relativePath
+        }),
         requirementIds,
         sourceAssetRefs: evidenceRefs
       });
@@ -2155,7 +2592,7 @@ function deriveRegisterFromMarkdownArtifact(input: {
         publicBoundary: row.publicBoundary,
         trancheId: null,
         firstProductFileToChange: row.relativePath,
-        upstreamComponentIds: Object.freeze([]),
+        upstreamComponentIds: componentHints.get(row.componentId)?.upstreamComponentIds ?? Object.freeze([]),
         requirementIds: row.requirementIds,
         sourceAssetRefs: row.sourceAssetRefs
       })
@@ -2181,13 +2618,15 @@ function deriveRegisterFromMarkdownArtifact(input: {
         buildTool
       })
     ]),
-    implementationModuleRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_implementation_module_row" as const,
-        moduleName,
-        moduleRef: `module://${slugPart(moduleName)}`
-      })
-    ]),
+    implementationModuleRows: Object.freeze(
+      uniqueSorted(componentTopologyRows.map((row) => row.moduleName)).map((rowModuleName) =>
+        Object.freeze({
+          kind: "sdlc_implementation_module_row" as const,
+          moduleName: rowModuleName,
+          moduleRef: `module://${slugPart(rowModuleName)}`
+        })
+      )
+    ),
     aggregateDomainModelRows: Object.freeze([
       Object.freeze({
         kind: "sdlc_aggregate_domain_model_row" as const,

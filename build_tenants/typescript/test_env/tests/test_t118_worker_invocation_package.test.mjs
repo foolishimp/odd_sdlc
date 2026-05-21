@@ -295,6 +295,14 @@ test("T-118 writes a compact worker invocation package while preserving the full
     "constructionTemplate" in invocationPackage.targetCarrierProjection,
     false
   );
+  assert.deepEqual(
+    constructionBrief.packageDispositions.map((entry) => entry.packageName),
+    ["worker_construction_brief.json"]
+  );
+  assert.doesNotMatch(
+    readFileSync(files.constructionBriefPath, "utf8"),
+    /worker_invocation_package\.json|traversal_intent_package\.json|handoff_manifest\.json/u
+  );
   assert(constructionBrief.currentState.authorityRefs.length > 0);
   assert(constructionBrief.currentState.authorityIndex.length > 0);
   assert(
@@ -398,6 +406,10 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.match(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].join("\n"),
     /Do not spawn another worker or resume traversal/u
+  );
+  assert.doesNotMatch(
+    [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].join("\n"),
+    /worker_invocation_package\.json|traversal_intent_package\.json|handoff_manifest\.json/u
   );
   assert(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].some(

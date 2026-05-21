@@ -332,7 +332,7 @@ test("T-172 accounts conditional repair pressure without treating it as always-o
 
   assert.ok(repairRow);
   assert.equal(repairRow.disposition, "conditional");
-  assert.equal(repairRow.workerDispatchAllowed, false);
+  assert.equal(repairRow.workerDispatchAllowed, true);
   assert.deepEqual(repairRow.ownedPressureRefs, [
     "pressure://component-failure/repair-schedule"
   ]);
@@ -383,6 +383,15 @@ test("T-172 rejects observed worker dispatch on no-dispatch accounting rows", ()
   );
 });
 
+test("T-172 F_D failure rows do not embed stack-specific build-tool classifiers", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "code/src/operator/handoff.ts"),
+    "utf8"
+  );
+  assert.doesNotMatch(source, /sharedSbtBuildConfigurationFailureRow/u);
+  assert.doesNotMatch(source, /failure:sbt-build-definition/u);
+});
+
 test("T-172 installed operator executes no-dispatch edges without worker_run", async () => {
   const noDispatchEdgeNames = SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING
     .filter((row) => !row.workerDispatchAllowed)
@@ -394,7 +403,6 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
     "prepare_test_execution_surface",
     "derive_test_execution_result_surface",
     "qualify_component_test_execution_surface",
-    "derive_component_repair_schedule_surface",
     "derive_test_run_archive_surface",
     "derive_release_depth_parity_surface",
     "prepare_release_surface"

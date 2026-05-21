@@ -180,6 +180,14 @@ dispatch on those rows.
 Subordinate payloads, manifests, archive files, and projections may serialize
 these carriers. They do not become parallel authority.
 
+Prompt-bearing and replay-bearing projections stay compact by default. The
+worker-facing construction brief carries current intent, authority refs, digests,
+target summary, and bounded obligation pressure. It does not advertise expanded
+forensic package files as worker input. Runtime replay uses compact handoff
+identity indexes and bounded liveness summaries on hot paths; full manifests,
+event streams, and package payloads remain archive evidence for explicit
+forensic inspection.
+
 ## Structural Carrier Diagram
 
 This is the DMM structural carrier asset for the active edge assurance contract

@@ -1049,6 +1049,30 @@ test("T-161 markdown renderer outputs each required section header", () => {
   }
 });
 
+test("T-161 markdown renderer bounds high-volume run tables by default", () => {
+  const archiveRoot = makeTempDir("odd-sdlc-ts-t161-markdown-bounded-");
+  try {
+    buildSyntheticT132Archive({
+      rootDir: archiveRoot,
+      edges: Array.from({ length: 75 }, (_, index) => ({
+        name: `derive_synthetic_edge_${String(index).padStart(2, "0")}`,
+        target: "component_code_surface"
+      }))
+    });
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: archiveRoot,
+      profile: "hello_world"
+    });
+    const md = renderSdlcFdRunAnalysisMarkdown(result);
+    assert.match(md, /bounded projection: showing first 30 and last 30; omitted 15\./u);
+    assert.match(md, /derive_synthetic_edge_00/u);
+    assert.match(md, /derive_synthetic_edge_74/u);
+    assert.doesNotMatch(md, /derive_synthetic_edge_37/u);
+  } finally {
+    rmSync(archiveRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-161 performs no writes to the inspected archive", () => {
   const archiveRoot = makeTempDir("odd-sdlc-ts-t161-readonly-");
   try {

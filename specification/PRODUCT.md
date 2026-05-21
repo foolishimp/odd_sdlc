@@ -218,6 +218,12 @@ construction templates, row templates, ledgers, and evaluator carriers remain
 archive or evaluator surfaces unless a current gap explicitly cites one for
 diagnosis.
 
+Runtime replay follows the same boundary. Hot-path replay and worker-facing
+state projection carry compact identity indexes, refs, digests, and bounded
+summary rows. Full handoff manifests, liveness streams, event archives, and
+forensic package payloads remain archive truth for explicit diagnosis; they are
+not default worker input and they are not default replay scan input.
+
 This boundary prevents `F_D` from becoming a hidden shortcut around the generic
 product definition. Deterministic work can make the generic `F_P` path cheaper,
 narrower, more replayable, and easier to close; it cannot stand in for the

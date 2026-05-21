@@ -292,3 +292,47 @@ test("T-113 admits repair and release-depth rows on current component-depth targ
     "admitted"
   );
 });
+
+test("T-113 ignores stale repair schedule payload on component-code target", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "source-component",
+        moduleName: "source",
+        relativePath: "src/main/scala",
+        publicBoundary: "source boundary",
+        requirementIds: ["requirement:data_mapper.req_source"],
+        sourceAssetRefs: ["build_tenants/scala_spark/src/main/scala"]
+      }
+    ],
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "no_repair_required",
+      repairRows: [
+        {
+          kind: "sdlc_component_repair_schedule_row",
+          scheduleId: "stale-row",
+          failureId: "stale-failure",
+          repairTarget: "component_code",
+          lawfulReentryPoint: "repair_worker_output",
+          attributionConfidence: "high"
+        }
+      ]
+    }
+  };
+  const { outputFile } = writeArtifact(register, "component_code_surface");
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentRepairSchedule, null);
+  assert.equal(admission.register.componentRealizationRows.length, 1);
+});

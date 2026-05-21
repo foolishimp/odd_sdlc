@@ -75,6 +75,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "tenant_stack_authority_missing",
   "tenant_stack_authority_invalid",
   "staged_authority_missing",
+  "staged_authority_admission_invalid",
   "staged_decomposition_rejected",
   "staged_dependency_map_missing",
   "staged_dependency_traversal_blocked",
@@ -388,6 +389,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       lawfulReentryPoint: "same_edge_retry",
       message:
         "Target carrier envelope evidence is missing for the selected contract."
+    });
+  }
+  if (code === "staged_authority_admission_invalid") {
+    return Object.freeze({
+      reasonClass: "contract_violation",
+      lawfulReentryPoint: "repair_worker_output",
+      message:
+        "Staged construction authority carrier could not be admitted as a closed typed carrier."
     });
   }
   if (code.startsWith("tenant_stack_")) {
