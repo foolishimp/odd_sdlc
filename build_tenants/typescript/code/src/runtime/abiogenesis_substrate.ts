@@ -52,7 +52,7 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.7.1-rc.1",
+  packageVersion: "3.8.0-rc.3",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   temporalTruthAuthority: "abiogenesis",
@@ -76,9 +76,9 @@ export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
     "ABIogenesis T-119 temporal GTL algebra is admitted through ABG runtime events",
     "ABIogenesis T-120 Event Calculus replay derives HoldsAt truth from admitted events",
     "ABIogenesis T-122 deadline pressure is replay-derived temporal projection truth",
-    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs for 3.7.1-rc.1",
+    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs for 3.8.0-rc.3",
     "ABIogenesis T-127 publishes the F_P construction evaluator and read-only public gaps ranking substrate under 3.7.0-rc.1",
-    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate under 3.7.1-rc.1"
+    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate under 3.8.0-rc.3"
   ])
 } as const);
 

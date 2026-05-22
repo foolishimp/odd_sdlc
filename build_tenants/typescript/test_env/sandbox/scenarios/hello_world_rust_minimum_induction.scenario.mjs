@@ -1,6 +1,7 @@
 // Minimum Rust hello-world induction scenario.
-// This is the loose-input lane: Fg_conform_project induces intent, product,
-// goals, and keyed requirement-family files from input.md plus constraints.
+// This is the loose-input lane: Fg_conform_project materializes the bootstrap
+// read model, canonical constraints, and tenant registry from input.md plus
+// constraints.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,9 +45,8 @@ export const helloWorldRustMinimumInductionScenario = Object.freeze({
     requirementIds: HELLO_WORLD_RUST_MINIMUM_INDUCTION_REQUIREMENT_IDS,
     workspaceFiles: [
       ".ai-workspace/context/project_bootstrap.md",
-      "specification/INTENT.md",
-      "specification/PRODUCT.md",
-      "specification/GOALS.md"
+      ".ai-workspace/context/project_constraints.yml",
+      "build_tenants/TENANT_REGISTRY.md"
     ],
     archiveArtifacts: ["conform_project_report.json"]
   },

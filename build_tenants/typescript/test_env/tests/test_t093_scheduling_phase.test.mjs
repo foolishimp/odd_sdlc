@@ -102,6 +102,22 @@ function makeWorkspace() {
     "utf8"
   );
   mkdirSync(path.join(root, "build_tenants/typescript"), { recursive: true });
+  mkdirSync(path.join(root, "build_tenants/typescript/spec"), { recursive: true });
+  writeFileSync(
+    path.join(root, "build_tenants/typescript/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "TypeScript",
+        buildTool: "npm",
+        runtime: "node",
+        testRunner: "node --test"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   writeFileSync(
     path.join(root, "build_tenants/typescript/package.json"),
     `${JSON.stringify(

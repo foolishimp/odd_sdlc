@@ -7,16 +7,65 @@ import { operatorRunRef } from "./archive_reader.js";
 import type { OperatorRunCarriers } from "./carrier_loaders.js";
 import type { DiagnosticDraft } from "./diagnostics.js";
 import type { SdlcFdRunAnalysisRuntimeArtifactGap } from "./types.js";
+import {
+  isSdlcOperatorRunArtifactRequiredForContext,
+  operatorRunArtifactRows,
+  type SdlcOperatorRunArtifactRow
+} from "../contracts/operator_run_artifact_catalog.js";
+import {
+  constructSdlcProductGraphContractCatalog,
+  type SdlcProductGraphContractRow
+} from "../contracts/product_graph_contract_catalog.js";
+import {
+  constructSdlcGtlModule,
+  constructSdlcTargetCarrierRegistry,
+  constructSdlcTraversalOverlayCatalog,
+  SDLC_EDGE_GAIN_CLOSURE_CONTRACTS
+} from "../graph/index.js";
 
-const REQUIRED_ARTIFACTS_FOR_PRESENT_EDGE: readonly string[] = Object.freeze([
-  "worker_run.json",
-  "worker_invocation_package.json",
-  "handoff_manifest.json",
-  "fp_evaluate_result.json",
-  "sdlc_edge_closure_decision.json",
-  "sdlc_edge_fulfillment_ledger.json",
-  "sdlc_next_action_projection.json"
-]);
+type RuntimeCarrierLoadState =
+  | { readonly status: "present" | "missing" }
+  | { readonly status: "malformed"; readonly detail: string };
+
+const DEFAULT_PRODUCT_GRAPH_CONTRACT_CATALOG = (() => {
+  const module = constructSdlcGtlModule();
+  const targetCarrierRegistry = constructSdlcTargetCarrierRegistry({ module });
+  const overlayCatalog = constructSdlcTraversalOverlayCatalog({ module });
+  return constructSdlcProductGraphContractCatalog({
+    module,
+    edgeContracts: SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
+    targetCarrierRows: targetCarrierRegistry.rows,
+    overlays: overlayCatalog.overlays
+  });
+})();
+
+function artifactMissingGap(input: {
+  readonly operatorRunRefValue: string;
+  readonly artifact: SdlcOperatorRunArtifactRow;
+  readonly detail: string | null;
+}): SdlcFdRunAnalysisRuntimeArtifactGap {
+  return Object.freeze({
+    operatorRunRef: input.operatorRunRefValue,
+    artifact: input.artifact.relativePath,
+    status: "missing" as const,
+    detail: input.detail
+  });
+}
+
+function missingArtifactDiagnostic(input: {
+  readonly operatorRunRefValue: string;
+  readonly artifact: SdlcOperatorRunArtifactRow;
+  readonly detail: string;
+}): DiagnosticDraft {
+  return {
+    code: "runtime_artifact_missing",
+    severity: "warn",
+    detail: input.detail,
+    evidenceRefs: Object.freeze([input.operatorRunRefValue]),
+    operatorRunRef: input.operatorRunRefValue,
+    edgeName: null
+  };
+}
 
 function fileExists(filePath: string): boolean {
   if (!existsSync(filePath)) {
@@ -27,6 +76,82 @@ function fileExists(filePath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function observedEdgeName(carriers: OperatorRunCarriers): string | null {
+  if (
+    carriers.handoffManifest.status === "present" &&
+    typeof carriers.handoffManifest.data.edgeName === "string"
+  ) {
+    return carriers.handoffManifest.data.edgeName;
+  }
+  if (
+    carriers.operatorSummary.status === "present" &&
+    typeof carriers.operatorSummary.data.currentEdge === "string"
+  ) {
+    return carriers.operatorSummary.data.currentEdge;
+  }
+  return null;
+}
+
+function selectedDependencyTraversalMethods(
+  carriers: OperatorRunCarriers
+): readonly string[] {
+  return Object.freeze([
+    ...(carriers.moduleDependencyTraversalSelection.status === "present"
+      ? [carriers.moduleDependencyTraversalSelection.data.selectedMethod]
+      : []),
+    ...(carriers.testDependencyTraversalSelection.status === "present"
+      ? [carriers.testDependencyTraversalSelection.data.selectedMethod]
+      : [])
+  ]);
+}
+
+function productGraphRowForCarriers(
+  carriers: OperatorRunCarriers
+): SdlcProductGraphContractRow | null {
+  const edgeName = observedEdgeName(carriers);
+  if (edgeName === null) {
+    return null;
+  }
+  return DEFAULT_PRODUCT_GRAPH_CONTRACT_CATALOG.rowByEdgeRef[edgeName] ?? null;
+}
+
+function requirednessContextForCarriers(carriers: OperatorRunCarriers) {
+  const productGraphRow = productGraphRowForCarriers(carriers);
+  return Object.freeze({
+    edgeRef: productGraphRow?.edgeRef ?? observedEdgeName(carriers),
+    targetAssetType:
+      productGraphRow?.targetAssetType ??
+      (carriers.handoffManifest.status === "present" &&
+      typeof carriers.handoffManifest.data.targetAssetType === "string"
+        ? carriers.handoffManifest.data.targetAssetType
+        : null),
+    closureDisposition:
+      carriers.edgeClosure.status === "present"
+        ? carriers.edgeClosure.data.disposition ?? null
+        : null,
+    selectedDependencyTraversalMethods: selectedDependencyTraversalMethods(carriers),
+    productGraphRequiredArtifactRefs:
+      productGraphRow?.requiredArtifactRefs ?? Object.freeze([])
+  });
+}
+
+function runtimeCarrierLoadStateForArtifact(input: {
+  readonly carriers: OperatorRunCarriers;
+  readonly artifact: SdlcOperatorRunArtifactRow;
+}): RuntimeCarrierLoadState | undefined {
+  const loaded = input.carriers.artifactStateByRef[input.artifact.artifactRef];
+  if (loaded === undefined) {
+    return undefined;
+  }
+  if (loaded.status === "malformed") {
+    return Object.freeze({
+      status: "malformed" as const,
+      detail: loaded.detail
+    });
+  }
+  return Object.freeze({ status: loaded.status });
 }
 
 export function deriveRuntimeArtifactGaps(input: {
@@ -43,112 +168,55 @@ export function deriveRuntimeArtifactGaps(input: {
       continue;
     }
     const operatorRunRefValue = operatorRunRef(carriers.operatorRunRoot);
-    const closure = carriers.edgeClosure.status === "present"
-      ? carriers.edgeClosure.data
-      : null;
-    const requiresProductManifest =
-      closure?.disposition === "close" &&
-      carriers.handoffManifest.status === "present" &&
-      typeof carriers.handoffManifest.data.targetAssetType === "string" &&
-      carriers.handoffManifest.data.targetAssetType !==
-        "feature_decomp_surface";
-    for (const artifact of REQUIRED_ARTIFACTS_FOR_PRESENT_EDGE) {
-      const filePath = path.join(carriers.operatorRunRoot, artifact);
-      if (!fileExists(filePath)) {
-        gaps.push(Object.freeze({
-          operatorRunRef: operatorRunRefValue,
+    const requirednessContext = requirednessContextForCarriers(carriers);
+    for (const artifact of operatorRunArtifactRows()) {
+      if (
+        !isSdlcOperatorRunArtifactRequiredForContext({
           artifact,
-          status: "missing" as const,
-          detail: null
+          context: requirednessContext
+        })
+      ) {
+        continue;
+      }
+      const filePath = path.join(carriers.operatorRunRoot, artifact.relativePath);
+      if (!fileExists(filePath)) {
+        const detail = artifact.requiredWhen === undefined
+          ? null
+          : `${artifact.requiredWhen}: ${artifact.relativePath} missing in ${operatorRunRefValue}`;
+        gaps.push(artifactMissingGap({
+          operatorRunRefValue,
+          artifact,
+          detail
         }));
-        diagnostics.push({
-          code: "runtime_artifact_missing",
-          severity: "warn",
-          detail: `${artifact} missing in ${operatorRunRefValue}`,
-          evidenceRefs: Object.freeze([operatorRunRefValue]),
-          operatorRunRef: operatorRunRefValue,
-          edgeName: null
-        });
+        diagnostics.push(missingArtifactDiagnostic({
+          operatorRunRefValue,
+          artifact,
+          detail: detail ?? `${artifact.relativePath} missing in ${operatorRunRefValue}`
+        }));
       }
     }
-    if (requiresProductManifest && carriers.productManifest.status === "missing") {
-      const refPath = path.join(carriers.operatorRunRoot, "product_materialization_manifest.json");
-      gaps.push(Object.freeze({
-        operatorRunRef: operatorRunRefValue,
-        artifact: "product_materialization_manifest.json",
-        status: "missing" as const,
-        detail: "product edge with no materialization manifest"
-      }));
-      diagnostics.push({
-        code: "runtime_artifact_missing",
-        severity: "warn",
-        detail: `product_materialization_manifest.json missing in ${operatorRunRefValue}`,
-        evidenceRefs: Object.freeze([refPath]),
-        operatorRunRef: operatorRunRefValue,
-        edgeName: null
-      });
-    }
-    const malformedCarrierEntries: { readonly artifact: string; readonly detail: string }[] = [];
-    if (carriers.operatorSummary.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "operator_summary.json",
-        detail: carriers.operatorSummary.detail
-      });
-    }
-    if (carriers.workerRun.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "worker_run.json",
-        detail: carriers.workerRun.detail
-      });
-    }
-    if (carriers.postflight.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "postflight.json",
-        detail: carriers.postflight.detail
-      });
-    }
-    if (carriers.edgeClosure.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "sdlc_edge_closure_decision.json",
-        detail: carriers.edgeClosure.detail
-      });
-    }
-    if (carriers.edgeFulfillmentLedger.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "sdlc_edge_fulfillment_ledger.json",
-        detail: carriers.edgeFulfillmentLedger.detail
-      });
-    }
-    if (carriers.nextActionProjection.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "sdlc_next_action_projection.json",
-        detail: carriers.nextActionProjection.detail
-      });
-    }
-    if (carriers.productManifest.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "product_materialization_manifest.json",
-        detail: carriers.productManifest.detail
-      });
-    }
-    if (carriers.handoffManifest.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "handoff_manifest.json",
-        detail: carriers.handoffManifest.detail
-      });
-    }
-    if (carriers.runtimeEvents.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "runtime_events.json",
-        detail: carriers.runtimeEvents.detail
-      });
-    }
-    if (carriers.workerProcessEvents.status === "malformed") {
-      malformedCarrierEntries.push({
-        artifact: "worker_process_events.jsonl",
-        detail: carriers.workerProcessEvents.detail
-      });
-    }
+    const malformedCarrierEntries = operatorRunArtifactRows({
+      malformedGapTracked: true
+    }).flatMap(
+      (artifact) => {
+        const loaded = runtimeCarrierLoadStateForArtifact({ carriers, artifact });
+        if (loaded === undefined) {
+          const filePath = path.join(carriers.operatorRunRoot, artifact.relativePath);
+          return fileExists(filePath)
+            ? [Object.freeze({
+                artifact: artifact.relativePath,
+                detail: "artifact catalog row has no runtime carrier loader"
+              })]
+            : [];
+        }
+        return loaded?.status === "malformed"
+          ? [Object.freeze({
+              artifact: artifact.relativePath,
+              detail: loaded.detail
+            })]
+          : [];
+      }
+    );
     for (const entry of malformedCarrierEntries) {
       gaps.push(Object.freeze({
         operatorRunRef: operatorRunRefValue,

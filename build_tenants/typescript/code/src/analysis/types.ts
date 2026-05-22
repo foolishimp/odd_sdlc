@@ -165,6 +165,52 @@ export interface SdlcFdRunAnalysisCurrentStateTelemetry {
   readonly productFileLineageCount: number;
 }
 
+export interface SdlcFdRunAnalysisFrontierBranch {
+  readonly branchRef: string;
+  readonly branchKey: string;
+  readonly nodeId: string;
+  readonly laneKind: "dev" | "test";
+  readonly workerProcessRef: string;
+  readonly materializationTargetRefs: readonly string[];
+  readonly readRefs: readonly string[];
+  readonly writeTerritoryRefs: readonly string[];
+  readonly outputAllocationRefs: readonly string[];
+}
+
+export interface SdlcFdRunAnalysisFrontierFanIn {
+  readonly branchRef: string;
+  readonly nodeId: string;
+  readonly predecessorBranchRefs: readonly string[];
+  readonly materializationTargetRefs: readonly string[];
+  readonly payloadDigest: string;
+}
+
+export interface SdlcFdRunAnalysisFrontierSummary {
+  readonly graphTruthSource: "sdlc_feature_dependency_dag";
+  readonly selectedMethod: string;
+  readonly dependencyMapRefs: readonly string[];
+  readonly traversalSelectionRefs: readonly string[];
+  readonly dagRef: string;
+  readonly startNodes: readonly string[];
+  readonly frontierRef: string;
+  readonly policyRef: string;
+  readonly laneCount: number;
+  readonly devLaneCount: number;
+  readonly testLaneCount: number;
+  readonly fanInCount: number;
+  readonly batchCount: number;
+  readonly batchSizes: readonly number[];
+  readonly maxActive: number;
+  readonly readyBranchRefs: readonly string[];
+  readonly compiledReadyBranchRefs: readonly string[];
+  readonly completedBranchRefs: readonly string[];
+  readonly failedBranchRefs: readonly string[];
+  readonly writeTerritoryConflictRefs: readonly string[];
+  readonly outputAllocationConflictRefs: readonly string[];
+  readonly branchRows: readonly SdlcFdRunAnalysisFrontierBranch[];
+  readonly fanInRows: readonly SdlcFdRunAnalysisFrontierFanIn[];
+}
+
 export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly attemptOrdinal: number;
   readonly operatorRunRef: string;
@@ -205,6 +251,7 @@ export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly handoffBytes: number;
   readonly stdoutBytes: number;
   readonly eventBytes: number;
+  readonly frontierSummary: SdlcFdRunAnalysisFrontierSummary | null;
   readonly workerDispatched: boolean;
   readonly workerStatus: string | null;
 }

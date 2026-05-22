@@ -125,11 +125,16 @@ test("T-138 replay reconstructs the full causal chain from predecessor refs", ()
 
   assert.deepEqual(replay.refs, {
     kind: "sdlc_traversal_consequence_refs",
+    compositionRef: rows.nextActionProjection.compositionRef,
+    compositionDigest: rows.nextActionProjection.compositionDigest,
+    compositionSelectionRef: rows.nextActionProjection.compositionSelectionRef,
     constructionIntentRef: rows.constructionIntent.intentRef,
     worksiteEvidenceRef: rows.worksiteEvidence.evidenceBundleRef,
     edgeFulfillmentLedgerRef: rows.edgeFulfillmentLedger.ledgerVersionRef,
     edgeClosureDecisionRef: rows.edgeClosureDecision.decisionRef,
-    nextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef
+    nextActionProjectionRef: rows.nextActionProjection.nextActionProjectionRef,
+    admittedStateRef: replay.admittedStateRef.frameRef,
+    consequenceProjectionRef: replay.consequenceProjection.consequenceRef
   });
 });
 

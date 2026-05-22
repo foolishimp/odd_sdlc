@@ -84,13 +84,16 @@ The current TypeScript line must converge on this loop:
 observe mutable W
 -> select lawful graph overlay / graph function / typed vector traversal
 -> resolve edge assurance contract ref and digest
+-> select composition C over selected abg.fn_composition
 -> derive obligations from authority basis
--> run declared transform mechanism under the edge contract
--> admit worker, runtime, artifact, ledger, and replay evidence
--> publish measuring ledger rows
--> measure edge gain
+-> run transform.C under the edge contract
+-> produce candidate/evidence refs
+-> run evaluate.C and publish evaluation finding refs
+-> admit worker, runtime, artifact, evaluation, and replay evidence through ABG
+-> project ABG events, payload ledgers, assurance, closure, traversal, and replay truth
+-> measure edge gain from admitted facts
 -> derive residual pressure
--> derive close / yield / retry / repair / re-enter / reprice / block
+-> derive consequence.C for close / yield / retry / repair / re-enter / reprice / block
 -> publish SdlcEdgeFulfillmentLedger
 -> publish SdlcEdgeClosureDecision
 -> publish SdlcNextActionProjection
@@ -101,6 +104,10 @@ observe mutable W
 Existing registers, counters, summaries, manifests, gap dossiers, archives, and
 worker reports are not closure truth. They are admitted evidence or read models
 only when the selected edge contract admits them.
+
+`C`, `transform.C`, `evaluate.C`, and `consequence.C` are notation over the
+selected ABG composition and admitted runtime truth. They do not introduce a
+product-local compute carrier, ledger writer, controller, or closure path.
 
 ## Current Trace Boundary
 

@@ -1,6 +1,6 @@
 # Typed Construction Algebra Requirements
 
-**Family**: REQ-F-ODDSDLC-074..083
+**Family**: REQ-F-ODDSDLC-074..084
 **Status**: Active
 **Category**: Governance, Runtime, Verification
 **Carries Forward From**:
@@ -47,18 +47,28 @@ pressure is not already owned by another retained edge. An edge that cannot
 make that claim is deleted, merged into its owning edge, or reclassified as a
 projection/no-close view.
 
-The algebra is:
+The typed construction algebra is the `odd_sdlc` product expression of the
+ABIogenesis compute epistemology:
 
 ```text
-GTL.edge
-  -> F_P.transform
+GTL edge / selected composition C
+  -> transform.C
+  -> candidate/evidence refs
+  -> evaluate.C
+  -> evaluation finding refs
   -> ABG.admit
-  -> ABG.events
-  -> F_P/F_D.evaluate
-  -> ABG.project
-  -> ABG.fold
-  -> next_action
+  -> ABG.events / payload ledgers / assurance projection / closure fold
+  -> ABG traversal transition / replay projection
+  -> consequence.C
+  -> odd_sdlc pressure/query/read-model interpretation
+  -> next_action or lawful continuation
 ```
+
+For generic prompt-bearing SDLC edges, the selected `transform.C` commonly
+binds `F_P.transform`. For deterministic product contracts, the selected
+composition may bind deterministic construction. In all cases, `C` is selected
+composition notation over selected `abg.fn_composition`; it is not a new
+product-local execution carrier.
 
 ### REQ-F-ODDSDLC-074 - construction stages remain typed and separated
 
@@ -284,6 +294,15 @@ claim product completeness.
   descriptions generically. Ecosystem file names or grammars such as SBT,
   Cargo, Maven, Gradle, Node, or Python build manifests are tenant-spec data,
   not hidden SDLC core law
+- AC-13: admitted module and test dependency maps compile into an SDLC feature
+  dependency DAG with `start_nodes[]`, predecessor/successor rows, read refs,
+  write territories, output allocations, and fan-in rows before branch
+  dispatch. ABG owns the frontier execution over that DAG.
+- AC-14: test materialization may run from admitted testcase authority,
+  test topology, and test stack/profile evidence when those surfaces are
+  sufficient to construct tests. Completed component source is consumed by
+  downstream fan-in, qualification, or repair adaptation rather than acting as
+  a blanket precondition for every test branch.
 
 ### REQ-F-ODDSDLC-081 - executive graph edges are retained only by accounted construction pressure
 
@@ -388,3 +407,34 @@ failure surfaces.
   liveness activity streams, event archives, and forensic package payloads remain
   archive truth for explicit diagnosis, not default worker input or replay scan
   input.
+
+### REQ-F-ODDSDLC-084 - construction algebra preserves selected composition epistemology
+
+TypeScript traversal code, worker handoffs, evaluator carriers, ledgers,
+analyzer output, and operator documentation shall interpret `transform.C`,
+`evaluate.C`, and `consequence.C` as epistemic stages over the selected
+`abg.fn_composition` and ABG-admitted runtime truth.
+
+**Acceptance Criteria**:
+- AC-1: every prompt-bearing transform boundary can be explained as
+  `transform.C` under selected composition, edge permission class, target
+  carrier or artifact contract, admitted authority refs, and current obligation
+  pressure
+- AC-2: transform workers may return candidates, product deltas, process facts,
+  and evidence; they must not receive ledger-writing, event-emission,
+  evaluator-publication, traversal-selection, projection-publication, or
+  closure authority
+- AC-3: evaluator stages can be explained as `evaluate.C`; they produce typed
+  findings and semantic rows for deterministic admission, not closure truth by
+  assertion
+- AC-4: ledger rows, events, projections, closure decisions, continuation, and
+  replay truth are produced only at or after ABG admission or ABG-compatible
+  runtime ingestion, never by plugin prose or worker self-certification
+- AC-5: `consequence.C` is rendered as a projection reference over admitted
+  ABG state plus `odd_sdlc` read-model refs; it must not become a separate
+  action authority or controller surface
+- AC-6: product pressure maps, gain interpretation, analyzer reports, and query
+  overlays remain `odd_sdlc` domain projections over ABG-admitted facts
+- AC-7: deterministic tests assert the documentation boundary and the worker
+  handoff boundary so future edits cannot reintroduce hidden ledger,
+  evaluator, projection, or closure surfaces into `F_P.transform`

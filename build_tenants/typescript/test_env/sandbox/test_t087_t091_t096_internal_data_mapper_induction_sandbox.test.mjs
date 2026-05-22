@@ -8,7 +8,8 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  readFileSync
+  readFileSync,
+  statSync
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -20,7 +21,8 @@ import {
   deriveSdlcWorkspaceIngressReport,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  invokeOddSdlcSpecMethodCommand,
+  normalizeSdlcRequirementDisplayId
 } from "../../build/semantic/code/src/index.js";
 import {
   copyInternalDataMapperFixture,
@@ -53,21 +55,50 @@ function runId() {
     .replace(".", "")}_pid${process.pid}`;
 }
 
-function requirementFamilyFiles(workspaceRoot) {
-  const requirementsRoot = path.join(workspaceRoot, "specification/requirements");
-  return readdirSync(requirementsRoot)
-    .filter((entry) => entry.endsWith(".md") && entry !== "00-imported-sources.md")
+function markdownFilesUnder(root) {
+  if (!existsSync(root)) return [];
+  return readdirSync(root)
     .sort()
-    .map((entry) => path.join(requirementsRoot, entry));
+    .flatMap((entry) => {
+      const absolutePath = path.join(root, entry);
+      const stat = statSync(absolutePath);
+      if (stat.isDirectory()) {
+        return markdownFilesUnder(absolutePath);
+      }
+      return stat.isFile() && /\.(?:md|markdown)$/iu.test(entry)
+        ? [absolutePath]
+        : [];
+    });
+}
+
+function requirementIdsFromMarkdownFiles(files) {
+  return [
+    ...new Set(
+      files.flatMap((file) => {
+        const content = readFileSync(file, "utf8");
+        return [...content.matchAll(/\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/gmu)]
+          .map((match) => normalizeSdlcRequirementDisplayId(match[0]));
+      })
+    )
+  ].sort();
 }
 
 function requirementIds(workspaceRoot) {
-  return requirementFamilyFiles(workspaceRoot)
-    .flatMap((file) => {
-      const content = readFileSync(file, "utf8");
-      return [...content.matchAll(/^## (REQ-[A-Z0-9-]+)/gmu)].map((match) => match[1]);
+  return requirementIdsFromMarkdownFiles(
+    markdownFilesUnder(path.join(workspaceRoot, "specification"))
+  );
+}
+
+function requirementIdsFromSourceRefs(sourceRefs) {
+  return requirementIdsFromMarkdownFiles(
+    sourceRefs.flatMap((ref) => {
+      if (!ref.startsWith("file://")) return [];
+      const filePath = fileURLToPath(ref);
+      return existsSync(filePath) && /\.(?:md|markdown)$/iu.test(filePath)
+        ? [filePath]
+        : [];
     })
-    .sort();
+  );
 }
 
 test("T-087/T-091/T-096 internal data_mapper fixture is local-only and legacy-shaped", () => {
@@ -176,21 +207,17 @@ test("T-087/T-091/T-096 live sandbox inducts internal data_mapper before downstr
   assert.match(canonicalConstraints, /output_dir: build_tenants\/scala_spark/u);
   assert.equal(canonicalConstraints.includes("imp_scala_spark"), false);
 
-  const familyFiles = requirementFamilyFiles(workspace);
-  assert(familyFiles.length >= 10);
-  const familyContent = familyFiles.map((file) => readFileSync(file, "utf8")).join("\n");
-  assert.match(familyContent, /## REQ-LDM-001/u);
-  assert.match(familyContent, /## REQ-COV-008/u);
-  assert.match(familyContent, /Source Digest: sha256:[a-f0-9]{64}/u);
-  assert.match(familyContent, /specification\/mapper_requirements\.md/u);
-
-  const importedSources = readFileSync(
-    path.join(workspace, "specification/requirements/00-imported-sources.md"),
+  const normalizedSourceIds = requirementIdsFromSourceRefs(report.sourceRefs);
+  assert(normalizedSourceIds.includes("REQ-LDM-001"));
+  assert(normalizedSourceIds.includes("REQ-COV-008"));
+  assert.equal(existsSync(path.join(workspace, "specification/requirements")), false);
+  const bootstrapReadModel = readFileSync(
+    path.join(workspace, ".ai-workspace/context/project_bootstrap.md"),
     "utf8"
   );
-  assert.match(importedSources, /specification\/REQUIREMENTS\.md/u);
-  assert.match(importedSources, /specification\/mapper_requirements\.md/u);
-  assert.match(importedSources, /REQ-LDM-01/u);
+  assert.match(bootstrapReadModel, /specification\/REQUIREMENTS\.md/u);
+  assert.match(bootstrapReadModel, /specification\/mapper_requirements\.md/u);
+  assert.match(bootstrapReadModel, /REQ-LDM-01/u);
 
   const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok");
@@ -282,7 +309,12 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
 
   const reportPath = path.join(induction.payload.archiveRoot, "conform_project_report.json");
   const ledgerPath = path.join(induction.payload.archiveRoot, "managed_traversal_ledger.json");
+  const controlReportPath = path.join(
+    controlInduction.payload.archiveRoot,
+    "conform_project_report.json"
+  );
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
+  const controlReport = JSON.parse(readFileSync(controlReportPath, "utf8"));
   const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
   assert.equal(report.status, "passed");
   assert.equal(report.workspaceRootUri, pathToFileURL(outputWorkspace).href);
@@ -296,16 +328,17 @@ test("T-087/T-091/T-096 induction can write a separate output workspace for comp
   assert.equal(ledger.workspaceRootUri, pathToFileURL(outputWorkspace).href);
   assert.deepStrictEqual(ledger.residualGaps, []);
 
-  const importedSources = readFileSync(
-    path.join(outputWorkspace, "specification/requirements/00-imported-sources.md"),
+  assert.equal(existsSync(path.join(outputWorkspace, "specification/requirements")), false);
+  const outputBootstrap = readFileSync(
+    path.join(outputWorkspace, ".ai-workspace/context/project_bootstrap.md"),
     "utf8"
   );
-  assert.match(importedSources, /specification\/REQUIREMENTS\.md/u);
-  assert.match(importedSources, /specification\/mapper_requirements\.md/u);
-  assert.match(importedSources, new RegExp(path.basename(inputWorkspace), "u"));
+  assert.match(outputBootstrap, /specification\/REQUIREMENTS\.md/u);
+  assert.match(outputBootstrap, /specification\/mapper_requirements\.md/u);
+  assert.match(outputBootstrap, new RegExp(path.basename(inputWorkspace), "u"));
 
-  const outputIds = requirementIds(outputWorkspace);
-  const controlIds = requirementIds(controlWorkspace);
+  const outputIds = requirementIdsFromSourceRefs(report.sourceRefs);
+  const controlIds = requirementIdsFromSourceRefs(controlReport.sourceRefs);
   assert.deepStrictEqual(outputIds, controlIds);
   assert(outputIds.includes("REQ-LDM-001"));
   assert(outputIds.includes("REQ-COV-008"));
@@ -417,7 +450,7 @@ test("T-087/T-091/T-096 induction can fan out one input into multiple output wor
       induction,
       report,
       ledger,
-      requirementIds: requirementIds(outputWorkspace)
+      requirementIds: requirementIdsFromSourceRefs(report.sourceRefs)
     };
   };
 

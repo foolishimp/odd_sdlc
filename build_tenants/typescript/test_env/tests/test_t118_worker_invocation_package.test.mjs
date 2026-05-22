@@ -383,13 +383,16 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.match(prompt, /Read in order:/u);
   assert.match(prompt, /Primary transform intent:/u);
   assert.match(prompt, /graph function: bootstrap_release_self_test/u);
-  assert.match(prompt, /selected target carrier: kind=/u);
+  assert.match(prompt, /target carrier protocol: evaluator-owned/u);
+  assert.doesNotMatch(prompt, /selected target carrier: kind=/u);
+  assert.doesNotMatch(prompt, /Target carrier contract:/u);
+  assert.doesNotMatch(prompt, /Worker-fillable target carrier fields:/u);
   assert.match(prompt, /This section is the core F_P transform/u);
   assert.match(prompt, /worker_construction_brief\.json/u);
   assert.match(prompt, /current authority refs listed by the construction brief/u);
-  assert.doesNotMatch(prompt, /worker_invocation_package\.json/u);
-  assert.doesNotMatch(prompt, /worker_brief\.json/u);
-  assert.doesNotMatch(prompt, /forensic manifest only when a package ref requires it/u);
+  assert.match(prompt, /worker_invocation_package\.json/u);
+  assert.match(prompt, /worker_brief\.json/u);
+  assert.match(prompt, /forensic manifest only when a package ref requires it/u);
   assert.match(prompt, /Terse axioms:/u);
   assert.match(
     prompt,
@@ -581,7 +584,8 @@ test("T-118 design-depth manifest carries a typed construction template by ref",
   assert.doesNotMatch(outcomeDirectives, /Each `moduleSchemaFragments` item/u);
   assert.doesNotMatch(outcomeDirectives, /\{"kind":"sdlc_module_schema_fragment"/u);
   assert.doesNotMatch(outcomeDirectives, /design_depth_module_schema_fragment/u);
-  assert.match(prompt, /Target carrier construction template ref:/u);
+  assert.match(prompt, /target carrier protocol: evaluator-owned/u);
+  assert.doesNotMatch(prompt, /Target carrier construction template ref:/u);
   assert.doesNotMatch(prompt, /targetCarrierProjection\.constructionTemplate/u);
 });
 

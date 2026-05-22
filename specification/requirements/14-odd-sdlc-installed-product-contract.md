@@ -30,7 +30,9 @@ Acceptance criteria:
 ### REQ-F-ODDSDLC-045 - odd_sdlc consumes ABG installed substrate truth
 
 `odd_sdlc` shall use the public ABG installer to populate substrate truth in an
-installed target workspace.
+installed target workspace. TypeScript install defaults shall invoke that
+installer from the pinned ABG release package, not from a mutable sibling source
+checkout.
 
 Acceptance criteria:
 
@@ -43,6 +45,12 @@ Acceptance criteria:
   ABG-owned installed truth
 - AC-4: ABG substrate gaps block RC as upstream installer gaps rather than being
   patched locally inside `odd_sdlc`
+- AC-5: TypeScript default install resolution prefers the package-local
+  `@abiogenesis/typescript-tenant` dependency installed from a release snapshot
+  tarball
+- AC-6: if package-local ABG release consumption is used, ABG docs and shared
+  standards roots are passed explicitly so `odd_sdlc` docs cannot be mistaken
+  for ABG docs
 
 ### REQ-F-ODDSDLC-046 - odd_sdlc installs product payload under the ABG product/tenant topology
 

@@ -26,7 +26,7 @@ test("T-028 declares ABIogenesis as consumed substrate authority", () => {
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.7.1-rc.1"
+    "3.8.0-rc.3"
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.runtimeTruthAuthority,

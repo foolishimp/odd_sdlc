@@ -28,10 +28,21 @@ contains needed behavior, dogfood evidence, and hard-won functionality. It is
 source material for comparison and translation, not the architecture authority
 for the TypeScript line.
 
-The ABIogenesis TypeScript tenant is substrate evidence. It proves GTL/ABG
-carriers, graph-function iteration, traversal probes, no-compute-basis failure
-taxonomy, and bootstrap-lineage slices that `odd_sdlc.TS` may consume. It is
-not itself `odd_sdlc.TS`, and it does not complete the SDLC product behavior.
+The ABIogenesis TypeScript tenant is substrate evidence consumed through
+explicit release snapshots. The current TypeScript line consumes
+`@abiogenesis/typescript-tenant@3.8.0-rc.3` from
+`/Users/jim/src/apps/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/`.
+That cut proves GTL/ABG carriers, graph-function iteration, traversal probes,
+evented saga-frontier execution, no-compute-basis failure taxonomy, and
+bootstrap-lineage slices that `odd_sdlc.TS` may consume. It is not itself
+`odd_sdlc.TS`, and it does not complete the SDLC product behavior.
+
+`odd_sdlc.TS` release evidence is rooted at
+`/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/`.
+The historical `.ai-workspace/release-cuts/typescript` archives have been
+migrated into that root as legacy release snapshots. Legacy migrated snapshots
+preserve former release-cut evidence; new release candidates must use the
+release-snapshot manifest that records the consumed ABG release snapshot.
 
 `odd_service` is the next incubating product line on that same method line.
 It is not a second runtime. It is the proposed enduring orchestration plane
@@ -86,14 +97,84 @@ project-owned realization topology rooted in `build_tenants/`.
 
 `build_tenants/` carries one or more realization instances of `HOW`.
 
+## Ontology And Epistemology
+
+`odd_sdlc` is a downstream product over the ratified GTL ontology and ABG
+runtime ontology.
+
+The GTL ontology names the authored carriers this product uses: `Graph`,
+`Node`, `GraphVector`, `Context`, `Operator`, `Evaluator`, `Rule`,
+`GraphFunction`, `RefinementBoundary`, `CandidateFamily`, `ContractRef`,
+`Role`, `Job`, and `Module`.
+
+The ABG runtime ontology owns the interpreter truth this product consumes:
+selected `abg.fn_composition`, runtime events, `Run`, `GraphCall`, `Frame`,
+`ExecutionBasis`, `AdvancementTransition`, `IterationAdvanceDecision`,
+`Continuation`, payload admission, payload ledgers, assurance projection,
+closure fold, traversal transition, and replay projection.
+
+The `odd_sdlc` product ontology owns the software-domain meaning over those
+carriers: SDLC edge meaning, graph overlays as product views, typed product
+assets, project authority surfaces, requirements/design/code/test/evidence
+domain surfaces, feature and test dependency maps, pressure maps, gain and
+closure interpretation, query overlays, analyzer projections, and proof
+interpretation.
+
+`odd_sdlc` uses the ABIogenesis compute notation as epistemology only. `C` is
+selected composition notation for the selected `abg.fn_composition` identity at
+the owning boundary. `C` is not `ComputeUnit`, not `ReliableCompute`, not a new
+GTL topology anchor, not an ABG runtime carrier, and not an execution target.
+
+The stable SDLC epistemic flow is:
+
+```text
+SDLC authority/product state A
+-> transform.C
+-> candidate/evidence refs
+-> evaluate.C
+-> evaluation finding refs
+-> ABG admission
+-> ABG events, payload ledgers, assurance projection, closure fold,
+   traversal transition, and replay projection
+-> consequence.C
+-> odd_sdlc pressure/query/read-model interpretation
+-> SDLC state B or lawful continuation
+```
+
+`transform.C` denotes candidate and evidence production under the selected
+composition. In generic prompt-bearing SDLC edges this commonly binds
+`F_P.transform`; in deterministic product contracts it may bind `F_D`
+construction. It does not emit runtime events, write ledgers, select traversal,
+publish projections, or close a boundary.
+
+`evaluate.C` denotes evaluation finding production under the selected
+composition. Findings may carry gain evidence, metrics, residual pressure,
+diagnostics, proposed disposition, continuation refs, evidence refs, and
+authority refs. They do not directly close, write, select, transition, or emit
+runtime truth.
+
+ABG admission is the epistemic boundary where candidate and evaluation payloads
+become runtime facts. ABG owns event emission, payload admission, payload
+ledgers, assurance projection, closure fold, traversal transition,
+continuation, correction, and replay truth.
+
+`consequence.C` denotes a projection reference over ABG-admitted state,
+assurance decision refs, traversal transition refs, and downstream
+`odd_sdlc` read-model refs. It is not an independent action stage and not a
+second source of runtime authority.
+
+Pressure maps, gain meaning, closure interpretation, and query surfaces are
+product-owned projections over ABG-admitted facts. They remain `odd_sdlc`
+domain meaning and do not become generic GTL or ABG ontology.
+
 ## Installed Development Product Contract
 
 `odd_sdlc` publishes an installer as product behavior.
 
 The installer prepares an independent target workspace as an installed
 development product for ODD software-domain work. It consumes the public ABG
-installer for substrate population and then installs the `odd_sdlc` product
-payload beneath:
+installer from the pinned ABG release package for substrate population and then
+installs the `odd_sdlc` product payload beneath:
 
 `.abiogenesis/odd_sdlc/<build_tenant>/`
 
@@ -321,6 +402,14 @@ Dependency maps are authority surfaces for traversal selection. Steel-thread
 and parallel build are evaluator-selected traversal methods over admitted
 dependency maps; they are not target carrier surfaces and not prompt-only
 strategy labels.
+
+For branch-capable construction, admitted module and test dependency maps
+compile into an SDLC feature dependency DAG. That carrier publishes
+`start_nodes[]`, predecessor/successor rows, read refs, write territories,
+output allocations, and fan-in refs. A serial topological order may exist as a
+projection, but ABG owns `parallel(start_nodes[], DAG)`: ready-frontier
+selection, branch leases, bounded concurrency, retry isolation, fan-in events,
+and replay truth.
 
 Tenant technology-stack descriptions are authority surfaces for executable
 materialization. Bootstrap derives one for each active build tenant when the

@@ -74,7 +74,7 @@ test("T-069 validates installed data_mapper initial state before traversal", asy
   assert.equal(validation.status, "valid");
   assert.deepStrictEqual(validation.missingPaths, []);
   assert.deepStrictEqual(validation.missingCommands, []);
-  assert.equal(validation.conformedProject.projectSlug, "data_mapper_test69_ts");
+  assert.equal(validation.conformedProject.projectSlug, "data_mapper");
   assert.equal(validation.conformedProject.activeTenant, "scala_spark");
   assert.equal(
     validation.conformedProject.selectedOutputRoot,

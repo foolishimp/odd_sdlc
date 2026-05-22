@@ -22,6 +22,21 @@ function requiredString(record: Record<string, unknown>, key: string): string {
   return value.trim();
 }
 
+function optionalString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalResolvedString(
+  record: Record<string, unknown>,
+  key: string
+): string | null {
+  const value = optionalString(record, key);
+  return value === null ? null : resolve(value);
+}
+
 export function admitOddSdlcTypescriptInstallRequest(
   input: unknown
 ): OddSdlcTypescriptInstallRequest {
@@ -31,6 +46,8 @@ export function admitOddSdlcTypescriptInstallRequest(
     targetRoot: resolve(requiredString(record, "targetRoot")),
     packageSourceRoot: resolve(requiredString(record, "packageSourceRoot")),
     abgPackageSourceRoot: resolve(requiredString(record, "abgPackageSourceRoot")),
+    abgStandardsSourceRoot: optionalResolvedString(record, "abgStandardsSourceRoot"),
+    abgDocsSourceRoot: optionalResolvedString(record, "abgDocsSourceRoot"),
     installedPackageName: requiredString(record, "installedPackageName")
   });
 }

@@ -13,9 +13,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  deriveSdlcEdgeFulfillmentCountsFromAssessments,
   deriveSdlcWorkerRetryContextFromPostActionProjection,
   deriveSdlcWorkerRetryContextFromTraversalConsequence,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
+  sdlcRequirementObligationBelongsToDownstreamComponentSurface,
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
 
@@ -212,6 +214,77 @@ test("T-164 retry context uses latest workspace runtime gap register", () => {
   assert.equal(retryContext.priorGapDossiers.length, 1);
   assert.equal(retryContext.priorGapDossiers[0].currentGapDossierRef, latestRef);
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, latestReason);
+});
+
+test("T-174 component-code closure carries test and execution requirements downstream", () => {
+  assert.equal(
+    sdlcRequirementObligationBelongsToDownstreamComponentSurface({
+      targetAssetType: "component_code_surface",
+      productMaterializationRequired: true,
+      obligationKind: "requirement",
+      sourceRefs: [
+        "workspace://build_tenants/typescript/design/adrs/ADR-003-test-design-surface.md"
+      ],
+      sourceSnippets: ["### REQ-T174-006 Hello Branch Test\nRun node --test."]
+    }),
+    true
+  );
+  assert.equal(
+    sdlcRequirementObligationBelongsToDownstreamComponentSurface({
+      targetAssetType: "component_code_surface",
+      productMaterializationRequired: true,
+      obligationKind: "requirement",
+      sourceRefs: ["workspace://specification/requirements/18-typed-construction-algebra.md"],
+      sourceSnippets: ["### REQ-T174-007 Execution Proof\nCapture test execution evidence."]
+    }),
+    true
+  );
+  assert.equal(
+    sdlcRequirementObligationBelongsToDownstreamComponentSurface({
+      targetAssetType: "component_code_surface",
+      productMaterializationRequired: true,
+      obligationKind: "requirement",
+      sourceRefs: ["workspace://specification/requirements/02-graph-functions.md"],
+      sourceSnippets: ["### REQ-T174-001 Publish a feature dependency frontier."]
+    }),
+    false
+  );
+  const projection = deriveSdlcEdgeFulfillmentCountsFromAssessments({
+    declaredObligationIds: [
+      "requirement:source",
+      "requirement:test"
+    ],
+    assessments: [
+      {
+        obligationId: "requirement:source",
+        fulfillmentStatus: "fulfilled",
+        evidenceRefs: ["workspace://src/index.js"]
+      },
+      {
+        obligationId: "requirement:test",
+        fulfillmentStatus: "partial",
+        evidenceRefs: ["workspace://test/hello.test.js"],
+        carryDirection: "downstream_transformation_set",
+        downstreamGraphFunctionRefs: ["derive_component_test_surface"],
+        targetBindingRefs: ["target-binding://component-test"]
+      }
+    ]
+  });
+  assert.deepEqual(projection.counts, {
+    expected: 1,
+    fulfilled: 1,
+    partial: 0,
+    blocked: 0,
+    unfulfilled: 0,
+    missing: 0,
+    extra: 0
+  });
+  assert.deepEqual(projection.nonConvergedReasonRefs, []);
+  assert(
+    projection.downstreamPressureRefs.includes(
+      "obligation://odd-sdlc/requirement%3Atest/downstream_transformation_set"
+    )
+  );
 });
 
 test("T-140 retry context is absent without executable evaluate-next truth", () => {

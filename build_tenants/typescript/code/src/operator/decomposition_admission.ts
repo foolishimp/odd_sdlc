@@ -56,6 +56,12 @@ export interface SdlcStagedTestTopologyAuthority {
   readonly dependencyMap: SdlcTestDependencyMap;
 }
 
+export interface SdlcDerivedTestDependencyMapInput {
+  readonly moduleDependencyMap: SdlcModuleDependencyMap;
+  readonly mapRef?: string | undefined;
+  readonly summaryRef?: string | undefined;
+}
+
 // The default 8:1 limits are the initial substantive-product guardrail. The
 // aggregate compression, per-upstream explosion, and per-row density limits are
 // independent profile levers even though the default policy gives them parity.
@@ -80,6 +86,15 @@ function invalidReferenceFields(input: {
   readonly stageUpstreamUniverseRefs: readonly string[];
 }): readonly string[] {
   const invalid: string[] = [];
+  const inspectScalar = (
+    owner: string,
+    fieldName: string,
+    value: string
+  ): void => {
+    if (value.trim().length === 0 || value.trim() !== value) {
+      invalid.push(`${owner}.${fieldName}`);
+    }
+  };
   const inspect = (
     owner: string,
     fieldName: string,
@@ -93,7 +108,11 @@ function invalidReferenceFields(input: {
   };
   inspect("stage", "stageUpstreamUniverseRefs", input.stageUpstreamUniverseRefs);
   for (const row of input.rows) {
-    const owner = row.downstreamId.trim().length > 0 ? row.downstreamId : "<blank>";
+    const owner = row.downstreamId.trim().length > 0 ? row.downstreamId.trim() : "<blank>";
+    inspectScalar(owner, "downstreamId", row.downstreamId);
+    if (row.parentId !== null && row.parentId !== undefined) {
+      inspectScalar(owner, "parentId", row.parentId);
+    }
     inspect(owner, "ownedUpstreamRefs", row.ownedUpstreamRefs);
     inspect(owner, "publicBoundaryRefs", row.publicBoundaryRefs ?? []);
     inspect(
@@ -450,6 +469,33 @@ function slugRefPart(input: string): string {
   );
 }
 
+function normalizedTargetPath(targetRef: string): string {
+  return targetRef
+    .trim()
+    .replace(/\\/gu, "/")
+    .replace(/^workspace:\/\//u, "")
+    .replace(/^file:\/\//u, "")
+    .replace(/^\.\//u, "");
+}
+
+function isTestMaterializationTarget(targetRef: string): boolean {
+  const normalized = normalizedTargetPath(targetRef);
+  return (
+    /(?:^|\/)test\//u.test(normalized) &&
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(normalized)
+  );
+}
+
+function materializationTargetBaseName(targetRef: string): string {
+  const normalized = normalizedTargetPath(targetRef);
+  const basename =
+    normalized.split("/").filter((part) => part.length > 0).at(-1) ??
+    normalized;
+  return basename
+    .replace(/\.(test|spec)\.[cm]?[jt]sx?$/u, "")
+    .replace(/\.[cm]?[jt]sx?$/u, "");
+}
+
 function implementationSummaryRows(
   register: SdlcDesignDepthRegister
 ): readonly SdlcDecompositionSummaryCandidateRow[] {
@@ -698,6 +744,46 @@ function testDependencyMapFromDesign(input: {
         row.shardId === null
           ? `shard://test-class/${slugRefPart(row.testClassId)}`
           : `shard://${slugRefPart(row.shardId)}`
+      )
+    ),
+    cycleRefs: Object.freeze([])
+  });
+}
+
+export function deriveSdlcTestDependencyMapFromImplementationDependencyMap(
+  input: SdlcDerivedTestDependencyMapInput
+): SdlcTestDependencyMap | null {
+  const testNodes = input.moduleDependencyMap.nodes.flatMap((node) =>
+    node.materializationTargetRefs
+      .filter(isTestMaterializationTarget)
+      .map((targetRef) =>
+        Object.freeze({
+          nodeId: `test-class://${slugRefPart(materializationTargetBaseName(targetRef))}`,
+          predecessorNodeIds: Object.freeze([]),
+          successorNodeIds: Object.freeze([]),
+          ownedRequirementRefs: node.ownedRequirementRefs,
+          materializationTargetRefs: Object.freeze([targetRef])
+        })
+      )
+  );
+  if (testNodes.length === 0) {
+    return null;
+  }
+  const firstTestNode = testNodes[0];
+  return Object.freeze({
+    kind: "sdlc_test_dependency_map" as const,
+    mapRef:
+      input.mapRef ??
+      "dependency-map://odd-sdlc/test/classes-derived-from-implementation",
+    summaryRef: input.summaryRef ?? input.moduleDependencyMap.summaryRef,
+    nodes: Object.freeze(testNodes),
+    steelThreadCandidateNodeIds:
+      firstTestNode === undefined
+        ? Object.freeze([])
+        : Object.freeze([firstTestNode.nodeId]),
+    parallelShardRefs: uniqueSorted(
+      testNodes.map(
+        (node) => `shard://test-class/${slugRefPart(node.nodeId)}`
       )
     ),
     cycleRefs: Object.freeze([])

@@ -5,10 +5,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   writeFileSync
 } from "node:fs";
@@ -18,11 +20,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   deriveOddSdlcTypescriptReleaseCut,
+  deriveOddSdlcTypescriptReleaseSnapshot,
   installOddSdlcTypescript,
   oddSdlcTypescriptProductInstallRoot,
   invokeOddSdlcSpecMethodCommandSync,
   invokeOddSdlcSpecMethodCommand,
-  resolveDefaultAbgPackageSourceRoot
+  resolveDefaultAbgDocsSourceRoot,
+  resolveDefaultAbgPackageSourceRoot,
+  resolveDefaultAbgStandardsSourceRoot
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +37,36 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
+const ABG_RELEASE_VERSION = "3.8.0-rc.3";
+const ABG_RELEASE_SOURCE_REF = "v3.8.0-rc.3";
+const ABG_RELEASE_SOURCE_COMMIT = "96e2ef61a12ae46758d75a77508bfc2edbd18a5f";
+const ABG_RELEASE_TARBALL_SHA256 =
+  "710f14449550eac0fa219e1aa322ede61db6260461ab99f0fa6dad5da992664c";
+const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
+  REPO_ROOT,
+  `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}`
+);
+const ABG_RELEASE_TARBALL = path.join(
+  ABG_RELEASE_SNAPSHOT_ROOT,
+  `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`
+);
+const ABG_RELEASE_DEPENDENCY_REF =
+  `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}/` +
+  `abiogenesis-typescript-tenant-${ABG_RELEASE_VERSION}.tgz`;
+const ODD_SDLC_RELEASE_SNAPSHOT_ROOT = resolve(
+  REPO_ROOT,
+  "release_snapshots/odd-sdlc-typescript-tenant"
+);
+const LEGACY_ODD_SDLC_RELEASE_SNAPSHOT_IDS = Object.freeze([
+  "20260515T001126Z",
+  "20260517T095944Z_t171_checkpoint_rc",
+  "20260518T125740Z_t171_hello_world_lifecycle_rc",
+  "20260518T183633Z_t102_t132_hello_world_rc3",
+  "20260519T051709Z_t171_data_mapper_test82_rc4",
+  "20260520T061522Z_t172_t173_rc5",
+  "20260520T170923Z_t172_t173_rc6",
+  "20260521T173625Z_t172_t173_rc7"
+]);
 
 function makeTargetWorkspace(label) {
   const targetRoot = mkdtempSync(path.join(tmpdir(), `odd-sdlc-ts-${label}-`));
@@ -51,6 +86,40 @@ function makeTargetWorkspace(label) {
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function sha256ForFile(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function readChecksumMap(filePath) {
+  const checksums = new Map();
+  for (const line of readFileSync(filePath, "utf8").trim().split("\n")) {
+    const match = /^([a-f0-9]{64})  (.+)$/u.exec(line);
+    assert(match, `invalid checksum line: ${line}`);
+    checksums.set(match[2], match[1]);
+  }
+  return checksums;
+}
+
+function assertChecksum(checksums, snapshotRoot, relativePath) {
+  assert.equal(
+    checksums.get(relativePath),
+    sha256ForFile(path.join(snapshotRoot, relativePath)),
+    `checksum mismatch for ${relativePath}`
+  );
+}
+
+function assertAbgReleaseSnapshotPin(substrate) {
+  assert.equal(substrate.packageName, "@abiogenesis/typescript-tenant");
+  assert.equal(substrate.packageVersion, ABG_RELEASE_VERSION);
+  assert.equal(substrate.dependencyRef, ABG_RELEASE_DEPENDENCY_REF);
+  assert.equal(substrate.snapshotRoot, ABG_RELEASE_SNAPSHOT_ROOT);
+  assert.equal(substrate.manifestPath, path.join(ABG_RELEASE_SNAPSHOT_ROOT, "release-snapshot-manifest.json"));
+  assert.equal(substrate.tarballPath, ABG_RELEASE_TARBALL);
+  assert.equal(substrate.tarballSha256, ABG_RELEASE_TARBALL_SHA256);
+  assert.equal(substrate.sourceRef, ABG_RELEASE_SOURCE_REF);
+  assert.equal(substrate.sourceCommit, ABG_RELEASE_SOURCE_COMMIT);
 }
 
 function assertCommandPath(paths, commandName) {
@@ -331,7 +400,7 @@ test("T-059 CLI install command uses the async bounded adapter", async () => {
   assert.match(syncResult.payload.error, /invokeOddSdlcSpecMethodCommand/u);
 });
 
-test("T-124 CLI install resolves the sibling ABG source checkout by default", async () => {
+test("T-177 CLI install resolves the pinned ABG release package by default", async () => {
   const targetRoot = makeTargetWorkspace("install-cli-default-abg");
   const result = await invokeOddSdlcSpecMethodCommand([
     "install",
@@ -349,7 +418,31 @@ test("T-124 CLI install resolves the sibling ABG source checkout by default", as
   assertCommandPath(result.payload.commandPaths, "odd-sdlc-ts");
   assertCommandPath(result.payload.commandPaths, "abiogenesis-ts");
   assert.equal(existsSync(path.join(targetRoot, ".odd_sdlc")), false);
-  assert.equal(result.payload.abgOutcome.packageSourceRoot, ABG_TYPESCRIPT_ROOT);
+  assert.equal(
+    result.payload.abgOutcome.packageSourceRoot,
+    path.join(PACKAGE_ROOT, "node_modules/@abiogenesis/typescript-tenant")
+  );
+  assert.equal(result.payload.abgOutcome.packageVersion, ABG_RELEASE_VERSION);
+  assert.equal(result.payload.abgOutcome.docsSourceRoot, resolve(REPO_ROOT, "../abiogenesis/docs"));
+  assert.equal(
+    result.payload.abgOutcome.standardsSourceRoot,
+    resolve(REPO_ROOT, "../specification_methodology/specification/standards")
+  );
+});
+
+test("T-177 default ABG source-root prefers packaged release dependency", () => {
+  assert.equal(
+    resolveDefaultAbgPackageSourceRoot(PACKAGE_ROOT),
+    path.join(PACKAGE_ROOT, "node_modules/@abiogenesis/typescript-tenant")
+  );
+  assert.equal(
+    resolveDefaultAbgDocsSourceRoot(PACKAGE_ROOT),
+    resolve(REPO_ROOT, "../abiogenesis/docs")
+  );
+  assert.equal(
+    resolveDefaultAbgStandardsSourceRoot(PACKAGE_ROOT),
+    resolve(REPO_ROOT, "../specification_methodology/specification/standards")
+  );
 });
 
 test("T-124 default ABG source-root falls back to packaged dependency", () => {
@@ -401,6 +494,123 @@ test("T-059 release-cut adapter writes package artifact and binary evidence", as
   assert.equal(cliResult.payload.kind, "odd_sdlc_typescript_release_cut");
 });
 
+test("T-177 release-snapshot adapter writes versioned package evidence and ABG substrate pin", async () => {
+  const snapshotRoot = path.join(
+    mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-")),
+    "0.0.0-dev"
+  );
+  const outcome = await deriveOddSdlcTypescriptReleaseSnapshot({
+    releaseIdentity: "0.0.0-dev",
+    packageSourceRoot: PACKAGE_ROOT,
+    snapshotRoot,
+    expectedPackageName: "@odd-sdlc/typescript-tenant",
+    expectedPackageVersion: "0.0.0-dev",
+    allowDirtySource: true,
+    npmCacheRoot: path.join(dirname(snapshotRoot), ".npm-cache")
+  });
+
+  assert.equal(outcome.kind, "created");
+  assert.equal(existsSync(outcome.manifestPath), true);
+  assert.equal(existsSync(outcome.checksumPath), true);
+  assert.equal(
+    existsSync(path.join(snapshotRoot, "odd-sdlc-typescript-tenant-0.0.0-dev.tgz")),
+    true
+  );
+  assert.equal(outcome.manifest.kind, "odd_sdlc_release_snapshot_manifest");
+  assertAbgReleaseSnapshotPin(outcome.manifest.abgSubstrate);
+
+  const manifest = readJson(outcome.manifestPath);
+  assertAbgReleaseSnapshotPin(manifest.abgSubstrate);
+
+  const cliSnapshotRoot = path.join(
+    mkdtempSync(path.join(tmpdir(), "odd-sdlc-ts-release-snapshot-cli-")),
+    "0.0.0-dev"
+  );
+  const cliResult = await invokeOddSdlcSpecMethodCommand([
+    "release-snapshot",
+    "--release-identity",
+    "0.0.0-dev",
+    "--snapshot-root",
+    cliSnapshotRoot,
+    "--package-source",
+    PACKAGE_ROOT,
+    "--expected-package-name",
+    "@odd-sdlc/typescript-tenant",
+    "--expected-package-version",
+    "0.0.0-dev",
+    "--allow-dirty-source",
+    "--npm-cache-root",
+    path.join(dirname(cliSnapshotRoot), ".npm-cache")
+  ]);
+  assert.equal(cliResult.status, "ok");
+  assert.equal(cliResult.payload.kind, "created");
+  assertAbgReleaseSnapshotPin(cliResult.payload.manifest.abgSubstrate);
+});
+
+test("T-177 migrated release-cut archives live under root release snapshots", () => {
+  assert.equal(
+    existsSync(path.join(REPO_ROOT, ".ai-workspace/release-cuts/typescript")),
+    false
+  );
+
+  const actualReleaseIds = new Set(
+    readdirSync(ODD_SDLC_RELEASE_SNAPSHOT_ROOT, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  );
+  for (const releaseIdentity of LEGACY_ODD_SDLC_RELEASE_SNAPSHOT_IDS) {
+    assert(actualReleaseIds.has(releaseIdentity), `missing ${releaseIdentity}`);
+    const snapshotRoot = path.join(
+      ODD_SDLC_RELEASE_SNAPSHOT_ROOT,
+      releaseIdentity
+    );
+    const manifestPath = path.join(snapshotRoot, "release-snapshot-manifest.json");
+    const checksumPath = path.join(snapshotRoot, "checksums.sha256");
+    const manifest = readJson(manifestPath);
+
+    assert.equal(manifest.kind, "odd_sdlc_legacy_release_snapshot_manifest");
+    assert.equal(manifest.releaseIdentity, releaseIdentity);
+    assert.equal(
+      manifest.migratedFrom,
+      `.ai-workspace/release-cuts/typescript/${releaseIdentity}`
+    );
+    assert.equal(manifest.legacyAbgSubstrateRecorded, false);
+    assert.match(manifest.legacyAbgSubstrateNote, /did not record/u);
+    assert.equal(manifest.package.packageName, "@odd-sdlc/typescript-tenant");
+    assert.equal(manifest.package.packageVersion, "0.0.0-dev");
+    assert.equal(
+      manifest.tarball.relativePath,
+      "odd-sdlc-typescript-tenant-0.0.0-dev.tgz"
+    );
+    assert.equal(
+      manifest.legacyReleaseCutManifest.relativePath,
+      "legacy-release-cut-manifest.json"
+    );
+    assert.equal(manifest.releaseNote.relativePath, "release-note.md");
+    assert.equal(manifest.checksumFile, "checksums.sha256");
+
+    const releaseNote = readFileSync(
+      path.join(snapshotRoot, "release-note.md"),
+      "utf8"
+    );
+    assert(releaseNote.includes("legacy release-cut manifest did not record an ABG release snapshot pin"));
+
+    const checksumMap = readChecksumMap(checksumPath);
+    const expectedChecksumPaths = [
+      manifest.tarball.relativePath,
+      manifest.releaseNote.relativePath,
+      manifest.legacyReleaseCutManifest.relativePath,
+      "release-snapshot-manifest.json",
+      ...manifest.legacyArtifacts.map((artifact) => artifact.relativePath)
+    ];
+    for (const relativePath of expectedChecksumPaths) {
+      assert.equal(existsSync(path.join(snapshotRoot, relativePath)), true);
+      assertChecksum(checksumMap, snapshotRoot, relativePath);
+    }
+    assert.equal(checksumMap.has("checksums.sha256"), false);
+  }
+});
+
 test("T-059 install and release adapters do not own traversal selection", () => {
   const installSource = readFileSync(
     resolve(PACKAGE_ROOT, "code/src/install/installer.ts"),
@@ -410,8 +620,14 @@ test("T-059 install and release adapters do not own traversal selection", () => 
     resolve(PACKAGE_ROOT, "code/src/release/release_cut.ts"),
     "utf8"
   );
+  const releaseSnapshotSource = readFileSync(
+    resolve(PACKAGE_ROOT, "code/src/release/release_snapshot.ts"),
+    "utf8"
+  );
   assert(!installSource.includes("publicStartOnce"));
   assert(!installSource.includes("deriveAdvancementTransition"));
   assert(!releaseSource.includes("publicStartOnce"));
   assert(!releaseSource.includes("deriveAdvancementTransition"));
+  assert(!releaseSnapshotSource.includes("publicStartOnce"));
+  assert(!releaseSnapshotSource.includes("deriveAdvancementTransition"));
 });

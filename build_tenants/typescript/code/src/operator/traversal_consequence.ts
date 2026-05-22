@@ -2,9 +2,17 @@
 // Implements: T-138
 
 import type {
+  GtlAdmittedStateRef,
+  GtlConsequenceProjectionRef
+} from "@abiogenesis/typescript-tenant";
+import type {
   SdlcEdgeAssuranceCloseDecision,
   SdlcTargetCarrierClosureStatus
 } from "./edge_gain_closure.js";
+import {
+  deriveFallbackSdlcSelectedAbgFnCompositionIdentity,
+  type SdlcSelectedAbgFnCompositionIdentity
+} from "./composition_identity.js";
 
 export type SdlcEdgeClosureDisposition =
   | "close"
@@ -35,11 +43,16 @@ export type SdlcNextActionBasisKind =
 
 export interface SdlcTraversalConsequenceRefs {
   readonly kind: "sdlc_traversal_consequence_refs";
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
   readonly constructionIntentRef: string;
   readonly worksiteEvidenceRef: string;
   readonly edgeFulfillmentLedgerRef: string;
   readonly edgeClosureDecisionRef: string;
   readonly nextActionProjectionRef: string;
+  readonly admittedStateRef: string;
+  readonly consequenceProjectionRef: string;
 }
 
 export interface SdlcConstructionIntent {
@@ -107,6 +120,10 @@ export interface SdlcEdgeFulfillmentCountProjection {
 
 export interface SdlcEdgeFulfillmentLedger {
   readonly kind: "sdlc_edge_fulfillment_ledger";
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
   readonly overlayRef: string | null;
@@ -153,6 +170,10 @@ export interface SdlcYieldResumeBasis {
 
 export interface SdlcEdgeClosureDecision {
   readonly kind: "sdlc_edge_closure_decision";
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
   readonly decisionRef: string;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
@@ -208,6 +229,10 @@ export interface SdlcOverlaySegmentCompletion {
 
 export interface SdlcNextActionProjection {
   readonly kind: "sdlc_next_action_projection";
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
   readonly evaluationFunction: "evaluate_next";
   readonly nextActionBasisKind: SdlcNextActionBasisKind;
   readonly nextActionProjectionRef: string;
@@ -248,6 +273,8 @@ export interface SdlcTraversalConsequenceReplay {
   readonly edgeFulfillmentLedger: SdlcEdgeFulfillmentLedger;
   readonly edgeClosureDecision: SdlcEdgeClosureDecision;
   readonly nextActionProjection: SdlcNextActionProjection;
+  readonly admittedStateRef: GtlAdmittedStateRef;
+  readonly consequenceProjection: GtlConsequenceProjectionRef;
 }
 
 function requireNonEmptyString(value: string, label: string): string {
@@ -266,6 +293,18 @@ function nonNegativeInteger(value: number, label: string): number {
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
+}
+
+function compositionIdentityForInput(input: {
+  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity | undefined;
+  readonly fallbackScopeRef: string;
+}): SdlcSelectedAbgFnCompositionIdentity {
+  return (
+    input.selectedComposition ??
+    deriveFallbackSdlcSelectedAbgFnCompositionIdentity({
+      scopeRef: input.fallbackScopeRef
+    })
+  );
 }
 
 function obligationReasonRef(input: {
@@ -686,6 +725,7 @@ export function constructSdlcWorksiteEvidence(input: {
 }
 
 export function constructSdlcEdgeFulfillmentLedger(input: {
+  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
   readonly overlayRef?: string | null;
@@ -761,6 +801,10 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
         : "not_required"
       : input.targetCarrierAdmissionStatus;
   const edgeRef = requireNonEmptyString(input.edgeRef, "edgeRef");
+  const selectedComposition = compositionIdentityForInput({
+    selectedComposition: input.selectedComposition,
+    fallbackScopeRef: edgeRef
+  });
   const targetCarrierPressureRefs = targetCarrierAdmissionPressureRefs({
     edgeRef,
     status: targetCarrierAdmissionStatus
@@ -771,6 +815,10 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
   ]);
   const ledger = Object.freeze({
     kind: "sdlc_edge_fulfillment_ledger" as const,
+    selectedComposition,
+    compositionRef: selectedComposition.compositionRef,
+    compositionDigest: selectedComposition.compositionDigest,
+    compositionSelectionRef: selectedComposition.compositionSelectionRef,
     ledgerRef: requireNonEmptyString(input.ledgerRef, "ledgerRef"),
     ledgerVersionRef: requireNonEmptyString(
       input.ledgerVersionRef,
@@ -863,6 +911,9 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       edgeResidualPressureRefs.length === 0,
     predecessorRefs: uniqueSorted([
       ...targetBindingRefs,
+      selectedComposition.compositionRef,
+      selectedComposition.compositionDigest,
+      selectedComposition.compositionSelectionRef,
       ...downstreamTargetBindingRefs,
       ...downstreamTransformationSetRefs,
       ...downstreamPressureRefs,
@@ -1044,6 +1095,10 @@ export function deriveSdlcEdgeClosureDecision(input: {
         });
   return Object.freeze({
     kind: "sdlc_edge_closure_decision" as const,
+    selectedComposition: input.ledger.selectedComposition,
+    compositionRef: input.ledger.compositionRef,
+    compositionDigest: input.ledger.compositionDigest,
+    compositionSelectionRef: input.ledger.compositionSelectionRef,
     decisionRef: requireNonEmptyString(input.decisionRef, "decisionRef"),
     ledgerRef: input.ledger.ledgerRef,
     ledgerVersionRef: input.ledger.ledgerVersionRef,
@@ -1069,6 +1124,9 @@ export function deriveSdlcEdgeClosureDecision(input: {
     edgeResidualPressureRefs: input.ledger.edgeResidualPressureRefs,
     disposition,
     basisRefs: uniqueSorted([
+      input.ledger.compositionRef,
+      input.ledger.compositionDigest,
+      input.ledger.compositionSelectionRef,
       input.ledger.ledgerRef,
       input.ledger.ledgerVersionRef,
       policy.policyRef,
@@ -1117,6 +1175,9 @@ export function deriveSdlcEdgeClosureDecision(input: {
     reasonRefs,
     yieldResumeBasis: normalizedYieldResumeBasis,
     predecessorRefs: uniqueSorted([
+      input.ledger.compositionRef,
+      input.ledger.compositionDigest,
+      input.ledger.compositionSelectionRef,
       input.ledger.ledgerRef,
       input.ledger.ledgerVersionRef,
       policy.policyRef,
@@ -1248,6 +1309,7 @@ export function constructSdlcOverlaySegmentCompletion(input: {
 }
 
 export function constructSdlcNextActionProjection(input: {
+  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity;
   readonly nextActionProjectionRef: string;
   readonly nextActionBasisKind?: SdlcNextActionBasisKind;
   readonly intentEventRefs: readonly string[];
@@ -1272,6 +1334,15 @@ export function constructSdlcNextActionProjection(input: {
   readonly readOnly?: boolean;
 }): SdlcNextActionProjection {
   const selectedActionRef = input.selectedActionRef ?? null;
+  const nextActionProjectionRef = requireNonEmptyString(
+    input.nextActionProjectionRef,
+    "nextActionProjectionRef"
+  );
+  const selectedComposition = compositionIdentityForInput({
+    selectedComposition:
+      input.selectedComposition ?? input.closureDecision?.selectedComposition,
+    fallbackScopeRef: nextActionProjectionRef
+  });
   const nextGraphFunctionRef = input.nextGraphFunctionRef ?? null;
   const nextGraphVectorRef = input.nextGraphVectorRef ?? null;
   const intentEventRefs = nonEmptyUniqueSorted(
@@ -1346,12 +1417,13 @@ export function constructSdlcNextActionProjection(input: {
   }
   return Object.freeze({
     kind: "sdlc_next_action_projection" as const,
+    selectedComposition,
+    compositionRef: selectedComposition.compositionRef,
+    compositionDigest: selectedComposition.compositionDigest,
+    compositionSelectionRef: selectedComposition.compositionSelectionRef,
     evaluationFunction: "evaluate_next" as const,
     nextActionBasisKind,
-    nextActionProjectionRef: requireNonEmptyString(
-      input.nextActionProjectionRef,
-      "nextActionProjectionRef"
-    ),
+    nextActionProjectionRef,
     intentEventRefs,
     productAssetModelRef,
     gapPressureRefs,
@@ -1386,6 +1458,9 @@ export function constructSdlcNextActionProjection(input: {
       nextGraphVectorRef !== null,
     readOnly: input.readOnly ?? false,
     predecessorRefs: uniqueSorted([
+      selectedComposition.compositionRef,
+      selectedComposition.compositionDigest,
+      selectedComposition.compositionSelectionRef,
       ...intentEventRefs,
       productAssetModelRef,
       ...gapPressureRefs,
@@ -1550,6 +1625,20 @@ export function replaySdlcTraversalConsequence(input: {
   ) {
     throw new TypeError("edge closure decision target carrier identity drift");
   }
+  if (
+    edgeClosureDecision.compositionRef !== edgeFulfillmentLedger.compositionRef ||
+    edgeClosureDecision.compositionDigest !==
+      edgeFulfillmentLedger.compositionDigest ||
+    edgeClosureDecision.compositionSelectionRef !==
+      edgeFulfillmentLedger.compositionSelectionRef ||
+    nextActionProjection.compositionRef !== edgeClosureDecision.compositionRef ||
+    nextActionProjection.compositionDigest !==
+      edgeClosureDecision.compositionDigest ||
+    nextActionProjection.compositionSelectionRef !==
+      edgeClosureDecision.compositionSelectionRef
+  ) {
+    throw new TypeError("traversal consequence selected composition identity drift");
+  }
   requireRefsContain({
     refs: edgeClosureDecision.predecessorRefs,
     requiredRefs: [
@@ -1625,21 +1714,59 @@ export function replaySdlcTraversalConsequence(input: {
     requiredRefs: [nextActionProjection.productAssetModelRef],
     label: constructionIntent.intentRef
   });
+  const admittedStateRef = Object.freeze({
+    compositionRef: nextActionProjection.compositionRef,
+    compositionDigest: nextActionProjection.compositionDigest,
+    compositionSelectionRef: nextActionProjection.compositionSelectionRef,
+    graphCallRef: constructionIntent.intentRef,
+    frameRef: worksiteEvidence.invocationRef,
+    eventRefs: uniqueSorted([
+      ...constructionIntent.intentEventRefs,
+      ...worksiteEvidence.processEventRefs
+    ]),
+    ledgerRefs: uniqueSorted([
+      edgeFulfillmentLedger.ledgerVersionRef,
+      edgeClosureDecision.decisionRef
+    ]),
+    projectionRefs: uniqueSorted([nextActionProjection.nextActionProjectionRef])
+  } satisfies GtlAdmittedStateRef);
+  const consequenceProjection = Object.freeze({
+    consequenceRef:
+      `consequence://odd-sdlc/${encodeURIComponent(nextActionProjection.nextActionProjectionRef)}`,
+    compositionRef: nextActionProjection.compositionRef,
+    compositionDigest: nextActionProjection.compositionDigest,
+    compositionSelectionRef: nextActionProjection.compositionSelectionRef,
+    assuranceDecisionRef:
+      edgeClosureDecision.edgeAssuranceDecisionRef ?? edgeClosureDecision.decisionRef,
+    traversalTransitionRef: nextActionProjection.nextActionProjectionRef,
+    domainReadModelRefs: uniqueSorted([
+      edgeFulfillmentLedger.ledgerVersionRef,
+      edgeClosureDecision.decisionRef,
+      nextActionProjection.nextActionProjectionRef
+    ])
+  } satisfies GtlConsequenceProjectionRef);
   return Object.freeze({
     kind: "sdlc_traversal_consequence_replay" as const,
     refs: Object.freeze({
       kind: "sdlc_traversal_consequence_refs" as const,
+      compositionRef: nextActionProjection.compositionRef,
+      compositionDigest: nextActionProjection.compositionDigest,
+      compositionSelectionRef: nextActionProjection.compositionSelectionRef,
       constructionIntentRef: constructionIntent.intentRef,
       worksiteEvidenceRef: worksiteEvidence.evidenceBundleRef,
       edgeFulfillmentLedgerRef: edgeFulfillmentLedger.ledgerVersionRef,
       edgeClosureDecisionRef: edgeClosureDecision.decisionRef,
-      nextActionProjectionRef: nextActionProjection.nextActionProjectionRef
+      nextActionProjectionRef: nextActionProjection.nextActionProjectionRef,
+      admittedStateRef: admittedStateRef.frameRef,
+      consequenceProjectionRef: consequenceProjection.consequenceRef
     }),
     constructionIntent,
     worksiteEvidence,
     edgeFulfillmentLedger,
     edgeClosureDecision,
-    nextActionProjection
+    nextActionProjection,
+    admittedStateRef,
+    consequenceProjection
   });
 }
 

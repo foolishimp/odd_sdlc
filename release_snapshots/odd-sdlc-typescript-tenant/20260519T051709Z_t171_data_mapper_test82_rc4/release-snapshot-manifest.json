@@ -1,0 +1,54 @@
+{
+  "kind": "odd_sdlc_legacy_release_snapshot_manifest",
+  "releaseIdentity": "20260519T051709Z_t171_data_mapper_test82_rc4",
+  "package": {
+    "packageName": "@odd-sdlc/typescript-tenant",
+    "packageVersion": "0.0.0-dev",
+    "packagePrivate": false
+  },
+  "migratedFrom": ".ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4",
+  "migratedAt": "2026-05-22T15:47:50.329Z",
+  "legacyAbgSubstrateRecorded": false,
+  "legacyAbgSubstrateNote": "The former release-cut manifest did not record a consumed ABG release snapshot. This migrated snapshot preserves historical release-cut evidence and does not assert a substrate pin.",
+  "legacyReleaseCutManifest": {
+    "kind": "legacy_release_cut_manifest",
+    "relativePath": "legacy-release-cut-manifest.json",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/legacy-release-cut-manifest.json",
+    "bytes": 1259,
+    "sha256": "cc976752a591d54ba24b598b3b973584835a8a2ecf7b6b4ff4df9234ef534762"
+  },
+  "sourcePackageRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript",
+  "legacyArchiveRoot": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4",
+  "snapshotRoot": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4",
+  "tarball": {
+    "kind": "package_tarball",
+    "relativePath": "odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "bytes": 353822,
+    "sha256": "b14bf62e178499fc87f907aed296602768b46d3a1a5ecc78e3955aa8b2a3ce5b"
+  },
+  "releaseNote": {
+    "kind": "release_note",
+    "relativePath": "release-note.md",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/release-note.md",
+    "bytes": 782,
+    "sha256": "75a02c4e76e0fdbfeaa50313996436e59479622e0921ac680c3782b9e7b712d5"
+  },
+  "legacyArtifacts": [
+    {
+      "kind": "legacy_release_cut_postmortem",
+      "relativePath": "release-cut-postmortem.md",
+      "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/release-cut-postmortem.md",
+      "bytes": 504,
+      "sha256": "55b219784f2073cee3b26c3f9e3e6ece93b46aa876908e565df20ffa9cad5d10"
+    },
+    {
+      "kind": "legacy_proof_artifact",
+      "relativePath": "t171-data-mapper-test82-rc4-proof-summary.json",
+      "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/t171-data-mapper-test82-rc4-proof-summary.json",
+      "bytes": 4983,
+      "sha256": "df6f93fd90a62d3822c651346a909391fef98edff513cb879f36731dd6330bf5"
+    }
+  ],
+  "checksumFile": "checksums.sha256"
+}

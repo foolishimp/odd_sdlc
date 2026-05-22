@@ -7,13 +7,14 @@ It covers:
 
 1. Cloning the three sibling repositories (`abiogenesis`, `odd_sdlc`,
    `specification_methodology`) into one parent folder.
-2. Building the TypeScript tenants for `abiogenesis` and `odd_sdlc`.
-3. Creating a fresh target project workspace.
-4. Running the `odd-sdlc-ts install` command into that workspace.
-5. Authoring the initial specification (`INTENT`, `PRODUCT`, `GOALS`,
+2. Verifying the pinned ABIogenesis release snapshot.
+3. Building the `odd_sdlc` TypeScript tenant against that snapshot.
+4. Creating a fresh target project workspace.
+5. Running the `odd-sdlc-ts install` command into that workspace.
+6. Authoring the initial specification (`INTENT`, `PRODUCT`, `GOALS`,
    `requirements/`).
-6. Running `gaps` and `start`.
-7. Reference material — key concepts, `gaps` and `start` flags, glossary.
+7. Running `gaps` and `start`.
+8. Reference material — key concepts, `gaps` and `start` flags, glossary.
 
 The runsheet uses the TypeScript line, which is the current active runtime.
 
@@ -40,9 +41,10 @@ git --version
 
 ## 1. Choose an apps-root and clone three sibling repos
 
-The odd_sdlc CLI **resolves the abiogenesis source through sibling-directory
-lookup** (`build_tenants/typescript/code/src/spec_method/entry.ts:218-225`).
-The three repositories must therefore live as siblings under a single parent.
+The odd_sdlc TypeScript package consumes ABIogenesis through a pinned release
+snapshot. The ABIogenesis source checkout remains a sibling because the
+snapshot and ABG docs live there, but the default package dependency is the
+snapshot tarball, not the mutable source package.
 
 Pick a parent directory. Throughout this runsheet `<APPS>` refers to that
 path; the user used `/Users/jim/src/apps` in the development tree.
@@ -88,8 +90,9 @@ Resulting layout (the install resolver depends on this sibling shape):
 
 ```
 <APPS>/
-├── abiogenesis/                   # GTL/ABG substrate source        (required)
-│   └── build_tenants/abiogenesis/typescript/
+├── abiogenesis/                   # GTL/ABG substrate snapshots/docs (required)
+│   ├── docs/
+│   └── release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/
 ├── odd_sdlc/                      # odd_sdlc domain source          (required)
 │   └── build_tenants/typescript/
 ├── specification_methodology/     # constitutional method standards (required)
@@ -101,7 +104,7 @@ Resulting layout (the install resolver depends on this sibling shape):
 Verify:
 
 ```bash
-ls "$APPS"/abiogenesis/build_tenants/abiogenesis/typescript/package.json
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz
 ls "$APPS"/odd_sdlc/build_tenants/typescript/package.json
 ls "$APPS"/specification_methodology/specification/standards/SPEC_METHOD.md
 ```
@@ -117,30 +120,33 @@ clone before continuing — the resolver will not find ABG otherwise.
 
 ---
 
-## 2. Build the abiogenesis TypeScript tenant
+## 2. Verify the pinned ABIogenesis TypeScript release snapshot
 
 ```bash
-cd "$APPS/abiogenesis/build_tenants/abiogenesis/typescript"
-npm install
-npm run build:semantic
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/release-snapshot-manifest.json
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/checksums.sha256
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz
 ```
 
-The build emits typed JavaScript under `build/semantic/`.
+The current pinned ABG package is:
 
-**Claude prompt** (alternative to running the build manually):
+```text
+@abiogenesis/typescript-tenant@3.8.0-rc.3
+```
 
-> Build the abiogenesis TypeScript tenant at
-> `$APPS/abiogenesis/build_tenants/abiogenesis/typescript`. Run
-> `npm install` then `npm run build:semantic` from that directory.
-> Verify `build/semantic/code/src/index.js` exists after the build.
-> Surface any TypeScript compile error verbatim. This step has no
-> dependency on `odd_sdlc`; do not touch any other directory.
+Do not rebuild ABIogenesis as part of normal odd_sdlc setup. Rebuilding ABG is
+upstream release work. odd_sdlc consumes the released snapshot unless you
+explicitly pass a developer override.
 
-Verify:
+The odd_sdlc TypeScript release archive uses the same root layout:
 
 ```bash
-test -f "$APPS/abiogenesis/build_tenants/abiogenesis/typescript/build/semantic/code/src/index.js" && echo "abg build ok"
+ls "$APPS"/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant
 ```
+
+Former `.ai-workspace/release-cuts/typescript` archives have been migrated into
+that root as legacy snapshots. Use `odd-sdlc-ts release-snapshot` for new
+release candidates so the manifest records the consumed ABG release snapshot.
 
 ---
 
@@ -167,14 +173,11 @@ npm run test:t058    # spec method entrypoint smoke
 **Claude prompt** (alternative to running the build manually):
 
 > Build the odd_sdlc TypeScript tenant at
-> `$APPS/odd_sdlc/build_tenants/typescript`. The abiogenesis tenant under
-> `$APPS/abiogenesis/build_tenants/abiogenesis/typescript` must already be
-> built (it is a `file:` dependency; its compiled artifacts live under
-> `build/semantic/`). Run `npm install` then `npm run build:semantic`.
-> Verify `build/semantic/code/src/cli/main.js` exists. If you see
-> module-not-found errors mentioning `@abiogenesis/typescript-tenant`,
-> stop and report — abiogenesis was probably not built. Then run
-> `npm run test:t058` as a smoke check.
+> `$APPS/odd_sdlc/build_tenants/typescript`. Run `npm install` then
+> `npm run build:semantic`. Verify `node_modules/@abiogenesis/typescript-tenant/package.json`
+> reports version `3.8.0-rc.3` and that
+> `build/semantic/code/src/cli/main.js` exists. Then run `npm run test:t058`
+> as a smoke check.
 
 ---
 
@@ -222,9 +225,10 @@ node "$APPS/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.j
   --target "$PROJECT_ROOT"
 ```
 
-The defaults for `--package-source` and `--abg-package-source` resolve through
-the sibling-directory convention you set up in step 1, so you do **not** need
-to pass them explicitly.
+The defaults for `--package-source` and `--abg-package-source` resolve to the
+odd_sdlc package root and its package-local ABIogenesis dependency. That
+dependency is installed from the ABIogenesis `3.8.0-rc.3` release snapshot, so
+you do **not** need to pass either flag explicitly.
 
 After the install completes, the project workspace contains:
 
@@ -262,7 +266,8 @@ node_modules/.bin/odd-sdlc-ts --help 2>&1 | head -5 || true
 > source-tree CLI:
 > `node $APPS/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.js install --target $PROJECT_ROOT`.
 > Do not pass `--package-source` or `--abg-package-source`; the resolver
-> finds abiogenesis through the sibling-directory convention. After the
+> uses the package-local ABIogenesis dependency installed from the pinned
+> release snapshot. After the
 > install completes verify that
 > `$PROJECT_ROOT/.abiogenesis/install-manifest.json`,
 > `$PROJECT_ROOT/.abiogenesis/odd_sdlc/typescript/install-manifest.json`,
@@ -739,20 +744,32 @@ model name, effort string) is the likely culprit — not the substrate.
 - `.ai-workspace/runtime/odd_sdlc/operator-runs/` — per-run archives written
   during `start`. Read-only after the run; the canonical evidence trail.
 
-**The W / L / E / Ev algebra.**
+**The W / L / E / Ev / C algebra.**
 
 - **W** — the mutable workspace under construction.
-- **L** — the immutable governed ledger of work over W.
-- **E** — the append-only event log; the replay spine.
-- **Ev** — evaluator work over L, whose output must itself be admitted into
-  L and E.
+- **C / selected composition** — notation over the selected
+  `abg.fn_composition` for the current graph-function, vector, evaluator, rule,
+  or operator boundary.
+- **transform.C** — candidate, product-delta, or evidence production under the
+  selected composition. It is not a ledger writer or closure authority.
+- **evaluate.C** — evaluation finding production under the selected
+  composition. It returns findings for admission; it does not close by
+  assertion.
+- **L** — ABG-owned event and ledger truth over W after admission. Product
+  pressure views are read models over that truth.
+- **E** — the ABG-owned append-only event log; the replay spine.
+- **Ev** — evaluator work over admitted facts. Its output must be admitted by
+  ABG before it becomes event, ledger, projection, traversal, or closure truth.
+- **consequence.C** — projection reference over ABG-admitted facts, assurance
+  decisions, traversal transitions, and product read model refs.
 
 **Three evaluator regimes.**
 
 - **F_D** — deterministic. Schema checks, hash checks, lifted-id checks,
   structural conformance. No LLM.
-- **F_P** — probabilistic. The LLM worker constructs an asset; F_D admits
-  and validates the result. F_P owns semantic quality.
+- **F_P** — probabilistic. The LLM worker constructs an asset or supplies
+  probabilistic findings under the selected composition. F_D admits and
+  validates returned carriers, and ABG owns event/ledger/projection/fold truth.
 - **F_H** — human. Operator approval gates for review/escalation. Cannot
   override deterministic failure.
 
@@ -1186,8 +1203,8 @@ requirement, design, code, test, evidence). Asset types carry semantic role.
 
 **Asset graph** — the dependency topology over typed asset nodes.
 
-**Assurance ledger** — a projection over admitted events recording per-edge
-obligation accounting. Read-only; derived.
+**Assurance ledger** — an ABG-owned projection over admitted events recording
+per-edge obligation accounting. Read-only; derived.
 
 **Blocking reason** — a typed reason an edge cannot advance, surfaced
 through `gaps` and admitted evidence.
@@ -1201,8 +1218,15 @@ into the governed line.
 **Carrier schema** — the typed contract a carrier must satisfy. F_D checks
 admitted payloads against the schema.
 
+**C / selected composition** — notation over selected `abg.fn_composition`.
+It is not a product-local compute carrier, runtime carrier, controller, or
+closure path.
+
 **Closure decision** — the per-edge disposition (`close`, `yield`, `retry`,
 `repair`, `re-enter`, `reprice`, `block`).
+
+**consequence.C** — a projection reference over ABG-admitted state, assurance
+decision refs, traversal transition refs, and product read model refs.
 
 **Conform project** — the F_D traversal that ingests `specification/`
 surfaces and lifts requirement ids into workspace requirement authority.
@@ -1228,6 +1252,10 @@ loaded at runtime over the same GTL/ABG substrate (for example the
 **Evaluator** — convergence and attestation surface; one of `F_D`, `F_P`,
 `F_H`.
 
+**evaluate.C** — evaluation finding production under selected composition.
+It returns metrics, diagnostics, evidence refs, residual pressure, and proposed
+disposition rows for admission; it does not write runtime truth.
+
 **Event** — one append-only runtime fact. The replay spine.
 
 **Evidence row** — one admitted record of admitted product or process truth.
@@ -1237,8 +1265,10 @@ checks. No LLM.
 
 **F_H (human)** — operator approval gate.
 
-**F_P (probabilistic)** — LLM-driven asset construction. Owns semantic
-quality of `A.req_i → B.result_i`.
+**F_P (probabilistic)** — LLM-driven construction or probabilistic finding
+production under selected composition. It may propose content, evidence, or
+semantic judgment, but ABG admission and deterministic fold decide runtime
+truth.
 
 **Fg_** — name prefix for graph functions in the odd_sdlc catalog. Examples:
 `Fg_conform_project`, `Fg_conform_project_authority`,
@@ -1274,7 +1304,8 @@ catalog that the operator may legally invoke at the current node.
 **Lawful re-entry** — the named constitutional or realization layer the
 system must re-enter after gap analysis before forward derivation resumes.
 
-**L (Ledger)** — the immutable governed ledger of work over W.
+**L (Ledger)** — ABG-owned event and ledger truth over W after admission.
+Product pressure views are read models over that truth.
 
 **Materialization** — the F_P-driven act of constructing a product asset
 into the workspace under governed binding.
@@ -1284,6 +1315,11 @@ contracts.
 
 **Next action projection** — the read model that picks the next lawful
 construction action from the current frontier.
+
+**transform.C** — candidate, product-delta, or evidence production under
+selected composition. For generic prompt-bearing SDLC edges this commonly binds
+`F_P.transform`; it does not write ledgers, emit events, publish projections,
+select traversal, or close a boundary.
 
 **Obligation** — a typed requirement to be satisfied for an edge to close.
 

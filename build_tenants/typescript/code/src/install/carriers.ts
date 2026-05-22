@@ -9,6 +9,8 @@ export interface OddSdlcTypescriptInstallRequest {
   readonly targetRoot: string;
   readonly packageSourceRoot: string;
   readonly abgPackageSourceRoot: string;
+  readonly abgStandardsSourceRoot: string | null;
+  readonly abgDocsSourceRoot: string | null;
   readonly installedPackageName: string;
 }
 

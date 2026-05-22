@@ -66,7 +66,7 @@ The accepted final segment closes:
 The proof summary is archived at:
 
 ```text
-.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4/t171-data-mapper-test82-rc4-proof-summary.json
+release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/t171-data-mapper-test82-rc4-proof-summary.json
 ```
 
 ## Qualification Bundle
@@ -75,12 +75,12 @@ The proof summary is archived at:
 - `npm run lint:semantic` - passed
 - `npm run lint:test-harness` - passed
 - `git diff --check` - passed
-- `odd-sdlc-ts release-cut --archive-root .ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4` - passed
+- `odd-sdlc-ts release-cut --archive-root .ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4` - passed; migrated to root `release_snapshots`
 
 Release-cut artifact:
 
 ```text
-.ai-workspace/release-cuts/typescript/20260519T051709Z_t171_data_mapper_test82_rc4/package/pack-dwdQfY/odd-sdlc-typescript-tenant-0.0.0-dev.tgz
+release_snapshots/odd-sdlc-typescript-tenant/20260519T051709Z_t171_data_mapper_test82_rc4/odd-sdlc-typescript-tenant-0.0.0-dev.tgz
 ```
 
 ## Known Limitations

@@ -85,6 +85,22 @@ function makeWorkspace() {
     ].join("\n"),
     "utf8"
   );
+  mkdirSync(path.join(root, "build_tenants/scala_spark/spec"), { recursive: true });
+  writeFileSync(
+    path.join(root, "build_tenants/scala_spark/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Scala",
+        buildTool: "sbt",
+        runtime: "JVM",
+        proofCommands: ["sbt test"]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   materializeSdlcProjectConformance({ workspaceRoot: root });
   return root;
 }
@@ -397,6 +413,11 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "  const sourceDigest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}`;",
       "  const relativePath = manifest.targetAssetType === 'component_code_surface' && !hasPriorGap ? path.relative(manifest.workspaceRoot, productPath) : tenantRelative;",
       "  materializedFiles.push({ kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath: productPath, digest: sourceDigest, byteCount: Buffer.byteLength(source, 'utf8') });",
+      "  const buildPath = path.join(manifest.productMaterialization.tenantRoot, 'build.sbt');",
+      "  const buildConfig = 'ThisBuild / scalaVersion := \"2.13.12\"\\n';",
+      "  writeFileSync(buildPath, buildConfig, 'utf8');",
+      "  const buildDigest = `sha256:${createHash('sha256').update(buildConfig, 'utf8').digest('hex')}`;",
+      "  materializedFiles.push({ kind: 'sdlc_materialized_product_file', role: 'build_config', relativePath: 'build.sbt', absolutePath: buildPath, digest: buildDigest, byteCount: Buffer.byteLength(buildConfig, 'utf8') });",
       "}",
       "const outputDigest = `sha256:${createHash('sha256').update(output, 'utf8').digest('hex')}`;",
       "const materializedRefs = materializedFiles.map((file) => `file://${file.absolutePath}`);",

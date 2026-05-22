@@ -42,6 +42,23 @@ function makeWorkspace(input = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t147-"));
   mkdirSync(path.join(root, "specification"), { recursive: true });
   writeConstraints(root, input);
+  const activeTenant = input.activeTenant ?? "custom_runtime";
+  mkdirSync(path.join(root, "build_tenants", activeTenant, "spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants", activeTenant, "spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: input.language ?? "custom",
+        buildTool: input.buildTool ?? "custom"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   if (input.productTargets !== undefined) {
     writeFileSync(
       path.join(root, "specification/PRODUCT.md"),

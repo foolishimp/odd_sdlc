@@ -173,6 +173,43 @@ function renderPromptAndEvidence(attempts: readonly SdlcFdRunAnalysisEdgeAttempt
   return lines.join("\n");
 }
 
+function renderFrontierGraphTruth(
+  attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
+): string {
+  const frontierAttempts = attempts.filter(
+    (attempt) => attempt.frontierSummary !== null
+  );
+  if (frontierAttempts.length === 0) {
+    return "## Frontier Graph Truth\n\nnone";
+  }
+  const bounded = boundedRows(frontierAttempts);
+  const lines: string[] = [
+    "## Frontier Graph Truth",
+    "",
+    "| # | dag | truth | selected | start | ready | batches | branches | fan-in | workers | conflicts |",
+    "| - | - | - | - | - | - | - | - | - | - | - |"
+  ];
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const attempt of bounded.rows) {
+    const frontier = attempt.frontierSummary;
+    if (frontier === null) {
+      continue;
+    }
+    const workers = frontier.branchRows.map((row) => row.workerProcessRef);
+    const conflicts = [
+      ...frontier.writeTerritoryConflictRefs,
+      ...frontier.outputAllocationConflictRefs
+    ];
+    lines.push(
+      `| ${attempt.attemptOrdinal} | ${frontier.dagRef} | ${frontier.graphTruthSource} | ${frontier.selectedMethod} | ${frontier.startNodes.length} | ${frontier.compiledReadyBranchRefs.length}/${frontier.readyBranchRefs.length} | ${frontier.batchSizes.join("+") || "0"} | ${frontier.devLaneCount} dev / ${frontier.testLaneCount} test | ${frontier.fanInRows.length} | ${boundedJoinedText(workers, "<br>")} | ${boundedJoinedText(conflicts, "<br>")} |`
+    );
+  }
+  return lines.join("\n");
+}
+
 function renderConceptualStageCoverage(
   coverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[]
 ): string {
@@ -405,6 +442,8 @@ export function renderSdlcFdRunAnalysisMarkdown(result: SdlcFdRunAnalysisResult)
     renderEdgeTraversal(result.edgeTraversal),
     "",
     renderPromptAndEvidence(result.edgeTraversal),
+    "",
+    renderFrontierGraphTruth(result.edgeTraversal),
     "",
     renderConceptualStageCoverage(result.conceptualStageCoverage),
     "",

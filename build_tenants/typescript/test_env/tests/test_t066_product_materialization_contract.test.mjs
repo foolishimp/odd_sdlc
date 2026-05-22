@@ -9043,22 +9043,18 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
         /generic repair depth/u
       ]
     },
-    {
-      edgeName: "prepare_test_execution_surface",
-      targetAssetType: "test_execution_surface",
-      registerKind: "test_execution_surface_register",
-      carrierKind: "sdlc_test_execution_surface_register",
-      registerVersion: "ts-test-execution-v1",
-      rowDirective: /payload\.testExecutionPreparationRows/u,
-      extraDirectives: [
-        /test-execution preparation carrier shape/u,
-        /do not inspect framework source code/u,
-        /sdlc_test_execution_preparation_row/u,
-        /scheduleRef, moduleName, testClassId, testcaseIds, command, workingDirectory, frameworkRef, shardId, sourceTestFileRefs, requirementIds, status, and evidenceRefs/u,
-        /Do not run the test command in this edge/u
-      ]
-    }
-  ];
+	    {
+	      edgeName: "prepare_test_execution_surface",
+	      targetAssetType: "test_execution_surface",
+	      registerKind: "test_execution_surface_register",
+	      carrierKind: "sdlc_test_execution_surface_register",
+	      registerVersion: "ts-test-execution-v1",
+	      frameworkOwned: true,
+	      publisherDirective:
+	        /Test-execution-surface carrier protocol is evaluator-owned/u,
+	      forbiddenDirectives: [/payload\.testExecutionPreparationRows/u]
+	    }
+	  ];
 
   for (const promptCase of cases) {
     const contract = hookContractByEdgeName(promptCase.edgeName);
@@ -9705,6 +9701,12 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     "component_test_qualification_surface",
     "release_depth_parity_surface"
   ]);
+  const workerAuthoredTargetCarrierProtocolTargets = new Set([
+    "component_code_surface",
+    "component_test_surface",
+    "test_design_surface",
+    "component_repair_schedule_surface"
+  ]);
   const forbiddenPromptPatterns = [
     /^- report surface:/mu,
     /Satisfy evaluator contract/u,
@@ -9727,6 +9729,16 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
     /next-tranche selectors/u,
     /Worker-fillable target carrier fields/u,
     /tenant-local SDLC surface artifact path/u
+  ];
+  const forbiddenNonStructuredTargetCarrierProtocolPatterns = [
+    /selected target carrier: kind=/u,
+    /Target carrier contract:/u,
+    /Target carrier digest:/u,
+    /Target carrier kind:/u,
+    /Target carrier required fields:/u,
+    /Target carrier fixed protocol fields:/u,
+    /Worker-fillable target carrier fields:/u,
+    /Target carrier construction template ref:/u
   ];
 
   for (const [index, contract] of constructSdlcHookContractCatalog().entries()) {
@@ -9793,6 +9805,12 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
 
     for (const pattern of forbiddenPromptPatterns) {
       assert.doesNotMatch(prompt, pattern, label);
+    }
+    if (!workerAuthoredTargetCarrierProtocolTargets.has(contract.targetAssetType)) {
+      assert.match(prompt, /target carrier protocol: evaluator-owned/u, label);
+      for (const pattern of forbiddenNonStructuredTargetCarrierProtocolPatterns) {
+        assert.doesNotMatch(prompt, pattern, label);
+      }
     }
     if (installedOperatorOwnedTargets.has(contract.targetAssetType)) {
       assert.equal(

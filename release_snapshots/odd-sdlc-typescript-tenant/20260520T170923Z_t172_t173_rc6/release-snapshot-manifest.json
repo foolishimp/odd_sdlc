@@ -1,0 +1,54 @@
+{
+  "kind": "odd_sdlc_legacy_release_snapshot_manifest",
+  "releaseIdentity": "20260520T170923Z_t172_t173_rc6",
+  "package": {
+    "packageName": "@odd-sdlc/typescript-tenant",
+    "packageVersion": "0.0.0-dev",
+    "packagePrivate": false
+  },
+  "migratedFrom": ".ai-workspace/release-cuts/typescript/20260520T170923Z_t172_t173_rc6",
+  "migratedAt": "2026-05-22T15:47:50.329Z",
+  "legacyAbgSubstrateRecorded": false,
+  "legacyAbgSubstrateNote": "The former release-cut manifest did not record a consumed ABG release snapshot. This migrated snapshot preserves historical release-cut evidence and does not assert a substrate pin.",
+  "legacyReleaseCutManifest": {
+    "kind": "legacy_release_cut_manifest",
+    "relativePath": "legacy-release-cut-manifest.json",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6/legacy-release-cut-manifest.json",
+    "bytes": 1217,
+    "sha256": "ad77548c3b2ff72c61a3a1577fea35a159b3e1ef9e47e1b2eddcd11bb203fcae"
+  },
+  "sourcePackageRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript",
+  "legacyArchiveRoot": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260520T170923Z_t172_t173_rc6",
+  "snapshotRoot": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6",
+  "tarball": {
+    "kind": "package_tarball",
+    "relativePath": "odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "bytes": 384741,
+    "sha256": "7aa04ac779f5e068901d5d7f987fac12ae170d1bfdc3bd86c61a7b65b83e67a8"
+  },
+  "releaseNote": {
+    "kind": "release_note",
+    "relativePath": "release-note.md",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6/release-note.md",
+    "bytes": 754,
+    "sha256": "141c40d21c1361732d2bc5880b12ae072d6a92743829559de2df8a52cedd3751"
+  },
+  "legacyArtifacts": [
+    {
+      "kind": "legacy_release_cut_postmortem",
+      "relativePath": "release-cut-postmortem.md",
+      "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6/release-cut-postmortem.md",
+      "bytes": 490,
+      "sha256": "44570848214627f56acccab6ef3a6a26f44471d3bb54b140c1fbe2c2d652f190"
+    },
+    {
+      "kind": "legacy_proof_artifact",
+      "relativePath": "t172-t173-rc6-proof-summary.json",
+      "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260520T170923Z_t172_t173_rc6/t172-t173-rc6-proof-summary.json",
+      "bytes": 2855,
+      "sha256": "b1f1149c03bfe7d71bdbce61e892b8faee468c98264f8e6ec50d6df996975397"
+    }
+  ],
+  "checksumFile": "checksums.sha256"
+}

@@ -53,11 +53,13 @@ import {
   type SdlcConstructionIntent,
   type SdlcNextActionProjection
 } from "../operator/traversal_consequence.js";
+import { deriveSdlcSelectedAbgFnCompositionIdentity } from "../operator/composition_identity.js";
 import {
   deriveSdlcDecompositionSummary,
   SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS
 } from "../operator/decomposition_admission.js";
 import { deriveSdlcTraversalHopSelection } from "../operator/traversal_complexity.js";
+import { resolveSdlcTraversalOutcomeClass } from "../contracts/carrier_domain_catalog.js";
 import type {
   SdlcDecompositionSummary,
   SdlcTraversalHopSelection,
@@ -352,17 +354,10 @@ function truthyCapability(profile: SdlcConformProjectProfile, name: string): boo
 function traversalOutcomeClassForPublicStart(
   profile: SdlcConformProjectProfile
 ): SdlcTraversalOutcomeClass {
-  const explicit = capabilityValue(profile, "sdlc_outcome_class");
-  if (
-    explicit === "framework_smoke" ||
-    explicit === "tutorial_example" ||
-    explicit === "domain_product"
-  ) {
-    return explicit;
-  }
-  return truthyCapability(profile, "trivial_product")
-    ? "framework_smoke"
-    : "domain_product";
+  return resolveSdlcTraversalOutcomeClass({
+    explicitValue: capabilityValue(profile, "sdlc_outcome_class"),
+    trivialProduct: truthyCapability(profile, "trivial_product")
+  }).outcomeClass;
 }
 
 function frontDoorTraversalSelection(input: {
@@ -971,6 +966,19 @@ function evaluateInitialPublicStartAction(input: {
     });
   }
   const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
+  const selectedComposition = deriveSdlcSelectedAbgFnCompositionIdentity({
+    graphFunctionRef: selectedCandidate.graphFunctionRef,
+    graphVectorRef:
+      selectedGraphVectorRef ?? `public-start:${selectedCandidate.graphFunctionRef}`,
+    compositionSelectionScopeRef:
+      input.request.replayNextActionProjectionRef ??
+      evaluator.priorityProjection.projectionRef,
+    carrierContextRefs: Object.freeze([
+      evaluator.priorityProjection.projectionRef,
+      evaluator.observation.observationId
+    ]),
+    assuranceContextRefs: Object.freeze([selectedOverlay.overlayRef])
+  });
   const priorTruthRefs = priorOverlayTruthRefs({
     request: input.request,
     overlay: selectedOverlay
@@ -1022,6 +1030,10 @@ function evaluateInitialPublicStartAction(input: {
       ? null
       : Object.freeze({
           kind: "sdlc_edge_closure_decision" as const,
+          selectedComposition,
+          compositionRef: selectedComposition.compositionRef,
+          compositionDigest: selectedComposition.compositionDigest,
+          compositionSelectionRef: selectedComposition.compositionSelectionRef,
           decisionRef: input.request.replayClosureDecisionRef,
           ledgerRef: `ledger://odd-sdlc/public-start/replay/${encodeURIComponent(input.request.replayClosureDecisionRef)}`,
           ledgerVersionRef:
@@ -1045,6 +1057,7 @@ function evaluateInitialPublicStartAction(input: {
           predecessorRefs: Object.freeze([input.request.replayClosureDecisionRef])
         });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition,
     nextActionProjectionRef:
       input.request.replayNextActionProjectionRef ??
       evaluator.priorityProjection.projectionRef,

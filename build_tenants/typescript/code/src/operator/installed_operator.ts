@@ -48,6 +48,8 @@ import {
   type ActorInvocation,
   type EnginePluginInput,
   type ExecutionBasis,
+  type GtlAdmittedStateRef,
+  type GtlConsequenceProjectionRef,
   type Module,
   type RuntimeAggregateProjection,
   type RuntimeEvent,
@@ -58,6 +60,11 @@ import {
   type TracedProcessOutcome,
   type TracedProcessStreamModel
 } from "@abiogenesis/typescript-tenant";
+import {
+  constructBranchExecutionPolicy,
+  runEventedNativeSagaFrontier,
+  type NativeBranchTask
+} from "@abiogenesis/typescript-tenant/abg/m03";
 import {
   FG_CONFORM_PROJECT,
   FG_CONFORM_PROJECT_AUTHORITY,
@@ -83,6 +90,7 @@ import {
   type SdlcTargetCarrierCandidateAdmission,
   type SdlcTargetCarrierContractRow
 } from "../graph/index.js";
+import { resolveSdlcTraversalOutcomeClass } from "../contracts/carrier_domain_catalog.js";
 import { deriveSdlcOperatorAssuranceGate } from "./assurance_gate.js";
 import {
   defaultOperationForTarget,
@@ -102,8 +110,15 @@ import type {
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcPostflightResult,
+  SdlcTraversalObligation,
   SdlcWorkerObligationAssessment,
   SdlcWorkerHandoffManifest,
+  SdlcDependencyMapNode,
+  SdlcDependencyTraversalSelection,
+  SdlcFeatureDependencyDag,
+  SdlcAbgFrontierCompilation,
+  SdlcModuleDependencyMap,
+  SdlcTestDependencyMap,
   SdlcWorkerProcessStartedContext,
   SdlcWorkerProcessSummary,
   SdlcWorkerRetryContext,
@@ -138,8 +153,23 @@ import {
   writeOperatorArchiveFile,
   writePostflightGapDossier,
   writeWorkerFpTransformResult,
-  writeProductMaterializationManifest
+  writeProductMaterializationManifest,
+  type SdlcStagedConstructionAuditCarrier
 } from "./handoff.js";
+import {
+  compileSdlcFeatureDependencyDagToAbgFrontier,
+  deriveSdlcFeatureDependencyDagFromMaps
+} from "./feature_dependency_dag.js";
+import {
+  classifySdlcLiveParallelModuleLane,
+  constructSdlcLiveFpParallelMaterializationFrontier,
+  deriveSdlcLiveFpParallelMaterializationBranchOverrides,
+  normalizeSdlcLiveFpParallelMaterializationTarget,
+  resolveSdlcLiveFpParallelBatchSize,
+  sdlcLiveParallelMaterializationTargetKey,
+  type SdlcLiveFpParallelMaterializationBranchRow,
+  type SdlcLiveFpParallelMaterializationFanInRow
+} from "./live_fp_parallel_materialization_frontier.js";
 import { deriveSdlcTraversalHopSelection } from "./traversal_complexity.js";
 import {
   admitWorkerTransport,
@@ -161,6 +191,11 @@ import {
   deriveOddSdlcEvaluateNextReport,
   type OddSdlcEvaluateNextActionInput
 } from "../runtime/index.js";
+import {
+  deriveSdlcSelectedAbgFnCompositionIdentity,
+  sdlcRunRefSegmentFromArchiveRoot,
+  type SdlcSelectedAbgFnCompositionIdentity
+} from "./composition_identity.js";
 import {
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcNextActionProjection,
@@ -454,7 +489,10 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
   }
   const priorGapDossiers =
     input.outcome.gapDossier === null
-      ? Object.freeze([])
+      ? syntheticGapDossiersFromClosureDecision({
+          outcome: input.outcome,
+          sourceProjectionRef
+        })
       : Object.freeze([input.outcome.gapDossier]);
   const priorAuthorityRef =
     priorGapDossiers[0]?.currentGapDossierRef ??
@@ -485,6 +523,66 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
     reasonRef: "retry-context://odd-sdlc/ready",
     sourceProjectionRef
   });
+}
+
+function syntheticGapDossiersFromClosureDecision(input: {
+  readonly outcome: SdlcInstalledOperatorStartOutcome;
+  readonly sourceProjectionRef: string;
+}): readonly SdlcPostflightGapDossier[] {
+  const manifest = input.outcome.manifest;
+  const consequence = input.outcome.traversalConsequence;
+  if (
+    manifest === null ||
+    consequence === null ||
+    consequence.edgeClosureDecision.disposition === "close" ||
+    consequence.edgeClosureDecision.reasonRefs.length === 0
+  ) {
+    return Object.freeze([]);
+  }
+  const currentGapDossierRef = `closure-gap-dossier://odd-sdlc/${encodeURIComponent(
+    consequence.edgeClosureDecision.decisionRef
+  )}`;
+  const reasons = consequence.edgeClosureDecision.reasonRefs.map(
+    (reasonRef): SdlcPostflightGapReason =>
+      Object.freeze({
+        kind: "sdlc_postflight_gap_reason" as const,
+        reason: `edge_closure_residual_pressure:${reasonRef}`,
+        reasonClass: "assurance" as const,
+        blockingReason: makeSdlcBlockingReason({
+          code: "assurance_ledger_reason",
+          reasonClass: "assurance",
+          lawfulReentryPoint: "same_edge_retry",
+          message: "Edge closure residual pressure requires same-edge repair.",
+          detail: reasonRef,
+          evidenceRefs: [
+            consequence.edgeClosureDecision.decisionRef,
+            input.sourceProjectionRef,
+            reasonRef
+          ]
+        })
+      })
+  );
+  return Object.freeze([
+    Object.freeze({
+      kind: "sdlc_postflight_gap_dossier" as const,
+      status: "open" as const,
+      graphFunctionName: manifest.graphFunctionName,
+      edgeName: manifest.edgeName,
+      vectorIndex: manifest.vectorIndex,
+      targetAssetType: manifest.targetAssetType,
+      reasons: Object.freeze(reasons),
+      evidenceRefs: uniqueSorted([
+        consequence.edgeClosureDecision.decisionRef,
+        input.sourceProjectionRef,
+        ...consequence.edgeClosureDecision.reasonRefs
+      ]),
+      priorManifestId: pathToFileURL(join(manifest.archiveRoot, "handoff_manifest.json"))
+        .href,
+      currentGapDossierRef,
+      retryEligible: true,
+      nextLawfulActions: Object.freeze(["retry_same_edge" as const])
+    })
+  ]);
 }
 
 function terminalReasonForInstalledStartLoop(input: {
@@ -1591,17 +1689,12 @@ function truthyCapabilityValue(value: string | null): boolean {
 function traversalOutcomeClassForManifest(
   manifest: SdlcWorkerHandoffManifest
 ): SdlcTraversalOutcomeClass {
-  const explicit = manifestCapabilityValue(manifest, "sdlc_outcome_class");
-  if (
-    explicit === "framework_smoke" ||
-    explicit === "tutorial_example" ||
-    explicit === "domain_product"
-  ) {
-    return explicit;
-  }
-  return truthyCapabilityValue(manifestCapabilityValue(manifest, "trivial_product"))
-    ? "framework_smoke"
-    : "domain_product";
+  return resolveSdlcTraversalOutcomeClass({
+    explicitValue: manifestCapabilityValue(manifest, "sdlc_outcome_class"),
+    trivialProduct: truthyCapabilityValue(
+      manifestCapabilityValue(manifest, "trivial_product")
+    )
+  }).outcomeClass;
 }
 
 function canonicalSummaryForManifest(input: {
@@ -1611,6 +1704,7 @@ function canonicalSummaryForManifest(input: {
   const summaries = input.carriers
     .filter(
       (carrier): carrier is {
+        readonly artifactRef: string;
         readonly relativePath: string;
         readonly payload: SdlcDecompositionSummary;
       } => carrier.payload.kind === "sdlc_decomposition_summary"
@@ -1622,8 +1716,9 @@ function canonicalSummaryForManifest(input: {
     );
   const preferred = summaries.find((carrier) =>
     preferTest
-      ? carrier.relativePath.includes("test")
-      : carrier.relativePath.includes("implementation")
+      ? carrier.artifactRef === "operator-run-artifact://test-decomposition-summary"
+      : carrier.artifactRef ===
+        "operator-run-artifact://implementation-decomposition-summary"
   );
   return preferred?.payload ?? summaries[0]?.payload ?? null;
 }
@@ -1643,24 +1738,496 @@ function traversalAuditRoutingDecision(
   return "continue";
 }
 
-function writeTraversalSelectionAudit(input: {
+type LiveParallelLaneKind = "dev" | "test";
+
+interface LiveParallelMaterializationLane {
+  readonly laneKind: "dev";
+  readonly branchKey: string;
+  readonly node: SdlcDependencyMapNode;
+  readonly targetRef: string;
+  readonly normalizedTargetRef: string;
+}
+
+function sdlcLiveSlug(input: string): string {
+  return (
+    input
+      .trim()
+      .replace(/[^A-Za-z0-9]+/gu, "-")
+      .replace(/^-+|-+$/gu, "")
+      .toLowerCase() || "unnamed"
+  );
+}
+
+function normalizedLiveMaterializationTarget(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly targetRef: string;
+}): string {
+  return normalizeSdlcLiveFpParallelMaterializationTarget({
+    targetRef: input.targetRef,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+    tenantRoot: input.manifest.productMaterialization.tenantRoot
+  });
+}
+
+function liveParallelModuleLaneKind(targetRef: string): "dev" | null {
+  return classifySdlcLiveParallelModuleLane(targetRef);
+}
+
+function liveParallelLaneForNode(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly node: SdlcDependencyMapNode;
+}): LiveParallelMaterializationLane | null {
+  for (const targetRef of input.node.materializationTargetRefs) {
+    const normalizedTargetRef = normalizedLiveMaterializationTarget({
+      manifest: input.manifest,
+      targetRef
+    });
+    const laneKind = liveParallelModuleLaneKind(normalizedTargetRef);
+    if (laneKind === null) {
+      continue;
+    }
+    return Object.freeze({
+      laneKind,
+      branchKey: `${laneKind}-${sdlcLiveSlug(
+        sdlcLiveParallelMaterializationTargetKey(normalizedTargetRef)
+      )}`,
+      node: input.node,
+      targetRef,
+      normalizedTargetRef
+    });
+  }
+  return null;
+}
+
+function liveParallelWorkerProcessRef(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly branchKey: string;
+}): string {
+  return `abg-native-branch-task://odd-sdlc/live/${manifestRefSegment(input.manifest)}/${input.branchKey}`;
+}
+
+function liveParallelFrontierRef(manifest: SdlcWorkerHandoffManifest): string {
+  return `frontier://odd-sdlc/live/${manifestRefSegment(manifest)}/parallel-materialization`;
+}
+
+function liveParallelFanInScopeRef(manifest: SdlcWorkerHandoffManifest): string {
+  return `fan-in://odd-sdlc/live/${manifestRefSegment(manifest)}/parallel-materialization`;
+}
+
+function moduleDependencyMapFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcModuleDependencyMap | null {
+  const carrier = carriers.find(
+    (candidate) => candidate.artifactRef === "operator-run-artifact://module-dependency-map"
+  );
+  return carrier?.payload.kind === "sdlc_module_dependency_map"
+    ? carrier.payload
+    : null;
+}
+
+function moduleTraversalSelectionFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcDependencyTraversalSelection | null {
+  const carrier = carriers.find(
+    (candidate) =>
+      candidate.artifactRef ===
+      "operator-run-artifact://module-dependency-traversal-selection"
+  );
+  return carrier?.payload.kind === "sdlc_dependency_traversal_selection"
+    ? carrier.payload
+    : null;
+}
+
+function testDependencyMapFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcTestDependencyMap | null {
+  const carrier = carriers.find(
+    (candidate) => candidate.artifactRef === "operator-run-artifact://test-dependency-map"
+  );
+  return carrier?.payload.kind === "sdlc_test_dependency_map"
+    ? carrier.payload
+    : null;
+}
+
+function testTraversalSelectionFromAuditCarriers(
+  carriers: readonly SdlcStagedConstructionAuditCarrier[]
+): SdlcDependencyTraversalSelection | null {
+  const carrier = carriers.find(
+    (candidate) =>
+      candidate.artifactRef ===
+      "operator-run-artifact://test-dependency-traversal-selection"
+  );
+  return carrier?.payload.kind === "sdlc_dependency_traversal_selection"
+    ? carrier.payload
+    : null;
+}
+
+function liveParallelNodeTargetRefs(
+  node: SdlcFeatureDependencyDag["nodes"][number]
+): readonly string[] {
+  return uniqueSorted(
+    node.targetAssetRefs.length > 0
+      ? node.targetAssetRefs
+      : node.outputAllocationRefs.map((ref) => ref.replace(/^artifact:\/\//u, ""))
+  );
+}
+
+function liveParallelFrontierDependencyMap(input: {
+  readonly source: SdlcModuleDependencyMap;
+  readonly lanes: readonly LiveParallelMaterializationLane[];
+}): SdlcModuleDependencyMap {
+  const laneIds = new Set(input.lanes.map((lane) => lane.node.nodeId));
+  const sourceIds = new Set(input.source.nodes.map((node) => node.nodeId));
+  const preserveLaneOrMalformedRef = (nodeId: string): boolean =>
+    laneIds.has(nodeId) || !sourceIds.has(nodeId);
+  return Object.freeze({
+    ...input.source,
+    nodes: Object.freeze(
+      input.lanes.map((lane) =>
+        Object.freeze({
+          ...lane.node,
+          predecessorNodeIds: Object.freeze(
+            lane.node.predecessorNodeIds.filter(preserveLaneOrMalformedRef)
+          ),
+          successorNodeIds: Object.freeze(
+            lane.node.successorNodeIds.filter(preserveLaneOrMalformedRef)
+          )
+        })
+      )
+    )
+  });
+}
+
+function liveParallelBranchRowsFromCompilation(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly dag: SdlcFeatureDependencyDag;
+  readonly compilation: SdlcAbgFrontierCompilation;
+}): readonly SdlcLiveFpParallelMaterializationBranchRow[] {
+  return input.dag.nodes.flatMap((node, index) => {
+    if (node.nodeKind === "fan_in") {
+      return [];
+    }
+    const branchRef = input.compilation.branchRefs[index];
+    if (branchRef === undefined) {
+      return [];
+    }
+    const targetRefs = liveParallelNodeTargetRefs(node);
+    const laneKind: LiveParallelLaneKind =
+      node.nodeKind === "test_materialization" ? "test" : "dev";
+    return Object.freeze({
+      branchRef: branchRef.branchRef,
+      branchKey: branchRef.branchKey,
+      nodeId: node.nodeRef,
+      laneKind,
+      workerProcessRef: liveParallelWorkerProcessRef({
+        manifest: input.manifest,
+        branchKey: branchRef.branchKey
+      }),
+      materializationTargetRefs: targetRefs,
+      readRefs: node.readRefs,
+      writeTerritoryRefs: node.writeTerritoryRefs,
+      outputAllocationRefs: node.outputAllocationRefs
+    });
+  });
+}
+
+function liveParallelFanInRowsFromCompilation(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly dag: SdlcFeatureDependencyDag;
+  readonly compilation: SdlcAbgFrontierCompilation;
+}): readonly SdlcLiveFpParallelMaterializationFanInRow[] {
+  const branchByNodeRef = new Map(
+    input.dag.nodes.flatMap((node, index) => {
+      const branchRef = input.compilation.branchRefs[index];
+      return branchRef === undefined
+        ? []
+        : [[node.nodeRef, branchRef] as const];
+    })
+  );
+  return input.dag.nodes.flatMap((node) => {
+    if (node.nodeKind !== "fan_in") {
+      return [];
+    }
+    const branchRef = branchByNodeRef.get(node.nodeRef);
+    if (branchRef === undefined) {
+      return [];
+    }
+    const declaration = input.compilation.declarations.find(
+      (candidate) => candidate.branchRef.branchRef === branchRef.branchRef
+    );
+    return [
+      Object.freeze({
+        branchRef: branchRef.branchRef,
+        nodeId: node.nodeRef,
+        predecessorBranchRefs: declaration?.parentBranchRefs ?? Object.freeze([]),
+        materializationTargetRefs: liveParallelNodeTargetRefs(node),
+        payloadDigest: `payload://odd-sdlc/live/${sdlcLiveSlug(input.manifest.edgeName)}/fan-in`
+      })
+    ];
+  });
+}
+
+function liveParallelTask(input: {
+  readonly declaration: SdlcAbgFrontierCompilation["declarations"][number];
+  readonly payloadDigest: string;
+  readonly counters: { active: number; maxActive: number };
+}): NativeBranchTask {
+  return Object.freeze({
+    kind: "native_branch_task" as const,
+    branchRef: input.declaration.branchRef.branchRef,
+    run: async () => {
+      input.counters.active += 1;
+      input.counters.maxActive = Math.max(input.counters.maxActive, input.counters.active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      input.counters.active -= 1;
+      return Object.freeze({
+        kind: "native_branch_task_result" as const,
+        branchRef: input.declaration.branchRef.branchRef,
+        payloadDigest: input.payloadDigest,
+        evidenceRefs: Object.freeze([input.declaration.branchRef.branchRef])
+      });
+    }
+  });
+}
+
+async function writeLiveFpParallelMaterializationFrontier(input: {
+  readonly basis: ExecutionBasis;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly carriers: readonly SdlcStagedConstructionAuditCarrier[];
+  readonly eventSink: (event: RuntimeEvent) => void;
+}): Promise<void> {
+  if (input.manifest.edgeName !== "derive_component_code_surface") {
+    return;
+  }
+  const dependencyMap = moduleDependencyMapFromAuditCarriers(input.carriers);
+  const traversal = moduleTraversalSelectionFromAuditCarriers(input.carriers);
+  const testDependencyMap = testDependencyMapFromAuditCarriers(input.carriers);
+  const testTraversal = testTraversalSelectionFromAuditCarriers(input.carriers);
+  if (
+    dependencyMap === null ||
+    traversal === null ||
+    traversal.selectedMethod !== "parallel"
+  ) {
+    return;
+  }
+  const selectedTestDependencyMap =
+    testDependencyMap !== null && testTraversal?.selectedMethod === "parallel"
+      ? testDependencyMap
+      : undefined;
+  const lanes = dependencyMap.nodes
+    .map((node) => liveParallelLaneForNode({ manifest: input.manifest, node }))
+    .filter((lane) => lane !== null);
+  const devLaneCount = lanes.length;
+  const testLaneCount = selectedTestDependencyMap?.nodes.length ?? 0;
+  const laneCount = devLaneCount + testLaneCount;
+  if (laneCount < 2) {
+    return;
+  }
+  const frontierDependencyMap = liveParallelFrontierDependencyMap({
+    source: dependencyMap,
+    lanes
+  });
+  const fanInNodes = dependencyMap.nodes.filter((node) =>
+    node.materializationTargetRefs.some((targetRef) =>
+      /^src\/index\.[cm]?[jt]sx?$/u.test(
+        normalizedLiveMaterializationTarget({
+          manifest: input.manifest,
+          targetRef
+        })
+      )
+    )
+  );
+  const dag = deriveSdlcFeatureDependencyDagFromMaps({
+    dagRef: `dag://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`,
+    graphFunctionName: input.manifest.graphFunctionName,
+    moduleDependencyMap: frontierDependencyMap,
+    testDependencyMap: selectedTestDependencyMap,
+    traversalSelectionRef: traversal.selectionRef,
+    fanInTargetRefs: uniqueSorted(
+      fanInNodes.flatMap((node) => node.materializationTargetRefs)
+    ),
+    evidenceRefs: Object.freeze([
+      dependencyMap.mapRef,
+      traversal.selectionRef,
+      ...(selectedTestDependencyMap === undefined
+        ? []
+        : [
+            selectedTestDependencyMap.mapRef,
+            ...(testTraversal === null ? [] : [testTraversal.selectionRef])
+          ])
+    ])
+  });
+  if (dag.blockingReasons.length > 0 || dag.startNodes.length < 2) {
+    return;
+  }
+  const branchOverrides = deriveSdlcLiveFpParallelMaterializationBranchOverrides({
+    edgeName: input.manifest.edgeName,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+    tenantRoot: input.manifest.productMaterialization.tenantRoot,
+    dag
+  });
+  const compilation = compileSdlcFeatureDependencyDagToAbgFrontier({
+    dag,
+    frontierRef: liveParallelFrontierRef(input.manifest),
+    graphCallId: `graph-call://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`,
+    frameId:
+      input.basis.frameId ??
+      `frame://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`,
+    fanInScopeRef: liveParallelFanInScopeRef(input.manifest),
+    basisId: input.basis.id,
+    graphFunctionId: input.basis.graphFunction.id,
+    frameLineageId: input.basis.frameLineageId,
+    frameAttemptId: null,
+    commandKind: `materialize_live_parallel_sdlc_branch:${input.manifest.edgeName}`,
+    workKeyPrefix: `work://odd-sdlc/live/${manifestRefSegment(input.manifest)}`,
+    basisRefs: Object.freeze([
+      dependencyMap.mapRef,
+      traversal.selectionRef,
+      ...(selectedTestDependencyMap === undefined
+        ? []
+        : [
+            selectedTestDependencyMap.mapRef,
+            ...(testTraversal === null ? [] : [testTraversal.selectionRef])
+          ])
+    ]),
+    branchKeyByNodeRef: branchOverrides.branchKeyByNodeRef,
+    branchRefByNodeRef: branchOverrides.branchRefByNodeRef
+  });
+  if (
+    compilation.writeTerritoryConflictRefs.length > 0 ||
+    compilation.outputAllocationConflictRefs.length > 0
+  ) {
+    return;
+  }
+  const branchRows = liveParallelBranchRowsFromCompilation({
+    manifest: input.manifest,
+    dag,
+    compilation
+  });
+  const fanInRows = liveParallelFanInRowsFromCompilation({
+    manifest: input.manifest,
+    dag,
+    compilation
+  });
+  const declarations = compilation.declarations;
+  const counters = { active: 0, maxActive: 0 };
+  const emittedEvents: RuntimeEvent[] = [];
+  const parallelBatchSize = resolveSdlcLiveFpParallelBatchSize({ laneCount });
+  const run = await runEventedNativeSagaFrontier({
+    basis: input.basis,
+    frontierRef: liveParallelFrontierRef(input.manifest),
+    declarations,
+    policy: constructBranchExecutionPolicy({
+      policyRef: `policy://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization/max-${parallelBatchSize}`,
+      maxConcurrency: parallelBatchSize,
+      maxRetryAttempts: 0,
+      leaseTtlMs: 10_000,
+      resolvedSystemPolicyRefs: Object.freeze([
+        "abg://event-sourced-saga-frontier",
+        traversal.selectionRef
+      ])
+    }),
+    tasks: declarations.map((declaration) => {
+      const fanInPayloadDigest =
+        fanInRows.find((row) => row.branchRef === declaration.branchRef.branchRef)
+          ?.payloadDigest;
+      return liveParallelTask({
+        declaration,
+        payloadDigest:
+          typeof fanInPayloadDigest === "string"
+            ? fanInPayloadDigest
+            : `payload://odd-sdlc/live/${sdlcLiveSlug(input.manifest.edgeName)}/${declaration.branchRef.branchKey}`,
+        counters
+      });
+    }),
+    eventSink: (event) => {
+      emittedEvents.push(event);
+      input.eventSink(event);
+    },
+    maxBatches: Math.max(3, Math.ceil(declarations.length / parallelBatchSize) + 1),
+    correlationId: `correlation://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
+    payload: constructSdlcLiveFpParallelMaterializationFrontier({
+      edgeName: input.manifest.edgeName,
+      executionAuthority: "abg_evented_saga_frontier",
+      parallelismControl: "abg_branch_execution_policy",
+      graphTruthSource: "sdlc_feature_dependency_dag",
+      selectedMethod: traversal.selectedMethod,
+      dependencyMapRef: dependencyMap.mapRef,
+      testDependencyMapRef: selectedTestDependencyMap?.mapRef ?? null,
+      dependencyMapRefs: Object.freeze([
+        dependencyMap.mapRef,
+        ...(selectedTestDependencyMap === undefined
+          ? []
+          : [selectedTestDependencyMap.mapRef])
+      ]),
+      traversalSelectionRef: traversal.selectionRef,
+      testTraversalSelectionRef:
+        selectedTestDependencyMap === undefined
+          ? null
+          : testTraversal?.selectionRef ?? null,
+      traversalSelectionRefs: Object.freeze([
+        traversal.selectionRef,
+        ...(testTraversal?.selectedMethod === "parallel"
+          ? [testTraversal.selectionRef]
+          : [])
+      ]),
+      dagRef: dag.dagRef,
+      startNodes: dag.startNodes,
+      frontierRef: run.frontierRef,
+      policyRef: run.policyRef,
+      laneCount,
+      devLaneCount,
+      testLaneCount,
+      fanInCount: fanInRows.length,
+      batchCount: run.batchCount,
+      batchSizes: run.batches.map(
+        (batch) => batch.selection.selectedBranchRefs.length
+      ),
+      maxActive: counters.maxActive,
+      readyBranchRefs: run.batches[0]?.selection.selectedBranchRefs ?? Object.freeze([]),
+      compiledReadyBranchRefs: compilation.readyBranchRefs,
+      completedBranchRefs: run.completedBranchRefs,
+      failedBranchRefs: run.failedBranchRefs,
+      writeTerritoryConflictRefs: compilation.writeTerritoryConflictRefs,
+      outputAllocationConflictRefs: compilation.outputAllocationConflictRefs,
+      branchRows,
+      fanInRows,
+      emittedEventKinds: uniqueSorted(run.emittedEvents.map((event) => event.kind)),
+      emittedEventCount: emittedEvents.length,
+      replayEventCount: run.replayEvents.length
+    })
+  });
+}
+
+async function writeTraversalSelectionAudit(input: {
   readonly basis: ExecutionBasis;
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly postflight: SdlcPostflightResult;
   readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow | null;
-}): RuntimeEvent | null {
+  readonly eventSink: (event: RuntimeEvent) => void;
+}): Promise<RuntimeEvent | null> {
   const auditCarriers = deriveSdlcStagedConstructionAuditCarriers(input.manifest);
   const writtenRefs: string[] = [];
   for (const carrier of auditCarriers) {
     writeOperatorArchiveFile({
       archiveRoot: input.manifest.archiveRoot,
-      relativePath: carrier.relativePath,
+      artifactRef: carrier.artifactRef,
       payload: carrier.payload
     });
     writtenRefs.push(
       pathToFileURL(join(input.manifest.archiveRoot, carrier.relativePath)).href
     );
   }
+  await writeLiveFpParallelMaterializationFrontier({
+    basis: input.basis,
+    manifest: input.manifest,
+    carriers: auditCarriers,
+    eventSink: input.eventSink
+  });
   const canonicalSummary = canonicalSummaryForManifest({
     manifest: input.manifest,
     carriers: auditCarriers
@@ -1668,7 +2235,7 @@ function writeTraversalSelectionAudit(input: {
   if (canonicalSummary !== null) {
     writeOperatorArchiveFile({
       archiveRoot: input.manifest.archiveRoot,
-      relativePath: "sdlc_decomposition_summary.json",
+      artifactRef: "operator-run-artifact://decomposition-summary",
       payload: canonicalSummary
     });
     writtenRefs.push(
@@ -3056,6 +3623,36 @@ function manifestRefSegment(manifest: SdlcWorkerHandoffManifest): string {
   return encodeURIComponent(pathToFileURL(manifest.archiveRoot).href);
 }
 
+function selectedCompositionForManifest(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): SdlcSelectedAbgFnCompositionIdentity {
+  return deriveSdlcSelectedAbgFnCompositionIdentity({
+    graphFunctionRef: input.manifest.graphFunctionName,
+    graphVectorRef: input.manifest.edgeName,
+    compositionSelectionScopeRef: sdlcRunRefSegmentFromArchiveRoot(
+      input.manifest.archiveRoot
+    ),
+    carrierContextRefs: Object.freeze([
+      input.manifest.fpEvaluateResultFile,
+      input.manifest.reportFile
+    ]),
+    assuranceContextRefs: Object.freeze([
+      ...(input.manifest.edgeAssuranceContractRef === undefined
+        ? []
+        : [input.manifest.edgeAssuranceContractRef]),
+      ...(input.manifest.edgeAssuranceContractDigest === undefined
+        ? []
+        : [input.manifest.edgeAssuranceContractDigest]),
+      ...(input.manifest.targetCarrierContractRef === undefined
+        ? []
+        : [input.manifest.targetCarrierContractRef]),
+      ...(input.manifest.targetCarrierContractDigest === undefined
+        ? []
+        : [input.manifest.targetCarrierContractDigest])
+    ])
+  });
+}
+
 function materializedFileRef(file: {
   readonly absolutePath: string;
 }): string {
@@ -3586,32 +4183,75 @@ export function sdlcAssessmentCarriesRequirementForDownstreamClosure(
   );
 }
 
-function manifestRequirementObligationBelongsToDownstreamSurface(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly assessment: SdlcWorkerObligationAssessment;
+export function sdlcRequirementObligationBelongsToDownstreamComponentSurface(input: {
+  readonly targetAssetType: string;
+  readonly productMaterializationRequired: boolean;
+  readonly obligationKind: string;
+  readonly sourceRefs: readonly string[];
+  readonly sourceSnippets: readonly string[];
 }): boolean {
   if (
-    input.manifest.targetAssetType !== "component_code_surface" ||
-    !input.manifest.productMaterialization.required
+    input.targetAssetType !== "component_code_surface" ||
+    !input.productMaterializationRequired ||
+    input.obligationKind !== "requirement"
   ) {
     return false;
   }
-  const obligation =
-    input.manifest.traversalObligationContext.obligations.find(
-      (candidate) => candidate.obligationId === input.assessment.obligationId
-    ) ?? null;
-  if (obligation === null || obligation.obligationKind !== "requirement") {
-    return false;
-  }
-  return obligation.payload.sourceRefs.some((ref) => {
+  const refNamesDownstream = input.sourceRefs.some((ref) => {
     const lower = ref.toLowerCase();
     return (
       lower.includes("adr-003-test-design-surface.md") ||
       lower.includes("/component_test_surface.md") ||
       lower.includes("/component_test_") ||
-      lower.includes("test-design-surface")
+      lower.includes("test-design-surface") ||
+      lower.includes("/test/") ||
+      lower.includes(".test.")
     );
   });
+  const sourceText = input.sourceSnippets.join("\n").toLowerCase();
+  return (
+    refNamesDownstream ||
+    sourceText.includes("execution proof") ||
+    sourceText.includes("execution evidence") ||
+    sourceText.includes("test execution") ||
+    sourceText.includes("test command") ||
+    sourceText.includes("branch test") ||
+    sourceText.includes("proof-test") ||
+    sourceText.includes("testcase") ||
+    sourceText.includes("test case") ||
+    sourceText.includes("/test/") ||
+    sourceText.includes(".test.") ||
+    sourceText.includes("`test`")
+  );
+}
+
+function manifestRequirementObligationBelongsToDownstreamSurface(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly obligation: SdlcTraversalObligation;
+}): boolean {
+  return sdlcRequirementObligationBelongsToDownstreamComponentSurface({
+    targetAssetType: input.manifest.targetAssetType,
+    productMaterializationRequired: input.manifest.productMaterialization.required,
+    obligationKind: input.obligation.obligationKind,
+    sourceRefs: input.obligation.payload.sourceRefs,
+    sourceSnippets: input.obligation.payload.sourceSnippets
+  });
+}
+
+function manifestAssessmentObligationBelongsToDownstreamSurface(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcWorkerObligationAssessment;
+}): boolean {
+  const obligation =
+    input.manifest.traversalObligationContext.obligations.find(
+      (candidate) => candidate.obligationId === input.assessment.obligationId
+    ) ?? null;
+  return obligation === null
+    ? false
+    : manifestRequirementObligationBelongsToDownstreamSurface({
+        manifest: input.manifest,
+        obligation
+      });
 }
 
 function edgeFulfillmentProjectionFor(input: {
@@ -3628,13 +4268,16 @@ function edgeFulfillmentProjectionFor(input: {
           input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
           !input.state.manifest.productMaterialization.required &&
           assessment.obligationId.startsWith("requirement:");
+        const belongsToDownstreamSurface =
+          manifestAssessmentObligationBelongsToDownstreamSurface({
+            manifest: input.state.manifest,
+            assessment
+          });
         const carriesDownstreamRequirement =
-          sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment) &&
-          (!input.state.manifest.productMaterialization.required ||
-            manifestRequirementObligationBelongsToDownstreamSurface({
-              manifest: input.state.manifest,
-              assessment
-            }));
+          assessment.obligationId.startsWith("requirement:") &&
+          (input.state.manifest.productMaterialization.required
+            ? belongsToDownstreamSurface
+            : sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment));
         const carriesRequirementTransformationSet =
           assessment.obligationId.startsWith("requirement:") &&
           (carriesDownstreamRequirement ||
@@ -4608,6 +5251,9 @@ function deriveInstalledTraversalConsequence(input: {
   const fpEvaluateResultRefs = fpEvaluateResultRefsForState(input.state);
   const evidenceRefs = traversalConsequenceEvidenceRefs({ state: input.state });
   const runRef = manifestRefSegment(input.state.manifest);
+  const selectedComposition = selectedCompositionForManifest({
+    manifest: input.state.manifest
+  });
   const ledgerRef = `ledger://odd-sdlc/${runRef}/edge-fulfillment`;
   const closureDecisionRef =
     `closure-decision://odd-sdlc/${runRef}/edge-fulfillment/1`;
@@ -4748,6 +5394,7 @@ function deriveInstalledTraversalConsequence(input: {
     lawfulReentryPoint: "reprice_requirement_or_design"
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition,
     ledgerRef,
     ledgerVersionRef: `ledger-version://odd-sdlc/${runRef}/edge-fulfillment/1`,
     overlayRef: input.start.executionContract.overlayRef,
@@ -4880,6 +5527,7 @@ function deriveInstalledTraversalConsequence(input: {
   const nextActionProjection =
     candidates.length === 0
       ? constructSdlcNextActionProjection({
+          selectedComposition,
           nextActionProjectionRef:
             `next-action://odd-sdlc/${runRef}/${closureDecision.disposition}/no-action`,
           intentEventRefs: constructionIntent.intentEventRefs,
@@ -4929,6 +5577,7 @@ function deriveInstalledTraversalConsequence(input: {
             actions: candidates
           });
           return constructSdlcNextActionProjection({
+            selectedComposition,
             nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
             intentEventRefs: evaluator.intentEventRefs,
             productAssetModelRef: evaluator.productAssetModelRef,
@@ -4954,8 +5603,42 @@ function deriveInstalledTraversalConsequence(input: {
       `workspace-fingerprint://odd-sdlc/post-action/${runRef}`,
     workspaceDeltaRef: `workspace-delta://odd-sdlc/${runRef}`
   });
+  const admittedStateRef: GtlAdmittedStateRef = Object.freeze({
+    compositionRef: selectedComposition.compositionRef,
+    compositionDigest: selectedComposition.compositionDigest,
+    compositionSelectionRef: selectedComposition.compositionSelectionRef,
+    graphCallRef: constructionIntent.intentRef,
+    frameRef: pathToFileURL(
+      join(input.state.manifest.archiveRoot, "handoff_manifest.json")
+    ).href,
+    eventRefs: uniqueSorted([
+      ...constructionIntent.intentEventRefs,
+      ...processEventRefs,
+      processEventsRef(input.state.manifest)
+    ]),
+    ledgerRefs: uniqueSorted([ledger.ledgerVersionRef, closureDecision.decisionRef]),
+    projectionRefs: uniqueSorted([nextActionProjection.nextActionProjectionRef])
+  });
+  const consequenceProjection: GtlConsequenceProjectionRef = Object.freeze({
+    consequenceRef: `consequence://odd-sdlc/${runRef}/traversal`,
+    compositionRef: selectedComposition.compositionRef,
+    compositionDigest: selectedComposition.compositionDigest,
+    compositionSelectionRef: selectedComposition.compositionSelectionRef,
+    assuranceDecisionRef:
+      closureDecision.edgeAssuranceDecisionRef ?? closureDecision.decisionRef,
+    traversalTransitionRef: nextActionProjection.nextActionProjectionRef,
+    domainReadModelRefs: uniqueSorted([
+      ledger.ledgerVersionRef,
+      closureDecision.decisionRef,
+      nextActionProjection.nextActionProjectionRef,
+      ...(overlaySegmentCompletion === null
+        ? []
+        : [overlaySegmentCompletion.completionRef])
+    ])
+  });
   return Object.freeze({
     kind: "sdlc_installed_operator_traversal_consequence" as const,
+    selectedComposition,
     constructionIntent,
     worksiteEvidence,
     edgeGain,
@@ -4964,7 +5647,9 @@ function deriveInstalledTraversalConsequence(input: {
     edgeClosureDecision: closureDecision,
     overlaySegmentCompletion,
     postActionOverlayBinding,
-    nextActionProjection
+    nextActionProjection,
+    admittedStateRef,
+    consequenceProjection
   });
 }
 
@@ -4972,6 +5657,16 @@ function writeTraversalConsequenceArchive(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly consequence: SdlcInstalledOperatorTraversalConsequence;
 }): void {
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "gtl_admitted_state_ref.json",
+    payload: input.consequence.admittedStateRef
+  });
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "gtl_consequence_projection_ref.json",
+    payload: input.consequence.consequenceProjection
+  });
   writeOperatorArchiveFile({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_construction_intent.json",
@@ -5901,7 +6596,7 @@ function compactRuntimeEventArchivePayload(
           evidenceRefs: input.evidenceRefs
         });
       };
-      const completeReportDispatch = (input: {
+      const completeReportDispatch = async (input: {
         readonly workerRun: SdlcWorkerRunResult | null;
         readonly workerReport: SdlcWorkerResultReport;
         readonly hookWorkerContractRef: string;
@@ -5921,11 +6616,14 @@ function compactRuntimeEventArchivePayload(
           payload: postflight
         });
         writeFpEvaluateResult({ manifest, report: input.workerReport, postflight });
-        const traversalAuditEvent = writeTraversalSelectionAudit({
+        const traversalAuditEvent = await writeTraversalSelectionAudit({
           basis,
           manifest,
           postflight,
-          edgeAccountingRow
+          edgeAccountingRow,
+          eventSink: (event) => {
+            emitted.push(event);
+          }
         });
         if (traversalAuditEvent !== null) {
           emitted.push(traversalAuditEvent);

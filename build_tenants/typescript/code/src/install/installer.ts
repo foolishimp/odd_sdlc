@@ -2,8 +2,9 @@
 
 import { installAbiogenesisTypescript } from "@abiogenesis/typescript-tenant/app/m04/install-bootstrap";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { admitOddSdlcTypescriptInstallRequest } from "./admission.js";
 import type {
   OddSdlcTypescriptInstallManifest,
@@ -61,6 +62,54 @@ export function oddSdlcTypescriptProductInstallRoot(targetRoot: string): string 
   return join(targetRoot, ...ODD_SDLC_TYPESCRIPT_PRODUCT_INSTALL_ROOT_RELATIVE);
 }
 
+function abgDocsSourceIsUsable(candidateRoot: string): boolean {
+  return (
+    existsSync(resolve(candidateRoot, "README.md")) &&
+    existsSync(resolve(candidateRoot, "LLM_GTL_APP_BUILDER_GUIDE.md")) &&
+    existsSync(resolve(candidateRoot, "USER_GUIDE.md"))
+  );
+}
+
+function standardsSourceIsUsable(candidateRoot: string): boolean {
+  return (
+    existsSync(resolve(candidateRoot, "SPEC_METHOD.md")) &&
+    existsSync(resolve(candidateRoot, "ODD_METHOD.md")) &&
+    existsSync(resolve(candidateRoot, "RELEASE_METHOD.md"))
+  );
+}
+
+function resolveInstallAbgDocsSourceRoot(
+  packageSourceRoot: string
+): string | null {
+  const siblingDocs = resolve(packageSourceRoot, "../../..", "abiogenesis/docs");
+  if (abgDocsSourceIsUsable(siblingDocs)) {
+    return siblingDocs;
+  }
+  const installedDocs = resolve(packageSourceRoot, ".abiogenesis/docs");
+  if (abgDocsSourceIsUsable(installedDocs)) {
+    return installedDocs;
+  }
+  return null;
+}
+
+function resolveInstallAbgStandardsSourceRoot(
+  packageSourceRoot: string
+): string | null {
+  const siblingStandards = resolve(
+    packageSourceRoot,
+    "../../..",
+    "specification_methodology/specification/standards"
+  );
+  if (standardsSourceIsUsable(siblingStandards)) {
+    return siblingStandards;
+  }
+  const installedStandards = resolve(packageSourceRoot, ".abiogenesis/docs/standards");
+  if (standardsSourceIsUsable(installedStandards)) {
+    return installedStandards;
+  }
+  return null;
+}
+
 function stableJson(payload: unknown): string {
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
@@ -83,7 +132,21 @@ async function persistInstalledPackageDependency(input: {
   readonly packageName: string;
   readonly tarballPath: string;
 }): Promise<void> {
-  const packageJsonPath = join(input.targetRoot, "package.json");
+  await persistPackageDependency({
+    packageJsonRoot: input.targetRoot,
+    dependencyBaseRoot: input.targetRoot,
+    packageName: input.packageName,
+    tarballPath: input.tarballPath
+  });
+}
+
+async function persistPackageDependency(input: {
+  readonly packageJsonRoot: string;
+  readonly dependencyBaseRoot: string;
+  readonly packageName: string;
+  readonly tarballPath: string;
+}): Promise<void> {
+  const packageJsonPath = join(input.packageJsonRoot, "package.json");
   const raw = await readFile(packageJsonPath, "utf8");
   const parsed: unknown = JSON.parse(raw);
   const packageJson: Record<string, unknown> = isPlainRecord(parsed)
@@ -92,7 +155,10 @@ async function persistInstalledPackageDependency(input: {
   const dependencies = isPlainRecord(packageJson["dependencies"])
     ? { ...packageJson["dependencies"] }
     : {};
-  dependencies[input.packageName] = fileDependencyRef(input.targetRoot, input.tarballPath);
+  dependencies[input.packageName] = fileDependencyRef(
+    input.dependencyBaseRoot,
+    input.tarballPath
+  );
   packageJson["dependencies"] = dependencies;
   await writeTextFile(packageJsonPath, stableJson(packageJson));
 }
@@ -152,13 +218,34 @@ async function installAdmittedOddSdlcTypescript(
           rootPath: request.targetRoot
         },
         packageSourceRoot: request.abgPackageSourceRoot,
+        standardsSourceRoot:
+          request.abgStandardsSourceRoot ??
+          resolveInstallAbgStandardsSourceRoot(request.packageSourceRoot),
+        docsSourceRoot:
+          request.abgDocsSourceRoot ??
+          resolveInstallAbgDocsSourceRoot(request.packageSourceRoot),
         installedPackageName: `${request.installedPackageName}-abg`
       })
     );
+    await persistPackageDependency({
+      packageJsonRoot: installedPackage.packageRoot,
+      dependencyBaseRoot: installedPackage.packageRoot,
+      packageName: abgOutcome.packageName,
+      tarballPath: abgOutcome.tarballPath
+    });
+    const repackedInstalledPackage = await packNodePackage({
+      packageSourceRoot: installedPackage.packageRoot,
+      packDestinationRoot: join(productInstallRoot, "package-pack"),
+      npmCacheRoot: join(request.targetRoot, ".npm-cache")
+    });
+    const installedPackageForManifest = Object.freeze({
+      ...installedPackage,
+      tarballPath: repackedInstalledPackage.tarballPath
+    });
     await persistInstalledPackageDependency({
       targetRoot: request.targetRoot,
-      packageName: installedPackage.packageName,
-      tarballPath: installedPackage.tarballPath
+      packageName: installedPackageForManifest.packageName,
+      tarballPath: installedPackageForManifest.tarballPath
     });
     const oddSdlcCommandPath = installedPackage.commandBindings[0]?.commandPath;
     if (oddSdlcCommandPath === undefined) {
@@ -205,12 +292,12 @@ async function installAdmittedOddSdlcTypescript(
       targetRoot: request.targetRoot,
       productInstallRoot,
       installedPackageName: request.installedPackageName,
-      packageName: installedPackage.packageName,
-      packageVersion: installedPackage.packageVersion,
+      packageName: installedPackageForManifest.packageName,
+      packageVersion: installedPackageForManifest.packageVersion,
       packageSourceRoot: request.packageSourceRoot,
-      packageRoot: installedPackage.packageRoot,
-      tarballPath: installedPackage.tarballPath,
-      commandBindings: installedPackage.commandBindings,
+      packageRoot: installedPackageForManifest.packageRoot,
+      tarballPath: installedPackageForManifest.tarballPath,
+      commandBindings: installedPackageForManifest.commandBindings,
       abgCommandPaths: abgOutcome.commandPaths,
       abgInstallManifestPath: abgOutcome.installManifestPath,
       abgInstallerManifestPath: abgOutcome.installerManifestPath,
@@ -252,11 +339,11 @@ async function installAdmittedOddSdlcTypescript(
       kind: "installed",
       request,
       productInstallRoot,
-      installedPackage,
+      installedPackage: installedPackageForManifest,
       abgOutcome,
       manifest,
       commandPaths: Object.freeze([
-        ...installedPackage.commandBindings.map((binding) => binding.commandPath),
+        ...installedPackageForManifest.commandBindings.map((binding) => binding.commandPath),
         ...abgOutcome.commandPaths
       ]),
       bootstrapGuidePath,

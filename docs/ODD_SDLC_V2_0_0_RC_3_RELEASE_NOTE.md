@@ -59,7 +59,7 @@ workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260518T183009792Z_pid42
 The release-cut proof summary is archived at:
 
 ```text
-.ai-workspace/release-cuts/typescript/20260518T183633Z_t102_t132_hello_world_rc3/t132-hello-world-live-proof-summary.json
+release_snapshots/odd-sdlc-typescript-tenant/20260518T183633Z_t102_t132_hello_world_rc3/t132-hello-world-live-proof-summary.json
 ```
 
 ### Archive Dependency Fix
@@ -82,7 +82,7 @@ evidence against that source edge schedule.
 Release-cut artifact:
 
 ```text
-.ai-workspace/release-cuts/typescript/20260518T183633Z_t102_t132_hello_world_rc3/package/pack-MU5uTu/odd-sdlc-typescript-tenant-0.0.0-dev.tgz
+release_snapshots/odd-sdlc-typescript-tenant/20260518T183633Z_t102_t132_hello_world_rc3/odd-sdlc-typescript-tenant-0.0.0-dev.tgz
 ```
 
 ## Known Limitations

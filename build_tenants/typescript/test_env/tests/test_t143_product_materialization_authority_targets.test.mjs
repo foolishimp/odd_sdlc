@@ -697,6 +697,34 @@ test("T-172 tenant stack authority missing blocks executable materialization adm
   assert.deepEqual(reconciliation.tenantStackAuthorityTargets, []);
 });
 
+test("T-172 semantically empty tenant stack authority blocks executable materialization admission", () => {
+  const workspace = workspaceWithProductAuthority();
+  const stackSpecFile = path.join(
+    workspace,
+    "build_tenants/scala_spark/spec/TECH_STACK.json"
+  );
+  writeFileSync(
+    stackSpecFile,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const manifest = materializationManifest(workspace);
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+
+  assert.equal(reconciliation.status, "ambiguous");
+  assert.equal(
+    reconciliation.reasonRefs.includes("tenant_stack_authority_missing"),
+    true
+  );
+  assert.deepEqual(reconciliation.tenantStackAuthorityTargets, []);
+});
+
 test("T-172 tenant stack rejects absolute build-config targets instead of rewriting them", () => {
   const workspace = workspaceWithProductAuthority();
   const stackSpecFile = path.join(

@@ -18,6 +18,7 @@ import type {
 import type {
   SdlcFdRunAnalysisByteAccount,
   SdlcFdRunAnalysisEdgeAttempt,
+  SdlcFdRunAnalysisFrontierSummary,
   SdlcFdRunAnalysisStageClass
 } from "./types.js";
 
@@ -222,6 +223,40 @@ function residualPressureTransition(input: {
   return "unknown";
 }
 
+function frontierSummaryFromCarriers(
+  carriers: OperatorRunCarriers
+): SdlcFdRunAnalysisFrontierSummary | null {
+  if (carriers.liveFpParallelMaterializationFrontier.status !== "present") {
+    return null;
+  }
+  const frontier = carriers.liveFpParallelMaterializationFrontier.data;
+  return Object.freeze({
+    graphTruthSource: frontier.graphTruthSource,
+    selectedMethod: frontier.selectedMethod,
+    dependencyMapRefs: frontier.dependencyMapRefs,
+    traversalSelectionRefs: frontier.traversalSelectionRefs,
+    dagRef: frontier.dagRef,
+    startNodes: frontier.startNodes,
+    frontierRef: frontier.frontierRef,
+    policyRef: frontier.policyRef,
+    laneCount: frontier.laneCount,
+    devLaneCount: frontier.devLaneCount,
+    testLaneCount: frontier.testLaneCount,
+    fanInCount: frontier.fanInCount,
+    batchCount: frontier.batchCount,
+    batchSizes: frontier.batchSizes,
+    maxActive: frontier.maxActive,
+    readyBranchRefs: frontier.readyBranchRefs,
+    compiledReadyBranchRefs: frontier.compiledReadyBranchRefs,
+    completedBranchRefs: frontier.completedBranchRefs,
+    failedBranchRefs: frontier.failedBranchRefs,
+    writeTerritoryConflictRefs: frontier.writeTerritoryConflictRefs,
+    outputAllocationConflictRefs: frontier.outputAllocationConflictRefs,
+    branchRows: frontier.branchRows,
+    fanInRows: frontier.fanInRows
+  });
+}
+
 function operatorRunStartMs(operatorRunRoot: string): number | null {
   const baseName = path.basename(operatorRunRoot);
   const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})Z/u.exec(baseName);
@@ -372,6 +407,7 @@ export function deriveEdgeAttempt(
     handoffBytes: carriers.fileSizes.handoffManifest,
     stdoutBytes: carriers.fileSizes.workerStdout,
     eventBytes,
+    frontierSummary: frontierSummaryFromCarriers(carriers),
     workerDispatched: workerRun !== null,
     workerStatus: operatorSummary?.status ?? null
   });

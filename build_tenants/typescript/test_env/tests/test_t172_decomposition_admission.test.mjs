@@ -319,6 +319,27 @@ test("T-172 rejects empty upstream refs instead of silently dropping them", () =
   );
 });
 
+test("T-172 rejects invalid downstream and parent identity refs", () => {
+  const rejected = summary([
+    row({
+      downstreamId: "   ",
+      parentId: " module://app ",
+      ownedUpstreamRefs: ["REQ-001"],
+      publicBoundaryRefs: ["src/parser.ts"],
+      substantiveResponsibilityRefs: ["function://parse"]
+    })
+  ]);
+
+  assert.equal(rejected.admissionDecision, "reject");
+  assert.deepEqual(rejected.invalidReferenceFields, [
+    "<blank>.downstreamId",
+    "<blank>.parentId"
+  ]);
+  assert.ok(
+    rejected.blockingReasons.includes("decomposition_invalid_reference_values")
+  );
+});
+
 function dependencyNode(nodeId, predecessorNodeIds = []) {
   return {
     nodeId,

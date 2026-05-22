@@ -18,6 +18,7 @@ test("T-052 sandbox registry: every TypeScript sandbox consumes the ABG installe
 
   assert.deepStrictEqual(sandboxTests, [
     "test_b068_enterprise_core_outcome_iteration.test.mjs",
+    "test_scenario_sandbox.test.mjs",
     "test_t047_pre_refactor_sandbox.test.mjs",
     "test_t087_t091_t096_internal_data_mapper_induction_sandbox.test.mjs",
     "test_t102_t109_abg37_semantic_ledger_sandbox.test.mjs"
@@ -29,27 +30,30 @@ test("T-052 sandbox registry: every TypeScript sandbox consumes the ABG installe
 
   for (const fileName of sandboxTests) {
     const content = readFileSync(path.join(TEST_DIR, fileName), "utf8");
+    const fixtureContent = fileName === "test_scenario_sandbox.test.mjs"
+      ? `${content}\n${readFileSync(path.join(TEST_DIR, "scenario_sandbox.mjs"), "utf8")}`
+      : content;
     if (directAbgContractTests.has(fileName)) {
       assert(
         content.includes("@abiogenesis/typescript-tenant"),
         `${fileName} must consume the public ABG TypeScript package`
       );
       assert(
-        content.includes("3.7.1-rc.1"),
-        `${fileName} must pin the ABG 3.7.1-rc.1 contract it verifies`
+        content.includes("3.8.0-rc.3"),
+        `${fileName} must pin the ABG 3.8.0-rc.3 contract it verifies`
       );
       continue;
     }
     assert(
-      content.includes("provisionAbgInstalledSandbox"),
+      fixtureContent.includes("provisionAbgInstalledSandbox"),
       `${fileName} must provision through the ABG TypeScript installer`
     );
     assert(
-      content.includes("assertAbgInstalledSandboxEvidence"),
+      fixtureContent.includes("assertAbgInstalledSandboxEvidence"),
       `${fileName} must assert installed ABG sandbox evidence`
     );
     assert(
-      !content.includes("M05 sandbox/archive framework exists but is not exported"),
+      !fixtureContent.includes("M05 sandbox/archive framework exists but is not exported"),
       `${fileName} must not retain the pre-T-076 ABG installer gap`
     );
   }

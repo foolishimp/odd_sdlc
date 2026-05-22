@@ -226,25 +226,23 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     ],
     outputs: ["code_surface"]
   }),
-  entry({
-    name: "derive_test_design_surface",
-    intent: "Derive the composite test plan carrier from design, scenarios, implementation plan, and component code evidence, including design-consumption rows, UAT testcase rows, testcase-authority rows, stack profile rows, test module rows, test topology rows, test data bindings, expected-result bindings, UAT-to-integration bindings, and execution schedule rows.",
-    inputs: [
+	  entry({
+	    name: "derive_test_design_surface",
+	    intent: "Derive the composite test plan carrier from design, scenarios, testcase authority, implementation topology, test data, and expected-result bindings without requiring completed component code.",
+	    inputs: [
       "design_surface",
       "scenario_surface",
       "uat_testcases_surface",
       "testcase_authority_surface",
-      "implementation_design_surface",
-      "component_code_surface"
+      "implementation_design_surface"
     ],
     outputs: ["test_design_surface"]
   }),
   entry({
     name: "derive_component_test_surface",
-    intent: "Materialize or repair component-shaped test code from the composite test plan carrier, component code, and any admitted component repair schedule.",
+    intent: "Materialize component-shaped test code from admitted testcase and test-topology authority; code-dependent adaptation is downstream fan-in or repair pressure.",
     inputs: [
-      "test_design_surface",
-      "component_code_surface"
+      "test_design_surface"
     ],
     outputs: ["component_test_surface"]
   }),

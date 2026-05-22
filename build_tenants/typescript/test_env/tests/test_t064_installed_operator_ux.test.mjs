@@ -1227,13 +1227,13 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   assert.equal(evaluateResult.postflightStatus, "blocked");
   assert.match(evaluateResult.postflightRef, /postflight\.json$/u);
   assert.match(
-    [
-      ...evaluateResult.blockingReasons,
-      ...postflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
-    ].join(","),
-    /design_depth_register_invalid/u
-  );
-});
+	    [
+	      ...evaluateResult.blockingReasons,
+	      ...postflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
+	    ].join(","),
+	    /design_depth_worker_emitted_register_forbidden/u
+	  );
+	});
 
 test("T-092 installed start --until blocked delegates iteration to ABG until a real stop", async () => {
   const workspace = makeWorkspace();

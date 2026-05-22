@@ -27,7 +27,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   installOddSdlcTypescript,
-  invokeOddSdlcSpecMethodCommand
+  invokeOddSdlcSpecMethodCommand,
+  normalizeSdlcRequirementDisplayId
 } from "../../build/semantic/code/src/index.js";
 import {
   assertAbgInstalledSandboxEvidence,
@@ -85,6 +86,17 @@ export function assertFixtureFiles(fixtureRoot, sourceFiles) {
 export function copyFixture(fixtureRoot, targetRoot) {
   mkdirSync(targetRoot, { recursive: true });
   cpSync(fixtureRoot, targetRoot, { recursive: true });
+  return targetRoot;
+}
+
+export function copyFixtureSourceFiles(fixtureRoot, targetRoot, sourceFiles) {
+  mkdirSync(targetRoot, { recursive: true });
+  for (const rel of sourceFiles) {
+    const source = path.join(fixtureRoot, rel);
+    const target = path.join(targetRoot, rel);
+    mkdirSync(path.dirname(target), { recursive: true });
+    cpSync(source, target, { recursive: true });
+  }
   return targetRoot;
 }
 
@@ -807,7 +819,15 @@ export async function runScenarioSandbox(scenario, options = {}) {
   });
   assertAbgInstalledSandboxEvidence(installedWorkspace);
 
-  copyFixture(scenario.fixture.root, workspace);
+  if (scenario.fixture.copySourceFilesOnly === true) {
+    copyFixtureSourceFiles(
+      scenario.fixture.root,
+      workspace,
+      scenario.fixture.sourceFiles ?? []
+    );
+  } else {
+    copyFixture(scenario.fixture.root, workspace);
+  }
 
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -894,16 +914,65 @@ export async function runScenarioSandbox(scenario, options = {}) {
   };
 }
 
-function findRequirementIds(workspace) {
-  const requirementsRoot = path.join(workspace, "specification/requirements");
-  if (!existsSync(requirementsRoot)) return [];
-  return readdirSync(requirementsRoot)
-    .filter((entry) => entry.endsWith(".md") && entry !== "00-imported-sources.md")
+function markdownFilesUnder(root) {
+  if (!existsSync(root)) return [];
+  return readdirSync(root)
     .sort()
     .flatMap((entry) => {
-      const content = readFileSync(path.join(requirementsRoot, entry), "utf8");
-      return [...content.matchAll(/\b(REQ-[A-Z0-9-]+)\b/gmu)].map((m) => m[1]);
+      const absolutePath = path.join(root, entry);
+      const stat = statSync(absolutePath);
+      if (stat.isDirectory()) {
+        return markdownFilesUnder(absolutePath);
+      }
+      return stat.isFile() && /\.(?:md|markdown)$/iu.test(entry)
+        ? [absolutePath]
+        : [];
     });
+}
+
+function sourceAuthorityMarkdownFiles(workspace) {
+  const reportFiles = operatorRunRoots(workspace)
+    .map((runRoot) => path.join(runRoot, "conform_project_report.json"))
+    .filter((filePath) => existsSync(filePath));
+  const sourceRefFiles = reportFiles.flatMap((filePath) => {
+    const report = readJsonFile(filePath);
+    const sourceRefs = Array.isArray(report?.sourceRefs) ? report.sourceRefs : [];
+    return sourceRefs.flatMap((ref) => {
+      if (typeof ref !== "string" || !ref.startsWith("file://")) return [];
+      try {
+        const sourcePath = fileURLToPath(ref);
+        return existsSync(sourcePath) && /\.(?:md|markdown)$/iu.test(sourcePath)
+          ? [sourcePath]
+          : [];
+      } catch {
+        return [];
+      }
+    });
+  });
+  if (sourceRefFiles.length > 0) {
+    return [...new Set(sourceRefFiles)].sort();
+  }
+  return markdownFilesUnder(workspace).filter((filePath) => {
+    const rel = path.relative(workspace, filePath).replace(/\\/gu, "/");
+    return (
+      !rel.startsWith("node_modules/") &&
+      !rel.startsWith(".npm-cache/") &&
+      !rel.startsWith(".abiogenesis/") &&
+      !rel.startsWith(".ai-workspace/runtime/")
+    );
+  });
+}
+
+function findRequirementIds(workspace) {
+  return [
+    ...new Set(
+      sourceAuthorityMarkdownFiles(workspace).flatMap((filePath) => {
+        const content = readFileSync(filePath, "utf8");
+        return [...content.matchAll(/\b(?:RF-[A-Z0-9]+(?:-[A-Z0-9]+)*|REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b(?!-)/gmu)]
+          .map((match) => normalizeSdlcRequirementDisplayId(match[0]));
+      })
+    )
+  ].sort();
 }
 
 export function assertScenarioExpectations(result, scenario) {
@@ -965,7 +1034,7 @@ export function assertScenarioExpectations(result, scenario) {
     for (const id of expectations.requirementIds) {
       if (!observed.includes(id)) {
         throw new Error(
-          `${scenario.scenarioId}: requirement ${id} not lifted into families`
+          `${scenario.scenarioId}: requirement ${id} not derivable from workspace source authority`
         );
       }
     }

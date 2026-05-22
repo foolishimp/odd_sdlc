@@ -23,7 +23,7 @@ operator
     -> install adapter
       -> package binding: pack/extract @odd-sdlc/typescript-tenant
       -> command binding: odd-sdlc-ts
-      -> ABG TypeScript public installer
+      -> ABG TypeScript public installer from pinned release package
       -> manifests + bootstrap guide + normalization projection
 
 operator
@@ -32,6 +32,14 @@ operator
       -> package binding: npm pack
       -> binary-binding proof
       -> release manifest + postmortem
+
+operator
+  -> odd-sdlc-ts release-snapshot --release-identity <version> --snapshot-root <dir>
+    -> release-snapshot adapter
+      -> semantic build
+      -> npm pack --json
+      -> consumed ABG release-snapshot admission
+      -> versioned snapshot manifest + checksums
 
 operator
   -> odd-sdlc-ts start/gaps/query-domain
@@ -60,6 +68,11 @@ Owns the `odd_sdlc.TS` install request:
 
 - admit target root, package source, ABG package source, and installed package
   name
+- prefer the package-local ABIogenesis dependency installed from a release
+  snapshot before any sibling source checkout
+- pass ABIogenesis docs and shared standards roots explicitly when consuming a
+  package-local ABG release so `odd_sdlc/docs` cannot become substrate docs by
+  upward-directory accident
 - install the TypeScript tenant package into the target workspace
 - invoke the public ABIogenesis TypeScript installer
 - write the TypeScript install manifest
@@ -77,11 +90,27 @@ It does not select next traversal, retry work, or close gaps.
 
 ### `release`
 
-Owns package release-cut evidence:
+Owns package release-cut and release-snapshot evidence:
 
 - pack the TypeScript tenant package
 - prove that `odd-sdlc-ts` is declared and materialized
 - write a release-cut manifest and postmortem
+- write ABIogenesis-style versioned release snapshots under
+  `release_snapshots/odd-sdlc-typescript-tenant/<release>/`
+- fail closed when the package dependency is not pinned to a versioned
+  ABIogenesis release snapshot tarball
+- write `release-snapshot-manifest.json`, optional `release-note.md`, and
+  `checksums.sha256`
+- record the consumed ABG package version, release snapshot manifest, tarball
+  path, tarball digest, source ref, and source commit
+
+Historical TypeScript release-cut archives are not a second active release
+surface. They are migrated under
+`release_snapshots/odd-sdlc-typescript-tenant/<legacy-release-id>/` with a
+legacy release-snapshot manifest, release note, package tarball, checksums, and
+preserved proof artifacts. Because those old release-cut manifests did not
+record ABG substrate pins, they are historical evidence only; new release
+closure must use `odd-sdlc-ts release-snapshot`.
 
 It does not claim live worker proof or installed-workspace convergence.
 
@@ -101,7 +130,13 @@ read/start adapters.
 - `PackageSourceRoot`: absolute or cwd-resolved `odd_sdlc.TS` package root
 - `AbgPackageSourceRoot`: absolute or cwd-resolved ABIogenesis TypeScript
   package root
+- `AbgStandardsSourceRoot`: optional absolute or cwd-resolved shared standards
+  root supplied to the ABG installer
+- `AbgDocsSourceRoot`: optional absolute or cwd-resolved ABIogenesis docs root
+  supplied to the ABG installer
 - `ReleaseArchiveRoot`: absolute or cwd-resolved archive path
+- `ReleaseSnapshotRoot`: absolute or cwd-resolved immutable snapshot path
+- `ReleaseIdentity`: package version being snapshotted
 
 ### Authority
 
@@ -122,6 +157,8 @@ read/start adapters.
 - `OddSdlcInstructionFileWrite`
 - `OddSdlcBootstrapGovernance`
 - `OddSdlcTypescriptReleaseCutManifest`
+- `OddSdlcTypescriptReleaseSnapshotManifest`
+- `OddSdlcTypescriptReleaseSnapshotAbgSubstrate`
 - `NodePackageIdentity`
 - `InstalledNodePackage`
 
@@ -146,6 +183,24 @@ The release adapter writes:
 - `release-cut-manifest.json`
 - `release-cut-postmortem.md`
 - package tarball under the archive root
+
+The release-snapshot adapter writes:
+
+- `release_snapshots/odd-sdlc-typescript-tenant/<release>/odd-sdlc-typescript-tenant-<release>.tgz`
+- `release_snapshots/odd-sdlc-typescript-tenant/<release>/release-snapshot-manifest.json`
+- `release_snapshots/odd-sdlc-typescript-tenant/<release>/release-note.md` when supplied
+- `release_snapshots/odd-sdlc-typescript-tenant/<release>/checksums.sha256`
+
+The repository root also contains migrated legacy snapshots at the same package
+root. Their `release-snapshot-manifest.json` kind is
+`odd_sdlc_legacy_release_snapshot_manifest` so consumers do not mistake old
+release-cut evidence for a new ABG-pinned release candidate.
+
+The TypeScript package dependency for ABIogenesis is release-pinned:
+
+```text
+@abiogenesis/typescript-tenant -> file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz
+```
 
 ## Design Module Review
 

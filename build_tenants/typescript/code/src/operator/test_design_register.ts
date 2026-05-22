@@ -1139,28 +1139,33 @@ export function admitTestDesignRegisterFromArtifact(input: {
   }
   const content = readFileSync(input.outputFile, "utf8");
   const errors: string[] = [];
-  for (const candidate of jsonCandidates(content)) {
-    const normalizedCandidate = normalizeCandidate(candidate);
-    try {
-      const register = parseRegister(
-        normalizedCandidate,
-        "test_design_register"
+	  for (const candidate of jsonCandidates(content)) {
+	    const shapeErrorCandidate =
+	      objectRecord(candidate) === null
+	        ? candidate
+	        : testDesignCandidateRecord(objectRecord(candidate) ?? {}) ?? candidate;
+	    const normalizedCandidate = normalizeCandidate(candidate);
+	    try {
+	      const register = parseRegister(
+	        normalizedCandidate,
+	        "test_design_register"
       );
       if (register.targetAssetType !== input.targetAssetType) {
         errors.push(`test_design_register_target_mismatch:${register.targetAssetType}`);
         continue;
       }
-      const rowReasons = requiredRowsPresent(register);
-      if (rowReasons.length > 0) {
-        return Object.freeze({
-          kind: "sdlc_test_design_register_admission" as const,
-          status: "rejected" as const,
-          targetAssetType: input.targetAssetType,
-          register,
-          blockingReasons: rowReasons,
-          evidenceRefs
-        });
-      }
+	      const rowReasons = requiredRowsPresent(register);
+	      if (rowReasons.length > 0) {
+	        const shapeReasons = testDesignRegisterShapeErrors(shapeErrorCandidate);
+	        return Object.freeze({
+	          kind: "sdlc_test_design_register_admission" as const,
+	          status: "rejected" as const,
+	          targetAssetType: input.targetAssetType,
+	          register,
+	          blockingReasons: Object.freeze([...rowReasons, ...shapeReasons]),
+	          evidenceRefs
+	        });
+	      }
       return Object.freeze({
         kind: "sdlc_test_design_register_admission" as const,
         status: "admitted" as const,

@@ -100,3 +100,18 @@ fragments, but they do not own a second closure law.
 - AC-5: overlay-specific optimization is declared through selected graph
   functions, deterministic support functions, capability assets, and edge
   assurance contracts rather than through hidden controller logic
+
+### REQ-F-GFUNC-007 — Selected graph functions normalize to dependency DAGs
+
+Every selected constructive graph function shall be representable as an SDLC
+feature dependency DAG, even when the current topology is a single serial
+chain. The DAG records work-item nodes, predecessor/successor relations,
+start nodes, read refs, write territories, output allocations, and fan-in refs.
+
+**Acceptance Criteria**:
+- AC-1: serial graph-function behavior is preserved as a DAG with one ready
+  start node at each dependency frontier
+- AC-2: graph functions with independent admitted module or test rows publish
+  all currently dependency-free rows in `start_nodes[]`
+- AC-3: execution mode is derived from DAG readiness and ABG policy, not from
+  prompt text, test harness ordering, or a product-local branch loop

@@ -1,0 +1,47 @@
+{
+  "kind": "odd_sdlc_legacy_release_snapshot_manifest",
+  "releaseIdentity": "20260517T095944Z_t171_checkpoint_rc",
+  "package": {
+    "packageName": "@odd-sdlc/typescript-tenant",
+    "packageVersion": "0.0.0-dev",
+    "packagePrivate": false
+  },
+  "migratedFrom": ".ai-workspace/release-cuts/typescript/20260517T095944Z_t171_checkpoint_rc",
+  "migratedAt": "2026-05-22T15:47:50.329Z",
+  "legacyAbgSubstrateRecorded": false,
+  "legacyAbgSubstrateNote": "The former release-cut manifest did not record a consumed ABG release snapshot. This migrated snapshot preserves historical release-cut evidence and does not assert a substrate pin.",
+  "legacyReleaseCutManifest": {
+    "kind": "legacy_release_cut_manifest",
+    "relativePath": "legacy-release-cut-manifest.json",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260517T095944Z_t171_checkpoint_rc/legacy-release-cut-manifest.json",
+    "bytes": 1232,
+    "sha256": "8af52fb6320c03fa777562e475be02c2995c6848489ab3c695c8b3c9ac205c11"
+  },
+  "sourcePackageRoot": "/Users/jim/src/apps/odd_sdlc/build_tenants/typescript",
+  "legacyArchiveRoot": "/Users/jim/src/apps/odd_sdlc/.ai-workspace/release-cuts/typescript/20260517T095944Z_t171_checkpoint_rc",
+  "snapshotRoot": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260517T095944Z_t171_checkpoint_rc",
+  "tarball": {
+    "kind": "package_tarball",
+    "relativePath": "odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260517T095944Z_t171_checkpoint_rc/odd-sdlc-typescript-tenant-0.0.0-dev.tgz",
+    "bytes": 343282,
+    "sha256": "7e698a670d832337054ed438762d920a410acfea4fd0d718a80751b6892c3c06"
+  },
+  "releaseNote": {
+    "kind": "release_note",
+    "relativePath": "release-note.md",
+    "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260517T095944Z_t171_checkpoint_rc/release-note.md",
+    "bytes": 764,
+    "sha256": "8d6056151ae67255e74ce5c018ae4c213673f332c2fde30258d1ba73acade5ae"
+  },
+  "legacyArtifacts": [
+    {
+      "kind": "legacy_release_cut_postmortem",
+      "relativePath": "release-cut-postmortem.md",
+      "path": "/Users/jim/src/apps/odd_sdlc/release_snapshots/odd-sdlc-typescript-tenant/20260517T095944Z_t171_checkpoint_rc/release-cut-postmortem.md",
+      "bytes": 495,
+      "sha256": "0c272e28535e8babec19f2b27bd61018ea7670ae6f3ac8922f96bebd6d688359"
+    }
+  ],
+  "checksumFile": "checksums.sha256"
+}

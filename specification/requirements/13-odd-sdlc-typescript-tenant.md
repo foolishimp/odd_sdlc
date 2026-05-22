@@ -47,17 +47,23 @@ Acceptance criteria:
 ### REQ-F-ODDSDLC-042 - TypeScript consumes ABIogenesis substrate truth
 
 `odd_sdlc.TS` shall consume the ABIogenesis TypeScript GTL/ABG substrate through
-declared public carriers and adapters. It shall not fork, vendor, or re-create
-ABG runtime truth as product-local controller state.
+declared public carriers, adapters, and versioned ABIogenesis release
+snapshots. It shall not fork, vendor, or re-create ABG runtime truth as
+product-local controller state.
 
 Acceptance criteria:
 
-- AC-1: ABIogenesis TypeScript dependency or source binding is explicit
+- AC-1: ABIogenesis TypeScript dependency or explicit developer source override
+  is declared
 - AC-2: ABG owns graph-call, frame, continuation, event, projection, and
   traversal truth
 - AC-3: `odd_sdlc.TS` does not infer next internal graph vectors outside ABG
   projection
 - AC-4: substrate assumptions are traced to ABIogenesis proof surfaces
+- AC-5: release and default install paths consume a specific ABIogenesis
+  release snapshot tarball instead of the mutable sibling source checkout
+- AC-6: the consumed ABIogenesis release identity, manifest, tarball path, and
+  digest are visible in `odd_sdlc.TS` release-snapshot evidence
 
 ### REQ-F-ODDSDLC-043 - TypeScript build work follows governed sequencing
 

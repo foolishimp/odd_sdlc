@@ -9,13 +9,19 @@
 // Implements: REQ-F-ODDSDLC-065
 
 import type {
+  BranchRef,
+  DependencyFrontierDeclaration,
   FpTransformRequest,
   FpTransformResult,
   RuntimeEvent,
   TracedProcessExecutorProfile,
   TracedProcessOutcome,
   TracedProcessStreamModel,
-  TraversalAttemptEnvelope
+  TraversalAttemptEnvelope,
+  GtlAdmittedStateRef,
+  GtlConsequenceProjectionRef,
+  GtlEvaluation,
+  GtlEvaluationFindingRef
 } from "@abiogenesis/typescript-tenant";
 import type { SdlcTraversalRequirementSatisfaction } from "../assurance/index.js";
 import type {
@@ -27,8 +33,17 @@ import type {
   SdlcBlockingReason,
   SdlcBlockingReasonCode
 } from "../shared/blocking_reason.js";
+import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import type { SdlcOverlayBinding } from "../graph/index.js";
+import type {
+  SdlcDependencyTraversalMethod,
+  SdlcFeatureDependencyDagNodeKind,
+  SdlcMinFpPressurePreservationMechanism,
+  SdlcTraversalHopClass,
+  SdlcTraversalOutcomeClass,
+  SdlcZoomAdmissionDisposition
+} from "../contracts/carrier_domain_catalog.js";
 import type {
   SdlcConstructionIntent,
   SdlcEdgeClosureDecision,
@@ -41,6 +56,15 @@ import type {
   SdlcEdgeGain,
   SdlcEdgeResidualPressure
 } from "./edge_gain_closure.js";
+
+export type {
+  SdlcDependencyTraversalMethod,
+  SdlcFeatureDependencyDagNodeKind,
+  SdlcMinFpPressurePreservationMechanism,
+  SdlcTraversalHopClass,
+  SdlcTraversalOutcomeClass,
+  SdlcZoomAdmissionDisposition
+} from "../contracts/carrier_domain_catalog.js";
 
 export type SdlcInstalledOperatorStatus =
   | "blocked"
@@ -96,6 +120,7 @@ export interface SdlcInstalledOperatorStartLoop {
 
 export interface SdlcInstalledOperatorTraversalConsequence {
   readonly kind: "sdlc_installed_operator_traversal_consequence";
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
   readonly constructionIntent: SdlcConstructionIntent;
   readonly worksiteEvidence: SdlcWorksiteEvidence;
   readonly edgeGain?: SdlcEdgeGain;
@@ -105,6 +130,8 @@ export interface SdlcInstalledOperatorTraversalConsequence {
   readonly overlaySegmentCompletion: SdlcOverlaySegmentCompletion | null;
   readonly postActionOverlayBinding: SdlcOverlayBinding;
   readonly nextActionProjection: SdlcNextActionProjection;
+  readonly admittedStateRef: GtlAdmittedStateRef;
+  readonly consequenceProjection: GtlConsequenceProjectionRef;
 }
 
 export interface SdlcWorkerTransportContract {
@@ -457,12 +484,6 @@ export interface SdlcTestDependencyMap {
   readonly cycleRefs: readonly string[];
 }
 
-export type SdlcDependencyTraversalMethod =
-  | "steel_thread"
-  | "parallel"
-  | "serial"
-  | "blocked";
-
 export interface SdlcDependencyTraversalSelection {
   readonly kind: "sdlc_dependency_traversal_selection";
   readonly selectionRef: string;
@@ -477,29 +498,62 @@ export interface SdlcDependencyTraversalSelection {
   readonly basisRefs: readonly string[];
 }
 
-export type SdlcTraversalOutcomeClass =
-  | "domain_product"
-  | "framework_smoke"
-  | "tutorial_example";
+export interface SdlcFeatureDependencyDagEdge {
+  readonly kind: "sdlc_feature_dependency_dag_edge";
+  readonly fromNodeRef: string;
+  readonly toNodeRef: string;
+}
 
-export type SdlcTraversalHopClass =
-  | "single_hop"
-  | "dual_hop"
-  | "staged"
-  | "zoom_required"
-  | "blocked";
+export interface SdlcFeatureDependencyDagNode {
+  readonly kind: "sdlc_feature_dependency_dag_node";
+  readonly nodeRef: string;
+  readonly nodeKind: SdlcFeatureDependencyDagNodeKind;
+  readonly edgeName: string;
+  readonly ledgerRefs: readonly string[];
+  readonly predecessorNodeRefs: readonly string[];
+  readonly successorNodeRefs: readonly string[];
+  readonly sourceAssetRefs: readonly string[];
+  readonly targetAssetRefs: readonly string[];
+  readonly readRefs: readonly string[];
+  readonly writeTerritoryRefs: readonly string[];
+  readonly outputAllocationRefs: readonly string[];
+  readonly fanInRefs: readonly string[];
+  readonly edgeAccountingRefs: readonly string[];
+  readonly ownedRequirementRefs: readonly string[];
+  readonly declaredPriority: number;
+  readonly criticalPathCost: number;
+}
 
-export type SdlcZoomAdmissionDisposition =
-  | "continue"
-  | "zoom_required"
-  | "blocked";
+export interface SdlcFeatureDependencyDag {
+  readonly kind: "sdlc_feature_dependency_dag";
+  readonly dagRef: string;
+  readonly graphFunctionName: string;
+  readonly traversalSelectionRef: string | null;
+  readonly sourceDependencyMapRefs: readonly string[];
+  readonly nodeRefs: readonly string[];
+  readonly startNodes: readonly string[];
+  readonly fanInNodeRefs: readonly string[];
+  readonly topologicalOrder: readonly string[];
+  readonly nodes: readonly SdlcFeatureDependencyDagNode[];
+  readonly edges: readonly SdlcFeatureDependencyDagEdge[];
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
 
-export type SdlcMinFpPressurePreservationMechanism =
-  | "none"
-  | "typed_template"
-  | "replay_visible_projection"
-  | "bundled_fp_output"
-  | "outcome_class_graph_variant";
+export interface SdlcAbgFrontierCompilation {
+  readonly kind: "sdlc_abg_frontier_compilation";
+  readonly dagRef: string;
+  readonly frontierRef: string;
+  readonly startNodes: readonly string[];
+  readonly branchRefs: readonly BranchRef[];
+  readonly readyBranchRefs: readonly string[];
+  readonly fanInBranchRefs: readonly string[];
+  readonly declarations: readonly DependencyFrontierDeclaration[];
+  readonly writeTerritoryConflictRefs: readonly string[];
+  readonly outputAllocationConflictRefs: readonly string[];
+  readonly conflictingBranchRefs: readonly string[];
+  readonly basisRefs: readonly string[];
+}
 
 export interface SdlcTraversalComplexityThresholds {
   readonly kind: "sdlc_traversal_complexity_thresholds";
@@ -1822,10 +1876,18 @@ export interface SdlcPostflightResult {
 export interface SdlcFpEvaluateResult {
   readonly kind: "sdlc_fp_evaluate_result";
   readonly stage: "F_P.evaluate";
+  readonly computeNotationStage: "evaluate.C";
   readonly stageAuthority: "typed_fp_stage_carriers";
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
   readonly workerReportProjectionRef: string;
   readonly transformResultRef: string | null;
   readonly postflightRef: string;
+  readonly evaluationRef: string;
+  readonly findings: readonly GtlEvaluationFindingRef[];
+  readonly evaluation: GtlEvaluation;
   readonly status:
     | SdlcPostflightResult["status"]
     | "admitted_with_open_obligations";

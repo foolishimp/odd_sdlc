@@ -24,6 +24,7 @@ import { buildDiagnostics, type DiagnosticDraft } from "./diagnostics.js";
 import { resolveSdlcFdRunAnalysisProfile } from "./profiles.js";
 import { deriveSdlcExecutiveEdgeAccountingAudit } from "../graph/edge_accounting.js";
 import { deriveSdlcTraversalHopSelection } from "../operator/traversal_complexity.js";
+import { resolveSdlcTraversalOutcomeClass } from "../contracts/carrier_domain_catalog.js";
 import type {
   SdlcDecompositionSummary,
   SdlcTraversalHopSelection,
@@ -357,7 +358,9 @@ function maxRequirementObligationCount(
 function outcomeClassForAnalysisProfile(
   profile: SdlcFdRunAnalysisProfile
 ): SdlcTraversalOutcomeClass {
-  return profile === "hello_world" ? "framework_smoke" : "domain_product";
+  return resolveSdlcTraversalOutcomeClass({
+    trivialProduct: profile === "hello_world"
+  }).outcomeClass;
 }
 
 function loadedDecompositionSummary(

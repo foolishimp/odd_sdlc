@@ -86,6 +86,15 @@ preserved as residual pressure. The evaluator owns the admitted
 `SdlcDecompositionSummary`; worker-emitted topology rows are evidence, not final
 authority.
 
+T-174 adds the branch publication bridge over the same admitted carriers.
+`SdlcModuleDependencyMap` and `SdlcTestDependencyMap` compile into an
+`SdlcFeatureDependencyDag` with `startNodes`, predecessor/successor rows,
+read refs, write territories, output allocations, and fan-in rows. The
+`SdlcAbgFrontierCompilation` translates that product DAG into ABG
+`DependencyFrontierDeclaration` rows. The topological order remains a
+projection; ABG owns ready-row selection, branch leases, bounded concurrency,
+retry isolation, fan-in events, and replay truth.
+
 The summary measures:
 
 - upstream obligation count;

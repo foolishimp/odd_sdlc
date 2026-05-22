@@ -20,6 +20,19 @@ export const T174_PARALLEL_HELLO_WORLD_JS_SOURCE_FILES = Object.freeze([
   "tools/run_t174_four_lane_frontier.mjs"
 ]);
 
+export const T174_PARALLEL_HELLO_WORLD_JS_FOCUSED_SOURCE_FILES = Object.freeze([
+  ...T174_PARALLEL_HELLO_WORLD_JS_SOURCE_FILES,
+  ".ai-workspace/context/project_bootstrap.md",
+  "build_tenants/TENANT_REGISTRY.md",
+  "specification/INTENT.md",
+  "specification/PRODUCT.md",
+  "specification/GOALS.md",
+  "specification/requirements/README.md",
+  "specification/requirements/01-parallel-hello-world.md",
+  "build_tenants/parallel_hello_world/design/adrs/ADR-002-implementation-design-surface.md",
+  "build_tenants/parallel_hello_world/design/adrs/ADR-003-test-design-surface.md"
+]);
+
 export const T174_PARALLEL_HELLO_WORLD_REQUIREMENT_IDS = Object.freeze([
   "REQ-T174-PARALLEL-HELLO-001",
   "REQ-T174-PARALLEL-HELLO-002",
@@ -50,7 +63,8 @@ export const t174ParallelHelloWorldJsScenario = Object.freeze({
   installedPackageName: "odd-sdlc-scenario-t174-parallel-hello-world-js",
   fixture: {
     root: FIXTURE_ROOT,
-    sourceFiles: T174_PARALLEL_HELLO_WORLD_JS_SOURCE_FILES
+    sourceFiles: T174_PARALLEL_HELLO_WORLD_JS_SOURCE_FILES,
+    copySourceFilesOnly: true
   },
   expectations: {
     firstEdge: FG_CONFORM_PROJECT,
@@ -146,6 +160,11 @@ export function t174ParallelHelloWorldJsLiveScenario({
     scenarioId: "scenario_t174_parallel_hello_world_js_live",
     installedPackageName:
       "odd-sdlc-scenario-t174-parallel-hello-world-js-live",
+    fixture: {
+      root: FIXTURE_ROOT,
+      sourceFiles: T174_PARALLEL_HELLO_WORLD_JS_FOCUSED_SOURCE_FILES,
+      copySourceFilesOnly: true
+    },
     expectations: {
       workspaceFiles: [
         ...T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES
@@ -207,6 +226,14 @@ export function t174ParallelHelloWorldJsFourLaneLiveScenario(input) {
       materializationEvidenceWorkspaceFiles: [
         ...T174_PARALLEL_HELLO_WORLD_FOUR_LANE_FILES
       ],
+      handoffEdgeSequencePrefix: [
+        "derive_component_code_surface",
+        "derive_component_test_surface"
+      ],
+      edgeAssuranceArchiveSequencePrefix: [
+        "derive_component_code_surface",
+        "derive_component_test_surface"
+      ],
       liveFpParallelMaterializationFrontier: {
         edgeName: "derive_component_code_surface",
         artifact: "sdlc_live_fp_parallel_materialization_frontier.json",
@@ -225,10 +252,10 @@ export function t174ParallelHelloWorldJsFourLaneLiveScenario(input) {
           maxActive: 4
         },
         requiredBranchRefs: [
-          "branch://odd-sdlc/t174/four-lane/dev-hello",
-          "branch://odd-sdlc/t174/four-lane/dev-world",
-          "branch://odd-sdlc/t174/four-lane/test-hello",
-          "branch://odd-sdlc/t174/four-lane/test-world"
+          "branch://odd-sdlc/live/derive-component-code-surface/dev-src-hello-js",
+          "branch://odd-sdlc/live/derive-component-code-surface/dev-src-world-js",
+          "branch://odd-sdlc/live/derive-component-code-surface/test-test-hello-test-js",
+          "branch://odd-sdlc/live/derive-component-code-surface/test-test-world-test-js"
         ],
         requireBranchWorkerProcessRefs: true,
         requireDisjointWriteTerritories: true,
@@ -237,7 +264,8 @@ export function t174ParallelHelloWorldJsFourLaneLiveScenario(input) {
           "branch_payload_admitted",
           "branch_fan_in_projected"
         ],
-        requiredFanInPayloadDigest: "payload://four-lane/hello-world"
+        requiredFanInPayloadDigest:
+          "payload://odd-sdlc/live/derive-component-code-surface/fan-in"
       },
       processChecks: [
         ...t174ParallelHelloWorldJsFourLaneFrontierScenario.expectations
@@ -245,10 +273,13 @@ export function t174ParallelHelloWorldJsFourLaneLiveScenario(input) {
         ...scenario.expectations.processChecks
       ]
     },
-    startTarget: "next",
-    startTargetSequence: undefined,
+    startTarget: "graph_function:derive_component_test_surface",
+    startTargetSequence: Object.freeze([
+      "graph_function:derive_component_code_surface",
+      "graph_function:derive_component_test_surface"
+    ]),
     startUntil: "first_traversal",
-    maxAdvances: input.maxAdvances ?? 32,
+    maxAdvances: input.maxAdvances ?? 4,
     continueOnEdgeConverge: true,
     stopAfterWorkspaceFilesExist: true
   });

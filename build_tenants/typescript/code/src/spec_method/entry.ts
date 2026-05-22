@@ -60,7 +60,10 @@ import {
   type SdlcRequirementFulfillmentPublicProjection
 } from "../projection/index.js";
 import { describeOddSdlcTypescriptRcQualification } from "../qualification/index.js";
-import { deriveOddSdlcTypescriptReleaseCut } from "../release/index.js";
+import {
+  deriveOddSdlcTypescriptReleaseCut,
+  deriveOddSdlcTypescriptReleaseSnapshot
+} from "../release/index.js";
 import {
   deriveSdlcPostCloseOverlayContinuationActionInput,
   executeInstalledOperatorStartWithReentry,
@@ -104,6 +107,7 @@ export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "start",
   "install",
   "release-cut",
+  "release-snapshot",
   "rc-report",
   "analyze-run"
 ] as const);
@@ -137,7 +141,7 @@ export interface OddSdlcSpecMethodTraversalRequest {
   readonly kind: "odd_sdlc_spec_method_request";
   readonly command: Exclude<
     OddSdlcSpecMethodCommand,
-    "install" | "release-cut" | "analyze-run"
+    "install" | "release-cut" | "release-snapshot" | "analyze-run"
   >;
   readonly workspaceRoot: string;
   readonly outputWorkspaceRoot: string | null;
@@ -156,6 +160,8 @@ export interface OddSdlcSpecMethodInstallRequest {
   readonly targetRoot: string;
   readonly packageSourceRoot: string;
   readonly abgPackageSourceRoot: string;
+  readonly abgStandardsSourceRoot: string | null;
+  readonly abgDocsSourceRoot: string | null;
   readonly installedPackageName: string;
 }
 
@@ -164,6 +170,23 @@ export interface OddSdlcSpecMethodReleaseCutRequest {
   readonly command: "release-cut";
   readonly archiveRoot: string;
   readonly packageSourceRoot: string;
+}
+
+export interface OddSdlcSpecMethodReleaseSnapshotRequest {
+  readonly kind: "odd_sdlc_spec_method_release_snapshot_request";
+  readonly command: "release-snapshot";
+  readonly releaseIdentity: string;
+  readonly snapshotRoot: string;
+  readonly packageSourceRoot: string;
+  readonly sourceRef: string | null;
+  readonly sourceCommit: string | null;
+  readonly rcBranch: string | null;
+  readonly releaseNotePath: string | null;
+  readonly expectedPackageName: string | null;
+  readonly expectedPackageVersion: string | null;
+  readonly runBuild: boolean;
+  readonly allowDirtySource: boolean;
+  readonly npmCacheRoot: string | null;
 }
 
 export interface OddSdlcSpecMethodAnalyzeRunRequest {
@@ -180,6 +203,7 @@ export type OddSdlcSpecMethodRequest =
   | OddSdlcSpecMethodTraversalRequest
   | OddSdlcSpecMethodInstallRequest
   | OddSdlcSpecMethodReleaseCutRequest
+  | OddSdlcSpecMethodReleaseSnapshotRequest
   | OddSdlcSpecMethodAnalyzeRunRequest;
 
 export interface OddSdlcSpecMethodResult {
@@ -212,12 +236,29 @@ interface SpecMethodInstallOptionReadModel {
   readonly targetRoot: string;
   readonly packageSourceRoot: string;
   readonly abgPackageSourceRoot: string;
+  readonly abgStandardsSourceRoot: string | null;
+  readonly abgDocsSourceRoot: string | null;
   readonly installedPackageName: string;
 }
 
 interface SpecMethodReleaseCutOptionReadModel {
   readonly archiveRoot: string;
   readonly packageSourceRoot: string;
+}
+
+interface SpecMethodReleaseSnapshotOptionReadModel {
+  readonly releaseIdentity: string;
+  readonly snapshotRoot: string;
+  readonly packageSourceRoot: string;
+  readonly sourceRef: string | null;
+  readonly sourceCommit: string | null;
+  readonly rcBranch: string | null;
+  readonly releaseNotePath: string | null;
+  readonly expectedPackageName: string | null;
+  readonly expectedPackageVersion: string | null;
+  readonly runBuild: boolean;
+  readonly allowDirtySource: boolean;
+  readonly npmCacheRoot: string | null;
 }
 
 interface SpecMethodAnalyzeRunOptionReadModel {
@@ -286,9 +327,33 @@ function abgPackageDependencyIsPresent(candidateRoot: string): boolean {
   return existsSync(resolve(candidateRoot, "package.json"));
 }
 
+function abgDocsSourceIsUsable(candidateRoot: string): boolean {
+  return (
+    existsSync(resolve(candidateRoot, "README.md")) &&
+    existsSync(resolve(candidateRoot, "LLM_GTL_APP_BUILDER_GUIDE.md")) &&
+    existsSync(resolve(candidateRoot, "USER_GUIDE.md"))
+  );
+}
+
+function standardsSourceIsUsable(candidateRoot: string): boolean {
+  return (
+    existsSync(resolve(candidateRoot, "SPEC_METHOD.md")) &&
+    existsSync(resolve(candidateRoot, "ODD_METHOD.md")) &&
+    existsSync(resolve(candidateRoot, "RELEASE_METHOD.md"))
+  );
+}
+
 export function resolveDefaultAbgPackageSourceRoot(
   packageSourceRoot: string = DEFAULT_PACKAGE_SOURCE_ROOT
 ): string {
+  const packageLocalDependency = resolve(
+    packageSourceRoot,
+    "node_modules/@abiogenesis/typescript-tenant"
+  );
+  if (abgPackageDependencyIsPresent(packageLocalDependency)) {
+    return packageLocalDependency;
+  }
+
   const siblingSourceCheckout = resolve(
     packageSourceRoot,
     "../../..",
@@ -298,13 +363,6 @@ export function resolveDefaultAbgPackageSourceRoot(
     return siblingSourceCheckout;
   }
 
-  const packageLocalDependency = resolve(
-    packageSourceRoot,
-    "node_modules/@abiogenesis/typescript-tenant"
-  );
-  if (abgPackageDependencyIsPresent(packageLocalDependency)) {
-    return packageLocalDependency;
-  }
   return resolve(
     packageSourceRoot,
     "../..",
@@ -313,6 +371,44 @@ export function resolveDefaultAbgPackageSourceRoot(
 }
 
 const DEFAULT_ABG_PACKAGE_SOURCE_ROOT = resolveDefaultAbgPackageSourceRoot();
+
+export function resolveDefaultAbgStandardsSourceRoot(
+  packageSourceRoot: string = DEFAULT_PACKAGE_SOURCE_ROOT
+): string | null {
+  const siblingStandards = resolve(
+    packageSourceRoot,
+    "../../..",
+    "specification_methodology/specification/standards"
+  );
+  if (standardsSourceIsUsable(siblingStandards)) {
+    return siblingStandards;
+  }
+  const installedStandards = resolve(
+    packageSourceRoot,
+    ".abiogenesis/docs/standards"
+  );
+  if (standardsSourceIsUsable(installedStandards)) {
+    return installedStandards;
+  }
+  return null;
+}
+
+export function resolveDefaultAbgDocsSourceRoot(
+  packageSourceRoot: string = DEFAULT_PACKAGE_SOURCE_ROOT
+): string | null {
+  const siblingDocs = resolve(packageSourceRoot, "../../..", "abiogenesis/docs");
+  if (abgDocsSourceIsUsable(siblingDocs)) {
+    return siblingDocs;
+  }
+  const installedDocs = resolve(packageSourceRoot, ".abiogenesis/docs");
+  if (abgDocsSourceIsUsable(installedDocs)) {
+    return installedDocs;
+  }
+  return null;
+}
+
+const DEFAULT_ABG_STANDARDS_SOURCE_ROOT = resolveDefaultAbgStandardsSourceRoot();
+const DEFAULT_ABG_DOCS_SOURCE_ROOT = resolveDefaultAbgDocsSourceRoot();
 
 function isCommand(value: string): value is OddSdlcSpecMethodCommand {
   return ODD_SDLC_SPEC_METHOD_COMMAND_SET.has(value);
@@ -353,6 +449,16 @@ function parseUntil(value: string): SdlcPublicStartUntil {
     return value;
   }
   throw new TypeError(`--until expected first_traversal, blocked, or converged`);
+}
+
+function parseBooleanOption(value: string, option: string): boolean {
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  throw new TypeError(`${option} expected true or false`);
 }
 
 function parseNonEmptyOptionValue(
@@ -428,6 +534,8 @@ function parseInstallOptions(argv: readonly string[]): SpecMethodInstallOptionRe
   let targetRoot: string | null = null;
   let packageSourceRoot = DEFAULT_PACKAGE_SOURCE_ROOT;
   let abgPackageSourceRoot = DEFAULT_ABG_PACKAGE_SOURCE_ROOT;
+  let abgStandardsSourceRoot = DEFAULT_ABG_STANDARDS_SOURCE_ROOT;
+  let abgDocsSourceRoot = DEFAULT_ABG_DOCS_SOURCE_ROOT;
   let installedPackageName = "odd-sdlc-typescript";
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -439,6 +547,12 @@ function parseInstallOptions(argv: readonly string[]): SpecMethodInstallOptionRe
       index += 1;
     } else if (token === "--abg-package-source") {
       abgPackageSourceRoot = requireOptionValue(argv, index, "--abg-package-source");
+      index += 1;
+    } else if (token === "--abg-standards-source") {
+      abgStandardsSourceRoot = requireOptionValue(argv, index, "--abg-standards-source");
+      index += 1;
+    } else if (token === "--abg-docs-source") {
+      abgDocsSourceRoot = requireOptionValue(argv, index, "--abg-docs-source");
       index += 1;
     } else if (token === "--installed-package-name") {
       installedPackageName = requireOptionValue(argv, index, "--installed-package-name");
@@ -454,6 +568,8 @@ function parseInstallOptions(argv: readonly string[]): SpecMethodInstallOptionRe
     targetRoot,
     packageSourceRoot,
     abgPackageSourceRoot,
+    abgStandardsSourceRoot,
+    abgDocsSourceRoot,
     installedPackageName
   });
 }
@@ -479,6 +595,84 @@ function parseReleaseCutOptions(argv: readonly string[]): SpecMethodReleaseCutOp
   return Object.freeze({
     archiveRoot,
     packageSourceRoot
+  });
+}
+
+function parseReleaseSnapshotOptions(
+  argv: readonly string[]
+): SpecMethodReleaseSnapshotOptionReadModel {
+  let releaseIdentity: string | null = null;
+  let snapshotRoot: string | null = null;
+  let packageSourceRoot = DEFAULT_PACKAGE_SOURCE_ROOT;
+  let sourceRef: string | null = null;
+  let sourceCommit: string | null = null;
+  let rcBranch: string | null = null;
+  let releaseNotePath: string | null = null;
+  let expectedPackageName: string | null = null;
+  let expectedPackageVersion: string | null = null;
+  let runBuild = true;
+  let allowDirtySource = false;
+  let npmCacheRoot: string | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--release-identity") {
+      releaseIdentity = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--snapshot-root") {
+      snapshotRoot = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--package-source") {
+      packageSourceRoot = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--source-ref") {
+      sourceRef = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--source-commit") {
+      sourceCommit = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--rc-branch") {
+      rcBranch = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--release-note") {
+      releaseNotePath = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--expected-package-name") {
+      expectedPackageName = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--expected-package-version") {
+      expectedPackageVersion = requireOptionValue(argv, index, token);
+      index += 1;
+    } else if (token === "--build") {
+      runBuild = parseBooleanOption(requireOptionValue(argv, index, token), token);
+      index += 1;
+    } else if (token === "--allow-dirty-source") {
+      allowDirtySource = true;
+    } else if (token === "--npm-cache-root") {
+      npmCacheRoot = requireOptionValue(argv, index, token);
+      index += 1;
+    } else {
+      throw new TypeError(`unknown release-snapshot option: ${token ?? ""}`);
+    }
+  }
+  if (releaseIdentity === null) {
+    throw new TypeError("release-snapshot requires --release-identity <version>");
+  }
+  if (snapshotRoot === null) {
+    throw new TypeError("release-snapshot requires --snapshot-root <directory>");
+  }
+  return Object.freeze({
+    releaseIdentity,
+    snapshotRoot,
+    packageSourceRoot,
+    sourceRef,
+    sourceCommit,
+    rcBranch,
+    releaseNotePath,
+    expectedPackageName,
+    expectedPackageVersion,
+    runBuild,
+    allowDirtySource,
+    npmCacheRoot
   });
 }
 
@@ -581,6 +775,14 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       targetRoot: resolve(options.targetRoot),
       packageSourceRoot: resolve(options.packageSourceRoot),
       abgPackageSourceRoot: resolve(options.abgPackageSourceRoot),
+      abgStandardsSourceRoot:
+        options.abgStandardsSourceRoot === null
+          ? null
+          : resolve(options.abgStandardsSourceRoot),
+      abgDocsSourceRoot:
+        options.abgDocsSourceRoot === null
+          ? null
+          : resolve(options.abgDocsSourceRoot),
       installedPackageName: options.installedPackageName
     });
   }
@@ -591,6 +793,27 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
       command,
       archiveRoot: resolve(options.archiveRoot),
       packageSourceRoot: resolve(options.packageSourceRoot)
+    });
+  }
+  if (command === "release-snapshot") {
+    const options = parseReleaseSnapshotOptions(argv.slice(1));
+    return Object.freeze({
+      kind: "odd_sdlc_spec_method_release_snapshot_request",
+      command,
+      releaseIdentity: options.releaseIdentity,
+      snapshotRoot: resolve(options.snapshotRoot),
+      packageSourceRoot: resolve(options.packageSourceRoot),
+      sourceRef: options.sourceRef,
+      sourceCommit: options.sourceCommit,
+      rcBranch: options.rcBranch,
+      releaseNotePath:
+        options.releaseNotePath === null ? null : resolve(options.releaseNotePath),
+      expectedPackageName: options.expectedPackageName,
+      expectedPackageVersion: options.expectedPackageVersion,
+      runBuild: options.runBuild,
+      allowDirtySource: options.allowDirtySource,
+      npmCacheRoot:
+        options.npmCacheRoot === null ? null : resolve(options.npmCacheRoot)
     });
   }
   if (command === "analyze-run") {
@@ -607,7 +830,7 @@ export function admitOddSdlcSpecMethodRequest(argv: readonly string[]): OddSdlcS
   }
   const traversalCommand: Exclude<
     OddSdlcSpecMethodCommand,
-    "install" | "release-cut" | "analyze-run"
+    "install" | "release-cut" | "release-snapshot" | "analyze-run"
   > = command;
   const options = parseOptions(traversalCommand, argv.slice(1));
   return Object.freeze({
@@ -1991,6 +2214,8 @@ async function commandPayloadAsync(request: OddSdlcSpecMethodRequest): Promise<u
       targetRoot: request.targetRoot,
       packageSourceRoot: request.packageSourceRoot,
       abgPackageSourceRoot: request.abgPackageSourceRoot,
+      abgStandardsSourceRoot: request.abgStandardsSourceRoot,
+      abgDocsSourceRoot: request.abgDocsSourceRoot,
       installedPackageName: request.installedPackageName
     });
   }
@@ -1998,6 +2223,22 @@ async function commandPayloadAsync(request: OddSdlcSpecMethodRequest): Promise<u
     return deriveOddSdlcTypescriptReleaseCut({
       archiveRoot: request.archiveRoot,
       packageSourceRoot: request.packageSourceRoot
+    });
+  }
+  if (request.command === "release-snapshot") {
+    return deriveOddSdlcTypescriptReleaseSnapshot({
+      releaseIdentity: request.releaseIdentity,
+      packageSourceRoot: request.packageSourceRoot,
+      snapshotRoot: request.snapshotRoot,
+      sourceRef: request.sourceRef,
+      sourceCommit: request.sourceCommit,
+      rcBranch: request.rcBranch,
+      releaseNotePath: request.releaseNotePath,
+      expectedPackageName: request.expectedPackageName,
+      expectedPackageVersion: request.expectedPackageVersion,
+      runBuild: request.runBuild,
+      allowDirtySource: request.allowDirtySource,
+      npmCacheRoot: request.npmCacheRoot
     });
   }
   if (request.command === "analyze-run") {
@@ -2018,7 +2259,8 @@ export function invokeOddSdlcSpecMethodCommandSync(
     command = request.command;
     if (
       request.command === "install" ||
-      request.command === "release-cut"
+      request.command === "release-cut" ||
+      request.command === "release-snapshot"
     ) {
       throw new TypeError(
         `${request.command} requires invokeOddSdlcSpecMethodCommand`

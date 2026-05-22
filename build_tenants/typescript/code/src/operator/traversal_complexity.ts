@@ -11,6 +11,9 @@ import type {
   SdlcTraversalOutcomeClass,
   SdlcZoomAdmissionDecision
 } from "./carriers.js";
+import {
+  SDLC_MIN_FP_PERMITTED_OUTCOME_CLASSES
+} from "../contracts/carrier_domain_catalog.js";
 
 export interface SdlcTraversalHopSelectionInput {
   readonly selectionRef: string;
@@ -24,8 +27,8 @@ export interface SdlcTraversalHopSelectionInput {
   readonly evidenceRefs?: readonly string[] | undefined;
 }
 
-const SDLC_MIN_FP_PERMITTED_OUTCOME_CLASSES = Object.freeze(
-  new Set<SdlcTraversalOutcomeClass>(["framework_smoke", "tutorial_example"])
+const SDLC_MIN_FP_PERMITTED_OUTCOME_CLASS_SET = Object.freeze(
+  new Set<SdlcTraversalOutcomeClass>(SDLC_MIN_FP_PERMITTED_OUTCOME_CLASSES)
 );
 
 const SDLC_PROJECTION_BENIGN_BLOCKING_REASONS = Object.freeze(
@@ -281,7 +284,7 @@ export function deriveSdlcTraversalHopSelection(
   const typedTemplateAvailable = input.typedTemplateAvailable ?? false;
   const projectionOnlyEligible = input.projectionOnlyEligible ?? false;
   const bundleEligible = input.bundleEligible ?? false;
-  const minFpEligible = SDLC_MIN_FP_PERMITTED_OUTCOME_CLASSES.has(outcomeClass);
+  const minFpEligible = SDLC_MIN_FP_PERMITTED_OUTCOME_CLASS_SET.has(outcomeClass);
   const projectionPreservesWithoutSummary =
     projectionOnlyEligible &&
     (input.evidenceRefs?.length ?? 0) > 0 &&

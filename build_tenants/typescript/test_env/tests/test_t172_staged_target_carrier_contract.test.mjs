@@ -15,6 +15,7 @@ import path from "node:path";
 import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
 import {
+  admitDesignDepthRegisterFromArtifact,
   constructWorkerInvocationPackage,
   constructSdlcGtlModule,
   constructSdlcTargetCarrierRows,
@@ -22,10 +23,14 @@ import {
   evaluateWorkerResultPostflight,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
+  reconcileSdlcProductMaterializationAuthority,
   resolveSdlcEdgeGainClosureContract,
   sha256Text,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
+import {
+  deriveSdlcStagedConstructionAuditCarriers
+} from "../../build/semantic/code/src/operator/handoff.js";
 
 function makeWorkspace({ trivialProduct = false } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t172-staged-"));
@@ -412,6 +417,92 @@ test("T-172 component-code materialization requires admitted implementation topo
   ]);
 });
 
+test("T-174 component-code targets include source topology even when ADR file targets are incomplete", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const tenantRoot = path.join(workspaceRoot, "build_tenants/typescript");
+    mkdirSync(path.join(tenantRoot, "design/adrs"), { recursive: true });
+    writeFileSync(
+      path.join(tenantRoot, "design/adrs/ADR-002-implementation-design-surface.md"),
+      [
+        "# ADR-002: Implementation Design Surface",
+        "",
+        "## Module Boundary",
+        "",
+        "| Module | Responsibility | Relative path | Depends on | Requirement refs |",
+        "| --- | --- | --- | --- | --- |",
+        "| `hello_branch` | Return exactly `hello`. | `src/hello.js` | None | `REQ-T172-001` |",
+        "| `world_branch` | Return exactly `world`. | `src/world.js` | None | `REQ-T172-001` |",
+        "| `composition` | Compose hello and world. | `src/index.js` | `hello_branch`, `world_branch` | `REQ-T172-001` |",
+        "| `hello_branch_test` | Verify hello. | `test/hello.test.js` | `hello_branch` | `REQ-T172-001` |",
+        "",
+        "## Product File Targets",
+        "",
+        "| File target | Role | Owning module | Realization decision | Requirement refs |",
+        "| --- | --- | --- | --- | --- |",
+        "| `build_tenants/typescript/package.json` | `build_config` | `package_contract` | Declared package target. | `REQ-T172-001` |",
+        "",
+        "Additional source and test realization pressure is carried by the module boundary."
+      ].join("\n"),
+      "utf8"
+    );
+    const contract = hookContractByEdgeName("derive_component_code_surface");
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot,
+      graphFunctionName: "derive_component_code_surface",
+      edgeName: contract.edgeName,
+      vectorIndex: 0,
+      contract,
+      runId: "t174-topology-derived-source-targets"
+    });
+    const authority = reconcileSdlcProductMaterializationAuthority(manifest);
+    const admission = admitDesignDepthRegisterFromArtifact({
+      targetAssetType: "implementation_design_surface",
+      outputFile: path.join(
+        tenantRoot,
+        "design/adrs/ADR-002-implementation-design-surface.md"
+      ),
+      archiveRoot: path.join(tenantRoot, ".ai-workspace/t174-archive")
+    });
+    assert.equal(admission.status, "admitted");
+    const realizationByComponent = new Map(
+      admission.register.componentRealizationRows.map((row) => [
+        row.componentId,
+        row
+      ])
+    );
+    const auditCarriers = deriveSdlcStagedConstructionAuditCarriers(manifest);
+    const traversalCarrier = auditCarriers.find(
+      (carrier) =>
+        carrier.relativePath === "sdlc_module_dependency_traversal_selection.json"
+    );
+
+    assert(authority.declaredProductFileTargets.includes("build_tenants/typescript/package.json"));
+    assert(authority.declaredProductFileTargets.includes("build_tenants/typescript/src/hello.js"));
+    assert(authority.declaredProductFileTargets.includes("build_tenants/typescript/src/world.js"));
+    assert(authority.declaredProductFileTargets.includes("build_tenants/typescript/src/index.js"));
+    assert(!authority.declaredProductFileTargets.includes("build_tenants/typescript/test/hello.test.js"));
+    assert.equal(realizationByComponent.get("hello_branch")?.relativePath, "src/hello.js");
+    assert.equal(realizationByComponent.get("world_branch")?.relativePath, "src/world.js");
+    assert.equal(realizationByComponent.get("composition")?.relativePath, "src/index.js");
+    assert.deepEqual(
+      realizationByComponent.get("composition")?.upstreamComponentIds,
+      ["hello_branch", "world_branch"]
+    );
+    assert.equal(traversalCarrier?.payload.kind, "sdlc_dependency_traversal_selection");
+    assert.equal(traversalCarrier?.payload.selectedMethod, "parallel");
+    assert.deepEqual(traversalCarrier?.payload.parallelGroupRefs, [
+      "partition://module/composition",
+      "partition://module/hello-branch",
+      "partition://module/hello-branch-test",
+      "partition://module/package-contract",
+      "partition://module/world-branch"
+    ]);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-172 test-design carrier declares test topology and stack authority output", () => {
   const row = targetCarrierRow("derive_test_design_surface");
 
@@ -515,7 +606,10 @@ test("T-172 implementation-design prompt preserves proportional topology capacit
     assert.match(prompt, /Product File Targets section/u);
     assert.match(prompt, /requirement-lineage table/u);
     assert.doesNotMatch(prompt, /Emit a fenced `json design_depth_register` carrier/u);
-    assert.doesNotMatch(prompt, /componentTopologyRows\[\]/u);
+    assert.match(
+      prompt,
+      /componentTopologyRows\[\]\.componentId\/moduleName\/relativePath\/publicBoundary\/concernRole/u
+    );
     assert.doesNotMatch(prompt, /8 componentTopologyRows, 12 componentRealizationRows/u);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });

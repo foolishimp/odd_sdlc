@@ -9,9 +9,52 @@ import {
   type LoadedJson,
   type LoadedJsonl
 } from "./archive_reader.js";
+import {
+  arrayOf,
+  guardKind,
+  guardKinds,
+  isNonNegativeFiniteNumber,
+  isRecord,
+  isTrimmedNonEmptyString,
+  nullable,
+  oneOf,
+  recordShape
+} from "../admission/codecs.js";
+import {
+  SDLC_MIN_FP_PRESSURE_PRESERVATION_MECHANISMS,
+  SDLC_DEPENDENCY_TRAVERSAL_METHODS,
+  SDLC_TRAVERSAL_HOP_CLASSES,
+  SDLC_TRAVERSAL_OUTCOME_CLASSES,
+  SDLC_ZOOM_ADMISSION_DISPOSITIONS
+} from "../contracts/carrier_domain_catalog.js";
+import {
+  SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
+  requireOperatorRunArtifactRowForArtifactRef,
+  type SdlcOperatorRunArtifactRow
+} from "../contracts/operator_run_artifact_catalog.js";
+import {
+  isSdlcLiveFpParallelMaterializationFrontier,
+  type SdlcLiveFpParallelMaterializationFrontier
+} from "../operator/live_fp_parallel_materialization_frontier.js";
 import type {
+  SdlcDecompositionAdmissionDecision,
+  SdlcDecompositionDownstreamKind,
   SdlcDecompositionSummary,
-  SdlcTraversalHopSelection
+  SdlcDecompositionSummaryRow,
+  SdlcDecompositionUpstreamKind,
+  SdlcDependencyMapNode,
+  SdlcDependencyTraversalMethod,
+  SdlcDependencyTraversalSelection,
+  SdlcMinFpPressurePreservationDecision,
+  SdlcMinFpPressurePreservationMechanism,
+  SdlcModuleDependencyMap,
+  SdlcTestDependencyMap,
+  SdlcTraversalComplexityAssessment,
+  SdlcTraversalHopClass,
+  SdlcTraversalHopSelection,
+  SdlcTraversalOutcomeClass,
+  SdlcZoomAdmissionDisposition,
+  SdlcZoomAdmissionDecision
 } from "../operator/carriers.js";
 
 export interface OperatorSummaryRecord {
@@ -193,6 +236,15 @@ export interface WorkerConstructionBriefRecord {
   }[];
 }
 
+export type LiveFpParallelMaterializationFrontierRecord =
+  SdlcLiveFpParallelMaterializationFrontier;
+
+export type LoadedOperatorRunArtifact =
+  | LoadedJson<unknown>
+  | LoadedJsonl<unknown>
+  | { readonly status: "present"; readonly bytes: number; readonly path: string }
+  | { readonly status: "missing" };
+
 export interface OperatorRunCarriers {
   readonly operatorRunRoot: string;
   readonly operatorSummary: LoadedJson<OperatorSummaryRecord>;
@@ -214,8 +266,15 @@ export interface OperatorRunCarriers {
   readonly implementationDecompositionSummary: LoadedJson<SdlcDecompositionSummary>;
   readonly testDecompositionSummary: LoadedJson<SdlcDecompositionSummary>;
   readonly traversalHopSelection: LoadedJson<SdlcTraversalHopSelection>;
+  readonly moduleDependencyMap: LoadedJson<SdlcModuleDependencyMap>;
+  readonly moduleDependencyTraversalSelection: LoadedJson<SdlcDependencyTraversalSelection>;
+  readonly testDependencyMap: LoadedJson<SdlcTestDependencyMap>;
+  readonly testDependencyTraversalSelection: LoadedJson<SdlcDependencyTraversalSelection>;
+  readonly liveFpParallelMaterializationFrontier: LoadedJson<LiveFpParallelMaterializationFrontierRecord>;
   readonly runPerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
   readonly edgePerformanceSummary: LoadedJson<RunPerformanceSummaryRecord>;
+  readonly artifactStateByRef: Readonly<Record<string, LoadedOperatorRunArtifact>>;
+  readonly fileSizeByArtifactRef: Readonly<Record<string, number>>;
   readonly fileSizes: OperatorRunFileSizes;
 }
 
@@ -246,30 +305,11 @@ export interface OperatorRunFileSizes {
   readonly sdlcImplementationDecompositionSummary: number;
   readonly sdlcTestDecompositionSummary: number;
   readonly sdlcTraversalHopSelection: number;
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function recordHasKind(value: unknown, expected: string): boolean {
-  return isRecord(value) && value["kind"] === expected;
-}
-
-function guardKind<T extends { readonly kind: string }>(
-  expected: T["kind"]
-): (value: unknown) => value is T {
-  return (value: unknown): value is T => recordHasKind(value, expected);
-}
-
-function guardKinds<T extends { readonly kind: string }>(
-  expectedKinds: readonly T["kind"][]
-): (value: unknown) => value is T {
-  const set = new Set<string>(expectedKinds);
-  return (value: unknown): value is T =>
-    isRecord(value) &&
-    typeof value["kind"] === "string" &&
-    set.has(value["kind"]);
+  readonly sdlcModuleDependencyMap: number;
+  readonly sdlcModuleDependencyTraversalSelection: number;
+  readonly sdlcTestDependencyMap: number;
+  readonly sdlcTestDependencyTraversalSelection: number;
+  readonly sdlcLiveFpParallelMaterializationFrontier: number;
 }
 
 function guardJsonlEvent(value: unknown): value is WorkerProcessEventRecord {
@@ -318,11 +358,211 @@ const WORKER_RESULT_REPORT_GUARD: (value: unknown) => value is WorkerResultRepor
 const WORKER_CONSTRUCTION_BRIEF_GUARD: (value: unknown) => value is WorkerConstructionBriefRecord =
   guardKind<WorkerConstructionBriefRecord>("sdlc_worker_construction_brief");
 
+const STRING_LIST_GUARD = arrayOf(isTrimmedNonEmptyString);
+
+const DECOMPOSITION_UPSTREAM_KIND_GUARD =
+  oneOf<SdlcDecompositionUpstreamKind>([
+    "requirement",
+    "design",
+    "module",
+    "component",
+    "testcase"
+  ]);
+
+const DECOMPOSITION_DOWNSTREAM_KIND_GUARD =
+  oneOf<SdlcDecompositionDownstreamKind>([
+    "design",
+    "module",
+    "component",
+    "function",
+    "test_module",
+    "test_class"
+  ]);
+
+const DECOMPOSITION_ADMISSION_DECISION_GUARD =
+  oneOf<SdlcDecompositionAdmissionDecision>(["admit", "reject"]);
+
+const TRAVERSAL_OUTCOME_CLASS_GUARD =
+  oneOf<SdlcTraversalOutcomeClass>(SDLC_TRAVERSAL_OUTCOME_CLASSES);
+
+const TRAVERSAL_HOP_CLASS_GUARD =
+  oneOf<SdlcTraversalHopClass>(SDLC_TRAVERSAL_HOP_CLASSES);
+
+const ZOOM_ADMISSION_DISPOSITION_GUARD =
+  oneOf<SdlcZoomAdmissionDisposition>(SDLC_ZOOM_ADMISSION_DISPOSITIONS);
+
+const MIN_FP_MECHANISM_GUARD =
+  oneOf<SdlcMinFpPressurePreservationMechanism>(
+    SDLC_MIN_FP_PRESSURE_PRESERVATION_MECHANISMS
+  );
+
+const DEPENDENCY_TRAVERSAL_METHOD_GUARD =
+  oneOf<SdlcDependencyTraversalMethod>(SDLC_DEPENDENCY_TRAVERSAL_METHODS);
+
+const DECOMPOSITION_SUMMARY_ROW_GUARD =
+  recordShape<SdlcDecompositionSummaryRow>({
+    fields: Object.freeze({
+      downstreamId: isTrimmedNonEmptyString,
+      parentId: nullable(isTrimmedNonEmptyString),
+      ownedUpstreamRefs: STRING_LIST_GUARD,
+      ownedUpstreamCount: isNonNegativeFiniteNumber,
+      publicBoundaryRefs: STRING_LIST_GUARD,
+      publicBoundaryCount: isNonNegativeFiniteNumber,
+      substantiveResponsibilityRefs: STRING_LIST_GUARD,
+      substantiveResponsibilityCount: isNonNegativeFiniteNumber,
+      materializationTargetRefs: STRING_LIST_GUARD,
+      residualRefs: STRING_LIST_GUARD
+    })
+  });
+
 const DECOMPOSITION_SUMMARY_GUARD: (value: unknown) => value is SdlcDecompositionSummary =
-  guardKind<SdlcDecompositionSummary>("sdlc_decomposition_summary");
+  recordShape<SdlcDecompositionSummary>({
+    kind: "sdlc_decomposition_summary",
+    fields: Object.freeze({
+      stageId: isTrimmedNonEmptyString,
+      upstreamKind: DECOMPOSITION_UPSTREAM_KIND_GUARD,
+      downstreamKind: DECOMPOSITION_DOWNSTREAM_KIND_GUARD,
+      thresholdProfileRef: isTrimmedNonEmptyString,
+      stageUpstreamUniverseRefs: STRING_LIST_GUARD,
+      upstreamCount: isNonNegativeFiniteNumber,
+      downstreamCount: isNonNegativeFiniteNumber,
+      upstreamPerDownstreamRatio: isNonNegativeFiniteNumber,
+      downstreamPerUpstreamRatio: isNonNegativeFiniteNumber,
+      maxUpstreamPerDownstreamRatio: isNonNegativeFiniteNumber,
+      maxDownstreamPerUpstream: isNonNegativeFiniteNumber,
+      maxOwnedUpstreamPerDownstream: isNonNegativeFiniteNumber,
+      maxOwnedUpstreamWithoutBoundary: isNonNegativeFiniteNumber,
+      rows: arrayOf(DECOMPOSITION_SUMMARY_ROW_GUARD),
+      overloadedDownstreamIds: STRING_LIST_GUARD,
+      explosionUpstreamRefs: STRING_LIST_GUARD,
+      unownedDownstreamIds: STRING_LIST_GUARD,
+      facadeDownstreamIds: STRING_LIST_GUARD,
+      underDecomposedParentIds: STRING_LIST_GUARD,
+      residualRefs: STRING_LIST_GUARD,
+      residualOutsideSubsurfaceRefs: STRING_LIST_GUARD,
+      invalidReferenceFields: STRING_LIST_GUARD,
+      blockingReasons: STRING_LIST_GUARD,
+      admissionDecision: DECOMPOSITION_ADMISSION_DECISION_GUARD
+    })
+  });
+
+const TRAVERSAL_COMPLEXITY_ASSESSMENT_GUARD =
+  recordShape<SdlcTraversalComplexityAssessment>({
+    kind: "sdlc_traversal_complexity_assessment",
+    fields: Object.freeze({
+      assessmentRef: isTrimmedNonEmptyString,
+      outcomeClass: TRAVERSAL_OUTCOME_CLASS_GUARD,
+      thresholdProfileRef: isTrimmedNonEmptyString,
+      decompositionSummaryRef: nullable(isTrimmedNonEmptyString),
+      inputObligationCount: isNonNegativeFiniteNumber,
+      outputRowCount: isNonNegativeFiniteNumber,
+      upstreamPerDownstreamRatio: isNonNegativeFiniteNumber,
+      downstreamPerUpstreamRatio: isNonNegativeFiniteNumber,
+      maxOwnedInputsPerOutput: isNonNegativeFiniteNumber,
+      residualRefCount: isNonNegativeFiniteNumber,
+      residualOutsideSubsurfaceRefCount: isNonNegativeFiniteNumber,
+      publicBoundaryCount: isNonNegativeFiniteNumber,
+      substantiveDownstreamResponsibilityCount: isNonNegativeFiniteNumber,
+      blockingReasons: STRING_LIST_GUARD,
+      evidenceRefs: STRING_LIST_GUARD
+    })
+  });
+
+const ZOOM_ADMISSION_GUARD =
+  recordShape<SdlcZoomAdmissionDecision>({
+    kind: "sdlc_zoom_admission_decision",
+    fields: Object.freeze({
+      disposition: ZOOM_ADMISSION_DISPOSITION_GUARD,
+      reasonRefs: STRING_LIST_GUARD,
+      selectedZoomStageRef: nullable(isTrimmedNonEmptyString)
+    })
+  });
+
+const MIN_FP_PRESSURE_PRESERVATION_GUARD =
+  recordShape<SdlcMinFpPressurePreservationDecision>({
+    kind: "sdlc_min_fp_pressure_preservation_decision",
+    fields: Object.freeze({
+      mechanism: MIN_FP_MECHANISM_GUARD,
+      preservedPressureRefs: STRING_LIST_GUARD,
+      skippedEdgeRefs: STRING_LIST_GUARD,
+      evidenceRefs: STRING_LIST_GUARD,
+      admissionDecision: DECOMPOSITION_ADMISSION_DECISION_GUARD,
+      blockingReasons: STRING_LIST_GUARD
+    })
+  });
 
 const TRAVERSAL_HOP_SELECTION_GUARD: (value: unknown) => value is SdlcTraversalHopSelection =
-  guardKind<SdlcTraversalHopSelection>("sdlc_traversal_hop_selection");
+  recordShape<SdlcTraversalHopSelection>({
+    kind: "sdlc_traversal_hop_selection",
+    fields: Object.freeze({
+      selectionRef: isTrimmedNonEmptyString,
+      outcomeClass: TRAVERSAL_OUTCOME_CLASS_GUARD,
+      hopClass: TRAVERSAL_HOP_CLASS_GUARD,
+      selectedGraphVariantRef: isTrimmedNonEmptyString,
+      complexityAssessment: TRAVERSAL_COMPLEXITY_ASSESSMENT_GUARD,
+      zoomAdmission: ZOOM_ADMISSION_GUARD,
+      pressurePreservation: MIN_FP_PRESSURE_PRESERVATION_GUARD,
+      rejectedAlternativeRefs: STRING_LIST_GUARD,
+      blockingReasons: STRING_LIST_GUARD,
+      evidenceRefs: STRING_LIST_GUARD
+    })
+  });
+
+const DEPENDENCY_MAP_NODE_GUARD =
+  recordShape<SdlcDependencyMapNode>({
+    fields: Object.freeze({
+      nodeId: isTrimmedNonEmptyString,
+      predecessorNodeIds: STRING_LIST_GUARD,
+      successorNodeIds: STRING_LIST_GUARD,
+      ownedRequirementRefs: STRING_LIST_GUARD,
+      materializationTargetRefs: STRING_LIST_GUARD
+    })
+  });
+
+const MODULE_DEPENDENCY_MAP_GUARD: (value: unknown) => value is SdlcModuleDependencyMap =
+  recordShape<SdlcModuleDependencyMap>({
+    kind: "sdlc_module_dependency_map",
+    fields: Object.freeze({
+      mapRef: isTrimmedNonEmptyString,
+      summaryRef: isTrimmedNonEmptyString,
+      nodes: arrayOf(DEPENDENCY_MAP_NODE_GUARD),
+      steelThreadCandidateNodeIds: STRING_LIST_GUARD,
+      parallelPartitionRefs: STRING_LIST_GUARD,
+      cycleRefs: STRING_LIST_GUARD
+    })
+  });
+
+const TEST_DEPENDENCY_MAP_GUARD: (value: unknown) => value is SdlcTestDependencyMap =
+  recordShape<SdlcTestDependencyMap>({
+    kind: "sdlc_test_dependency_map",
+    fields: Object.freeze({
+      mapRef: isTrimmedNonEmptyString,
+      summaryRef: isTrimmedNonEmptyString,
+      nodes: arrayOf(DEPENDENCY_MAP_NODE_GUARD),
+      steelThreadCandidateNodeIds: STRING_LIST_GUARD,
+      parallelShardRefs: STRING_LIST_GUARD,
+      cycleRefs: STRING_LIST_GUARD
+    })
+  });
+
+const DEPENDENCY_TRAVERSAL_SELECTION_GUARD:
+  (value: unknown) => value is SdlcDependencyTraversalSelection =
+  recordShape<SdlcDependencyTraversalSelection>({
+    kind: "sdlc_dependency_traversal_selection",
+    fields: Object.freeze({
+      selectionRef: isTrimmedNonEmptyString,
+      dependencyMapRef: isTrimmedNonEmptyString,
+      dependencyMapKind: oneOf([
+        "sdlc_module_dependency_map",
+        "sdlc_test_dependency_map"
+      ] as const),
+      selectedMethod: DEPENDENCY_TRAVERSAL_METHOD_GUARD,
+      selectedNodeIds: STRING_LIST_GUARD,
+      parallelGroupRefs: STRING_LIST_GUARD,
+      blockingReasons: STRING_LIST_GUARD,
+      basisRefs: STRING_LIST_GUARD
+    })
+  });
 
 const PERF_SUMMARY_GUARD: (value: unknown) => value is RunPerformanceSummaryRecord =
   guardKinds<RunPerformanceSummaryRecord>([
@@ -330,125 +570,291 @@ const PERF_SUMMARY_GUARD: (value: unknown) => value is RunPerformanceSummaryReco
     "sdlc_edge_performance_summary"
   ]);
 
+type JsonGuard<T> = (value: unknown) => value is T;
+
+const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
+  Object.freeze({
+    "operator-run-artifact://operator-summary": OPERATOR_SUMMARY_GUARD,
+    "operator-run-artifact://worker-run": WORKER_RUN_GUARD,
+    "operator-run-artifact://postflight": POSTFLIGHT_GUARD,
+    "operator-run-artifact://edge-closure": EDGE_CLOSURE_GUARD,
+    "operator-run-artifact://edge-fulfillment-ledger": EDGE_FULFILLMENT_GUARD,
+    "operator-run-artifact://edge-gain": EDGE_GAIN_GUARD,
+    "operator-run-artifact://next-action-projection": NEXT_ACTION_GUARD,
+    "operator-run-artifact://product-materialization-manifest": PRODUCT_MANIFEST_GUARD,
+    "operator-run-artifact://handoff-manifest": HANDOFF_MANIFEST_GUARD,
+    "operator-run-artifact://fp-evaluate-result": FP_EVALUATE_GUARD,
+    "operator-run-artifact://worker-process-started": WORKER_PROCESS_STARTED_GUARD,
+    "operator-run-artifact://runtime-events": RUNTIME_EVENTS_GUARD,
+    "operator-run-artifact://worker-result-report": WORKER_RESULT_REPORT_GUARD,
+    "operator-run-artifact://worker-construction-brief": WORKER_CONSTRUCTION_BRIEF_GUARD,
+    "operator-run-artifact://decomposition-summary": DECOMPOSITION_SUMMARY_GUARD,
+    "operator-run-artifact://implementation-decomposition-summary": DECOMPOSITION_SUMMARY_GUARD,
+    "operator-run-artifact://test-decomposition-summary": DECOMPOSITION_SUMMARY_GUARD,
+    "operator-run-artifact://traversal-hop-selection": TRAVERSAL_HOP_SELECTION_GUARD,
+    "operator-run-artifact://module-dependency-map": MODULE_DEPENDENCY_MAP_GUARD,
+    "operator-run-artifact://module-dependency-traversal-selection": DEPENDENCY_TRAVERSAL_SELECTION_GUARD,
+    "operator-run-artifact://test-dependency-map": TEST_DEPENDENCY_MAP_GUARD,
+    "operator-run-artifact://test-dependency-traversal-selection": DEPENDENCY_TRAVERSAL_SELECTION_GUARD,
+    "operator-run-artifact://live-fp-parallel-materialization-frontier":
+      isSdlcLiveFpParallelMaterializationFrontier,
+    "operator-run-artifact://run-performance-summary": PERF_SUMMARY_GUARD,
+    "operator-run-artifact://edge-performance-summary": PERF_SUMMARY_GUARD
+  });
+
+const OPERATOR_RUN_JSONL_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
+  Object.freeze({
+    "operator-run-artifact://worker-process-events": guardJsonlEvent
+  });
+
+function operatorRunArtifactPath(input: {
+  readonly operatorRunRoot: string;
+  readonly artifact: SdlcOperatorRunArtifactRow;
+}): string {
+  return path.join(input.operatorRunRoot, input.artifact.relativePath);
+}
+
+function loadCatalogedOperatorRunArtifact(input: {
+  readonly operatorRunRoot: string;
+  readonly artifact: SdlcOperatorRunArtifactRow;
+}): LoadedOperatorRunArtifact {
+  const filePath = operatorRunArtifactPath(input);
+  const jsonlGuard = OPERATOR_RUN_JSONL_GUARDS[input.artifact.artifactRef];
+  if (jsonlGuard !== undefined) {
+    return loadJsonlFile(filePath, jsonlGuard);
+  }
+  const jsonGuard = OPERATOR_RUN_JSON_GUARDS[input.artifact.artifactRef];
+  if (jsonGuard !== undefined) {
+    return loadJsonFile(filePath, jsonGuard);
+  }
+  const bytes = fileSizeOrZero(filePath);
+  return bytes > 0
+    ? Object.freeze({ status: "present" as const, bytes, path: filePath })
+    : Object.freeze({ status: "missing" as const });
+}
+
+function catalogedArtifactStateByRef(
+  operatorRunRoot: string
+): Readonly<Record<string, LoadedOperatorRunArtifact>> {
+  return Object.freeze(
+    Object.fromEntries(
+      SDLC_OPERATOR_RUN_ARTIFACT_CATALOG.map((artifact) => [
+        artifact.artifactRef,
+        loadCatalogedOperatorRunArtifact({ operatorRunRoot, artifact })
+      ])
+    )
+  );
+}
+
+function catalogedFileSizeByArtifactRef(
+  operatorRunRoot: string
+): Readonly<Record<string, number>> {
+  return Object.freeze(
+    Object.fromEntries(
+      SDLC_OPERATOR_RUN_ARTIFACT_CATALOG.map((artifact) => [
+        artifact.artifactRef,
+        fileSizeOrZero(operatorRunArtifactPath({ operatorRunRoot, artifact }))
+      ])
+    )
+  );
+}
+
+function loadCatalogedJsonArtifact<T>(input: {
+  readonly operatorRunRoot: string;
+  readonly artifactRef: string;
+  readonly guard: JsonGuard<T>;
+}): LoadedJson<T> {
+  const artifact = requireOperatorRunArtifactRowForArtifactRef(input.artifactRef);
+  return loadJsonFile(
+    operatorRunArtifactPath({ operatorRunRoot: input.operatorRunRoot, artifact }),
+    input.guard
+  );
+}
+
+function loadCatalogedJsonlArtifact<T>(input: {
+  readonly operatorRunRoot: string;
+  readonly artifactRef: string;
+  readonly guard: JsonGuard<T>;
+}): LoadedJsonl<T> {
+  const artifact = requireOperatorRunArtifactRowForArtifactRef(input.artifactRef);
+  return loadJsonlFile(
+    operatorRunArtifactPath({ operatorRunRoot: input.operatorRunRoot, artifact }),
+    input.guard
+  );
+}
+
 export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCarriers {
-  const sizeOf = (relative: string): number =>
-    fileSizeOrZero(path.join(operatorRunRoot, relative));
+  const artifactStateByRef = catalogedArtifactStateByRef(operatorRunRoot);
+  const fileSizeByArtifactRef = catalogedFileSizeByArtifactRef(operatorRunRoot);
+  const sizeOfArtifact = (artifactRef: string): number =>
+    fileSizeByArtifactRef[artifactRef] ?? 0;
   const fileSizes: OperatorRunFileSizes = Object.freeze({
-    handoffManifest: sizeOf("handoff_manifest.json"),
-    traversalIntentPackage: sizeOf("traversal_intent_package.json"),
-    workerInvocationPackage: sizeOf("worker_invocation_package.json"),
-    workerPrompt: sizeOf("worker_prompt.md"),
-    workerStdout: sizeOf("worker_stdout.log"),
-    workerStderr: sizeOf("worker_stderr.log"),
-    workerProcessEvents: sizeOf("worker_process_events.jsonl"),
-    runtimeEvents: sizeOf("runtime_events.json"),
-    workerResultReport: sizeOf("worker_result_report.json"),
-    workerConstructionBrief: sizeOf("worker_construction_brief.json"),
-    productMaterializationManifest: sizeOf("product_materialization_manifest.json"),
-    fpTransformRequest: sizeOf("fp_transform_request.json"),
-    fpTransformResult: sizeOf("fp_transform_result.json"),
-    assuranceLedgers: sizeOf("assurance_ledgers.json"),
-    hookOutcome: sizeOf("hook_outcome.json"),
-    postTransformObservation: sizeOf("post_transform_observation.json"),
-    sdlcWorksiteEvidence: sizeOf("sdlc_worksite_evidence.json"),
-    sdlcEdgeClosureDecision: sizeOf("sdlc_edge_closure_decision.json"),
-    sdlcEdgeFulfillmentLedger: sizeOf("sdlc_edge_fulfillment_ledger.json"),
-    sdlcEdgeGain: sizeOf("sdlc_edge_gain.json"),
-    sdlcEdgeResidualPressure: sizeOf("sdlc_edge_residual_pressure.json"),
-    sdlcNextActionProjection: sizeOf("sdlc_next_action_projection.json"),
-    sdlcDecompositionSummary: sizeOf("sdlc_decomposition_summary.json"),
-    sdlcImplementationDecompositionSummary: sizeOf(
-      "sdlc_implementation_decomposition_summary.json"
-    ),
-    sdlcTestDecompositionSummary: sizeOf("sdlc_test_decomposition_summary.json"),
-    sdlcTraversalHopSelection: sizeOf("sdlc_traversal_hop_selection.json")
+    handoffManifest: sizeOfArtifact("operator-run-artifact://handoff-manifest"),
+    traversalIntentPackage: sizeOfArtifact("operator-run-artifact://traversal-intent-package"),
+    workerInvocationPackage: sizeOfArtifact("operator-run-artifact://worker-invocation-package"),
+    workerPrompt: sizeOfArtifact("operator-run-artifact://worker-prompt"),
+    workerStdout: sizeOfArtifact("operator-run-artifact://worker-stdout"),
+    workerStderr: sizeOfArtifact("operator-run-artifact://worker-stderr"),
+    workerProcessEvents: sizeOfArtifact("operator-run-artifact://worker-process-events"),
+    runtimeEvents: sizeOfArtifact("operator-run-artifact://runtime-events"),
+    workerResultReport: sizeOfArtifact("operator-run-artifact://worker-result-report"),
+    workerConstructionBrief: sizeOfArtifact("operator-run-artifact://worker-construction-brief"),
+    productMaterializationManifest: sizeOfArtifact("operator-run-artifact://product-materialization-manifest"),
+    fpTransformRequest: sizeOfArtifact("operator-run-artifact://fp-transform-request"),
+    fpTransformResult: sizeOfArtifact("operator-run-artifact://fp-transform-result"),
+    assuranceLedgers: sizeOfArtifact("operator-run-artifact://assurance-ledgers"),
+    hookOutcome: sizeOfArtifact("operator-run-artifact://hook-outcome"),
+    postTransformObservation: sizeOfArtifact("operator-run-artifact://post-transform-observation"),
+    sdlcWorksiteEvidence: sizeOfArtifact("operator-run-artifact://worksite-evidence"),
+    sdlcEdgeClosureDecision: sizeOfArtifact("operator-run-artifact://edge-closure"),
+    sdlcEdgeFulfillmentLedger: sizeOfArtifact("operator-run-artifact://edge-fulfillment-ledger"),
+    sdlcEdgeGain: sizeOfArtifact("operator-run-artifact://edge-gain"),
+    sdlcEdgeResidualPressure: sizeOfArtifact("operator-run-artifact://edge-residual-pressure"),
+    sdlcNextActionProjection: sizeOfArtifact("operator-run-artifact://next-action-projection"),
+    sdlcDecompositionSummary: sizeOfArtifact("operator-run-artifact://decomposition-summary"),
+    sdlcImplementationDecompositionSummary: sizeOfArtifact("operator-run-artifact://implementation-decomposition-summary"),
+    sdlcTestDecompositionSummary: sizeOfArtifact("operator-run-artifact://test-decomposition-summary"),
+    sdlcTraversalHopSelection: sizeOfArtifact("operator-run-artifact://traversal-hop-selection"),
+    sdlcModuleDependencyMap: sizeOfArtifact("operator-run-artifact://module-dependency-map"),
+    sdlcModuleDependencyTraversalSelection: sizeOfArtifact("operator-run-artifact://module-dependency-traversal-selection"),
+    sdlcTestDependencyMap: sizeOfArtifact("operator-run-artifact://test-dependency-map"),
+    sdlcTestDependencyTraversalSelection: sizeOfArtifact("operator-run-artifact://test-dependency-traversal-selection"),
+    sdlcLiveFpParallelMaterializationFrontier: sizeOfArtifact("operator-run-artifact://live-fp-parallel-materialization-frontier")
   });
   return Object.freeze({
     operatorRunRoot,
-    operatorSummary: loadJsonFile<OperatorSummaryRecord>(
-      path.join(operatorRunRoot, "operator_summary.json"),
-      OPERATOR_SUMMARY_GUARD
-    ),
-    workerRun: loadJsonFile<WorkerRunRecord>(
-      path.join(operatorRunRoot, "worker_run.json"),
-      WORKER_RUN_GUARD
-    ),
-    postflight: loadJsonFile<PostflightRecord>(
-      path.join(operatorRunRoot, "postflight.json"),
-      POSTFLIGHT_GUARD
-    ),
-    edgeClosure: loadJsonFile<EdgeClosureDecisionRecord>(
-      path.join(operatorRunRoot, "sdlc_edge_closure_decision.json"),
-      EDGE_CLOSURE_GUARD
-    ),
-    edgeFulfillmentLedger: loadJsonFile<EdgeFulfillmentLedgerRecord>(
-      path.join(operatorRunRoot, "sdlc_edge_fulfillment_ledger.json"),
-      EDGE_FULFILLMENT_GUARD
-    ),
-    edgeGain: loadJsonFile<EdgeGainRecord>(
-      path.join(operatorRunRoot, "sdlc_edge_gain.json"),
-      EDGE_GAIN_GUARD
-    ),
-    nextActionProjection: loadJsonFile<NextActionProjectionRecord>(
-      path.join(operatorRunRoot, "sdlc_next_action_projection.json"),
-      NEXT_ACTION_GUARD
-    ),
-    productManifest: loadJsonFile<ProductMaterializationManifestRecord>(
-      path.join(operatorRunRoot, "product_materialization_manifest.json"),
-      PRODUCT_MANIFEST_GUARD
-    ),
-    handoffManifest: loadJsonFile<HandoffManifestRecord>(
-      path.join(operatorRunRoot, "handoff_manifest.json"),
-      HANDOFF_MANIFEST_GUARD
-    ),
-    fpEvaluateResult: loadJsonFile<FpEvaluateResultRecord>(
-      path.join(operatorRunRoot, "fp_evaluate_result.json"),
-      FP_EVALUATE_GUARD
-    ),
-    workerProcessStarted: loadJsonFile<WorkerProcessStartedRecord>(
-      path.join(operatorRunRoot, "worker_process_started.json"),
-      WORKER_PROCESS_STARTED_GUARD
-    ),
-    workerProcessEvents: loadJsonlFile<WorkerProcessEventRecord>(
-      path.join(operatorRunRoot, "worker_process_events.jsonl"),
-      guardJsonlEvent
-    ),
-    runtimeEvents: loadJsonFile<RuntimeEventsArchiveRecord>(
-      path.join(operatorRunRoot, "runtime_events.json"),
-      RUNTIME_EVENTS_GUARD
-    ),
-    workerResultReport: loadJsonFile<WorkerResultReportRecord>(
-      path.join(operatorRunRoot, "worker_result_report.json"),
-      WORKER_RESULT_REPORT_GUARD
-    ),
-    workerConstructionBrief: loadJsonFile<WorkerConstructionBriefRecord>(
-      path.join(operatorRunRoot, "worker_construction_brief.json"),
-      WORKER_CONSTRUCTION_BRIEF_GUARD
-    ),
-    decompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
-      path.join(operatorRunRoot, "sdlc_decomposition_summary.json"),
-      DECOMPOSITION_SUMMARY_GUARD
-    ),
-    implementationDecompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
-      path.join(operatorRunRoot, "sdlc_implementation_decomposition_summary.json"),
-      DECOMPOSITION_SUMMARY_GUARD
-    ),
-    testDecompositionSummary: loadJsonFile<SdlcDecompositionSummary>(
-      path.join(operatorRunRoot, "sdlc_test_decomposition_summary.json"),
-      DECOMPOSITION_SUMMARY_GUARD
-    ),
-    traversalHopSelection: loadJsonFile<SdlcTraversalHopSelection>(
-      path.join(operatorRunRoot, "sdlc_traversal_hop_selection.json"),
-      TRAVERSAL_HOP_SELECTION_GUARD
-    ),
-    runPerformanceSummary: loadJsonFile<RunPerformanceSummaryRecord>(
-      path.join(operatorRunRoot, "run_performance_summary.json"),
-      PERF_SUMMARY_GUARD
-    ),
-    edgePerformanceSummary: loadJsonFile<RunPerformanceSummaryRecord>(
-      path.join(operatorRunRoot, "edge_performance_summary.json"),
-      PERF_SUMMARY_GUARD
-    ),
+    operatorSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://operator-summary",
+      guard: OPERATOR_SUMMARY_GUARD
+    }),
+    workerRun: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://worker-run",
+      guard: WORKER_RUN_GUARD
+    }),
+    postflight: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://postflight",
+      guard: POSTFLIGHT_GUARD
+    }),
+    edgeClosure: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://edge-closure",
+      guard: EDGE_CLOSURE_GUARD
+    }),
+    edgeFulfillmentLedger: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://edge-fulfillment-ledger",
+      guard: EDGE_FULFILLMENT_GUARD
+    }),
+    edgeGain: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://edge-gain",
+      guard: EDGE_GAIN_GUARD
+    }),
+    nextActionProjection: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://next-action-projection",
+      guard: NEXT_ACTION_GUARD
+    }),
+    productManifest: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://product-materialization-manifest",
+      guard: PRODUCT_MANIFEST_GUARD
+    }),
+    handoffManifest: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://handoff-manifest",
+      guard: HANDOFF_MANIFEST_GUARD
+    }),
+    fpEvaluateResult: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://fp-evaluate-result",
+      guard: FP_EVALUATE_GUARD
+    }),
+    workerProcessStarted: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://worker-process-started",
+      guard: WORKER_PROCESS_STARTED_GUARD
+    }),
+    workerProcessEvents: loadCatalogedJsonlArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://worker-process-events",
+      guard: guardJsonlEvent
+    }),
+    runtimeEvents: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://runtime-events",
+      guard: RUNTIME_EVENTS_GUARD
+    }),
+    workerResultReport: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://worker-result-report",
+      guard: WORKER_RESULT_REPORT_GUARD
+    }),
+    workerConstructionBrief: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://worker-construction-brief",
+      guard: WORKER_CONSTRUCTION_BRIEF_GUARD
+    }),
+    decompositionSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://decomposition-summary",
+      guard: DECOMPOSITION_SUMMARY_GUARD
+    }),
+    implementationDecompositionSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://implementation-decomposition-summary",
+      guard: DECOMPOSITION_SUMMARY_GUARD
+    }),
+    testDecompositionSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://test-decomposition-summary",
+      guard: DECOMPOSITION_SUMMARY_GUARD
+    }),
+    traversalHopSelection: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://traversal-hop-selection",
+      guard: TRAVERSAL_HOP_SELECTION_GUARD
+    }),
+    moduleDependencyMap: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://module-dependency-map",
+      guard: MODULE_DEPENDENCY_MAP_GUARD
+    }),
+    moduleDependencyTraversalSelection: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://module-dependency-traversal-selection",
+      guard: DEPENDENCY_TRAVERSAL_SELECTION_GUARD
+    }),
+    testDependencyMap: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://test-dependency-map",
+      guard: TEST_DEPENDENCY_MAP_GUARD
+    }),
+    testDependencyTraversalSelection: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://test-dependency-traversal-selection",
+      guard: DEPENDENCY_TRAVERSAL_SELECTION_GUARD
+    }),
+    liveFpParallelMaterializationFrontier: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
+      guard: isSdlcLiveFpParallelMaterializationFrontier
+    }),
+    runPerformanceSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://run-performance-summary",
+      guard: PERF_SUMMARY_GUARD
+    }),
+    edgePerformanceSummary: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://edge-performance-summary",
+      guard: PERF_SUMMARY_GUARD
+    }),
+    artifactStateByRef,
+    fileSizeByArtifactRef,
     fileSizes
   });
 }

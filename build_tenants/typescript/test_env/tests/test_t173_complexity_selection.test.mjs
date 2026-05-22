@@ -518,6 +518,59 @@ test("T-173 analyze-run reads archived traversal selection carrier", () => {
   }
 });
 
+test("T-173 analyze-run rejects malformed archived traversal selection carrier", () => {
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t173-forged-"));
+  try {
+    const runRoot = path.join(
+      workspaceRoot,
+      ".ai-workspace/runtime/odd_sdlc/operator-runs/20260520T020304005Z_pid173"
+    );
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      path.join(runRoot, "operator_summary.json"),
+      JSON.stringify({
+        kind: "sdlc_operator_summary",
+        graphFunctionName: "bootstrap_release_self_test",
+        currentEdge: null,
+        status: "converged",
+        nextLawfulAction: "disposition://close",
+        archiveRoot: runRoot
+      }),
+      "utf8"
+    );
+    writeFileSync(
+      path.join(runRoot, "sdlc_traversal_hop_selection.json"),
+      JSON.stringify({
+        kind: "sdlc_traversal_hop_selection",
+        selectionRef: "selection://t173/forged",
+        outcomeClass: "framework_smoke",
+        hopClass: "single_hop",
+        pressurePreservation: { mechanism: "typed_template" },
+        complexityAssessment: { decompositionSummaryRef: null },
+        blockingReasons: [],
+        evidenceRefs: []
+      }),
+      "utf8"
+    );
+
+    const result = analyzeSdlcFdRunArchive({
+      inspectedRoot: workspaceRoot,
+      profile: "hello_world",
+      nowMs: Date.parse("2026-05-20T00:00:00.000Z")
+    });
+    const malformed = result.runtimeArtifactGaps.find(
+      (gap) =>
+        gap.artifact === "sdlc_traversal_hop_selection.json" &&
+        gap.status === "malformed"
+    );
+
+    assert.equal(result.traversalHopSelection.hopClass, "blocked");
+    assert.notEqual(malformed, undefined);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-173 installed operator archives traversal selection and emits typed audit event", () => {
   const source = readFileSync(
     path.join(PACKAGE_ROOT, "code/src/operator/installed_operator.ts"),

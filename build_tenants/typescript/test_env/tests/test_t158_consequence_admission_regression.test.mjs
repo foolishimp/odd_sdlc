@@ -196,6 +196,22 @@ function makeWorkspace() {
     ].join("\n"),
     "utf8"
   );
+  mkdirSync(path.join(root, "build_tenants/scala_spark/spec"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(root, "build_tenants/scala_spark/spec/TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        language: "Scala",
+        buildTool: "sbt"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   materializeSdlcProjectConformance({ workspaceRoot: root });
   writeImplementationDesignAuthority(root);
   return root;

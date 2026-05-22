@@ -44,6 +44,10 @@ export function describeOddSdlcTypescriptTenant(): OddSdlcTypescriptTenantInfo {
 }
 
 export * from "./runtime/index.js";
+export * from "./contracts/index.js";
+export * from "./admission/index.js";
+export * from "./authority/index.js";
+export * from "./effects/index.js";
 export * from "./shared/blocking_reason.js";
 export * from "./shared/overlay_strategy.js";
 export * from "./domain/index.js";
@@ -58,6 +62,7 @@ export * from "./qualification/index.js";
 export * from "./package_binding/index.js";
 export * from "./install/index.js";
 export * from "./operator/index.js";
+export * from "./postflight/index.js";
 export * from "./assurance/index.js";
 export * from "./release/index.js";
 export * from "./spec_method/index.js";

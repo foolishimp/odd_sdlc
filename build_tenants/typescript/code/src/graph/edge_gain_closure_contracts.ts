@@ -719,8 +719,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
       "scenario_surface",
       "uat_testcases_surface",
       "testcase_authority_surface",
-      "implementation_design_surface",
-      "component_code_surface"
+      "implementation_design_surface"
     ],
     targetAssetType: "test_design_surface",
     compositionRole: "intermediate",
@@ -732,10 +731,7 @@ export const SDLC_EDGE_GAIN_CLOSURE_CONTRACTS = Object.freeze([
     edgeRef: "derive_component_test_surface",
     category: "test_encoding_and_execution",
     closureClassification: "close_capable",
-    sourceAssetTypes: [
-      "test_design_surface",
-      "component_code_surface",
-    ],
+    sourceAssetTypes: ["test_design_surface"],
     targetAssetType: "component_test_surface",
     compositionRole: "intermediate",
     authorityBasisRefs: TEST_REFS,

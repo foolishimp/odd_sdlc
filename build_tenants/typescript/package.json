@@ -116,6 +116,7 @@
     "test:t160:hello-world-js-overlays": "npm run build:semantic && node --test --test-name-pattern \"T-160 JavaScript hello-world overlay matrix\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t160:hello-world-js-lite-live": "npm run test:scenario:t160-hello-world-js-lite-live",
     "test:t160:hello-world-rust-lite-live": "npm run test:scenario:t160-hello-world-rust-lite-live",
+    "test:t161": "npm run build:semantic && node --test test_env/tests/test_t161_fd_run_analysis_linter.test.mjs",
     "test:t164": "npm run test:t164:edge-contract && npm run test:t164:rust-service",
     "test:t164:edge-contract": "npm run build:semantic && node --test test_env/tests/test_t164_edge_gain_closure_contract.test.mjs",
     "test:t164:rust-service": "npm run build:semantic && node --test --test-name-pattern \"T-164 Rust hello service conformance bootstrap\" test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -139,11 +140,16 @@
     "test:t173:saga-frontier-stress-sandbox": "npm run build:semantic && node --test --test-name-pattern \"T-173 ABG saga frontier 50-way stress\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t173:zoom-admission": "npm run build:semantic && node --test test_env/tests/test_t173_zoom_admission.test.mjs",
     "test:t173:rust-hello-service-live": "npm run test:scenario:t164-rust-hello-service-live",
-    "test:t174": "npm run test:t173:parallel-hello-world-frontier && npm run test:t174:parallel-hello-world-sandbox && npm run test:t174:four-lane-frontier-sandbox",
+    "test:t174": "npm run test:t174:dag-catalog && npm run test:t174:frontier-compiler && npm run test:t174:synthetic-multilane && npm run test:t173:parallel-hello-world-frontier && npm run test:t174:parallel-hello-world-sandbox && npm run test:t174:four-lane-frontier-sandbox",
+    "test:t174:dag-catalog": "npm run build:semantic && node --test --test-name-pattern \"T-174 compiles|T-174 serial\" test_env/tests/test_t174_feature_dependency_dag_frontier.test.mjs",
+    "test:t174:frontier-compiler": "npm run build:semantic && node --test --test-name-pattern \"T-174 ABG|T-174 write\" test_env/tests/test_t174_feature_dependency_dag_frontier.test.mjs",
+    "test:t174:synthetic-multilane": "npm run build:semantic && node --test --test-name-pattern \"T-174 synthetic hello-world\" test_env/tests/test_t174_feature_dependency_dag_frontier.test.mjs",
     "test:t174:parallel-hello-world-sandbox": "npm run build:semantic && node --test --test-name-pattern \"T-174 parallel hello-world JS conformance bootstrap\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t174:four-lane-frontier-sandbox": "npm run build:semantic && node --test --test-name-pattern \"T-174 parallel hello-world JS four-lane frontier\" test_env/sandbox/test_scenario_sandbox.test.mjs",
     "test:t174:parallel-hello-world-live": "npm run test:scenario:t174-parallel-hello-world-js-live",
     "test:t174:four-lane-live": "npm run test:scenario:t174-four-lane-hello-world-js-live",
+    "test:t175": "npm run build:semantic && node --test test_env/tests/test_t175_source_truth_migration.test.mjs",
+    "test:t179": "npm run build:semantic && node --test test_env/tests/test_t179_epistemology_compliance.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -169,6 +175,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/build_tenants/abiogenesis/typescript"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz"
   }
 }

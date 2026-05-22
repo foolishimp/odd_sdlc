@@ -416,22 +416,22 @@ test("scenario sandbox: live four-lane proof requires ABG-owned F_P branch front
       ],
       branchRows: [
         {
-          branchRef: "branch://odd-sdlc/t174/four-lane/dev-hello",
+          branchRef: "branch://odd-sdlc/live/derive-component-code-surface/dev-src-hello-js",
           workerProcessRef: "worker-process://dev-hello",
           writeTerritoryRefs: ["workspace://build_tenants/app/src/hello.js"]
         },
         {
-          branchRef: "branch://odd-sdlc/t174/four-lane/dev-world",
+          branchRef: "branch://odd-sdlc/live/derive-component-code-surface/dev-src-world-js",
           workerProcessRef: "worker-process://dev-world",
           writeTerritoryRefs: ["workspace://build_tenants/app/src/world.js"]
         },
         {
-          branchRef: "branch://odd-sdlc/t174/four-lane/test-hello",
+          branchRef: "branch://odd-sdlc/live/derive-component-code-surface/test-test-hello-test-js",
           workerProcessRef: "worker-process://test-hello",
           writeTerritoryRefs: ["workspace://build_tenants/app/test/hello.test.js"]
         },
         {
-          branchRef: "branch://odd-sdlc/t174/four-lane/test-world",
+          branchRef: "branch://odd-sdlc/live/derive-component-code-surface/test-test-world-test-js",
           workerProcessRef: "worker-process://test-world",
           writeTerritoryRefs: ["workspace://build_tenants/app/test/world.test.js"]
         }
@@ -439,7 +439,8 @@ test("scenario sandbox: live four-lane proof requires ABG-owned F_P branch front
       fanInRows: [
         {
           branchRef: "branch://odd-sdlc/t174/four-lane/fan-in",
-          payloadDigest: "payload://four-lane/hello-world"
+          payloadDigest:
+            "payload://odd-sdlc/live/derive-component-code-surface/fan-in"
         }
       ]
     }
