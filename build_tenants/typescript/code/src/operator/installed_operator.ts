@@ -3868,6 +3868,7 @@ function reviewGradeEdgeFulfillmentPrompt(input: {
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
     "- summary: one compact sentence",
+    "- No other top-level keys are allowed.",
     "",
     "Finding shape:",
     "- kind: \"sdlc_review_grade_obligation_finding\"",
@@ -3878,6 +3879,7 @@ function reviewGradeEdgeFulfillmentPrompt(input: {
     "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
     "- acceptedAuthorityRefs: requirement/design/depth/test authority refs used for this judgment",
     "- rationale: compact reason for the judgment",
+    "- No other finding keys are allowed. Do not add helper booleans, carryover flags, scores, sourceAssetCarryover, sourceAssetStatus, confidence, or notes fields.",
     "",
     "Review rules:",
     "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
@@ -3890,7 +3892,9 @@ function reviewGradeEdgeFulfillmentPrompt(input: {
     "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
     "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
     "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction.",
-    "- Before final response, re-open and parse the assessment JSON. Rewrite until it is valid whole-file JSON with no Markdown fences, comments, or trailing prose.",
+    "- Before final response, re-open and parse the assessment JSON. Verify the top-level key set is exactly kind, assessmentVersion, graphFunctionName, edgeName, targetAssetType, status, reviewedObligationIds, findings, evidenceRefs, summary.",
+    "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, rationale.",
+    "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
     "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
   ].join("\n");
 }

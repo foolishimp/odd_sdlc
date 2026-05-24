@@ -516,6 +516,20 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(prompt, /Do not return success while required checklist rows are unmapped/u);
     assert.match(prompt, /materialize or repair the named source file/u);
     assert.match(prompt, /Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade/u);
+
+    const installedOperatorSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/installed_operator.ts"
+    );
+    assert.match(installedOperatorSource, /No other top-level keys are allowed/u);
+    assert.match(installedOperatorSource, /No other finding keys are allowed/u);
+    assert.match(
+      installedOperatorSource,
+      /sourceAssetCarryover, sourceAssetStatus, confidence/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Verify every finding key set is exactly kind, obligationId, fulfillmentStatus/u
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
