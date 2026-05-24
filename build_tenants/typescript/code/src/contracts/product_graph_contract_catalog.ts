@@ -141,7 +141,8 @@ export const SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS = Object.freeze([
       "operator-run-artifact://module-dependency-traversal-selection",
       "operator-run-artifact://test-dependency-map",
       "operator-run-artifact://test-dependency-traversal-selection",
-      "operator-run-artifact://live-fp-parallel-materialization-frontier"
+      "operator-run-artifact://live-fp-parallel-materialization-frontier",
+      "operator-run-artifact://review-grade-edge-fulfillment-assessment"
     ]),
     proofLaneRefs: Object.freeze([
       "test://odd-sdlc/t174/feature-dependency-frontier"
@@ -153,7 +154,8 @@ export const SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS = Object.freeze([
     requiredArtifactRefs: Object.freeze([
       "operator-run-artifact://test-decomposition-summary",
       "operator-run-artifact://test-dependency-map",
-      "operator-run-artifact://test-dependency-traversal-selection"
+      "operator-run-artifact://test-dependency-traversal-selection",
+      "operator-run-artifact://review-grade-edge-fulfillment-assessment"
     ])
   }),
   Object.freeze({
@@ -182,6 +184,37 @@ function defaultWorkerDispatchPolicy(
     return "projection_only";
   }
   return "single_worker_handoff";
+}
+
+function reviewGradeArtifactRefsForContract(input: {
+  readonly closeClassification: SdlcEdgeClosureClassification;
+  readonly workerDispatchPolicy: SdlcProductGraphWorkerDispatchPolicy;
+  readonly targetAssetType: string;
+}): readonly string[] {
+  if (input.closeClassification !== "close_capable") {
+    return Object.freeze([]);
+  }
+  if (
+    input.workerDispatchPolicy === "projection_only" ||
+    input.workerDispatchPolicy === "library_only"
+  ) {
+    return Object.freeze([]);
+  }
+  if (
+    input.targetAssetType === "component_realization_qualification_surface" ||
+    input.targetAssetType === "test_execution_surface" ||
+    input.targetAssetType === "test_execution_result_surface" ||
+    input.targetAssetType === "component_test_qualification_surface" ||
+    input.targetAssetType === "test_run_archive_surface" ||
+    input.targetAssetType === "release_depth_parity_surface"
+  ) {
+    return Object.freeze([]);
+  }
+  return Object.freeze([
+    "operator-run-artifact://review-grade-edge-fulfillment-assessment",
+    "operator-run-artifact://review-grade-edge-fulfillment-run",
+    "operator-run-artifact://review-grade-edge-fulfillment-process-started"
+  ]);
 }
 
 function productMaterializationArtifactRefsForContract(input: {
@@ -214,6 +247,9 @@ function rowForEdge(input: {
   const edgePolicy = edgePolicyForEdge(input.edgeRef);
   const edgePolicyRequiredArtifactRefs =
     edgePolicy?.requiredArtifactRefs ?? Object.freeze([]);
+  const workerDispatchPolicy =
+    edgePolicy?.workerDispatchPolicy ??
+    defaultWorkerDispatchPolicy(closeClassification);
   return Object.freeze({
     kind: "sdlc_product_graph_contract_row" as const,
     graphVectorRef: input.edgeRef,
@@ -237,9 +273,7 @@ function rowForEdge(input: {
       edgeRef: input.edgeRef,
       overlays: input.overlays
     }),
-    workerDispatchPolicy:
-      edgePolicy?.workerDispatchPolicy ??
-      defaultWorkerDispatchPolicy(closeClassification),
+    workerDispatchPolicy,
     deterministicActionRef:
       input.contract?.deterministicOptimizationRefs[0] ?? null,
     requiredArtifactRefs: uniqueSorted([
@@ -248,6 +282,11 @@ function rowForEdge(input: {
       ) ?? []),
       ...productMaterializationArtifactRefsForContract({
         closeClassification,
+        targetAssetType
+      }),
+      ...reviewGradeArtifactRefsForContract({
+        closeClassification,
+        workerDispatchPolicy,
         targetAssetType
       }),
       ...edgePolicyRequiredArtifactRefs

@@ -53,6 +53,8 @@ import type {
   SdlcMinFpPressurePreservationDecision,
   SdlcMinFpPressurePreservationMechanism,
   SdlcModuleDependencyMap,
+  SdlcReviewGradeEdgeFulfillmentAssessment,
+  SdlcReviewGradeObligationFinding,
   SdlcTestDependencyMap,
   SdlcTraversalComplexityAssessment,
   SdlcTraversalHopClass,
@@ -198,6 +200,17 @@ export interface DesignDepthFpEvaluatorRunRecord {
   readonly timedOut?: boolean;
   readonly promptRef?: string;
   readonly registerRef?: string;
+  readonly processEventsRef?: string;
+}
+
+export interface ReviewGradeEdgeFulfillmentRunRecord {
+  readonly kind: "sdlc_review_grade_edge_fulfillment_run";
+  readonly status?: number | null;
+  readonly signal?: string | null;
+  readonly elapsedMs?: number;
+  readonly timedOut?: boolean;
+  readonly promptRef?: string;
+  readonly assessmentRef?: string;
   readonly processEventsRef?: string;
 }
 
@@ -442,6 +455,33 @@ const DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD: (
   value: unknown
 ) => value is DesignDepthFpEvaluatorRunRecord =
   guardKind<DesignDepthFpEvaluatorRunRecord>("sdlc_design_depth_fp_evaluator_run");
+
+const REVIEW_GRADE_EDGE_FULFILLMENT_RUN_GUARD: (
+  value: unknown
+) => value is ReviewGradeEdgeFulfillmentRunRecord =
+  guardKind<ReviewGradeEdgeFulfillmentRunRecord>("sdlc_review_grade_edge_fulfillment_run");
+
+const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_GUARD: (
+  value: unknown
+) => value is SdlcReviewGradeEdgeFulfillmentAssessment =
+  recordShape<SdlcReviewGradeEdgeFulfillmentAssessment>({
+    kind: "sdlc_review_grade_edge_fulfillment_assessment",
+    fields: {
+      assessmentVersion: oneOf(["ts-review-grade-v1"]),
+      graphFunctionName: isTrimmedNonEmptyString,
+      edgeName: isTrimmedNonEmptyString,
+      targetAssetType: isTrimmedNonEmptyString,
+      status: oneOf(["passed", "blocked"]),
+      reviewedObligationIds: arrayOf(isTrimmedNonEmptyString),
+      findings: arrayOf(
+        guardKind<SdlcReviewGradeObligationFinding>(
+          "sdlc_review_grade_obligation_finding"
+        )
+      ),
+      evidenceRefs: arrayOf(isTrimmedNonEmptyString),
+      summary: isTrimmedNonEmptyString
+    }
+  });
 
 const GTL_ADMITTED_STATE_REF_GUARD: (value: unknown) => value is GtlAdmittedStateRefRecord =
   recordShape<GtlAdmittedStateRefRecord>({
@@ -713,6 +753,12 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
     "operator-run-artifact://product-materialization-manifest": PRODUCT_MANIFEST_GUARD,
     "operator-run-artifact://handoff-manifest": HANDOFF_MANIFEST_GUARD,
     "operator-run-artifact://fp-evaluate-result": FP_EVALUATE_GUARD,
+    "operator-run-artifact://review-grade-edge-fulfillment-assessment":
+      REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_GUARD,
+    "operator-run-artifact://review-grade-edge-fulfillment-run":
+      REVIEW_GRADE_EDGE_FULFILLMENT_RUN_GUARD,
+    "operator-run-artifact://review-grade-edge-fulfillment-postflight":
+      POSTFLIGHT_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-run":
       DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-process-started":
@@ -768,7 +814,7 @@ function loadDesignDepthFpEvaluatorRegisterArtifact(
   const bytes = stats.size;
   const admission = admitDesignDepthFpEvaluatorRegisterArtifact({
     registerPath: filePath,
-    archiveRoot: path.dirname(filePath)
+    archiveRoot: null
   });
   if (admission.status !== "admitted") {
     return Object.freeze({

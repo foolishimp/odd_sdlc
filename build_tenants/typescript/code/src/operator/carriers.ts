@@ -1370,12 +1370,63 @@ export type SdlcWorkerObligationFulfillmentStatus =
   | "blocked"
   | "unassessed";
 
+export const SDLC_REVIEW_GRADE_FAILURE_CLASSES = Object.freeze([
+  "trace_missing",
+  "semantic_not_realized",
+  "boundary_collapsed",
+  "wrong_stage",
+  "schema_invalid",
+  "execution_environment",
+  "test_overlap_missing"
+] as const);
+
+export type SdlcReviewGradeFailureClass =
+  (typeof SDLC_REVIEW_GRADE_FAILURE_CLASSES)[number];
+
 export interface SdlcWorkerObligationAssessment {
   readonly kind: "sdlc_worker_obligation_assessment";
   readonly obligationId: string;
   readonly fulfillmentStatus: SdlcWorkerObligationFulfillmentStatus;
   readonly evidenceRefs: readonly string[];
   readonly blockingReasons: readonly string[];
+  readonly reviewGrade?: boolean | undefined;
+  readonly reviewFailureClass?: SdlcReviewGradeFailureClass | null | undefined;
+  readonly requiredAction?: string | null | undefined;
+  readonly semanticEvidenceRefs?: readonly string[] | undefined;
+  readonly acceptedAuthorityRefs?: readonly string[] | undefined;
+}
+
+export interface SdlcReviewGradeObligationFinding {
+  readonly kind: "sdlc_review_grade_obligation_finding";
+  readonly obligationId: string;
+  readonly fulfillmentStatus: SdlcWorkerObligationFulfillmentStatus;
+  readonly failureClass: SdlcReviewGradeFailureClass | null;
+  readonly requiredAction: string | null;
+  readonly evidenceRefs: readonly string[];
+  readonly acceptedAuthorityRefs: readonly string[];
+  readonly rationale: string;
+}
+
+export interface SdlcReviewGradeEdgeFulfillmentAssessment {
+  readonly kind: "sdlc_review_grade_edge_fulfillment_assessment";
+  readonly assessmentVersion: "ts-review-grade-v1";
+  readonly graphFunctionName: string;
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+  readonly status: "passed" | "blocked";
+  readonly reviewedObligationIds: readonly string[];
+  readonly findings: readonly SdlcReviewGradeObligationFinding[];
+  readonly evidenceRefs: readonly string[];
+  readonly summary: string;
+}
+
+export interface SdlcReviewGradeEdgeFulfillmentAdmission {
+  readonly kind: "sdlc_review_grade_edge_fulfillment_admission";
+  readonly status: "admitted" | "rejected" | "not_required";
+  readonly targetAssetType: string;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment | null;
+  readonly blockingReasons: readonly string[];
+  readonly evidenceRefs: readonly string[];
 }
 
 export type SdlcPostflightGapReasonClass =

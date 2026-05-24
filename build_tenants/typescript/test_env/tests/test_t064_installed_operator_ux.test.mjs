@@ -107,14 +107,34 @@ function makeWorkspace() {
   return root;
 }
 
+function reviewGradeEvaluatorBranch(summary) {
+  return [
+    "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+    "  const assessmentPath = process.env.ODD_SDLC_EVALUATOR_ASSESSMENT ?? path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json');",
+    "  const reportPath = process.env.ODD_SDLC_EVALUATOR_WORKER_REPORT ?? manifest.reportFile;",
+    "  const report = JSON.parse(readFileSync(reportPath, 'utf8'));",
+    "  const reviewedObligationIds = report.obligationAssessments.map((assessment) => assessment.obligationId);",
+    "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+    "  const reportRef = pathToFileURL(reportPath).href;",
+    "  const findings = reviewedObligationIds.map((obligationId) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts generated asset for installed-operator UX regression' }));",
+    `  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: ${JSON.stringify(summary)} };`,
+    "  writeFileSync(assessmentPath, `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+    "  process.stdout.write(`reviewStatus=passed reviewed=${reviewedObligationIds.length} blocked=0\\n`);",
+    "  process.exit(0);",
+    "}"
+  ].join("\n");
+}
+
 function writeWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t064_worker.mjs");
   writeFileSync(
     workerPath,
     [
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname } from 'node:path';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for T-064 worker"),
       "process.stdout.write('t064 stdout before report\\n');",
       "process.stderr.write('t064 stderr before report\\n');",
       "const obligationLines = manifest.traversalObligationContext.obligations.flatMap((obligation) => [`obligation: ${obligation.obligationId}`, ...obligation.evidenceRefs.map((ref) => `evidence: ${ref}`)]);",
@@ -133,8 +153,10 @@ function writeEnvEchoWorkerScript(workspaceRoot) {
     workerPath,
     [
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname } from 'node:path';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for T-064 env worker"),
       "process.stdout.write(`NODE_TEST_CONTEXT=${process.env.NODE_TEST_CONTEXT ?? ''}\\n`);",
       "const content = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, '', 'REQ-T064-001'].join('\\n');",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
@@ -151,8 +173,10 @@ function writeSecondEdgeFailingWorkerScript(workspaceRoot) {
     workerPath,
     [
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname } from 'node:path';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed before second-edge failure"),
       "if (manifest.edgeName === 'derive_product_surface') process.exit(7);",
       "const obligationLines = manifest.traversalObligationContext.obligations.flatMap((obligation) => [`obligation: ${obligation.obligationId}`, ...obligation.evidenceRefs.map((ref) => `evidence: ${ref}`)]);",
       "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'This is governed autonomous-loop output.', '', '## Obligations', ...obligationLines].join('\\n');",
@@ -170,8 +194,10 @@ function writeTransformOnlyWorkerScript(workspaceRoot) {
     workerPath,
     [
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname } from 'node:path';",
+      "import path, { dirname } from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for transform-only worker"),
       "const content = [`# ${manifest.targetAssetType}`, '', `graph_function: ${manifest.graphFunctionName}`, `edge: ${manifest.edgeName}`, '', 'Implements: REQ-T064-001', '', 'This worker performs only F_P.transform and leaves evaluation to the framework.'].join('\\n');",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, `${content}\\n`, 'utf8');"
@@ -229,10 +255,14 @@ function writeInvalidComponentTopologyWorkerScript(workspaceRoot) {
     workerPath,
     [
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname } from 'node:path';",
+      "import path, { dirname } from 'node:path';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
       "const axis = (axis) => ({ kind: 'sdlc_design_completeness_axis_verdict', axis, status: 'satisfied', reasons: ['fixture complete'], evidenceRefs: ['fixture://t064'] });",
-      "const register = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: 'implementation_design_surface', stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://typescript', language: 'typescript', buildTool: 'node' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'typescript', moduleRef: 'module://typescript' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://typescript' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'typescript', entities: [{ kind: 'sdlc_domain_entity', entityId: 'entity:entry', moduleName: 'typescript', ownership: 'owned', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], invariants: [], sourceAssetRefs: ['fixture://t064'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'typescript', entityId: 'entity:entry', stateless: true, states: [], transitions: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], aggregateDomainModel: { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [{ kind: 'sdlc_aggregate_domain_entity', entityId: 'entity:entry', ownerModuleName: 'typescript', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], sourceModuleNames: ['typescript'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], crossModuleReferences: [], evidenceRefs: ['fixture://t064'] }, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://typescript/hello' }], aggregateSunnyDaySequence: { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:emit', moduleName: 'typescript', operationId: 'operation:typescript.emit', inputEntityIds: [], outputEntityIds: ['entity:entry'], stateTransitionIds: [] }], evidenceRefs: ['fixture://t064'] }, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'entry', moduleName: 'typescript', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', trancheId: null, firstProductFileToChange: 'src/index.ts', upstreamComponentIds: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: 'src/index.ts', role: 'source' }], designCompletenessVerdict: { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') } };",
+      "const register = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: 'implementation_design_surface', stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://typescript', language: 'typescript', buildTool: 'node' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'typescript', moduleRef: 'module://typescript' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://typescript' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'typescript', entities: [{ kind: 'sdlc_domain_entity', entityId: 'entity:entry', moduleName: 'typescript', ownership: 'owned', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], invariants: [], sourceAssetRefs: ['fixture://t064'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'typescript', entityId: 'entity:entry', stateless: true, states: [], transitions: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], aggregateDomainModel: { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [{ kind: 'sdlc_aggregate_domain_entity', entityId: 'entity:entry', ownerModuleName: 'typescript', attributes: [{ kind: 'sdlc_domain_attribute', attributeId: 'attr:entry.stdout', name: 'stdout', valueType: 'string', cardinality: 'one', invariantRefs: ['REQ-T064-001'] }], sourceModuleNames: ['typescript'] }], operations: [{ kind: 'sdlc_domain_operation', operationId: 'operation:typescript.emit', moduleName: 'typescript', inputEntityIds: [], outputEntityIds: ['entity:entry'], requiredAttributeIds: ['attr:entry.stdout'] }], crossModuleReferences: [], evidenceRefs: ['fixture://t064'] }, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://typescript/hello' }], aggregateSunnyDaySequence: { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:emit', moduleName: 'typescript', operationId: 'operation:typescript.emit', inputEntityIds: [], outputEntityIds: ['entity:entry'], stateTransitionIds: [] }], evidenceRefs: ['fixture://t064'] }, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'entry', moduleName: 'missing-module', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', concernRole: 'entry_script_stdout_emitter', requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'entry', moduleName: 'missing-module', relativePath: 'src/index.ts', publicBoundary: 'node-entry-script:src/index.ts', trancheId: null, firstProductFileToChange: 'src/index.ts', upstreamComponentIds: [], requirementIds: ['REQ-T064-001'], sourceAssetRefs: ['fixture://t064'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: 'src/index.ts', role: 'source' }], designCompletenessVerdict: { kind: 'sdlc_design_completeness_verdict', verdictVersion: 'ts-design-depth-v1', entity: axis('entity'), attribute: axis('attribute'), flow: axis('flow') } };",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'design_depth_register') {",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'design_depth_fp_evaluator_register.json'), `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "const content = ['# implementation_design_surface', '', '```json design_depth_register', JSON.stringify(register, null, 2), '```', ''].join('\\n');",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, content, 'utf8');"
@@ -1212,6 +1242,7 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
   ]);
 
   assert.equal(start.status, "ok");
+  assert.equal(start.payload.status, "blocked");
   assert.equal(
     existsSync(path.join(start.payload.archiveRoot, "postflight.json")),
     true
@@ -1223,15 +1254,16 @@ test("T-159 assurance rejection rewrites F_P evaluate result as blocked", async 
     readFileSync(path.join(start.payload.archiveRoot, "postflight.json"), "utf8")
   );
   assert.equal(evaluateResult.kind, "sdlc_fp_evaluate_result");
-  assert.equal(evaluateResult.status, "blocked");
-  assert.equal(evaluateResult.postflightStatus, "blocked");
+  assert.equal(evaluateResult.status, "passed");
+  assert.equal(evaluateResult.postflightStatus, "passed");
   assert.match(evaluateResult.postflightRef, /postflight\.json$/u);
   assert.match(
 	    [
+	      start.payload.summary.blockingReason ?? "",
 	      ...evaluateResult.blockingReasons,
 	      ...postflight.blockingReasonCarriers.map((reason) => reason.detail ?? "")
 	    ].join(","),
-	    /design_depth_worker_emitted_register_forbidden/u
+	    /design_depth_register_invalid|component_topology_unknown_module|component_realization_unknown_module/u
 	  );
 	});
 

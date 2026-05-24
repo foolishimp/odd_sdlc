@@ -16,7 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   analyzeSdlcFdRunArchive,
@@ -218,6 +218,21 @@ function buildSyntheticT132Archive(opts) {
       `abg.fn_composition_selection://synthetic/${edge.name}/${index}`;
     const selectedRegimeBindingRef =
       `abg.fn_composition.regime_binding://synthetic/${edge.name}/${index}/evaluate/fp`;
+    const selectedComposition = {
+      kind: "sdlc_selected_abg_fn_composition_identity",
+      compositionRef,
+      compositionDigest,
+      compositionSelectionRef,
+      selectedRegimeBindingRef,
+      graphFunctionRef: `graph-function://synthetic/${edge.name}`,
+      graphVectorRef: edge.name,
+      basisRef: "basis://synthetic/t161"
+    };
+    const designDepthRegisterPath = path.join(
+      operatorRunRoot,
+      "design_depth_fp_evaluator_register.json"
+    );
+    const designDepthRegisterRef = pathToFileURL(designDepthRegisterPath).href;
     const defaultExecutionCommand = edge.target === "test_execution_result_surface"
       ? "node --test test/hello.test.js"
       : "node build_tenants/hello_world_javascript/src/hello.js";
@@ -419,14 +434,209 @@ function buildSyntheticT132Archive(opts) {
           kind: "sdlc_fp_evaluate_result",
           stage: "F_P.evaluate",
           computeNotationStage: "evaluate.C",
+          stageAuthority: "typed_fp_stage_carriers",
+          selectedComposition,
           compositionRef,
           compositionDigest,
           compositionSelectionRef,
           selectedRegimeBindingRef,
+          evaluationRef: `evaluation://synthetic/${edge.name}/${index}`,
+          findings: edge.target === "implementation_design_surface"
+            ? [
+                {
+                  findingRef:
+                    `finding://synthetic/${edge.name}/${index}/design-depth-register`,
+                  compositionRef,
+                  compositionDigest,
+                  authorityRefs: [designDepthRegisterRef],
+                  evidenceRefs: [designDepthRegisterRef]
+                }
+              ]
+            : [],
+          evaluation: {
+            evaluationRef: `evaluation://synthetic/${edge.name}/${index}`,
+            status: postflightStatus,
+            findingRefs: edge.target === "implementation_design_surface"
+              ? [
+                  `finding://synthetic/${edge.name}/${index}/design-depth-register`
+                ]
+              : []
+          },
           status: postflightStatus,
           postflightStatus,
           blockingReasons: blockingReasonCodes,
-          evidenceRefs: []
+          evidenceRefs: edge.target === "implementation_design_surface"
+            ? [designDepthRegisterRef]
+            : []
+        },
+        dirMtimeMs
+      );
+      const obligationIds = Array.from(
+        { length: 22 },
+        (_, i) => `target_asset:${edge.target}/${i}`
+      );
+      if (edge.target === "implementation_design_surface") {
+        writeJson(
+          designDepthRegisterPath,
+          {
+            kind: "sdlc_design_depth_register",
+            registerVersion: "ts-design-depth-v1",
+            targetAssetType: "implementation_design_surface",
+            stackProfileRows: [
+              {
+                kind: "sdlc_stack_profile_row",
+                stackRef: "stack://synthetic/node",
+                language: "javascript",
+                buildTool: "npm"
+              }
+            ],
+            implementationModuleRows: [
+              {
+                kind: "sdlc_implementation_module_row",
+                moduleName: "hello_world_javascript",
+                moduleRef: "module://synthetic/hello_world_javascript"
+              }
+            ],
+            aggregateDomainModelRows: [],
+            moduleSchemaFragments: [],
+            moduleStateDiagramFragments: [],
+            aggregateDomainModel: null,
+            sunnyDaySequenceRows: [],
+            aggregateSunnyDaySequence: null,
+            componentTopologyRows: [
+              {
+                kind: "sdlc_component_topology_row",
+                componentId: "hello-world-entrypoint",
+                moduleName: "hello_world_javascript",
+                relativePath: "src/hello.js",
+                publicBoundary: "Prints the required greeting.",
+                concernRole: "other",
+                requirementIds: [...finalProductLineageRefs],
+                sourceAssetRefs: [designDepthRegisterRef]
+              }
+            ],
+            componentRealizationRows: [
+              {
+                kind: "sdlc_component_realization_row",
+                componentId: "hello-world-entrypoint",
+                moduleName: "hello_world_javascript",
+                relativePath: "src/hello.js",
+                publicBoundary: "Prints the required greeting.",
+                trancheId: null,
+                firstProductFileToChange: "src/hello.js",
+                upstreamComponentIds: [],
+                requirementIds: [...finalProductLineageRefs],
+                sourceAssetRefs: [designDepthRegisterRef]
+              }
+            ],
+            fileTargetRows: [
+              {
+                kind: "sdlc_file_target_row",
+                relativePath: "src/hello.js",
+                role: "source"
+              }
+            ],
+            designCompletenessVerdict: null
+          },
+          dirMtimeMs
+        );
+      }
+      const assessmentPath = path.join(
+        operatorRunRoot,
+        "review_grade_edge_fulfillment_assessment.json"
+      );
+      const assessmentRef = pathToFileURL(assessmentPath).href;
+      const reviewRunPath = path.join(
+        operatorRunRoot,
+        "review_grade_edge_fulfillment_run.json"
+      );
+      const reviewPromptPath = path.join(
+        operatorRunRoot,
+        "review_grade_edge_fulfillment_prompt.md"
+      );
+      const reviewEventsPath = path.join(
+        operatorRunRoot,
+        "review_grade_edge_fulfillment_process_events.jsonl"
+      );
+      writeText(
+        reviewPromptPath,
+        `synthetic review-grade evaluator prompt for ${edge.name}\n`,
+        dirMtimeMs
+      );
+      writeText(
+        path.join(operatorRunRoot, "review_grade_edge_fulfillment_stdout.log"),
+        `reviewStatus=passed reviewed=${obligationIds.length} blocked=0\n`,
+        dirMtimeMs
+      );
+      writeText(
+        path.join(operatorRunRoot, "review_grade_edge_fulfillment_stderr.log"),
+        "",
+        dirMtimeMs
+      );
+      writeJson(
+        path.join(operatorRunRoot, "review_grade_edge_fulfillment_process_started.json"),
+        {
+          kind: "actor_process_started",
+          pid: pid + index + 10_000,
+          observedAtMs: dirStartMs + 1
+        },
+        dirMtimeMs
+      );
+      writeText(
+        reviewEventsPath,
+        [
+          JSON.stringify({
+            kind: "actor_process_started",
+            pid: pid + index + 10_000,
+            observedAtMs: dirStartMs + 1
+          }),
+          JSON.stringify({
+            kind: "actor_process_exited",
+            pid: pid + index + 10_000,
+            status: 0,
+            elapsedMs: 120,
+            observedAtMs: dirMtimeMs
+          })
+        ].join("\n") + "\n",
+        dirMtimeMs
+      );
+      writeJson(
+        reviewRunPath,
+        {
+          kind: "sdlc_review_grade_edge_fulfillment_run",
+          status: 0,
+          signal: null,
+          elapsedMs: 120,
+          timedOut: false,
+          promptRef: pathToFileURL(reviewPromptPath).href,
+          assessmentRef,
+          processEventsRef: pathToFileURL(reviewEventsPath).href
+        },
+        dirMtimeMs
+      );
+      writeJson(
+        assessmentPath,
+        {
+          kind: "sdlc_review_grade_edge_fulfillment_assessment",
+          assessmentVersion: "ts-review-grade-v1",
+          graphFunctionName: edge.name,
+          edgeName: edge.name,
+          targetAssetType: edge.target,
+          status: "passed",
+          reviewedObligationIds: obligationIds,
+          findings: obligationIds.map((obligationId) => ({
+            kind: "sdlc_review_grade_obligation_finding",
+            obligationId,
+            fulfillmentStatus: "fulfilled",
+            failureClass: null,
+            requiredAction: null,
+            evidenceRefs: [assessmentRef],
+            acceptedAuthorityRefs: [assessmentRef],
+            rationale:
+              "Synthetic clean archive carries admitted review-grade stage truth."
+          })),
+          evidenceRefs: [assessmentRef],
+          summary: "Synthetic review-grade assessment passed."
         },
         dirMtimeMs
       );
@@ -474,9 +684,9 @@ function buildSyntheticT132Archive(opts) {
           materializationDiagnostics: [],
           executionEvidence,
           executionEvidenceErrors: [],
-          obligationAssessments: Array.from({ length: 22 }, (_, i) => ({
+          obligationAssessments: obligationIds.map((obligationId) => ({
             kind: "sdlc_worker_obligation_assessment",
-            obligationId: `target_asset:${edge.target}/${i}`,
+            obligationId,
             fulfillmentStatus: "fulfilled",
             evidenceRefs: [],
             blockingReasons: []

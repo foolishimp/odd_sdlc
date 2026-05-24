@@ -64,6 +64,9 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "obligation_assessment_extra",
   "obligation_payload_insufficient",
   "obligation_fulfilled_without_output_coverage",
+  "review_grade_assessment_missing",
+  "review_grade_assessment_invalid",
+  "review_grade_edge_fulfillment_blocked",
   "source_asset_dependency_missing",
   "assurance_ledger_reason",
   "hook_postflight_failed",
@@ -196,6 +199,9 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "obligation_assessment_extra",
   "obligation_payload_insufficient",
   "obligation_fulfilled_without_output_coverage",
+  "review_grade_assessment_missing",
+  "review_grade_assessment_invalid",
+  "review_grade_edge_fulfillment_blocked",
   "source_asset_dependency_missing",
   "sbt_security_manager_option_unsupported",
   "unsupported_fd_transition",
@@ -352,6 +358,9 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     code === "obligation_assessment_extra" ||
     code === "obligation_payload_insufficient" ||
     code === "obligation_fulfilled_without_output_coverage" ||
+    code === "review_grade_assessment_missing" ||
+    code === "review_grade_assessment_invalid" ||
+    code === "review_grade_edge_fulfillment_blocked" ||
     code === "source_asset_dependency_missing"
   ) {
     return Object.freeze({

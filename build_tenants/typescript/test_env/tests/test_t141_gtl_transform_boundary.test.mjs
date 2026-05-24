@@ -140,6 +140,24 @@ function writeRequirementWorkspace() {
   return root;
 }
 
+function reviewGradeEvaluatorBranch(summary) {
+  return [
+    "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+    "  const assessmentPath = process.env.ODD_SDLC_EVALUATOR_ASSESSMENT ?? path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json');",
+    "  const reportPath = process.env.ODD_SDLC_EVALUATOR_WORKER_REPORT ?? manifest.reportFile;",
+    "  const report = JSON.parse(readFileSync(reportPath, 'utf8'));",
+    "  const reviewedObligationIds = report.obligationAssessments.map((assessment) => assessment.obligationId);",
+    "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+    "  const reportRef = pathToFileURL(reportPath).href;",
+    "  const findings = reviewedObligationIds.map((obligationId) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts generated authority conformance asset for GTL transform-boundary regression' }));",
+    `  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: ${JSON.stringify(summary)} };`,
+    "  writeFileSync(assessmentPath, `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+    "  process.stdout.write(`reviewStatus=passed reviewed=${reviewedObligationIds.length} blocked=0\\n`);",
+    "  process.exit(0);",
+    "}"
+  ].join("\n");
+}
+
 function writeAuthorityConformanceWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t141_authority_worker.mjs");
   writeFileSync(
@@ -147,9 +165,12 @@ function writeAuthorityConformanceWorkerScript(workspaceRoot) {
     [
       "import { createHash } from 'node:crypto';",
       "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';",
-      "import { dirname, join } from 'node:path';",
+      "import path, { dirname, join } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch(
+        "synthetic review-grade evaluator accepted authority conformance output"
+      ),
       "const requirementId = 'REQ-T141-001';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "mkdirSync(join(manifest.workspaceRoot, 'specification/requirements'), { recursive: true });",

@@ -203,6 +203,370 @@ depth-oriented F_P evaluation surface when ambiguity is high.
    same as an agentic evaluator that inspects the workspace, writes an evaluation
    artifact, validates it, and iterates before returning.
 
+## Proposed Gap Analysis: F_P Review-Grade Edge Fulfillment
+
+The next significant assurance gap is asset accountability against incoming
+requirements. This is not a special code-review mechanism. Every generated asset
+can undergo the same level of scrutiny: the evaluator asks whether that stage's
+output actually realizes the incoming requirements, upstream authority, and
+carried pressure with enough depth, quality, completion, and traceability to
+justify closure.
+
+Current depth review holds the transformer accountable for decomposition and
+planning quality. The existing surface to strengthen is the per-edge fulfillment
+path: `SdlcWorkerObligationAssessment` rows feed the
+`SdlcEdgeFulfillmentLedger`, and that ledger is already the generic closure
+authority for an edge.
+
+```text
+incoming requirements + accepted upstream authority + generated asset
+  -> evaluate.C/F_P review-grade obligation assessment
+  -> SdlcWorkerObligationAssessment rows + F_P findings
+  -> SdlcEdgeFulfillmentLedger
+  -> transformer retry work queue
+  -> admitted closure only when asset obligations converge
+```
+
+### Current State
+
+- Implementation-design depth has an F_P evaluator sidecar.
+- Component-code closure is guarded by deterministic postflight, target-carrier
+  checks, materialization evidence, and scalar evaluation blockers.
+- The live run showed these guards can preserve enough pressure for retries to
+  converge.
+- There is no generic F_P prompt/admission pattern that makes existing
+  obligation assessments review-grade for each asset.
+- The most urgent first slice is component-code because the live failures showed
+  source files can exist while still under-realizing the accepted depth and
+  requirement pressure.
+
+### Target State
+
+Add stage-specific agentic `evaluate.C/F_P` obligation-assessment rules for
+generated assets, starting with `derive_component_code_surface` and then
+extending the same pattern to tests, scenarios, decomposition, design, and
+release surfaces.
+
+This is one instance of the general rule: every promoted stage review surface
+should receive the same level of accountability for that stage's output.
+Component-code assessment reviews source realization. UAT assessment reviews
+testcase adequacy. Decomposition assessment reviews feature boundary depth.
+Scenario assessment reviews scenario pressure and coverage. None of these
+should be treated as weaker commentary once they are promoted into
+`evaluate.C/F_P` admission.
+
+The evaluator reads:
+
+- incoming requirements and carried residual obligations
+- accepted upstream authority rows for the stage
+- the generated asset being evaluated
+- asset-specific evidence such as files, rows, scenarios, test cases, or
+  execution artifacts
+- existing overlap evidence when available
+- previous edge fulfillment and gap rows on retry
+
+The evaluator writes compact review-grade obligation assessments, not a prose
+review:
+
+```text
+review-grade obligation assessment
+  -> stage and asset ref
+  -> requirement or obligation ref
+  -> upstream authority ref
+  -> asset location, row ref, file path, symbol, test id, or scenario id when known
+  -> review axis: depth | quality | completion | fit | traceability
+  -> finding: pass | blocked | residual_pressure
+  -> required action
+  -> evidence refs
+```
+
+The admitted edge fulfillment rows are then treated as a transformer work queue.
+A retry prompt must tell the transformer to work every blocked row to closure or
+convert it into explicit residual pressure with evidence.
+
+### Gap Matrix
+
+| Current Surface | Gap | Target F_P Behavior | Fail-Closed Rule |
+| --- | --- | --- | --- |
+| Upstream authority surface | Proves accepted intent/design/scenario/test pressure, not necessarily downstream realization | Reuse upstream rows as accountability basis for the generated asset | Asset cannot close if it does not realize the accepted upstream authority |
+| Asset existence contract | Proves files/rows/artifacts exist and are in declared roots | Check whether each asset item actually carries its assigned requirement pressure | Existence without semantic realization remains pressure |
+| Requirement fulfillment ledger | Can show obligations mapped, but may not inspect asset adequacy | Review each asset against each incoming requirement and carried obligation | Unreviewed requirement-to-asset mapping blocks closure |
+| Tests/execution evidence | Can prove observed behavior for declared commands | Treat passing tests as overlap, not as complete semantic review | Passing tests do not close unresolved accountability blockers |
+| Scalar evaluation blockers | Useful but too coarse for asset-level accountability | Promote findings into durable row-level work orders | Blocked rows must be consumed by retry or preserved as residual pressure |
+
+### Review Axes
+
+The proposed F_P review-grade obligation assessment should hold each stage
+transformer to account on these axes:
+
+- `depth`: whether the asset realizes the declared stage shape and boundaries
+  instead of collapsing requirements into shallow or global output.
+- `quality`: whether the asset is coherent, maintainable, stage-appropriate,
+  and avoids placeholders, dead paths, and fragile shortcuts.
+- `completion`: whether every input requirement and carried residual obligation
+  has a traceable, reviewable asset realization or an explicit blocker.
+- `fit`: whether the asset is the right kind of output for the stage and does
+  not smuggle work that belongs to another stage.
+- `traceability`: whether requirement, authority, asset, and evidence refs are
+  sufficient for replay and later overlap checks.
+
+This is a stricter framing of depth review, not a new independent authority
+surface. Depth asks whether the product was decomposed with enough semantic
+force. Review-grade fulfillment asks whether that semantic force survived
+transformation into the next asset and records the answer in the existing edge
+fulfillment path.
+
+### Incremental Slice
+
+The first implementation slice should be small:
+
+1. Strengthen the existing `SdlcWorkerObligationAssessment` prompt contract so
+   assessment rows are review-grade for the current stage asset.
+2. Add an F_P evaluate rule that writes component-code obligation assessments
+   from requirements, accepted depth register, component rows, and materialized
+   files.
+3. Add F_D admission for assessment shape, refs, file paths, and row
+   completeness.
+4. Feed blocked edge fulfillment rows into the retry prompt as work queue rows.
+5. Add closure checks proving component-code cannot close with unreviewed or
+   blocked obligation-assessment rows.
+6. Run JS hello world, Rust server hello world, and data mapper to compare
+   retry quality against the current depth-only evaluator path.
+
+The important boundary is that F_P reviews semantic asset adequacy while F_D
+admits the assessment shape and evidence. F_D must not become the semantic
+reviewer.
+
+### Full Graph Evaluator Audit Table
+
+This table records the current evaluator surface and the proposed next F_P
+ledger against the optimized full SDLC graph. It is intentionally stage-by-stage
+so stale graph assumptions or hidden evaluator surfaces are easier to audit.
+
+The scrutiny standard is the same for each promoted edge: evaluate the stage
+asset against its input obligations, write row-level blockers/residual pressure
+into the existing obligation assessment path, feed those rows back as the
+transformer work queue, and fail closure when unresolved rows remain. The
+component-code assessment strengthening is the first source-facing slice, not
+the only stage where this standard applies.
+
+Current graph truth is `OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS`. Every stage
+has the generic GTL evaluator pair declared by the graph module:
+
+```text
+<stage>_core_fd
+<stage>_semantic_fp
+```
+
+Runtime currently adds one concrete agentic F_P evaluation rule:
+
+```text
+derive_implementation_design_surface
+  -> evaluate.C/F_P design-depth register rule
+```
+
+The proposed next concrete evaluator rule is:
+
+```text
+derive_component_code_surface
+  -> evaluate.C/F_P review-grade obligation assessment rule
+```
+
+| # | Stage | Current Evaluator Surface | Existing Edge-Ledger Strengthening |
+| ---: | --- | --- | --- |
+| 1 | `derive_intent_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review intent asset against seed inputs and declared scope through obligation assessments |
+| 2 | `derive_product_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review product definition against intent and excluded scope through obligation assessments |
+| 3 | `derive_goal_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review goals against product obligations and current work wave through obligation assessments |
+| 4 | `derive_requirement_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review requirements against goals, testability, and traceability through obligation assessments |
+| 5 | `derive_uat_testcases_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review UAT cases against requirements, scenarios, and obligation coverage through obligation assessments |
+| 6 | `derive_testcase_authority_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review testcase authority refs, traceability, and executable-test intent through obligation assessments |
+| 7 | `derive_feature_decomp_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review feature boundaries, independence, and carried pressure through obligation assessments |
+| 8 | `derive_design_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review architecture, module responsibilities, and public boundaries through obligation assessments |
+| 9 | `derive_scenario_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | review scenario breadth, edge pressure, and requirement coverage through obligation assessments |
+| 10 | `derive_implementation_design_surface` | current agentic `evaluate.C/F_P` design-depth register plus F_D admission | existing implementation design-depth ledger remains primary |
+| 11 | `derive_component_code_surface` | generic postflight/scalar evaluation over worker output | review source realization against requirements and accepted depth through obligation assessments |
+| 12 | `qualify_component_realization_surface` | operator/evaluator qualification, no worker dispatch | consume strengthened edge fulfillment rows as overlap and fail-closed proof |
+| 13 | `derive_code_surface` | projection/no-close rollup | no new transformer; project only admitted code truth and unresolved asset pressure |
+| 14 | `derive_test_design_surface` | generic `F_D` postflight plus scalar `F_P.evaluate` result | possible future test-design depth ledger |
+| 15 | `derive_component_test_surface` | generic postflight/scalar evaluation over test worker output | review test source against test design and requirements through obligation assessments |
+| 16 | `prepare_test_execution_surface` | projection/no-close execution transition | none |
+| 17 | `derive_test_execution_result_surface` | operator-owned execution evidence admission | review result evidence against declared execution contract through obligation assessments |
+| 18 | `qualify_component_test_execution_surface` | operator/evaluator qualification of results against test design | consume strengthened source/test obligation pressure as overlap |
+| 19 | `derive_component_repair_schedule_surface` | conditional worker/evaluator path under failure pressure | future repair-quality/depth ledger possible |
+| 20 | `derive_test_run_archive_surface` | projection/no-close archive view | none |
+| 21 | `derive_release_depth_parity_surface` | evaluator co-affirmation between code, tests, and archive | consume strengthened edge fulfillment rows as release parity input |
+| 22 | `prepare_release_surface` | final release qualification | fail closed if any required obligation assessment remains unresolved |
+
+The incremental proposal is not to implement every stage strengthening in one
+slice. It is to name every generated asset as accountable to incoming
+requirements, keep the existing implementation design-depth evaluator,
+strengthen the first component-code F_P obligation-assessment prompt, and make
+downstream qualification/release stages consume the existing edge ledger as
+admitted pressure.
+
+### Test35 Enforcement Check
+
+The proposed review-grade edge-fulfillment pattern is necessary but not
+sufficient to
+reproduce the test35 data mapper outcome.
+
+The test35 advantage was not simply better review after implementation. It
+forced a deeper interpretation before implementation by inserting an
+implementation-module authority surface between requirements and code. That
+surface named component responsibilities, package/file structures, fulfillment
+boundaries, and requirement-to-component assignments before the code writer ran.
+
+Therefore the enforcement chain must be:
+
+```text
+requirements
+  -> evaluate.C/F_P design-depth register with requirement-to-component depth
+  -> transform.C/F_P component code realization
+  -> evaluate.C/F_P review-grade obligation assessments against requirements and accepted depth
+  -> SdlcEdgeFulfillmentLedger
+  -> retry work queue
+  -> closure only when design depth and code realization both converge
+```
+
+If the design-depth register remains coarse, the strengthened edge ledger can only
+prove realization against a coarse topology. It can reject files that fail to
+realize declared component depth, but it cannot by itself recover missing
+component boundaries that were never admitted upstream.
+
+The generic rule to add is:
+
+```text
+For every asset-producing edge, accepted upstream authority must decompose
+requirement pressure to the granularity needed by that asset. For component-code
+edges, accepted implementation design depth must decompose requirement pressure
+into component-level realization rows when the requirement semantics imply
+separable public boundaries. Component-code closure then fails if materialized
+files collapse those declared boundaries back into a coarse module facade or
+leave requirement-to-asset mappings unreviewed.
+```
+
+For data mapper, test35 is useful as an audit oracle, not as hard-coded runtime
+truth. The depth evaluator should learn the pattern:
+
+- compiler requirements imply separate type resolution, cast/unification,
+  topology compilation, law validation, registry, and dry-run responsibilities
+- executor requirements imply separate execution, manifest, replay, lookup,
+  costing, synthesis, residue, late-arrival, and completion-gate
+  responsibilities
+- test requirements imply a richer test topology than a small module-level
+  smoke set when the requirement algebra is broad
+
+The strategy should therefore enforce test35-style properties, not test35
+filenames. A future data mapper run should match or exceed test35 only when the
+design-depth evaluator admits a sufficiently granular topology and the
+F_P evaluator proves through edge fulfillment rows that the generated source
+files realize it.
+
+### Postmortem: T-164 Data Mapper Full Capability Live
+
+Run inspected:
+
+`build_tenants/typescript/test_env/test_runs/t164_data_mapper_full_capability_live/20260524T034346301Z_pid43157/workspace`
+
+The run already proves the right pressure pattern: imperfect workers converged
+because edge fulfillment rows, gap pressure, and retry prompts kept applying
+pressure. The weakness is that the pressure mostly behaved like trace/tag and
+schema accountability. The next iteration should strengthen the same existing
+edge fulfillment path until it behaves like a real review of each generated
+asset against its incoming requirements.
+
+Observed convergence:
+
+| Stage | Attempts | First Result | Final Result | What Forced Movement |
+| --- | ---: | --- | --- | --- |
+| `derive_implementation_design_surface` | 1 | 9 component topology rows, 9 component realization rows, local JSON validation passed | closed | F_P design-depth evaluator created the pressure map consumed by later transforms |
+| `derive_component_code_surface` | 4 | 219/235 fulfilled, 1 partial, 15 blocked; compiler model/plan collapsed and multiple requirement traces missing | 235/235 fulfilled | F_P evaluation blocked missing trace and collapsed-component evidence; retry prompts carried gap rows forward |
+| `derive_component_test_surface` | 2 | 71/240 fulfilled, 169 blocked | 240/240 fulfilled | F_P evaluation blocked missing test requirement traces, then retry completed the declared test files and tags |
+| `derive_component_repair_schedule_surface` | 5 | repeated schema/status enum defects | closed | gap rows eventually forced valid repair target/status values |
+| `derive_release_depth_parity_surface` | 6 | blocked on open executor repair/failure pressure | closed | repeated release-parity evaluation held open repair pressure until execution evidence and repair schedule aligned |
+
+Transformer findings:
+
+- The first component-code transform followed the admitted implementation design
+  enough to create a broad Scala/Spark tenant, but it did not complete the
+  requirement-to-source evidence contract.
+- The first retry had the gap list, but the prompt did not yet state that the
+  gaps were the worker's work queue. It repaired some structure while regressing
+  obligation counts from 219 fulfilled to 162 fulfilled.
+- Once the prompt pressure narrowed to concrete residual rows, the agent made
+  targeted repairs: split compiler source responsibility, added native
+  `// requirement:` tags, updated component rows, and closed the last residual
+  bootstrap requirement.
+- Terminal output was too large. Several workers printed large diffs or generated
+  scripts instead of updating files and returning compact counts.
+
+Evaluator findings:
+
+- The F_P evaluator was effective at enforcing trace evidence and component
+  boundary pressure. It caught collapsed compiler components, missing source
+  tags, missing test tags, invalid repair schedule enums, and open release parity
+  pressure.
+- The evaluation was not yet review-grade in the code-review sense. It mostly
+  asked "is there parseable evidence for the requirement?" rather than "does the
+  asset plausibly implement the requirement with the accepted design boundary,
+  correct behavior, maintainable structure, and enough test overlap?"
+- The existing `SdlcEdgeFulfillmentLedger` is the right closure ledger to
+  strengthen. A new code-review ledger is not needed for this release line. The
+  F_P evaluator should produce review-grade obligation assessments and findings
+  that feed the existing edge fulfillment path.
+
+What "code review" means here:
+
+```text
+incoming requirements + accepted upstream authority + generated asset/diff
+  -> F_P review of correctness, completeness, boundary fit, evidence, risk
+  -> per-obligation assessment rows with evidence and required action
+  -> existing SdlcEdgeFulfillmentLedger
+  -> retry until rows are fulfilled or explicitly blocked as residual pressure
+```
+
+Code review is not a separate artifact class. It is one stage-specific form of
+review-grade edge fulfillment. The same structure applies to UAT cases, testcase
+authority, feature decomposition, design, scenarios, tests, repair schedules,
+and release parity.
+
+Actions for transformer prompts:
+
+1. On every stage, build a checklist from incoming requirements, accepted
+   upstream authority rows, target carrier rows, and current evaluated gaps
+   before editing.
+2. Treat current evaluated gaps as the worker's work queue. Do not return
+   success while any row is unmapped; either fulfill it with evidence or preserve
+   it as explicit residual pressure.
+3. For source-producing edges, every fulfilled requirement must have an owning
+   component row, source file path, parseable source tag, materialized file trace
+   entry, and evidence ref.
+4. For first attempts, apply the same checklist discipline even when there is no
+   retry gap list yet. The agent should not wait for the evaluator to discover
+   obvious missing requirement-to-asset mappings.
+5. Keep stdout bounded. Write assets and validation files; return counts and
+   touched paths only. Do not print full diffs, generated JSON, long scripts, or
+   broad `git status` output.
+
+Actions for evaluator prompts:
+
+1. Evaluate the asset like a reviewer: inspect the generated asset against the
+   incoming requirement, accepted upstream authority, declared boundary, evidence,
+   and likely failure mode.
+2. Use existing edge fulfillment rows as the output target. Each finding should
+   map to `fulfilled`, `partial`, `blocked`, or `unassessed`, with evidence refs
+   and a required action when not fulfilled.
+3. Distinguish evidence classes: `trace_missing`, `semantic_not_realized`,
+   `boundary_collapsed`, `wrong_stage`, `schema_invalid`, `execution_environment`,
+   and `test_overlap_missing`.
+4. Do not accept a requirement tag alone for high-pressure source behavior. A tag
+   is trace evidence; the evaluator should also check that the nearby code or
+   asset content plausibly implements the obligation.
+5. Validate schema-local enum values and carrier shape before returning. The
+   repair-schedule loop showed that missing enum pressure wastes iterations.
+6. Emit compact blocker summaries to the CLI and durable row-level findings to
+   the admitted evaluation/edge-fulfillment path.
+
 ### Source Fixes Made During This Run
 
 - Added explicit retry wording: current evaluated gaps are the worker's work
@@ -277,7 +641,7 @@ Each product closure must be covered by multiple evaluator perspectives:
 - materialization and target-carrier pressure
 - semantic intent-fit and residual ambiguity pressure
 - execution and test evidence pressure
-- code quality and review pressure
+- asset quality and review-grade fulfillment pressure
 - traversal and next-action pressure
 - parallel frontier pressure where the graph declares independent work
 
@@ -287,7 +651,8 @@ Critical facts must appear in more than one admitted surface:
 
 - requirement ids appear in fulfillment pressure and design/component rows
 - file targets appear in materialization contracts and component realization rows
-- source modules appear in design-depth registers and code-review/test surfaces
+- source modules appear in design-depth registers and strengthened edge
+  fulfillment/test surfaces
 - test obligations appear in testcase authority, execution evidence, and
   requirement fulfillment
 - selected composition identity appears in transform, evaluation, consequence,
@@ -391,7 +756,7 @@ Every product edge should have a compact coverage matrix:
 | Requirement fulfillment | obligation ledger | trace/register rows | evaluation result | missing/unassessed/blocking obligation |
 | Decomposition | design-depth register | component realization rows | downstream transform pressure | collapsed/unowned component |
 | Materialization | materialization contract | worker report projection | product materialization manifest | missing role, wrong root, replay mismatch |
-| Code quality | code-review register or diagnostics | tests/lint/runtime evidence | execution evidence | unresolved diagnostic or missing proof |
+| Asset adequacy | F_P review-grade obligation assessments | tests/lint/runtime evidence | edge fulfillment ledger plus evaluation rule outcome | unresolved assessment row, unreviewed requirement-to-asset mapping, or missing proof |
 | Semantic fit | evaluate.C/F_P finding | residual pressure refs | ABG evaluation ledger | partial, ambiguous, or stale evidence |
 | Execution | test execution register | requirement closure | test/run artifact | no run, failed run, or undeclared skip |
 | Traversal | closure decision | next-action projection | ABG replay event | missing fold, stale identity, bypassed consequence |
@@ -431,10 +796,14 @@ The durable artifact is the work product. Terminal narration is not truth.
    findings, registers, diagnostics, and residual pressure. Keep ABG as the only
    writer of admitted event and ledger truth.
 
-4. Add a code-quality pressure surface.
-   Either define a compact code-review register or explicitly route code-review
-   pressure through existing execution/materialization diagnostics. Do not leave
-   code review as an implicit bucket.
+4. Strengthen F_P obligation assessment.
+   Use the existing edge fulfillment path. Every close-capable
+   worker-dispatched generated asset edge must run a separate selected
+   `evaluate.C/F_P` review-grade evaluator process. The evaluator reviews the
+   generated asset against input requirements, accepted upstream authority, stage
+   boundary, and carried residual pressure, then emits review-grade obligation
+   assessment rows. The retry transformer must treat blocked assessment rows as
+   its work queue.
 
 5. Add matrix tests.
    For each closure concern, add positive and negative tests proving the primary
@@ -455,7 +824,8 @@ The system is ready for the next release candidate when:
 - every known bypass is removed or explicitly projection-only
 - analyzer output and runtime admission agree on the same authority surfaces
 - data mapper can fail, retry, and converge without losing requirement,
-  decomposition, materialization, code-review, execution, or traversal pressure
+  decomposition, materialization, asset adequacy, execution, or traversal
+  pressure
 
 The target is not a perfect worker. The target is a system where imperfect work
 cannot close unless the admitted evidence is complete.

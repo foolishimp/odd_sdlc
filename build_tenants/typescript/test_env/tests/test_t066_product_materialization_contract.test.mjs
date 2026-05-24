@@ -142,6 +142,109 @@ function selectedCompositionForManifest(manifest) {
   });
 }
 
+function writeAdmittedImplementationDesignArchive({
+  workspaceRoot,
+  register,
+  outputContent
+}) {
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const prior = deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 9,
+    contract,
+    runId: "20260524T000000000Z_pid66"
+  });
+  writeHandoffFiles(prior);
+  mkdirSync(dirname(prior.outputFile), { recursive: true });
+  writeFileSync(prior.outputFile, outputContent, "utf8");
+  const registerPath = path.join(
+    prior.archiveRoot,
+    "design_depth_fp_evaluator_register.json"
+  );
+  const registerRef = pathToFileURL(registerPath).href;
+  writeFileSync(registerPath, `${JSON.stringify(register, null, 2)}\n`, "utf8");
+  const selectedComposition = selectedCompositionForManifest(prior);
+  writeFileSync(
+    path.join(prior.archiveRoot, "fp_evaluate_result.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_fp_evaluate_result",
+        stage: "F_P.evaluate",
+        computeNotationStage: "evaluate.C",
+        stageAuthority: "typed_fp_stage_carriers",
+        selectedComposition,
+        compositionRef: selectedComposition.compositionRef,
+        compositionDigest: selectedComposition.compositionDigest,
+        compositionSelectionRef: selectedComposition.compositionSelectionRef,
+        selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
+        evaluationRef: "evaluation://t066/design-depth",
+        findings: [
+          {
+            findingRef: "finding://t066/evaluate/design-depth-register",
+            compositionRef: selectedComposition.compositionRef,
+            compositionDigest: selectedComposition.compositionDigest,
+            authorityRefs: [registerRef],
+            evidenceRefs: [registerRef]
+          }
+        ],
+        evaluation: {
+          evaluationRef: "evaluation://t066/design-depth",
+          status: "passed",
+          findingRefs: ["finding://t066/evaluate/design-depth-register"]
+        },
+        status: "passed",
+        postflightStatus: "passed",
+        blockingReasons: [],
+        evidenceRefs: [registerRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    prior.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          prior.fpEvaluateResultFile
+        ).href,
+        graphFunctionName: prior.graphFunctionName,
+        edgeName: prior.edgeName,
+        targetAssetType: prior.targetAssetType,
+        outputFile: prior.outputFile,
+        digest: sha256Text(outputContent),
+        summary: "fixture admitted implementation design-depth authority",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        materializationDiagnostics: [],
+        executionEvidence: null,
+        executionEvidenceErrors: [],
+        obligationAssessments: prior.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [registerRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        ),
+        fpTransformRequestRef: null,
+        fpTransformResultRef: null,
+        fpTransformStatusSnapshot: null,
+        fpEvaluateResultRef: pathToFileURL(prior.fpEvaluateResultFile).href
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
   const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
@@ -204,55 +307,72 @@ function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
     "design/adrs/ADR-003-test-design-surface.md"
   );
   mkdirSync(dirname(implementationDesignFile), { recursive: true });
+  const implementationDesignRequirementRefs = ["reqref://t066/default"];
+  const implementationDesignSourceRefs = ["fixture://t066"];
+  const implementationDesignRegister = {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t066/scala-sbt",
+        language: stackLanguage,
+        buildTool: stackBuildTool
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "generated",
+        moduleRef: "module://t066/generated"
+      }
+    ],
+    aggregateDomainModelRows: [],
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: null,
+    sunnyDaySequenceRows: [],
+    aggregateSunnyDaySequence: null,
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "generated-data-mapper",
+        moduleName: "generated",
+        relativePath: sourceRelative,
+        publicBoundary: "DataMapper",
+        concernRole: "mapper",
+        requirementIds: implementationDesignRequirementRefs,
+        sourceAssetRefs: implementationDesignSourceRefs
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "generated-data-mapper",
+        moduleName: "generated",
+        relativePath: sourceRelative,
+        publicBoundary: "DataMapper",
+        trancheId: null,
+        firstProductFileToChange: sourceRelative,
+        upstreamComponentIds: [],
+        requirementIds: implementationDesignRequirementRefs,
+        sourceAssetRefs: implementationDesignSourceRefs
+      }
+    ],
+    fileTargetRows,
+    designCompletenessVerdict: null
+  };
   writeFileSync(
     implementationDesignFile,
-    `${JSON.stringify(
-      {
-        kind: "sdlc_design_depth_register",
-        registerVersion: "ts-design-depth-v1",
-        targetAssetType: "implementation_design_surface",
-        stackProfileRows: [
-          {
-            kind: "sdlc_stack_profile_row",
-            stackRef: "stack://t066/scala-sbt",
-            language: stackLanguage,
-            buildTool: stackBuildTool
-          }
-        ],
-        implementationModuleRows: [
-          {
-            kind: "sdlc_implementation_module_row",
-            moduleName: "generated",
-            moduleRef: "module://t066/generated"
-          }
-        ],
-        aggregateDomainModelRows: [],
-        moduleSchemaFragments: [],
-        moduleStateDiagramFragments: [],
-        aggregateDomainModel: null,
-        sunnyDaySequenceRows: [],
-        aggregateSunnyDaySequence: null,
-        componentTopologyRows: [
-          {
-            kind: "sdlc_component_topology_row",
-            componentId: "generated-data-mapper",
-            moduleName: "generated",
-            relativePath: sourceRelative,
-            publicBoundary: "DataMapper",
-            concernRole: "mapper",
-            requirementIds: ["reqref://t066/default"],
-            sourceAssetRefs: ["fixture://t066"]
-          }
-        ],
-        componentRealizationRows: [],
-        fileTargetRows,
-        designCompletenessVerdict: null
-      },
-      null,
-      2
-    )}\n`,
+    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot,
+    register: implementationDesignRegister,
+    outputContent: readFileSync(implementationDesignFile, "utf8")
+  });
   mkdirSync(dirname(testDesignFile), { recursive: true });
   writeFileSync(
     testDesignFile,
@@ -560,6 +680,24 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
   );
 }
 
+function reviewGradeEvaluatorBranch(summary) {
+  return [
+    "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+    "  const assessmentPath = process.env.ODD_SDLC_EVALUATOR_ASSESSMENT ?? path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json');",
+    "  const reportPath = process.env.ODD_SDLC_EVALUATOR_WORKER_REPORT ?? manifest.reportFile;",
+    "  const report = JSON.parse(readFileSync(reportPath, 'utf8'));",
+    "  const reviewedObligationIds = report.obligationAssessments.map((assessment) => assessment.obligationId);",
+    "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+    "  const reportRef = pathToFileURL(reportPath).href;",
+    "  const findings = reviewedObligationIds.map((obligationId) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts generated asset for materialization regression' }));",
+    `  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: ${JSON.stringify(summary)} };`,
+    "  writeFileSync(assessmentPath, `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+    "  process.stdout.write(`reviewStatus=passed reviewed=${reviewedObligationIds.length} blocked=0\\n`);",
+    "  process.exit(0);",
+    "}"
+  ].join("\n");
+}
+
 function writePlaceholderWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t066_placeholder_worker.mjs");
   writeFileSync(
@@ -570,6 +708,7 @@ function writePlaceholderWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for placeholder worker"),
       "const sourceRelative = 'src/main/scala/generated/DataMapper.scala';",
       "const testRelative = 'src/test/scala/generated/DataMapperSpec.scala';",
       "function designCompletenessVerdict() {",
@@ -661,6 +800,7 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for capability worker"),
       "const sourceRelative = 'src/main/scala/generated/DataMapper.scala';",
       "const testRelative = 'src/test/scala/generated/DataMapperSpec.scala';",
       "function componentDepthRegister() {",
@@ -775,7 +915,20 @@ function writeSilentWorkerScript(workspaceRoot) {
 
 function writeNoopWorkerScript(workspaceRoot) {
   const workerPath = path.join(workspaceRoot, "t066_noop_worker.mjs");
-  writeFileSync(workerPath, "process.exit(0);\n", "utf8");
+  writeFileSync(
+    workerPath,
+    [
+      "import { readFileSync, writeFileSync } from 'node:fs';",
+      "import path from 'node:path';",
+      "import { pathToFileURL } from 'node:url';",
+      "const manifest = process.argv[2] === undefined ? null : JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "if (manifest !== null) {",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for noop worker"),
+      "}",
+      "process.exit(0);"
+    ].join("\n"),
+    "utf8"
+  );
   return workerPath;
 }
 
@@ -788,6 +941,7 @@ function writeRepairScheduleWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      reviewGradeEvaluatorBranch("synthetic review-grade assessment passed for repair schedule worker"),
       "function findFile(root, basename) {",
       "  if (!existsSync(root)) return null;",
       "  for (const entry of readdirSync(root, { withFileTypes: true })) {",
@@ -958,7 +1112,7 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  const aggregateSunnyDaySequence = { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:compileMappingPlan', moduleName: 'cdme-compiler', operationId: operation.operationId, inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], stateTransitionIds: ['transition:MappingPlan.draft.compiled'] }], evidenceRefs: [`file://${manifest.outputFile}`] };",
       "  const topologyRow = { kind: 'sdlc_component_topology_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', concernRole: 'mapper', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] };",
       "  const componentRow = { kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', trancheId: 'tranche:data-mapper/core', firstProductFileToChange: sourceRelative, upstreamComponentIds: [], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] };",
-      "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType, stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://scala-sbt', language: 'scala', buildTool: 'sbt' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'cdme-compiler', moduleRef: 'module://cdme-compiler' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://cdme-compiler/aggregate' }], sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://cdme-compiler/compileMappingPlan' }], componentTopologyRows: [topologyRow], componentRealizationRows: [componentRow], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: sourceRelative, role: 'source' }] };",
+      "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType, stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://scala-sbt', language: 'scala', buildTool: 'sbt' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'cdme-compiler', moduleRef: 'module://cdme-compiler' }, { kind: 'sdlc_implementation_module_row', moduleName: 'cdme-core', moduleRef: 'module://cdme-core' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://cdme-compiler/aggregate' }], sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://cdme-compiler/compileMappingPlan' }], componentTopologyRows: [topologyRow], componentRealizationRows: [componentRow], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: sourceRelative, role: 'source' }] };",
       "  if (manifest.targetAssetType === 'implementation_design_surface') return { ...base, moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'cdme-compiler', entities: [entity], operations: [operation], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'cdme-compiler', entityId: entity.entityId, stateless: false, states: ['draft', 'compiled'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:MappingPlan.draft.compiled', fromState: 'draft', toState: 'compiled', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], aggregateDomainModel, aggregateSunnyDaySequence, designCompletenessVerdict: designCompletenessVerdict() };",
       "  return null;",
       "}",
@@ -1020,6 +1174,43 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  return { kind: projection.outputCarrierKind, targetAssetType: manifest.targetAssetType, edgeRef: manifest.edgeName, contractRef: projection.targetCarrierContractRef, contractDigest: projection.targetCarrierContractDigest, payload, evidenceRefs: payload.evidenceRefs };",
       "}",
       "const testExecutionRegister = testExecutionSurfaceRegister();",
+      "const evaluateStage = process.env.ODD_SDLC_EVALUATE_STAGE || '';",
+      "if (evaluateStage === 'design_depth_register') {",
+      "  const register = designDepthRegister();",
+      "  if (register === null) throw new Error(`design depth register not available for ${manifest.targetAssetType}`);",
+      "  const registerPath = path.join(manifest.archiveRoot, 'design_depth_fp_evaluator_register.json');",
+      "  writeFileSync(registerPath, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
+      "if (evaluateStage === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({",
+      "    kind: 'sdlc_review_grade_obligation_finding',",
+      "    obligationId: obligation.obligationId,",
+      "    fulfillmentStatus: 'fulfilled',",
+      "    failureClass: null,",
+      "    requiredAction: null,",
+      "    evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)],",
+      "    acceptedAuthorityRefs: [outputRef, reportRef],",
+      "    rationale: 'synthetic evaluator confirms generated artifact maps this obligation to accepted stage output'",
+      "  }));",
+      "  const assessment = {",
+      "    kind: 'sdlc_review_grade_edge_fulfillment_assessment',",
+      "    assessmentVersion: 'ts-review-grade-v1',",
+      "    graphFunctionName: manifest.graphFunctionName,",
+      "    edgeName: manifest.edgeName,",
+      "    targetAssetType: manifest.targetAssetType,",
+      "    status: 'passed',",
+      "    reviewedObligationIds,",
+      "    findings,",
+      "    evidenceRefs: [outputRef, reportRef],",
+      "    summary: 'synthetic evaluator admitted review-grade edge fulfillment for data_mapper inventory test'",
+      "  };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "const outputLines = [`# ${manifest.targetAssetType}`];",
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
@@ -3111,11 +3302,44 @@ test("T-159 post-transform assessments do not flatten every requirement onto eve
       role: "source"
     }
   ];
+  implementationDesignRegister.componentTopologyRows = [
+    ...implementationDesignRegister.componentTopologyRows,
+    {
+      kind: "sdlc_component_topology_row",
+      componentId: "generated-helper",
+      moduleName: "generated",
+      relativePath: "src/main/scala/generated/Helper.scala",
+      publicBoundary: "Helper",
+      concernRole: "mapper",
+      requirementIds: ["REQ-T066-002"],
+      sourceAssetRefs: ["fixture://t066/helper"]
+    }
+  ];
+  implementationDesignRegister.componentRealizationRows = [
+    ...implementationDesignRegister.componentRealizationRows,
+    {
+      kind: "sdlc_component_realization_row",
+      componentId: "generated-helper",
+      moduleName: "generated",
+      relativePath: "src/main/scala/generated/Helper.scala",
+      publicBoundary: "Helper",
+      trancheId: null,
+      firstProductFileToChange: "src/main/scala/generated/Helper.scala",
+      upstreamComponentIds: [],
+      requirementIds: ["REQ-T066-002"],
+      sourceAssetRefs: ["fixture://t066/helper"]
+    }
+  ];
   writeFileSync(
     implementationDesignFile,
     `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register: implementationDesignRegister,
+    outputContent: `${JSON.stringify(implementationDesignRegister, null, 2)}\n`
+  });
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -3165,11 +3389,16 @@ test("T-159 post-transform assessments do not flatten every requirement onto eve
     ])
   );
 
-  assert.deepEqual(byPath.get(mainRelativePath), [mainRequirement]);
-  assert.deepEqual(byPath.get(helperRelativePath), [helperRequirement]);
+  const mainPathRequirements = byPath.get(mainRelativePath) ?? [];
+  const helperPathRequirements = byPath.get(helperRelativePath) ?? [];
+  assert.equal(mainPathRequirements.length, 1);
+  assert.equal(helperPathRequirements.length, 1);
+  assert.equal(mainPathRequirements[0].endsWith("req_t066_001"), true);
+  assert.equal(helperPathRequirements[0].endsWith("req_t066_002"), true);
+  assert.notDeepEqual(mainPathRequirements, helperPathRequirements);
   assert.equal(
     report.obligationAssessments
-      .find((assessment) => assessment.obligationId === mainRequirement)
+      .find((assessment) => assessment.obligationId === mainPathRequirements[0])
       ?.evidenceRefs.includes(`file://${helperPath}`),
     false
   );
@@ -4003,11 +4232,44 @@ test("T-164 observed product roles follow explicit design targets before generic
     implementationDesignRegister.fileTargetRows.map((row) =>
       row.relativePath === "Cargo.toml" ? { ...row, role: "source" } : row
     );
+  implementationDesignRegister.componentTopologyRows = [
+    ...implementationDesignRegister.componentTopologyRows,
+    {
+      kind: "sdlc_component_topology_row",
+      componentId: "cargo-manifest",
+      moduleName: "generated",
+      relativePath: "Cargo.toml",
+      publicBoundary: "Cargo manifest",
+      concernRole: "other",
+      requirementIds: ["reqref://t164/cargo"],
+      sourceAssetRefs: ["fixture://t164/cargo"]
+    }
+  ];
+  implementationDesignRegister.componentRealizationRows = [
+    ...implementationDesignRegister.componentRealizationRows,
+    {
+      kind: "sdlc_component_realization_row",
+      componentId: "cargo-manifest",
+      moduleName: "generated",
+      relativePath: "Cargo.toml",
+      publicBoundary: "Cargo manifest",
+      trancheId: null,
+      firstProductFileToChange: "Cargo.toml",
+      upstreamComponentIds: [],
+      requirementIds: ["reqref://t164/cargo"],
+      sourceAssetRefs: ["fixture://t164/cargo"]
+    }
+  ];
   writeFileSync(
     implementationDesignFile,
     `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register: implementationDesignRegister,
+    outputContent: `${JSON.stringify(implementationDesignRegister, null, 2)}\n`
+  });
 
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
@@ -7805,6 +8067,11 @@ test("T-083 component-code admits sbt build plugin targets declared by implement
     `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register,
+    outputContent: `${JSON.stringify(register, null, 2)}\n`
+  });
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -7898,6 +8165,11 @@ test("T-164 component-code postflight rejects SBT Security Manager JVM options b
     `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register,
+    outputContent: `${JSON.stringify(register, null, 2)}\n`
+  });
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspace,
@@ -7989,6 +8261,11 @@ test("T-083 replay reclassifies legacy sbt plugin without rewriting source roles
     `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
+  writeAdmittedImplementationDesignArchive({
+    workspaceRoot: workspace,
+    register,
+    outputContent: `${JSON.stringify(register, null, 2)}\n`
+  });
 
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const firstManifest = deriveWorkerHandoffManifest({

@@ -56,6 +56,7 @@ export * from "./live_fp_parallel_materialization_frontier.js";
 export * from "./test_pipeline.js";
 export * from "./component_depth_register.js";
 export * from "./design_depth_register.js";
+export * from "./review_grade_edge_fulfillment.js";
 export * from "./test_design_register.js";
 export * from "./installed_operator.js";
 export * from "./transport.js";

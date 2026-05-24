@@ -120,6 +120,7 @@ import type {
   SdlcPostflightResult,
   SdlcTraversalObligation,
   SdlcWorkerObligationAssessment,
+  SdlcWorkerObligationFulfillmentStatus,
   SdlcWorkerHandoffManifest,
   SdlcDependencyMapNode,
   SdlcDependencyTraversalSelection,
@@ -134,6 +135,7 @@ import type {
   SdlcWorkerResultReport,
   SdlcWorkerRunResult,
   SdlcDecompositionSummary,
+  SdlcReviewGradeEdgeFulfillmentAssessment,
   SdlcTraversalHopSelection,
   SdlcTraversalOutcomeClass,
   SdlcWorkerTransportContract
@@ -177,6 +179,12 @@ import {
   evaluateSdlcComputeStage,
   writeSdlcFpEvaluateResult
 } from "./plugins/evaluate/index.js";
+import {
+  REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
+  REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+  admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
+  reviewGradeEdgeFulfillmentAssessmentRequired
+} from "./review_grade_edge_fulfillment.js";
 import {
   compileSdlcFeatureDependencyDagToAbgFrontier,
   deriveSdlcFeatureDependencyDagFromMaps
@@ -1650,6 +1658,19 @@ function designDepthFpEvaluatorRuleContract() {
     authority: "effect_plugin",
     inputCarrier: "EnginePluginInput",
     outputCarrier: "SdlcDesignDepthRegister",
+    computeStageRole: "evaluate",
+    computeMeans: "F_P",
+    computeStagePurpose: "candidate_evaluation"
+  });
+}
+
+function reviewGradeEdgeFulfillmentRuleContract() {
+  return constructEnginePluginContract({
+    ref: "plugin://odd-sdlc/typescript/installed-operator/review-grade-edge-fulfillment",
+    pluginKind: "fp_evaluator",
+    authority: "effect_plugin",
+    inputCarrier: "EnginePluginInput",
+    outputCarrier: "SdlcReviewGradeEdgeFulfillmentAssessment",
     computeStageRole: "evaluate",
     computeMeans: "F_P",
     computeStagePurpose: "candidate_evaluation"
@@ -3452,6 +3473,7 @@ function designDepthFpEvaluatorPrompt(input: {
     "- Populate the implementation design-depth register as the highest semantic design-depth truth for downstream transforms.",
     "- Evaluate the workspace, admitted transform evidence, worker report, construction brief, invocation package, ADR artifact, and ledger pressure together.",
     "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
+    "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
     "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
     "- The register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
     "",
@@ -3536,8 +3558,13 @@ function designDepthFpEvaluatorPrompt(input: {
     "- Use the ADR Product File Targets table for fileTargetRows, but keep fileTargetRows to materialized product file roles.",
     "- Canonical fileTargetRows[].role values are source, test, build_config, design, documentation, or other.",
     "- A source row marked deferred is still a materialized product target; emit it with role source.",
+    "- For a trivial product, fileTargetRows must name only downstream materialized product targets such as source, test, or build_config files; do not include the current ADR/design document as a file target.",
     "- componentTopologyRows and componentRealizationRows must not be empty for implementation-design registers.",
     "- Do not collapse the register to manifest-only when source/runtime requirements are present in the ADR requirement lineage, construction brief, invocation package, or worker stderr.",
+    "- Requirements that imply separable public/runtime/data/test boundaries must become separate component-level realization rows unless the register gives a specific shared-component rationale in publicBoundary and designCompletenessVerdict.reasons.",
+    "- Trivial product override: when the workspace/constraints/ADR identify a trivial product or one tiny executable/script target, keep one componentTopologyRows row and one componentRealizationRows row for the shared source target unless there are separate source files or a hard accepted authority requiring separate product components. Carry runtime, route, response, and proof requirement ids as facets of that one component with an explicit shared-component rationale.",
+    "- Do not split a trivial single-file service into runtime_binding, response, and proof-support components when all behavior is intentionally implemented in the same source file.",
+    "- Fail your own self-check and rewrite if the register assigns unrelated source/runtime/data/test obligations to one coarse component without a specific cohesion rationale.",
     "- When a requirement lineage row says a source obligation is deferred to a downstream source-materialization edge, create the implementation component topology/realization row for that source target now and carry the deferred requirement id on that component.",
     "- Staged decomposition admission is mandatory: each componentTopologyRows[] or componentRealizationRows[] row must own no more than 8 requirementIds.",
     "- If one module or source root owns more than 8 requirement ids, split it into multiple component rows under the same module/source root with distinct componentIds and publicBoundary values.",
@@ -3553,7 +3580,7 @@ function designDepthFpEvaluatorPrompt(input: {
     "- concernRole must be one of the allowed values exactly; for hello-world, stdout emitters, entry scripts, or simple glue use \"other\" unless the ADR clearly maps to parser, validator, mapper, error_model, io_adapter, reporting, or domain_model.",
     "- Preserve requirement ids exactly as written in the ADR or construction brief.",
     "- Use file:// evidence refs for the ADR transform artifact.",
-    "- If the product is trivial, keep the register trivial; do not invent modules, entities, APIs, or persistence.",
+    "- If the product is trivial, keep the register trivial; do not invent modules, entities, APIs, persistence, or multiple same-file components.",
     "- designCompletenessVerdict evaluates the implementation-design surface only. Do not mark an axis partial or blocked merely because source materialization, test design, execution, or runtime proof happens on a downstream edge.",
     "- Before the final response, re-open the JSON you wrote and verify that every typed nested item above is an object with exactly the declared fields, not a string, Markdown paragraph, or partial object.",
     "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 8 or fewer requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
@@ -3796,6 +3823,477 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
   return pathToFileURL(
     join(input.manifest.archiveRoot, DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE)
   ).href;
+}
+
+function reviewGradeEdgeFulfillmentPrompt(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly governanceRef: string;
+  readonly governancePath: string;
+  readonly constructionBriefPath: string;
+  readonly invocationPackagePath: string;
+  readonly workerReportPath: string;
+  readonly assessmentPath: string;
+}): string {
+  return [
+    "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
+    "",
+    "Purpose:",
+    "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
+    "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
+    "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
+    "",
+    "Read in order:",
+    `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
+    `2. construction brief: ${input.constructionBriefPath}`,
+    `3. invocation package: ${input.invocationPackagePath}`,
+    `4. worker result report: ${input.workerReportPath}`,
+    "5. generated asset artifacts named by worker_result_report.materializedFiles.",
+    "6. accepted design-depth register refs from construction_brief.stagePressure.designDepthEvaluatorRegisterRefs when present.",
+    "",
+    "Reading discipline:",
+    "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
+    "- Use targeted scripts that print compact counts or short ids only.",
+    "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
+    "",
+    `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
+    "",
+    "Required JSON shape:",
+    "- kind: \"sdlc_review_grade_edge_fulfillment_assessment\"",
+    "- assessmentVersion: \"ts-review-grade-v1\"",
+    `- graphFunctionName: ${JSON.stringify(input.manifest.graphFunctionName)}`,
+    `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
+    `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
+    "- status: \"passed\" or \"blocked\"",
+    "- reviewedObligationIds: every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations",
+    "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
+    "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
+    "- summary: one compact sentence",
+    "",
+    "Finding shape:",
+    "- kind: \"sdlc_review_grade_obligation_finding\"",
+    "- obligationId: exact obligation id",
+    "- fulfillmentStatus: fulfilled, partial, blocked, or unassessed",
+    "- failureClass: null when fulfilled, otherwise one of trace_missing, semantic_not_realized, boundary_collapsed, wrong_stage, schema_invalid, execution_environment, test_overlap_missing",
+    "- requiredAction: null when fulfilled, otherwise the concrete work item the next transform must complete",
+    "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
+    "- acceptedAuthorityRefs: requirement/design/depth/test authority refs used for this judgment",
+    "- rationale: compact reason for the judgment",
+    "",
+    "Review rules:",
+    "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
+    "- Mark partial or blocked when an asset exists but does not plausibly implement the accepted responsibility.",
+    "- Mark boundary_collapsed when generated source collapses multiple accepted component rows back into a coarse facade.",
+    "- Mark semantic_not_realized when requirement tags are present but the behavior is absent, stubbed, placeholder, or not connected to the exported/public boundary.",
+    "- Mark test_overlap_missing when accepted depth requires test overlap and the generated tests do not exercise the responsibility.",
+    "- For component_code_surface, compare source files to accepted design-depth componentRealizationRows and fileTargetRows.",
+    "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
+    "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
+    "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
+    "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction.",
+    "- Before final response, re-open and parse the assessment JSON. Rewrite until it is valid whole-file JSON with no Markdown fences, comments, or trailing prose.",
+    "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
+  ].join("\n");
+}
+
+function workerReportWithReviewGradeAssessment(input: {
+  readonly report: SdlcWorkerResultReport;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): SdlcWorkerResultReport {
+  const existingById = new Map(
+    input.report.obligationAssessments.map((assessment) => [
+      assessment.obligationId,
+      assessment
+    ])
+  );
+  const findingById = new Map(
+    input.assessment.findings.map((finding) => [finding.obligationId, finding])
+  );
+  const statusWeight = (
+    status: SdlcWorkerObligationFulfillmentStatus
+  ): number => {
+    switch (status) {
+      case "fulfilled":
+        return 0;
+      case "unassessed":
+        return 1;
+      case "partial":
+        return 2;
+      case "blocked":
+        return 3;
+    }
+  };
+  const stricterStatus = (
+    left: SdlcWorkerObligationFulfillmentStatus,
+    right: SdlcWorkerObligationFulfillmentStatus
+  ): SdlcWorkerObligationFulfillmentStatus =>
+    statusWeight(left) >= statusWeight(right) ? left : right;
+  const reviewed = new Set(input.assessment.reviewedObligationIds);
+  const reviewedRows = input.assessment.reviewedObligationIds.flatMap((obligationId) => {
+    const finding = findingById.get(obligationId);
+    if (finding === undefined) {
+      return [];
+    }
+    const existing = existingById.get(obligationId);
+    const existingStatus =
+      existing === undefined
+        ? "fulfilled"
+        : existing.blockingReasons.length > 0 &&
+            existing.fulfillmentStatus === "fulfilled"
+          ? "blocked"
+          : existing.fulfillmentStatus;
+    const fulfillmentStatus = stricterStatus(
+      existingStatus,
+      finding.fulfillmentStatus
+    );
+    const blockingReasons = uniqueSorted([
+      ...(existing?.blockingReasons ?? Object.freeze([])),
+      ...(finding.fulfillmentStatus === "fulfilled"
+        ? Object.freeze([])
+        : Object.freeze([
+            finding.failureClass ?? "review_grade_open",
+            finding.requiredAction ?? "required_action_missing"
+          ]))
+    ]);
+    const requiredAction =
+      fulfillmentStatus === "fulfilled"
+        ? null
+        : finding.requiredAction ?? existing?.blockingReasons[0] ?? "required_action_missing";
+    return [
+      Object.freeze({
+        kind: "sdlc_worker_obligation_assessment" as const,
+        obligationId,
+        fulfillmentStatus,
+        evidenceRefs: uniqueSorted([
+          ...(existing?.evidenceRefs ?? Object.freeze([])),
+          ...finding.evidenceRefs,
+          ...input.assessment.evidenceRefs
+        ]),
+        blockingReasons,
+        reviewGrade: true,
+        reviewFailureClass: finding.failureClass,
+        requiredAction,
+        semanticEvidenceRefs: finding.evidenceRefs,
+        acceptedAuthorityRefs: finding.acceptedAuthorityRefs
+      })
+    ];
+  });
+  const unreviewedRows = input.report.obligationAssessments.filter(
+    (assessment) => !reviewed.has(assessment.obligationId)
+  );
+  return Object.freeze({
+    ...input.report,
+    obligationAssessments: Object.freeze([...reviewedRows, ...unreviewedRows])
+  });
+}
+
+function reviewGradePostflight(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly code: SdlcBlockingReasonCode;
+  readonly details: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}): SdlcPostflightResult {
+  const detail =
+    input.details.length === 0 ? input.code : input.details.slice(0, 12).join("; ");
+  const carrier = makeSdlcBlockingReason({
+    code: input.code,
+    detail,
+    evidenceRefs: input.evidenceRefs
+  });
+  return Object.freeze({
+    kind: "sdlc_operator_postflight_result" as const,
+    status: "blocked" as const,
+    blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+    blockingReasonCarriers: Object.freeze([carrier]),
+    evidenceRefs: input.evidenceRefs
+  });
+}
+
+async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
+  readonly transport: SdlcWorkerTransportContract;
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly pluginInput: EnginePluginInput;
+  readonly eventSink: (event: RuntimeEvent) => void;
+}): Promise<EvaluationRuleOutcome> {
+  const manifestPath = join(input.manifest.archiveRoot, "handoff_manifest.json");
+  const constructionBriefPath = join(
+    input.manifest.archiveRoot,
+    "worker_construction_brief.json"
+  );
+  const invocationPackagePath = join(
+    input.manifest.archiveRoot,
+    "worker_invocation_package.json"
+  );
+  const workerReportPath = join(input.manifest.archiveRoot, "worker_result_report.json");
+  const workCategoryGovernance = selectSdlcWorkCategoryGovernance(input.manifest);
+  const assessmentPath = join(
+    input.manifest.archiveRoot,
+    REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+  );
+  const promptPath = join(
+    input.manifest.archiveRoot,
+    "review_grade_edge_fulfillment_prompt.md"
+  );
+  writeFileSync(
+    promptPath,
+    reviewGradeEdgeFulfillmentPrompt({
+      manifest: input.manifest,
+      governanceRef: workCategoryGovernance.configRef,
+      governancePath: workCategoryGovernance.workerPath,
+      constructionBriefPath,
+      invocationPackagePath,
+      workerReportPath,
+      assessmentPath
+    }),
+    "utf8"
+  );
+  const stdoutPath = join(
+    input.manifest.archiveRoot,
+    "review_grade_edge_fulfillment_stdout.log"
+  );
+  const stderrPath = join(
+    input.manifest.archiveRoot,
+    "review_grade_edge_fulfillment_stderr.log"
+  );
+  const processStartedPath = join(
+    input.manifest.archiveRoot,
+    "review_grade_edge_fulfillment_process_started.json"
+  );
+  const processEventsPath = join(
+    input.manifest.archiveRoot,
+    "review_grade_edge_fulfillment_process_events.jsonl"
+  );
+  const outputLastMessagePath =
+    input.transport.agentKey === "codex"
+      ? join(input.manifest.archiveRoot, "review_grade_edge_fulfillment_last_message.txt")
+      : "";
+  const executorProfile = selectedWorkerExecutorProfile();
+  const processLaunch = processLaunchForWorker({
+    transport: input.transport,
+    manifestPath,
+    manifest: input.manifest,
+    promptPath,
+    outputLastMessagePath,
+    executorProfile
+  });
+  const inactivityPolicy = workerInactivityPolicy();
+  const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
+  const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
+  const traceRoot = `${processEventsPath}.trace`;
+  const processResult = await invokeSupervisedProcessActor({
+    invocation: actorInvocationForPluginInput({
+      pluginInput: input.pluginInput,
+      transport: input.transport
+    }),
+    command: processLaunch.command,
+    args: processLaunch.args,
+    cwd: input.manifest.workspaceRoot,
+    environment: {
+      ...installedOperatorChildProcessEnvironment(),
+      ODD_SDLC_EVALUATE_STAGE: "review_grade_edge_fulfillment",
+      ODD_SDLC_EVALUATOR_ASSESSMENT: assessmentPath,
+      ODD_SDLC_EVALUATOR_PROMPT: promptPath,
+      ODD_SDLC_EVALUATOR_WORKER_REPORT: workerReportPath
+    },
+    environmentPolicy: environmentPolicyForTransport(input.transport),
+    stdin: processLaunch.stdin,
+    stdoutPath,
+    stderrPath,
+    stdoutRef: pathToFileURL(stdoutPath).href,
+    stderrRef: pathToFileURL(stderrPath).href,
+    processStartedPath,
+    processEventsPath,
+    parser: parserForWorkerTransport(input.transport),
+    executorProfile,
+    timeoutMs: evaluatorTimeoutMs,
+    terminationGraceMs: inactivityPolicy.terminationGraceMs,
+    heartbeatMs: inactivityPolicy.heartbeatMs,
+    eventSink: input.eventSink
+  });
+  const stdoutByteCount = fileByteCount(stdoutPath);
+  const stderrByteCount = fileByteCount(stderrPath);
+  const runRef = pathToFileURL(
+    join(input.manifest.archiveRoot, "review_grade_edge_fulfillment_run.json")
+  ).href;
+  writeOperatorArchiveFile({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "review_grade_edge_fulfillment_run.json",
+    payload: Object.freeze({
+      kind: "sdlc_review_grade_edge_fulfillment_run",
+      command: processResult.command,
+      args: processResult.args,
+      cwd: processResult.cwd,
+      status: processResult.status,
+      signal: processResult.signal,
+      elapsedMs: processResult.elapsedMs,
+      timedOut: processResult.timedOut,
+      error: processResult.error,
+      timeoutMs: evaluatorTimeoutMs,
+      workerTimeoutMs: inactivityPolicy.timeoutMs,
+      stdoutBudgetBytes,
+      stdoutByteCount,
+      stderrByteCount,
+      stdoutRef: pathToFileURL(stdoutPath).href,
+      stderrRef: pathToFileURL(stderrPath).href,
+      promptRef: pathToFileURL(promptPath).href,
+      assessmentRef: pathToFileURL(assessmentPath).href,
+      processEventsRef: pathToFileURL(processEventsPath).href,
+      traceRoot,
+      traceResultRef: fileRef(traceResultPath(traceRoot))
+    })
+  });
+  const evidenceRefs = uniqueSorted([
+    pathToFileURL(promptPath).href,
+    pathToFileURL(workerReportPath).href,
+    pathToFileURL(input.manifest.outputFile).href,
+    pathToFileURL(stdoutPath).href,
+    pathToFileURL(stderrPath).href,
+    pathToFileURL(processEventsPath).href,
+    pathToFileURL(processStartedPath).href,
+    runRef
+  ]);
+  if (processResult.status !== 0) {
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs,
+      diagnosticRefs: evidenceRefs,
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason: "review_grade_evaluator_process_failed"
+    });
+  }
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: input.manifest,
+    outputFile: assessmentPath
+  });
+  if (admission.status !== "admitted" || admission.assessment === null) {
+    const postflight = reviewGradePostflight({
+      manifest: input.manifest,
+      code: admission.status === "not_required"
+        ? "review_grade_assessment_missing"
+        : "review_grade_assessment_invalid",
+      details: admission.blockingReasons,
+      evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
+    });
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "review_grade_postflight.json",
+      payload: postflight
+    });
+    writePostflightGapDossier({
+      manifest: input.manifest,
+      gapDossier: constructPostflightGapDossier({
+        manifest: input.manifest,
+        postflight
+      })
+    });
+    const diagnosticRefs = uniqueSorted([
+      ...evidenceRefs,
+      ...admission.evidenceRefs
+    ]);
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs: diagnosticRefs,
+      residualPressureRefs: admission.blockingReasons.map(
+        (reason) =>
+          `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/${encodeURIComponent(reason)}`
+      ),
+      diagnosticRefs,
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason: admission.blockingReasons.join(",") || "review_grade_assessment_rejected"
+    });
+  }
+  const openFindings = admission.assessment.findings.filter(
+    (finding) => finding.fulfillmentStatus !== "fulfilled"
+  );
+  if (admission.assessment.status === "blocked" || openFindings.length > 0) {
+    const postflight = reviewGradePostflight({
+      manifest: input.manifest,
+      code: "review_grade_edge_fulfillment_blocked",
+      details: openFindings.map(
+        (finding) =>
+          `${finding.obligationId}:${finding.failureClass ?? "open"}:${finding.requiredAction ?? "required_action_missing"}`
+      ),
+      evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
+    });
+    writeOperatorArchiveFile({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "review_grade_postflight.json",
+      payload: postflight
+    });
+    writePostflightGapDossier({
+      manifest: input.manifest,
+      gapDossier: constructPostflightGapDossier({
+        manifest: input.manifest,
+        postflight
+      })
+    });
+    const residualPressureRefs = uniqueSorted(
+      openFindings.map(
+        (finding) =>
+          `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/${encodeURIComponent(finding.obligationId)}`
+      )
+    );
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs]),
+      residualPressureRefs,
+      diagnosticRefs: residualPressureRefs,
+      findingRefs: Object.freeze([
+        `finding://odd-sdlc/${manifestRefSegment(input.manifest)}/evaluate/review-grade-edge-fulfillment`
+      ]),
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason: openFindings
+        .map((finding) => `${finding.obligationId}:${finding.failureClass ?? "open"}`)
+        .join(",")
+    });
+  }
+  return constructEvaluationRuleOutcome({
+    status: "accepted",
+    ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+    ruleRole: "semantic_judgment",
+    computeMeans: "F_P",
+    evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs]),
+    findingRefs: Object.freeze([
+      `finding://odd-sdlc/${manifestRefSegment(input.manifest)}/evaluate/review-grade-edge-fulfillment`
+    ]),
+    selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+    selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+    selectedCompositionSelectionRef:
+      input.pluginInput.selectedCompositionSelectionRef,
+    selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+    compositionContributionRef:
+      input.pluginInput.selectedRegimeBindingRef ??
+      input.pluginInput.selectedCompositionRef
+  });
 }
 
 function fulfillmentArtifact(input: {
@@ -4392,20 +4890,7 @@ function admittedAssetTypesFromEvents(
   );
 }
 
-function graphFunctionOutputAssetTypes(input: {
-  readonly module: Module;
-  readonly graphFunctionName: string;
-}): readonly string[] {
-  const graphFunction = input.module.graphFunctions.find(
-    (candidate) => candidate.name === input.graphFunctionName
-  );
-  return graphFunction === undefined
-    ? Object.freeze([])
-    : uniqueSorted(graphFunction.outputs.map((output) => output.name));
-}
-
 function admittedAssetTypesForState(input: {
-  readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
   readonly replayEvents: readonly RuntimeEvent[];
   readonly emittedEvents: readonly RuntimeEvent[];
@@ -4419,11 +4904,7 @@ function admittedAssetTypesForState(input: {
     ...(currentEdgeAdmitted
       ? [
           ...input.state.manifest.inputAssetTypes,
-          input.state.manifest.targetAssetType,
-          ...graphFunctionOutputAssetTypes({
-            module: input.module,
-            graphFunctionName: input.state.manifest.graphFunctionName
-          })
+          input.state.manifest.targetAssetType
         ]
       : [])
   ]);
@@ -5860,7 +6341,6 @@ function deriveInstalledTraversalConsequence(input: {
     throw new TypeError("installed traversal consequence edge assurance contract drift");
   }
   const admittedAssetTypes = admittedAssetTypesForState({
-    module,
     state: input.state,
     replayEvents: input.admittedAssetEvents ?? input.replayEvents,
     emittedEvents: input.emittedEvents
@@ -7973,6 +8453,112 @@ function compactRuntimeEventArchivePayload(
       return outcome;
     }
   });
+  const reviewGradeEdgeFulfillmentRule = Object.freeze({
+    contract: reviewGradeEdgeFulfillmentRuleContract(),
+    ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+    ruleRole: "semantic_judgment" as const,
+    required: true,
+    outputCarrierRefs: Object.freeze(["SdlcReviewGradeEdgeFulfillmentAssessment"]),
+    evaluate: async (pluginInput: EnginePluginInput): Promise<EvaluationRuleOutcome> => {
+      if (dispatchState.current === null) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            "finding://odd-sdlc/evaluate/review-grade-edge-fulfillment/not-applicable/no-transform-state"
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "review-grade edge fulfillment rule has no transform state for this vector"
+        });
+      }
+      if (!reviewGradeEdgeFulfillmentAssessmentRequired(dispatchState.current.manifest)) {
+        return constructEvaluationRuleOutcome({
+          status: "accepted",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          findingRefs: Object.freeze([
+            `finding://odd-sdlc/${manifestRefSegment(dispatchState.current.manifest)}/evaluate/review-grade-edge-fulfillment/not-applicable`
+          ]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "review-grade edge fulfillment rule not required for this vector"
+        });
+      }
+      if (transport === null) {
+        return constructEvaluationRuleOutcome({
+          status: "blocked",
+          ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+          ruleRole: "semantic_judgment",
+          computeMeans: "F_P",
+          evidenceRefs: Object.freeze([pluginInput.sourceProjectionRef]),
+          selectedCompositionRef: pluginInput.selectedCompositionRef,
+          selectedCompositionDigest: pluginInput.selectedCompositionDigest,
+          selectedCompositionSelectionRef:
+            pluginInput.selectedCompositionSelectionRef,
+          selectedRegimeBindingRef: pluginInput.selectedRegimeBindingRef,
+          compositionContributionRef:
+            pluginInput.selectedRegimeBindingRef ??
+            pluginInput.selectedCompositionRef,
+          reason: "fp_worker_unattached"
+        });
+      }
+      const outcome = await materializeReviewGradeEdgeFulfillmentWithFpEvaluator({
+        transport,
+        manifest: dispatchState.current.manifest,
+        pluginInput,
+        eventSink: (event) => {
+          emitted.push(event);
+        }
+      });
+      if (
+        dispatchState.current !== null &&
+        dispatchState.current.workerReport !== null
+      ) {
+        const assessmentPath = join(
+          dispatchState.current.manifest.archiveRoot,
+          REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+        );
+        const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+          manifest: dispatchState.current.manifest,
+          outputFile: assessmentPath
+        });
+        if (admission.status === "admitted" && admission.assessment !== null) {
+          const workerReport = workerReportWithReviewGradeAssessment({
+            report: dispatchState.current.workerReport,
+            assessment: admission.assessment
+          });
+          dispatchState.current = Object.freeze({
+            ...dispatchState.current,
+            workerReport
+          });
+          writeOperatorArchiveFile({
+            archiveRoot: dispatchState.current.manifest.archiveRoot,
+            relativePath: "worker_result_report.json",
+            payload: workerReport
+          });
+        }
+      }
+      return outcome;
+    }
+  });
   const engineResult = await runEngineIterateAsync({
     basis,
     runtimeEvents: effectiveReplayEvents,
@@ -7983,9 +8569,13 @@ function compactRuntimeEventArchivePayload(
       fpDispatch,
       fpEvaluator,
       consequenceProjection,
-      evaluationRules: Object.freeze([designDepthFpEvaluatorRule]),
+      evaluationRules: Object.freeze([
+        designDepthFpEvaluatorRule,
+        reviewGradeEdgeFulfillmentRule
+      ]),
       requiredEvaluationRuleRefs: Object.freeze([
-        DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
+        DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+        REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF
       ])
     },
     maxAttachedFpAttempts: 3
@@ -8076,10 +8666,25 @@ function compactRuntimeEventArchivePayload(
   const closedWithNextTraversal =
     closureDisposition === "close" &&
     traversalConsequence.nextActionProjection.choosesNextTraversal;
+  const closedWithoutNextTraversal =
+    closureDisposition === "close" &&
+    !traversalConsequence.nextActionProjection.choosesNextTraversal &&
+    traversalConsequence.nextActionProjection.selectedActionRef === null &&
+    traversalConsequence.nextActionProjection.nextGraphFunctionRef === null &&
+    traversalConsequence.nextActionProjection.nextGraphVectorRef === null;
+  const terminalReason =
+    typeof terminal?.reason === "string" ? terminal.reason : null;
+  const evaluationSetBlocked =
+    terminal?.terminalKind === "gap_stop" &&
+    terminalReason !== null &&
+    terminalReason.includes("evaluation_set_incomplete");
   const status =
-    completedDispatchState.status === "worker_invoked" &&
-    terminal?.terminalKind === "converged" &&
-    closureDisposition === "close"
+    completedDispatchState.status === "worker_invoked" && evaluationSetBlocked
+      ? "blocked"
+      : completedDispatchState.status === "worker_invoked" &&
+    closureDisposition === "close" &&
+    (terminal?.terminalKind === "converged" ||
+      (terminal?.terminalKind === "gap_stop" && closedWithoutNextTraversal))
       ? "converged"
       : completedDispatchState.status === "worker_invoked" &&
           terminal?.terminalKind === "gap_stop" &&

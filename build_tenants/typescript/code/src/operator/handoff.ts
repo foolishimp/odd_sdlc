@@ -135,7 +135,8 @@ import {
   SDLC_DESIGN_COMPLETENESS_AXES,
   SDLC_DESIGN_COMPLETENESS_STATUSES,
   SDLC_DOMAIN_ATTRIBUTE_CARDINALITIES,
-  SDLC_DOMAIN_ENTITY_OWNERSHIP
+  SDLC_DOMAIN_ENTITY_OWNERSHIP,
+  SDLC_REVIEW_GRADE_FAILURE_CLASSES
 } from "./carriers.js";
 import type {
   SdlcMaterializedProductFile,
@@ -6699,6 +6700,7 @@ function compactDesignDepthDirective(
         "Hard output bound: keep the Markdown artifact under 450 lines, keep each write/edit payload under 180 lines, and use compact rows with source refs rather than copying upstream authority text.",
         "Keep the ADR proportional to immediate implementation structure: identify only the stack, module boundary, component/file targets, requirement lineage, and design decisions needed to materialize the declared product surface from current source assets.",
         "A substantive implementation design must preserve decomposition proportionality: no component should own more than 8 requirement refs in the requirement-lineage table; split coarse facade/engine/validator decisions into narrower public-boundary components before materialization.",
+        "Before code can close, implementation design must explicitly decompose requirement pressure to the asset granularity it demands. If requirements imply separable public, runtime, data-contract, or test boundaries, name those boundaries in component-level rows instead of hiding them inside one coarse module facade.",
         "Implementation component topology rows admitted by the evaluator use componentTopologyRows[].componentId/moduleName/relativePath/publicBoundary/concernRole with row kind=sdlc_component_topology_row; publicBoundary and concernRole are string fields.",
         "Use the Product File Targets section to name every declared product file and role. Source/implementation realization belongs to source file targets; proof-test targets belong to test design and component-test surfaces.",
         "Graph-generated tests are declared as product file targets with role=test, then realized by test_design_surface and component_test_surface. Component_code_surface realization rows own source and implementation files.",
@@ -7016,9 +7018,10 @@ function outcomeDirectivesForWorker(
         manifest.targetCarrierProjection.requiredStagedAuthorityRefs.length > 0
       ) {
         directives.push(
-          "Treat the admitted design-depth evaluator register as the highest implementation-design semantic pressure for this transform.",
-          "Read construction_brief.stagePressure.designDepthEvaluatorRegisterRefs before writing product source files; if that list is empty, report missing admitted design pressure instead of inventing a new topology.",
-          "Use source-role fileTargetRows and componentRealizationRows from that register as the product source target set."
+          "Treat the admitted design-depth evaluator register as the highest implementation-design semantic pressure; read construction_brief.stagePressure.designDepthEvaluatorRegisterRefs before source edits.",
+          "Use its source-role fileTargetRows/componentRealizationRows as source targets; if absent, report missing admitted design pressure.",
+          "For each source-role realization, materialize or repair the named source file and carry componentId, publicBoundary, requirementIds, source tags, and materializedFiles[].requirementTraceObligationIds.",
+          "Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade unless the admitted register gives that shared-component rationale."
         );
       }
       if (
@@ -7857,26 +7860,26 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     workerAuthoredTargetCarrierProtocolRequired(manifest);
   const targetCarrierIntentLine = workerAuthoredTargetCarrierProtocol
     ? `- selected target carrier: kind=${manifest.targetCarrierProjection.outputCarrierKind}; contract=${manifest.targetCarrierProjection.targetCarrierContractRef}; digest=${manifest.targetCarrierProjection.targetCarrierContractDigest}; payload path=${manifest.targetCarrierProjection.nestedPayloadPath}`
-    : "- target carrier protocol: evaluator-owned; do not copy carrier kind, contract, digest, payload path, construction-template, targetCarrierProjection, or selected-target-carrier metadata into the output artifact";
+    : "- target carrier protocol: evaluator-owned; do not copy carrier metadata into the output artifact";
   const constructionBriefFieldLines = [
     "- targetState",
-    "- stagePressure.requiredStagedAuthorityRefs and stagePressure.designDepthEvaluatorRegisterRefs when present.",
+    "- stagePressure.requiredStagedAuthorityRefs / designDepthEvaluatorRegisterRefs.",
     ...(workerAuthoredTargetCarrierProtocol
       ? ["- targetCarrierProjection"]
       : [
-          "- targetCarrierProjection is evaluator-owned protocol; do not copy or render its fields in the output artifact."
+          "- targetCarrierProjection: evaluator-owned protocol; do not render fields."
         ]),
     "- currentState.authorityIndex",
     "- obligations.requirementTraceObligationIds exactly when present.",
     "- retryAndRepair and current evaluated gaps when present.",
     "- retryRepairInstructions and repairReentryPlans when present.",
-    "- traversalIntentPackage projection by ref."
+    "- traversalIntentPackage by ref."
   ];
   const workerPackageFieldLines = [
-    "- worker_invocation_package.outcomeDirectives as the authoritative worker action contract.",
-    "- worker_invocation_package.retryRepairInstructions and repairReentryPlans when present.",
-    "- worker_invocation_package.acceptedCarrierSchemaRef and acceptedCarrierFieldSet rows when a retry is schema-local.",
-    "- worker_invocation_package.traversalIntentPackageRef by reference; do not inline full package JSON into product/design artifacts."
+    "- worker_invocation_package.outcomeDirectives as worker action contract.",
+    "- retryRepairInstructions and repairReentryPlans when present.",
+    "- acceptedCarrierSchemaRef / acceptedCarrierFieldSet for schema-local retry.",
+    "- traversalIntentPackageRef by ref; do not inline package JSON into artifacts."
   ];
   return [
     "odd_sdlc F_P.transform launch contract.",
@@ -7919,8 +7922,10 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
-    "- Archive package files and manifests are replay/audit projections. Current evaluated gaps cite any diagnostic archive file that this transform needs.",
+    "- Archive package files and manifests are replay/audit projections. Evaluated gaps cite needed diagnostics.",
     "- Apply the transform axioms projected in this launch contract and construction brief.",
+    "- First action: build a Requirement/Authority/Asset Checklist from requirement ids, accepted authority rows, target rows, expected artifacts, and evaluated gaps.",
+    "- Treat the checklist as the work queue. Do not return success while required checklist rows are unmapped or unreported as blocked residual pressure with evidence.",
     "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; evaluator-owned carrier contracts stay in framework archives unless this prompt explicitly asks for a structured register carrier.",
     "- Do not render target-carrier protocol fields in Markdown product/design surfaces unless an outcome directive explicitly asks for a structured carrier block.",
     "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
@@ -8460,12 +8465,42 @@ function admitWorkerObligationAssessment(
     "obligationId",
     "fulfillmentStatus",
     "evidenceRefs",
-    "blockingReasons"
+    "blockingReasons",
+    "reviewGrade",
+    "reviewFailureClass",
+    "requiredAction",
+    "semanticEvidenceRefs",
+    "acceptedAuthorityRefs"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
   if (kind !== "sdlc_worker_obligation_assessment") {
     throw new TypeError(`${label}.kind: unexpected obligation assessment kind`);
   }
+  const reviewFailureClass =
+    record["reviewFailureClass"] === undefined ||
+    record["reviewFailureClass"] === null
+      ? null
+      : parseEnumValue(
+          record["reviewFailureClass"],
+          `${label}.reviewFailureClass`,
+          SDLC_REVIEW_GRADE_FAILURE_CLASSES
+        );
+  const reviewGrade =
+    record["reviewGrade"] === undefined
+      ? undefined
+      : parseBoolean(record["reviewGrade"], `${label}.reviewGrade`);
+  const requiredAction = parseOptionalNonEmptyString(
+    record["requiredAction"],
+    `${label}.requiredAction`
+  );
+  const semanticEvidenceRefs =
+    record["semanticEvidenceRefs"] === undefined
+      ? undefined
+      : parseStringList(record["semanticEvidenceRefs"], `${label}.semanticEvidenceRefs`);
+  const acceptedAuthorityRefs =
+    record["acceptedAuthorityRefs"] === undefined
+      ? undefined
+      : parseStringList(record["acceptedAuthorityRefs"], `${label}.acceptedAuthorityRefs`);
   return Object.freeze({
     kind: "sdlc_worker_obligation_assessment" as const,
     obligationId: parseNonEmptyString(record["obligationId"], `${label}.obligationId`),
@@ -8478,7 +8513,14 @@ function admitWorkerObligationAssessment(
     blockingReasons: parseStringList(
       record["blockingReasons"],
       `${label}.blockingReasons`
-    )
+    ),
+    ...(reviewGrade === undefined ? {} : { reviewGrade }),
+    ...(record["reviewFailureClass"] === undefined
+      ? {}
+      : { reviewFailureClass }),
+    ...(record["requiredAction"] === undefined ? {} : { requiredAction }),
+    ...(semanticEvidenceRefs === undefined ? {} : { semanticEvidenceRefs }),
+    ...(acceptedAuthorityRefs === undefined ? {} : { acceptedAuthorityRefs })
   });
 }
 

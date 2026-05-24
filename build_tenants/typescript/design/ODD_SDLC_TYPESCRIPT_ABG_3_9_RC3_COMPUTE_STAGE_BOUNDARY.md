@@ -221,9 +221,9 @@ The implementation-design depth register pilot promotes one concrete
 - Visibility: operator-run artifact catalog, postflight evidence,
   `fp_evaluate_result.json`, evaluation finding authority refs, analyzer carrier
   state, and staged audit output.
-- Bridge: deterministic ADR-derived register synthesis is retained only as a
-  declared compatibility path when the evaluator-register feature flag is
-  disabled or a legacy deterministic fixture intentionally exercises it.
+- Bridge: none in default live execution. Deterministic source-text guards may
+  still reject malformed candidates, but they do not synthesize semantic
+  design-depth truth for closure.
 
 The sidecar is not a final ledger write, not closure authority, and not a
 product design surface. For the pilot path, selected `evaluate.C/F_P` over the
@@ -263,6 +263,76 @@ Tests for this pilot derive from the IACS boundary above. They must prove the
 sidecar path, runtime/analyzer admission parity, strict malformed-input
 rejection, evidence propagation, and evaluator-rule registration. Source-text
 guards may remain as drift detection, but they are not the sole design proof.
+
+#### Review-Grade Edge Fulfillment Rule
+
+Every close-capable worker-dispatched generated asset edge requires a separate
+`evaluate.C/F_P` rule that reviews the generated asset against incoming
+requirements, accepted upstream authority, stage fit, and overlap evidence.
+This rule does not introduce a new closure ledger. Source code is code review;
+requirements, UAT cases, testcase authority, feature decomposition, design,
+scenario, repair, execution, release, and runtime surfaces receive the same
+review-grade accountability in their own stage terms.
+
+Rule output:
+
+- Interface: `EnginePluginInput` plus selected composition identity, admitted
+  transform refs, construction brief refs, invocation package refs, manifest
+  refs, worker output refs, scalar `fp_evaluate_result.json`, and accepted
+  upstream design-depth evidence refs.
+- Adapter: `SdlcEvaluatePluginAdapter`.
+- Candidate carrier: `SdlcReviewGradeEdgeFulfillmentAssessment` serialized as
+  `review_grade_edge_fulfillment_assessment.json`.
+- Admission carrier: runtime/analyzer admission of the assessment artifact.
+- System owner: ABG owns evaluation-set execution, admission, event and ledger
+  writes, replay identity, and traversal consequence.
+- Product owner: ODD_SDLC owns the prompt contract, failure-class taxonomy,
+  per-obligation semantic adequacy policy, and interpretation of generated
+  asset fit.
+- Visibility: operator-run artifact catalog, assessment artifact, review-grade
+  postflight artifact when blocked, `fp_evaluate_result.json` evidence refs,
+  analyzer carrier state, and staged audit output.
+
+The assessment is consumed through the existing
+`SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger` path. It is not a
+second code-review ledger, not closure authority by itself, and not a
+replacement for ABG admission. The selected `evaluate.C/F_P` rule is the
+semantic review source. F_D admission guards shape, identity, complete coverage
+of traversal obligations, required actions for open findings, and fail-closed
+consistency.
+
+Review-grade findings classify generated-asset failure as:
+
+- `trace_missing`
+- `semantic_not_realized`
+- `boundary_collapsed`
+- `wrong_stage`
+- `schema_invalid`
+- `execution_environment`
+- `test_overlap_missing`
+
+The fulfilled state requires semantic evidence and accepted authority refs.
+Partial, blocked, or unassessed states require a failure class and a concrete
+required action. A passed assessment with any open finding is invalid. A blocked
+assessment with no open finding is invalid.
+
+Review-grade flow:
+
+```text
+incoming requirements + accepted upstream authority + generated asset/diff
+  -> selected evaluate.C/F_P review-grade rule
+  -> review_grade_edge_fulfillment_assessment.json
+  -> F_D admission guard
+  -> existing edge fulfillment rows and ledger
+  -> closure only when required rows are fulfilled
+```
+
+Forbidden flow:
+
+```text
+generated asset exists + requirement tags parse + schema passes
+  -> fulfilled without semantic review-grade assessment
+```
 
 ### SdlcConsequenceProjectionPluginAdapter
 

@@ -19,24 +19,30 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   admitSdlcProjectConstraints,
   conformProjectProfileFromConstraintsText,
   constructSdlcGtlModule,
+  deriveSdlcProjectConstraintsFromWorkspace,
+  deriveSdlcSelectedAbgFnCompositionIdentity,
   deriveSdlcInstalledQualificationInitialState,
   deriveSdlcWorkspaceIngressReport,
+  deriveWorkerHandoffManifest,
   executeInstalledOperatorStart,
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
+  hookContractByEdgeName,
   materializeSdlcProjectConformance,
   evalSdlcGapFromReplay,
   projectSdlcQueryDomain,
   projectSdlcWorkerAttachment,
   publicStartOnce,
-  readOddSdlcRuntimeEvents
+  readOddSdlcRuntimeEvents,
+  sha256Text,
+  writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -111,56 +117,168 @@ function writeAdmittedImplementationDesignSurface(workspaceRoot) {
     workspaceRoot,
     "build_tenants/scala_spark/design/adrs/ADR-002-implementation-design-surface.md"
   );
+  const register = {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t076/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "cdme-core",
+        moduleRef: "module://t076/cdme-core"
+      }
+    ],
+    aggregateDomainModelRows: [],
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: null,
+    sunnyDaySequenceRows: [],
+    aggregateSunnyDaySequence: null,
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "cdme-core",
+        moduleName: "cdme-core",
+        relativePath: sourceRelative,
+        publicBoundary: "Core.retryClosed",
+        concernRole: "mapper",
+        requirementIds: ["REQ-T076-001"],
+        sourceAssetRefs: ["fixture://t076"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "cdme-core",
+        moduleName: "cdme-core",
+        relativePath: sourceRelative,
+        publicBoundary: "Core.retryClosed",
+        trancheId: null,
+        firstProductFileToChange: sourceRelative,
+        upstreamComponentIds: [],
+        requirementIds: ["REQ-T076-001"],
+        sourceAssetRefs: ["fixture://t076"]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: sourceRelative,
+        role: "source"
+      }
+    ],
+    designCompletenessVerdict: null
+  };
+  const outputContent = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(dirname(outputFile), { recursive: true });
+  writeFileSync(outputFile, outputContent, "utf8");
+
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspaceRoot);
+  const contract = hookContractByEdgeName("derive_implementation_design_surface");
+  const prior = deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 9,
+    contract,
+    projectConstraints: constraints,
+    runId: "20260524T000000000Z_pid76"
+  });
+  writeHandoffFiles(prior);
+  mkdirSync(dirname(prior.outputFile), { recursive: true });
+  writeFileSync(prior.outputFile, outputContent, "utf8");
+  const registerPath = path.join(
+    prior.archiveRoot,
+    "design_depth_fp_evaluator_register.json"
+  );
+  const registerRef = pathToFileURL(registerPath).href;
+  writeFileSync(registerPath, outputContent, "utf8");
+  const selectedComposition = deriveSdlcSelectedAbgFnCompositionIdentity({
+    graphFunctionRef: prior.graphFunctionName,
+    graphVectorRef: prior.edgeName,
+    compositionSelectionScopeRef: `test://${prior.edgeName}`,
+    carrierContextRefs: [prior.reportFile],
+    assuranceContextRefs: []
+  });
   writeFileSync(
-    outputFile,
+    prior.fpEvaluateResultFile,
     `${JSON.stringify(
       {
-        kind: "sdlc_design_depth_register",
-        registerVersion: "ts-design-depth-v1",
-        targetAssetType: "implementation_design_surface",
-        stackProfileRows: [
+        kind: "sdlc_fp_evaluate_result",
+        stage: "F_P.evaluate",
+        computeNotationStage: "evaluate.C",
+        stageAuthority: "typed_fp_stage_carriers",
+        selectedComposition,
+        compositionRef: selectedComposition.compositionRef,
+        compositionDigest: selectedComposition.compositionDigest,
+        compositionSelectionRef: selectedComposition.compositionSelectionRef,
+        selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
+        evaluationRef: "evaluation://t076/design-depth",
+        findings: [
           {
-            kind: "sdlc_stack_profile_row",
-            stackRef: "stack://t076/scala-sbt",
-            language: "scala",
-            buildTool: "sbt"
+            findingRef: "finding://t076/design-depth",
+            compositionRef: selectedComposition.compositionRef,
+            compositionDigest: selectedComposition.compositionDigest,
+            authorityRefs: [registerRef],
+            evidenceRefs: [registerRef]
           }
         ],
-        implementationModuleRows: [
-          {
-            kind: "sdlc_implementation_module_row",
-            moduleName: "cdme-core",
-            moduleRef: "module://t076/cdme-core"
-          }
-        ],
-        aggregateDomainModelRows: [],
-        moduleSchemaFragments: [],
-        moduleStateDiagramFragments: [],
-        aggregateDomainModel: null,
-        sunnyDaySequenceRows: [],
-        aggregateSunnyDaySequence: null,
-        componentTopologyRows: [
-          {
-            kind: "sdlc_component_topology_row",
-            componentId: "cdme-core",
-            moduleName: "cdme-core",
-            relativePath: sourceRelative,
-            publicBoundary: "Core.retryClosed",
-            concernRole: "mapper",
-            requirementIds: ["REQ-T076-001"],
-            sourceAssetRefs: ["fixture://t076"]
-          }
-        ],
-        componentRealizationRows: [],
-        fileTargetRows: [
-          {
-            kind: "sdlc_file_target_row",
-            relativePath: sourceRelative,
-            role: "source"
-          }
-        ],
-        designCompletenessVerdict: null
+        evaluation: {
+          evaluationRef: "evaluation://t076/design-depth",
+          status: "passed",
+          findingRefs: ["finding://t076/design-depth"]
+        },
+        status: "passed",
+        postflightStatus: "passed",
+        blockingReasons: [],
+        evidenceRefs: [registerRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    prior.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          prior.fpEvaluateResultFile
+        ).href,
+        graphFunctionName: prior.graphFunctionName,
+        edgeName: prior.edgeName,
+        targetAssetType: prior.targetAssetType,
+        outputFile: prior.outputFile,
+        digest: sha256Text(outputContent),
+        summary: "fixture admitted implementation design-depth authority",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        materializationDiagnostics: [],
+        executionEvidence: null,
+        executionEvidenceErrors: [],
+        obligationAssessments: prior.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [registerRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        ),
+        fpTransformRequestRef: null,
+        fpTransformResultRef: null,
+        fpTransformStatusSnapshot: null,
+        fpEvaluateResultRef: pathToFileURL(prior.fpEvaluateResultFile).href
       },
       null,
       2
@@ -323,6 +441,15 @@ function writeRetryAwareWorkerScript(workspaceRoot) {
       "  return { kind: 'sdlc_component_depth_register', registerVersion: 'ts-component-depth-v1', targetAssetType: manifest.targetAssetType, componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', requirementIds: ['REQ-T076-001'], sourceAssetRefs: ['fixture://t076'] }] };",
       "}",
       "const register = componentDepthRegister();",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts retry-aware component materialization' }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment passed' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`];",
       "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
       "const output = outputLines.join('\\n') + '\\n';",
@@ -374,7 +501,7 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "  const aggregateDomainModel = { kind: 'sdlc_aggregate_domain_model', modelVersion: 'ts-design-depth-v1', entities: [aggregateEntity], operations: [operation], crossModuleReferences: [], evidenceRefs: [manifest.outputFile] };",
       "  const aggregateSunnyDaySequence = { kind: 'sdlc_aggregate_sunny_day_sequence', sequenceVersion: 'ts-design-depth-v1', steps: [{ kind: 'sdlc_sunny_day_sequence_step', stepId: 'step:Core.retryClosed', moduleName: 'cdme-compiler', operationId: operation.operationId, inputEntityIds: [entity.entityId], outputEntityIds: [entity.entityId], stateTransitionIds: ['transition:Core.open.closed'] }], evidenceRefs: [manifest.outputFile] };",
       "  const base = { kind: 'sdlc_design_depth_register', registerVersion: 'ts-design-depth-v1', targetAssetType: manifest.targetAssetType };",
-      "  if (manifest.targetAssetType === 'implementation_design_surface') return { ...base, stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://t076/scala-sbt', language: 'scala', buildTool: 'sbt' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'cdme-compiler', moduleRef: 'module://t076/cdme-compiler' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://t076/aggregate' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'cdme-compiler', entities: [entity], operations: [operation], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'cdme-compiler', entityId: entity.entityId, stateless: false, states: ['open', 'closed'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:Core.open.closed', fromState: 'open', toState: 'closed', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], aggregateDomainModel, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://t076/core-retry' }], aggregateSunnyDaySequence, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', concernRole: 'mapper', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', trancheId: 'tranche:core', firstProductFileToChange: sourceRelative, upstreamComponentIds: [], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: sourceRelative, role: 'source' }], designCompletenessVerdict: designCompletenessVerdict() };",
+      "  if (manifest.targetAssetType === 'implementation_design_surface') return { ...base, stackProfileRows: [{ kind: 'sdlc_stack_profile_row', stackRef: 'stack://t076/scala-sbt', language: 'scala', buildTool: 'sbt' }], implementationModuleRows: [{ kind: 'sdlc_implementation_module_row', moduleName: 'cdme-compiler', moduleRef: 'module://t076/cdme-compiler' }, { kind: 'sdlc_implementation_module_row', moduleName: 'cdme-core', moduleRef: 'module://t076/cdme-core' }], aggregateDomainModelRows: [{ kind: 'sdlc_aggregate_domain_model_row', modelRef: 'model://t076/aggregate' }], moduleSchemaFragments: [{ kind: 'sdlc_module_schema_fragment', moduleName: 'cdme-compiler', entities: [entity], operations: [operation], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], moduleStateDiagramFragments: [{ kind: 'sdlc_module_state_diagram_fragment', moduleName: 'cdme-compiler', entityId: entity.entityId, stateless: false, states: ['open', 'closed'], transitions: [{ kind: 'sdlc_entity_state_transition', transitionId: 'transition:Core.open.closed', fromState: 'open', toState: 'closed', operationId: operation.operationId, entityId: entity.entityId }], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], aggregateDomainModel, sunnyDaySequenceRows: [{ kind: 'sdlc_sunny_day_sequence_row', sequenceRef: 'sequence://t076/core-retry' }], aggregateSunnyDaySequence, componentTopologyRows: [{ kind: 'sdlc_component_topology_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', concernRole: 'mapper', requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], componentRealizationRows: [{ kind: 'sdlc_component_realization_row', componentId: 'cdme-core', moduleName: 'cdme-core', relativePath: sourceRelative, publicBoundary: 'Core.retryClosed', trancheId: 'tranche:core', firstProductFileToChange: sourceRelative, upstreamComponentIds: [], requirementIds: ['REQ-ENG-001'], sourceAssetRefs: ['template://data_mapper'] }], fileTargetRows: [{ kind: 'sdlc_file_target_row', relativePath: sourceRelative, role: 'source' }], designCompletenessVerdict: designCompletenessVerdict() };",
       "  return null;",
       "}",
       "function componentDepthRegister() {",
@@ -392,6 +519,20 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
       "}",
       "const designRegister = designDepthRegister();",
       "const componentRegister = componentDepthRegister();",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'design_depth_register') {",
+      "  if (designRegister === null) throw new Error(`design depth register not available for ${manifest.targetAssetType}`);",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'design_depth_fp_evaluator_register.json'), `${JSON.stringify(designRegister, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts installed retry-aware materialization' }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment passed' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "const requirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `retry_context: ${hasPriorGap}`, '', '## Requirement Trace', ...(requirementTags.length > 0 ? requirementTags.map((tag) => `// Implements: ${tag}`) : ['// no requirement obligations'])];",
       "if (designRegister !== null) outputLines.push('', '```design_depth_register', JSON.stringify(designRegister, null, 2), '```');",

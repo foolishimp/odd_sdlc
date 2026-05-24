@@ -19,7 +19,8 @@ export type SdlcOperatorRunArtifactSourceOwner =
 export type SdlcOperatorRunArtifactRequiredWhen =
   | "parallel_dependency_traversal_selected"
   | "closed_product_edge_requires_materialization_manifest"
-  | "implementation_design_surface_present";
+  | "implementation_design_surface_present"
+  | "review_grade_edge_fulfillment_required";
 
 export interface SdlcOperatorRunArtifactRow {
   readonly artifactRef: string;
@@ -185,6 +186,99 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: true,
     malformedGapTracked: false,
     admissionRef: "admission://odd-sdlc/operator-run/fp-evaluate-result"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-assessment",
+    relativePath: "review_grade_edge_fulfillment_assessment.json",
+    carrierKind: "sdlc_review_grade_edge_fulfillment_assessment",
+    role: "authority_admission",
+    sourceOwner: "fp_evaluator",
+    requiredForPresentEdge: false,
+    requiredWhen: "review_grade_edge_fulfillment_required",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/review-grade-edge-fulfillment-assessment"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-run",
+    relativePath: "review_grade_edge_fulfillment_run.json",
+    carrierKind: "sdlc_review_grade_edge_fulfillment_run",
+    role: "runtime_fact",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    requiredWhen: "review_grade_edge_fulfillment_required",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/review-grade-edge-fulfillment-run"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-prompt",
+    relativePath: "review_grade_edge_fulfillment_prompt.md",
+    carrierKind: null,
+    role: "worker_projection",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-postflight",
+    relativePath: "review_grade_postflight.json",
+    carrierKind: "sdlc_operator_postflight_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/review-grade-postflight"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-stdout",
+    relativePath: "review_grade_edge_fulfillment_stdout.log",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-stderr",
+    relativePath: "review_grade_edge_fulfillment_stderr.log",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-last-message",
+    relativePath: "review_grade_edge_fulfillment_last_message.txt",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-process-started",
+    relativePath: "review_grade_edge_fulfillment_process_started.json",
+    carrierKind: "actor_process_started",
+    role: "runtime_fact",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    requiredWhen: "review_grade_edge_fulfillment_required",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/review-grade-edge-fulfillment-process-started"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-process-events",
+    relativePath: "review_grade_edge_fulfillment_process_events.jsonl",
+    carrierKind: "jsonl:runtime_event",
+    role: "runtime_fact",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/review-grade-edge-fulfillment-process-events"
   }),
   row({
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-run",
@@ -823,6 +917,9 @@ export function isSdlcOperatorRunArtifactRequiredForContext(input: {
   }
   if (input.artifact.requiredWhen === "implementation_design_surface_present") {
     return input.context.targetAssetType === "implementation_design_surface";
+  }
+  if (input.artifact.requiredWhen === "review_grade_edge_fulfillment_required") {
+    return input.context.edgeRef !== null && input.context.targetAssetType !== null;
   }
   return false;
 }

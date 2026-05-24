@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { materializeGraphFunction } from "@abiogenesis/typescript-tenant";
 
@@ -154,6 +155,178 @@ function writeImplementationDesignAuthority(workspaceRoot) {
           attribute: axis("attribute"),
           flow: axis("flow")
         }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const archiveRoot = path.join(
+    workspaceRoot,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260512T000158000Z_pid158"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const registerPath = path.join(archiveRoot, "design_depth_fp_evaluator_register.json");
+  const registerRef = pathToFileURL(registerPath).href;
+  const fpEvaluateResultPath = path.join(archiveRoot, "fp_evaluate_result.json");
+  const composition = {
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: "abg.fn_composition://t158/implementation-design",
+    compositionDigest: "digest://t158/implementation-design",
+    compositionSelectionRef:
+      "abg.fn_composition_selection://t158/implementation-design",
+    selectedRegimeBindingRef:
+      "abg.fn_composition.regime_binding://t158/implementation-design/evaluate/fp",
+    graphFunctionRef: "derive_implementation_design_surface",
+    graphVectorRef: "derive_implementation_design_surface",
+    basisRef: "basis://t158/implementation-design"
+  };
+  const sidecarRegister = {
+    kind: "sdlc_design_depth_register",
+    registerVersion: "ts-design-depth-v1",
+    targetAssetType: "implementation_design_surface",
+    stackProfileRows: [
+      {
+        kind: "sdlc_stack_profile_row",
+        stackRef: "stack://t158/scala-sbt",
+        language: "scala",
+        buildTool: "sbt"
+      }
+    ],
+    implementationModuleRows: [
+      {
+        kind: "sdlc_implementation_module_row",
+        moduleName: "generated",
+        moduleRef: "module://t158/generated"
+      }
+    ],
+    aggregateDomainModelRows: [],
+    moduleSchemaFragments: [],
+    moduleStateDiagramFragments: [],
+    aggregateDomainModel: null,
+    sunnyDaySequenceRows: [],
+    aggregateSunnyDaySequence: null,
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "generated-core",
+        moduleName: "generated",
+        relativePath: sourceRelative,
+        publicBoundary: "generated.Core",
+        concernRole: "other",
+        requirementIds,
+        sourceAssetRefs: [registerRef]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "generated-core",
+        moduleName: "generated",
+        relativePath: sourceRelative,
+        publicBoundary: "generated.Core",
+        trancheId: null,
+        firstProductFileToChange: sourceRelative,
+        upstreamComponentIds: [],
+        requirementIds,
+        sourceAssetRefs: [registerRef]
+      }
+    ],
+    fileTargetRows: [
+      {
+        kind: "sdlc_file_target_row",
+        relativePath: sourceRelative,
+        role: "source"
+      }
+    ],
+    designCompletenessVerdict: null
+  };
+  writeFileSync(registerPath, `${JSON.stringify(sidecarRegister, null, 2)}\n`, "utf8");
+  writeFileSync(
+    path.join(archiveRoot, "handoff_manifest.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_worker_handoff_manifest",
+        contractVersion: "synthetic-v1",
+        workspaceRoot,
+        archiveRoot,
+        graphFunctionName: "derive_implementation_design_surface",
+        edgeName: "derive_implementation_design_surface",
+        vectorIndex: 0,
+        inputAssetTypes: ["scenario_surface"],
+        targetAssetType: "implementation_design_surface",
+        outputFile,
+        reportFile: path.join(archiveRoot, "worker_result_report.json"),
+        productMaterialization: {
+          tenantRoot: path.join(workspaceRoot, "build_tenants/scala_spark")
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    fpEvaluateResultPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_fp_evaluate_result",
+        stage: "F_P.evaluate",
+        computeNotationStage: "evaluate.C",
+        stageAuthority: "typed_fp_stage_carriers",
+        selectedComposition: composition,
+        compositionRef: composition.compositionRef,
+        compositionDigest: composition.compositionDigest,
+        compositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        evaluationRef: "evaluation://t158/implementation-design",
+        findings: [
+          {
+            findingRef: "finding://t158/implementation-design/depth-register",
+            compositionRef: composition.compositionRef,
+            compositionDigest: composition.compositionDigest,
+            authorityRefs: [registerRef],
+            evidenceRefs: [registerRef]
+          }
+        ],
+        evaluation: {
+          evaluationRef: "evaluation://t158/implementation-design",
+          status: "passed",
+          findingRefs: ["finding://t158/implementation-design/depth-register"]
+        },
+        status: "passed",
+        postflightStatus: "passed",
+        blockingReasons: [],
+        evidenceRefs: [registerRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "worker_result_report.json"),
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(fpEvaluateResultPath).href,
+        graphFunctionName: "derive_implementation_design_surface",
+        edgeName: "derive_implementation_design_surface",
+        targetAssetType: "implementation_design_surface",
+        outputFile,
+        digest: "sha256:t158-implementation-design",
+        summary: "admitted F_P design-depth predecessor",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        materializationDiagnostics: [],
+        executionEvidence: null,
+        executionEvidenceErrors: [],
+        obligationAssessments: [],
+        fpTransformRequestRef: null,
+        fpTransformResultRef: null,
+        fpTransformStatusSnapshot: null,
+        fpEvaluateResultRef: pathToFileURL(fpEvaluateResultPath).href
       },
       null,
       2
@@ -314,6 +487,15 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
       "import path, { dirname } from 'node:path';",
       "import { pathToFileURL } from 'node:url';",
       "const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator admits semantic review so the test isolates consequence publication retry law' }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment passed for consequence regression test' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "const output = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`].join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
@@ -414,7 +596,8 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
   assert(outcome.archiveRoot);
   assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
+  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "yield");
+  assert(outcome.traversalConsequence.edgeClosureDecision.yieldResumeBasis);
 
   const closurePath = path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json");
   const nextActionPath = path.join(outcome.archiveRoot, "sdlc_next_action_projection.json");
@@ -423,14 +606,14 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
 
   const closureDecision = JSON.parse(readFileSync(closurePath, "utf8"));
   const nextActionProjection = JSON.parse(readFileSync(nextActionPath, "utf8"));
-  assert.equal(closureDecision.disposition, "retry");
+  assert.equal(closureDecision.disposition, "yield");
   assert.equal(
     nextActionProjection.nextActionProjectionRef,
     outcome.traversalConsequence.nextActionProjection.nextActionProjectionRef
   );
   assert.equal(
     outcome.summary.nextLawfulAction,
-    nextActionProjection.selectedActionRef
+    "disposition://yield"
   );
 
   const runtimeEvents = JSON.parse(
@@ -454,7 +637,7 @@ test("T-158 non-close F_P dispatch publishes consequence before returning dispat
   );
   assert.equal(
     gaps.payload.requirementFulfillment.edgeClosureDisposition,
-    "retry"
+    "yield"
   );
   assert(
     gaps.payload.requirementFulfillment.rows.some((row) =>

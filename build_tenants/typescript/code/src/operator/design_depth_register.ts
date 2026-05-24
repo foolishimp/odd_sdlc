@@ -1818,10 +1818,16 @@ function designDepthRegisterQualityErrors(input: {
   const topologyComponentIds = new Set(
     register.componentTopologyRows.map((row) => row.componentId)
   );
+  const realizationComponentIds = new Set(
+    register.componentRealizationRows.map((row) => row.componentId)
+  );
   const sourceFileTargetPaths = new Set(
     register.fileTargetRows
       .filter((row) => row.role === "source")
       .map((row) => row.relativePath)
+  );
+  const sourceRealizationPaths = new Set(
+    register.componentRealizationRows.map((row) => row.relativePath)
   );
   if (register.componentTopologyRows.length === 0) {
     errors.push("component_topology_required");
@@ -1843,6 +1849,15 @@ function designDepthRegisterQualityErrors(input: {
         `component_topology_placeholder_public_boundary:${row.componentId}:${row.publicBoundary}`
       );
     }
+    if (row.requirementIds.length === 0) {
+      errors.push(`component_topology_requirement_ids_missing:${row.componentId}`);
+    }
+    if (row.sourceAssetRefs.length === 0) {
+      errors.push(`component_topology_evidence_refs_missing:${row.componentId}`);
+    }
+    if (!realizationComponentIds.has(row.componentId)) {
+      errors.push(`component_topology_realization_missing:${row.componentId}`);
+    }
     if (!sourceFileTargetPaths.has(row.relativePath)) {
       errors.push(
         `component_topology_source_file_target_missing:${row.componentId}:${row.relativePath}`
@@ -1863,10 +1878,21 @@ function designDepthRegisterQualityErrors(input: {
         `component_realization_placeholder_public_boundary:${row.componentId}:${row.publicBoundary}`
       );
     }
+    if (row.requirementIds.length === 0) {
+      errors.push(`component_realization_requirement_ids_missing:${row.componentId}`);
+    }
+    if (row.sourceAssetRefs.length === 0) {
+      errors.push(`component_realization_evidence_refs_missing:${row.componentId}`);
+    }
     if (!sourceFileTargetPaths.has(row.relativePath)) {
       errors.push(
         `component_realization_source_file_target_missing:${row.componentId}:${row.relativePath}`
       );
+    }
+  }
+  for (const relativePath of sourceFileTargetPaths) {
+    if (!sourceRealizationPaths.has(relativePath)) {
+      errors.push(`source_file_target_realization_missing:${relativePath}`);
     }
   }
   const rolesByPath = new Map<string, Set<string>>();

@@ -84,7 +84,8 @@ test("T-181 design module declares evaluator register IACS carrier truth", () =>
   assert.match(design, /requireSourceFileTargets=true/u);
   assert.match(design, /System owner: ABG owns/u);
   assert.match(design, /Product owner: ODD_SDLC owns/u);
-  assert.match(design, /feature flag is\s+disabled/u);
+  assert.match(design, /Bridge: none in default live execution/u);
+  assert.match(design, /do not synthesize semantic\s+design-depth truth for closure/u);
   assert.match(design, /not a final ledger write/u);
   assert.match(design, /not closure authority/u);
   assert.match(design, /flowchart TD/u);
@@ -930,8 +931,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /outputCarrier: "SdlcDesignDepthRegister"/u);
   assert.match(source, /computeStageRole: "evaluate"/u);
   assert.match(source, /computeMeans: "F_P"/u);
-  assert.match(source, /evaluationRules: Object\.freeze\(\[designDepthFpEvaluatorRule\]\)/u);
+  assert.match(source, /evaluationRules: Object\.freeze\(\[\s*designDepthFpEvaluatorRule,\s*reviewGradeEdgeFulfillmentRule\s*\]\)/u);
   assert.match(source, /requiredEvaluationRuleRefs: Object\.freeze\(\[/u);
+  assert.match(source, /REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF/u);
   assert.doesNotMatch(source, /designDepthFpEvaluatorRuleEnabled/u);
   assert.doesNotMatch(handoffSource, /designDepthFpEvaluatorRegistersEnabled/u);
   assert.doesNotMatch(handoffSource, /allowLegacyImplementationDesignDerivation/u);

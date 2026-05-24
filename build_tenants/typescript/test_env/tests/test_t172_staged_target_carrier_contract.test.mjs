@@ -330,20 +330,79 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     "design_depth_fp_evaluator_register.json"
   );
   const registerRef = pathToFileURL(registerPath).href;
-  writeJsonFile(registerPath, register);
-  writeJsonFile(path.join(manifest.archiveRoot, "fp_evaluate_result.json"), {
-    kind: "sdlc_fp_evaluate_result",
-    computeNotationStage: "evaluate.C",
+  const composition = {
+    kind: "sdlc_selected_abg_fn_composition_identity",
     compositionRef: "abg.fn_composition://t172/fp-evaluate",
     compositionDigest: "digest://t172/fp-evaluate",
     compositionSelectionRef: "abg.fn_composition_selection://t172/fp-evaluate",
     selectedRegimeBindingRef:
       "abg.fn_composition.regime_binding://t172/evaluate/fp",
+    graphFunctionRef: "Fg_t172",
+    graphVectorRef: manifest.edgeName,
+    basisRef: "basis://t172"
+  };
+  writeJsonFile(registerPath, register);
+  writeJsonFile(path.join(manifest.archiveRoot, "fp_evaluate_result.json"), {
+    kind: "sdlc_fp_evaluate_result",
+    stage: "F_P.evaluate",
+    computeNotationStage: "evaluate.C",
+    stageAuthority: "typed_fp_stage_carriers",
+    selectedComposition: composition,
+    compositionRef: composition.compositionRef,
+    compositionDigest: composition.compositionDigest,
+    compositionSelectionRef: composition.compositionSelectionRef,
+    selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+    evaluationRef: "evaluation://t172/fp",
+    findings: [
+      {
+        findingRef: "finding://t172/evaluate/design-depth-register",
+        compositionRef: composition.compositionRef,
+        compositionDigest: composition.compositionDigest,
+        authorityRefs: [registerRef],
+        evidenceRefs: [registerRef]
+      }
+    ],
+    evaluation: {
+      evaluationRef: "evaluation://t172/fp",
+      status: "passed",
+      findingRefs: ["finding://t172/evaluate/design-depth-register"]
+    },
+    status: "passed",
+    postflightStatus: "passed",
+    blockingReasons: [],
     evidenceRefs: [registerRef]
+  });
+  const outcomePath = path.join(
+    manifest.archiveRoot,
+    "design_depth_fp_evaluator_rule_outcome.json"
+  );
+  writeJsonFile(outcomePath, {
+    kind: "evaluation_rule_outcome",
+    status: "accepted",
+    ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+    ruleRole: "semantic_judgment",
+    computeMeans: "F_P",
+    producedRegisterRefs: [registerRef],
+    evidenceRefs: [registerRef],
+    findingRefs: ["finding://t172/evaluate/design-depth-register"],
+    humanResponseRefs: [],
+    residualPressureRefs: [],
+    continuationRefs: [],
+    diagnosticRefs: [],
+    selectedCompositionRef: composition.compositionRef,
+    selectedCompositionDigest: composition.compositionDigest,
+    selectedCompositionSelectionRef: composition.compositionSelectionRef,
+    selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+    compositionContributionRef: composition.selectedRegimeBindingRef,
+    reason: null
   });
   return {
     registerPath,
-    evidenceRefs: [registerRef, "finding://t172/evaluate/design-depth-register"]
+    evidenceRefs: [
+      pathToFileURL(outcomePath).href,
+      registerRef,
+      "finding://t172/evaluate/design-depth-register"
+    ]
   };
 }
 

@@ -153,6 +153,7 @@
     "test:t179": "npm run build:semantic && node --test test_env/tests/test_t179_epistemology_compliance.test.mjs",
     "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_3_9_rc3_staged_compute_boundary.test.mjs",
     "test:t181": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs",
+    "test:t182": "npm run build:semantic && node --test test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",

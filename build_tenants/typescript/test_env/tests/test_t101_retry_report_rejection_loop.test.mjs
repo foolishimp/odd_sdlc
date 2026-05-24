@@ -128,7 +128,8 @@ function writeRetryWorker(workspaceRoot) {
       "const retryDossierCount = manifest.retryContext.priorGapDossiers.length;",
       "const retryReasons = manifest.retryContext.priorGapDossiers.flatMap((dossier) => dossier.reasons.map((reason) => reason.reason));",
       "const requirementTags = [...new Set(manifest.traversalObligationContext.obligations.flatMap((obligation) => { if (obligation.obligationKind !== 'requirement') return []; const match = /^Fulfill ([^:]+):/u.exec(obligation.summary); return match?.[1] === undefined ? [] : [match[1]]; }))];",
-      "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, retryDossierCount, retryReasons, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
+      "const evaluateStage = process.env.ODD_SDLC_EVALUATE_STAGE || null;",
+      "appendFileSync(path.join(runtimeRoot, 't101_edge_log.jsonl'), `${JSON.stringify({ edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, attempt: counts[manifest.edgeName], priorGapCount, retryDossierCount, retryReasons, evaluateStage, archiveRoot: manifest.archiveRoot })}\\n`, 'utf8');",
       "function digestText(content) { return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`; }",
       "function materializedFile(role, relativePath, content) { const absolutePath = path.join(manifest.productMaterialization.tenantRoot, relativePath); mkdirSync(dirname(absolutePath), { recursive: true }); writeFileSync(absolutePath, content, 'utf8'); return { kind: 'sdlc_materialized_product_file', role, relativePath, absolutePath, digest: digestText(content), byteCount: Buffer.byteLength(content, 'utf8') }; }",
       "const sourceRelative = 'retry-core/src/index.ts';",
@@ -178,7 +179,7 @@ function writeRetryWorker(workspaceRoot) {
       "}",
       "const materializedFiles = [];",
       "const outputLines = [`# ${manifest.targetAssetType}`, '', `edge: ${manifest.edgeName}`, `attempt: ${counts[manifest.edgeName]}`, `prior_gap_count: ${priorGapCount}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', ...(requirementTags.length > 0 ? requirementTags.map((tag) => `// Validates: ${tag}`) : ['// no requirement obligations'])];",
-      "if (manifest.targetAssetType === 'implementation_design_surface' && retryDossierCount === 0) { process.exit(0); }",
+      "if (manifest.targetAssetType === 'implementation_design_surface' && retryDossierCount === 0 && evaluateStage === null) { process.exit(0); }",
       "const designRegister = designDepthRegister();",
       "const testRegister = testDesignRegister();",
       "const testExecutionRegister = testExecutionSurfaceRegister();",
@@ -187,6 +188,20 @@ function writeRetryWorker(workspaceRoot) {
       "if (testRegister !== null) { outputLines.push('', '```test_design_register', JSON.stringify(testRegister, null, 2), '```'); }",
       "if (testExecutionRegister !== null) { outputLines.push('', '```json test_execution_surface_register', JSON.stringify(testExecutionRegister, null, 2), '```'); }",
       "if (componentRegister !== null) { outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```'); }",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'design_depth_register') {",
+      "  if (designRegister === null) throw new Error(`design depth register not available for ${manifest.targetAssetType}`);",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'design_depth_fp_evaluator_register.json'), `${JSON.stringify(designRegister, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
+      "if (process.env.ODD_SDLC_EVALUATE_STAGE === 'review_grade_edge_fulfillment') {",
+      "  const outputRef = pathToFileURL(manifest.outputFile).href;",
+      "  const reportRef = pathToFileURL(manifest.reportFile).href;",
+      "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator accepts retry graph materialization' }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment passed' };",
+      "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
+      "  process.exit(0);",
+      "}",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "const outputContent = `${outputLines.join('\\n')}\\n`;",
       "writeFileSync(manifest.outputFile, outputContent, 'utf8');",
@@ -259,7 +274,9 @@ test("T-101 ABG-owned iteration continues retry-eligible worker report rejection
     .split("\n")
     .map((line) => JSON.parse(line));
   const implementationDesignAttempts = edgeLog.filter(
-    (entry) => entry.edgeName === "derive_implementation_design_surface"
+    (entry) =>
+      entry.edgeName === "derive_implementation_design_surface" &&
+      entry.evaluateStage === null
   );
   assert.equal(implementationDesignAttempts.length, 2);
   assert.equal(implementationDesignAttempts[0].priorGapCount, 0);

@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   compileSdlcFeatureDependencyDagToAbgFrontier,
@@ -496,6 +497,216 @@ function writeT174SyntheticWorkspace(root) {
     ].join("\n"),
     "utf8"
   );
+}
+
+function writeT174AdmittedImplementationDesignArchive(root, manifest) {
+  const archiveRoot = path.join(
+    root,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260523T000000000Z_pid174"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const registerPath = path.join(archiveRoot, "design_depth_fp_evaluator_register.json");
+  const registerRef = pathToFileURL(registerPath).href;
+  const composition = {
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: "abg.fn_composition://t174/implementation-design",
+    compositionDigest: "digest://t174/implementation-design",
+    compositionSelectionRef:
+      "abg.fn_composition_selection://t174/implementation-design",
+    selectedRegimeBindingRef:
+      "abg.fn_composition.regime_binding://t174/implementation-design/evaluate/fp",
+    graphFunctionRef: "derive_implementation_design_surface",
+    graphVectorRef: "derive_implementation_design_surface",
+    basisRef: "basis://t174/implementation-design"
+  };
+  const componentRows = [
+    {
+      componentId: "package_metadata",
+      moduleName: "package_metadata",
+      relativePath: "build_tenants/parallel_hello_world/package.json",
+      concernRole: "other",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-001"]
+    },
+    {
+      componentId: "hello_branch",
+      moduleName: "hello_branch",
+      relativePath: "build_tenants/parallel_hello_world/src/hello.js",
+      concernRole: "other",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-002"]
+    },
+    {
+      componentId: "world_branch",
+      moduleName: "world_branch",
+      relativePath: "build_tenants/parallel_hello_world/src/world.js",
+      concernRole: "other",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-003"]
+    },
+    {
+      componentId: "composition_export",
+      moduleName: "composition",
+      relativePath: "build_tenants/parallel_hello_world/src/index.js",
+      concernRole: "other",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-004"]
+    },
+    {
+      componentId: "hello_branch_test",
+      moduleName: "hello_branch_test",
+      relativePath: "build_tenants/parallel_hello_world/test/hello.test.js",
+      concernRole: "validator",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-005"]
+    },
+    {
+      componentId: "world_branch_test",
+      moduleName: "world_branch_test",
+      relativePath: "build_tenants/parallel_hello_world/test/world.test.js",
+      concernRole: "validator",
+      targetRole: "source",
+      requirementIds: ["REQ-T174-PARALLEL-HELLO-006"]
+    }
+  ];
+  const topologyRows = componentRows.map((row) => ({
+    kind: "sdlc_component_topology_row",
+    componentId: row.componentId,
+    moduleName: row.moduleName,
+    relativePath: row.relativePath,
+    concernRole: row.concernRole,
+    requirementIds: row.requirementIds,
+    publicBoundary: `${row.componentId} accepted F_P design-depth boundary`,
+    sourceAssetRefs: [registerRef]
+  }));
+  const realizationRows = topologyRows.map((row) => ({
+    kind: "sdlc_component_realization_row",
+    componentId: row.componentId,
+    moduleName: row.moduleName,
+    relativePath: row.relativePath,
+    publicBoundary: row.publicBoundary,
+    trancheId: null,
+    firstProductFileToChange: row.relativePath,
+    upstreamComponentIds:
+      row.componentId === "composition_export"
+        ? ["hello_branch", "world_branch"]
+        : [],
+    requirementIds: row.requirementIds,
+    sourceAssetRefs: [registerRef]
+  }));
+  writeFileSync(
+    path.join(archiveRoot, "handoff_manifest.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_worker_handoff_manifest",
+        contractVersion: "synthetic-v1",
+        workspaceRoot: root,
+        archiveRoot,
+        graphFunctionName: "derive_implementation_design_surface",
+        edgeName: "derive_implementation_design_surface",
+        vectorIndex: 0,
+        inputAssetTypes: ["scenario_surface"],
+        targetAssetType: "implementation_design_surface",
+        outputFile: path.join(
+          root,
+          "build_tenants/parallel_hello_world/design/implementation_design_surface.md"
+        ),
+        reportFile: path.join(archiveRoot, "worker_result_report.json"),
+        productMaterialization: {
+          tenantRoot: manifest.productMaterialization.tenantRoot
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    registerPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_design_depth_register",
+        registerVersion: "ts-design-depth-v1",
+        targetAssetType: "implementation_design_surface",
+        stackProfileRows: [
+          {
+            kind: "sdlc_stack_profile_row",
+            stackRef: "stack://t174/node-esm",
+            language: "javascript",
+            buildTool: "node"
+          }
+        ],
+        implementationModuleRows: [
+          "package_metadata",
+          "hello_branch",
+          "world_branch",
+          "composition",
+          "hello_branch_test",
+          "world_branch_test"
+        ].map((moduleName) => ({
+          kind: "sdlc_implementation_module_row",
+          moduleName,
+          moduleRef: `module://t174/${moduleName}`
+        })),
+        aggregateDomainModelRows: [],
+        moduleSchemaFragments: [],
+        moduleStateDiagramFragments: [],
+        aggregateDomainModel: null,
+        sunnyDaySequenceRows: [],
+        aggregateSunnyDaySequence: null,
+        componentTopologyRows: topologyRows,
+        componentRealizationRows: realizationRows,
+        fileTargetRows: componentRows.map((row) => ({
+          kind: "sdlc_file_target_row",
+          relativePath: row.relativePath,
+          role: row.targetRole
+        })),
+        designCompletenessVerdict: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "fp_evaluate_result.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_fp_evaluate_result",
+        stage: "F_P.evaluate",
+        computeNotationStage: "evaluate.C",
+        stageAuthority: "typed_fp_stage_carriers",
+        selectedComposition: composition,
+        compositionRef: composition.compositionRef,
+        compositionDigest: composition.compositionDigest,
+        compositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        evaluationRef: "evaluation://t174/implementation-design",
+        findings: [
+          {
+            findingRef: "finding://t174/implementation-design/depth-register",
+            compositionRef: composition.compositionRef,
+            compositionDigest: composition.compositionDigest,
+            authorityRefs: [registerRef],
+            evidenceRefs: [registerRef]
+          }
+        ],
+        evaluation: {
+          evaluationRef: "evaluation://t174/implementation-design",
+          status: "passed",
+          findingRefs: ["finding://t174/implementation-design/depth-register"]
+        },
+        status: "passed",
+        postflightStatus: "passed",
+        blockingReasons: [],
+        evidenceRefs: [registerRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return archiveRoot;
 }
 
 function compileFourLaneDag() {
@@ -986,7 +1197,7 @@ test("T-174 synthetic hello-world handoff payload is hygienic and admits derived
   try {
     writeT174SyntheticWorkspace(root);
     const contract = hookContractByEdgeName("derive_component_code_surface");
-    const manifest = deriveWorkerHandoffManifest({
+    const baseManifest = deriveWorkerHandoffManifest({
       workspaceRoot: root,
       graphFunctionName: "derive_component_code_surface",
       edgeName: contract.edgeName,
@@ -994,6 +1205,20 @@ test("T-174 synthetic hello-world handoff payload is hygienic and admits derived
       contract,
       runId: "t174-synthetic-multilane-prompt"
     });
+    const predecessorArchiveRoot =
+      writeT174AdmittedImplementationDesignArchive(root, baseManifest);
+    const manifest = {
+      ...baseManifest,
+      traversalObligationContext: {
+        ...baseManifest.traversalObligationContext,
+        priorEdgeRefs: Object.freeze([
+          ...baseManifest.traversalObligationContext.priorEdgeRefs,
+          pathToFileURL(
+            path.join(predecessorArchiveRoot, "handoff_manifest.json")
+          ).href
+        ])
+      }
+    };
     const files = writeHandoffFiles(manifest);
     const prompt = readFileSync(files.promptPath, "utf8");
     const workerResponse = [
