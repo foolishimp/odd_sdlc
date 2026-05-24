@@ -4,6 +4,7 @@ import {
   admitModule,
   admitNode,
   admitOperator,
+  constructDefaultAbgFnCompositionDeclarations,
   edge,
   graphFunctionForVector,
   materializeGraphFunction,
@@ -188,6 +189,33 @@ function traversalModulationDeclaration(
   );
 }
 
+function abgFnCompositionDeclaration(input: {
+  readonly name: string;
+  readonly target: Node;
+}): SerializedAttrEntry {
+  const declarations = constructDefaultAbgFnCompositionDeclarations({
+    scopeRef: `odd-sdlc/${input.name}`,
+    hostGraphVectorRef: `vector:odd_sdlc:${input.name}`,
+    hostTargetNodeRef: input.target.id,
+    hostTargetSchemaRef: input.target.schema.ref,
+    standardsContextRefs: Object.freeze(["REQ-L-GTL3-COMPUTE-NOTATION"]),
+    policyContextRefs: Object.freeze([
+      "policy://odd-sdlc/abg-3.9-rc3-staged-compute"
+    ]),
+    carrierContextRefs: Object.freeze([
+      "carrier://odd-sdlc/transform-evaluate-consequence"
+    ]),
+    assuranceContextRefs: Object.freeze([
+      "assurance://odd-sdlc/edge-closure"
+    ])
+  });
+  const declaration = declarations.entries[0];
+  if (declaration === undefined) {
+    throw new TypeError(`${input.name}: ABG fn composition declaration missing`);
+  }
+  return declaration;
+}
+
 function graphFunctionDeclarations(): SerializedAttrs {
   return attrs([
     attr("function_kind", scalarValue("odd_asset_function")),
@@ -242,6 +270,7 @@ function vectorDeclarations(
   target: Node
 ): SerializedAttrs {
   return attrs([
+    abgFnCompositionDeclaration({ name: entry.name, target }),
     sdlcTargetCarrierDeclarationForTarget({
       edgeRef: entry.name,
       targetAssetType: firstOutput(entry),
@@ -275,6 +304,7 @@ function reusableVectorDeclarations(
   target: Node
 ): SerializedAttrs {
   return attrs([
+    abgFnCompositionDeclaration({ name: entry.name, target }),
     sdlcTargetCarrierDeclarationForTarget({
       edgeRef: entry.name,
       targetAssetType: firstOutput(entry),

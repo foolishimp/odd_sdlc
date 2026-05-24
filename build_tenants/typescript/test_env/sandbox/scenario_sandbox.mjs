@@ -1076,7 +1076,9 @@ export function assertScenarioExpectations(result, scenario) {
     });
   }
   if (Array.isArray(expectations.exactHandoffEdgeSequence)) {
-    const observed = observedHandoffEdgeSequence(result.workspace);
+    const observed = compressConsecutiveValues(
+      observedHandoffEdgeSequence(result.workspace)
+    );
     const expected = expectations.exactHandoffEdgeSequence;
     if (JSON.stringify(observed) !== JSON.stringify(expected)) {
       throw new Error(

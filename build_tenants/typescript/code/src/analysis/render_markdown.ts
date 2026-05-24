@@ -210,6 +210,32 @@ function renderFrontierGraphTruth(
   return lines.join("\n");
 }
 
+function renderRc3StageTruth(
+  attempts: readonly SdlcFdRunAnalysisEdgeAttempt[]
+): string {
+  if (attempts.length === 0) {
+    return "## RC3 Stage Truth\n\nnone";
+  }
+  const bounded = boundedRows(attempts);
+  const lines: string[] = [
+    "## RC3 Stage Truth",
+    "",
+    "| # | status | composition | regime binding | evaluate | admitted graph call | consequence | read models | detail |",
+    "| - | - | - | - | - | - | - | - | - |"
+  ];
+  const limitLine = boundedRowsLine("bounded projection", bounded);
+  if (limitLine !== null) {
+    lines.push(limitLine);
+  }
+  for (const attempt of bounded.rows) {
+    const truth = attempt.rc3StageTruth;
+    lines.push(
+      `| ${attempt.attemptOrdinal} | ${truth.status} | ${truth.selectedCompositionRef ?? "-"} | ${truth.selectedRegimeBindingRef ?? "-"} | ${truth.evaluateRef ?? "-"} | ${truth.admittedStateGraphCallRef ?? "-"} | ${truth.consequenceRef ?? "-"} | ${boundedJoinedText(truth.domainReadModelRefs, "<br>") || "-"} | ${truth.detail ?? "-"} |`
+    );
+  }
+  return lines.join("\n");
+}
+
 function renderConceptualStageCoverage(
   coverage: readonly SdlcFdRunAnalysisConceptualStageCoverage[]
 ): string {
@@ -444,6 +470,8 @@ export function renderSdlcFdRunAnalysisMarkdown(result: SdlcFdRunAnalysisResult)
     renderPromptAndEvidence(result.edgeTraversal),
     "",
     renderFrontierGraphTruth(result.edgeTraversal),
+    "",
+    renderRc3StageTruth(result.edgeTraversal),
     "",
     renderConceptualStageCoverage(result.conceptualStageCoverage),
     "",

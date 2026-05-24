@@ -23,7 +23,7 @@ import {
   constructWorkerInvocationPackage,
   declaredProductFileTargets,
   deriveWorkerHandoffManifest,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   installedReentryAttemptLimit,
   installedReentryDispositionForOutcome,
@@ -697,6 +697,41 @@ test("T-172 tenant stack authority missing blocks executable materialization adm
   assert.deepEqual(reconciliation.tenantStackAuthorityTargets, []);
 });
 
+test("T-180 tenant stack repair routes to canonical tenant spec authority", () => {
+  const workspace = workspaceWithModuleTargetProductAuthority();
+  rmSync(path.join(workspace, "build_tenants/scala_spark/spec"), {
+    recursive: true,
+    force: true
+  });
+  const manifest = materializationManifest(
+    workspace,
+    "derive_component_code_surface",
+    steelThreadEnvelope("derive_component_code_surface")
+  );
+  const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+  const allowedWriteRoots = manifest.allowedWriteRoots
+    .map((root) => path.relative(workspace, root).split(path.sep).join("/"))
+    .sort();
+  const prompt = promptForHandoff(manifest);
+
+  assert.equal(
+    reconciliation.reasonRefs.includes("tenant_stack_authority_missing"),
+    true
+  );
+  assert.equal(
+    allowedWriteRoots.includes("build_tenants/scala_spark/spec"),
+    true
+  );
+  assert.match(
+    prompt,
+    /Tenant-stack authority repair target: build_tenants\/scala_spark\/spec\/TECH_STACK\.json/u
+  );
+  assert.match(
+    prompt,
+    /Do not embed tenant-stack authority inside component_depth_register/u
+  );
+});
+
 test("T-172 semantically empty tenant stack authority blocks executable materialization admission", () => {
   const workspace = workspaceWithProductAuthority();
   const stackSpecFile = path.join(
@@ -863,6 +898,60 @@ test("T-143 derives product targets from conformed module structure", () => {
     )?.targetKind,
     "directory"
   );
+});
+
+test("T-143 treats extensionless language source roots as directory targets", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t143-source-root-"));
+  try {
+    mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+    mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+    writeFileSync(
+      path.join(root, ".ai-workspace/context/project_constraints.yml"),
+      [
+        "project:",
+        "  name: data_mapper_t143_source_root",
+        "active_tenant: scala_spark",
+        "build_tenants:",
+        "  scala_spark:",
+        "    output_dir: build_tenants/scala_spark",
+        "    language: scala",
+        "    build_tool: sbt",
+        "    build_command: sbt compile",
+        "    test_command: sbt test"
+      ].join("\n"),
+      "utf8"
+    );
+    writeFileSync(
+      path.join(root, "specification/PRODUCT.md"),
+      [
+        "# Product",
+        "",
+        "## Expected Product Files",
+        "",
+        "- `build_tenants/scala_spark/cdme-compiler/src/main/scala` (role: `source`)",
+        "- `build_tenants/scala_spark/build.sbt` (role: `build_config`)",
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+    writeTenantTechStackSpec(root, "build_tenants/scala_spark", [
+      "build.sbt",
+      "project/"
+    ]);
+
+    const manifest = materializationManifest(root);
+    const reconciliation = reconcileSdlcProductMaterializationAuthority(manifest);
+    const sourceRootTarget = reconciliation.productAuthorityTargetContracts.find(
+      (target) =>
+        target.path === "build_tenants/scala_spark/cdme-compiler/src/main/scala"
+    );
+
+    assert.equal(reconciliation.status, "passed");
+    assert.equal(sourceRootTarget?.targetKind, "directory");
+    assert.equal(sourceRootTarget?.requiredRole, "source");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("T-143 derives Rust targets from Expected Files shorthand authority", () => {
@@ -1104,6 +1193,41 @@ test("T-143 build-only files do not satisfy component source materialization", (
   assert.equal(materialized.some((file) => file.role === "source"), false);
 });
 
+test("T-143 non-materialization surface edge ignores pre-existing tenant build config", () => {
+  const workspace = workspaceWithoutProductTargets();
+  writeTenantTechStackSpec(workspace, "build_tenants/scala_spark", ["project/"]);
+  const buildProperties = path.join(
+    workspace,
+    "build_tenants/scala_spark/project/build.properties"
+  );
+  mkdirSync(path.dirname(buildProperties), { recursive: true });
+  writeFileSync(buildProperties, "sbt.version=1.10.7\n", "utf8");
+  const contract = hookContractByEdgeName("derive_intent_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "derive_intent_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t143-surface-preexisting-build-config"
+  });
+  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
+
+  writeOutputSurface(manifest, "intent_surface");
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+
+  assert.equal(manifest.productMaterialization.required, false);
+  assert.deepEqual(report.materializedFiles, []);
+  assert.equal(
+    postflight.blockingReasons.includes(
+      "unexpected_product_materialization_for_surface_edge"
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasons, null, 2)
+  );
+});
+
 test("T-143 context expected-file targets are observation beside product authority", () => {
   const workspace = workspaceWithProductAuthority();
   writeJsonExpectedFiles(workspace, [
@@ -1179,7 +1303,7 @@ test("T-143 component-code materialization leaves execution evidence to downstre
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.doesNotMatch(prompt, /sdlc_worker_execution_evidence/u);
   assert.equal(report.executionEvidence, null);
@@ -1441,7 +1565,7 @@ test("T-143 component-code transform artifact carrying execution evidence is rej
 
   const report = buildPostTransformWorkerResultReport({ manifest, before });
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(report.executionEvidence, null);
   assert.match(

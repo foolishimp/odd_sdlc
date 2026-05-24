@@ -53,6 +53,75 @@ function writeJson(filePath, payload) {
   writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
+function writeClosedComponentCodeBaselineArtifacts(archiveRoot) {
+  const compositionRef = "abg.fn_composition://t175/product-manifest-gap";
+  const compositionDigest = "digest://t175/product-manifest-gap";
+  const compositionSelectionRef =
+    "abg.fn_composition_selection://t175/product-manifest-gap";
+  const selectedRegimeBindingRef =
+    "abg.fn_composition.regime_binding://t175/evaluate/fp";
+  writeJson(path.join(archiveRoot, "worker_run.json"), {
+    kind: "sdlc_worker_run_result",
+    status: 0,
+    timedOut: false
+  });
+  writeJson(path.join(archiveRoot, "worker_invocation_package.json"), {
+    kind: "sdlc_worker_invocation_package"
+  });
+  writeJson(path.join(archiveRoot, "fp_evaluate_result.json"), {
+    kind: "sdlc_fp_evaluate_result",
+    computeNotationStage: "evaluate.C",
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    selectedRegimeBindingRef,
+    status: "passed"
+  });
+  writeJson(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), {
+    kind: "sdlc_edge_closure_decision",
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    selectedRegimeBindingRef,
+    disposition: "close"
+  });
+  writeJson(path.join(archiveRoot, "sdlc_edge_fulfillment_ledger.json"), {
+    kind: "sdlc_edge_fulfillment_ledger",
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    selectedRegimeBindingRef,
+    targetCarrierAdmissionStatus: "admitted"
+  });
+  writeJson(path.join(archiveRoot, "sdlc_next_action_projection.json"), {
+    kind: "sdlc_next_action_projection",
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    selectedRegimeBindingRef,
+    choosesNextTraversal: true
+  });
+  writeJson(path.join(archiveRoot, "gtl_admitted_state_ref.json"), {
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    graphCallRef: "graph-call://t175/product-manifest-gap",
+    frameRef: "frame://t175/product-manifest-gap",
+    eventRefs: [],
+    ledgerRefs: [],
+    projectionRefs: []
+  });
+  writeJson(path.join(archiveRoot, "gtl_consequence_projection_ref.json"), {
+    consequenceRef: "consequence://t175/product-manifest-gap",
+    compositionRef,
+    compositionDigest,
+    compositionSelectionRef,
+    assuranceDecisionRef: "assurance://t175/product-manifest-gap",
+    traversalTransitionRef: "transition://t175/product-manifest-gap",
+    domainReadModelRefs: []
+  });
+}
+
 function frontierPayload() {
   return constructSdlcLiveFpParallelMaterializationFrontier({
     edgeName: "derive_component_code_surface",
@@ -625,10 +694,7 @@ test("T-175 runtime gaps require product materialization from catalog and graph 
       edgeName: "derive_component_code_surface",
       targetAssetType: "component_code_surface"
     });
-    writeJson(path.join(archiveRoot, "sdlc_edge_closure_decision.json"), {
-      kind: "sdlc_edge_closure_decision",
-      disposition: "close"
-    });
+    writeClosedComponentCodeBaselineArtifacts(archiveRoot);
 
     const carriers = readOperatorRunCarriers(archiveRoot);
     const result = deriveRuntimeArtifactGaps({ carriers: [carriers] });
@@ -719,7 +785,7 @@ test("T-175 analyzer reports T-174 frontier graph truth as reviewable output", (
   }
 });
 
-test("T-175 design admission preserves T-174 live ADR component DAG", () => {
+test("T-181 design admission rejects T-174 ADR markdown as implementation-register authority", () => {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t175-live-adr-"));
   try {
     const adrPath = path.join(
@@ -776,50 +842,16 @@ test("T-175 design admission preserves T-174 live ADR component DAG", () => {
       outputFile: adrPath,
       archiveRoot: path.join(root, "archive")
     });
-    assert.equal(admission.status, "admitted");
-    const realizationByComponent = new Map(
-      admission.register.componentRealizationRows.map((row) => [row.componentId, row])
-    );
-    assert.equal(
-      realizationByComponent.get("hello_branch")?.relativePath,
-      "build_tenants/parallel_hello_world/src/hello.js"
-    );
-    assert.deepEqual(
-      realizationByComponent.get("composition_export")?.upstreamComponentIds,
-      ["hello_branch", "world_branch"]
-    );
-    const authority = deriveSdlcStagedImplementationTopologyAuthority({
-      register: admission.register
-    });
-    assert(authority.dependencyMap.nodes.length >= 6);
-    assert.deepEqual(
-      authority.dependencyMap.nodes
-        .map((node) => node.nodeId)
-        .filter((nodeId) => /hello-branch|world-branch|composition-export/u.test(nodeId))
-        .sort(),
-      [
-        "module://composition-export",
-        "module://hello-branch",
-        "module://hello-branch-test",
-        "module://world-branch",
-        "module://world-branch-test"
-      ]
-    );
-    const traversal = selectSdlcDependencyMapTraversal({
-      dependencyMap: authority.dependencyMap,
-      policy: "parallel_when_partitioned"
-    });
-    assert.equal(traversal.selectedMethod, "parallel");
-    assert(
-      traversal.parallelGroupRefs.includes("partition://module/hello-branch"),
-      JSON.stringify(traversal, null, 2)
-    );
+    assert.equal(admission.status, "rejected");
+    assert.deepEqual(admission.blockingReasons, [
+      "design_depth_register_missing"
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("T-175 design admission preserves data-mapper module source decomposition", () => {
+test("T-181 design admission rejects data-mapper ADR markdown as implementation-register authority", () => {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t175-data-mapper-"));
   try {
     const adrPath = path.join(
@@ -882,34 +914,10 @@ test("T-175 design admission preserves data-mapper module source decomposition",
       outputFile: adrPath,
       archiveRoot: path.join(root, "archive")
     });
-    assert.equal(admission.status, "admitted");
-    const authority = deriveSdlcStagedImplementationTopologyAuthority({
-      register: admission.register
-    });
-    assert.deepEqual(
-      authority.dependencyMap.nodes.map((node) => node.nodeId).sort(),
-      [
-        "module://cdme-accounting",
-        "module://cdme-adjoint",
-        "module://cdme-assurance",
-        "module://cdme-compiler",
-        "module://cdme-engine",
-        "module://cdme-executor",
-        "module://cdme-fidelity"
-      ]
-    );
-    const adjointNode = authority.dependencyMap.nodes.find(
-      (node) => node.nodeId === "module://cdme-adjoint"
-    );
-    assert.deepEqual(adjointNode?.materializationTargetRefs, [
-      "build_tenants/scala_spark/cdme-adjoint/src/main/scala"
+    assert.equal(admission.status, "rejected");
+    assert.deepEqual(admission.blockingReasons, [
+      "design_depth_register_missing"
     ]);
-    const traversal = selectSdlcDependencyMapTraversal({
-      dependencyMap: authority.dependencyMap,
-      policy: "parallel_when_partitioned"
-    });
-    assert.equal(traversal.selectedMethod, "parallel");
-    assert.equal(traversal.parallelGroupRefs.length, 7);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

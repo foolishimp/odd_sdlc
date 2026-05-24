@@ -396,7 +396,7 @@ test("T-064 installed operator start invokes worker and replay-backed gaps advan
     true
   );
   assert.deepStrictEqual(start.payload.emittedRuntimeEventKinds.slice(-2), [
-    "vector_closed",
+    "payload_validated",
     "terminal_reached"
   ]);
   assert.equal(existsSync(start.payload.workerReport.outputFile), true);

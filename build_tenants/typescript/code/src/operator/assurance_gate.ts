@@ -585,6 +585,12 @@ function postflightFromSatisfaction(
   });
 }
 
+function designCompletenessIsEvaluateOwned(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return manifest.targetAssetType === "implementation_design_surface";
+}
+
 export function deriveSdlcOperatorAssuranceGate(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
@@ -651,13 +657,15 @@ export function deriveSdlcOperatorAssuranceGate(input: {
     }
   }
 
-  const designCompleteness = deriveDesignCompletenessAssuranceLedger({
-    manifest: input.manifest,
-    report: input.report
-  });
-  if (designCompleteness !== null) {
-    ledgers.push(designCompleteness);
-    requiredDimensions.push("design_completeness");
+  if (!designCompletenessIsEvaluateOwned(input.manifest)) {
+    const designCompleteness = deriveDesignCompletenessAssuranceLedger({
+      manifest: input.manifest,
+      report: input.report
+    });
+    if (designCompleteness !== null) {
+      ledgers.push(designCompleteness);
+      requiredDimensions.push("design_completeness");
+    }
   }
 
   const requirementClosureRegister = requirementClosureRegisterFromObligations({

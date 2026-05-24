@@ -1,5 +1,9 @@
 // Implements: T-161
 
+import {
+  existsSync,
+  statSync
+} from "node:fs";
 import path from "node:path";
 
 import {
@@ -36,6 +40,7 @@ import {
   isSdlcLiveFpParallelMaterializationFrontier,
   type SdlcLiveFpParallelMaterializationFrontier
 } from "../operator/live_fp_parallel_materialization_frontier.js";
+import { admitDesignDepthFpEvaluatorRegisterArtifact } from "../operator/handoff.js";
 import type {
   SdlcDecompositionAdmissionDecision,
   SdlcDecompositionDownstreamKind,
@@ -88,6 +93,10 @@ export interface PostflightRecord {
 
 export interface EdgeClosureDecisionRecord {
   readonly kind: "sdlc_edge_closure_decision";
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly disposition?: string;
   readonly decisionRef?: string;
   readonly ledgerRef?: string;
@@ -96,6 +105,10 @@ export interface EdgeClosureDecisionRecord {
 
 export interface EdgeFulfillmentLedgerRecord {
   readonly kind: "sdlc_edge_fulfillment_ledger";
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly edgeRef?: string;
   readonly attemptRef?: string;
   readonly counts?: {
@@ -120,6 +133,10 @@ export interface EdgeGainRecord {
 
 export interface NextActionProjectionRecord {
   readonly kind: "sdlc_next_action_projection";
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly choosesNextTraversal?: boolean;
   readonly nextActionProjectionRef?: string;
   readonly selectedActionRef?: string;
@@ -161,10 +178,48 @@ export interface HandoffManifestRecord {
 
 export interface FpEvaluateResultRecord {
   readonly kind: "sdlc_fp_evaluate_result";
+  readonly computeNotationStage: "evaluate.C";
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+  readonly evaluationRef?: string;
   readonly status?: string;
   readonly postflightStatus?: string;
   readonly blockingReasons?: readonly unknown[];
   readonly evidenceRefs?: readonly string[];
+}
+
+export interface DesignDepthFpEvaluatorRunRecord {
+  readonly kind: "sdlc_design_depth_fp_evaluator_run";
+  readonly status?: number | null;
+  readonly signal?: string | null;
+  readonly elapsedMs?: number;
+  readonly timedOut?: boolean;
+  readonly promptRef?: string;
+  readonly registerRef?: string;
+  readonly processEventsRef?: string;
+}
+
+export interface GtlAdmittedStateRefRecord {
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly graphCallRef: string;
+  readonly frameRef: string;
+  readonly eventRefs: readonly string[];
+  readonly ledgerRefs: readonly string[];
+  readonly projectionRefs: readonly string[];
+}
+
+export interface GtlConsequenceProjectionRefRecord {
+  readonly consequenceRef: string;
+  readonly compositionRef: string;
+  readonly compositionDigest: string;
+  readonly compositionSelectionRef: string;
+  readonly assuranceDecisionRef: string;
+  readonly traversalTransitionRef: string;
+  readonly domainReadModelRefs: readonly string[];
 }
 
 export interface WorkerProcessStartedRecord {
@@ -254,6 +309,8 @@ export interface OperatorRunCarriers {
   readonly edgeFulfillmentLedger: LoadedJson<EdgeFulfillmentLedgerRecord>;
   readonly edgeGain: LoadedJson<EdgeGainRecord>;
   readonly nextActionProjection: LoadedJson<NextActionProjectionRecord>;
+  readonly gtlAdmittedStateRef: LoadedJson<GtlAdmittedStateRefRecord>;
+  readonly gtlConsequenceProjectionRef: LoadedJson<GtlConsequenceProjectionRefRecord>;
   readonly productManifest: LoadedJson<ProductMaterializationManifestRecord>;
   readonly handoffManifest: LoadedJson<HandoffManifestRecord>;
   readonly fpEvaluateResult: LoadedJson<FpEvaluateResultRecord>;
@@ -301,6 +358,8 @@ export interface OperatorRunFileSizes {
   readonly sdlcEdgeGain: number;
   readonly sdlcEdgeResidualPressure: number;
   readonly sdlcNextActionProjection: number;
+  readonly gtlAdmittedStateRef: number;
+  readonly gtlConsequenceProjectionRef: number;
   readonly sdlcDecompositionSummary: number;
   readonly sdlcImplementationDecompositionSummary: number;
   readonly sdlcTestDecompositionSummary: number;
@@ -332,19 +391,86 @@ const POSTFLIGHT_GUARD: (value: unknown) => value is PostflightRecord =
   guardKind<PostflightRecord>("sdlc_operator_postflight_result");
 
 const EDGE_CLOSURE_GUARD: (value: unknown) => value is EdgeClosureDecisionRecord =
-  guardKind<EdgeClosureDecisionRecord>("sdlc_edge_closure_decision");
+  recordShape<EdgeClosureDecisionRecord>({
+    kind: "sdlc_edge_closure_decision",
+    fields: {
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      selectedRegimeBindingRef: nullable(isTrimmedNonEmptyString)
+    }
+  });
 
 const EDGE_FULFILLMENT_GUARD: (value: unknown) => value is EdgeFulfillmentLedgerRecord =
-  guardKind<EdgeFulfillmentLedgerRecord>("sdlc_edge_fulfillment_ledger");
+  recordShape<EdgeFulfillmentLedgerRecord>({
+    kind: "sdlc_edge_fulfillment_ledger",
+    fields: {
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      selectedRegimeBindingRef: nullable(isTrimmedNonEmptyString)
+    }
+  });
 
 const EDGE_GAIN_GUARD: (value: unknown) => value is EdgeGainRecord =
   guardKind<EdgeGainRecord>("sdlc_edge_gain");
 
 const NEXT_ACTION_GUARD: (value: unknown) => value is NextActionProjectionRecord =
-  guardKind<NextActionProjectionRecord>("sdlc_next_action_projection");
+  recordShape<NextActionProjectionRecord>({
+    kind: "sdlc_next_action_projection",
+    fields: {
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      selectedRegimeBindingRef: nullable(isTrimmedNonEmptyString)
+    }
+  });
 
 const FP_EVALUATE_GUARD: (value: unknown) => value is FpEvaluateResultRecord =
-  guardKind<FpEvaluateResultRecord>("sdlc_fp_evaluate_result");
+  recordShape<FpEvaluateResultRecord>({
+    kind: "sdlc_fp_evaluate_result",
+    fields: {
+      computeNotationStage: oneOf(["evaluate.C"]),
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      selectedRegimeBindingRef: nullable(isTrimmedNonEmptyString)
+    }
+  });
+
+const DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD: (
+  value: unknown
+) => value is DesignDepthFpEvaluatorRunRecord =
+  guardKind<DesignDepthFpEvaluatorRunRecord>("sdlc_design_depth_fp_evaluator_run");
+
+const GTL_ADMITTED_STATE_REF_GUARD: (value: unknown) => value is GtlAdmittedStateRefRecord =
+  recordShape<GtlAdmittedStateRefRecord>({
+    fields: {
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      graphCallRef: isTrimmedNonEmptyString,
+      frameRef: isTrimmedNonEmptyString,
+      eventRefs: arrayOf(isTrimmedNonEmptyString),
+      ledgerRefs: arrayOf(isTrimmedNonEmptyString),
+      projectionRefs: arrayOf(isTrimmedNonEmptyString)
+    }
+  });
+
+const GTL_CONSEQUENCE_PROJECTION_REF_GUARD: (
+  value: unknown
+) => value is GtlConsequenceProjectionRefRecord =
+  recordShape<GtlConsequenceProjectionRefRecord>({
+    fields: {
+      consequenceRef: isTrimmedNonEmptyString,
+      compositionRef: isTrimmedNonEmptyString,
+      compositionDigest: isTrimmedNonEmptyString,
+      compositionSelectionRef: isTrimmedNonEmptyString,
+      assuranceDecisionRef: isTrimmedNonEmptyString,
+      traversalTransitionRef: isTrimmedNonEmptyString,
+      domainReadModelRefs: arrayOf(isTrimmedNonEmptyString)
+    }
+  });
 
 const WORKER_PROCESS_STARTED_GUARD: (value: unknown) => value is WorkerProcessStartedRecord =
   guardKind<WorkerProcessStartedRecord>("actor_process_started");
@@ -581,9 +707,17 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
     "operator-run-artifact://edge-fulfillment-ledger": EDGE_FULFILLMENT_GUARD,
     "operator-run-artifact://edge-gain": EDGE_GAIN_GUARD,
     "operator-run-artifact://next-action-projection": NEXT_ACTION_GUARD,
+    "operator-run-artifact://gtl-admitted-state-ref": GTL_ADMITTED_STATE_REF_GUARD,
+    "operator-run-artifact://gtl-consequence-projection-ref":
+      GTL_CONSEQUENCE_PROJECTION_REF_GUARD,
     "operator-run-artifact://product-materialization-manifest": PRODUCT_MANIFEST_GUARD,
     "operator-run-artifact://handoff-manifest": HANDOFF_MANIFEST_GUARD,
     "operator-run-artifact://fp-evaluate-result": FP_EVALUATE_GUARD,
+    "operator-run-artifact://design-depth-fp-evaluator-run":
+      DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD,
+    "operator-run-artifact://design-depth-fp-evaluator-process-started":
+      WORKER_PROCESS_STARTED_GUARD,
+    "operator-run-artifact://fp-evaluator-postflight": POSTFLIGHT_GUARD,
     "operator-run-artifact://worker-process-started": WORKER_PROCESS_STARTED_GUARD,
     "operator-run-artifact://runtime-events": RUNTIME_EVENTS_GUARD,
     "operator-run-artifact://worker-result-report": WORKER_RESULT_REPORT_GUARD,
@@ -604,7 +738,9 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
 
 const OPERATOR_RUN_JSONL_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
   Object.freeze({
-    "operator-run-artifact://worker-process-events": guardJsonlEvent
+    "operator-run-artifact://worker-process-events": guardJsonlEvent,
+    "operator-run-artifact://design-depth-fp-evaluator-process-events":
+      guardJsonlEvent
   });
 
 function operatorRunArtifactPath(input: {
@@ -614,11 +750,56 @@ function operatorRunArtifactPath(input: {
   return path.join(input.operatorRunRoot, input.artifact.relativePath);
 }
 
+function loadDesignDepthFpEvaluatorRegisterArtifact(
+  filePath: string
+): LoadedJson<unknown> {
+  if (!existsSync(filePath)) {
+    return Object.freeze({ status: "missing" as const });
+  }
+  const stats = statSync(filePath);
+  if (!stats.isFile()) {
+    return Object.freeze({
+      status: "malformed" as const,
+      bytes: 0,
+      path: filePath,
+      detail: "design_depth_fp_evaluator_register_not_file"
+    });
+  }
+  const bytes = stats.size;
+  const admission = admitDesignDepthFpEvaluatorRegisterArtifact({
+    registerPath: filePath,
+    archiveRoot: path.dirname(filePath)
+  });
+  if (admission.status !== "admitted") {
+    return Object.freeze({
+      status: "malformed" as const,
+      bytes,
+      path: filePath,
+      detail:
+        admission.blockingReasons.length === 0
+          ? "design_depth_fp_evaluator_register_rejected"
+          : admission.blockingReasons.join("; ")
+    });
+  }
+  return Object.freeze({
+    status: "present" as const,
+    data: admission.register,
+    bytes,
+    path: filePath
+  });
+}
+
 function loadCatalogedOperatorRunArtifact(input: {
   readonly operatorRunRoot: string;
   readonly artifact: SdlcOperatorRunArtifactRow;
 }): LoadedOperatorRunArtifact {
   const filePath = operatorRunArtifactPath(input);
+  if (
+    input.artifact.artifactRef ===
+    "operator-run-artifact://design-depth-fp-evaluator-register"
+  ) {
+    return loadDesignDepthFpEvaluatorRegisterArtifact(filePath);
+  }
   const jsonlGuard = OPERATOR_RUN_JSONL_GUARDS[input.artifact.artifactRef];
   if (jsonlGuard !== undefined) {
     return loadJsonlFile(filePath, jsonlGuard);
@@ -711,6 +892,8 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     sdlcEdgeGain: sizeOfArtifact("operator-run-artifact://edge-gain"),
     sdlcEdgeResidualPressure: sizeOfArtifact("operator-run-artifact://edge-residual-pressure"),
     sdlcNextActionProjection: sizeOfArtifact("operator-run-artifact://next-action-projection"),
+    gtlAdmittedStateRef: sizeOfArtifact("operator-run-artifact://gtl-admitted-state-ref"),
+    gtlConsequenceProjectionRef: sizeOfArtifact("operator-run-artifact://gtl-consequence-projection-ref"),
     sdlcDecompositionSummary: sizeOfArtifact("operator-run-artifact://decomposition-summary"),
     sdlcImplementationDecompositionSummary: sizeOfArtifact("operator-run-artifact://implementation-decomposition-summary"),
     sdlcTestDecompositionSummary: sizeOfArtifact("operator-run-artifact://test-decomposition-summary"),
@@ -757,6 +940,16 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
       operatorRunRoot,
       artifactRef: "operator-run-artifact://next-action-projection",
       guard: NEXT_ACTION_GUARD
+    }),
+    gtlAdmittedStateRef: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://gtl-admitted-state-ref",
+      guard: GTL_ADMITTED_STATE_REF_GUARD
+    }),
+    gtlConsequenceProjectionRef: loadCatalogedJsonArtifact({
+      operatorRunRoot,
+      artifactRef: "operator-run-artifact://gtl-consequence-projection-ref",
+      guard: GTL_CONSEQUENCE_PROJECTION_REF_GUARD
     }),
     productManifest: loadCatalogedJsonArtifact({
       operatorRunRoot,

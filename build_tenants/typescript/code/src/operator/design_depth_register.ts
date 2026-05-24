@@ -21,7 +21,6 @@ import type {
   SdlcAggregateDomainModel,
   SdlcAggregateDomainModelRow,
   SdlcAggregateSunnyDaySequence,
-  SdlcComponentConcernRole,
   SdlcDesignCompletenessAxisVerdict,
   SdlcDesignCompletenessVerdict,
   SdlcDesignDepthRegister,
@@ -50,6 +49,36 @@ const DESIGN_DEPTH_TARGETS = Object.freeze([
 ] as const);
 
 type DesignDepthTarget = (typeof DESIGN_DEPTH_TARGETS)[number];
+
+const MATERIALIZED_FILE_TARGET_ROLES = Object.freeze([
+  "source",
+  "test",
+  "build_config",
+  "design",
+  "documentation",
+  "other"
+] as const);
+
+const PLACEHOLDER_PUBLIC_BOUNDARIES = Object.freeze([
+  "boundary",
+  "component",
+  "component-boundary",
+  "component boundary",
+  "implementation",
+  "implementation-component",
+  "implementation component",
+  "implementation-core",
+  "implementation core",
+  "module",
+  "module-boundary",
+  "module boundary",
+  "module-root",
+  "module root",
+  "target",
+  "tbd",
+  "todo",
+  "<boundary>"
+] as const);
 
 function isDesignDepthTarget(
   targetAssetType: string
@@ -89,12 +118,6 @@ function unknownArray(input: unknown): readonly unknown[] {
 
 function optionalString(input: unknown): string | null {
   return typeof input === "string" && input.length > 0 ? input : null;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.filter((value) => value.trim().length > 0))].sort()
-  );
 }
 
 function stringFromRecord(
@@ -1761,1131 +1784,115 @@ function parseRegister(input: unknown, label: string): SdlcDesignDepthRegister {
   });
 }
 
-function objectRecord(input: unknown): Record<string, unknown> | null {
-  return mutableRecord(input);
-}
-
-function cleanMarkdownCell(input: string): string {
+function normalizedPublicBoundary(input: string): string {
   return input
     .trim()
-    .replace(/^`+|`+$/gu, "")
-    .trim();
+    .toLowerCase()
+    .replace(/[`"']/gu, "")
+    .replace(/\s+/gu, " ");
 }
 
-function escapedRegexLiteral(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function markdownSection(input: {
-  readonly content: string;
-  readonly heading: string;
-}): string {
-  const headingWords = input.heading
-    .trim()
-    .split(/\s+/u)
-    .map(escapedRegexLiteral)
-    .join("\\s+");
-  const headingExpression = new RegExp(
-    `^(#{1,6})\\s+(?:\\d+(?:\\.\\d+)*\\.?\\s+)?(?:[^\\n]*?:\\s+)?${headingWords}\\s*$`,
-    "iu"
-  );
-  const anyHeadingExpression = /^(#{1,6})\s+/u;
-  const lines = input.content.split(/\r?\n/u);
-  const startIndex = lines.findIndex((line) => headingExpression.test(line.trim()));
-  if (startIndex < 0) {
-    return "";
-  }
-  const headingMatch = headingExpression.exec(lines[startIndex]?.trim() ?? "");
-  const headingLevel = headingMatch?.[1]?.length ?? 6;
-  const selectedLines: string[] = [];
-  for (const line of lines.slice(startIndex + 1)) {
-    const nextHeadingLevel = anyHeadingExpression.exec(line.trim())?.[1]?.length;
-    if (nextHeadingLevel !== undefined && nextHeadingLevel <= headingLevel) {
-      break;
-    }
-    selectedLines.push(line);
-  }
-  return selectedLines.join("\n");
-}
-
-function markdownSectionForHeadings(input: {
-  readonly content: string;
-  readonly headings: readonly string[];
-}): string {
-  for (const heading of input.headings) {
-    const section = markdownSection({ content: input.content, heading });
-    if (section.length > 0) {
-      return section;
-    }
-  }
-  return "";
-}
-
-function markdownTableCells(section: string): readonly (readonly string[])[] {
-  return Object.freeze(
-    section
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("|") && line.endsWith("|"))
-      .map((line) => line.slice(1, -1).split("|").map(cleanMarkdownCell))
-      .filter((cells) => {
-        if (cells.length === 0) {
-          return false;
-        }
-        return !cells.every((cell) => /^:?-{3,}:?$/u.test(cell.trim()));
-      })
+function isPlaceholderPublicBoundary(input: string): boolean {
+  const normalized = normalizedPublicBoundary(input);
+  return PLACEHOLDER_PUBLIC_BOUNDARIES.some((placeholder) =>
+    normalized === placeholder
   );
 }
 
-function markdownTableWithHeader(section: string): {
-  readonly header: readonly string[];
-  readonly rows: readonly (readonly string[])[];
-} {
-  const cells = markdownTableCells(section);
-  return Object.freeze({
-    header: Object.freeze(cells[0] ?? []),
-    rows: Object.freeze(cells.slice(1))
-  });
+function isMaterializedFileTargetRole(input: string): boolean {
+  return MATERIALIZED_FILE_TARGET_ROLES.some((role) => input === role);
 }
 
-function normalizedMarkdownHeader(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9]+/gu, "");
-}
-
-function markdownColumnIndex(input: {
-  readonly header: readonly string[];
-  readonly candidates: readonly string[];
-  readonly fallback: number;
-}): number {
-  for (const candidate of input.candidates.map(normalizedMarkdownHeader)) {
-    const index = input.header.findIndex(
-      (cell) => normalizedMarkdownHeader(cell) === candidate
-    );
-    if (index >= 0) {
-      return index;
-    }
-  }
-  return input.fallback;
-}
-
-function markdownColumnIndexOrNull(input: {
-  readonly header: readonly string[];
-  readonly candidates: readonly string[];
-}): number | null {
-  for (const candidate of input.candidates.map(normalizedMarkdownHeader)) {
-    const index = input.header.findIndex(
-      (cell) => normalizedMarkdownHeader(cell) === candidate
-    );
-    if (index >= 0) {
-      return index;
-    }
-  }
-  return null;
-}
-
-function isRequirementAuthorityRef(input: string): boolean {
-  return /^(?:REQ-[A-Z0-9][A-Z0-9_-]*|requirement:[^\s|]+|req_[A-Za-z0-9_]+)$/u.test(
-    input
-  );
-}
-
-function requirementRefMatches(input: string): readonly string[] {
-  return Object.freeze([
-    ...(input.match(/\bREQ-[A-Z0-9][A-Z0-9_-]*/gu) ?? []),
-    ...(input.match(/\brequirement:[^\s|`),]+/gu) ?? []),
-    ...(input.match(/\breq_[A-Za-z0-9_]+/gu) ?? [])
-  ]);
-}
-
-function requirementRefEquivalenceKey(input: string): string {
-  const localRef = input.startsWith("requirement:")
-    ? input.split(".").filter((part) => part.length > 0).at(-1) ?? input
-    : input;
-  return localRef.toLowerCase().replace(/[^a-z0-9]+/gu, "");
-}
-
-function requirementRefPriority(input: string): number {
-  if (input.startsWith("requirement:")) {
-    return 3;
-  }
-  if (input.startsWith("req_")) {
-    return 2;
-  }
-  return 1;
-}
-
-function uniqueRequirementRefs(values: readonly string[]): readonly string[] {
-  const byKey = new Map<string, string>();
-  for (const value of values.filter(isRequirementAuthorityRef)) {
-    const key = requirementRefEquivalenceKey(value);
-    const prior = byKey.get(key);
-    if (
-      prior === undefined ||
-      requirementRefPriority(value) > requirementRefPriority(prior)
-    ) {
-      byKey.set(key, value);
-    }
-  }
-  return uniqueSorted([...byKey.values()]);
-}
-
-function firstMarkdownBulletValue(input: {
-  readonly content: string;
-  readonly label: string;
-}): string | null {
-  const expression = new RegExp(
-    `^-\\s+${escapedRegexLiteral(input.label)}\\s*:\\s*(.+)$`,
-    "imu"
-  );
-  const value = expression.exec(input.content)?.[1];
-  return value === undefined ? null : cleanMarkdownCell(value);
-}
-
-function requirementIdsFromText(content: string): readonly string[] {
-  return uniqueRequirementRefs(requirementRefMatches(content));
-}
-
-function moduleNameFromOutputPath(outputFile: string): string {
-  const normalized = outputFile.replace(/\\/gu, "/");
-  const matches = [...normalized.matchAll(/\/build_tenants\/([^/]+)\//gu)];
-  return matches.at(-1)?.[1] ?? "app";
-}
-
-function moduleNameFromComponentId(componentId: string, fallback: string): string {
-  if (!componentId.includes(".")) {
-    return fallback;
-  }
-  const dotPrefix = componentId.split(".").filter((part) => part.length > 0)[0];
-  return dotPrefix ?? fallback;
-}
-
-function concernRoleFromBoundary(input: {
-  readonly publicBoundary: string;
-  readonly relativePath: string;
-}): SdlcComponentConcernRole {
-  const text = `${input.publicBoundary} ${input.relativePath}`.toLowerCase();
-  return /http|curl|api|get\s+\/|listener|server|main\.rs/u.test(text)
-    ? "io_adapter"
-    : "other";
-}
-
-function concreteProductPathCandidate(input: string | null | undefined): string | null {
-  const value = input?.trim() ?? "";
-  if (
-    value.length === 0 ||
-    value.includes("://") ||
-    /\s/u.test(value) ||
-    /^ft[_-]/iu.test(value) ||
-    /^residual\b/iu.test(value)
-  ) {
-    return null;
-  }
-  return value.includes("/") || value.includes(".") ? value : null;
-}
-
-function parseFileTargetRowsFromMarkdown(content: string): readonly SdlcFileTargetRow[] {
-  const table = markdownTableWithHeader(
-    markdownSection({ content, heading: "Product File Targets" })
-  );
-  const pathColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: [
-      "path",
-      "relative path",
-      "output path",
-      "file path",
-      "target path",
-      "product file target"
-    ],
-    fallback: 0
-  });
-  const roleColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: ["role", "file role", "target role"],
-    fallback: 1
-  });
-  return Object.freeze(
-    table.rows
-      .map((cells) => {
-        const relativePath = cells[pathColumn] ?? "";
-        const role = cells[roleColumn] ?? "";
-        if (relativePath.length === 0 || role.length === 0) {
-          return null;
-        }
-        return Object.freeze({
-          kind: "sdlc_file_target_row" as const,
-          relativePath,
-          role
-        });
-      })
-      .filter((row): row is SdlcFileTargetRow => row !== null)
-  );
-}
-
-function moduleNameFromSourceTargetPath(relativePath: string): string | null {
-  const parts = relativePath
-    .replace(/\\/gu, "/")
-    .replace(/^\.\//u, "")
-    .split("/")
-    .filter((part) => part.length > 0);
-  const sourceIndex = parts.indexOf("src");
-  if (sourceIndex <= 0) {
-    return null;
-  }
-  const candidate = parts[sourceIndex - 1];
-  return candidate === undefined || candidate === "*" ? null : candidate;
-}
-
-function sourceTargetByModuleFromFileTargetRows(
-  rows: readonly SdlcFileTargetRow[]
-): ReadonlyMap<string, string> {
-  const byModule = new Map<string, string>();
-  for (const row of rows) {
-    if (!/\bsource\b/iu.test(row.role) || /\btest\b/iu.test(row.role)) {
-      continue;
-    }
-    const moduleName = moduleNameFromSourceTargetPath(row.relativePath);
-    if (moduleName !== null && !byModule.has(moduleName)) {
-      byModule.set(moduleName, row.relativePath);
-    }
-  }
-  return byModule;
-}
-
-function moduleNameFromKnownModulePrefix(input: {
-  readonly componentId: string;
-  readonly moduleNames: Iterable<string>;
-}): string | null {
-  const componentId = componentRefFromMarkdownCell(input.componentId);
-  const matches = [...input.moduleNames]
-    .filter(
-      (moduleName) =>
-        componentId === moduleName ||
-        componentId.startsWith(`${moduleName}/`) ||
-        componentId.startsWith(`${moduleName}.`)
-    )
-    .sort((left, right) => right.length - left.length);
-  return matches[0] ?? null;
-}
-
-function parseFileTargetOwnerHintsFromMarkdown(
-  content: string
-): ReadonlyMap<string, MarkdownComponentHint> {
-  const table = markdownTableWithHeader(
-    markdownSection({ content, heading: "Product File Targets" })
-  );
-  const pathColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: [
-      "path",
-      "relative path",
-      "output path",
-      "file path",
-      "target path",
-      "product file target",
-      "product target",
-      "target file",
-      "target"
-    ],
-    fallback: 0
-  });
-  const ownerColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: [
-      "owning module",
-      "owner module",
-      "owning component",
-      "owner component",
-      "component owner",
-      "component",
-      "module",
-      "owner"
-    ]
-  });
-  const roleColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["role", "file role", "target role"]
-  });
-  const hints = new Map<string, MarkdownComponentHint>();
-  if (ownerColumn === null) {
-    return hints;
-  }
-  const ownerColumnHeader = normalizedMarkdownHeader(table.header[ownerColumn] ?? "");
-  const ownerNamesModule =
-    ownerColumnHeader.includes("module") && !ownerColumnHeader.includes("component");
-  for (const cells of table.rows) {
-    const publicBoundary =
-      roleColumn === null ? null : cleanMarkdownCell(cells[roleColumn] ?? "");
-    for (const componentId of uniqueSorted(
-      (cells[ownerColumn] ?? "")
-        .split(/[,;]|\band\b/iu)
-        .map((value) => componentRefFromMarkdownCell(value))
-        .filter((value) => value.length > 0 && !/^none$/iu.test(value))
-    )) {
-      const relativePath = normalizedNonePath(cells[pathColumn] ?? "", componentId);
-      hints.set(
-        componentId,
-        Object.freeze({
-          componentId,
-          moduleName: ownerNamesModule ? componentId : null,
-          relativePath,
-          publicBoundary:
-            publicBoundary === null || publicBoundary.length === 0
-              ? null
-              : publicBoundary,
-          upstreamComponentIds: Object.freeze([])
-        })
-      );
-    }
-  }
-  return hints;
-}
-
-type MarkdownComponentHint = {
-  readonly componentId: string;
-  readonly moduleName: string | null;
-  readonly relativePath: string | null;
-  readonly publicBoundary: string | null;
-  readonly upstreamComponentIds: readonly string[];
-};
-
-function componentRefFromMarkdownCell(input: string): string {
-  return cleanMarkdownCell(input)
-    .replace(/^component:\/\//iu, "")
-    .replace(/^module:\/\//iu, "")
-    .trim();
-}
-
-function runtimeEvidenceRefForComponent(componentId: string): string {
-  return `runtime-evidence://${slugPart(componentId)}`;
-}
-
-function normalizedNonePath(input: string, componentId: string): string {
-  const clean = cleanMarkdownCell(input);
-  if (/^none(?:\b|\s|\()/iu.test(clean) || clean.length === 0) {
-    return runtimeEvidenceRefForComponent(componentId);
-  }
-  return concreteProductPathCandidate(clean) ?? runtimeEvidenceRefForComponent(componentId);
-}
-
-function concreteMarkdownPathCell(input: string): string | null {
-  const clean = cleanMarkdownCell(input);
-  return /^none(?:\b|\s|\()/iu.test(clean) || clean.length === 0
-    ? null
-    : concreteProductPathCandidate(clean);
-}
-
-function parseComponentDependencyEdgesFromMarkdown(
-  content: string
-): ReadonlyMap<string, readonly string[]> {
-  const table = markdownTableWithHeader(
-    markdownSectionForHeadings({
-      content,
-      headings: [
-        "Component Topology",
-        "Component Topology And Requirement Lineage"
-      ]
-    })
-  );
-  const edgeColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["edge", "edge source target", "edge source to target"]
-  });
-  const sourceColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["source", "from", "predecessor"]
-  });
-  const targetColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["target", "to", "successor"]
-  });
-  const componentColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["component ref", "component", "component id"]
-  });
-  const dependsOnColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["depends on", "dependencies", "upstream components"]
-  });
-  const predecessorsByTarget = new Map<string, Set<string>>();
-  const addEdge = (source: string, target: string) => {
-    const cleanSource = componentRefFromMarkdownCell(source);
-    const cleanTarget = componentRefFromMarkdownCell(target);
-    if (cleanSource.length === 0 || cleanTarget.length === 0) {
-      return;
-    }
-    const predecessors = predecessorsByTarget.get(cleanTarget) ?? new Set<string>();
-    predecessors.add(cleanSource);
-    predecessorsByTarget.set(cleanTarget, predecessors);
-  };
-  if (
-    edgeColumn === null &&
-    (sourceColumn === null || targetColumn === null) &&
-    (componentColumn === null || dependsOnColumn === null)
-  ) {
-    return new Map();
-  }
-  for (const cells of table.rows) {
-    if (edgeColumn !== null) {
-      const edgeCell = cells[edgeColumn] ?? "";
-      const arrowParts = edgeCell.split(/\s*(?:->|→|=>)\s*/u);
-      if (arrowParts.length >= 2) {
-        addEdge(arrowParts[0] ?? "", arrowParts.slice(1).join(" "));
-        continue;
-      }
-    }
-    if (sourceColumn !== null && targetColumn !== null) {
-      addEdge(cells[sourceColumn] ?? "", cells[targetColumn] ?? "");
-      continue;
-    }
-    if (componentColumn !== null && dependsOnColumn !== null) {
-      const target = cells[componentColumn] ?? "";
-      for (const source of (cells[dependsOnColumn] ?? "").split(/[,;]|\band\b/iu)) {
-        if (!/^none$/iu.test(cleanMarkdownCell(source))) {
-          addEdge(source, target);
-        }
-      }
-    }
-  }
-  return new Map(
-    [...predecessorsByTarget.entries()].map(([target, predecessors]) => [
-      target,
-      uniqueSorted([...predecessors])
-    ])
-  );
-}
-
-function parseModuleBoundaryHintsFromMarkdown(
-  content: string
-): ReadonlyMap<string, MarkdownComponentHint> {
-  const table = markdownTableWithHeader(
-    markdownSection({ content, heading: "Module Boundary" })
-  );
-  const componentColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["component ref", "component", "component id"]
-  });
-  const moduleColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["module ref", "module", "module name"]
-  });
-  const effectiveComponentColumn = componentColumn ?? moduleColumn;
-  const pathColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: [
-      "product file target",
-      "file target",
-      "output path",
-      "path",
-      "relative path",
-      "realization file",
-      "product target",
-      "target path",
-      "target file",
-      "source target"
-    ]
-  });
-  const boundaryColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: ["public boundary", "boundary"],
-    fallback: 1
-  });
-  const dependsOnColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["depends on", "dependencies", "upstream components"]
-  });
-  const hints = new Map<string, MarkdownComponentHint>();
-  if (effectiveComponentColumn === null) {
-    return hints;
-  }
-  for (const cells of table.rows) {
-    const componentId = componentRefFromMarkdownCell(
-      cells[effectiveComponentColumn] ?? ""
-    );
-    if (componentId.length === 0) {
-      continue;
-    }
-    const moduleName =
-      moduleColumn === null
-        ? componentId
-        : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || null;
-    const relativePath =
-      pathColumn === null
-        ? null
-        : normalizedNonePath(cells[pathColumn] ?? "", componentId);
-    const publicBoundary = cleanMarkdownCell(cells[boundaryColumn] ?? "");
-    const upstreamComponentIds =
-      dependsOnColumn === null
-        ? uniqueSorted([])
-        : uniqueSorted(
-            (cells[dependsOnColumn] ?? "")
-              .split(/[,;]|\band\b/iu)
-              .map((value) => componentRefFromMarkdownCell(value))
-              .filter((value) => value.length > 0 && !/^none$/iu.test(value))
-          );
-    hints.set(
-      componentId,
-      Object.freeze({
-        componentId,
-        moduleName,
-        relativePath,
-        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
-        upstreamComponentIds
-      })
-    );
-  }
-  return hints;
-}
-
-function parseComponentTopologyHintsFromMarkdown(
-  content: string
-): ReadonlyMap<string, MarkdownComponentHint> {
-  const table = markdownTableWithHeader(
-    markdownSectionForHeadings({
-      content,
-      headings: [
-        "Component Topology",
-        "Component Topology And Requirement Lineage"
-      ]
-    })
-  );
-  const componentColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["component ref", "component", "component id"]
-  });
-  if (componentColumn === null) {
-    return new Map();
-  }
-  const moduleColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["module ref", "module", "module name"]
-  });
-  const boundaryColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["public boundary", "public symbol shape", "boundary", "exposes"]
-  });
-  const dependencyEdges = parseComponentDependencyEdgesFromMarkdown(content);
-  const hints = new Map<string, MarkdownComponentHint>();
-  for (const cells of table.rows) {
-    const componentId = componentRefFromMarkdownCell(cells[componentColumn] ?? "");
-    if (componentId.length === 0) {
-      continue;
-    }
-    const publicBoundary =
-      boundaryColumn === null ? "" : cleanMarkdownCell(cells[boundaryColumn] ?? "");
-    const moduleName =
-      moduleColumn === null
-        ? componentId
-        : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || componentId;
-    hints.set(
-      componentId,
-      Object.freeze({
-        componentId,
-        moduleName,
-        relativePath: null,
-        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
-        upstreamComponentIds: dependencyEdges.get(componentId) ?? Object.freeze([])
-      })
-    );
-  }
-  return hints;
-}
-
-function parseComponentRealizationHintsFromMarkdown(
-  content: string
-): ReadonlyMap<string, MarkdownComponentHint> {
-  const table = markdownTableWithHeader(
-    markdownSectionForHeadings({
-      content,
-      headings: ["Component Realization", "Component Realization Targets"]
-    })
-  );
-  const dependencyEdges = parseComponentDependencyEdgesFromMarkdown(content);
-  const componentColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: ["component ref", "component", "component id"],
-    fallback: 0
-  });
-  const pathColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: [
-      "output path",
-      "path",
-      "relative path",
-      "realization file",
-      "later source target",
-      "product target",
-      "target path",
-      "target file",
-      "source target"
-    ],
-    fallback: 2
-  });
-  const moduleColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["module ref", "module", "module name"]
-  });
-  const boundaryColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: ["public boundary", "public symbol shape", "boundary"],
-    fallback: 3
-  });
-  const hints = new Map<string, MarkdownComponentHint>();
-  for (const cells of table.rows) {
-    const componentId = componentRefFromMarkdownCell(cells[componentColumn] ?? "");
-    if (componentId.length === 0) {
-      continue;
-    }
-    const relativePath = normalizedNonePath(cells[pathColumn] ?? "", componentId);
-    const publicBoundary = cleanMarkdownCell(cells[boundaryColumn] ?? "");
-    hints.set(
-      componentId,
-      Object.freeze({
-        componentId,
-        moduleName:
-          moduleColumn === null
-            ? null
-            : componentRefFromMarkdownCell(cells[moduleColumn] ?? "") || null,
-        relativePath,
-        publicBoundary: publicBoundary.length === 0 ? null : publicBoundary,
-        upstreamComponentIds: dependencyEdges.get(componentId) ?? Object.freeze([])
-      })
-    );
-  }
-  return hints;
-}
-
-function mergeComponentHints(
-  ...hintMaps: readonly ReadonlyMap<string, MarkdownComponentHint>[]
-): ReadonlyMap<string, MarkdownComponentHint> {
-  const merged = new Map<string, MarkdownComponentHint>();
-  for (const hintMap of hintMaps) {
-    for (const hint of hintMap.values()) {
-      const prior = merged.get(hint.componentId);
-      merged.set(
-        hint.componentId,
-        Object.freeze({
-          componentId: hint.componentId,
-          moduleName: hint.moduleName ?? prior?.moduleName ?? null,
-          relativePath: hint.relativePath ?? prior?.relativePath ?? null,
-          publicBoundary: hint.publicBoundary ?? prior?.publicBoundary ?? null,
-          upstreamComponentIds: uniqueSorted([
-            ...(prior?.upstreamComponentIds ?? []),
-            ...hint.upstreamComponentIds
-          ])
-        })
-      );
-    }
-  }
-  return merged;
-}
-
-function parseRequirementLineageSubsectionRows(input: {
-  readonly content: string;
-  readonly componentHints: ReadonlyMap<string, MarkdownComponentHint>;
-}): readonly {
-  readonly requirementId: string;
-  readonly componentId: string;
-  readonly relativePath: string;
-}[] {
-  const section = markdownSection({ content: input.content, heading: "Requirement Lineage" });
-  if (section.length === 0) {
+function designDepthRegisterQualityErrors(input: {
+  readonly register: SdlcDesignDepthRegister;
+  readonly requireSourceFileTargets: boolean;
+}): readonly string[] {
+  if (!input.requireSourceFileTargets) {
     return Object.freeze([]);
   }
-  const lines = section.split(/\r?\n/u);
-  const rows: {
-    readonly requirementId: string;
-    readonly componentId: string;
-    readonly relativePath: string;
-  }[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const heading = /^#{3,6}\s+Requirement\s+Lineage\s*(?:[-—:]\s*)?(.+)$/iu.exec(
-      lines[index]?.trim() ?? ""
+  const { register } = input;
+  const errors: string[] = [];
+  const moduleNames = new Set(
+    register.implementationModuleRows.map((row) => row.moduleName)
+  );
+  const topologyComponentIds = new Set(
+    register.componentTopologyRows.map((row) => row.componentId)
+  );
+  const sourceFileTargetPaths = new Set(
+    register.fileTargetRows
+      .filter((row) => row.role === "source")
+      .map((row) => row.relativePath)
+  );
+  if (register.componentTopologyRows.length === 0) {
+    errors.push("component_topology_required");
+  }
+  if (register.componentRealizationRows.length === 0) {
+    errors.push("component_realization_required");
+  }
+  if (sourceFileTargetPaths.size === 0) {
+    errors.push("source_file_target_required");
+  }
+  for (const row of register.componentTopologyRows) {
+    if (!moduleNames.has(row.moduleName)) {
+      errors.push(
+        `component_topology_unknown_module:${row.componentId}:${row.moduleName}`
+      );
+    }
+    if (isPlaceholderPublicBoundary(row.publicBoundary)) {
+      errors.push(
+        `component_topology_placeholder_public_boundary:${row.componentId}:${row.publicBoundary}`
+      );
+    }
+    if (!sourceFileTargetPaths.has(row.relativePath)) {
+      errors.push(
+        `component_topology_source_file_target_missing:${row.componentId}:${row.relativePath}`
+      );
+    }
+  }
+  for (const row of register.componentRealizationRows) {
+    if (!topologyComponentIds.has(row.componentId)) {
+      errors.push(`component_realization_unknown_component:${row.componentId}`);
+    }
+    if (!moduleNames.has(row.moduleName)) {
+      errors.push(
+        `component_realization_unknown_module:${row.componentId}:${row.moduleName}`
+      );
+    }
+    if (isPlaceholderPublicBoundary(row.publicBoundary)) {
+      errors.push(
+        `component_realization_placeholder_public_boundary:${row.componentId}:${row.publicBoundary}`
+      );
+    }
+    if (!sourceFileTargetPaths.has(row.relativePath)) {
+      errors.push(
+        `component_realization_source_file_target_missing:${row.componentId}:${row.relativePath}`
+      );
+    }
+  }
+  const rolesByPath = new Map<string, Set<string>>();
+  for (const row of register.fileTargetRows) {
+    const roles = rolesByPath.get(row.relativePath) ?? new Set<string>();
+    roles.add(row.role);
+    rolesByPath.set(row.relativePath, roles);
+  }
+  for (const [relativePath, roles] of rolesByPath.entries()) {
+    if (roles.size <= 1) {
+      continue;
+    }
+    const nonMaterializedRoles = [...roles].filter(
+      (role) => !isMaterializedFileTargetRole(role)
     );
-    if (heading === null) {
-      continue;
-    }
-    const componentId = componentRefFromMarkdownCell(heading[1] ?? "");
-    if (componentId.length === 0) {
-      continue;
-    }
-    const blockLines: string[] = [];
-    for (const line of lines.slice(index + 1)) {
-      if (/^#{3,6}\s+/u.test(line.trim())) {
-        break;
-      }
-      blockLines.push(line);
-    }
-    const hint = input.componentHints.get(componentId);
-    const relativePath =
-      hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId);
-    for (const requirementId of requirementIdsFromText(blockLines.join("\n"))) {
-      rows.push(
-        Object.freeze({
-          requirementId,
-          componentId,
-          relativePath
-        })
+    if (nonMaterializedRoles.length > 0) {
+      errors.push(
+        `file_target_duplicate_non_materialized_role:${relativePath}:${nonMaterializedRoles.join(",")}`
       );
     }
   }
-  return Object.freeze(rows);
+  return Object.freeze(errors);
 }
 
-function parseLineageRowsFromMarkdown(content: string): readonly {
-  readonly requirementId: string;
-  readonly componentId: string;
-  readonly relativePath: string;
-}[] {
-  const componentHints = mergeComponentHints(
-    parseModuleBoundaryHintsFromMarkdown(content),
-    parseComponentTopologyHintsFromMarkdown(content),
-    parseComponentRealizationHintsFromMarkdown(content),
-    parseFileTargetOwnerHintsFromMarkdown(content)
-  );
-  const table = markdownTableWithHeader(
-    markdownSectionForHeadings({
-      content,
-      headings: [
-        "Requirement Lineage",
-        "Component Topology And Requirement Lineage"
-      ]
-    })
-  );
-  const requirementColumn = markdownColumnIndex({
-    header: table.header,
-    candidates: [
-      "obligation id",
-      "requirement id",
-      "requirement ref",
-      "requirement refs",
-      "requirement ids",
-      "requirement references",
-      "requirement"
-    ],
-    fallback: 0
-  });
-  const componentColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: ["owning component", "owning component ref", "owned by", "component", "component ref", "owner component"]
-  });
-  const pathColumn = markdownColumnIndexOrNull({
-    header: table.header,
-    candidates: [
-      "realization file",
-      "product file target",
-      "product target",
-      "downstream target",
-      "target path",
-      "target file",
-      "path",
-      "satisfied by",
-      "source file",
-      "realization locus",
-      "closure mechanism"
-    ]
-  });
-  const candidateRows = table.rows
-    .flatMap((cells) => {
-      const requirementIds = requirementIdsFromText(cells[requirementColumn] ?? "");
-      const componentId = componentColumn === null
-        ? ""
-        : componentRefFromMarkdownCell(cells[componentColumn] ?? "");
-      const hint = componentHints.get(componentId);
-      const columnPath =
-        pathColumn === null ? null : concreteMarkdownPathCell(cells[pathColumn] ?? "");
-      const relativePath =
-        pathColumn === null
-          ? hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId)
-          : columnPath ?? hint?.relativePath ?? runtimeEvidenceRefForComponent(componentId);
-      if (
-        requirementIds.length === 0 ||
-        componentId.length === 0 ||
-        relativePath.length === 0
-      ) {
-        return [];
-      }
-      return requirementIds.map((requirementId) =>
-        Object.freeze({ requirementId, componentId, relativePath })
-      );
-    })
-    .filter((row): row is {
-      readonly requirementId: string;
-      readonly componentId: string;
-      readonly relativePath: string;
-    } => row !== null);
-  const subsectionRows = parseRequirementLineageSubsectionRows({
-    content,
-    componentHints
-  });
-  const mergedRows = [...candidateRows, ...subsectionRows];
-  const concreteComponentIds = uniqueSorted(
-    mergedRows
-      .map((row) => row.componentId)
-      .filter((componentId) => !/^residual\b:?/iu.test(componentId))
-  );
-  const residualOwner =
-    concreteComponentIds.length === 1 ? concreteComponentIds[0] : null;
-  return Object.freeze(
-    mergedRows
-      .map((row) => {
-        if (!/^residual\b:?/iu.test(row.componentId)) {
-          return row;
-        }
-        return residualOwner === null
-          ? null
-          : Object.freeze({
-              ...row,
-              componentId: residualOwner
-            });
-      })
-      .filter((row): row is {
-        readonly requirementId: string;
-        readonly componentId: string;
-        readonly relativePath: string;
-      } => row !== null)
-  );
-}
-
-function moduleBoundaryFieldFromMarkdown(input: {
-  readonly content: string;
-  readonly columnCandidates: readonly string[];
-  readonly fallbackColumn: number;
-}): string | null {
-  const table = markdownTableWithHeader(
-    markdownSection({ content: input.content, heading: "Module Boundary" })
-  );
-  const column = markdownColumnIndex({
-    header: table.header,
-    candidates: input.columnCandidates,
-    fallback: input.fallbackColumn
-  });
-  return table.rows[0]?.[column] ?? null;
-}
-
-function designCompletenessVerdictFromEvidence(
-  evidenceRefs: readonly string[]
-): SdlcDesignCompletenessVerdict {
-  const axis = (axisName: "entity" | "attribute" | "flow") =>
-    Object.freeze({
-      kind: "sdlc_design_completeness_axis_verdict" as const,
-      axis: axisName,
-      status: "partial" as const,
-      reasons: Object.freeze([
-        "Evaluator-derived from implementation design artifact; content assurance remains downstream evidence."
-      ]),
-      evidenceRefs
-    });
-  return Object.freeze({
-    kind: "sdlc_design_completeness_verdict" as const,
-    verdictVersion: "ts-design-depth-v1" as const,
-    entity: axis("entity"),
-    attribute: axis("attribute"),
-    flow: axis("flow")
-  });
-}
-
-function deriveRegisterFromMarkdownArtifact(input: {
-  readonly targetAssetType: string;
-  readonly outputFile: string;
-  readonly content: string;
-}): SdlcDesignDepthRegister | null {
-  const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
-  const fileTargetRows = parseFileTargetRowsFromMarkdown(input.content);
-  const sourceTargetByModule =
-    sourceTargetByModuleFromFileTargetRows(fileTargetRows);
-  const componentHints = mergeComponentHints(
-    parseModuleBoundaryHintsFromMarkdown(input.content),
-    parseComponentTopologyHintsFromMarkdown(input.content),
-    parseComponentRealizationHintsFromMarkdown(input.content),
-    parseFileTargetOwnerHintsFromMarkdown(input.content)
-  );
-  const lineageRows = parseLineageRowsFromMarkdown(input.content);
-  const allRequirementIds = requirementIdsFromText(input.content);
-  const primarySourcePath =
-    fileTargetRows.find((row) => row.role === "source")?.relativePath ??
-    fileTargetRows[0]?.relativePath ??
-    null;
-  if (lineageRows.length === 0 && primarySourcePath === null) {
-    return null;
-  }
-  const moduleName =
-    firstMarkdownBulletValue({ content: input.content, label: "Module" }) ??
-    moduleBoundaryFieldFromMarkdown({
-      content: input.content,
-      columnCandidates: ["module", "module name", "name"],
-      fallbackColumn: 0
-    }) ??
-    (lineageRows[0] === undefined
-      ? moduleNameFromOutputPath(input.outputFile)
-      : moduleNameFromComponentId(
-          lineageRows[0].componentId,
-          moduleNameFromOutputPath(input.outputFile)
-        ));
-  const publicBoundary =
-    firstMarkdownBulletValue({ content: input.content, label: "Public boundary" }) ??
-    moduleBoundaryFieldFromMarkdown({
-      content: input.content,
-      columnCandidates: ["public boundary", "boundary"],
-      fallbackColumn: 1
-    }) ??
-    primarySourcePath ??
-    `module:${moduleName}`;
-  const componentIds = uniqueSorted(
-    lineageRows.length === 0
-      ? componentHints.size === 0
-        ? [`${moduleName}.main`]
-        : [...componentHints.keys()]
-      : [
-          ...lineageRows.map((row) => row.componentId),
-          ...[...componentHints.values()]
-            .filter((hint) =>
-              hint.relativePath !== null &&
-              !hint.relativePath.startsWith("runtime-evidence://")
-            )
-            .map((hint) => hint.componentId)
-        ]
-  );
-  const componentTopologyRows = Object.freeze(
-    componentIds.map((componentId) => {
-      const ownedRows = lineageRows.filter((row) => row.componentId === componentId);
-      const componentHint = componentHints.get(componentId);
-      const lineagePath = concreteProductPathCandidate(
-        ownedRows[0]?.relativePath
-      );
-      const selectedModuleName =
-        componentHint?.moduleName ??
-        moduleNameFromKnownModulePrefix({
-          componentId,
-          moduleNames: sourceTargetByModule.keys()
-        }) ??
-        moduleNameFromComponentId(componentId, moduleName);
-      const relativePath =
-        concreteProductPathCandidate(componentHint?.relativePath) ??
-        lineagePath ??
-        sourceTargetByModule.get(selectedModuleName) ??
-        primarySourcePath ??
-        `${moduleName}/main`;
-      const requirementIds = uniqueSorted(
-        ownedRows.length === 0
-          ? allRequirementIds
-          : ownedRows.map((row) => row.requirementId)
-      );
-      const selectedPublicBoundary =
-        componentHint?.publicBoundary ?? publicBoundary;
-      return Object.freeze({
-        kind: "sdlc_component_topology_row" as const,
-        componentId,
-        moduleName: selectedModuleName,
-        relativePath,
-        publicBoundary: selectedPublicBoundary,
-        concernRole: concernRoleFromBoundary({
-          publicBoundary: selectedPublicBoundary,
-          relativePath
-        }),
-        requirementIds,
-        sourceAssetRefs: evidenceRefs
-      });
-    })
-  );
-  const componentRealizationRows = Object.freeze(
-    componentTopologyRows.map((row) =>
-      Object.freeze({
-        kind: "sdlc_component_realization_row" as const,
-        componentId: row.componentId,
-        moduleName: row.moduleName,
-        relativePath: row.relativePath,
-        publicBoundary: row.publicBoundary,
-        trancheId: null,
-        firstProductFileToChange: row.relativePath,
-        upstreamComponentIds: componentHints.get(row.componentId)?.upstreamComponentIds ?? Object.freeze([]),
-        requirementIds: row.requirementIds,
-        sourceAssetRefs: row.sourceAssetRefs
-      })
-    )
-  );
-  const language =
-    firstMarkdownBulletValue({ content: input.content, label: "language" }) ??
-    (/rust/iu.test(input.content) ? "Rust" : "unspecified");
-  const buildTool =
-    firstMarkdownBulletValue({
-      content: input.content,
-      label: "package manager/build tool"
-    }) ?? (/cargo/iu.test(input.content) ? "cargo" : "unspecified");
-  return Object.freeze({
-    kind: "sdlc_design_depth_register" as const,
-    registerVersion: "ts-design-depth-v1" as const,
-    targetAssetType: input.targetAssetType,
-    stackProfileRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_stack_profile_row" as const,
-        stackRef: `stack://${slugPart(moduleName)}/${slugPart(language)}-${slugPart(buildTool)}`,
-        language,
-        buildTool
-      })
-    ]),
-    implementationModuleRows: Object.freeze(
-      uniqueSorted(componentTopologyRows.map((row) => row.moduleName)).map((rowModuleName) =>
-        Object.freeze({
-          kind: "sdlc_implementation_module_row" as const,
-          moduleName: rowModuleName,
-          moduleRef: `module://${slugPart(rowModuleName)}`
-        })
-      )
-    ),
-    aggregateDomainModelRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_aggregate_domain_model_row" as const,
-        modelRef: `model://${slugPart(moduleName)}/evaluator-derived`
-      })
-    ]),
-    moduleSchemaFragments: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_module_schema_fragment" as const,
-        moduleName,
-        entities: Object.freeze([]),
-        operations: Object.freeze([]),
-        requirementIds: allRequirementIds,
-        sourceAssetRefs: evidenceRefs
-      })
-    ]),
-    moduleStateDiagramFragments: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_module_state_diagram_fragment" as const,
-        moduleName,
-        entityId: `entity:${slugPart(moduleName)}.program`,
-        stateless: true,
-        states: Object.freeze([]),
-        transitions: Object.freeze([]),
-        requirementIds: allRequirementIds,
-        sourceAssetRefs: evidenceRefs
-      })
-    ]),
-    aggregateDomainModel: Object.freeze({
-      kind: "sdlc_aggregate_domain_model" as const,
-      modelVersion: "ts-design-depth-v1" as const,
-      entities: Object.freeze([]),
-      operations: Object.freeze([]),
-      crossModuleReferences: Object.freeze([]),
-      evidenceRefs
-    }),
-    sunnyDaySequenceRows: Object.freeze([
-      Object.freeze({
-        kind: "sdlc_sunny_day_sequence_row" as const,
-        sequenceRef: `sequence://${slugPart(moduleName)}/evaluator-derived`
-      })
-    ]),
-    aggregateSunnyDaySequence: Object.freeze({
-      kind: "sdlc_aggregate_sunny_day_sequence" as const,
-      sequenceVersion: "ts-design-depth-v1" as const,
-      steps: Object.freeze([]),
-      evidenceRefs
-    }),
-    componentTopologyRows,
-    componentRealizationRows,
-    fileTargetRows,
-    designCompletenessVerdict: designCompletenessVerdictFromEvidence(evidenceRefs)
-  });
+function objectRecord(input: unknown): Record<string, unknown> | null {
+  return mutableRecord(input);
 }
 
 function normalizeCandidate(input: unknown): unknown {
@@ -2996,26 +2003,11 @@ function writeDesignDepthCandidateEvidence(input: {
   return Object.freeze([pathToFileURL(rawPath).href, pathToFileURL(normalizedPath).href]);
 }
 
-function writeDerivedDesignDepthRegisterEvidence(input: {
-  readonly archiveRoot: string | null | undefined;
-  readonly register: SdlcDesignDepthRegister;
-}): readonly string[] {
-  if (input.archiveRoot === null || input.archiveRoot === undefined) {
-    return Object.freeze([]);
-  }
-  mkdirSync(input.archiveRoot, { recursive: true });
-  const derivedPath = join(
-    input.archiveRoot,
-    "design_depth_evaluator_derived_register.json"
-  );
-  writeFileSync(derivedPath, `${JSON.stringify(input.register, null, 2)}\n`, "utf8");
-  return Object.freeze([pathToFileURL(derivedPath).href]);
-}
-
 export function admitDesignDepthRegisterFromArtifact(input: {
   readonly targetAssetType: string;
   readonly outputFile: string;
   readonly archiveRoot?: string | null;
+  readonly requireSourceFileTargets?: boolean | undefined;
 }): SdlcDesignDepthRegisterAdmission {
   const evidenceRefs = Object.freeze([pathToFileURL(input.outputFile).href]);
   if (!isDesignDepthTarget(input.targetAssetType)) {
@@ -3039,6 +2031,34 @@ export function admitDesignDepthRegisterFromArtifact(input: {
     });
   }
   const content = readFileSync(input.outputFile, "utf8");
+  let strictWholeFileCandidate: unknown = undefined;
+  if (input.requireSourceFileTargets === true) {
+    try {
+      strictWholeFileCandidate = JSON.parse(content);
+    } catch {
+      return Object.freeze({
+        kind: "sdlc_design_depth_register_admission" as const,
+        status: "rejected" as const,
+        targetAssetType: input.targetAssetType,
+        register: null,
+        blockingReasons: Object.freeze(["design_depth_register_json_required"]),
+        evidenceRefs
+      });
+    }
+    const strictRecord = objectRecord(strictWholeFileCandidate);
+    if (strictRecord?.["kind"] !== "sdlc_design_depth_register") {
+      return Object.freeze({
+        kind: "sdlc_design_depth_register_admission" as const,
+        status: "rejected" as const,
+        targetAssetType: input.targetAssetType,
+        register: null,
+        blockingReasons: Object.freeze([
+          "design_depth_register_top_level_kind_required"
+        ]),
+        evidenceRefs
+      });
+    }
+  }
   if (containsFencedDesignDepthRegister(content)) {
     return Object.freeze({
       kind: "sdlc_design_depth_register_admission" as const,
@@ -3053,7 +2073,11 @@ export function admitDesignDepthRegisterFromArtifact(input: {
   }
   const errors: string[] = [];
   const candidateEvidenceRefs: string[] = [];
-  for (const [candidateIndex, candidate] of jsonCandidates(content).entries()) {
+  const candidates =
+    input.requireSourceFileTargets === true
+      ? Object.freeze([strictWholeFileCandidate])
+      : jsonCandidates(content);
+  for (const [candidateIndex, candidate] of candidates.entries()) {
     const normalizedCandidate = normalizeCandidate(candidate);
     candidateEvidenceRefs.push(
       ...writeDesignDepthCandidateEvidence({
@@ -3073,6 +2097,14 @@ export function admitDesignDepthRegisterFromArtifact(input: {
         errors.push(`design_depth_register_target_mismatch:${register.targetAssetType}`);
         continue;
       }
+      const qualityErrors = designDepthRegisterQualityErrors({
+        register,
+        requireSourceFileTargets: input.requireSourceFileTargets === true
+      });
+      if (qualityErrors.length > 0) {
+        errors.push(`design_depth_register_quality:${qualityErrors.join(",")}`);
+        continue;
+      }
       return Object.freeze({
         kind: "sdlc_design_depth_register_admission" as const,
         status: "admitted" as const,
@@ -3084,29 +2116,6 @@ export function admitDesignDepthRegisterFromArtifact(input: {
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
-  }
-  const derivedRegister = deriveRegisterFromMarkdownArtifact({
-    targetAssetType: input.targetAssetType,
-    outputFile: input.outputFile,
-    content
-  });
-  if (derivedRegister !== null) {
-    const derivedEvidenceRefs = writeDerivedDesignDepthRegisterEvidence({
-      archiveRoot: input.archiveRoot,
-      register: derivedRegister
-    });
-    return Object.freeze({
-      kind: "sdlc_design_depth_register_admission" as const,
-      status: "admitted" as const,
-      targetAssetType: input.targetAssetType,
-      register: derivedRegister,
-      blockingReasons: Object.freeze([]),
-      evidenceRefs: Object.freeze([
-        ...evidenceRefs,
-        ...candidateEvidenceRefs,
-        ...derivedEvidenceRefs
-      ])
-    });
   }
   return Object.freeze({
     kind: "sdlc_design_depth_register_admission" as const,

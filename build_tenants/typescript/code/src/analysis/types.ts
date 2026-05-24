@@ -211,6 +211,19 @@ export interface SdlcFdRunAnalysisFrontierSummary {
   readonly fanInRows: readonly SdlcFdRunAnalysisFrontierFanIn[];
 }
 
+export interface SdlcFdRunAnalysisRc3StageTruth {
+  readonly status: "present" | "missing" | "malformed" | "drift";
+  readonly selectedCompositionRef: string | null;
+  readonly selectedCompositionDigest: string | null;
+  readonly selectedCompositionSelectionRef: string | null;
+  readonly selectedRegimeBindingRef: string | null;
+  readonly evaluateRef: string | null;
+  readonly admittedStateGraphCallRef: string | null;
+  readonly consequenceRef: string | null;
+  readonly domainReadModelRefs: readonly string[];
+  readonly detail: string | null;
+}
+
 export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly attemptOrdinal: number;
   readonly operatorRunRef: string;
@@ -252,6 +265,7 @@ export interface SdlcFdRunAnalysisEdgeAttempt {
   readonly stdoutBytes: number;
   readonly eventBytes: number;
   readonly frontierSummary: SdlcFdRunAnalysisFrontierSummary | null;
+  readonly rc3StageTruth: SdlcFdRunAnalysisRc3StageTruth;
   readonly workerDispatched: boolean;
   readonly workerStatus: string | null;
 }

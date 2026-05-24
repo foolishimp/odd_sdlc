@@ -35,7 +35,10 @@ import type {
 } from "../shared/blocking_reason.js";
 import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
-import type { SdlcOverlayBinding } from "../graph/index.js";
+import type {
+  SdlcOverlayBinding,
+  SdlcWorkCategoryGovernanceCategory
+} from "../graph/index.js";
 import type {
   SdlcDependencyTraversalMethod,
   SdlcFeatureDependencyDagNodeKind,
@@ -1666,6 +1669,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly vectorIndex: number;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
+  readonly workCategoryGovernance: SdlcWorkerWorkCategoryGovernanceSelection;
   readonly manifestPath: string;
   readonly manifestRef: string;
   readonly manifestDigest: string;
@@ -1697,6 +1701,18 @@ export interface SdlcWorkerInvocationPackage {
   readonly packageDigest: string;
 }
 
+export interface SdlcWorkerWorkCategoryGovernanceSelection {
+  readonly kind: "sdlc_work_category_governance_selection";
+  readonly category: SdlcWorkCategoryGovernanceCategory;
+  readonly configRef: string;
+  readonly workerPath: string;
+  readonly selectionSource:
+    | "graph_function_catalog"
+    | "target_asset_catalog_fallback";
+  readonly edgeName: string;
+  readonly targetAssetType: string;
+}
+
 export interface SdlcWorkerConstructionBriefPackageDisposition {
   readonly kind: "sdlc_worker_construction_brief_package_disposition";
   readonly packageName: string;
@@ -1714,6 +1730,7 @@ export interface SdlcWorkerConstructionBrief {
   readonly vectorIndex: number;
   readonly sourceAssetTypes: readonly string[];
   readonly targetAssetType: string;
+  readonly workCategoryGovernance: SdlcWorkerWorkCategoryGovernanceSelection;
   readonly targetCarrierProjection: SdlcWorkerTargetCarrierPromptProjection;
   readonly canonicalPromptCarrierPath: string;
   readonly promptSourcePolicyRef: string;
@@ -1727,6 +1744,12 @@ export interface SdlcWorkerConstructionBrief {
     readonly omittedPriorEdgeRefCount: number;
     readonly runtimeContextRefs: readonly string[];
     readonly omittedRuntimeContextRefCount: number;
+  };
+  readonly stagePressure: {
+    readonly producedStagedAuthorityRefs: readonly string[];
+    readonly requiredStagedAuthorityRefs: readonly string[];
+    readonly designDepthEvaluatorRegisterRefs: readonly string[];
+    readonly expectedDesignDepthEvaluatorRegisterPath: string | null;
   };
   readonly targetState: {
     readonly outputFile: string;
@@ -1882,6 +1905,7 @@ export interface SdlcFpEvaluateResult {
   readonly compositionRef: string;
   readonly compositionDigest: string;
   readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly workerReportProjectionRef: string;
   readonly transformResultRef: string | null;
   readonly postflightRef: string;

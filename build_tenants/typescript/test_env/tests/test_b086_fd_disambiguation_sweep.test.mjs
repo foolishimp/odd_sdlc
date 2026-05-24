@@ -35,7 +35,7 @@ import {
   deriveWorkerHandoffManifest,
   evaluateSdlcHookPostflight,
   evaluateSdlcHookPreflight,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   minimalSdlcHookInvocationForContract,
   projectConstraintsFromConformProjectProfile,
@@ -983,7 +983,7 @@ test("B-086 execution evidence admits declared pending and rejects non-contract 
   );
   const report = readWorkerResultReport(handoff);
   assert.equal(report.executionEvidence.status, "pending");
-  const postflight = evaluateWorkerResultPostflight({ manifest: handoff, report });
+  const postflight = evaluateSdlcComputeStage({ manifest: handoff, report });
   assert.equal(postflight.status, "blocked");
   assert.equal(
     postflight.blockingReasonCarriers.find(
@@ -1027,7 +1027,7 @@ test("B-086 failed execution evidence is repair input unless counts contradict i
       }))
   );
   const failedReport = readWorkerResultReport(handoff);
-  const admittedFailure = evaluateWorkerResultPostflight({
+  const admittedFailure = evaluateSdlcComputeStage({
     manifest: handoff,
     report: failedReport
   });
@@ -1043,7 +1043,7 @@ test("B-086 failed execution evidence is repair input unless counts contradict i
       }))
   );
   const contradictoryReport = readWorkerResultReport(handoff);
-  const contradiction = evaluateWorkerResultPostflight({
+  const contradiction = evaluateSdlcComputeStage({
     manifest: handoff,
     report: contradictoryReport
   });
@@ -1073,7 +1073,7 @@ test("B-086 archive F_D accepts admitted execution-result refs and rejects prose
       )
   );
   assert.equal(
-    evaluateWorkerResultPostflight({
+    evaluateSdlcComputeStage({
       manifest: executionManifest,
       report: readWorkerResultReport(executionManifest)
     }).status,
@@ -1103,7 +1103,7 @@ test("B-086 archive F_D accepts admitted execution-result refs and rejects prose
       ])
     }
   );
-  const proseOnlyPostflight = evaluateWorkerResultPostflight({
+  const proseOnlyPostflight = evaluateSdlcComputeStage({
     manifest: archiveManifest,
     report: readWorkerResultReport(archiveManifest)
   });
@@ -1134,7 +1134,7 @@ test("B-086 archive F_D accepts admitted execution-result refs and rejects prose
       )
     }
   );
-  const archivePostflight = evaluateWorkerResultPostflight({
+  const archivePostflight = evaluateSdlcComputeStage({
     manifest: archiveManifest,
     report: readWorkerResultReport(archiveManifest)
   });

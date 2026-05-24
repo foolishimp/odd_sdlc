@@ -1,7 +1,49 @@
 export * from "./carriers.js";
 export * from "./assurance_gate.js";
 export * from "./event_store.js";
-export * from "./handoff.js";
+export {
+  stableOperatorJson,
+  sha256Text,
+  sha256File,
+  operatorRunId,
+  reconcileSdlcProductMaterializationAuthority,
+  declaredProductFileTargets,
+  assertTraversalIntentPackagePressure,
+  deriveWorkerHandoffManifest,
+  componentRepairReentryPlansForGapDossier,
+  constructWorkerInvocationPackage,
+  constructWorkerBrief,
+  constructWorkerConstructionBrief,
+  promptForHandoff,
+  writeHandoffFiles,
+  admitWorkerResultReport,
+  snapshotProductMaterializationRoot,
+  deriveSdlcStagedConstructionAuditCarriers,
+  observeProductMaterializationDelta,
+  designDepthFpEvaluatorRegisterPath,
+  admitImplementationDesignRegisterForManifest,
+  writeInstalledOperatorOwnedEvaluationArtifact,
+  buildPostTransformWorkerResultReport,
+  workerResultReportWithReplayedProductMaterialization,
+  workerResultReportWithFpStageRefs,
+  constructWorkerFpTransformResult,
+  writeWorkerFpTransformResult,
+  writeProductMaterializationManifest,
+  gapDossierPathForManifest,
+  constructPostflightGapDossier,
+  writePostflightGapDossier,
+  admitPostflightGapDossier,
+  readPostflightGapDossierRef,
+  constructorResultFromWorkerOutput,
+  readWorkerResultReport,
+  writeOperatorArchiveFile,
+  relativeToWorkspace,
+  type SdlcObservedProductFileSnapshot,
+  type SdlcStagedConstructionAuditCarrier,
+  type SdlcProductMaterializationSnapshot
+} from "./handoff.js";
+export * from "./plugins/evaluate/index.js";
+export * from "./work_category_governance.js";
 export * from "./feature_scope.js";
 export * from "./traversal_strategy.js";
 export * from "./traversal_consequence.js";

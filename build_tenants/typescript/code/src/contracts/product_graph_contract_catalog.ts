@@ -126,6 +126,13 @@ function overlaysForEdge(input: {
 
 export const SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS = Object.freeze([
   Object.freeze({
+    edgeRef: "derive_implementation_design_surface",
+    workerDispatchPolicy: "single_worker_handoff",
+    requiredArtifactRefs: Object.freeze([
+      "operator-run-artifact://design-depth-fp-evaluator-register"
+    ])
+  }),
+  Object.freeze({
     edgeRef: "derive_component_code_surface",
     workerDispatchPolicy: "abg_frontier_eligible",
     requiredArtifactRefs: Object.freeze([

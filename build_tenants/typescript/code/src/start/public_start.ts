@@ -53,7 +53,7 @@ import {
   type SdlcConstructionIntent,
   type SdlcNextActionProjection
 } from "../operator/traversal_consequence.js";
-import { deriveSdlcSelectedAbgFnCompositionIdentity } from "../operator/composition_identity.js";
+import { deriveSdlcPreRuntimePlanningCompositionIdentity } from "../operator/composition_identity.js";
 import {
   deriveSdlcDecompositionSummary,
   SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS
@@ -966,7 +966,7 @@ function evaluateInitialPublicStartAction(input: {
     });
   }
   const selectedGraphVectorRef = input.request.replayNextGraphVectorRef ?? null;
-  const selectedComposition = deriveSdlcSelectedAbgFnCompositionIdentity({
+  const selectedComposition = deriveSdlcPreRuntimePlanningCompositionIdentity({
     graphFunctionRef: selectedCandidate.graphFunctionRef,
     graphVectorRef:
       selectedGraphVectorRef ?? `public-start:${selectedCandidate.graphFunctionRef}`,
@@ -1034,6 +1034,7 @@ function evaluateInitialPublicStartAction(input: {
           compositionRef: selectedComposition.compositionRef,
           compositionDigest: selectedComposition.compositionDigest,
           compositionSelectionRef: selectedComposition.compositionSelectionRef,
+          selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
           decisionRef: input.request.replayClosureDecisionRef,
           ledgerRef: `ledger://odd-sdlc/public-start/replay/${encodeURIComponent(input.request.replayClosureDecisionRef)}`,
           ledgerVersionRef:

@@ -23,7 +23,6 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_files_missing",
   "materialized_product_role_missing",
   "context_expected_files_not_materialization_authority",
-  "materialized_product_file_unbound_to_declared_target",
   "materialized_product_role_policy_mismatch",
   "materialized_product_role_policy_ref_mismatch",
   "materialized_product_replay_role_policy_missing",
@@ -39,6 +38,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_path_not_file",
   "materialized_design_file_outside_design_root",
   "materialized_product_file_empty",
+  "sbt_security_manager_option_unsupported",
   "materialized_product_byte_count_mismatch",
   "materialized_product_digest_mismatch",
   "test_execution_evidence_missing",
@@ -197,6 +197,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "obligation_payload_insufficient",
   "obligation_fulfilled_without_output_coverage",
   "source_asset_dependency_missing",
+  "sbt_security_manager_option_unsupported",
   "unsupported_fd_transition",
   "unsupported_transition",
   "unknown_blocking_reason"
@@ -266,6 +267,14 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
         : "authority_to_code",
       lawfulReentryPoint: "same_edge_retry",
       message: "Materialized product evidence does not satisfy the product contract."
+    });
+  }
+  if (code === "sbt_security_manager_option_unsupported") {
+    return Object.freeze({
+      reasonClass: "code_to_test",
+      lawfulReentryPoint: "same_edge_retry",
+      message:
+        "SBT/JDK execution configuration uses an unsupported Security Manager option."
     });
   }
   if (code === "context_expected_files_not_materialization_authority") {

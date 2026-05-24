@@ -21,7 +21,7 @@ import {
   classifySdlcFdFailure,
   constructPostflightGapDossier,
   deriveWorkerHandoffManifest,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   installOddSdlcTypescript,
   legacyBlockingReasonCode,
@@ -261,7 +261,7 @@ test("T-086/T-114 postflight classifies from typed truth, not report prose", () 
     obligationAssessments: []
   };
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "blocked");
   assert(
     postflight.blockingReasonCarriers.some(

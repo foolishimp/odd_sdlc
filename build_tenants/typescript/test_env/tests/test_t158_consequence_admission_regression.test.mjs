@@ -796,7 +796,7 @@ test("T-158 installed operator admits non-close consequence before dispatch retu
     "utf8"
   );
   const publishMarkers =
-    source.match(/const consequence = publishDispatchState\(current\);/gu) ?? [];
+    source.match(/publishDispatchState\(current\)/gu) ?? [];
   assert.equal(publishMarkers.length, 7);
 
   for (const branchStatus of [
@@ -809,7 +809,7 @@ test("T-158 installed operator admits non-close consequence before dispatch retu
     const branchIndex = source.indexOf(branchStatus);
     assert.notEqual(branchIndex, -1, branchStatus);
     const publishIndex = source.indexOf(
-      "const consequence = publishDispatchState(current);",
+      "publishDispatchState(current)",
       branchIndex
     );
     const returnIndex = source.indexOf("return constructFpDispatchOutcome", branchIndex);

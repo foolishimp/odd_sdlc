@@ -91,6 +91,7 @@ export function t132HelloWorldJsLiveScenario({
       ...t132HelloWorldJsScenario.expectations,
       archiveArtifacts: [],
       workspaceFiles: [
+        "build_tenants/hello_world_javascript/spec/TECH_STACK.json",
         "build_tenants/hello_world_javascript/src/hello.js",
         "build_tenants/hello_world_javascript/test/hello.test.js"
       ],
@@ -137,20 +138,22 @@ export function t132HelloWorldJsLiveScenario({
             "pressurePreservation.admissionDecision": "admit",
             "pressurePreservation.mechanism": "outcome_class_graph_variant"
           }
-        },
-        {
-          file: "worker_result_report.json",
-          equals: {
-            "executionEvidence.status": "succeeded",
-            "executionEvidence.failedCount": 0
-          },
-          atLeast: {
-            "executionEvidence.testsObserved": 1,
-            "executionEvidence.passedCount": 1
-          }
         }
       ],
-      processChecks: []
+      processChecks: [
+        {
+          command: "node",
+          args: ["src/hello.js"],
+          cwd: "build_tenants/hello_world_javascript",
+          stdout: "Hello, world!"
+        },
+        {
+          command: "node",
+          args: ["--test", "test/hello.test.js"],
+          cwd: "build_tenants/hello_world_javascript",
+          exitCode: 0
+        }
+      ]
     },
     liveWorker: worker,
     startTarget: "next",

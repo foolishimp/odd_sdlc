@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  constructFpEvaluateResult,
+  constructSdlcFpEvaluateResult,
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcNextActionProjection,
   deriveSdlcEdgeClosureDecision,
@@ -168,7 +168,8 @@ test("T-179 F_P.transform prompt stays inside transform.C authority", () => {
 
 test("T-179 evaluate.C result preserves selected abg.fn_composition identity", () => {
   const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t179-eval-"));
-  const result = constructFpEvaluateResult({
+  const selectedComposition = compositionIdentity();
+  const result = constructSdlcFpEvaluateResult({
     manifest: {
       archiveRoot,
       graphFunctionName: "Fg_t179_runtime_alignment",
@@ -177,6 +178,7 @@ test("T-179 evaluate.C result preserves selected abg.fn_composition identity", (
       fpTransformRequest: null,
       fpTransformResultFile: path.join(archiveRoot, "fp_transform_result.json")
     },
+    selectedComposition,
     report: {
       obligationAssessments: [
         {

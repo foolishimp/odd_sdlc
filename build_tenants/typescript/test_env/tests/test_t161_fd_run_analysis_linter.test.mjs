@@ -212,6 +212,12 @@ function buildSyntheticT132Archive(opts) {
     const postflightStatus = override.postflightStatus ?? "passed";
     const blockingReasonCodes = override.blockingReasonCodes ?? [];
     const residualPressureRefs = override.residualPressureRefs ?? [];
+    const compositionRef = `abg.fn_composition://synthetic/${edge.name}/${index}`;
+    const compositionDigest = `digest://synthetic/${edge.name}/${index}`;
+    const compositionSelectionRef =
+      `abg.fn_composition_selection://synthetic/${edge.name}/${index}`;
+    const selectedRegimeBindingRef =
+      `abg.fn_composition.regime_binding://synthetic/${edge.name}/${index}/evaluate/fp`;
     const defaultExecutionCommand = edge.target === "test_execution_result_surface"
       ? "node --test test/hello.test.js"
       : "node build_tenants/hello_world_javascript/src/hello.js";
@@ -313,6 +319,10 @@ function buildSyntheticT132Archive(opts) {
         path.join(operatorRunRoot, "sdlc_edge_closure_decision.json"),
         {
           kind: "sdlc_edge_closure_decision",
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          selectedRegimeBindingRef,
           decisionRef: `closure-decision://synthetic/${edge.name}/${index}`,
           ledgerRef: `ledger://synthetic/${edge.name}`,
           ledgerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
@@ -325,6 +335,10 @@ function buildSyntheticT132Archive(opts) {
         path.join(operatorRunRoot, "sdlc_edge_fulfillment_ledger.json"),
         {
           kind: "sdlc_edge_fulfillment_ledger",
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          selectedRegimeBindingRef,
           ledgerRef: `ledger://synthetic/${edge.name}`,
           ledgerVersionRef: `ledger-version://synthetic/${edge.name}/${index}`,
           edgeRef: `edge://synthetic/${edge.name}/${index}`,
@@ -364,6 +378,10 @@ function buildSyntheticT132Archive(opts) {
         path.join(operatorRunRoot, "sdlc_next_action_projection.json"),
         {
           kind: "sdlc_next_action_projection",
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          selectedRegimeBindingRef,
           choosesNextTraversal: index < edges.length - 1,
           nextActionProjectionRef: `next-action://synthetic/${edge.name}/${index}`,
           selectedActionRef: `construction-action://synthetic/${edge.name}`,
@@ -400,10 +418,44 @@ function buildSyntheticT132Archive(opts) {
         {
           kind: "sdlc_fp_evaluate_result",
           stage: "F_P.evaluate",
+          computeNotationStage: "evaluate.C",
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          selectedRegimeBindingRef,
           status: postflightStatus,
           postflightStatus,
           blockingReasons: blockingReasonCodes,
           evidenceRefs: []
+        },
+        dirMtimeMs
+      );
+      writeJson(
+        path.join(operatorRunRoot, "gtl_admitted_state_ref.json"),
+        {
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          graphCallRef: `graph-call://synthetic/${edge.name}/${index}`,
+          frameRef: `frame://synthetic/${edge.name}/${index}`,
+          eventRefs: [`event://synthetic/${edge.name}/${index}/evaluate`],
+          ledgerRefs: [`ledger://synthetic/${edge.name}`],
+          projectionRefs: [`projection://synthetic/${edge.name}/${index}`]
+        },
+        dirMtimeMs
+      );
+      writeJson(
+        path.join(operatorRunRoot, "gtl_consequence_projection_ref.json"),
+        {
+          consequenceRef: `consequence://synthetic/${edge.name}/${index}`,
+          compositionRef,
+          compositionDigest,
+          compositionSelectionRef,
+          assuranceDecisionRef: `assurance://synthetic/${edge.name}/${index}`,
+          traversalTransitionRef: `transition://synthetic/${edge.name}/${index}`,
+          domainReadModelRefs: [
+            `next-action://synthetic/${edge.name}/${index}`
+          ]
         },
         dirMtimeMs
       );

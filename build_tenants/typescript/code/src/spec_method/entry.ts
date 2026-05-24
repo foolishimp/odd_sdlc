@@ -1831,6 +1831,15 @@ function startOutcomeForObservedReplay(input: {
       module
     })
   ) {
+    const replayNextAction = {
+      nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
+      selectedActionRef: selectedNextGraphFunction.selectedActionRef,
+      nextGraphFunctionRef: selectedNextGraphFunction.graphFunctionName,
+      nextGraphVectorRef: selectedNextGraphFunction.nextGraphVectorRef,
+      closureDecisionRef: selectedNextGraphFunction.closureDecisionRef,
+      overlayRef: selectedNextGraphFunction.overlayRef,
+      overlayBindingRef: selectedNextGraphFunction.overlayBindingRef
+    };
     const selected = startOutcomeFor({
       ...input.request,
       target:
@@ -1841,20 +1850,31 @@ function startOutcomeForObservedReplay(input: {
               kind: "graph_function",
               handle: selectedNextGraphFunction.graphFunctionName
             }
-    }, {
-      nextActionProjectionRef: selectedNextGraphFunction.nextActionProjectionRef,
-      selectedActionRef: selectedNextGraphFunction.selectedActionRef,
-      nextGraphFunctionRef: selectedNextGraphFunction.graphFunctionName,
-      nextGraphVectorRef: selectedNextGraphFunction.nextGraphVectorRef,
-      closureDecisionRef: selectedNextGraphFunction.closureDecisionRef,
-      overlayRef: selectedNextGraphFunction.overlayRef,
-      overlayBindingRef: selectedNextGraphFunction.overlayBindingRef
-    });
+    }, replayNextAction);
     if (
       selected.executionContract !== null ||
       (selected.kind === "sdlc_public_start_blocked" &&
         selected.blockingReason === "stale_query_domain")
     ) {
+      if (
+        input.request.target.kind === "next" &&
+        selected.executionContract !== null &&
+        !hasReplayForBasis(selected.executionContract.basis, input.events)
+      ) {
+        const replayMatched = startOutcomeFor({
+          ...input.request,
+          target: {
+            kind: "graph_function",
+            handle: selectedNextGraphFunction.graphFunctionName
+          }
+        }, replayNextAction);
+        if (
+          replayMatched.executionContract !== null &&
+          hasReplayForBasis(replayMatched.executionContract.basis, input.events)
+        ) {
+          return replayMatched;
+        }
+      }
       return selected;
     }
   }

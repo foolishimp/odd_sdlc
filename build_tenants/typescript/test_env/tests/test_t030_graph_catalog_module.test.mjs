@@ -67,6 +67,21 @@ const ASSURANCE_GRAPH_FUNCTION_NAMES = [
   FG_TRAVERSAL_ASSURANCE_FOLD
 ];
 
+const RETIRED_OPTIMIZED_EXECUTIVE_EDGE_NAMES = Object.freeze([
+  "Fg_conform_project_authority",
+  "select_implementation_stack_profile",
+  "derive_implementation_module_surface",
+  "derive_aggregate_domain_model_surface",
+  "derive_implementation_component_topology_surface",
+  "derive_aggregate_sunny_day_sequence_surface",
+  "derive_component_realization_schedule_surface",
+  "select_test_stack_profile",
+  "derive_test_module_surface",
+  "derive_test_component_topology_surface",
+  "derive_test_schedule_surface",
+  "qualify_testcase_authority"
+]);
+
 function basisFor(module, handle) {
   return admitExecutionBasis({
     startIntent: admitStartIntent({
@@ -172,6 +187,36 @@ test("T-030 publishes machine-readable function and executive catalogs", () => {
     catalog.functions.find((entry) => entry.name === "derive_test_design_surface")?.outputs[0],
     "test_design_surface"
   );
+});
+
+test("T-030 optimized release executive rejects stale split-edge graph names", () => {
+  const catalog = constructSdlcGraphFunctionCatalog();
+  const optimizedExecutive = catalog.executives.find(
+    (entry) => entry.name === "bootstrap_release_self_test"
+  );
+  assert(optimizedExecutive);
+  const optimizedSteps = [...optimizedExecutive.steps];
+  const productFunctionNames = new Set(
+    BOOTSTRAP_RELEASE_FUNCTION_CATALOG.map((entry) => entry.name)
+  );
+
+  assert.deepStrictEqual(optimizedSteps, [
+    ...OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS
+  ]);
+  for (const edgeName of RETIRED_OPTIMIZED_EXECUTIVE_EDGE_NAMES) {
+    assert.equal(
+      optimizedSteps.includes(edgeName),
+      false,
+      `optimized release executive must not require stale edge: ${edgeName}`
+    );
+  }
+  for (const edgeName of optimizedSteps) {
+    assert.equal(
+      productFunctionNames.has(edgeName),
+      true,
+      `optimized release executive step lacks a product catalog row: ${edgeName}`
+    );
+  }
 });
 
 test("T-030 reusable graph functions preserve catalog input and output signatures", () => {

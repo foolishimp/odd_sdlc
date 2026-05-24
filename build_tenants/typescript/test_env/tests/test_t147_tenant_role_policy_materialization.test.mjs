@@ -11,7 +11,7 @@ import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   constructWorkerInvocationPackage,
   deriveWorkerHandoffManifest,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   promptForHandoff,
   readWorkerResultReport,
@@ -331,7 +331,7 @@ test("T-147 declared unknown file family satisfies product source role by policy
       }
     ]
   });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(reconciliation.status, "passed");
   assert.equal(
@@ -361,10 +361,20 @@ test("T-147 declared unknown file family satisfies product source role by policy
     ]
   );
   assert.match(prompt, /app\.widget \(file, role=source, policy=target-role-policy/u);
-  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasonCarriers.some((reason) =>
+      [
+        "materialized_product_file_unbound_to_declared_target",
+        "materialized_product_role_policy_mismatch",
+        "materialized_product_role_policy_ref_mismatch"
+      ].includes(reason.code)
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+  );
 });
 
-test("T-147 known ecosystem file cannot satisfy an undeclared product role", () => {
+test("T-147 known ecosystem file is evaluate.C pressure, not an F_D unbound blocker", () => {
   const workspace = makeWorkspace({
     activeTenant: "scala_spark",
     language: "scala",
@@ -390,15 +400,15 @@ test("T-147 known ecosystem file cannot satisfy an undeclared product role", () 
       }
     ]
   });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
-  assert(
+  assert.equal(
     postflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.code === "materialized_product_file_unbound_to_declared_target" &&
-        reason.detail === "build.sbt"
-    )
+      (reason) => reason.code === "materialized_product_file_unbound_to_declared_target"
+    ),
+    false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
 
@@ -445,7 +455,7 @@ test("T-147 context expected files alone cannot define materialization targets",
       }
     ]
   });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(reconciliation.status, "missing");
   assert.deepEqual(reconciliation.declaredProductTargetContracts, []);

@@ -12,7 +12,7 @@ import path from "node:path";
 
 import {
   deriveWorkerHandoffManifest,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   sha256Text,
@@ -125,7 +125,7 @@ test("T-089 early non-materializing edge keeps evaluator contract separate from 
 
 test("T-089 postflight rejects missing and unassessed obligation coverage", () => {
   const manifest = earlyManifest(makeWorkspace());
-  const missing = evaluateWorkerResultPostflight({
+  const missing = evaluateSdlcComputeStage({
     manifest,
     report: reportFor(manifest)
   });
@@ -137,7 +137,7 @@ test("T-089 postflight rejects missing and unassessed obligation coverage", () =
     )
   );
 
-  const unassessed = evaluateWorkerResultPostflight({
+  const unassessed = evaluateSdlcComputeStage({
     manifest,
     report: reportFor(manifest, {
       obligationAssessments: manifest.traversalObligationContext.obligations.map(
@@ -173,7 +173,7 @@ test("T-089 postflight admits fulfilled obligation coverage on early edge", () =
       })
     )
   });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
   assert.deepEqual(postflight.blockingReasons, []);

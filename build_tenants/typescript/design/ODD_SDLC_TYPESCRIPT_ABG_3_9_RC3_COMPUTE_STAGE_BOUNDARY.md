@@ -1,6 +1,7 @@
-# ODD SDLC TypeScript ABG RC5 Compute-Stage Boundary
+# ODD SDLC TypeScript ABG 3.9 RC3 Staged Compute Boundary
 
-Status: proposed design for T-180.
+Status: implemented design for T-180 semantic proof; live hello-world proof
+pending.
 
 Derives from:
 
@@ -9,7 +10,7 @@ Derives from:
 - `specification/requirements/18-typed-construction-algebra.md`
 - ABIogenesis `REQ-R-ABG3-FN-COMPOSITION`
 - ABIogenesis `REQ-L-GTL3-COMPUTE-NOTATION`
-- ABIogenesis `3.8.0-rc.5`
+- ABIogenesis `3.9.0-rc.3`
 
 ## STDO Re-Triage
 
@@ -18,24 +19,48 @@ This is a `requirement_reprice` followed by `design_reframe`.
 The current SDLC TypeScript runtime states the compute-stage epistemology but
 still contains realization paths where SDLC-local code synthesizes selected
 composition identity and derives evaluation, ledgers, consequence, closure, and
-next action around one `fpDispatch` adapter. That conflicts with the ABG RC5
+next action around one `fpDispatch` adapter. That conflicts with the ABG 3.9 RC3
 boundary where ABG is the system side-effect owner and product plugins compute
 typed values or refs only.
 
 ## One Truth Rule
 
-Selected composition identity comes from ABG-selected `abg.fn_composition`
-truth. SDLC shall consume selected composition ref, digest, selection ref, and
-selected regime binding ref from ABG runtime/plugin carriers. SDLC shall not
-derive live selected composition identity from graph-function names, edge names,
-archive roots, report paths, or local context refs.
+Plugin stages are composed through GTL. ABG selects that GTL composition through
+`abg.fn_composition` and owns runtime truth over the selected composition. SDLC
+shall consume selected composition ref, digest, selection ref, and selected
+regime binding ref from ABG runtime/plugin carriers. SDLC shall not derive live
+selected composition identity from graph-function names, edge names, archive
+roots, report paths, or local context refs.
 
 ABG is the only writer for runtime events, admission truth, payload ledgers,
 assurance fold, traversal transition, continuation, correction, closure, and
 replay truth.
 
+SDLC may keep multiple product ledger/read-model surfaces, but they must be
+projections over ABG-admitted events and ABG-derived ledgers. They are not
+independent writers of runtime truth.
+
 SDLC owns product semantics, product plugins, pressure interpretation, gain
 meaning, analyzer read models, target-carrier meaning, and proof interpretation.
+
+## Common-Surface Compression Rule
+
+This design extends the T-175 source-truth consolidation. New RC3 migration code
+must first route through existing common surfaces:
+
+- value domains: `contracts/carrier_domain_catalog.ts`
+- artifact truth: `contracts/operator_run_artifact_catalog.ts`
+- graph/frontier policy: `contracts/product_graph_contract_catalog.ts`
+- carrier ingress: `admission/*`
+- file/process effects: `effects/*`
+- missing/malformed runtime gaps: `analysis/runtime_gaps.ts` via catalog truth
+- analyzer proof: projections over admitted carriers
+
+Do not add a second local enum, artifact filename list, selected-composition
+helper, path-derived graph policy, analyzer fallback, archive writer, or process
+effect when one of those common surfaces can be extended. If a new common
+surface is required, it must name producers, consumers, admission, effects, and
+proof before implementation closure.
 
 ## Target Flow
 
@@ -75,9 +100,9 @@ flowchart TD
 
 ## IACS
 
-### AbgRc5SubstratePin
+### AbgRc2SubstratePin
 
-Purpose: make ABG `3.8.0-rc.5` the single substrate release truth for the
+Purpose: make ABG `3.9.0-rc.3` the single substrate release truth for the
 TypeScript tenant.
 
 Owning surfaces:
@@ -97,7 +122,7 @@ surface without local synthesis.
 
 Owning surfaces:
 
-- ABG RC5 plugin input / compute-stage binding carriers
+- ABG 3.9 RC3 plugin input / compute-stage binding carriers
 - SDLC transform, evaluate, consequence, analyzer, and archive carriers
 
 Acceptance: missing, stale, or locally synthesized selected composition identity
@@ -133,8 +158,10 @@ Forbidden:
 
 Purpose: bind SDLC ambiguous evaluation to `plugin.evaluate.C`.
 
-The general SDLC path is F_P-formed because it maps ambiguity across transform
-work, deterministic evidence registers, pressure, and intent fit.
+The general SDLC path is GTL-composed and F_P-formed because it maps ambiguity
+across transform work, deterministic evidence registers, pressure, and intent
+fit. ABG selects/admit the composed `evaluate.C` stage; SDLC does not create a
+second local evaluation runtime.
 
 Inputs:
 
@@ -151,6 +178,8 @@ Outputs:
 
 - `GtlEvaluationFindingRef[]`
 - `GtlEvaluation`
+- `SdlcDesignDepthRegister` evaluator-rule candidate when the selected rule is
+  the implementation-design depth register pilot
 - metrics refs
 - residual pressure refs
 - diagnostic refs
@@ -169,6 +198,71 @@ Forbidden:
 
 F_D evaluation may exist only as an explicit optimization for a disambiguated
 edge contract. It still passes through the same `evaluate.C` admission boundary.
+
+#### Design-Depth Evaluator Register Rule
+
+The implementation-design depth register pilot promotes one concrete
+`evaluate.C/F_P` rule output:
+
+- Interface: `EnginePluginInput` plus selected composition identity, admitted
+  transform refs, construction brief refs, invocation package refs, manifest
+  refs, and retained deterministic evidence registers.
+- Adapter: `SdlcEvaluatePluginAdapter`.
+- Candidate carrier: `SdlcDesignDepthRegister` serialized as
+  `design_depth_fp_evaluator_register.json`.
+- Admission carrier: the runtime/analyzer result of
+  `admitDesignDepthRegisterFromArtifact` with
+  `requireSourceFileTargets=true`.
+- System owner: ABG owns evaluation-set execution, admission, event and ledger
+  writes, replay identity, and consequence traversal.
+- Product owner: ODD_SDLC owns the prompt contract, register schema policy,
+  target/source-file completeness law, and domain interpretation of the admitted
+  register rows.
+- Visibility: operator-run artifact catalog, postflight evidence,
+  `fp_evaluate_result.json`, evaluation finding authority refs, analyzer carrier
+  state, and staged audit output.
+- Bridge: deterministic ADR-derived register synthesis is retained only as a
+  declared compatibility path when the evaluator-register feature flag is
+  disabled or a legacy deterministic fixture intentionally exercises it.
+
+The sidecar is not a final ledger write, not closure authority, and not a
+product design surface. For the pilot path, selected `evaluate.C/F_P` over the
+workspace is the highest semantic/product judgment truth for the register
+content. F_D admission guards shape, identity, completeness, provenance, and
+fail-closed consistency. ABG owns event, ledger, admission, provenance, and
+replay truth; it records the selected evaluation as runtime truth and does not
+semantically override the selected F_P judgment.
+
+The consumed register flow is therefore:
+
+```text
+workspace -> selected evaluate.C/F_P -> evaluator sidecar candidate
+  -> F_D admission guard -> ABG ledger/provenance/replay
+```
+
+The forbidden flow is:
+
+```text
+workspace -> any matching archive JSON -> admission helper -> consumed truth
+```
+
+Structural carrier flow:
+
+```mermaid
+flowchart TD
+  A["transform.C/F_P ADR candidate"] --> B["system.admitTransform"]
+  B --> C["evaluate.C/F_P design-depth rule"]
+  C --> D["design_depth_fp_evaluator_register.json"]
+  D --> E["F_D admission guard"]
+  E --> F["FpEvaluationOutcome and findings"]
+  F --> G["system.writeEvaluationLedgers"]
+  G --> H["consequence.C/F_D projection"]
+```
+
+Tests for this pilot derive from the IACS boundary above. They must prove the
+sidecar path, runtime/analyzer admission parity, strict malformed-input
+rejection, evidence propagation, and evaluator-rule registration. Source-text
+guards may remain as drift detection, but they are not the sole design proof.
 
 ### SdlcConsequenceProjectionPluginAdapter
 
@@ -217,9 +311,9 @@ Analyzer output must show:
 - replay continuation refs
 - parallel branch refs and fan-in rows when T-174 frontier truth applies
 
-### HelloWorldRc5ProofHarness
+### HelloWorldRc2ProofHarness
 
-Purpose: prove the installed hello-world lane follows the RC5 staged boundary.
+Purpose: prove the installed hello-world lane follows the RC3 staged boundary.
 
 The proof must run only after semantic tests pass. It must fail if hello-world
 output is produced through the old bundled SDLC adapter path.
@@ -266,9 +360,9 @@ truth surface.
 
 ## Implementation Sequence
 
-1. Pin ABG RC5 in package, lockfile, substrate contract, install adapter, and
+1. Pin ABG 3.9 RC3 in package, lockfile, substrate contract, install adapter, and
    release snapshot tests.
-2. Wire RC5 selected composition and compute-stage binding consumption into
+2. Wire ABG 3.9 RC3 selected composition and compute-stage binding consumption into
    installed operator runtime inputs.
 3. Split current installed operator dispatch into transform, evaluate, and
    consequence product plugins.
@@ -281,15 +375,19 @@ truth surface.
 7. Update analyzer admission and markdown rendering for stage truth.
 8. Update installed cold-agent guidance and prompt hygiene checks.
 9. Add semantic tests and negative tests.
-10. Run live hello-world after semantic tests pass.
+10. Add a ledgered steel-thread proof for runtime event, payload/evidence,
+    assurance/evaluation, consequence/read-model, and traversal/replay surfaces.
+11. Run live hello-world after semantic tests pass.
 
 ## Required Proof
 
 ```bash
 npm run build:semantic
 npm run lint:semantic
+npm run test:t059
 npm run test:t179
 npm run test:t174
+npm run test:t180
 npm run test:scenario:t132-hello-world-js-live
 ```
 

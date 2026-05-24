@@ -243,6 +243,18 @@ test("T-118 writes a compact worker invocation package while preserving the full
   );
   assert.equal(path.isAbsolute(invocationPackage.manifestPath), false);
   assert.equal(invocationPackage.traversalIntentPackagePath.endsWith("traversal_intent_package.json"), true);
+  assert.equal(
+    invocationPackage.workCategoryGovernance.kind,
+    "sdlc_work_category_governance_selection"
+  );
+  assert.equal(
+    invocationPackage.workCategoryGovernance.selectionSource,
+    "graph_function_catalog"
+  );
+  assert.equal(
+    invocationPackage.workCategoryGovernance.workerPath,
+    "node_modules/@odd-sdlc/typescript-tenant/config/work-category-governance/requirements_build.md"
+  );
   assert(invocationPackage.transformAxioms.length >= 5);
   assert(invocationPackage.transformAxioms.some((axiom) => axiom.includes("F_P.transform only")));
   assert(invocationPackage.transformAxioms.some((axiom) => axiom.includes("Read boundary:")));
@@ -279,6 +291,10 @@ test("T-118 writes a compact worker invocation package while preserving the full
   assert(invocationPackage.omittedObligationCount > 100);
   assert.equal(workerBrief.kind, "sdlc_worker_brief");
   assert.equal(constructionBrief.kind, "sdlc_worker_construction_brief");
+  assert.deepEqual(
+    constructionBrief.workCategoryGovernance,
+    invocationPackage.workCategoryGovernance
+  );
   assert.equal(
     constructionBrief.targetCarrierProjection.kind,
     "sdlc_worker_target_carrier_prompt_projection"
@@ -575,7 +591,7 @@ test("T-118 design-depth manifest carries a typed construction template by ref",
     aggregateTemplate.example.operations[0].requiredAttributeIds,
     [aggregateTemplate.example.entities[0].attributes[0].attributeId]
   );
-  assert.match(outcomeDirectives, /framework evaluator derives and publishes the design-depth register/u);
+  assert.match(outcomeDirectives, /evaluate\.C\/F_P design-depth evaluator populates the design-depth register/u);
   assert.match(outcomeDirectives, /Keep the ADR proportional to immediate implementation structure/u);
   assert.match(outcomeDirectives, /A substantive implementation design must preserve decomposition proportionality/u);
   assert.match(outcomeDirectives, /For a single-file or script product/u);
@@ -663,7 +679,7 @@ test("T-118 composite design-depth prompt does not duplicate carrier-shape evalu
   assert.equal(new Set(rowTemplateRefs).size, rowTemplateRefs.length);
   assert.match(
     directives,
-    /framework evaluator derives and publishes the design-depth register/u
+    /evaluate\.C\/F_P design-depth evaluator populates the design-depth register/u
   );
   assert.match(
     directives,

@@ -128,6 +128,7 @@ test("T-138 replay reconstructs the full causal chain from predecessor refs", ()
     compositionRef: rows.nextActionProjection.compositionRef,
     compositionDigest: rows.nextActionProjection.compositionDigest,
     compositionSelectionRef: rows.nextActionProjection.compositionSelectionRef,
+    selectedRegimeBindingRef: rows.nextActionProjection.selectedRegimeBindingRef,
     constructionIntentRef: rows.constructionIntent.intentRef,
     worksiteEvidenceRef: rows.worksiteEvidence.evidenceBundleRef,
     edgeFulfillmentLedgerRef: rows.edgeFulfillmentLedger.ledgerVersionRef,

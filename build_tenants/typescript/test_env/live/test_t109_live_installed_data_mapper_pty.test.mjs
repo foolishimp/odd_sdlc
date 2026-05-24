@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   FG_CONFORM_PROJECT,
+  OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
@@ -482,13 +483,19 @@ test(
     const target = "graph_function:bootstrap_release_self_test";
     const requiredEdges = new Set([
       "derive_code_surface",
-      "derive_test_module_surface",
+      "derive_test_design_surface",
       "derive_component_test_surface",
       "derive_test_execution_result_surface",
       "derive_component_repair_schedule_surface",
       "derive_release_depth_parity_surface",
       "derive_test_run_archive_surface"
     ]);
+    for (const edge of requiredEdges) {
+      assert(
+        OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS.includes(edge),
+        `required live edge must be in optimized graph catalog: ${edge}`
+      );
+    }
     const reachedEdges = new Set();
     const steps = [];
     let terminalProof = null;

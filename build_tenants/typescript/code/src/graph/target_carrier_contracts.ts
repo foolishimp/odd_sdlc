@@ -251,9 +251,11 @@ function payloadRequiredFieldRefsForTarget(
 
 function constructionDepthRoleForEdge(edgeRef: string): SdlcTargetCarrierContractRow["constructionDepthRole"] {
   switch (edgeRef) {
+    case "derive_lite_design_adr_surface":
     case "derive_implementation_design_surface":
     case "derive_test_design_surface":
       return "staged_authority_producer";
+    case "derive_lite_component_code_surface":
     case "derive_component_code_surface":
     case "derive_component_test_surface":
       return "staged_materialization_consumer";
@@ -264,6 +266,7 @@ function constructionDepthRoleForEdge(edgeRef: string): SdlcTargetCarrierContrac
 
 function producedStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] {
   switch (edgeRef) {
+    case "derive_lite_design_adr_surface":
     case "derive_implementation_design_surface":
       return Object.freeze([
         "surface://implementation-decomposition-summary",
@@ -282,6 +285,7 @@ function producedStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] 
 
 function requiredStagedAuthorityRefsForEdge(edgeRef: string): readonly string[] {
   switch (edgeRef) {
+    case "derive_lite_component_code_surface":
     case "derive_component_code_surface":
       return Object.freeze([
         "surface://implementation-decomposition-summary",

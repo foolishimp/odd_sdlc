@@ -26,7 +26,8 @@
     "odd-sdlc-ts": "./build/semantic/code/src/cli/main.js"
   },
   "files": [
-    "build/semantic/**"
+    "build/semantic/**",
+    "config/**"
   ],
   "engines": {
     "node": ">=20"
@@ -150,6 +151,8 @@
     "test:t174:four-lane-live": "npm run test:scenario:t174-four-lane-hello-world-js-live",
     "test:t175": "npm run build:semantic && node --test test_env/tests/test_t175_source_truth_migration.test.mjs",
     "test:t179": "npm run build:semantic && node --test test_env/tests/test_t179_epistemology_compliance.test.mjs",
+    "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_3_9_rc3_staged_compute_boundary.test.mjs",
+    "test:t181": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs",
     "live:data-mapper-sandbox": "npm run build:semantic && node test_env/live/run_full_external_data_mapper_sandbox.mjs",
     "live:data-mapper-steel-thread-sandbox": "ODD_SDLC_TS_DATA_MAPPER_LANE_NAME=data_mapper_steel_thread_sandbox ODD_SDLC_TS_TRAVERSAL_STRATEGY_PROFILE=steel_thread_after_requirements npm run live:data-mapper-sandbox",
     "test:scenario-sandbox": "npm run build:semantic && node --test test_env/sandbox/test_scenario_sandbox.test.mjs",
@@ -175,6 +178,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.3/abiogenesis-typescript-tenant-3.9.0-rc.3.tgz"
   }
 }

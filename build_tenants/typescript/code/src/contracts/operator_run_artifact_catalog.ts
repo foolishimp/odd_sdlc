@@ -9,6 +9,7 @@ export type SdlcOperatorRunArtifactRole =
 
 export type SdlcOperatorRunArtifactSourceOwner =
   | "abg_runtime"
+  | "fp_evaluator"
   | "installed_operator"
   | "handoff_projection"
   | "worker_process"
@@ -17,7 +18,8 @@ export type SdlcOperatorRunArtifactSourceOwner =
 
 export type SdlcOperatorRunArtifactRequiredWhen =
   | "parallel_dependency_traversal_selected"
-  | "closed_product_edge_requires_materialization_manifest";
+  | "closed_product_edge_requires_materialization_manifest"
+  | "implementation_design_surface_present";
 
 export interface SdlcOperatorRunArtifactRow {
   readonly artifactRef: string;
@@ -183,6 +185,97 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: true,
     malformedGapTracked: false,
     admissionRef: "admission://odd-sdlc/operator-run/fp-evaluate-result"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-run",
+    relativePath: "design_depth_fp_evaluator_run.json",
+    carrierKind: "sdlc_design_depth_fp_evaluator_run",
+    role: "runtime_fact",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-run"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-register",
+    relativePath: "design_depth_fp_evaluator_register.json",
+    carrierKind: "sdlc_design_depth_register",
+    role: "authority_admission",
+    sourceOwner: "fp_evaluator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-register"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-prompt",
+    relativePath: "design_depth_fp_evaluator_prompt.md",
+    carrierKind: null,
+    role: "worker_projection",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-stdout",
+    relativePath: "design_depth_fp_evaluator_stdout.log",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-stderr",
+    relativePath: "design_depth_fp_evaluator_stderr.log",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-last-message",
+    relativePath: "design_depth_fp_evaluator_last_message.txt",
+    carrierKind: null,
+    role: "forensic_payload",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: false,
+    admissionRef: null
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-process-started",
+    relativePath: "design_depth_fp_evaluator_process_started.json",
+    carrierKind: "actor_process_started",
+    role: "runtime_fact",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-process-started"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-process-events",
+    relativePath: "design_depth_fp_evaluator_process_events.jsonl",
+    carrierKind: "jsonl:runtime_event",
+    role: "runtime_fact",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-process-events"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://fp-evaluator-postflight",
+    relativePath: "fp_evaluator_postflight.json",
+    carrierKind: "sdlc_operator_postflight_result",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/fp-evaluator-postflight"
   }),
   row({
     artifactRef: "operator-run-artifact://postflight",
@@ -537,6 +630,26 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/worker-process-summary"
   }),
   row({
+    artifactRef: "operator-run-artifact://gtl-admitted-state-ref",
+    relativePath: "gtl_admitted_state_ref.json",
+    carrierKind: "gtl_admitted_state_ref",
+    role: "authority_admission",
+    sourceOwner: "abg_runtime",
+    requiredForPresentEdge: true,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/gtl-admitted-state-ref"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://gtl-consequence-projection-ref",
+    relativePath: "gtl_consequence_projection_ref.json",
+    carrierKind: "gtl_consequence_projection_ref",
+    role: "read_model",
+    sourceOwner: "abg_runtime",
+    requiredForPresentEdge: true,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/gtl-consequence-projection-ref"
+  }),
+  row({
     artifactRef: "operator-run-artifact://construction-intent",
     relativePath: "sdlc_construction_intent.json",
     carrierKind: "sdlc_construction_intent",
@@ -707,6 +820,9 @@ export function isSdlcOperatorRunArtifactRequiredForContext(input: {
     "closed_product_edge_requires_materialization_manifest"
   ) {
     return input.context.closureDisposition === "close";
+  }
+  if (input.artifact.requiredWhen === "implementation_design_surface_present") {
+    return input.context.targetAssetType === "implementation_design_surface";
   }
   return false;
 }

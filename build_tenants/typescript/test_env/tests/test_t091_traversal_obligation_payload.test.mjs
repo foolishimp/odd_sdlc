@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import {
   assertTraversalIntentPackagePressure,
   deriveWorkerHandoffManifest,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   sha256Text,
@@ -361,7 +361,7 @@ test("T-091 postflight rejects fulfilled requirement without output coverage evi
     }))
   );
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert(
@@ -393,7 +393,7 @@ test("T-091 postflight admits anchored output evidence for requirement coverage"
     }))
   );
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
 });
@@ -418,7 +418,7 @@ test("T-091 postflight admits generated asset ref as output coverage evidence", 
     }))
   );
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
 });

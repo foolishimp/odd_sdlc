@@ -545,13 +545,14 @@ test("scenario sandbox: handoff sequence assertion tolerates same-edge retries",
         ]
       },
       {
-        scenarioId: "retry-sequence-regression",
-        expectations: {
-          handoffEdgeSequencePrefix: ["first_edge", "retry_edge", "next_edge"]
+          scenarioId: "retry-sequence-regression",
+          expectations: {
+            handoffEdgeSequencePrefix: ["first_edge", "retry_edge", "next_edge"],
+            exactHandoffEdgeSequence: ["first_edge", "retry_edge", "next_edge"]
+          }
         }
-      }
-    )
-  );
+      )
+    );
 });
 
 test("scenario sandbox: exact handoff sequence rejects post-close re-entry", () => {

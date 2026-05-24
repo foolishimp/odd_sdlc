@@ -33,7 +33,7 @@ import {
   buildPostTransformWorkerResultReport,
   constructWorkerInvocationPackage,
   constructPostflightGapDossier,
-  constructFpEvaluateResult,
+  constructSdlcFpEvaluateResult,
   constructSdlcEdgeFulfillmentLedger,
   constructSdlcGtlModule,
   constructSdlcHookContractCatalog,
@@ -53,6 +53,7 @@ import {
   deriveSdlcProductLineageYieldResumeBasis,
   deriveSdlcWorkspaceIngressReport,
   deriveSdlcConformProjectProfileFromWorkspace,
+  deriveSdlcSelectedAbgFnCompositionIdentity,
   deriveSdlcProjectConstraintsFromWorkspace,
   deriveSdlcSourceInput,
   deriveWorkerHandoffManifest,
@@ -62,7 +63,7 @@ import {
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
   FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
-  evaluateWorkerResultPostflight,
+  evaluateSdlcComputeStage,
   FG_CONFORM_PROJECT,
   hookContractByEdgeName,
   installOddSdlcTypescript,
@@ -129,6 +130,16 @@ function makeWorkspace() {
   materializeSdlcProjectConformance({ workspaceRoot: root });
   writeAdmittedStagedAuthoritySurfaces(root);
   return root;
+}
+
+function selectedCompositionForManifest(manifest) {
+  return deriveSdlcSelectedAbgFnCompositionIdentity({
+    graphFunctionRef: manifest.graphFunctionName,
+    graphVectorRef: manifest.edgeName,
+    compositionSelectionScopeRef: `test://${manifest.runId ?? manifest.edgeName}`,
+    carrierContextRefs: [manifest.reportFile],
+    assuranceContextRefs: []
+  });
 }
 
 function writeAdmittedStagedAuthoritySurfaces(workspaceRoot) {
@@ -1257,7 +1268,7 @@ test("T-066 code-surface handoff admits tenant-root product source materializati
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const constructorResult = constructorResultFromWorkerOutput({
     manifest,
     report,
@@ -1353,7 +1364,7 @@ test("T-172 no-dispatch surface postflight admits replayed materialization linea
     fpEvaluateResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href
   };
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
   assert.equal(
@@ -1418,7 +1429,7 @@ test("T-158 postflight blocks worker reads outside active workspace", () => {
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const authorityReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_authority_read_outside_workspace:")
   );
@@ -1470,7 +1481,7 @@ test("T-158 worker read-boundary ignores regex pattern strings that begin with s
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const authorityReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_authority_read_outside_workspace:")
   );
@@ -1514,7 +1525,7 @@ test("T-159 worker read-boundary ignores executor persisted output metadata", ()
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const authorityReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_authority_read_outside_workspace:")
   );
@@ -1582,7 +1593,7 @@ test("T-164 worker read-boundary ignores executor session tool-result metadata",
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const authorityReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_authority_read_outside_workspace:")
   );
@@ -1638,7 +1649,7 @@ test("T-164 worker read-boundary still blocks outside workspace tool input reads
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const authorityReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_authority_read_outside_workspace:")
   );
@@ -1693,7 +1704,7 @@ test("T-172 worker read-boundary blocks installed odd_sdlc runtime source reads"
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   const runtimeSourceReason = postflight.blockingReasons.find((reason) =>
     reason.startsWith("worker_runtime_source_read:")
   );
@@ -1742,7 +1753,7 @@ test("T-159 product materialization blocks cited source without requirement line
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -1827,7 +1838,7 @@ test("T-159 product materialization blocks source row without requirement lineag
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -1913,7 +1924,7 @@ test("T-171 product materialization permits auxiliary build config without requi
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
   assert.equal(
@@ -1997,7 +2008,7 @@ test("T-159 product materialization blocks lineage outside current obligations",
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -2073,7 +2084,7 @@ test("T-159 product materialization admits source with requirement lineage in fi
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   writeProductMaterializationManifest({ manifest, report });
   const materializationManifest = JSON.parse(
     readFileSync(manifest.productMaterialization.manifestFile, "utf8")
@@ -2191,7 +2202,7 @@ test("T-159 product materialization canonicalizes duplicate requirement authorit
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   writeProductMaterializationManifest({ manifest, report });
   const materializationManifest = JSON.parse(
     readFileSync(manifest.productMaterialization.manifestFile, "utf8")
@@ -2267,7 +2278,7 @@ test("T-164 post-transform closes duplicate requirement aliases from canonical t
   const requirementAssessments = report.obligationAssessments.filter((assessment) =>
     assessment.obligationId.startsWith("requirement:")
   );
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(requirementAssessments.length > invocationPackage.requirementTraceObligationIds.length, true);
   assert.equal(
@@ -2345,7 +2356,7 @@ test("T-164 product lineage admits full requirement set beyond prompt slice", ()
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   writeProductMaterializationManifest({ manifest, report });
   const materializationManifest = JSON.parse(
     readFileSync(manifest.productMaterialization.manifestFile, "utf8")
@@ -2516,14 +2527,19 @@ test("T-159 authority conformance carries unobserved requirements instead of ret
     JSON.stringify(requirementAssessment.blockingReasons)
   );
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 
   const gate = deriveSdlcOperatorAssuranceGate({ manifest, report, postflight });
   assert.equal(gate.satisfaction.status, "close_allowed");
   assert.equal(gate.blockingPostflight, null);
 
-  const evaluation = constructFpEvaluateResult({ manifest, report, postflight });
+  const evaluation = constructSdlcFpEvaluateResult({
+    manifest,
+    selectedComposition: selectedCompositionForManifest(manifest),
+    report,
+    postflight
+  });
   assert.equal(evaluation.postflightStatus, "passed");
   assert.equal(evaluation.status, "admitted_with_open_obligations");
   assert.equal(evaluation.obligationAssessmentCounts.blocked, 0);
@@ -2627,14 +2643,19 @@ test("T-171 non-materialized F_P surfaces carry unobserved requirement pressure 
   assert.equal(edgeFulfillment.downstreamTransformationSetRefs.length, 1);
   assert.equal(edgeFulfillment.nonConvergedReasonRefs.length, 0);
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
 
   const gate = deriveSdlcOperatorAssuranceGate({ manifest, report, postflight });
   assert.equal(gate.satisfaction.status, "close_allowed");
   assert.equal(gate.blockingPostflight, null);
 
-  const evaluation = constructFpEvaluateResult({ manifest, report, postflight });
+  const evaluation = constructSdlcFpEvaluateResult({
+    manifest,
+    selectedComposition: selectedCompositionForManifest(manifest),
+    report,
+    postflight
+  });
   assert.equal(evaluation.postflightStatus, "passed");
   assert.equal(evaluation.status, "admitted_with_open_obligations");
   assert.equal(evaluation.obligationAssessmentCounts.blocked, 0);
@@ -2748,7 +2769,12 @@ test("T-158 F_P.evaluate keeps report admission distinct from open obligation cl
     evidenceRefs: [`file://${manifest.outputFile}`]
   };
 
-  const result = constructFpEvaluateResult({ manifest, report, postflight });
+  const result = constructSdlcFpEvaluateResult({
+    manifest,
+    selectedComposition: selectedCompositionForManifest(manifest),
+    report,
+    postflight
+  });
 
   assert.equal(result.postflightStatus, "passed");
   assert.equal(result.status, "admitted_with_open_obligations");
@@ -2968,7 +2994,7 @@ test("T-004 tenant-local surface output is not counted as product source materia
     ["src/main/scala/generated/DataMapper.scala"]
   );
   assert.equal(report.materializedFiles[0].role, "source");
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -3047,7 +3073,7 @@ test("T-002 component-code materialization ignores build execution byproducts", 
     [sbtProjectRelativePath, sourceRelativePath]
   );
   assert.equal(report.materializedFiles[0].role, "build_config");
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -3147,7 +3173,7 @@ test("T-159 post-transform assessments do not flatten every requirement onto eve
       ?.evidenceRefs.includes(`file://${helperPath}`),
     false
   );
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
 });
 
@@ -3203,7 +3229,7 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     summary: "generated ADR path without ADR fields",
     materializedFiles: []
   });
-  const advisory = evaluateWorkerResultPostflight({
+  const advisory = evaluateSdlcComputeStage({
     manifest,
     report: readWorkerResultReport(manifest)
   });
@@ -3260,7 +3286,7 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     summary: "generated ADR path with ADR fields",
     materializedFiles: []
   });
-  const passed = evaluateWorkerResultPostflight({
+  const passed = evaluateSdlcComputeStage({
     manifest,
     report: readWorkerResultReport(manifest)
   });
@@ -3291,7 +3317,7 @@ test("T-066 code-surface postflight rejects markdown-only realization", () => {
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -3378,7 +3404,7 @@ test("T-158 product materialization repair replays prior same-edge manifest", ()
   });
 
   const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -3494,7 +3520,7 @@ test("T-171 product materialization repair admits current bytes over stale repla
     manifest: repairManifest,
     before
   });
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -3548,7 +3574,7 @@ test("T-171 product materialization repair admits current bytes over stale repla
     manifest: followupManifest,
     before: followupBefore
   });
-  const followupPostflight = evaluateWorkerResultPostflight({
+  const followupPostflight = evaluateSdlcComputeStage({
     manifest: followupManifest,
     report: followupReport
   });
@@ -3720,7 +3746,7 @@ test("T-158 replay completeness follows declared product targets, not role-only 
   });
 
   const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -4038,7 +4064,7 @@ test("T-164 observed product roles follow explicit design targets before generic
   assert.notEqual(cargoRow, undefined);
   assert.equal(cargoRow.role, "source");
 
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest,
     report
   });
@@ -4185,7 +4211,7 @@ test("T-164 design manifest role normalizes to build_config product materializat
   );
   assert.notEqual(cargoRow, undefined);
   assert.equal(cargoRow.role, "build_config");
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
 });
 
@@ -4531,7 +4557,7 @@ test("T-164 replay empty predecessor is superseded by later admitted product row
   });
 
   const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -4629,7 +4655,7 @@ test("T-171 current component-test materialization supersedes empty predecessor 
   });
 
   const report = readWorkerResultReport(validManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: validManifest,
     report
   });
@@ -4905,7 +4931,7 @@ test("T-158 replay preserves predecessor role policy instead of synthesizing it"
     materializedFiles: []
   });
 
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: readWorkerResultReport(repairManifest)
   });
@@ -4992,7 +5018,7 @@ test("T-158 observed unchanged repair files keep prior admitted role policy befo
     manifest: repairManifest,
     before
   });
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -5031,7 +5057,7 @@ test("T-158 product materialization repair without predecessor still blocks", ()
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -5117,7 +5143,7 @@ test("T-158 mismatched predecessor materialization cannot satisfy repair", () =>
   });
 
   const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -5169,7 +5195,7 @@ test("T-158 corrupt predecessor materialization emits replay diagnostic", () => 
   });
 
   const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -5263,7 +5289,7 @@ test("T-158 replay keeps diagnostics when an older predecessor can replay", () =
     materializedFiles: []
   });
 
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: readWorkerResultReport(repairManifest)
   });
@@ -5325,7 +5351,7 @@ test("T-158 unchanged observed files cannot bypass corrupt predecessor replay di
     manifest: repairManifest,
     before
   });
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -5399,7 +5425,7 @@ test("T-158 unchanged observed diagnostics block even when current files satisfy
     manifest: repairManifest,
     before
   });
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -5474,7 +5500,7 @@ test("T-158 non-materialization surface edges ignore empty product replay manife
     manifest: repairManifest,
     before
   });
-  const postflight = evaluateWorkerResultPostflight({
+  const postflight = evaluateSdlcComputeStage({
     manifest: repairManifest,
     report: repairReport
   });
@@ -6069,7 +6095,7 @@ test("T-102 post-transform observation admits existing discoverable test files",
   assert.equal(report.materializedFiles.length, 1);
   assert.equal(report.materializedFiles[0].role, "test");
   assert.equal(report.materializedFiles[0].relativePath, testRelativePath);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -6145,7 +6171,7 @@ test("T-102 post-transform observation ignores component-test build byproducts",
     report.materializedFiles.map((file) => file.relativePath),
     [testRelativePath]
   );
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -6238,7 +6264,7 @@ test("T-168 component-test materialization binds tests to design-derived targets
   assert.equal(report.materializedFiles.length, 1);
   assert.equal(report.materializedFiles[0].role, "test");
   assert.equal(report.materializedFiles[0].relativePath, testRelativePath);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -6352,7 +6378,7 @@ test("T-066 test execution result postflight rejects missing execution evidence"
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   const missingReason = postflight.blockingReasonCarriers.find(
@@ -6451,7 +6477,7 @@ test("T-170 lite component-code defers execution evidence to graph test-executio
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
   assert.equal(
@@ -6538,7 +6564,7 @@ test("T-171 full component-code defers execution evidence to graph test-executio
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
   assert.equal(
@@ -6581,7 +6607,7 @@ test("T-104 test-run archive is surface-only and does not require fresh executio
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(report.executionEvidence, null);
   assert.equal(postflight.status, "blocked");
@@ -6688,7 +6714,7 @@ test("T-104 test-run archive closure depends on cited execution-result truth", (
     "utf8"
   );
   const executionReport = readWorkerResultReport(executionManifest);
-  const executionPostflight = evaluateWorkerResultPostflight({
+  const executionPostflight = evaluateSdlcComputeStage({
     manifest: executionManifest,
     report: executionReport
   });
@@ -6751,7 +6777,7 @@ test("T-104 test-run archive closure depends on cited execution-result truth", (
   );
 
   const proseOnlyReport = readWorkerResultReport(manifest);
-  const proseOnlyPostflight = evaluateWorkerResultPostflight({
+  const proseOnlyPostflight = evaluateSdlcComputeStage({
     manifest,
     report: proseOnlyReport
   });
@@ -6803,7 +6829,7 @@ test("T-104 test-run archive closure depends on cited execution-result truth", (
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
 });
@@ -6903,7 +6929,7 @@ test("T-102 test-run archive validates execution evidence against source edge sh
   );
   const executionReport = readWorkerResultReport(executionManifest);
   assert.equal(
-    evaluateWorkerResultPostflight({
+    evaluateSdlcComputeStage({
       manifest: executionManifest,
       report: executionReport
     }).status,
@@ -6974,7 +7000,7 @@ test("T-102 test-run archive validates execution evidence against source edge sh
   );
 
   const archiveReport = readWorkerResultReport(archiveManifest);
-  const archivePostflight = evaluateWorkerResultPostflight({
+  const archivePostflight = evaluateSdlcComputeStage({
     manifest: archiveManifest,
     report: archiveReport
   });
@@ -7103,7 +7129,7 @@ test("T-115 test-run archive admits structurally valid failed execution evidence
   );
   const executionReport = readWorkerResultReport(executionManifest);
   assert.equal(
-    evaluateWorkerResultPostflight({
+    evaluateSdlcComputeStage({
       manifest: executionManifest,
       report: executionReport
     }).status,
@@ -7169,7 +7195,7 @@ test("T-115 test-run archive admits structurally valid failed execution evidence
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
 });
@@ -7394,7 +7420,7 @@ test("B-077 execution evidence contradiction stops for triage instead of retry",
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "blocked");
   assert.equal(
@@ -7480,7 +7506,7 @@ test("B-072 post-transform test execution result admits embedded execution evide
   assert.deepStrictEqual(report.executionEvidence?.reportRefs, [
     `file://${manifest.outputFile}`
   ]);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
 });
 
@@ -7568,7 +7594,7 @@ test("B-084 post-transform execution evidence drops worker-local metadata from t
   ]);
   assert.equal(report.executionEvidenceErrors.length, 0);
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "blocked");
   assert.equal(
     postflight.blockingReasonCarriers.some(
@@ -7638,7 +7664,7 @@ test("T-115 failed execution evidence with zero observed tests is admitted for r
   writeFileSync(manifest.outputFile, `${content}\n`, "utf8");
 
   const report = buildPostTransformWorkerResultReport({ manifest, before });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(report.executionEvidence?.status, "failed");
   assert.equal(postflight.status, "passed");
@@ -7839,12 +7865,104 @@ test("T-083 component-code admits sbt build plugin targets declared by implement
   );
   assert(assemblyFile);
   assert.equal(assemblyFile.role, "build_config");
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(
     postflight.blockingReasons.includes(
       "materialized_product_file_unbound_to_declared_target"
     ),
     false,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
+  );
+});
+
+test("T-164 component-code postflight rejects SBT Security Manager JVM options before test repair", () => {
+  const workspace = makeWorkspace();
+  declareScalaSbtTestRunner(workspace);
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const implementationDesignFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "design/adrs/ADR-002-implementation-design-surface.md"
+  );
+  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
+  register.fileTargetRows = [
+    ...register.fileTargetRows,
+    {
+      kind: "sdlc_file_target_row",
+      relativePath: "build_tenants/scala_spark/build.sbt",
+      role: "build-config"
+    }
+  ];
+  writeFileSync(
+    implementationDesignFile,
+    `${JSON.stringify(register, null, 2)}\n`,
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 23,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-sbt-security-manager-postflight"
+  });
+  const handoffFiles = writeHandoffFiles(manifest);
+  const prompt = readFileSync(handoffFiles.promptPath, "utf8");
+
+  assert.match(prompt, /SBT\/JDK compatibility law/u);
+  assert.match(prompt, /do not write `-Djava\.security\.manager`/u);
+  assert.match(prompt, /Could not accept connection from test agent/u);
+
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeOutputSurface(manifest, "component_code_surface");
+  const files = new Map([
+    [
+      "build.sbt",
+      [
+        ...requirementTraceLines(manifest),
+        'ThisBuild / scalaVersion := "2.12.18"',
+        "Test / fork := true",
+        'Test / javaOptions += "-Djava.security.manager=allow"',
+        'libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test'
+      ].join("\n") + "\n"
+    ],
+    [
+      "src/main/scala/generated/DataMapper.scala",
+      [
+        ...requirementTraceLines(manifest),
+        "package generated",
+        "object DataMapper"
+      ].join("\n") + "\n"
+    ]
+  ]);
+  for (const [relativePath, content] of files.entries()) {
+    const absolutePath = path.join(
+      manifest.productMaterialization.tenantRoot,
+      relativePath
+    );
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, content, "utf8");
+  }
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const buildFile = report.materializedFiles.find(
+    (file) => file.relativePath === "build.sbt"
+  );
+  assert(buildFile);
+
+  writeProductMaterializationManifest({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+
+  assert.equal(postflight.status, "blocked");
+  assert.equal(
+    postflight.blockingReasons.some((reason) =>
+      reason.startsWith("sbt_security_manager_option_unsupported")
+    ),
+    true,
     JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
@@ -7976,7 +8094,7 @@ test("T-083 replay reclassifies legacy sbt plugin without rewriting source roles
     assemblyFile.rolePolicyRef,
     "target-role-policy://odd-sdlc/implementation-design/build_config"
   );
-  const postflight = evaluateWorkerResultPostflight({ manifest: repairManifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest: repairManifest, report });
   assert.equal(
     postflight.blockingReasons.includes(
       "materialized_product_role_policy_ref_mismatch"
@@ -8050,7 +8168,7 @@ test("T-083 component-code carries test-design requirements downstream", () => {
       testRequirementAssessment
     )
   );
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(
     postflight.blockingReasons.some((reason) =>
       reason.includes(testRequirementAssessment.obligationId)
@@ -8172,7 +8290,7 @@ test("T-102 execution-result postflight admits scoped tenant repair edits", () =
   });
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
   assert.equal(
@@ -8302,7 +8420,7 @@ test("T-102 postflight rejects worker-asserted out-of-scope obligation", () => {
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(
     postflight.blockingReasons.some((reason) =>
@@ -8368,7 +8486,7 @@ test("T-102 postflight rejects worker-asserted fulfillment without evidence", ()
   );
 
   const report = readWorkerResultReport(manifest);
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(
     postflight.blockingReasons.some((reason) =>
@@ -8425,7 +8543,7 @@ test("B-072 malformed transform execution result evidence becomes typed invalid 
   assert.equal(report.executionEvidenceErrors.length, 1);
   assert.match(report.executionEvidenceErrors[0], /command/);
 
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "blocked");
   assert.equal(
     postflight.blockingReasonCarriers.some(
@@ -8531,7 +8649,7 @@ test("B-079 execution-result postflight requires registered shard evidence", () 
   );
 
   const blockedReport = readWorkerResultReport(manifest);
-  const blockedPostflight = evaluateWorkerResultPostflight({
+  const blockedPostflight = evaluateSdlcComputeStage({
     manifest,
     report: blockedReport
   });
@@ -8598,7 +8716,7 @@ test("B-079 execution-result postflight requires registered shard evidence", () 
     "utf8"
   );
   const passedReport = readWorkerResultReport(manifest);
-  const passedPostflight = evaluateWorkerResultPostflight({
+  const passedPostflight = evaluateSdlcComputeStage({
     manifest,
     report: passedReport
   });
@@ -8713,7 +8831,7 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
   );
   const executionReport = readWorkerResultReport(executionManifest);
   assert.equal(
-    evaluateWorkerResultPostflight({
+    evaluateSdlcComputeStage({
       manifest: executionManifest,
       report: executionReport
     }).status,
@@ -8796,7 +8914,7 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
     "utf8"
   );
   const archiveReport = readWorkerResultReport(archiveManifest);
-  const archivePostflight = evaluateWorkerResultPostflight({
+  const archivePostflight = evaluateSdlcComputeStage({
     manifest: archiveManifest,
     report: archiveReport
   });
@@ -8980,7 +9098,7 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
       carrierKind: "sdlc_design_depth_register",
       registerVersion: "ts-design-depth-v1",
       envelopePattern:
-        /The framework evaluator derives and publishes the design-depth register/u,
+        /The evaluate\.C\/F_P design-depth evaluator populates the design-depth register/u,
       rowDirective: /requirement-lineage table/u,
       extraDirectives: [
         /Product File Targets section/u,
@@ -9209,7 +9327,7 @@ test("T-100 component-test postflight admits materialized tests before execution
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(postflight.status, "passed");
   assert.equal(
@@ -9279,7 +9397,7 @@ test("T-100 component-test postflight admits sbt-discoverable framework tests", 
 
   const report = readWorkerResultReport(manifest);
   writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateWorkerResultPostflight({ manifest, report });
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
 
   assert.equal(
     postflight.blockingReasons.some((reason) =>

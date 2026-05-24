@@ -15,6 +15,7 @@ export interface SdlcFunctionCatalogEntry {
   readonly kind: "sdlc_function_catalog_entry";
   readonly catalogRole: "product_specialization";
   readonly graphTrackPublication: "default" | "overlay_only";
+  readonly workCategoryGovernanceCategory: SdlcWorkCategoryGovernanceCategory;
   readonly name: string;
   readonly intent: string;
   readonly inputs: readonly string[];
@@ -33,6 +34,13 @@ export interface SdlcExecutiveProgramEntry {
   readonly outputs: readonly string[];
   readonly backingGraphFunction: string;
 }
+
+export type SdlcWorkCategoryGovernanceCategory =
+  | "requirements_build"
+  | "design_build"
+  | "coding_build"
+  | "uat_test_case_build"
+  | "unit_test_build";
 
 export interface SdlcGraphFunctionCatalog {
   readonly kind: "sdlc_graph_function_catalog";
@@ -85,12 +93,14 @@ function entry(input: {
   readonly intent: string;
   readonly inputs: readonly string[];
   readonly outputs: readonly string[];
+  readonly workCategoryGovernanceCategory: SdlcWorkCategoryGovernanceCategory;
   readonly graphTrackPublication?: SdlcFunctionCatalogEntry["graphTrackPublication"];
 }): SdlcFunctionCatalogEntry {
   return Object.freeze({
     kind: "sdlc_function_catalog_entry",
     catalogRole: "product_specialization",
     graphTrackPublication: input.graphTrackPublication ?? "default",
+    workCategoryGovernanceCategory: input.workCategoryGovernanceCategory,
     name: input.name,
     intent: input.intent,
     inputs: Object.freeze([...input.inputs]),
@@ -135,43 +145,50 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     name: "derive_intent_surface",
     intent: "Derive or revise intent from the bound bootstrap inputs.",
     inputs: ["input_set"],
-    outputs: ["intent_surface"]
+    outputs: ["intent_surface"],
+    workCategoryGovernanceCategory: "requirements_build"
   }),
   entry({
     name: "derive_product_surface",
     intent: "Derive product definition from bootstrap inputs and intent.",
     inputs: ["input_set", "intent_surface"],
-    outputs: ["product_surface"]
+    outputs: ["product_surface"],
+    workCategoryGovernanceCategory: "requirements_build"
   }),
   entry({
     name: "derive_goal_surface",
     intent: "Derive current goals from input, intent, and product surfaces.",
     inputs: ["input_set", "intent_surface", "product_surface"],
-    outputs: ["goal_surface"]
+    outputs: ["goal_surface"],
+    workCategoryGovernanceCategory: "requirements_build"
   }),
   entry({
     name: "derive_requirement_surface",
     intent: "Derive the requirement family surface for the current wave.",
     inputs: ["input_set", "intent_surface", "product_surface", "goal_surface"],
-    outputs: ["requirement_surface"]
+    outputs: ["requirement_surface"],
+    workCategoryGovernanceCategory: "requirements_build"
   }),
   entry({
     name: "derive_uat_testcases_surface",
     intent: "Derive UAT testcase pressure directly from requirements before solution design so tests can constrain design instead of being reconstructed from it.",
     inputs: ["requirement_surface"],
-    outputs: ["uat_testcases_surface"]
+    outputs: ["uat_testcases_surface"],
+    workCategoryGovernanceCategory: "uat_test_case_build"
   }),
   entry({
     name: "derive_testcase_authority_surface",
     intent: "Derive testcase authority that binds UAT testcase rows to requirement pressure before design and implementation planning.",
     inputs: ["requirement_surface", "uat_testcases_surface"],
-    outputs: ["testcase_authority_surface"]
+    outputs: ["testcase_authority_surface"],
+    workCategoryGovernanceCategory: "uat_test_case_build"
   }),
   entry({
     name: "derive_feature_decomp_surface",
     intent: "Derive feature decomposition from current requirements.",
     inputs: ["requirement_surface", "uat_testcases_surface"],
-    outputs: ["feature_decomp_surface"]
+    outputs: ["feature_decomp_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "derive_design_surface",
@@ -182,7 +199,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "testcase_authority_surface",
       "feature_decomp_surface"
     ],
-    outputs: ["design_surface"]
+    outputs: ["design_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "derive_scenario_surface",
@@ -193,19 +211,22 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "testcase_authority_surface",
       "design_surface"
     ],
-    outputs: ["scenario_surface"]
+    outputs: ["scenario_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "derive_implementation_design_surface",
     intent: "Derive the composite implementation plan carrier from design and scenarios, including stack profile, module rows, aggregate domain model rows, component topology rows, sunny-day sequence rows, realization schedule rows, and file target rows.",
     inputs: ["design_surface", "scenario_surface"],
-    outputs: ["implementation_design_surface"]
+    outputs: ["implementation_design_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "derive_component_code_surface",
     intent: "Materialize or repair component-shaped implementation code from the composite implementation plan carrier and any admitted component repair schedule.",
     inputs: ["implementation_design_surface"],
-    outputs: ["component_code_surface"]
+    outputs: ["component_code_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "qualify_component_realization_surface",
@@ -214,7 +235,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "implementation_design_surface",
       "component_code_surface"
     ],
-    outputs: ["component_realization_qualification_surface"]
+    outputs: ["component_realization_qualification_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "derive_code_surface",
@@ -224,7 +246,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "component_code_surface",
       "component_realization_qualification_surface"
     ],
-    outputs: ["code_surface"]
+    outputs: ["code_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
 	  entry({
 	    name: "derive_test_design_surface",
@@ -236,7 +259,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "testcase_authority_surface",
       "implementation_design_surface"
     ],
-    outputs: ["test_design_surface"]
+    outputs: ["test_design_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_component_test_surface",
@@ -244,19 +268,22 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
     inputs: [
       "test_design_surface"
     ],
-    outputs: ["component_test_surface"]
+    outputs: ["component_test_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "prepare_test_execution_surface",
     intent: "Prepare declared framework or command-side test execution transition surface from the admitted composite test plan.",
     inputs: ["test_design_surface"],
-    outputs: ["test_execution_surface"]
+    outputs: ["test_execution_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_test_execution_result_surface",
     intent: "Admit governed framework execution evidence and observed test results before archive publication.",
     inputs: ["test_execution_surface", "test_design_surface"],
-    outputs: ["test_execution_result_surface"]
+    outputs: ["test_execution_result_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "qualify_component_test_execution_surface",
@@ -266,7 +293,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "test_design_surface",
       "component_test_surface"
     ],
-    outputs: ["component_test_qualification_surface"]
+    outputs: ["component_test_qualification_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_component_repair_schedule_surface",
@@ -276,7 +304,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "test_execution_result_surface",
       "component_realization_qualification_surface"
     ],
-    outputs: ["component_repair_schedule_surface"]
+    outputs: ["component_repair_schedule_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_test_run_archive_surface",
@@ -287,7 +316,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "component_test_qualification_surface",
       "component_repair_schedule_surface"
     ],
-    outputs: ["test_run_archive_surface"]
+    outputs: ["test_run_archive_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_release_depth_parity_surface",
@@ -299,7 +329,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "component_repair_schedule_surface",
       "test_run_archive_surface"
     ],
-    outputs: ["release_depth_parity_surface"]
+    outputs: ["release_depth_parity_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "prepare_release_surface",
@@ -316,7 +347,8 @@ export const BOOTSTRAP_RELEASE_FUNCTION_CATALOG = Object.freeze([
       "component_repair_schedule_surface",
       "release_depth_parity_surface"
     ],
-    outputs: ["release_surface"]
+    outputs: ["release_surface"],
+    workCategoryGovernanceCategory: "design_build"
   })
 ]);
 
@@ -325,43 +357,50 @@ export const OPERATIONAL_FUNCTION_CATALOG = Object.freeze([
     name: "prepare_build_execution_surface",
     intent: "Prepare command-side build transition surface.",
     inputs: ["release_surface"],
-    outputs: ["build_execution_surface"]
+    outputs: ["build_execution_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "derive_build_execution_result_surface",
     intent: "Admit returned build result or pending build state.",
     inputs: ["build_execution_surface"],
-    outputs: ["build_execution_result_surface"]
+    outputs: ["build_execution_result_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "prepare_deployment_surface",
     intent: "Prepare command-side deployment transition surface.",
     inputs: ["release_surface"],
-    outputs: ["deployment_surface"]
+    outputs: ["deployment_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "derive_deployment_result_surface",
     intent: "Admit returned deployment result or pending deployment state.",
     inputs: ["deployment_surface"],
-    outputs: ["deployment_result_surface"]
+    outputs: ["deployment_result_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "derive_deployed_environment_surface",
     intent: "Project current deployed environment from deployment result.",
     inputs: ["deployment_result_surface"],
-    outputs: ["deployed_environment_surface"]
+    outputs: ["deployed_environment_surface"],
+    workCategoryGovernanceCategory: "coding_build"
   }),
   entry({
     name: "derive_runtime_observation_surface",
     intent: "Bind returned runtime evidence back into the worksite.",
     inputs: ["deployment_result_surface", "test_run_archive_surface"],
-    outputs: ["runtime_observation_surface"]
+    outputs: ["runtime_observation_surface"],
+    workCategoryGovernanceCategory: "unit_test_build"
   }),
   entry({
     name: "derive_retrofit_plan_surface",
     intent: "Plan the next retrofit wave from runtime observation and release state.",
     inputs: ["runtime_observation_surface", "release_surface"],
-    outputs: ["retrofit_plan_surface"]
+    outputs: ["retrofit_plan_surface"],
+    workCategoryGovernanceCategory: "design_build"
   })
 ]);
 
@@ -370,37 +409,43 @@ export const TRIAGE_FUNCTION_CATALOG = Object.freeze([
     name: "observe_gap_pressure",
     intent: "Project current gap pressure from gap dossier and requirement closure truth.",
     inputs: ["sdlc_gap_dossier", "sdlc_requirement_closure_register"],
-    outputs: ["gap_observation_surface"]
+    outputs: ["gap_observation_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "classify_gap_triage",
     intent: "Classify observed pressure into framework layer, condition, and process outcome.",
     inputs: ["gap_observation_surface"],
-    outputs: ["gap_triage_surface"]
+    outputs: ["gap_triage_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "bind_gap_route",
     intent: "Bind triage classification to lawful re-entry and public start target.",
     inputs: ["gap_observation_surface", "gap_triage_surface"],
-    outputs: ["gap_route_surface"]
+    outputs: ["gap_route_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "propose_constitutional_repricing",
     intent: "Publish a gated constitutional repricing proposal without applying it.",
     inputs: ["gap_triage_surface"],
-    outputs: ["repricing_proposal_surface"]
+    outputs: ["repricing_proposal_surface"],
+    workCategoryGovernanceCategory: "requirements_build"
   }),
   entry({
     name: "route_ticket_work_item",
     intent: "Project ticket/work-item routing under TICKET_METHOD authority.",
     inputs: ["gap_route_surface"],
-    outputs: ["ticket_work_item_route_surface"]
+    outputs: ["ticket_work_item_route_surface"],
+    workCategoryGovernanceCategory: "design_build"
   }),
   entry({
     name: "retire_gap_after_loopback",
     intent: "Publish gap retirement state after loopback over renewed closure truth.",
     inputs: ["gap_observation_surface", "sdlc_requirement_closure_register"],
-    outputs: ["gap_retirement_surface"]
+    outputs: ["gap_retirement_surface"],
+    workCategoryGovernanceCategory: "design_build"
   })
 ]);
 
@@ -410,6 +455,7 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
     intent: "Derive a compact design/ADR authority surface for a bounded implementation slice without expanding the full solution architecture graph.",
     inputs: ["input_set"],
     outputs: ["implementation_design_surface"],
+    workCategoryGovernanceCategory: "design_build",
     graphTrackPublication: "overlay_only"
   }),
   entry({
@@ -417,6 +463,7 @@ export const LITE_FUNCTION_CATALOG = Object.freeze([
     intent: "Materialize a bounded component implementation from the lite composite implementation design carrier.",
     inputs: ["implementation_design_surface"],
     outputs: ["component_code_surface"],
+    workCategoryGovernanceCategory: "coding_build",
     graphTrackPublication: "overlay_only"
   })
 ]);

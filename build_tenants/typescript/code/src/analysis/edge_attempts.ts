@@ -19,6 +19,7 @@ import type {
   SdlcFdRunAnalysisByteAccount,
   SdlcFdRunAnalysisEdgeAttempt,
   SdlcFdRunAnalysisFrontierSummary,
+  SdlcFdRunAnalysisRc3StageTruth,
   SdlcFdRunAnalysisStageClass
 } from "./types.js";
 
@@ -257,6 +258,134 @@ function frontierSummaryFromCarriers(
   });
 }
 
+function rc3StageTruthFromCarriers(
+  carriers: OperatorRunCarriers
+): SdlcFdRunAnalysisRc3StageTruth {
+  const inputs = [
+    carriers.fpEvaluateResult,
+    carriers.gtlAdmittedStateRef,
+    carriers.gtlConsequenceProjectionRef,
+    carriers.edgeClosure,
+    carriers.edgeFulfillmentLedger,
+    carriers.nextActionProjection
+  ] as const;
+  const malformed = inputs.find((input) => input.status === "malformed");
+  if (malformed !== undefined && malformed.status === "malformed") {
+    return Object.freeze({
+      status: "malformed" as const,
+      selectedCompositionRef: null,
+      selectedCompositionDigest: null,
+      selectedCompositionSelectionRef: null,
+      selectedRegimeBindingRef: null,
+      evaluateRef: null,
+      admittedStateGraphCallRef: null,
+      consequenceRef: null,
+      domainReadModelRefs: Object.freeze([]),
+      detail: malformed.detail
+    });
+  }
+  if (inputs.some((input) => input.status === "missing")) {
+    return Object.freeze({
+      status: "missing" as const,
+      selectedCompositionRef: null,
+      selectedCompositionDigest: null,
+      selectedCompositionSelectionRef: null,
+      selectedRegimeBindingRef: null,
+      evaluateRef: null,
+      admittedStateGraphCallRef: null,
+      consequenceRef: null,
+      domainReadModelRefs: Object.freeze([]),
+      detail: "required RC3 stage truth artifact missing"
+    });
+  }
+  if (
+    carriers.fpEvaluateResult.status !== "present" ||
+    carriers.gtlAdmittedStateRef.status !== "present" ||
+    carriers.gtlConsequenceProjectionRef.status !== "present" ||
+    carriers.edgeClosure.status !== "present" ||
+    carriers.edgeFulfillmentLedger.status !== "present" ||
+    carriers.nextActionProjection.status !== "present"
+  ) {
+    return Object.freeze({
+      status: "malformed" as const,
+      selectedCompositionRef: null,
+      selectedCompositionDigest: null,
+      selectedCompositionSelectionRef: null,
+      selectedRegimeBindingRef: null,
+      evaluateRef: null,
+      admittedStateGraphCallRef: null,
+      consequenceRef: null,
+      domainReadModelRefs: Object.freeze([]),
+      detail: "required RC3 stage truth artifact not admitted"
+    });
+  }
+  const fpEvaluate = carriers.fpEvaluateResult.data;
+  const admitted = carriers.gtlAdmittedStateRef.data;
+  const consequence = carriers.gtlConsequenceProjectionRef.data;
+  const compositionRefs = [
+    fpEvaluate.compositionRef,
+    admitted.compositionRef,
+    consequence.compositionRef,
+    carriers.edgeClosure.data.compositionRef,
+    carriers.edgeFulfillmentLedger.data.compositionRef,
+    carriers.nextActionProjection.data.compositionRef
+  ];
+  const compositionDigests = [
+    fpEvaluate.compositionDigest,
+    admitted.compositionDigest,
+    consequence.compositionDigest,
+    carriers.edgeClosure.data.compositionDigest,
+    carriers.edgeFulfillmentLedger.data.compositionDigest,
+    carriers.nextActionProjection.data.compositionDigest
+  ];
+  const compositionSelectionRefs = [
+    fpEvaluate.compositionSelectionRef,
+    admitted.compositionSelectionRef,
+    consequence.compositionSelectionRef,
+    carriers.edgeClosure.data.compositionSelectionRef,
+    carriers.edgeFulfillmentLedger.data.compositionSelectionRef,
+    carriers.nextActionProjection.data.compositionSelectionRef
+  ];
+  const selectedRegimeBindingRefs = [
+    fpEvaluate.selectedRegimeBindingRef,
+    carriers.edgeClosure.data.selectedRegimeBindingRef,
+    carriers.edgeFulfillmentLedger.data.selectedRegimeBindingRef,
+    carriers.nextActionProjection.data.selectedRegimeBindingRef
+  ];
+  if (
+    new Set(compositionRefs).size !== 1 ||
+    new Set(compositionDigests).size !== 1 ||
+    new Set(compositionSelectionRefs).size !== 1 ||
+    new Set(selectedRegimeBindingRefs).size !== 1
+  ) {
+    return Object.freeze({
+      status: "drift" as const,
+      selectedCompositionRef: fpEvaluate.compositionRef,
+      selectedCompositionDigest: fpEvaluate.compositionDigest,
+      selectedCompositionSelectionRef: fpEvaluate.compositionSelectionRef,
+      selectedRegimeBindingRef: fpEvaluate.selectedRegimeBindingRef,
+      evaluateRef: fpEvaluate.evaluationRef ?? null,
+      admittedStateGraphCallRef: admitted.graphCallRef,
+      consequenceRef: consequence.consequenceRef,
+      domainReadModelRefs: consequence.domainReadModelRefs,
+      detail:
+        "RC3 selected composition drift across evaluate/admission/consequence carriers"
+    });
+  }
+  return Object.freeze({
+    status: "present" as const,
+    selectedCompositionRef: fpEvaluate.compositionRef,
+    selectedCompositionDigest: fpEvaluate.compositionDigest,
+    selectedCompositionSelectionRef: fpEvaluate.compositionSelectionRef,
+    selectedRegimeBindingRef: fpEvaluate.selectedRegimeBindingRef,
+    evaluateRef: fpEvaluate.evaluationRef ?? null,
+    admittedStateGraphCallRef: admitted.graphCallRef,
+    consequenceRef: consequence.consequenceRef,
+    domainReadModelRefs: consequence.domainReadModelRefs,
+    detail: null
+  });
+}
+
 function operatorRunStartMs(operatorRunRoot: string): number | null {
   const baseName = path.basename(operatorRunRoot);
   const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})Z/u.exec(baseName);
@@ -408,6 +537,7 @@ export function deriveEdgeAttempt(
     stdoutBytes: carriers.fileSizes.workerStdout,
     eventBytes,
     frontierSummary: frontierSummaryFromCarriers(carriers),
+    rc3StageTruth: rc3StageTruthFromCarriers(carriers),
     workerDispatched: workerRun !== null,
     workerStatus: operatorSummary?.status ?? null
   });

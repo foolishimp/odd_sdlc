@@ -10,7 +10,7 @@ import type {
   SdlcTargetCarrierClosureStatus
 } from "./edge_gain_closure.js";
 import {
-  deriveFallbackSdlcSelectedAbgFnCompositionIdentity,
+  deriveLegacyReplayOnlySdlcSelectedAbgFnCompositionIdentity,
   type SdlcSelectedAbgFnCompositionIdentity
 } from "./composition_identity.js";
 
@@ -46,6 +46,7 @@ export interface SdlcTraversalConsequenceRefs {
   readonly compositionRef: string;
   readonly compositionDigest: string;
   readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly constructionIntentRef: string;
   readonly worksiteEvidenceRef: string;
   readonly edgeFulfillmentLedgerRef: string;
@@ -124,6 +125,7 @@ export interface SdlcEdgeFulfillmentLedger {
   readonly compositionRef: string;
   readonly compositionDigest: string;
   readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
   readonly overlayRef: string | null;
@@ -174,6 +176,7 @@ export interface SdlcEdgeClosureDecision {
   readonly compositionRef: string;
   readonly compositionDigest: string;
   readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly decisionRef: string;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
@@ -233,6 +236,7 @@ export interface SdlcNextActionProjection {
   readonly compositionRef: string;
   readonly compositionDigest: string;
   readonly compositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
   readonly evaluationFunction: "evaluate_next";
   readonly nextActionBasisKind: SdlcNextActionBasisKind;
   readonly nextActionProjectionRef: string;
@@ -295,13 +299,15 @@ function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
 }
 
-function compositionIdentityForInput(input: {
+function legacyReplayOnlyCompositionIdentityForInput(input: {
   readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity | undefined;
   readonly fallbackScopeRef: string;
 }): SdlcSelectedAbgFnCompositionIdentity {
+  // Migration-only support for historical tests/replay fixtures. Live runtime
+  // callers pass ABG-selected identity from EnginePluginInput.
   return (
     input.selectedComposition ??
-    deriveFallbackSdlcSelectedAbgFnCompositionIdentity({
+    deriveLegacyReplayOnlySdlcSelectedAbgFnCompositionIdentity({
       scopeRef: input.fallbackScopeRef
     })
   );
@@ -801,7 +807,7 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
         : "not_required"
       : input.targetCarrierAdmissionStatus;
   const edgeRef = requireNonEmptyString(input.edgeRef, "edgeRef");
-  const selectedComposition = compositionIdentityForInput({
+  const selectedComposition = legacyReplayOnlyCompositionIdentityForInput({
     selectedComposition: input.selectedComposition,
     fallbackScopeRef: edgeRef
   });
@@ -819,6 +825,7 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
     compositionRef: selectedComposition.compositionRef,
     compositionDigest: selectedComposition.compositionDigest,
     compositionSelectionRef: selectedComposition.compositionSelectionRef,
+    selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
     ledgerRef: requireNonEmptyString(input.ledgerRef, "ledgerRef"),
     ledgerVersionRef: requireNonEmptyString(
       input.ledgerVersionRef,
@@ -914,6 +921,9 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
       selectedComposition.compositionRef,
       selectedComposition.compositionDigest,
       selectedComposition.compositionSelectionRef,
+      ...(selectedComposition.selectedRegimeBindingRef === null
+        ? []
+        : [selectedComposition.selectedRegimeBindingRef]),
       ...downstreamTargetBindingRefs,
       ...downstreamTransformationSetRefs,
       ...downstreamPressureRefs,
@@ -1099,6 +1109,7 @@ export function deriveSdlcEdgeClosureDecision(input: {
     compositionRef: input.ledger.compositionRef,
     compositionDigest: input.ledger.compositionDigest,
     compositionSelectionRef: input.ledger.compositionSelectionRef,
+    selectedRegimeBindingRef: input.ledger.selectedRegimeBindingRef,
     decisionRef: requireNonEmptyString(input.decisionRef, "decisionRef"),
     ledgerRef: input.ledger.ledgerRef,
     ledgerVersionRef: input.ledger.ledgerVersionRef,
@@ -1127,6 +1138,9 @@ export function deriveSdlcEdgeClosureDecision(input: {
       input.ledger.compositionRef,
       input.ledger.compositionDigest,
       input.ledger.compositionSelectionRef,
+      ...(input.ledger.selectedRegimeBindingRef === null
+        ? []
+        : [input.ledger.selectedRegimeBindingRef]),
       input.ledger.ledgerRef,
       input.ledger.ledgerVersionRef,
       policy.policyRef,
@@ -1338,7 +1352,7 @@ export function constructSdlcNextActionProjection(input: {
     input.nextActionProjectionRef,
     "nextActionProjectionRef"
   );
-  const selectedComposition = compositionIdentityForInput({
+  const selectedComposition = legacyReplayOnlyCompositionIdentityForInput({
     selectedComposition:
       input.selectedComposition ?? input.closureDecision?.selectedComposition,
     fallbackScopeRef: nextActionProjectionRef
@@ -1421,6 +1435,7 @@ export function constructSdlcNextActionProjection(input: {
     compositionRef: selectedComposition.compositionRef,
     compositionDigest: selectedComposition.compositionDigest,
     compositionSelectionRef: selectedComposition.compositionSelectionRef,
+    selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
     evaluationFunction: "evaluate_next" as const,
     nextActionBasisKind,
     nextActionProjectionRef,
@@ -1461,6 +1476,9 @@ export function constructSdlcNextActionProjection(input: {
       selectedComposition.compositionRef,
       selectedComposition.compositionDigest,
       selectedComposition.compositionSelectionRef,
+      ...(selectedComposition.selectedRegimeBindingRef === null
+        ? []
+        : [selectedComposition.selectedRegimeBindingRef]),
       ...intentEventRefs,
       productAssetModelRef,
       ...gapPressureRefs,
@@ -1631,11 +1649,15 @@ export function replaySdlcTraversalConsequence(input: {
       edgeFulfillmentLedger.compositionDigest ||
     edgeClosureDecision.compositionSelectionRef !==
       edgeFulfillmentLedger.compositionSelectionRef ||
+    edgeClosureDecision.selectedRegimeBindingRef !==
+      edgeFulfillmentLedger.selectedRegimeBindingRef ||
     nextActionProjection.compositionRef !== edgeClosureDecision.compositionRef ||
     nextActionProjection.compositionDigest !==
       edgeClosureDecision.compositionDigest ||
     nextActionProjection.compositionSelectionRef !==
-      edgeClosureDecision.compositionSelectionRef
+      edgeClosureDecision.compositionSelectionRef ||
+    nextActionProjection.selectedRegimeBindingRef !==
+      edgeClosureDecision.selectedRegimeBindingRef
   ) {
     throw new TypeError("traversal consequence selected composition identity drift");
   }
@@ -1752,6 +1774,7 @@ export function replaySdlcTraversalConsequence(input: {
       compositionRef: nextActionProjection.compositionRef,
       compositionDigest: nextActionProjection.compositionDigest,
       compositionSelectionRef: nextActionProjection.compositionSelectionRef,
+      selectedRegimeBindingRef: nextActionProjection.selectedRegimeBindingRef,
       constructionIntentRef: constructionIntent.intentRef,
       worksiteEvidenceRef: worksiteEvidence.evidenceBundleRef,
       edgeFulfillmentLedgerRef: edgeFulfillmentLedger.ledgerVersionRef,
