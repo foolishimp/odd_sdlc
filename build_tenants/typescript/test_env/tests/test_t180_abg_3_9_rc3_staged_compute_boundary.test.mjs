@@ -1,5 +1,5 @@
 // Validates: T-180
-// Proves the first ABG 3.9 RC3 migration slice uses the release substrate and
+// Proves the ABG 3.9 release substrate uses the current immutable tarball and
 // consumes selected composition identity from ABG plugin input.
 
 import test from "node:test";
@@ -23,11 +23,11 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
-test("T-180 pins the TypeScript tenant to ABG 3.9.0-rc.3", () => {
+test("T-180 pins the TypeScript tenant to ABG 3.9.0-rc.4", () => {
   const packageJson = readPackageJson("package.json");
   const packageLock = readPackageJson("package-lock.json");
   const dependencyRef =
-    "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.3/abiogenesis-typescript-tenant-3.9.0-rc.3.tgz";
+    "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.4/abiogenesis-typescript-tenant-3.9.0-rc.4.tgz";
 
   assert.equal(
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
@@ -39,11 +39,11 @@ test("T-180 pins the TypeScript tenant to ABG 3.9.0-rc.3", () => {
   );
   assert.equal(
     packageLock.packages["node_modules/@abiogenesis/typescript-tenant"].version,
-    "3.9.0-rc.3"
+    "3.9.0-rc.4"
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.9.0-rc.3"
+    "3.9.0-rc.4"
   );
 });
 
@@ -159,7 +159,7 @@ test("T-180 analyzer admits and renders RC3 stage truth", () => {
   assert.match(markdown, /## RC3 Stage Truth/u);
 });
 
-test("T-180 ABG RC3 passes actor invocation provenance to F_P evaluation rules", () => {
+test("T-180 ABG release substrate passes actor invocation provenance to F_P evaluation rules", () => {
   const runner = readFileSync(
     path.join(
       PACKAGE_ROOT,

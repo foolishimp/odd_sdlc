@@ -10,7 +10,7 @@ Derives from:
 - `specification/requirements/18-typed-construction-algebra.md`
 - ABIogenesis `REQ-R-ABG3-FN-COMPOSITION`
 - ABIogenesis `REQ-L-GTL3-COMPUTE-NOTATION`
-- ABIogenesis `3.9.0-rc.3`
+- ABIogenesis `3.9.0-rc.4`
 
 ## STDO Re-Triage
 
@@ -375,9 +375,9 @@ flowchart TD
 
 ## IACS
 
-### AbgRc2SubstratePin
+### AbgRc4SubstratePin
 
-Purpose: make ABG `3.9.0-rc.3` the single substrate release truth for the
+Purpose: make ABG `3.9.0-rc.4` the single substrate release truth for the
 TypeScript tenant.
 
 Owning surfaces:
