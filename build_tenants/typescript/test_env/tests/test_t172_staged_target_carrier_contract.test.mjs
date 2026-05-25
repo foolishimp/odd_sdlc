@@ -31,7 +31,7 @@ import {
 } from "../../build/semantic/code/src/index.js";
 import {
   deriveSdlcStagedConstructionAuditCarriers
-} from "../../build/semantic/code/src/operator/handoff.js";
+} from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 
 function makeWorkspace({ trivialProduct = false } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t172-staged-"));

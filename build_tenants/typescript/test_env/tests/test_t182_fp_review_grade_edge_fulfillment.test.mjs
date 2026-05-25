@@ -249,7 +249,7 @@ function shallowImplementationDesignRegister(manifest) {
 
 test("T-183 ticket absorbs review-grade fulfillment into the one edge ledger surface", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
+    ".ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
   const design = readRepoFile(
     "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
@@ -799,6 +799,22 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(
       installedOperatorSource,
       /Mark trace_missing when a generated product file is used as fulfillment evidence/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /compare worker_result_report\.materializedFiles and product_materialization_manifest files to declared product-file targets/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /undeclared build\/test byproducts or extra product files as materialized product truth/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Allowed execution byproducts may remain only as byproducts/u
     );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });

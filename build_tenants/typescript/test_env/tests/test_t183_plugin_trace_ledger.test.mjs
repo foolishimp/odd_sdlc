@@ -14,7 +14,7 @@ function readRepoFile(relativePath) {
 
 test("T-183 records the finite ABG plugin trace ledger as the audit work queue", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
+    ".ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
 
   for (const row of [
@@ -92,7 +92,7 @@ test("T-183 lineage completeness is review-grade F_P pressure, not F_D postfligh
   assert.doesNotMatch(postflightReturn, /status: blockingReasons\.length/u);
 
   const handoffSource = readRepoFile(
-    "build_tenants/typescript/code/src/operator/handoff.ts"
+    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
   );
   const materializationCheck = handoffSource.slice(
     handoffSource.indexOf("function evaluateMaterializedProductFiles"),
@@ -208,7 +208,7 @@ test("T-183 F_D assurance ledgers are diagnostic facts, not traversal authority"
 
 test("T-183 system artifacts use the ABG/system artifact writer surface", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
+    ".ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
   assert.match(ticket, /\| R-129 \| System artifact write authority \|/u);
 
@@ -219,16 +219,11 @@ test("T-183 system artifacts use the ABG/system artifact writer surface", () => 
   assert.match(systemArtifactSource, /constructSdlcOperatorRunArtifactArchiveWritePlan/u);
   assert.match(systemArtifactSource, /authoritative operator archive payload has no catalog row/u);
 
-  const handoffSource = readRepoFile(
-    "build_tenants/typescript/code/src/operator/handoff.ts"
+  const transformLaunchSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
   );
-  const archiveWriter = handoffSource.slice(
-    handoffSource.indexOf("export function writeOperatorArchiveFile"),
-    handoffSource.indexOf("export function relativeToWorkspace")
-  );
-  assert.match(archiveWriter, /writeSdlcSystemArtifact\(input\)/u);
-  assert.doesNotMatch(archiveWriter, /writeFileSync/u);
-  assert.doesNotMatch(archiveWriter, /constructSdlcArchiveWritePlan/u);
+  assert.match(transformLaunchSource, /writeSdlcSystemArtifact\(\{/u);
+  assert.doesNotMatch(transformLaunchSource, /writeOperatorArchiveFile/u);
 
   for (const relativePath of [
     "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts",
@@ -247,12 +242,12 @@ test("T-183 system artifacts use the ABG/system artifact writer surface", () => 
     installedOperatorSource.indexOf("async function materializeDesignDepthRegisterWithFpEvaluator"),
     installedOperatorSource.indexOf("async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator")
   );
-  assert.match(designDepthEvaluator, /writeOperatorArchiveFile\(\{/u);
+  assert.match(designDepthEvaluator, /writeSdlcSystemArtifact\(\{/u);
   assert.doesNotMatch(designDepthEvaluator, /writeFileSync/u);
   const reviewGradeEvaluator = installedOperatorSource.slice(
     installedOperatorSource.indexOf("async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator"),
     installedOperatorSource.indexOf("function constructSdlcAbgOwnedFpEvaluationOutcome")
   );
-  assert.match(reviewGradeEvaluator, /writeOperatorArchiveFile\(\{/u);
+  assert.match(reviewGradeEvaluator, /writeSdlcSystemArtifact\(\{/u);
   assert.doesNotMatch(reviewGradeEvaluator, /writeFileSync/u);
 });

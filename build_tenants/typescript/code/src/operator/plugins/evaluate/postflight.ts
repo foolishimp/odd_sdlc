@@ -27,7 +27,7 @@ import {
   __handoffPathIsInside,
   __handoffResolveProductMaterializationReplay,
   sha256Text
-} from "../../handoff.js";
+} from "../transform/launch_contract.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
 import {
   admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,

@@ -13,11 +13,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   existsSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
-  statSync,
-  writeFileSync
+  statSync
 } from "node:fs";
 import {
   admitGraphSpanAssessment,
@@ -165,12 +163,12 @@ import {
   workerResultReportWithFpStageRefs,
   writeInstalledOperatorOwnedEvaluationArtifact,
   writeHandoffFiles,
-  writeOperatorArchiveFile,
   writePostflightGapDossier,
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest,
   type SdlcStagedConstructionAuditCarrier
-} from "./handoff.js";
+} from "./plugins/transform/launch_contract.js";
+import { writeSdlcSystemArtifact } from "./system_artifacts.js";
 import {
   selectSdlcWorkCategoryGovernance
 } from "./work_category_governance.js";
@@ -1763,8 +1761,11 @@ function writeInstalledOperatorNoDispatchArtifact(input: {
     "",
     ...input.manifest.traversalObligationContext.authorityRefs.map((ref) => `- ${ref}`)
   ].join("\n");
-  mkdirSync(dirname(input.manifest.outputFile), { recursive: true });
-  writeFileSync(input.manifest.outputFile, content, "utf8");
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    absolutePath: input.manifest.outputFile,
+    payload: content
+  });
   return input.manifest.outputFile;
 }
 
@@ -2264,7 +2265,7 @@ async function writeLiveFpParallelMaterializationFrontier(input: {
     maxBatches: Math.max(3, Math.ceil(declarations.length / parallelBatchSize) + 1),
     correlationId: `correlation://odd-sdlc/live/${manifestRefSegment(input.manifest)}/parallel-materialization`
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
     payload: constructSdlcLiveFpParallelMaterializationFrontier({
@@ -2334,7 +2335,7 @@ async function writeTraversalSelectionAudit(input: {
   );
   const writtenRefs: string[] = [];
   for (const carrier of auditCarriers) {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       artifactRef: carrier.artifactRef,
       payload: carrier.payload
@@ -2354,7 +2355,7 @@ async function writeTraversalSelectionAudit(input: {
     carriers: auditCarriers
   });
   if (canonicalSummary !== null) {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       artifactRef: "operator-run-artifact://decomposition-summary",
       payload: canonicalSummary
@@ -2388,7 +2389,7 @@ async function writeTraversalSelectionAudit(input: {
       canonicalSummary !== null,
     evidenceRefs
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_traversal_hop_selection.json",
     payload: selection
@@ -2437,12 +2438,12 @@ function writeFrontDoorTraversalSelectionAudit(input: {
   ) {
     return null;
   }
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_frontdoor_decomposition_summary.json",
     payload: input.summary
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_frontdoor_traversal_hop_selection.json",
     payload: input.selection
@@ -2754,7 +2755,7 @@ function writeWorkerProcessStartedContext(input: {
     inactivityTimeoutMs: input.policy.inactivityTimeoutMs,
     heartbeatMs: input.policy.heartbeatMs
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "worker_process_started_context.json",
     payload: context
@@ -2821,7 +2822,7 @@ function writeRuntimeLivenessObserverProjection(input: {
       elapsedMs: input.processResult.elapsedMs
     })
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "runtime_liveness_observer_projection.json",
     payload: archivedRuntimeLivenessObserverProjection(projection)
@@ -2913,7 +2914,7 @@ function writeWorkerProcessSummary(input: {
     timedOut: input.workerRun.timedOut,
     error: input.workerRun.error
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "worker_process_summary.json",
     payload: summary
@@ -3463,7 +3464,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
     outputLastMessagePath,
     error: processResult.error
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "worker_run.json",
     payload: workerRun
@@ -3541,6 +3542,10 @@ function designDepthFpEvaluatorPrompt(input: {
     "- The content ledger carries an embedded ProductAssetModel payload whose contentKind is sdlc_design_depth_register. F_D will only project that exact payload to the legacy register path after admission.",
     `- Do not write the legacy projection path directly: ${input.registerProjectionPath}`,
     "- The first ledger can be compact; after it exists, iterate only if validation fails or a specific axis is partial/blocked.",
+    "- After the first ledger exists, perform a mandatory bounded target-path reconciliation pass against the transform artifact and any source authority refs that explicitly name product files.",
+    "- In that reconciliation pass, compare fileTargetRows[].relativePath, componentTopologyRows[].relativePath, componentRealizationRows[].relativePath, and firstProductFileToChange against the transform artifact Product File Targets / Component rows and explicit source-authority file paths.",
+    "- If those sources name exact product paths, the final register must preserve those exact paths unless an admitted later authority supersedes them; do not shorten, normalize away source directories, or invent sibling paths.",
+    "- If the transform artifact and source authority disagree on a target path, cite both refs and choose the path required by the highest source authority. If the conflict cannot be resolved, emit a blocked designCompletenessVerdict axis instead of guessing.",
     "Reading discipline:",
     "- Do not print, cat, tail, grep, or paste full authority files into stdout.",
     "- Do not display worker_invocation_package.json, requirement tables, authority ref arrays, evidence arrays, or full JSON objects in the terminal.",
@@ -3674,6 +3679,8 @@ function designDepthFpEvaluatorPrompt(input: {
     "- If the product is trivial, keep the register trivial; do not invent modules, entities, APIs, persistence, or multiple same-file components.",
     "- designCompletenessVerdict evaluates the implementation-design surface only. Do not mark an axis partial or blocked merely because source materialization, test design, execution, or runtime proof happens on a downstream edge.",
     "- Before the final response, re-open the JSON you wrote and verify that every typed nested item above is an object with exactly the declared fields, not a string, Markdown paragraph, or partial object.",
+    "- Before the final response, run a bounded path-integrity self-check: every source-role fileTargetRows[].relativePath and every component source relativePath must either appear in the transform artifact target/component tables or be justified by a higher source authority ref cited in sourceBasisRefs/evidenceRefs.",
+    "- The path-integrity self-check is mandatory even when the first ledger was structurally valid; structural validity alone is not enough if exact product file paths drift from the admitted design/source authority.",
     "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 8 or fewer requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
     `- Required self-check before final response: run a local JSON check over the content ledger file and rewrite until it passes. At minimum, verify contentRows[0] has exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs; verify payload.registerVersion, payload.aggregateDomainModel.modelVersion, payload.aggregateSunnyDaySequence.sequenceVersion, and payload.designCompletenessVerdict.verdictVersion are exactly "ts-design-depth-v1"; verify contentRows[0].payload arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities, aggregateDomainModel.entities[].attributes, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.`,
     "- Do not run another exploratory command after deciding the component/module set; write the content ledger file first, then validate that file.",
@@ -3773,7 +3780,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "design_depth_fp_evaluator_prompt.md"
   );
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "design_depth_fp_evaluator_prompt.md",
     payload: designDepthFpEvaluatorPrompt({
@@ -3875,7 +3882,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   const runRef = pathToFileURL(
     join(input.manifest.archiveRoot, "design_depth_fp_evaluator_run.json")
   ).href;
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "design_depth_fp_evaluator_run.json",
     payload: Object.freeze({
@@ -4081,7 +4088,7 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly outcome: EvaluationRuleOutcome;
 }): string {
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE,
     payload: input.outcome
@@ -4181,6 +4188,9 @@ function reviewGradeEdgeFulfillmentPrompt(input: {
     "- When the generated asset includes a declared executable or test execution contract that can run locally without network or destructive side effects, execute it from the declared working directory and use the observed exit/stdout/stderr as evaluation evidence. If it fails, mark the relevant obligation blocked with execution_environment or semantic_not_realized instead of passing by inspection.",
     "- Mark test_overlap_missing when accepted depth requires test overlap and the generated tests do not exercise the responsibility.",
     "- For component_code_surface, compare source files to accepted design-depth componentRealizationRows and fileTargetRows.",
+    "- For materialization-required component_code_surface, compare worker_result_report.materializedFiles and product_materialization_manifest files to declared product-file targets.",
+    "- Mark boundary_collapsed or wrong_stage when worker_result_report.materializedFiles or product_materialization_manifest files list undeclared build/test byproducts or extra product files as materialized product truth.",
+    "- Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof unless they are declared product targets. Allowed execution byproducts may remain only as byproducts, not as product-file fulfillment evidence.",
     "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
     "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
     "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
@@ -4331,7 +4341,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "review_grade_edge_fulfillment_prompt.md"
   );
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "review_grade_edge_fulfillment_prompt.md",
     payload: reviewGradeEdgeFulfillmentPrompt({
@@ -4412,7 +4422,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const runRef = pathToFileURL(
     join(input.manifest.archiveRoot, "review_grade_edge_fulfillment_run.json")
   ).href;
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "review_grade_edge_fulfillment_run.json",
     payload: Object.freeze({
@@ -4464,7 +4474,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ],
       evidenceRefs
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "review_grade_postflight.json",
       payload: postflight
@@ -4511,7 +4521,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       details: admission.blockingReasons,
       evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "review_grade_postflight.json",
       payload: postflight
@@ -4593,7 +4603,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ),
       evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs])
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "review_grade_postflight.json",
       payload: postflight
@@ -5047,7 +5057,7 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
     fpEvaluatorAdmissionEvidenceRefs:
       input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.state.manifest.archiveRoot,
     relativePath: input.postflightRelativePath,
     payload: postflight
@@ -5078,12 +5088,12 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
     report: input.state.workerReport,
     postflight
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.state.manifest.archiveRoot,
     relativePath: "assurance_satisfaction.json",
     payload: assuranceGate.satisfaction
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.state.manifest.archiveRoot,
     relativePath: "assurance_ledgers.json",
     payload: assuranceGate.ledgers
@@ -7169,63 +7179,63 @@ function writeTraversalConsequenceArchive(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly consequence: SdlcInstalledOperatorTraversalConsequence;
 }): void {
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "gtl_admitted_state_ref.json",
     payload: input.consequence.admittedStateRef
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "gtl_consequence_projection_ref.json",
     payload: input.consequence.consequenceProjection
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_construction_intent.json",
     payload: input.consequence.constructionIntent
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_worksite_evidence.json",
     payload: input.consequence.worksiteEvidence
   });
   if (input.consequence.edgeGain !== undefined) {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "sdlc_edge_gain.json",
       payload: input.consequence.edgeGain
     });
   }
   if (input.consequence.edgeResidualPressure !== undefined) {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "sdlc_edge_residual_pressure.json",
       payload: input.consequence.edgeResidualPressure
     });
   }
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_edge_fulfillment_ledger.json",
     payload: input.consequence.edgeFulfillmentLedger
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_edge_closure_decision.json",
     payload: input.consequence.edgeClosureDecision
   });
   if (input.consequence.overlaySegmentCompletion !== null) {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: input.manifest.archiveRoot,
       relativePath: "sdlc_overlay_segment_completion.json",
       payload: input.consequence.overlaySegmentCompletion
     });
   }
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_overlay_binding_post_action.json",
     payload: input.consequence.postActionOverlayBinding
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "sdlc_next_action_projection.json",
     payload: input.consequence.nextActionProjection
@@ -7475,12 +7485,12 @@ function writeRunArchive(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly outcome: SdlcInstalledOperatorStartOutcome;
 }): void {
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "run.json",
     payload: input.outcome
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "postmortem.md",
     payload: [
@@ -7837,17 +7847,17 @@ function compactRuntimeEventArchivePayload(
       manifest: managedTraversalManifest,
       report
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "managed_traversal_manifest.json",
       payload: managedTraversalManifest
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "managed_traversal_ledger.json",
       payload: managedTraversalLedger
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "conform_project_report.json",
       payload: report
@@ -7900,17 +7910,17 @@ function compactRuntimeEventArchivePayload(
           : "repair_project_conformance",
       currentEdge: transition.edge
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "runtime_events.json",
       payload: emitted
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "run.json",
       payload: outcome
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "postmortem.md",
       payload: [
@@ -8149,7 +8159,7 @@ function compactRuntimeEventArchivePayload(
           report: input.workerReport,
           operationType: defaultOperationForTarget(contract.targetAssetType)
         });
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "constructor_result.json",
           payload: constructorResult
@@ -8163,7 +8173,7 @@ function compactRuntimeEventArchivePayload(
           }),
           constructorResult
         });
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "hook_outcome.json",
           payload: hookOutcome
@@ -8194,7 +8204,7 @@ function compactRuntimeEventArchivePayload(
             blockingReasonCarriers: hookDiagnosticReasonCarriers,
             evidenceRefs: Object.freeze([...(hookOutcome.postflight?.evidenceRefs ?? [])])
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "hook_diagnostics.json",
             payload: hookDiagnostics
@@ -8266,7 +8276,7 @@ function compactRuntimeEventArchivePayload(
             edgeAccountingRow
           });
         } else {
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "installed_operator_evaluation_artifact.json",
             payload: {
@@ -8286,12 +8296,12 @@ function compactRuntimeEventArchivePayload(
               before: beforeMaterialization
             })
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "worker_result_report.json",
             payload: workerReport
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "post_transform_observation.json",
             payload: {
@@ -8313,7 +8323,7 @@ function compactRuntimeEventArchivePayload(
             reason:
               error instanceof Error ? error.message : "worker_report_rejected"
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "worker_report_admission_postflight.json",
             payload: rejectionPostflight
@@ -8357,7 +8367,7 @@ function compactRuntimeEventArchivePayload(
           report: workerReport
         });
         workerReport = noDispatchReport({ manifest, report: workerReport });
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "worker_result_report.json",
           payload: workerReport
@@ -8389,7 +8399,7 @@ function compactRuntimeEventArchivePayload(
           workerRun
         });
         const stopForRuntimeTriage = workerRuntimeTriageStop(failurePostflight);
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "worker_process_failure_postflight.json",
           payload: failurePostflight
@@ -8435,7 +8445,7 @@ function compactRuntimeEventArchivePayload(
       const frameworkOwnedEvaluationArtifact =
         writeInstalledOperatorOwnedEvaluationArtifact({ manifest });
       if (frameworkOwnedEvaluationArtifact !== null) {
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "installed_operator_evaluation_artifact.json",
           payload: {
@@ -8452,12 +8462,12 @@ function compactRuntimeEventArchivePayload(
           manifest,
           before: beforeMaterialization
         });
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "worker_result_report.json",
           payload: workerReport
         });
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "post_transform_observation.json",
           payload: {
@@ -8481,7 +8491,7 @@ function compactRuntimeEventArchivePayload(
             reason:
               error instanceof Error ? error.message : "worker_report_rejected"
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
             relativePath: "worker_report_admission_postflight.json",
             payload: rejectionPostflight
@@ -8528,7 +8538,7 @@ function compactRuntimeEventArchivePayload(
         manifest,
         report: workerReport
       });
-      writeOperatorArchiveFile({
+      writeSdlcSystemArtifact({
         archiveRoot: manifest.archiveRoot,
         relativePath: "worker_result_report.json",
         payload: workerReport
@@ -8832,7 +8842,7 @@ function compactRuntimeEventArchivePayload(
             ...dispatchState.current,
             workerReport
           });
-          writeOperatorArchiveFile({
+          writeSdlcSystemArtifact({
             archiveRoot: dispatchState.current.manifest.archiveRoot,
             relativePath: "worker_result_report.json",
             payload: workerReport
@@ -9009,19 +9019,19 @@ function compactRuntimeEventArchivePayload(
         ? nextVector ?? traversalConsequence.nextActionProjection.nextGraphVectorRef
         : completedDispatchState.currentEdge
   });
-  writeOperatorArchiveFile({
+  writeSdlcSystemArtifact({
     archiveRoot: completedDispatchState.manifest.archiveRoot,
     relativePath: "runtime_events.json",
     payload: compactRuntimeEventArchivePayload(eventsToAppend)
   });
   writeRunArchive({ manifest: completedDispatchState.manifest, outcome });
   if (completedDispatchState.status === "worker_invoked") {
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: completedDispatchState.manifest.archiveRoot,
       relativePath: "operator_summary.json",
       payload: outcome.summary
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: completedDispatchState.manifest.archiveRoot,
       relativePath: "run_compact.json",
       payload: {
@@ -9036,7 +9046,7 @@ function compactRuntimeEventArchivePayload(
         materializedFileCount: outcome.workerReport?.materializedFiles.length ?? 0
       }
     });
-    writeOperatorArchiveFile({
+    writeSdlcSystemArtifact({
       archiveRoot: completedDispatchState.manifest.archiveRoot,
       relativePath: "run_compact.txt",
       payload: stableOperatorJson(outcome.summary)

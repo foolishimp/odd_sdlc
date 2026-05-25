@@ -34,12 +34,12 @@ export {
   readPostflightGapDossierRef,
   constructorResultFromWorkerOutput,
   readWorkerResultReport,
-  writeOperatorArchiveFile,
   relativeToWorkspace,
   type SdlcObservedProductFileSnapshot,
   type SdlcStagedConstructionAuditCarrier,
   type SdlcProductMaterializationSnapshot
-} from "./handoff.js";
+} from "./plugins/transform/launch_contract.js";
+export * from "./system_artifacts.js";
 export * from "./plugins/evaluate/index.js";
 export * from "./work_category_governance.js";
 export * from "./feature_scope.js";

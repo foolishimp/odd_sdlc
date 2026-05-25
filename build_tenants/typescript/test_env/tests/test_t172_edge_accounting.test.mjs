@@ -385,7 +385,7 @@ test("T-172 rejects observed worker dispatch on no-dispatch accounting rows", ()
 
 test("T-172 F_D failure rows do not embed stack-specific build-tool classifiers", () => {
   const source = readFileSync(
-    path.join(process.cwd(), "code/src/operator/handoff.ts"),
+    path.join(process.cwd(), "code/src/operator/plugins/transform/launch_contract.ts"),
     "utf8"
   );
   assert.doesNotMatch(source, /sharedSbtBuildConfigurationFailureRow/u);

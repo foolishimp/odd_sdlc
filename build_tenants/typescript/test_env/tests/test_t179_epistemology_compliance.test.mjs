@@ -147,7 +147,7 @@ test("T-179 operator guide teaches C notation without hiding ledgers in plugins"
 });
 
 test("T-179 F_P.transform prompt stays inside transform.C authority", () => {
-  const handoffSource = readPackageFile("code/src/operator/handoff.ts");
+  const handoffSource = readPackageFile("code/src/operator/plugins/transform/launch_contract.ts");
   const promptSource = extractTransformPromptSource(handoffSource);
 
   assertIncludesAll(promptSource, [

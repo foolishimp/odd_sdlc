@@ -35,7 +35,7 @@ import {
   resolveSdlcTraversalOutcomeClass,
   selectSdlcDependencyMapTraversal,
   sdlcPostflightGapRetryEligible,
-  writeOperatorArchiveFile,
+  writeSdlcSystemArtifact,
   SDLC_DEPENDENCY_TRAVERSAL_METHODS,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_MIN_FP_PRESSURE_PRESERVATION_MECHANISMS,
@@ -399,7 +399,7 @@ test("T-175 archive writes are catalog-enforced for authoritative artifacts", ()
   try {
     assert.throws(
       () =>
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: root,
           relativePath: "uncataloged_authority.json",
           payload: {
@@ -411,7 +411,7 @@ test("T-175 archive writes are catalog-enforced for authoritative artifacts", ()
 
     assert.throws(
       () =>
-        writeOperatorArchiveFile({
+        writeSdlcSystemArtifact({
           archiveRoot: root,
           artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
           payload: {
@@ -421,7 +421,7 @@ test("T-175 archive writes are catalog-enforced for authoritative artifacts", ()
       /does not match catalog carrier kind/u
     );
 
-    const written = writeOperatorArchiveFile({
+    const written = writeSdlcSystemArtifact({
       archiveRoot: root,
       artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",
       payload: frontierPayload()

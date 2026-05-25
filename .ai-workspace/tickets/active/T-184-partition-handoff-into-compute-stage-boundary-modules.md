@@ -127,20 +127,20 @@ Current suspect side effects to eliminate or rehome:
 
 | id | task | closure proof | status |
 | --- | --- | --- | --- |
-| H-001 | Add a source test that enumerates current `handoff.ts` public exports and fails if new exports are added during migration. | test fails on new public handoff export | planned |
+| H-001 | Add a source test that enumerates current `handoff.ts` public exports and fails if new exports are added during migration. | test fails on new public handoff export | done: `test_t184_handoff_partition_boundary.test.mjs` fails if `handoff.ts`, public imports, `writeOperatorArchiveFile`, or raw operator file writers return |
 | H-010 | Move stable JSON/hash/run-id helpers out of handoff. | build passes; no installed operator import for these helpers from handoff | planned |
 | H-020 | Move product-materialization authority helpers into `product_materialization/authority.ts`. | tests still prove tenant stack/product target authority; no source-specific branch added | planned |
-| H-030 | Move transform launch contract helpers into `plugins/transform/launch_contract.ts`. | worker prompt/package tests pass; prompt still uses one governance reference and typed work queue | planned |
+| H-030 | Move transform launch contract helpers into `plugins/transform/launch_contract.ts`. | worker prompt/package tests pass; prompt still uses one governance reference and typed work queue | first slice done: former `handoff.ts` moved under transform plugin ownership; finer extraction still belongs to H-040/H-050/H-070/H-080 |
 | H-040 | Move materialization observation/replay/manifest helpers into `product_materialization/*`. | observation is read-only; no output artifact synthesis remains | planned |
 | H-050 | Move worker result and `FpTransformResult` projection into `plugins/transform/result_projection.ts`. | generated-asset closure still requires selected F_P review evidence | planned |
 | H-060 | Split or delete installed-operator-owned evaluation artifacts. | no deterministic work-surface writer remains except declared execution evidence through ABG/system | planned |
 | H-070 | Move gap dossier and retry diagnostic projection into `postflight/gap_dossier.ts`. | gap dossier remains diagnostic/read model; it cannot select next action directly | planned |
 | H-080 | Move repair re-entry projection into consequence module. | repair action derives from closure decision plus `ActionCatalog` | planned |
-| H-090 | Replace `writeOperatorArchiveFile` with direct `writeSdlcSystemArtifact` imports. | grep proves no `writeOperatorArchiveFile` export/import remains | planned |
-| H-100 | Delete `handoff.ts` and update `operator/index.ts`. | build fails if any consumer imports `./handoff.js`; file removed | planned |
-| H-110 | Add raw-write audit tests for operator modules. | raw writes only in effect executors or approved product transformer/evaluator boundary | planned |
-| H-120 | Run clean JS hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | planned |
-| H-130 | Run clean Rust server hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | planned |
+| H-090 | Replace `writeOperatorArchiveFile` with direct `writeSdlcSystemArtifact` imports. | grep proves no `writeOperatorArchiveFile` export/import remains | done: source imports direct system writer and public wrapper export is removed |
+| H-100 | Delete `handoff.ts` and update `operator/index.ts`. | build fails if any consumer imports `./handoff.js`; file removed | done: `operator/index.ts` exports the transform launch contract and system artifact writer directly |
+| H-110 | Add raw-write audit tests for operator modules. | raw writes only in effect executors or approved product transformer/evaluator boundary | done for operator source: T-184 test rejects `writeFileSync`, `appendFileSync`, and `createWriteStream` in `operator/` |
+| H-120 | Run clean JS hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260525T183305414Z_pid95270`; bug fixed where design-depth evaluate.C/F_P shortened exact source paths from the admitted design artifact |
+| H-130 | Run clean Rust server hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t133_hello_world_rust_live/20260525T190915811Z_pid70152`; byproducts remain by execution policy only and are not admitted as product-file truth |
 | H-140 | Run clean data mapper live with PTY. | final close or lawful block, no source-specific F_D compensations | planned |
 
 ## Closure Checklist
@@ -164,8 +164,8 @@ Current suspect side effects to eliminate or rehome:
 - [ ] `npm run test:t184` exists and passes.
 - [ ] `npm run lint:semantic` passes.
 - [ ] `git diff --check` passes.
-- [ ] JS hello-world live is clean.
-- [ ] Rust server hello-world live is clean.
+- [x] JS hello-world live is clean.
+- [x] Rust server hello-world live is clean.
 - [ ] Data mapper live is clean or blocks lawfully without source-specific F_D
   compensation.
 

@@ -47,7 +47,7 @@ function readRepoFile(relativePath) {
 
 test("T-183 ticket is the admitted deletion-first implementation migration contract", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
+    ".ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
 
   assert.match(ticket, /ticket_category: implementation_migration/u);
@@ -1137,7 +1137,7 @@ test("T-181 analyzer uses runtime admission for evaluator sidecar", () => {
 
 test("T-181 installed operator declares an F_P evaluation rule for register population", () => {
   const source = readRepoFile("build_tenants/typescript/code/src/operator/installed_operator.ts");
-  const handoffSource = readRepoFile("build_tenants/typescript/code/src/operator/handoff.ts");
+  const handoffSource = readRepoFile("build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts");
   const operatorIndex = readRepoFile("build_tenants/typescript/code/src/operator/index.ts");
   const evaluatePluginSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/index.ts"
@@ -1256,6 +1256,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(source, /model:cdme-data-mapper/u);
   assert.match(source, /First register materialization rule/u);
   assert.match(source, /selected evaluate\.C\/F_P semantic pressure map/u);
+  assert.match(source, /mandatory bounded target-path reconciliation pass/u);
+  assert.match(source, /If those sources name exact product paths, the final register must preserve those exact paths/u);
   assert.match(source, /Do not use scripts to deterministically construct semantic register rows/u);
   assert.match(source, /Do not spend the run enumerating every requirement id before writing the register/u);
   assert.match(source, /Missing-ledger timeout is worse than an admitted pressure map/u);
@@ -1298,6 +1300,8 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /Allowed designCompletenessVerdict\.\*\.status values/u);
   assert.match(source, /Use "satisfied" for a complete axis; never use "complete"/u);
   assert.match(source, /re-open the JSON you wrote and verify that every typed nested item above is an object/u);
+  assert.match(source, /bounded path-integrity self-check/u);
+  assert.match(source, /structural validity alone is not enough if exact product file paths drift/u);
   assert.match(source, /Required self-check before final response/u);
   assert.match(source, /contentRows\[0\] has exactly kind, rowRef, authorityFunction/u);
   assert.match(source, /payload\.aggregateDomainModel\.modelVersion/u);

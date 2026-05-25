@@ -1905,7 +1905,7 @@ test("T-164 worker read-boundary still blocks outside workspace tool input reads
               id: "toolu_boundary_real_read",
               name: "Read",
               input: {
-                file_path: "/Users/jim/src/apps/odd_sdlc/code/src/operator/handoff.ts"
+                file_path: "/Users/jim/src/apps/odd_sdlc/code/src/operator/plugins/transform/launch_contract.ts"
               }
             }
           ]
@@ -1946,7 +1946,7 @@ test("T-172 worker read-boundary blocks installed odd_sdlc runtime source reads"
   });
   const runtimeSourcePath = path.join(
     workspace,
-    ".abiogenesis/odd_sdlc/typescript/package-extract/code/src/operator/handoff.ts"
+    ".abiogenesis/odd_sdlc/typescript/package-extract/code/src/operator/plugins/transform/launch_contract.ts"
   );
   mkdirSync(dirname(runtimeSourcePath), { recursive: true });
   writeFileSync(runtimeSourcePath, "// installed runtime source fixture\n", "utf8");
@@ -10687,7 +10687,7 @@ test("T-102 axiomatic construction algebra sweep separates evidence admission fr
 
 test("T-171 installed-operator shard runner honors manifest timeout unless explicitly capped", () => {
   const handoffSource = readFileSync(
-    resolve(PACKAGE_ROOT, "code/src/operator/handoff.ts"),
+    resolve(PACKAGE_ROOT, "code/src/operator/plugins/transform/launch_contract.ts"),
     "utf8"
   );
   const start = handoffSource.indexOf("function installedOperatorShardTimeoutMs");

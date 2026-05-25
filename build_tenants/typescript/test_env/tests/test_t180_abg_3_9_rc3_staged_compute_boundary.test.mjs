@@ -122,7 +122,7 @@ test("T-180 installed operator binds distinct transform, evaluate, and consequen
 });
 
 test("T-180 live evaluate and consequence paths do not synthesize selected composition", () => {
-  const handoff = readRepoFile("build_tenants/typescript/code/src/operator/handoff.ts");
+  const handoff = readRepoFile("build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts");
   const evaluatePostflight = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts"
   );

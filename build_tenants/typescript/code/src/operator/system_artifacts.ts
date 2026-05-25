@@ -15,27 +15,62 @@ export function stableSdlcSystemArtifactJson(payload: unknown): string {
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
-function normalizedRelativeArchivePath(input: {
-  readonly archiveRoot: string;
+function relativePathWithinRoot(input: {
+  readonly root: string;
   readonly absolutePath: string;
-}): string {
-  const archiveRoot = resolve(input.archiveRoot);
+}): string | null {
+  const root = resolve(input.root);
   const absolutePath = resolve(input.absolutePath);
-  const relativePath = relative(archiveRoot, absolutePath).split("\\").join("/");
+  const relativePath = relative(root, absolutePath).split("\\").join("/");
   if (
     relativePath.length === 0 ||
     relativePath.startsWith("../") ||
     relativePath === ".."
   ) {
-    throw new TypeError(
-      `${input.absolutePath}: system artifact path is outside archive root ${input.archiveRoot}`
-    );
+    return null;
   }
   return relativePath;
 }
 
-function isUncatalogedEvidenceArchivePath(relativePath: string): boolean {
-  return relativePath.startsWith("installed_operator_execution/");
+function normalizedSystemArtifactTarget(input: {
+  readonly archiveRoot: string;
+  readonly absolutePath: string;
+}): {
+  readonly root: string;
+  readonly relativePath: string;
+} {
+  const archiveRoot = resolve(input.archiveRoot);
+  const archiveRelativePath = relativePathWithinRoot({
+    root: archiveRoot,
+    absolutePath: input.absolutePath
+  });
+  if (archiveRelativePath !== null) {
+    return Object.freeze({
+      root: archiveRoot,
+      relativePath: archiveRelativePath
+    });
+  }
+  const runtimeRoot = resolve(archiveRoot, "../..");
+  const runtimeRelativePath = relativePathWithinRoot({
+    root: runtimeRoot,
+    absolutePath: input.absolutePath
+  });
+  if (runtimeRelativePath === null) {
+    throw new TypeError(
+      `${input.absolutePath}: system artifact path is outside archive root ${input.archiveRoot}`
+    );
+  }
+  return Object.freeze({
+    root: runtimeRoot,
+    relativePath: runtimeRelativePath
+  });
+}
+
+function isUncatalogedSystemArtifactPath(relativePath: string): boolean {
+  return (
+    relativePath.startsWith("installed_operator_execution/") ||
+    relativePath.startsWith("transform-assets/")
+  );
 }
 
 function assertCatalogedAuthorityPayload(input: {
@@ -43,7 +78,7 @@ function assertCatalogedAuthorityPayload(input: {
   readonly payload: unknown;
 }): void {
   if (
-    !isUncatalogedEvidenceArchivePath(input.relativePath) &&
+    !isUncatalogedSystemArtifactPath(input.relativePath) &&
     typeof input.payload === "object" &&
     input.payload !== null &&
     !Array.isArray(input.payload) &&
@@ -70,14 +105,19 @@ export function writeSdlcSystemArtifact(input: {
     typeof input.payload === "string"
       ? input.payload
       : stableSdlcSystemArtifactJson(input.payload);
-  const relativePath =
-    input.relativePath ??
-    (input.absolutePath === undefined
-      ? undefined
-      : normalizedRelativeArchivePath({
-          archiveRoot: input.archiveRoot,
-          absolutePath: input.absolutePath
-        }));
+  const target =
+    input.relativePath !== undefined
+      ? Object.freeze({
+          root: input.archiveRoot,
+          relativePath: input.relativePath
+        })
+      : input.absolutePath === undefined
+        ? null
+        : normalizedSystemArtifactTarget({
+            archiveRoot: input.archiveRoot,
+            absolutePath: input.absolutePath
+          });
+  const relativePath = target?.relativePath;
   const artifact =
     input.artifactRef !== undefined
       ? requireOperatorRunArtifactRowForArtifactRef(input.artifactRef)
@@ -106,7 +146,7 @@ export function writeSdlcSystemArtifact(input: {
       })
     );
   }
-  if (relativePath === undefined) {
+  if (target === null || relativePath === undefined) {
     throw new TypeError(
       "system artifact write requires artifactRef, relativePath, or absolutePath"
     );
@@ -117,7 +157,7 @@ export function writeSdlcSystemArtifact(input: {
   });
   return executeSdlcArchiveWritePlan(
     constructSdlcArchiveWritePlan({
-      archiveRoot: input.archiveRoot,
+      archiveRoot: target.root,
       relativePath,
       content
     })
