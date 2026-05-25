@@ -295,6 +295,34 @@ test("T-118 writes a compact worker invocation package while preserving the full
     constructionBrief.workCategoryGovernance,
     invocationPackage.workCategoryGovernance
   );
+  assert.deepEqual(
+    constructionBrief.obligations.inlineObligations.map(
+      (obligation) => obligation.obligationId
+    ),
+    invocationPackage.inlineObligations
+      .filter((obligation) => obligation.obligationKind !== "requirement")
+      .slice(0, 4)
+      .concat(
+        invocationPackage.inlineObligations
+          .filter((obligation) => obligation.obligationKind === "requirement")
+          .slice(0, 4)
+      )
+      .map((obligation) => obligation.obligationId)
+  );
+  assert(
+    constructionBrief.obligations.inlineObligations.every(
+      (obligation) => obligation.evidenceRefs.length <= 2 &&
+        obligation.sourceRefs.length <= 2
+    )
+  );
+  assert.equal(constructionBrief.obligations.inlineRequirementPressureRows.length, 4);
+  assert(
+    constructionBrief.obligations.inlineRequirementPressureRows.every(
+      (obligation) => obligation.kind === "sdlc_worker_invocation_obligation" &&
+        obligation.obligationKind === "requirement" &&
+        obligation.summary.length > 0
+    )
+  );
   assert.equal(
     constructionBrief.targetCarrierProjection.kind,
     "sdlc_worker_target_carrier_prompt_projection"
@@ -383,7 +411,7 @@ test("T-118 construction brief omits escaped runtime basis refs from worker prom
   assert.equal(constructionBrief.currentState.omittedPriorEdgeRefCount, 1);
   assert.doesNotMatch(constructionBriefContent, /manifest:fp_retry/u);
   assert.doesNotMatch(constructionBriefContent, /execution_basis/u);
-  assert(Buffer.byteLength(constructionBriefContent, "utf8") < 16 * 1024);
+  assert(Buffer.byteLength(constructionBriefContent, "utf8") < 24 * 1024);
 });
 
 test("T-118 prompt points workers to the construction brief and not forensic packages", () => {
@@ -410,10 +438,7 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.match(prompt, /worker_brief\.json/u);
   assert.match(prompt, /forensic manifest only when a package ref requires it/u);
   assert.match(prompt, /Terse axioms:/u);
-  assert.match(
-    prompt,
-    /Apply the transform axioms projected in this launch contract and construction brief/u
-  );
+  assert.match(prompt, /Apply worker_construction_brief\.json as the single prompt source carrier/u);
   assert.match(prompt, /Read boundary: stay under the current workspace/u);
   assert.match(prompt, /Control boundary: do not run `odd-sdlc-ts`/u);
   assert.match(prompt, /Do not spawn another worker or resume traversal/u);
@@ -438,6 +463,8 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.doesNotMatch(prompt, /This invocation is F_P\.transform only/u);
   assert.match(prompt, /Construction brief fields to apply:/u);
   assert.doesNotMatch(prompt, /Read the full handoff manifest before writing output/u);
+  assert.match(prompt, /obligations\.inlineObligations typed pressure rows/u);
+  assert.match(prompt, /obligations\.inlineRequirementPressureRows typed requirement work queue/u);
   assert.match(prompt, /obligations\.requirementTraceObligationIds/u);
   assert(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].some(

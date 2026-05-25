@@ -682,6 +682,15 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
   );
   assert.match(
     prompt,
+    /Every materializedFiles\[\] row for a declared product file target with role source, test, or build_config must carry requirementTraceObligationIds/u
+  );
+  assert.match(prompt, /Build_config files are not exempt/u);
+  assert.match(
+    prompt,
+    /For product files that cannot carry native comments, such as structured configuration files, carry lineage in the target carrier\/table and materializedFiles\[\]\.requirementTraceObligationIds/u
+  );
+  assert.match(
+    prompt,
     /Current evaluated gaps are also admissible repair tags/u
   );
   assert.doesNotMatch(prompt, /complete product-file requirement tag set/u);

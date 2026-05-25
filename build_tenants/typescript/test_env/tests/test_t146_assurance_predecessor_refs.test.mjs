@@ -91,14 +91,7 @@ function componentDepthArtifact(register) {
   return tmpFile(
     "odd-sdlc-t146-component-depth-",
     `${register.targetAssetType}.md`,
-    [
-      `# ${register.targetAssetType}`,
-      "",
-      "```component_depth_register",
-      JSON.stringify(register, null, 2),
-      "```",
-      ""
-    ].join("\n")
+    `${JSON.stringify(register, null, 2)}\n`
   );
 }
 

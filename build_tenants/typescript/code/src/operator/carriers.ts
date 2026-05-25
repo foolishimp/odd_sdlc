@@ -75,8 +75,7 @@ export type SdlcInstalledOperatorStatus =
   | "fp_escalation"
   | "worker_invoked"
   | "worker_failed"
-  | "worker_report_rejected"
-  | "postflight_failed";
+  | "worker_report_rejected";
 
 export interface SdlcOperatorSummary {
   readonly kind: "sdlc_operator_summary";
@@ -1394,6 +1393,24 @@ export interface SdlcWorkerObligationAssessment {
   readonly requiredAction?: string | null | undefined;
   readonly semanticEvidenceRefs?: readonly string[] | undefined;
   readonly acceptedAuthorityRefs?: readonly string[] | undefined;
+  readonly fulfillmentBinding?:
+    | SdlcRequirementFunctionFulfillmentBinding
+    | null
+    | undefined;
+}
+
+export interface SdlcRequirementFunctionFulfillmentBinding {
+  readonly kind: "sdlc_requirement_function_fulfillment_binding";
+  readonly requirementRef: string;
+  readonly productRequirementRef: string;
+  readonly designObligationRef: string;
+  readonly componentRef: string;
+  readonly productTargetRef: string;
+  readonly codeSurfaceRef: string;
+  readonly functionOrEntrypointRef: string;
+  readonly realizationEvidenceRefs: readonly string[];
+  readonly testOrExecutionEvidenceRefs: readonly string[];
+  readonly evaluatorFindingRef: string;
 }
 
 export interface SdlcReviewGradeObligationFinding {
@@ -1404,6 +1421,7 @@ export interface SdlcReviewGradeObligationFinding {
   readonly requiredAction: string | null;
   readonly evidenceRefs: readonly string[];
   readonly acceptedAuthorityRefs: readonly string[];
+  readonly fulfillmentBinding: SdlcRequirementFunctionFulfillmentBinding | null;
   readonly rationale: string;
 }
 
@@ -1823,6 +1841,8 @@ export interface SdlcWorkerConstructionBrief {
     readonly featureScopeRef: string;
   };
   readonly obligations: {
+    readonly inlineObligations: readonly SdlcWorkerInvocationObligation[];
+    readonly inlineRequirementPressureRows: readonly SdlcWorkerInvocationObligation[];
     readonly inlineObligationIds: readonly string[];
     readonly requirementTraceObligationIds: readonly string[];
     readonly omittedObligationCount: number;

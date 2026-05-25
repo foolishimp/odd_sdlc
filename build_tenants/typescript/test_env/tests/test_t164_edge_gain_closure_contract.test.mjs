@@ -1000,6 +1000,17 @@ test("T-164 installed closure dispositions are governed by edge assurance close 
     closeDecision.edgeAssuranceDecisionRef,
     closed.edgeAssuranceCloseDecision.decisionRef
   );
+  const abgRetryPressureDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t164/abg-evaluation-set-retry",
+    ledger: closed.ledger,
+    edgeClosureFunctionRef: closed.gain.closureFunctionRef,
+    edgeAssuranceCloseDecision: closed.edgeAssuranceCloseDecision,
+    currentEdgeLawful: false,
+    retryReasonRefs: [
+      "retry://odd-sdlc/t164/abg-evaluation-set/evaluation_set_incomplete"
+    ]
+  });
+  assert.equal(abgRetryPressureDecision.disposition, "retry");
 
   const open = edgeAssuranceClosureContext("derive_requirement_surface", false);
   assert.equal(open.edgeAssuranceCloseDecision.disposition, "retry");

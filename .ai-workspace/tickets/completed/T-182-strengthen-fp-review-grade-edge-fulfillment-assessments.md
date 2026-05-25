@@ -4,8 +4,8 @@
 - title: Strengthen F_P review-grade edge fulfillment assessments
 - type: realization_refactor
 - ticket_category: implementation_migration
-- status: active
-- proof_status: not_started
+- status: completed
+- proof_status: superseded_by_T-183_not_independently_closed
 - build_tenant: typescript
 - goal: make every generated SDLC asset accountable to its incoming requirements through review-grade `evaluate.C/F_P` obligation assessments on the existing edge fulfillment path, and force explicit semantic depth before code whenever requirements imply separable asset boundaries
 - change_intent: consolidate the T-164 data mapper live-run postmortem and the historical data-mapper depth comparison into a targeted prompt/evaluator refactor that strengthens `SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger` instead of adding a second code-review ledger
@@ -14,7 +14,7 @@
 - first_missing_layer: generic F_P depth predicate and review-grade F_P evaluation over generated assets before edge fulfillment closure
 - triaged_at: 2026-05-24
 - created_at: 2026-05-24
-- updated_at: 2026-05-24
+- updated_at: 2026-05-25
 - migration_strategy: strengthen_existing_edge_fulfillment_no_new_review_ledger
 - target_truth: accepted upstream design depth plus existing edge fulfillment rows and ledger contain review-grade asset adequacy judgments for each generated asset against incoming requirements and accepted upstream authority
 - superseded_truth: trace/tag-only fulfillment, schema-only blocking, or a separate proposed code-review ledger as closure authority
@@ -24,6 +24,32 @@
 - proof_surface: this ticket, T-181 design-depth ticket, RC3 compute-stage design module, T-164 data mapper live-run archive, historical data-mapper depth comparison post, strategy post `20260524T042351Z_STRATEGY_layered_assurance_for_fallible_workers.md`, focused T-182 tests, semantic suite, and live sandbox archives
 - depends_on:
   - T-181
+- superseded_by:
+  - T-183
+
+## Closure Disposition
+
+T-182 is closed as superseded and absorbed by T-183, not as independently
+implemented or release-proven.
+
+T-182 correctly identified that review-grade `evaluate.C/F_P` must hold every
+generated asset accountable to incoming requirements and accepted upstream
+authority through the existing edge fulfillment path. The follow-up diagnosis
+showed that this is one instance of the broader F_D semantic-register drift:
+F_D helpers were still preserving or inventing semantic register meaning across
+multiple ledgers and carriers.
+
+T-183 is now the controlling execution contract. It absorbs T-182's review-grade
+goal into the broader cleanup:
+
+- selected `evaluate.C/F_P` owns semantic adequacy findings;
+- each evaluator rule emits typed ledger candidates or findings;
+- ABG/system F_D performs admission and ledger writing;
+- `SdlcEdgeFulfillmentLedger` remains the only fulfillment closure ledger;
+- F_D semantic review substitution is removed rather than tuned.
+
+Do not treat this completed ticket as proof that T-182's live closure criteria
+were independently satisfied. Closure proof moves to T-183.
 
 ## Intake
 

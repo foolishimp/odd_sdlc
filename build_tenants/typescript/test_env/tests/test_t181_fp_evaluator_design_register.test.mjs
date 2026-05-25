@@ -14,8 +14,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  designDepthFpEvaluatorRegisterPath,
-  admitImplementationDesignRegisterForManifest,
+  designDepthFpEvaluatorContentLedgerPath,
+  admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity,
   constructSdlcFpEvaluateResult,
   constructWorkerConstructionBrief,
   constructWorkerInvocationPackage,
@@ -32,8 +32,10 @@ import {
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
 import {
-  admitImplementationDesignRegisterCandidateForManifest
-} from "../../build/semantic/code/src/operator/handoff.js";
+  admitImplementationDesignRegisterCandidateForManifest,
+  admitImplementationDesignRegisterForManifest,
+  designDepthFpEvaluatorRegisterPath
+} from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
 import { readOperatorRunCarriers } from "../../build/semantic/code/src/analysis/carrier_loaders.js";
 
 const PACKAGE_ROOT = process.cwd();
@@ -43,33 +45,27 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
-test("T-181 ticket is an admitted STDO implementation migration contract", () => {
+test("T-183 ticket is the admitted deletion-first implementation migration contract", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-181-pilot-fp-evaluator-populated-design-depth-registers.md"
+    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
 
   assert.match(ticket, /ticket_category: implementation_migration/u);
   assert.match(ticket, /change_intent:/u);
   assert.match(ticket, /triaged_at: \d{4}-\d{2}-\d{2}/u);
   assert.match(ticket, /migration_strategy:/u);
-  assert.match(ticket, /library_usage: consume/u);
-  assert.match(ticket, /governing_library:/u);
   assert.match(ticket, /target_truth:/u);
   assert.match(ticket, /superseded_truth:/u);
   assert.match(ticket, /closure_law:/u);
   assert.match(ticket, /evaluation_criteria:/u);
   assert.match(ticket, /non_closure_conditions:/u);
   assert.match(ticket, /proof_surface:/u);
-  assert.match(ticket, /## Execution Contract Admission/u);
-  assert.match(ticket, /## Implementation Migration Contract/u);
-  assert.match(ticket, /old_truth_path/u);
-  assert.match(ticket, /new_truth_path/u);
-  assert.match(ticket, /producers/u);
-  assert.match(ticket, /consumers/u);
-  assert.match(ticket, /projection_surfaces/u);
-  assert.match(ticket, /bridge_policy/u);
-  assert.match(ticket, /negative_proof/u);
-  assert.match(ticket, /## Design Module Reconciliation/u);
+  assert.match(ticket, /## Design Module Method Refactor Ledger/u);
+  assert.match(ticket, /single authoritative truth surface/u);
+  assert.match(ticket, /R-010/u);
+  assert.match(ticket, /R-030/u);
+  assert.match(ticket, /R-040/u);
+  assert.match(ticket, /no compatibility bridge for default live execution/u);
 });
 
 test("T-181 design module declares evaluator register IACS carrier truth", () => {
@@ -109,6 +105,8 @@ test("T-181 common config carries one compressed governance doc per work categor
     assert.match(doc, /Agentic work policy:/u);
     assert.match(doc, /one truth/u);
     assert.match(doc, /Stdout is work trace only/u);
+    assert.match(doc, /Keep tool IO bounded/u);
+    assert.match(doc, /targeted edits rather than whole-file replacement/u);
   }
   for (const entry of SDLC_FUNCTION_CATALOG) {
     assert.ok(
@@ -140,6 +138,28 @@ test("T-181 common config carries one compressed governance doc per work categor
     }).category,
     "coding_build"
   );
+});
+
+test("T-181 worker prompts prevent whole-file Write drift in live PTY execution", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000006Z_pid18107",
+      graphFunctionName: "derive_requirement_surface",
+      edgeName: "derive_requirement_surface"
+    });
+    const prompt = promptForHandoff(manifest);
+
+    assert.match(prompt, /Keep tool IO bounded/u);
+    assert.match(prompt, /large authority files/u);
+    assert.match(prompt, /targeted read ranges/u);
+    assert.match(prompt, /do not use the Claude Write tool for whole-file replacement/u);
+    assert.match(prompt, /targeted Edit operations/u);
+    assert.doesNotMatch(prompt, /make the file-write operation the next worker action/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 function makeWorkspace() {
@@ -354,6 +374,9 @@ function selectedComposition() {
 function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath }) {
   const composition = selectedComposition();
   const registerRef = pathToFileURL(registerPath).href;
+  const contentLedgerRef = pathToFileURL(
+    designDepthFpEvaluatorContentLedgerPath({ archiveRoot: manifest.archiveRoot })
+  ).href;
   const proofPath = path.join(
     manifest.archiveRoot,
     "design_depth_fp_evaluator_rule_outcome.json"
@@ -367,8 +390,8 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
         ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
         ruleRole: "semantic_judgment",
         computeMeans: "F_P",
-        producedRegisterRefs: [registerRef],
-        evidenceRefs: [registerRef],
+        producedRegisterRefs: [contentLedgerRef, registerRef],
+        evidenceRefs: [contentLedgerRef, registerRef],
         findingRefs: [
           `finding://odd-sdlc/${manifest.runId}/evaluate/design-depth-register`
         ],
@@ -391,27 +414,39 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
   return pathToFileURL(proofPath).href;
 }
 
-function fpEvaluateResultPayloadForRegister(registerPath) {
+function fpEvaluateResultPayloadForRegister(registerPath, options = {}) {
   const composition = selectedComposition();
+  const scalarSelectedRegimeBindingRef =
+    options.selectedRegimeBindingRef ?? composition.selectedRegimeBindingRef;
+  const scalarComposition = {
+    ...composition,
+    selectedRegimeBindingRef: scalarSelectedRegimeBindingRef
+  };
   const registerRef = pathToFileURL(registerPath).href;
+  const contentLedgerRef = pathToFileURL(
+    path.join(path.dirname(registerPath), "design_depth_fp_evaluator_content_ledger.json")
+  ).href;
+  const ruleOutcomeRef = pathToFileURL(
+    path.join(path.dirname(registerPath), "design_depth_fp_evaluator_rule_outcome.json")
+  ).href;
   return {
     kind: "sdlc_fp_evaluate_result",
     stage: "F_P.evaluate",
     computeNotationStage: "evaluate.C",
     stageAuthority: "typed_fp_stage_carriers",
-    selectedComposition: composition,
+    selectedComposition: scalarComposition,
     compositionRef: composition.compositionRef,
     compositionDigest: composition.compositionDigest,
     compositionSelectionRef: composition.compositionSelectionRef,
-    selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+    selectedRegimeBindingRef: scalarSelectedRegimeBindingRef,
     evaluationRef: "evaluation://t181/fp",
     findings: [
       {
         findingRef: "finding://t181/evaluate/design-depth-register",
         compositionRef: composition.compositionRef,
         compositionDigest: composition.compositionDigest,
-        authorityRefs: [registerRef],
-        evidenceRefs: [registerRef]
+        authorityRefs: [contentLedgerRef, registerRef, ruleOutcomeRef],
+        evidenceRefs: [contentLedgerRef, registerRef, ruleOutcomeRef]
       }
     ],
     evaluation: {
@@ -422,9 +457,149 @@ function fpEvaluateResultPayloadForRegister(registerPath) {
     status: "passed",
     postflightStatus: "passed",
     blockingReasons: [],
-    evidenceRefs: [registerRef]
+    evidenceRefs: [contentLedgerRef, registerRef, ruleOutcomeRef]
   };
 }
+
+function writeDesignDepthFpEvaluatorContentLedger({ manifest, registerPath }) {
+  const composition = selectedComposition();
+  const register = JSON.parse(readFileSync(registerPath, "utf8"));
+  const contentLedgerPath = designDepthFpEvaluatorContentLedgerPath({
+    archiveRoot: manifest.archiveRoot
+  });
+  const contentLedgerRef = pathToFileURL(contentLedgerPath).href;
+  const registerRef = pathToFileURL(registerPath).href;
+  writeFileSync(
+    contentLedgerPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_evaluate_content_ledger",
+        ledgerVersion: "ts-evaluate-content-v1",
+        stage: "evaluate.C",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        authorityFunction: "synthesize_model",
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        compositionContributionRef: composition.selectedRegimeBindingRef,
+        sourceBasisRefs: [pathToFileURL(manifest.outputFile).href],
+        candidateArtifactRefs: [pathToFileURL(manifest.outputFile).href],
+        evidenceRefs: [pathToFileURL(manifest.outputFile).href, registerRef],
+        contentRows: [
+          {
+            kind: "sdlc_evaluate_content_ledger_row",
+            rowRef: `content-ledger-row://t181/${manifest.runId}/design-depth`,
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register",
+            payload: register,
+            sourceBasisRefs: [pathToFileURL(manifest.outputFile).href],
+            evidenceRefs: [pathToFileURL(manifest.outputFile).href, registerRef]
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  return contentLedgerRef;
+}
+
+test("T-183 evaluate content ledger rejects bridge-shaped extra semantic surfaces", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForImplementationDesign(
+      workspaceRoot,
+      "t183-content-ledger-closed-shape"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(manifest.outputFile, implementationDesignAdr("fp-sidecar"), "utf8");
+    const registerPath = designDepthFpEvaluatorRegisterPath(manifest);
+    mkdirSync(path.dirname(registerPath), { recursive: true });
+    writeFileSync(
+      registerPath,
+      `${JSON.stringify(
+        implementationDesignRegister(
+          "fp-sidecar",
+          pathToFileURL(manifest.outputFile).href
+        ),
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    writeDesignDepthFpEvaluatorContentLedger({ manifest, registerPath });
+    const contentLedgerPath = designDepthFpEvaluatorContentLedgerPath({
+      archiveRoot: manifest.archiveRoot
+    });
+    const composition = selectedComposition();
+    const selectedIdentity = {
+      selectedCompositionRef: composition.compositionRef,
+      selectedCompositionDigest: composition.compositionDigest,
+      selectedCompositionSelectionRef: composition.compositionSelectionRef,
+      selectedRegimeBindingRef: composition.selectedRegimeBindingRef
+    };
+    const admissionInput = {
+      ledgerPath: contentLedgerPath,
+      selectedIdentity,
+      ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+      authorityFunction: "synthesize_model"
+    };
+
+    const cleanLedger = JSON.parse(readFileSync(contentLedgerPath, "utf8"));
+    assert.equal(
+      admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity(admissionInput)
+        .status,
+      "admitted"
+    );
+
+    writeFileSync(
+      contentLedgerPath,
+      `${JSON.stringify(
+        {
+          ...cleanLedger,
+          legacySemanticRows: []
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    const topLevelExtra =
+      admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity(admissionInput);
+    assert.equal(topLevelExtra.status, "rejected");
+    assert.match(
+      topLevelExtra.blockingReasons.join("\n"),
+      /unexpected keys legacySemanticRows/u
+    );
+
+    writeFileSync(
+      contentLedgerPath,
+      `${JSON.stringify(
+        {
+          ...cleanLedger,
+          contentRows: cleanLedger.contentRows.map((row) => ({
+            ...row,
+            legacyScore: 1
+          }))
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    const rowExtra =
+      admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity(admissionInput);
+    assert.equal(rowExtra.status, "rejected");
+    assert.match(rowExtra.blockingReasons.join("\n"), /unexpected keys legacyScore/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
 
 test("T-181 handoff names evaluate.C/F_P as design-depth register population", () => {
   const workspaceRoot = makeWorkspace();
@@ -513,7 +688,7 @@ test("T-181 evaluator sidecar must be admitted JSON, not Markdown fallback", () 
   }
 });
 
-test("T-181 evaluator sidecar rejects shallow placeholder register rows", () => {
+test("T-183 evaluator sidecar admission is structural and does not replace F_P semantic judgment", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForImplementationDesign(
@@ -542,15 +717,18 @@ test("T-181 evaluator sidecar rejects shallow placeholder register rows", () => 
       manifest
     });
 
-    assert.equal(admission.status, "rejected");
-    assert.match(
-      admission.blockingReasons.join("\n"),
-      /component_topology_placeholder_public_boundary:fp-sidecar:module-root/u
+    assert.equal(admission.status, "admitted");
+    assert.equal(
+      admission.register.componentTopologyRows[0].publicBoundary,
+      "module-root"
     );
-    assert.match(
-      admission.blockingReasons.join("\n"),
-      /file_target_duplicate_non_materialized_role:src\/fp-sidecar\.js:runtime_binding/u
-    );
+    const runtimeAdmission = admitImplementationDesignRegisterForManifest({
+      manifest
+    });
+    assert.equal(runtimeAdmission.status, "rejected");
+    assert.deepEqual(runtimeAdmission.blockingReasons, [
+      "design_depth_fp_evaluator_register_unadmitted"
+    ]);
 
     const missingSourceTargetRegister = implementationDesignRegister(
       "fp-sidecar",
@@ -572,10 +750,10 @@ test("T-181 evaluator sidecar rejects shallow placeholder register rows", () => 
       admitImplementationDesignRegisterCandidateForManifest({
         manifest
       });
-    assert.equal(missingSourceTargetAdmission.status, "rejected");
-    assert.match(
-      missingSourceTargetAdmission.blockingReasons.join("\n"),
-      /component_realization_source_file_target_missing:fp-sidecar:src\/fp-sidecar\.js/u
+    assert.equal(missingSourceTargetAdmission.status, "admitted");
+    assert.deepEqual(
+      missingSourceTargetAdmission.register.fileTargetRows.map((row) => row.role),
+      ["build_config"]
     );
 
     const emptyTopologyRegister = implementationDesignRegister(
@@ -600,15 +778,8 @@ test("T-181 evaluator sidecar rejects shallow placeholder register rows", () => 
       admitImplementationDesignRegisterCandidateForManifest({
         manifest
       });
-    assert.equal(emptyTopologyAdmission.status, "rejected");
-    assert.match(
-      emptyTopologyAdmission.blockingReasons.join("\n"),
-      /component_topology_required/u
-    );
-    assert.match(
-      emptyTopologyAdmission.blockingReasons.join("\n"),
-      /source_file_target_required/u
-    );
+    assert.equal(emptyTopologyAdmission.status, "admitted");
+    assert.deepEqual(emptyTopologyAdmission.register.componentTopologyRows, []);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
@@ -674,11 +845,8 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
     );
 
     const filesystemOnly = evaluateSdlcComputeStage({ manifest, report });
-    assert.equal(filesystemOnly.status, "blocked");
-    assert.match(
-      filesystemOnly.blockingReasons.join("\n"),
-      /staged_authority_admission_invalid/u
-    );
+    assert.equal(filesystemOnly.status, "passed");
+    assert.deepEqual(filesystemOnly.blockingReasons, []);
     assert.match(
       JSON.stringify(filesystemOnly.blockingReasonCarriers),
       /design_depth_fp_evaluator_register_unadmitted/u
@@ -687,6 +855,19 @@ test("T-181 F_P evaluator register truth defers transform postflight and validat
     const fpEvaluatorAdmissionEvidenceRefs = Object.freeze([
       writeDesignDepthFpEvaluatorRuleOutcomeProof({ manifest, registerPath })
     ]);
+    const missingContentLedger = evaluateSdlcComputeStage({
+      manifest,
+      report,
+      fpEvaluatorAdmissionEvidenceRefs
+    });
+    assert.equal(missingContentLedger.status, "passed");
+    assert.deepEqual(missingContentLedger.blockingReasons, []);
+    assert.match(
+      JSON.stringify(missingContentLedger.blockingReasonCarriers),
+      /design_depth_fp_evaluator_register_unadmitted/u
+    );
+
+    writeDesignDepthFpEvaluatorContentLedger({ manifest, registerPath });
     const after = evaluateSdlcComputeStage({
       manifest,
       report,
@@ -760,10 +941,21 @@ test("T-181 component edges read evaluator register from source-asset lineage re
       )}\n`,
       "utf8"
     );
+    writeDesignDepthFpEvaluatorContentLedger({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
     writeFileSync(
       path.join(prior.archiveRoot, "fp_evaluate_result.json"),
       `${JSON.stringify(
-        fpEvaluateResultPayloadForRegister(priorRegisterPath),
+        fpEvaluateResultPayloadForRegister(priorRegisterPath, {
+          selectedRegimeBindingRef:
+            "regime-binding://odd-sdlc/derive_lite_design_adr_surface/transform/F_P"
+        }),
         null,
         2
       )}\n`,
@@ -813,6 +1005,26 @@ test("T-181 component edges read evaluator register from source-asset lineage re
       prompt,
       /Treat the admitted design-depth evaluator register as the highest implementation-design semantic pressure/u
     );
+    assert.match(
+      prompt,
+      /connect the product behavior to that source file's runtime entrypoint/u
+    );
+    assert.match(
+      prompt,
+      /Tenant stack authority must match the product files actually emitted/u
+    );
+    assert.match(
+      prompt,
+      /Pre-return syntax check: every emitted source, test, and build\/config product file must use the language, module\/import system, file extension, test framework, and command shape declared by tenant stack authority/u
+    );
+    assert.match(
+      prompt,
+      /When admitted design authority puts role=test product targets in this component-code materialization edge, treat those tests as proof materialization for this edge/u
+    );
+    assert.match(
+      prompt,
+      /If the declared test command fails because emitted test files use a different module\/import\/test syntax than tenant stack authority, repair the product files before returning/u
+    );
     assert.match(prompt, /construction_brief\.stagePressure\.designDepthEvaluatorRegisterRefs/u);
     assert.match(prompt, /compressed work-category governance/u);
     assert.match(prompt, /config\/work-category-governance\/coding_build\.md/u);
@@ -846,6 +1058,14 @@ test("T-181 component-code edge accepts implementation-design evaluator register
       )}\n`,
       "utf8"
     );
+    writeDesignDepthFpEvaluatorContentLedger({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
+    writeDesignDepthFpEvaluatorRuleOutcomeProof({
+      manifest: prior,
+      registerPath: priorRegisterPath
+    });
     writeFileSync(
       path.join(prior.archiveRoot, "fp_evaluate_result.json"),
       `${JSON.stringify(
@@ -925,6 +1145,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   const evaluatePostflightSource = readRepoFile(
     "build_tenants/typescript/code/src/operator/plugins/evaluate/postflight.ts"
   );
+  const evaluateDesignDepthSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/design_depth_register.ts"
+  );
 
   assert.match(source, /DESIGN_DEPTH_FP_EVALUATOR_RULE_REF/u);
   assert.match(source, /function designDepthFpEvaluatorRuleContract\(\)/u);
@@ -938,10 +1161,22 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(handoffSource, /designDepthFpEvaluatorRegistersEnabled/u);
   assert.doesNotMatch(handoffSource, /allowLegacyImplementationDesignDerivation/u);
   assert.doesNotMatch(handoffSource, /allowLegacyDerivation/u);
+  assert.doesNotMatch(handoffSource, /node\/javascript/u);
+  assert.doesNotMatch(handoffSource, /SBT\/JDK/u);
+  assert.doesNotMatch(handoffSource, /java\.security\.manager/u);
+  assert.doesNotMatch(operatorIndex, /admitImplementationDesignRegisterForManifest/u);
   assert.match(operatorIndex, /export \* from "\.\/plugins\/evaluate\/index\.js"/u);
   assert.doesNotMatch(operatorIndex, /export \* from "\.\/handoff\.js"/u);
   assert.match(evaluatePluginSource, /SDLC_EVALUATE_C_PLUGIN_SURFACE/u);
   assert.match(evaluatePluginSource, /evaluateSdlcComputeStage/u);
+  assert.doesNotMatch(
+    evaluatePluginSource,
+    /admitImplementationDesignRegisterForManifest/u
+  );
+  assert.doesNotMatch(
+    evaluatePluginSource,
+    /admitImplementationDesignRegisterCandidateForManifest/u
+  );
   assert.match(evaluatePostflightSource, /export function evaluateSdlcComputeStage/u);
   assert.match(evaluatePostflightSource, /export function constructSdlcFpEvaluateResult/u);
   assert.match(evaluatePostflightSource, /export function writeSdlcFpEvaluateResult/u);
@@ -997,12 +1232,36 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /Do not display worker_invocation_package\.json/u);
   assert.match(source, /Do not use cat, sed, head, tail, grep, jq '\.'/u);
   assert.match(source, /run Node snippets that read silently/u);
-  assert.match(source, /The register path is the durable evaluation artifact/u);
+  assert.match(source, /The content ledger path is the durable evaluation artifact/u);
   assert.match(source, /not a single-shot JSON response/u);
   assert.match(source, /Agentic F_P work loop/u);
   assert.match(source, /Start by writing a short plan and checklist/u);
-  assert.match(source, /Work through the checklist incrementally/u);
-  assert.match(source, /It is acceptable to rewrite the register multiple times while converging/u);
+  assert.match(source, /create the content ledger file before doing deep exploratory review/u);
+  assert.match(source, /Do not use the Read tool on the handoff manifest/u);
+  assert.match(source, /Precomputed worker result report summary/u);
+  assert.match(source, /Do not inspect the worker result report/u);
+  assert.match(source, /Do not use the Read tool on the worker invocation package/u);
+  assert.match(source, /At most one bounded summary script is allowed before the first ledger write/u);
+  assert.match(source, /must not inspect worker_result_report\.json/u);
+  assert.match(source, /the next tool call must create or overwrite the content ledger file/u);
+  assert.match(source, /Do not say .*writing the ledger.* until that file write has succeeded/u);
+  assert.doesNotMatch(source, /Use the provided .*seed script/u);
+  assert.doesNotMatch(source, /First register materialization recipe/u);
+  assert.doesNotMatch(source, /parses the ADR component topology table/u);
+  assert.doesNotMatch(source, /designDepthFpEvaluatorSeedScript/u);
+  assert.doesNotMatch(source, /design_depth_fp_evaluator_seed_register/u);
+  assert.doesNotMatch(source, /moduleName\.startsWith\("cdme-"\)/u);
+  assert.doesNotMatch(source, /src\/main\/scala/u);
+  assert.doesNotMatch(source, /stack:scala-spark-sbt/u);
+  assert.doesNotMatch(source, /model:cdme-data-mapper/u);
+  assert.match(source, /First register materialization rule/u);
+  assert.match(source, /selected evaluate\.C\/F_P semantic pressure map/u);
+  assert.match(source, /Do not use scripts to deterministically construct semantic register rows/u);
+  assert.match(source, /Do not spend the run enumerating every requirement id before writing the register/u);
+  assert.match(source, /Missing-ledger timeout is worse than an admitted pressure map/u);
+  assert.match(source, /Script output budget before first ledger write: no more than 40/u);
+  assert.match(source, /Bounded first-pass register target/u);
+  assert.match(source, /It is acceptable to rewrite the content ledger multiple times while converging/u);
   assert.match(source, /Stdout is an agent work trace, not evaluation truth/u);
   assert.match(source, /compressed work-category governance/u);
   assert.match(source, /selectSdlcWorkCategoryGovernance/u);
@@ -1012,8 +1271,19 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS/u);
   assert.match(source, /ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES/u);
   assert.match(source, /stdoutBudgetBytes/u);
-  assert.match(source, /write the register file first, then validate that file/u);
+  assert.match(source, /write the content ledger file first, then validate that file/u);
   assert.match(source, /highest semantic design-depth truth/u);
+  assert.match(source, /sdlc_evaluate_content_ledger/u);
+  assert.match(source, /contentRows\[0\]\.rowRef/u);
+  assert.match(source, /contentRows\[0\]\.sourceBasisRefs\[\]/u);
+  assert.match(source, /contentRows\[0\]\.evidenceRefs\[\]/u);
+  assert.match(source, /Ledger rows are closed carriers/u);
+  assert.match(source, /contentRows\[0\]\.payload must be the full design-depth register object/u);
+  assert.match(source, /F_D will only project that exact payload to the legacy register path after admission/u);
+  assert.match(
+    source,
+    /preserve that executable-entrypoint obligation in publicBoundary/u
+  );
   assert.match(source, /Evaluate the workspace, admitted transform evidence/u);
   assert.match(source, /compact pressure map from design state A to implementation state B/u);
   assert.match(source, /Nested closed-object contract/u);
@@ -1022,13 +1292,18 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /moduleSchemaFragments\[\]\.operations\[\] and aggregateDomainModel\.operations\[\] must contain closed sdlc_domain_operation objects/u);
   assert.match(source, /aggregateDomainModel\.entities\[\]\.attributes\[\] must contain full closed sdlc_domain_attribute objects/u);
   assert.match(source, /never emit attribute id strings, names, or summaries in this array/u);
+  assert.match(source, /aggregateDomainModel\.modelVersion must be exactly "ts-design-depth-v1"/u);
+  assert.match(source, /aggregateSunnyDaySequence\.sequenceVersion must be exactly "ts-design-depth-v1"/u);
+  assert.match(source, /verdictVersion must be exactly "ts-design-depth-v1"/u);
   assert.match(source, /Allowed designCompletenessVerdict\.\*\.status values/u);
   assert.match(source, /Use "satisfied" for a complete axis; never use "complete"/u);
   assert.match(source, /re-open the JSON you wrote and verify that every typed nested item above is an object/u);
   assert.match(source, /Required self-check before final response/u);
+  assert.match(source, /contentRows\[0\] has exactly kind, rowRef, authorityFunction/u);
+  assert.match(source, /payload\.aggregateDomainModel\.modelVersion/u);
   assert.match(source, /aggregateDomainModel\.entities\[\]\.attributes, aggregateDomainModel\.operations/u);
   assert.match(source, /Do not mark an axis partial or blocked merely because/u);
-  assert.match(
+  assert.doesNotMatch(
     readRepoFile("build_tenants/typescript/code/src/operator/design_depth_register.ts"),
     /component_realization_source_file_target_missing/u
   );
@@ -1041,8 +1316,10 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /design-depth evaluator rule not applicable to non-design edge/u);
   assert.doesNotMatch(source, /design-depth evaluator rule selected for non-design edge/u);
   assert.doesNotMatch(handoffSource, /latestDesignDepthFpEvaluatorRegisterPath/u);
-  assert.match(handoffSource, /source_asset:implementation_design_surface/u);
-  assert.match(handoffSource, /design_depth_fp_evaluator_register_unadmitted/u);
+  assert.match(evaluateDesignDepthSource, /source_asset:implementation_design_surface/u);
+  assert.match(evaluateDesignDepthSource, /design_depth_fp_evaluator_register_unadmitted/u);
+  assert.match(evaluateDesignDepthSource, /export function admitImplementationDesignRegisterForManifest/u);
+  assert.doesNotMatch(handoffSource, /export function admitImplementationDesignRegisterForManifest/u);
   assert.match(handoffSource, /stagePressure\.designDepthEvaluatorRegisterRefs/u);
 });
 
@@ -1052,6 +1329,7 @@ test("T-181 evaluator artifacts are cataloged operator-run truth", () => {
   );
   const expected = [
     "design_depth_fp_evaluator_run.json",
+    "design_depth_fp_evaluator_content_ledger.json",
     "design_depth_fp_evaluator_register.json",
     "design_depth_fp_evaluator_prompt.md",
     "design_depth_fp_evaluator_stdout.log",
@@ -1066,6 +1344,14 @@ test("T-181 evaluator artifacts are cataloged operator-run truth", () => {
     assert.ok(rowsByPath.has(relativePath), `${relativePath} has catalog row`);
   }
 
+  assert.equal(
+    rowsByPath.get("design_depth_fp_evaluator_content_ledger.json").carrierKind,
+    "sdlc_evaluate_content_ledger"
+  );
+  assert.equal(
+    rowsByPath.get("design_depth_fp_evaluator_content_ledger.json").sourceOwner,
+    "fp_evaluator"
+  );
   assert.equal(
     rowsByPath.get("design_depth_fp_evaluator_register.json").carrierKind,
     "sdlc_design_depth_register"

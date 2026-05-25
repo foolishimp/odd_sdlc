@@ -18,7 +18,8 @@ const FIXTURE_ROOT = resolve(HERE, "../../fixtures/t132_hello_world_single_tenan
 export const T132_HELLO_WORLD_JS_FIXTURE_ROOT = FIXTURE_ROOT;
 export const T132_HELLO_WORLD_JS_SOURCE_FILES = Object.freeze([
   "bootstrap.md",
-  ".ai-workspace/context/project_constraints.yml"
+  ".ai-workspace/context/project_constraints.yml",
+  "build_tenants/hello_world_javascript/spec/TECH_STACK.json"
 ]);
 export const T132_HELLO_WORLD_JS_REQUIREMENT_IDS = Object.freeze([
   "REQ-T132-001"

@@ -93,7 +93,7 @@ function featureScopeTokens(featureScope: SdlcFeatureScope): readonly string[] {
     ...featureScope.includedEntityIds,
     ...featureScope.includedOperationIds
   );
-  return uniqueSorted(tokens.filter((token) => token !== "cdme"));
+  return uniqueSorted(tokens);
 }
 
 export function sdlcModuleNameInFeatureScope(input: {

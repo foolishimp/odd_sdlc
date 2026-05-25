@@ -20,8 +20,6 @@ export {
   snapshotProductMaterializationRoot,
   deriveSdlcStagedConstructionAuditCarriers,
   observeProductMaterializationDelta,
-  designDepthFpEvaluatorRegisterPath,
-  admitImplementationDesignRegisterForManifest,
   writeInstalledOperatorOwnedEvaluationArtifact,
   buildPostTransformWorkerResultReport,
   workerResultReportWithReplayedProductMaterialization,

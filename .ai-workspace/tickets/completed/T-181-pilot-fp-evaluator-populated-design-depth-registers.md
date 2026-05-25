@@ -4,8 +4,8 @@
 - title: Pilot F_P evaluator populated design-depth registers
 - type: realization_refactor
 - ticket_category: implementation_migration
-- status: active
-- proof_status: focused_passed_pending_semantic_suite_and_live_sandboxes
+- status: completed
+- proof_status: superseded_by_T-183_not_independently_closed
 - build_tenant: typescript
 - goal: replace the implementation-design register population path with a tightly-scoped `evaluate.C/F_P` prompt while retaining deterministic admission, validation, ledgering, and closure guards
 - change_intent: migrate implementation-design depth register source truth from deterministic ADR-derived synthesis to an evaluator-produced `evaluate.C/F_P` sidecar; F_P evaluator register truth is mandatory for default live execution
@@ -14,7 +14,7 @@
 - first_missing_layer: SDLC evaluator plugin realization over ABG 3.9 RC3 evaluation-set stage
 - triaged_at: 2026-05-24
 - created_at: 2026-05-23
-- updated_at: 2026-05-24
+- updated_at: 2026-05-25
 - migration_strategy: authoritative_evaluator_sidecar_no_legacy_bridge
 - library_usage: consume
 - governing_library: ABIogenesis 3.9 RC3 `evaluate.C` evaluation-set stage and GTL compute-notation carriers
@@ -26,6 +26,33 @@
 - proof_surface: T-181 ticket, RC3 compute-stage design module, operator-run sidecar artifacts, `fp_evaluate_result.json`, postflight evidence, analyzer carrier loader output, focused T-181 tests, semantic test suite, and live sandbox archive
 - depends_on:
   - T-180
+- superseded_by:
+  - T-183
+
+## Closure Disposition
+
+T-181 is closed as superseded and absorbed by T-183, not as independently
+implemented or release-proven.
+
+T-181 correctly established that implementation-design depth must come from
+selected `evaluate.C/F_P` rather than deterministic ADR-derived synthesis. The
+subsequent live-run review showed the same issue is broader than the
+implementation-design sidecar: deterministic code still preserves or invents
+semantic register meaning across design-depth, component-depth, test schedule,
+repair schedule, review-grade, stale carrier, and requirement-pressure
+surfaces.
+
+T-183 is now the controlling execution contract. It keeps the T-181 insight but
+widens the work to a deletion-first cleanup:
+
+- F_P evaluator rules produce semantic row or ledger candidates.
+- ABG/system F_D admits and writes ledgers.
+- F_D does not invent semantic rows.
+- One selected `evaluate.C/F_P` stage can fan out into multiple typed evaluator
+  rules, all admitted through the same ABG/F_D ledger writer path.
+
+Do not treat this completed ticket as proof that T-181's live closure criteria
+were independently satisfied. Closure proof moves to T-183.
 
 ## Intake
 

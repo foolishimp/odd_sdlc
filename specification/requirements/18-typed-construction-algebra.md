@@ -28,16 +28,19 @@ proof interpretation.
 The workspace editor axiom is absolute: `F_P.transform` is the only `F_P`
 process that may edit the workspace, and only within the active edge permission
 class. Every other `F_P` process is read-only over workspace state. It returns
-typed findings, parameters, or semantic rows to the installed operator
-typed-carrier interface. The installed operator owns deterministic carrier
-publication, ledger writes, runtime events, projection, fold, and continuation.
+typed findings, parameters, or authority-function candidates to the installed
+operator typed-carrier interface. The installed operator owns deterministic
+carrier publication, ledger writes, runtime events, projection, fold, and
+continuation.
 
 The construction-depth axiom is also absolute: deterministic code and tests are
-not lawful substitutes for unresolved upstream ambiguity. Every solution must
-reduce ambiguity through admitted intermediate subsurfaces before materialized
-source, materialized tests, execution evidence, or release closure can claim
-product completeness. A trivial product is the degenerate case of that same
-law, not an escape from it.
+proof surfaces after semantic pressure has been mapped; they are not lawful
+substitutes for unresolved upstream ambiguity and they do not create the
+semantic obligation map. Every solution must reduce ambiguity through admitted
+intermediate subsurfaces and selected `evaluate.C/F_P` semantic rows before
+materialized source, materialized tests, execution evidence, or release closure
+can claim product completeness. A trivial product is the degenerate case of
+that same law, not an escape from it.
 
 The graph-edge accounting axiom is equally binding: no edge remains in the
 executive graph by inheritance, ceremony, or local precedent. Every retained
@@ -54,21 +57,66 @@ ABIogenesis compute epistemology:
 GTL edge / selected composition C
   -> transform.C
   -> candidate/evidence refs
-  -> evaluate.C
-  -> evaluation finding refs
+  -> evaluate.C/F_P
+  -> semantic rows / evaluation finding refs / pressure map
   -> ABG.admit
   -> ABG.events / payload ledgers / assurance projection / closure fold
-  -> ABG traversal transition / replay projection
   -> consequence.C
+  -> admitted consequence projection
+  -> ABG traversal transition / replay projection
   -> odd_sdlc pressure/query/read-model interpretation
   -> next_action or lawful continuation
 ```
+
+ODD_SDLC remains the practical implementation of ODD methodology. ODD method
+labels are interpreted through the current compute-stage notation, not as a new
+runtime ontology:
+
+| ODD authority function | current compute-stage spelling | admitted carrier family |
+| --- | --- | --- |
+| `synthesize_model` | `synthesize_model.C/F_P` as a selected `evaluate.C` rule when model meaning is ambiguous | `ProductAssetModel` |
+| `eval_gap` | `eval_gap.C/F_P` as a selected `evaluate.C` rule over declared lineage-reachable ledger snapshots | `ObservationSnapshot` and `GapPressureRow` |
+| `evaluate_action` | `evaluate_action.C/F_P` or disambiguated `F_D` policy inside the selected `evaluate.C` stage | `EdgeFulfillmentLedger` and `EdgeClosureDecision` |
+| `evaluate_next` | `evaluate_next.C/F_D` or `F_P` policy over admitted closure truth | `NextActionProjection` over `ActionCatalog` |
+
+`evaluate.C` is the post-transform compute-stage container. It is not a single
+semantic authority carrier. Each evaluator rule declares which ODD authority
+function it realizes or consumes, and its output admits into the corresponding
+carrier family.
 
 For generic prompt-bearing SDLC edges, the selected `transform.C` commonly
 binds `F_P.transform`. For deterministic product contracts, the selected
 composition may bind deterministic construction. In all cases, `C` is selected
 composition notation over selected `abg.fn_composition`; it is not a new
 product-local execution carrier.
+
+Algorithmically, an SDLC graph node is:
+
+```text
+node(A, B):
+  basis = admitted(A) + declared_lineage_reachable_ledger_snapshot(A)
+    + admitted_dependencies(A)
+  candidate = selected transform.C over basis
+  authority_output = selected evaluate.C authority rule over basis + candidate
+  admitted_pressure = ABG/system F_D admits authority_output by shape,
+    identity, provenance, freshness, declared authority role, and evidence refs
+  B = admitted target carrier plus admitted pressure ledgers
+  next = consequence.C over admitted ABG state
+```
+
+For a chain `A -> B -> C -> D`, the semantic obligations for `D` are the
+carried pressure of `(A, B, C)`. Each intermediate surface is both an admitted
+product surface for its edge and a dependency-pressure source for the next edge.
+The governing ledger rule is:
+
+```text
+evaluate.C authority rule -> constitutional carrier candidate
+  -> ABG/system F_D ledger writer
+```
+
+F_D may index, package, admit, write, execute declared commands, and project
+consequence. F_D shall not infer semantic register rows from filenames, logs,
+language conventions, source-tree shape, archive shape, or deterministic tests.
 
 ### REQ-F-ODDSDLC-074 - construction stages remain typed and separated
 
@@ -83,7 +131,8 @@ construction, admission, evaluation, projection, closure, and continuation.
   execution observation, or carrier envelope enters runtime truth
 - AC-3: `F_D` may reject malformed or impossible evidence, but must not replace
   requirement-by-requirement `F_P` semantic judgment
-- AC-4: `F_P.evaluate` reads admitted evidence refs and returns semantic rows
+- AC-4: `evaluate.C/F_P` reads admitted evidence refs and declared
+  lineage-reachable ledger snapshots, then returns authority-function candidates
   to the installed operator typed-carrier interface; the installed operator
   publishes `fp_evaluate_result.json`, and the worker may not close the edge by
   assertion
@@ -237,17 +286,22 @@ claim product completeness.
   admitted tenant technology-stack description, module/component topology,
   dependency map, evaluator-selected traversal, bounded source/test/build
   materialization, execution evidence, and release qualification
-- AC-2: deterministic code and deterministic tests are the highest
-  disambiguation surfaces; they may close product content only after upstream
-  ambiguity has been reduced into admitted intermediate surfaces or preserved
-  as explicit residual pressure
+- AC-2: selected post-transform `evaluate.C` authority-function outputs and
+  admitted intermediate pressure maps are the highest disambiguation surfaces
+  for generic SDLC product meaning; deterministic code, deterministic tests,
+  and execution evidence are proof surfaces and may close product content only
+  after upstream ambiguity has been reduced into admitted intermediate surfaces
+  or preserved as explicit residual pressure
 - AC-3: implementation materialization requires admitted implementation
   topology and decomposition summary evidence before component code closure
 - AC-3a: F_P implementation-design workers produce the candidate design
-  artifact only; evaluator/runtime code derives and publishes the
-  design-depth register, decomposition summary, dependency map, and admission
-  truth from the artifact, source authority, product file targets, requirement
-  lineage, and post-transform evidence
+  artifact only; selected post-transform `evaluate.C` authority rules produce
+  the design-depth model candidate, decomposition summary candidate, dependency
+  map candidate, and gap/action pressure candidates from the artifact, admitted
+  source authority, product file targets, requirement lineage, upstream design
+  surfaces, dependency pressure, and post-transform evidence. Runtime F_D
+  admits, rejects, writes, and projects those candidates; it does not derive
+  their semantic row meaning.
 - AC-4: test materialization requires admitted testcase authority, test
   topology, test stack/profile evidence, and decomposition summary evidence
   before component test closure
@@ -401,7 +455,10 @@ failure surfaces.
   Worker-facing prompts and briefs shall not inline expanded forensic runtime
   packages, full handoff manifests, target-carrier construction templates, row
   templates, ledgers, closure carriers, or evaluator-owned publication truth.
-  They cite those surfaces by ref/digest when enforceable detail is needed.
+  They cite those surfaces by ref/digest when enforceable detail is needed. The
+  construction brief itself carries compact typed obligation-pressure rows for
+  the current edge; requirement ids/counts alone are not an admissible prompt
+  work queue.
 - AC-9: runtime replay and worker-facing state projection use compact identity
   indexes, bounded summaries, refs, and digests on hot paths. Full manifests,
   liveness activity streams, event archives, and forensic package payloads remain
@@ -424,9 +481,10 @@ analyzer output, and operator documentation shall interpret `transform.C`,
   and evidence; they must not receive ledger-writing, event-emission,
   evaluator-publication, traversal-selection, projection-publication, or
   closure authority
-- AC-3: evaluator stages can be explained as `evaluate.C`; they produce typed
-  findings and semantic rows for deterministic admission, not closure truth by
-  assertion
+- AC-3: evaluator stages can be explained as post-transform `evaluate.C`; each
+  evaluator rule declares the ODD authority function it realizes or consumes and
+  produces typed carrier candidates for deterministic admission, not closure
+  truth by assertion
 - AC-4: ledger rows, events, projections, closure decisions, continuation, and
   replay truth are produced only at or after ABG admission or ABG-compatible
   runtime ingestion, never by plugin prose or worker self-certification
@@ -438,3 +496,11 @@ analyzer output, and operator documentation shall interpret `transform.C`,
 - AC-7: deterministic tests assert the documentation boundary and the worker
   handoff boundary so future edits cannot reintroduce hidden ledger,
   evaluator, projection, or closure surfaces into `F_P.transform`
+- AC-8: evaluator rules may not read ambient workspace prose, logs, paths, or
+  archives as authority input unless those observations have first entered the
+  declared lineage-reachable ledger snapshot as admitted evidence or
+  `ObservationSnapshot` rows
+- AC-9: repair and continuation are not standalone evaluator register
+  authorities; repair is represented by `EdgeClosureDecision.disposition` and
+  selected continuation is represented by `NextActionProjection` over
+  `ActionCatalog`

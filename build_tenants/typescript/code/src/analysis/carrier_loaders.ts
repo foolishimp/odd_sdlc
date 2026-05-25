@@ -40,7 +40,7 @@ import {
   isSdlcLiveFpParallelMaterializationFrontier,
   type SdlcLiveFpParallelMaterializationFrontier
 } from "../operator/live_fp_parallel_materialization_frontier.js";
-import { admitDesignDepthFpEvaluatorRegisterArtifact } from "../operator/handoff.js";
+import { admitDesignDepthFpEvaluatorRegisterArtifact } from "../operator/plugins/evaluate/index.js";
 import type {
   SdlcDecompositionAdmissionDecision,
   SdlcDecompositionDownstreamKind,
@@ -199,8 +199,18 @@ export interface DesignDepthFpEvaluatorRunRecord {
   readonly elapsedMs?: number;
   readonly timedOut?: boolean;
   readonly promptRef?: string;
+  readonly contentLedgerRef?: string;
+  readonly registerProjectionRef?: string;
   readonly registerRef?: string;
   readonly processEventsRef?: string;
+}
+
+export interface EvaluateContentLedgerRecord {
+  readonly kind: "sdlc_evaluate_content_ledger";
+  readonly ledgerVersion?: string;
+  readonly stage?: string;
+  readonly ruleRef?: string;
+  readonly authorityFunction?: string;
 }
 
 export interface ReviewGradeEdgeFulfillmentRunRecord {
@@ -455,6 +465,11 @@ const DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD: (
   value: unknown
 ) => value is DesignDepthFpEvaluatorRunRecord =
   guardKind<DesignDepthFpEvaluatorRunRecord>("sdlc_design_depth_fp_evaluator_run");
+
+const EVALUATE_CONTENT_LEDGER_GUARD: (
+  value: unknown
+) => value is EvaluateContentLedgerRecord =
+  guardKind<EvaluateContentLedgerRecord>("sdlc_evaluate_content_ledger");
 
 const REVIEW_GRADE_EDGE_FULFILLMENT_RUN_GUARD: (
   value: unknown
@@ -761,6 +776,8 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
       POSTFLIGHT_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-run":
       DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD,
+    "operator-run-artifact://design-depth-fp-evaluator-content-ledger":
+      EVALUATE_CONTENT_LEDGER_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-process-started":
       WORKER_PROCESS_STARTED_GUARD,
     "operator-run-artifact://fp-evaluator-postflight": POSTFLIGHT_GUARD,

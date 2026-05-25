@@ -140,72 +140,12 @@ function parseRegister(
   });
 }
 
-function objectRecord(input: unknown): Record<string, unknown> | null {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return null;
-  }
-  return Object.fromEntries(Object.entries(input));
-}
-
-function normalizeCandidate(input: unknown): unknown {
-  const record = objectRecord(input);
-  if (record === null) {
-    return input;
-  }
-  if (record["test_execution_surface_register"] !== undefined) {
-    return normalizeCandidate(record["test_execution_surface_register"]);
-  }
-  if (record["testExecutionSurfaceRegister"] !== undefined) {
-    return normalizeCandidate(record["testExecutionSurfaceRegister"]);
-  }
-  const payload = objectRecord(record["payload"]);
-  if (payload?.["kind"] === "sdlc_test_execution_surface_register") {
-    return record["payload"];
-  }
-  if (record["kind"] === "sdlc_test_execution_surface_register") {
-    return input;
-  }
-  return input;
-}
-
 function jsonCandidates(content: string): readonly unknown[] {
-  const candidates: unknown[] = [];
   try {
-    candidates.push(JSON.parse(content));
+    return Object.freeze([JSON.parse(content)]);
   } catch {
-    // Whole artifact is usually markdown; fenced JSON below is canonical.
+    return Object.freeze([]);
   }
-  const fencedBlockExpression =
-    /^```([^\r\n`]*)\r?\n([\s\S]*?)^```[^\S\r\n]*$/gmu;
-  for (const match of content.matchAll(fencedBlockExpression)) {
-    const infoString = match[1]?.trim() ?? "";
-    const infoParts = infoString.split(/\s+/u).filter((part) => part.length > 0);
-    const language = infoParts[0] ?? "";
-    if (
-      infoString !== "" &&
-      language !== "json" &&
-      language !== "test_execution_surface_register" &&
-      language !== "testExecutionSurfaceRegister" &&
-      !infoParts.includes("test_execution_surface_register") &&
-      !infoParts.includes("testExecutionSurfaceRegister")
-    ) {
-      continue;
-    }
-    const block = match[2]?.trim() ?? "";
-    if (
-      infoString === "" &&
-      !block.startsWith("{") &&
-      !block.startsWith("[")
-    ) {
-      continue;
-    }
-    try {
-      candidates.push(JSON.parse(block));
-    } catch {
-      // Invalid JSON block is reported only if no later candidate admits.
-    }
-  }
-  return Object.freeze(candidates);
 }
 
 function requiredRowsPresent(
@@ -247,10 +187,7 @@ export function admitTestExecutionSurfaceRegisterFromArtifact(input: {
   const errors: string[] = [];
   for (const candidate of jsonCandidates(content)) {
     try {
-      const register = parseRegister(
-        normalizeCandidate(candidate),
-        "test_execution_surface_register"
-      );
+      const register = parseRegister(candidate, "test_execution_surface_register");
       const rowReasons = requiredRowsPresent(register);
       if (rowReasons.length > 0) {
         return Object.freeze({

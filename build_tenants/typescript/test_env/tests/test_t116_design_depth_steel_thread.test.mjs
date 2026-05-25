@@ -177,7 +177,6 @@ function implementationDesignRegister(overrides = {}) {
         relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
         concernRole: "parser",
         publicBoundary: "package_internal",
-        upstreamComponentIds: [],
         requirementIds: ["REQ-T116-001"],
         sourceAssetRefs: ["fixture://t116/component-topology"]
       }
@@ -229,15 +228,8 @@ function sunnyDayRegister(sequence = sunnyDaySequence(), verdict = satisfiedVerd
 
 function writeArtifact(targetAssetType, register) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t116-"));
-  const outputFile = path.join(root, `${targetAssetType}.md`);
-  const content = [
-    `# ${targetAssetType}`,
-    "",
-    "```design_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
+  const outputFile = path.join(root, `${targetAssetType}.json`);
+  const content = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(path.dirname(outputFile), { recursive: true });
   writeFileSync(outputFile, content, "utf8");
   return outputFile;
@@ -324,7 +316,7 @@ test("T-169 design-depth admission is structural while content gaps stay in assu
   );
 });
 
-test("T-171 admits design-depth payload from the selected target-carrier envelope", () => {
+test("T-183 rejects design-depth selected target-carrier envelopes as duplicate authority", () => {
   const register = moduleRegister();
   const envelopedCarrier = {
     kind: "sdlc_implementation_design_surface_target_carrier",
@@ -340,11 +332,12 @@ test("T-171 admits design-depth payload from the selected target-carrier envelop
     envelopedCarrier
   );
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.kind, "sdlc_design_depth_register");
-  assert.equal(admission.register.targetAssetType, "implementation_design_surface");
+  assert.equal(admission.status, "rejected");
+  assert.deepEqual(admission.blockingReasons, [
+    "design_depth_register_top_level_kind_required"
+  ]);
   assert(ledger);
-  assert.equal(ledger.verdict, "satisfied");
+  assert.equal(ledger.verdict, "open_gap");
 });
 
 test("T-116 admits aggregate domain model and sunny-day sequence steel thread", () => {

@@ -20,6 +20,7 @@ export type SdlcTargetCarrierClosureStatus =
 
 export type SdlcEdgeEvidenceSourceKind =
   | "worker_assessment"
+  | "review_grade_assessment"
   | "runtime_event"
   | "product_artifact"
   | "execution_result"

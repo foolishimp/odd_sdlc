@@ -167,7 +167,6 @@ function completeDesignDepthRegister(register) {
         relativePath: "cdme-compiler/src/main/scala/cdme/compiler/Compiler.scala",
         concernRole: "parser",
         publicBoundary: "package_internal",
-        upstreamComponentIds: [],
         requirementIds: ["REQ-T122-001"],
         sourceAssetRefs: ["fixture://t122/component-topology"]
       }
@@ -201,18 +200,11 @@ function completeDesignDepthRegister(register) {
 function designDepthArtifact(register) {
   const normalizedRegister = completeDesignDepthRegister(register);
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t122-"));
-  const outputFile = path.join(root, `${normalizedRegister.targetAssetType}.md`);
+  const outputFile = path.join(root, `${normalizedRegister.targetAssetType}.json`);
   mkdirSync(path.dirname(outputFile), { recursive: true });
   writeFileSync(
     outputFile,
-    [
-      `# ${normalizedRegister.targetAssetType}`,
-      "",
-      "```design_depth_register",
-      JSON.stringify(normalizedRegister, null, 2),
-      "```",
-      ""
-    ].join("\n"),
+    `${JSON.stringify(normalizedRegister, null, 2)}\n`,
     "utf8"
   );
   return outputFile;
@@ -626,7 +618,7 @@ test("T-122 steel-thread pressure excludes deferred-module requirement obligatio
   );
 });
 
-test("T-122 design-depth admission normalizes relational partial candidates", () => {
+test("T-122 design-depth admission rejects relational alias candidates", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -673,18 +665,13 @@ test("T-122 design-depth admission normalizes relational partial candidates", ()
   assert(ledger);
   assert.equal(ledger.verdict, "open_gap");
   assert(
-    ledger.reasons.some(
-      (reason) => reason.code === "design_depth_module_state_diagram_fragments_missing"
-    )
-  );
-  assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
 
-test("B-084 design-depth admission normalizes state diagram fragments without carrier kinds", () => {
+test("B-084 design-depth admission rejects state diagram fragments without carrier kinds", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -745,13 +732,13 @@ test("B-084 design-depth admission normalizes state diagram fragments without ca
   });
   assert(ledger);
   assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
 
-test("B-084 design-depth admission normalizes implementation module refs and stack extras", () => {
+test("B-084 design-depth admission rejects implementation module aliases and stack extras", () => {
   const ledger = ledgerFor(
     {
       kind: "sdlc_design_depth_register",
@@ -880,7 +867,7 @@ test("B-084 design-depth admission normalizes implementation module refs and sta
   );
   assert(ledger);
   assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
@@ -961,7 +948,7 @@ test("B-084 design-depth admission rejects contradictory schema and entity modul
   assert.equal(ledger.verdict, "open_gap");
   assert(
     ledger.reasons.some((reason) =>
-      reason.code.includes("contradicts schema moduleName cdme-compiler")
+      reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
@@ -975,7 +962,7 @@ test("B-084 design-depth generic core does not invent module identity", () => {
   assert(!source.includes('firstPart === "compiler"'));
 });
 
-test("B-084 design-depth admission normalizes attributeId/type shorthand", () => {
+test("B-084 design-depth admission rejects attributeId/type shorthand", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -1037,13 +1024,13 @@ test("B-084 design-depth admission normalizes attributeId/type shorthand", () =>
   });
   assert(ledger);
   assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
 
-test("B-084 design-depth admission normalizes aggregate model metadata and verdict axes", () => {
+test("B-084 design-depth admission rejects aggregate model metadata aliases", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -1115,13 +1102,13 @@ test("B-084 design-depth admission normalizes aggregate model metadata and verdi
   });
   assert(ledger);
   assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
 
-test("B-084 design-depth admission normalizes sunny-day sequence metadata", () => {
+test("B-084 design-depth admission rejects sunny-day sequence metadata aliases", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",
@@ -1206,13 +1193,13 @@ test("B-084 design-depth admission normalizes sunny-day sequence metadata", () =
   });
   assert(ledger);
   assert(
-    !ledger.reasons.some((reason) =>
+    ledger.reasons.some((reason) =>
       reason.code.startsWith("design_depth_register_invalid:")
     )
   );
 });
 
-test("B-084 design-depth assurance accepts allowed carrier-id aliases when identity is ambiguous", () => {
+test("B-084 design-depth assurance admits exact carrier-id rows when identity is explicit", () => {
   const outputFile = designDepthArtifact({
     kind: "sdlc_design_depth_register",
     registerVersion: "ts-design-depth-v1",

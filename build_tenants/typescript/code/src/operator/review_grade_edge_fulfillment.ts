@@ -13,6 +13,8 @@ import {
   type SdlcReviewGradeEdgeFulfillmentAdmission,
   type SdlcReviewGradeEdgeFulfillmentAssessment,
   type SdlcReviewGradeObligationFinding,
+  type SdlcRequirementFunctionFulfillmentBinding,
+  type SdlcWorkerObligationAssessment,
   type SdlcWorkerHandoffManifest
 } from "./carriers.js";
 
@@ -24,6 +26,7 @@ export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
 
 function frameworkOwnedEvaluationTarget(targetAssetType: string): boolean {
   return (
+    targetAssetType === "code_surface" ||
     targetAssetType === "component_realization_qualification_surface" ||
     targetAssetType === "test_execution_surface" ||
     targetAssetType === "test_execution_result_surface" ||
@@ -41,6 +44,35 @@ export function reviewGradeEdgeFulfillmentAssessmentRequired(
     !frameworkOwnedEvaluationTarget(manifest.targetAssetType) &&
     manifest.outputFile.trim().length > 0 &&
     manifest.traversalObligationContext.obligations.length > 0
+  );
+}
+
+export function reviewGradeFindingsAreDownstreamStagePressure(
+  findings: readonly SdlcReviewGradeObligationFinding[]
+): boolean {
+  return (
+    findings.length > 0 &&
+    findings.every(
+      (finding) =>
+        finding.fulfillmentStatus === "partial" &&
+        finding.failureClass === "wrong_stage"
+    )
+  );
+}
+
+export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
+  readonly runRef: string;
+  readonly assessments: readonly SdlcWorkerObligationAssessment[];
+}): readonly string[] {
+  return uniqueSorted(
+    input.assessments.flatMap((assessment) =>
+      assessment.reviewGrade === true &&
+      assessment.fulfillmentStatus !== "fulfilled"
+        ? [
+            `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(assessment.obligationId)}`
+          ]
+        : []
+    )
   );
 }
 
@@ -77,6 +109,79 @@ function parseNullableRequiredAction(
   return parseNonEmptyString(input, label);
 }
 
+function parseFulfillmentBinding(
+  input: unknown,
+  label: string
+): SdlcRequirementFunctionFulfillmentBinding {
+  const record = parseClosedRecord(input, label, [
+    "kind",
+    "requirementRef",
+    "productRequirementRef",
+    "designObligationRef",
+    "componentRef",
+    "productTargetRef",
+    "codeSurfaceRef",
+    "functionOrEntrypointRef",
+    "realizationEvidenceRefs",
+    "testOrExecutionEvidenceRefs",
+    "evaluatorFindingRef"
+  ]);
+  const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
+  if (kind !== "sdlc_requirement_function_fulfillment_binding") {
+    throw new TypeError(`${label}.kind: unexpected fulfillment binding kind`);
+  }
+  return Object.freeze({
+    kind: "sdlc_requirement_function_fulfillment_binding" as const,
+    requirementRef: parseNonEmptyString(
+      record["requirementRef"],
+      `${label}.requirementRef`
+    ),
+    productRequirementRef: parseNonEmptyString(
+      record["productRequirementRef"],
+      `${label}.productRequirementRef`
+    ),
+    designObligationRef: parseNonEmptyString(
+      record["designObligationRef"],
+      `${label}.designObligationRef`
+    ),
+    componentRef: parseNonEmptyString(record["componentRef"], `${label}.componentRef`),
+    productTargetRef: parseNonEmptyString(
+      record["productTargetRef"],
+      `${label}.productTargetRef`
+    ),
+    codeSurfaceRef: parseNonEmptyString(
+      record["codeSurfaceRef"],
+      `${label}.codeSurfaceRef`
+    ),
+    functionOrEntrypointRef: parseNonEmptyString(
+      record["functionOrEntrypointRef"],
+      `${label}.functionOrEntrypointRef`
+    ),
+    realizationEvidenceRefs: parseStringList(
+      record["realizationEvidenceRefs"],
+      `${label}.realizationEvidenceRefs`
+    ),
+    testOrExecutionEvidenceRefs: parseStringList(
+      record["testOrExecutionEvidenceRefs"],
+      `${label}.testOrExecutionEvidenceRefs`
+    ),
+    evaluatorFindingRef: parseNonEmptyString(
+      record["evaluatorFindingRef"],
+      `${label}.evaluatorFindingRef`
+    )
+  });
+}
+
+function parseNullableFulfillmentBinding(
+  input: unknown,
+  label: string
+): SdlcRequirementFunctionFulfillmentBinding | null {
+  if (input === null) {
+    return null;
+  }
+  return parseFulfillmentBinding(input, label);
+}
+
 function parseReviewFinding(
   input: unknown,
   label: string
@@ -89,6 +194,7 @@ function parseReviewFinding(
     "requiredAction",
     "evidenceRefs",
     "acceptedAuthorityRefs",
+    "fulfillmentBinding",
     "rationale"
   ]);
   const kind = parseNonEmptyString(record["kind"], `${label}.kind`);
@@ -109,6 +215,10 @@ function parseReviewFinding(
     acceptedAuthorityRefs: parseStringList(
       record["acceptedAuthorityRefs"],
       `${label}.acceptedAuthorityRefs`
+    ),
+    fulfillmentBinding: parseNullableFulfillmentBinding(
+      record["fulfillmentBinding"],
+      `${label}.fulfillmentBinding`
     ),
     rationale: parseNonEmptyString(record["rationale"], `${label}.rationale`)
   });
@@ -223,6 +333,25 @@ function assessmentValidationErrors(input: {
     }
     if (finding.acceptedAuthorityRefs.length === 0) {
       errors.push(`review_grade_finding_authority_missing:${finding.obligationId}`);
+    }
+    if (
+      finding.fulfillmentBinding !== null &&
+      finding.fulfillmentBinding.requirementRef !== finding.obligationId
+    ) {
+      errors.push(`review_grade_fulfillment_binding_requirement_mismatch:${finding.obligationId}`);
+    }
+    if (
+      manifest.targetAssetType === "component_code_surface" &&
+      finding.fulfillmentStatus === "fulfilled" &&
+      finding.fulfillmentBinding === null
+    ) {
+      errors.push(`review_grade_function_binding_missing:${finding.obligationId}`);
+    }
+    if (
+      finding.fulfillmentBinding !== null &&
+      finding.fulfillmentBinding.realizationEvidenceRefs.length === 0
+    ) {
+      errors.push(`review_grade_realization_evidence_missing:${finding.obligationId}`);
     }
     if (finding.fulfillmentStatus === "fulfilled") {
       if (finding.failureClass !== null) {

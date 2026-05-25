@@ -38,7 +38,6 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "materialized_product_path_not_file",
   "materialized_design_file_outside_design_root",
   "materialized_product_file_empty",
-  "sbt_security_manager_option_unsupported",
   "materialized_product_byte_count_mismatch",
   "materialized_product_digest_mismatch",
   "test_execution_evidence_missing",
@@ -67,10 +66,12 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "review_grade_evaluator_process_failed",
+  "review_grade_evaluator_process_timeout",
   "source_asset_dependency_missing",
   "assurance_ledger_reason",
-  "hook_postflight_failed",
-  "hook_postflight_missing",
+  "hook_diagnostic_failed",
+  "hook_diagnostic_missing",
   "installed_topology_invalid",
   "target_unavailable",
   "stale_query_domain",
@@ -202,8 +203,9 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "review_grade_assessment_missing",
   "review_grade_assessment_invalid",
   "review_grade_edge_fulfillment_blocked",
+  "review_grade_evaluator_process_failed",
+  "review_grade_evaluator_process_timeout",
   "source_asset_dependency_missing",
-  "sbt_security_manager_option_unsupported",
   "unsupported_fd_transition",
   "unsupported_transition",
   "unknown_blocking_reason"
@@ -273,14 +275,6 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
         : "authority_to_code",
       lawfulReentryPoint: "same_edge_retry",
       message: "Materialized product evidence does not satisfy the product contract."
-    });
-  }
-  if (code === "sbt_security_manager_option_unsupported") {
-    return Object.freeze({
-      reasonClass: "code_to_test",
-      lawfulReentryPoint: "same_edge_retry",
-      message:
-        "SBT/JDK execution configuration uses an unsupported Security Manager option."
     });
   }
   if (code === "context_expected_files_not_materialization_authority") {
@@ -361,6 +355,8 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     code === "review_grade_assessment_missing" ||
     code === "review_grade_assessment_invalid" ||
     code === "review_grade_edge_fulfillment_blocked" ||
+    code === "review_grade_evaluator_process_failed" ||
+    code === "review_grade_evaluator_process_timeout" ||
     code === "source_asset_dependency_missing"
   ) {
     return Object.freeze({
@@ -380,11 +376,11 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Assurance ledger fold blocked traversal closure."
     });
   }
-  if (code === "hook_postflight_failed" || code === "hook_postflight_missing") {
+  if (code === "hook_diagnostic_failed" || code === "hook_diagnostic_missing") {
     return Object.freeze({
       reasonClass: "contract_violation",
       lawfulReentryPoint: "same_edge_retry",
-      message: "Hook postflight did not admit the generated result."
+      message: "Hook diagnostic did not admit the generated result."
     });
   }
   if (
@@ -623,11 +619,11 @@ export function legacyBlockingReasonCode(reason: SdlcBlockingReason): string {
   if (preservesLegacyReasonDetail(reason.code)) {
     return `${reason.code}:${reason.detail}`;
   }
-  if (reason.code === "hook_postflight_failed") {
-    return `hook_postflight:${reason.detail}`;
+  if (reason.code === "hook_diagnostic_failed") {
+    return `hook_diagnostic:${reason.detail}`;
   }
-  if (reason.code === "hook_postflight_missing") {
-    return "hook_postflight:hook_postflight_missing";
+  if (reason.code === "hook_diagnostic_missing") {
+    return "hook_diagnostic:hook_diagnostic_missing";
   }
   if (reason.code === "assurance_ledger_reason") {
     return reason.detail;
@@ -774,14 +770,14 @@ export function sdlcBlockingReasonFromLegacy(input: {
       evidenceRefs
     });
   }
-  const hookPostflight = splitKnownPrefix(input.reason, "hook_postflight");
-  if (hookPostflight !== null) {
+  const hookDiagnostic = splitKnownPrefix(input.reason, "hook_diagnostic");
+  if (hookDiagnostic !== null) {
     return makeSdlcBlockingReason({
       code:
-        hookPostflight === "hook_postflight_missing"
-          ? "hook_postflight_missing"
-          : "hook_postflight_failed",
-      detail: hookPostflight,
+        hookDiagnostic === "hook_diagnostic_missing"
+          ? "hook_diagnostic_missing"
+          : "hook_diagnostic_failed",
+      detail: hookDiagnostic,
       evidenceRefs
     });
   }

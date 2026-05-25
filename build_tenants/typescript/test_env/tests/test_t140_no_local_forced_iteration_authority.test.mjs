@@ -216,6 +216,72 @@ test("T-164 retry context uses latest workspace runtime gap register", () => {
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, latestReason);
 });
 
+test("T-164 runtime gap register does not contaminate fresh post-action continuation", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-fresh-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const staleRun = path.join(runsRoot, "20260524T234438416Z_pid26467");
+  mkdirSync(staleRun, { recursive: true });
+  const staleRef = pathToFileURL(path.join(staleRun, "gap_dossier.json")).href;
+  const staleExecutionEvidence =
+    "file:///tmp/stale/assets/20260524T234422163Z_pid26467/test_execution_result_surface.md";
+  const dossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_component_repair_schedule_surface",
+    vectorIndex: 0,
+    targetAssetType: "component_repair_schedule_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason: "review_grade_edge_fulfillment_blocked:stale_execution_result",
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({
+          reason: "review_grade_edge_fulfillment_blocked:stale_execution_result"
+        })
+      }
+    ],
+    evidenceRefs: [staleExecutionEvidence],
+    priorManifestId: staleRef.replace("gap_dossier.json", "handoff_manifest.json"),
+    currentGapDossierRef: staleRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  writeFileSync(path.join(staleRun, "gap_dossier.json"), JSON.stringify(dossier), "utf8");
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_component_repair_schedule_surface",
+    targetAssetType: "component_repair_schedule_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 0,
+          retryRunId: "post-action-reentry",
+          retryCallId: "construction-priority-projection://fresh",
+          manifestId: "construction-priority-projection://fresh",
+          priorAuthorityRef:
+            "construction-action://odd-sdlc/post-action/derive_component_repair_schedule_surface/post_close_overlay_continuation/derive_component_repair_schedule_surface/file%3A%2F%2F%2Ftmp%2Flatest-qualification",
+          attemptIndex: 0,
+          sourceProjectionRef: "construction-priority-projection://fresh"
+        }
+      ],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 0);
+  assert.equal(
+    retryContext.retryAttemptRefs[0].priorAuthorityRef.includes("post_close_overlay_continuation"),
+    true
+  );
+});
+
 test("T-174 component-code closure carries test and execution requirements downstream", () => {
   assert.equal(
     sdlcRequirementObligationBelongsToDownstreamComponentSurface({

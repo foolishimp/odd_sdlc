@@ -55,16 +55,7 @@ function makeWorkspace() {
 function writeArtifact(register, name = register.targetAssetType) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
   const outputFile = path.join(root, `${name}.md`);
-  const content = [
-    `# ${register.targetAssetType}`,
-    "",
-    "Typed component-depth carrier follows.",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
+  const content = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(path.dirname(outputFile), { recursive: true });
   writeFileSync(outputFile, content, "utf8");
   return { outputFile, content };
@@ -167,7 +158,7 @@ test("T-113 admits production-shaped component realization rows on current compo
   assert.equal(ledger.reasons.length, 0);
 });
 
-test("B-084 admits metadata-rich component realization rows after prose fences", () => {
+test("B-084 rejects metadata-rich component realization aliases", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -188,15 +179,11 @@ test("B-084 admits metadata-rich component realization rows after prose fences",
     outputFile
   });
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.componentRealizationRows.length, 1);
-  assert.equal(
-    admission.register.componentRealizationRows[0].publicBoundary,
-    "package_internal"
-  );
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /realizationOrder: unexpected field/u);
 });
 
-test("T-171 normalizes boolean publicBoundary on component realization rows", () => {
+test("T-171 rejects boolean publicBoundary on component realization rows", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -215,8 +202,8 @@ test("T-171 normalizes boolean publicBoundary on component realization rows", ()
     outputFile
   });
 
-  assert.equal(admission.status, "admitted");
-  assert.equal(admission.register.componentRealizationRows[0].publicBoundary, "public");
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /publicBoundary: expected string/u);
 });
 
 test("B-084 admits metadata-rich component test rows", () => {

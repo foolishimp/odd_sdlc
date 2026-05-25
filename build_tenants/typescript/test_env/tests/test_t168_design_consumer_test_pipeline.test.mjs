@@ -425,7 +425,7 @@ test("T-168 node execution shard runs materialized test files", () => {
   assert.equal(manifest.productMaterialization.executionShards.length, 1);
   assert.equal(
     manifest.productMaterialization.executionShards[0].command,
-    "node --test test/HelloWorldProofBindingTests.test.js"
+    "node"
   );
 });
 

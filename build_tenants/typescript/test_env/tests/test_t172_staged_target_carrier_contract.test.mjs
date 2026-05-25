@@ -325,10 +325,15 @@ function manifestForEdge(workspaceRoot, edgeName, runId, options = {}) {
 }
 
 function writeFpEvaluatorDesignRegister(manifest, register) {
+  const contentLedgerPath = path.join(
+    manifest.archiveRoot,
+    "design_depth_fp_evaluator_content_ledger.json"
+  );
   const registerPath = path.join(
     manifest.archiveRoot,
     "design_depth_fp_evaluator_register.json"
   );
+  const contentLedgerRef = pathToFileURL(contentLedgerPath).href;
   const registerRef = pathToFileURL(registerPath).href;
   const composition = {
     kind: "sdlc_selected_abg_fn_composition_identity",
@@ -341,6 +346,35 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     graphVectorRef: manifest.edgeName,
     basisRef: "basis://t172"
   };
+  writeJsonFile(contentLedgerPath, {
+    kind: "sdlc_evaluate_content_ledger",
+    ledgerVersion: "ts-evaluate-content-v1",
+    stage: "evaluate.C",
+    ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+    ruleRole: "semantic_judgment",
+    computeMeans: "F_P",
+    authorityFunction: "synthesize_model",
+    selectedCompositionRef: composition.compositionRef,
+    selectedCompositionDigest: composition.compositionDigest,
+    selectedCompositionSelectionRef: composition.compositionSelectionRef,
+    selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+    compositionContributionRef: composition.selectedRegimeBindingRef,
+    sourceBasisRefs: [pathToFileURL(manifest.outputFile).href],
+    candidateArtifactRefs: [pathToFileURL(manifest.outputFile).href],
+    evidenceRefs: [pathToFileURL(manifest.outputFile).href],
+    contentRows: [
+      {
+        kind: "sdlc_evaluate_content_ledger_row",
+        rowRef: "evaluate-content-row://t172/design-depth-register",
+        authorityFunction: "synthesize_model",
+        carrierFamily: "ProductAssetModel",
+        contentKind: "sdlc_design_depth_register",
+        payload: register,
+        sourceBasisRefs: [pathToFileURL(manifest.outputFile).href],
+        evidenceRefs: [pathToFileURL(manifest.outputFile).href]
+      }
+    ]
+  });
   writeJsonFile(registerPath, register);
   writeJsonFile(path.join(manifest.archiveRoot, "fp_evaluate_result.json"), {
     kind: "sdlc_fp_evaluate_result",
@@ -358,8 +392,8 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
         findingRef: "finding://t172/evaluate/design-depth-register",
         compositionRef: composition.compositionRef,
         compositionDigest: composition.compositionDigest,
-        authorityRefs: [registerRef],
-        evidenceRefs: [registerRef]
+          authorityRefs: [contentLedgerRef, registerRef],
+          evidenceRefs: [contentLedgerRef, registerRef]
       }
     ],
     evaluation: {
@@ -370,7 +404,7 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     status: "passed",
     postflightStatus: "passed",
     blockingReasons: [],
-    evidenceRefs: [registerRef]
+    evidenceRefs: [contentLedgerRef, registerRef]
   });
   const outcomePath = path.join(
     manifest.archiveRoot,
@@ -382,8 +416,8 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
     ruleRole: "semantic_judgment",
     computeMeans: "F_P",
-    producedRegisterRefs: [registerRef],
-    evidenceRefs: [registerRef],
+    producedRegisterRefs: [contentLedgerRef, registerRef],
+    evidenceRefs: [contentLedgerRef, registerRef],
     findingRefs: ["finding://t172/evaluate/design-depth-register"],
     humanResponseRefs: [],
     residualPressureRefs: [],
@@ -400,6 +434,7 @@ function writeFpEvaluatorDesignRegister(manifest, register) {
     registerPath,
     evidenceRefs: [
       pathToFileURL(outcomePath).href,
+      contentLedgerRef,
       registerRef,
       "finding://t172/evaluate/design-depth-register"
     ]
@@ -1239,7 +1274,7 @@ test("T-172 implementation-design producer rejects fenced design-depth register 
       postflight.blockingReasonCarriers.some(
         (reason) =>
           reason.code === "staged_authority_admission_invalid" &&
-          reason.detail.includes("design_depth_register_json_required")
+          reason.detail.includes("design_depth_worker_emitted_register_forbidden")
       ),
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)
     );
@@ -1570,7 +1605,7 @@ test("T-172 trivial test-design producer admits explicit single-row topology", (
   }
 });
 
-test("T-172 test-design admission normalizes common semantic carrier aliases", () => {
+test("T-172 test-design admission rejects common semantic carrier aliases", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForEdge(
@@ -1689,11 +1724,12 @@ test("T-172 test-design admission normalizes common semantic carrier aliases", (
 
     const postflight = evaluateSdlcComputeStage({ manifest, report });
 
-    assert.equal(
-      postflight.blockingReasonCarriers.some((reason) =>
-        reason.code === "staged_authority_admission_invalid"
+    assert(
+      postflight.blockingReasonCarriers.some(
+        (reason) =>
+          reason.code === "staged_authority_admission_invalid" &&
+          reason.detail === "test_design_register_missing"
       ),
-      false,
       JSON.stringify(postflight.blockingReasonCarriers, null, 2)
     );
   } finally {

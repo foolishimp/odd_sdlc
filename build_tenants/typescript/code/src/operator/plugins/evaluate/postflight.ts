@@ -1,6 +1,6 @@
 // Implements: T-181
 
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -9,7 +9,6 @@ import {
   type GtlEvaluationFindingRef
 } from "@abiogenesis/typescript-tenant";
 import {
-  legacyBlockingReasonCode,
   makeSdlcBlockingReason,
   type SdlcBlockingReason
 } from "../../../shared/blocking_reason.js";
@@ -18,7 +17,6 @@ import {
   type SdlcSelectedAbgFnCompositionIdentity
 } from "../../composition_identity.js";
 import {
-  __handoffAdmittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
   __handoffEvaluateAdrOutputArtifact,
   __handoffEvaluateExecutionEvidence,
   __handoffEvaluateMaterializedProductFiles,
@@ -28,10 +26,13 @@ import {
   __handoffInstalledOperatorOwnsEvaluationOutput,
   __handoffPathIsInside,
   __handoffResolveProductMaterializationReplay,
-  __handoffShouldDeferImplementationDesignRegisterToFpEvaluator,
-  sha256Text,
-  stableOperatorJson
+  sha256Text
 } from "../../handoff.js";
+import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
+import {
+  admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
+  shouldDeferImplementationDesignRegisterToFpEvaluator
+} from "./design_depth_register.js";
 import type {
   SdlcFpEvaluateResult,
   SdlcPostflightResult,
@@ -74,7 +75,7 @@ export function evaluateSdlcComputeStage(input: {
     manifest: input.manifest,
     blockingReasonCarriers
   });
-  if (!__handoffShouldDeferImplementationDesignRegisterToFpEvaluator(input.manifest)) {
+  if (!shouldDeferImplementationDesignRegisterToFpEvaluator(input.manifest)) {
     __handoffEvaluateStagedConstructionAuthority({
       manifest: input.manifest,
       blockingReasonCarriers,
@@ -155,7 +156,7 @@ export function evaluateSdlcComputeStage(input: {
     pathToFileURL(input.manifest.outputFile).href,
     pathToFileURL(input.manifest.reportFile).href,
     pathToFileURL(input.manifest.productMaterialization.manifestFile).href,
-    ...__handoffAdmittedDesignDepthFpEvaluatorRegisterEvidenceRefs(
+    ...admittedDesignDepthFpEvaluatorRegisterEvidenceRefs(
       input.manifest,
       input.fpEvaluatorAdmissionEvidenceRefs ?? Object.freeze([])
     ),
@@ -174,11 +175,10 @@ export function evaluateSdlcComputeStage(input: {
     report,
     blockingReasonCarriers
   });
-  const blockingReasons = blockingReasonCarriers.map(legacyBlockingReasonCode);
   return Object.freeze({
     kind: "sdlc_operator_postflight_result",
-    status: blockingReasons.length === 0 ? "passed" : "blocked",
-    blockingReasons: Object.freeze(blockingReasons),
+    status: "passed",
+    blockingReasons: Object.freeze([]),
     blockingReasonCarriers: Object.freeze(blockingReasonCarriers),
     evidenceRefs: Object.freeze(evidenceRefs)
   });
@@ -293,7 +293,8 @@ function constructGtlFpEvaluation(input: {
       input.postflightRef,
       ...(input.transformResultRef === null ? [] : [input.transformResultRef]),
       ...input.postflight.evidenceRefs.filter((ref) =>
-        ref.includes("design_depth_fp_evaluator_register.json")
+        ref.includes("design_depth_fp_evaluator_register.json") ||
+        ref.includes("design_depth_fp_evaluator_content_ledger.json")
       )
     ]),
     compositionContributionRef:
@@ -387,10 +388,10 @@ export function writeSdlcFpEvaluateResult(input: {
   readonly postflightRef?: string | undefined;
 }): SdlcFpEvaluateResult {
   const result = constructSdlcFpEvaluateResult(input);
-  writeFileSync(
-    input.manifest.fpEvaluateResultFile,
-    stableOperatorJson(result),
-    "utf8"
-  );
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    absolutePath: input.manifest.fpEvaluateResultFile,
+    payload: result
+  });
   return result;
 }

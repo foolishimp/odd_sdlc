@@ -100,14 +100,7 @@ function fulfilledObligationAssessments(manifest, evidenceRefs) {
 }
 
 function writeRegister(manifest, register) {
-  const output = [
-    `# ${manifest.targetAssetType}`,
-    "",
-    "```component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
+  const output = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
   writeFileSync(manifest.outputFile, output, "utf8");
   return output;
@@ -180,9 +173,6 @@ test("T-115 admits compile-failure qualification carrier as repair input", () =>
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
     targetAssetType: "component_test_qualification_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "qualify_component_test_execution_surface",
-    vectorIndex: 27,
     componentTestQualificationRows: [
       {
         kind: "sdlc_component_test_qualification_row",
@@ -206,8 +196,6 @@ test("T-115 admits compile-failure qualification carrier as repair input", () =>
     componentExecutionFailureRegister: {
       kind: "component_execution_failure_register",
       registerVersion: "ts-component-depth-v1",
-      shardId: "test-shard-01-cdme-compiler",
-      moduleName: "cdme-compiler",
       failureRows: [
         {
           kind: "sdlc_component_execution_failure_row",
@@ -219,9 +207,7 @@ test("T-115 admits compile-failure qualification carrier as repair input", () =>
           componentIds: ["cdme-diagnostics"],
           requirementIds: ["REQ-T115-001"],
           failureKind: "test_compile_error",
-          failureDetail: "test compile failed before execution",
-          repairTarget:
-            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
+          repairTarget: "component_test",
           lawfulReentryPoint: "realization_refactor",
           attributionConfidence: "high",
           sourceRefs: [
@@ -232,8 +218,7 @@ test("T-115 admits compile-failure qualification carrier as repair input", () =>
           ],
           evidenceRefs: ["artifact://test-execution/cdme-compiler"]
         }
-      ],
-      blockedTestClassIds: ["ApiCompileSpec"]
+      ]
     }
   });
 
@@ -472,26 +457,16 @@ test("T-115 admits repair schedule carrier with repair-target paths", () => {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
     targetAssetType: "component_repair_schedule_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_component_repair_schedule_surface",
-    vectorIndex: 28,
-    moduleName: "cdme-compiler",
     componentRepairSchedule: {
       kind: "sdlc_component_repair_schedule",
       registerVersion: "ts-component-depth-v1",
       scheduleStatus: "repair_required",
-      scheduleSource:
-        "asset://component_test_qualification_surface#componentExecutionFailureRegister",
       repairRows: [
         {
           kind: "sdlc_component_repair_schedule_row",
           scheduleId: "schedule.compiler.diagnostics.scalac.001",
           failureId: "fail.compiler.diagnostics.scalac.001",
-          moduleName: "cdme-compiler",
-          shardId: "test-shard-01-cdme-compiler",
-          trancheId: "T-REPAIR-1",
-          repairTarget:
-            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
+          repairTarget: "component_test",
           lawfulReentryPoint: "realization_refactor",
           attributionConfidence: "high",
           testcaseIds: ["TC-DM-DIAG-001"],
@@ -505,11 +480,12 @@ test("T-115 admits repair schedule carrier with repair-target paths", () => {
           ],
           evidenceRefs: [
             "asset://component_test_qualification_surface#componentExecutionFailureRegister/failureRows/fail.compiler.diagnostics.scalac.001"
-          ],
-          repairKind: "fix_test_source_to_match_realized_diagnostic_api"
+          ]
         }
       ],
-      triageGaps: []
+      evidenceRefs: [
+        "asset://component_test_qualification_surface#componentExecutionFailureRegister/failureRows/fail.compiler.diagnostics.scalac.001"
+      ]
     }
   });
 
@@ -542,23 +518,17 @@ test("T-115 admits release-depth parity carrier as blocked repair pressure", () 
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
     targetAssetType: "release_depth_parity_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_release_depth_parity_surface",
-    vectorIndex: 31,
     releaseDepthParity: {
       kind: "sdlc_release_depth_parity_assessment",
       status: "blocked",
-      scope: "release_surface",
-      blockerCodes: [
+      summary: "test shard failed at test_compile",
+      blockingReasons: [
         "shard_compile_failed_no_test_evidence",
         "blocked_test_classes_have_no_pass_evidence"
       ],
-      blockerDetail: "test shard failed at test_compile",
-      decisionBasis: [
+      evidenceRefs: [
         "schedule://odd_sdlc/derive_release_depth_parity_surface/primary"
-      ],
-      metPrecondition: false,
-      repricedRequested: false
+      ]
     }
   });
 
@@ -591,9 +561,6 @@ test("B-085 release-depth parity repair rows route to repair worker output", () 
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
     targetAssetType: "release_depth_parity_surface",
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: "derive_release_depth_parity_surface",
-    vectorIndex: 31,
     componentRepairSchedule: {
       kind: "sdlc_component_repair_schedule",
       registerVersion: "ts-component-depth-v1",
@@ -603,10 +570,7 @@ test("B-085 release-depth parity repair rows route to repair worker output", () 
           kind: "sdlc_component_repair_schedule_row",
           scheduleId: "schedule.compiler.diagnostics.scalac.001",
           failureId: "fail.compiler.diagnostics.scalac.001",
-          moduleName: "cdme-compiler",
-          shardId: "test-shard-01-cdme-compiler",
-          repairTarget:
-            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
+          repairTarget: "component_test",
           lawfulReentryPoint: "realization_refactor",
           attributionConfidence: "high",
           testcaseIds: ["TC-DM-DIAG-001"],
@@ -631,18 +595,15 @@ test("B-085 release-depth parity repair rows route to repair worker output", () 
     releaseDepthParity: {
       kind: "sdlc_release_depth_parity_assessment",
       status: "blocked",
-      scope: "release_surface",
-      blockerCodes: [
+      summary: "test shard failed at test_compile",
+      blockingReasons: [
         "shard_compile_failed_no_test_evidence",
         "blocked_test_classes_have_no_pass_evidence"
       ],
-      blockerDetail: "test shard failed at test_compile",
-      decisionBasis: [
+      evidenceRefs: [
         "asset://component_repair_schedule_surface#componentRepairSchedule",
         "asset://test_execution_result_surface#shardEvidence/test-shard-01-cdme-compiler"
-      ],
-      metPrecondition: false,
-      repricedRequested: false
+      ]
     }
   });
   const outputRef = `file://${handoff.outputFile}`;
@@ -708,8 +669,7 @@ test("B-085 release-depth parity consumes source repair schedule without duplica
           kind: "sdlc_component_repair_schedule_row",
           scheduleId: "schedule.compiler.diagnostics.scalac.001",
           failureId: "fail.compiler.diagnostics.scalac.001",
-          repairTarget:
-            "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
+          repairTarget: "component_test",
           lawfulReentryPoint: "realization_refactor",
           attributionConfidence: "high",
           testcaseIds: ["TC-DM-DIAG-001"],
@@ -743,15 +703,12 @@ test("B-085 release-depth parity consumes source repair schedule without duplica
     releaseDepthParity: {
       kind: "sdlc_release_depth_parity_assessment",
       status: "blocked",
-      scope: "release_surface",
-      blockerCodes: ["blocked_test_classes_have_no_pass_evidence"],
-      blockerDetail: "component repair schedule is still repair_required",
-      decisionBasis: [
+      summary: "component repair schedule is still repair_required",
+      blockingReasons: ["blocked_test_classes_have_no_pass_evidence"],
+      evidenceRefs: [
         `file://${scheduleHandoff.outputFile}`,
         "asset://test_execution_result_surface#shardEvidence/test-shard-01-cdme-compiler"
-      ],
-      metPrecondition: false,
-      repricedRequested: false
+      ]
     }
   });
   const releaseOutputRef = `file://${releaseHandoff.outputFile}`;
@@ -830,8 +787,7 @@ test("T-173 release-depth parity retires stale repair schedule after newer passi
           kind: "sdlc_component_repair_schedule_row",
           scheduleId: "schedule.compiler.diagnostics.scalac.001",
           failureId: "fail.compiler.diagnostics.scalac.001",
-          repairTarget:
-            "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala",
+          repairTarget: "component_code",
           lawfulReentryPoint: "realization_refactor",
           attributionConfidence: "high",
           testcaseIds: ["TC-DM-DIAG-001"],

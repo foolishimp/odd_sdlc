@@ -15,7 +15,6 @@ import {
   foldSdlcAssuranceLedgers,
   type SdlcAssuranceLedger,
   type SdlcAssuranceLedgerDimension,
-  type SdlcAssuranceLedgerReason,
   type SdlcTraversalRequirementSatisfaction,
   type SdlcObservedCapability,
   type SdlcRealizationTextSurface,
@@ -28,9 +27,7 @@ import {
   verdictFromReasons
 } from "../assurance/shared.js";
 import {
-  canonicalSdlcPriorGapReasonCode,
-  legacyBlockingReasonCode,
-  makeSdlcBlockingReason
+  canonicalSdlcPriorGapReasonCode
 } from "../shared/blocking_reason.js";
 import { FG_CONFORM_PROJECT_AUTHORITY } from "../graph/index.js";
 import type { SdlcRequirementClosureRegister } from "../projection/index.js";
@@ -47,7 +44,6 @@ export interface SdlcOperatorAssuranceGateResult {
   readonly requiredDimensions: readonly SdlcAssuranceLedgerDimension[];
   readonly ledgers: readonly SdlcAssuranceLedger[];
   readonly satisfaction: SdlcTraversalRequirementSatisfaction;
-  readonly blockingPostflight: SdlcPostflightResult | null;
 }
 
 function isPositiveCapabilityValue(value: string): boolean {
@@ -504,91 +500,19 @@ function currentAssuranceReasonCodes(
   );
 }
 
-function blockingReentryForAssuranceReason(
-  reason: SdlcAssuranceLedgerReason
-):
-  | "same_edge_retry"
-  | "escalate_to_fp"
-  | "repair_worker_output"
-  | "reprice_requirement_or_design"
-  | "operator_blocked" {
-  if (
-    reason.lawfulReentryPoint === "requirement_reprice" ||
-    reason.lawfulReentryPoint === "design_reframe"
-  ) {
-    return "reprice_requirement_or_design";
-  }
-  return reason.lawfulReentryPoint;
-}
-
-function orderedSatisfactionReasons(
-  satisfaction: SdlcTraversalRequirementSatisfaction
-): readonly SdlcAssuranceLedgerReason[] {
-  const reasonByCode = new Map<string, SdlcAssuranceLedgerReason>();
-  for (const reason of [
-    ...satisfaction.gapReasons,
-    ...satisfaction.blockingReasons,
-    ...satisfaction.repriceReasons,
-    ...satisfaction.fpEscalationReasons
-  ]) {
-    reasonByCode.set(reason.code, reason);
-  }
-  return Object.freeze(
-    satisfaction.retryHandoff.reasonCodes.map((reasonCode) => {
-      const reason = reasonByCode.get(reasonCode);
-      if (reason === undefined) {
-        return assuranceReason({
-          code: reasonCode,
-          message: `Assurance ledger reason ${reasonCode} was present in retry handoff without full reason detail.`,
-          evidenceRefs: satisfaction.retryHandoff.evidenceRefs,
-          lawfulReentryPoint:
-            satisfaction.status === "reprice_required"
-              ? "requirement_reprice"
-              : satisfaction.status === "fp_escalation"
-                ? "escalate_to_fp"
-              : "same_edge_retry"
-        });
-      }
-      return reason;
-    })
-  );
-}
-
-function postflightFromSatisfaction(
-  satisfaction: SdlcTraversalRequirementSatisfaction
-): SdlcPostflightResult | null {
-  if (
-    satisfaction.status === "close_allowed" ||
-    satisfaction.status === "not_applicable"
-  ) {
-    return null;
-  }
-  const carriers = orderedSatisfactionReasons(satisfaction).map((reason) =>
-    makeSdlcBlockingReason({
-      code: "assurance_ledger_reason",
-      detail: reason.code,
-      evidenceRefs: uniqueSorted([
-        ...satisfaction.retryHandoff.evidenceRefs,
-        ...reason.evidenceRefs
-      ]),
-      lawfulReentryPoint: blockingReentryForAssuranceReason(reason),
-      message: reason.message,
-      reasonClass: "assurance"
-    })
-  );
-  return Object.freeze({
-    kind: "sdlc_operator_postflight_result" as const,
-    status: "blocked" as const,
-    blockingReasons: Object.freeze(carriers.map(legacyBlockingReasonCode)),
-    blockingReasonCarriers: Object.freeze(carriers),
-    evidenceRefs: satisfaction.retryHandoff.evidenceRefs
-  });
-}
-
 function designCompletenessIsEvaluateOwned(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
   return manifest.targetAssetType === "implementation_design_surface";
+}
+
+function diagnosticOnlyAssuranceLedger(
+  ledger: SdlcAssuranceLedger
+): SdlcAssuranceLedger {
+  return Object.freeze({
+    ...ledger,
+    required: false
+  });
 }
 
 export function deriveSdlcOperatorAssuranceGate(input: {
@@ -602,7 +526,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
     postflight: input.postflight
   });
   const ledgers: SdlcAssuranceLedger[] = [materialization];
-  const requiredDimensions: SdlcAssuranceLedgerDimension[] = ["materialization"];
 
   if (input.manifest.productMaterialization.required) {
     const surfaces = materializedTextSurfaces(input.report);
@@ -614,7 +537,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
           input.manifest.targetAssetType === "component_test_surface"
       })
     );
-    requiredDimensions.push("shallow_realization");
 
     const requiredCapabilities =
       input.manifest.targetAssetType === "code_surface"
@@ -631,7 +553,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
           inventoryRequired: true
         })
       );
-      requiredDimensions.push("capability");
     }
   }
 
@@ -643,7 +564,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
         postflight: input.postflight
       })
     );
-    requiredDimensions.push("semantic_convergence");
   }
 
   const componentDepth = deriveComponentDepthAssuranceLedger({
@@ -652,9 +572,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
   });
   if (componentDepth !== null) {
     ledgers.push(componentDepth);
-    if (componentDepth.required !== false) {
-      requiredDimensions.push("component_depth");
-    }
   }
 
   if (!designCompletenessIsEvaluateOwned(input.manifest)) {
@@ -664,7 +581,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
     });
     if (designCompleteness !== null) {
       ledgers.push(designCompleteness);
-      requiredDimensions.push("design_completeness");
     }
   }
 
@@ -679,7 +595,6 @@ export function deriveSdlcOperatorAssuranceGate(input: {
         closureRegister: requirementClosureRegister
       })
     );
-    requiredDimensions.push("requirement_fulfillment");
   }
 
   if (input.manifest.retryContext.priorGapDossiers.length > 0) {
@@ -701,19 +616,22 @@ export function deriveSdlcOperatorAssuranceGate(input: {
         closedReasonCodes
       })
     );
-    requiredDimensions.push("obligation_carry");
   }
 
+  // Deterministic assurance ledgers are diagnostic facts. Traversal authority
+  // belongs to admitted evaluate.C/F_P findings and consequence.C.
+  const diagnosticLedgers = Object.freeze(
+    ledgers.map((ledger) => diagnosticOnlyAssuranceLedger(ledger))
+  );
   const satisfaction = foldSdlcAssuranceLedgers({
-    ledgers,
-    requiredDimensions
+    ledgers: diagnosticLedgers,
+    requiredDimensions: Object.freeze([])
   });
 
   return Object.freeze({
     kind: "sdlc_operator_assurance_gate_result" as const,
-    requiredDimensions: Object.freeze(requiredDimensions),
-    ledgers: Object.freeze(ledgers),
-    satisfaction,
-    blockingPostflight: postflightFromSatisfaction(satisfaction)
+    requiredDimensions: Object.freeze([]),
+    ledgers: diagnosticLedgers,
+    satisfaction
   });
 }

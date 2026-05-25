@@ -1047,12 +1047,21 @@ export function deriveSdlcEdgeClosureDecision(input: {
       throw new TypeError("edge assurance close decision target carrier admission drift");
     }
   }
+  const openReasonRefs = uniqueSorted([
+    ...(input.retryReasonRefs ?? []),
+    ...(input.repairReasonRefs ?? []),
+    ...(input.reenterReasonRefs ?? []),
+    ...(input.repriceReasonRefs ?? []),
+    ...(input.blockReasonRefs ?? [])
+  ]);
+  const closureAllowed = openReasonRefs.length === 0;
   const candidates = new Set<SdlcEdgeClosureDisposition>(["block"]);
   if (edgeAssuranceCloseDecision === null) {
-    if (input.ledger.edgeConverged) {
+    if (closureAllowed && input.ledger.edgeConverged) {
       candidates.add("close");
     }
   } else if (
+    closureAllowed &&
     edgeAssuranceCloseDecision.disposition === "close" &&
     input.ledger.edgeConverged
   ) {

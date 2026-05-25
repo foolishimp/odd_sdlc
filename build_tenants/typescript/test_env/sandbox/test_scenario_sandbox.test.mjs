@@ -251,6 +251,11 @@ test("scenario sandbox: hello-world live descriptors bind profile overlay scope"
   assert.equal(Array.isArray(jsLive.startTargetSequence), false);
   assert.equal(jsLive.continueOnEdgeConverge, undefined);
   assert.equal(jsLive.stopAfterGraphClose, true);
+  assert.ok(
+    jsLive.fixture.sourceFiles.includes(
+      "build_tenants/hello_world_javascript/spec/TECH_STACK.json"
+    )
+  );
   assert.deepEqual(jsLive.expectations.exactHandoffEdgeSequence, [
     ...T132_HELLO_WORLD_JS_MIN_FP_EDGES
   ]);

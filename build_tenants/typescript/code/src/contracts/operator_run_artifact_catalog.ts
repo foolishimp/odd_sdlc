@@ -291,6 +291,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-run"
   }),
   row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-content-ledger",
+    relativePath: "design_depth_fp_evaluator_content_ledger.json",
+    carrierKind: "sdlc_evaluate_content_ledger",
+    role: "authority_admission",
+    sourceOwner: "fp_evaluator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-content-ledger"
+  }),
+  row({
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-register",
     relativePath: "design_depth_fp_evaluator_register.json",
     carrierKind: "sdlc_design_depth_register",
@@ -784,16 +795,6 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/assurance-satisfaction"
   }),
   row({
-    artifactRef: "operator-run-artifact://assurance-postflight",
-    relativePath: "assurance_postflight.json",
-    carrierKind: "sdlc_operator_postflight_result",
-    role: "authority_admission",
-    sourceOwner: "installed_operator",
-    requiredForPresentEdge: false,
-    malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/assurance-postflight"
-  }),
-  row({
     artifactRef: "operator-run-artifact://constructor-result",
     relativePath: "constructor_result.json",
     carrierKind: "sdlc_constructor_result",
@@ -804,14 +805,14 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/constructor-result"
   }),
   row({
-    artifactRef: "operator-run-artifact://hook-postflight",
-    relativePath: "hook_postflight.json",
+    artifactRef: "operator-run-artifact://hook-diagnostics",
+    relativePath: "hook_diagnostics.json",
     carrierKind: "sdlc_operator_postflight_result",
-    role: "authority_admission",
+    role: "forensic_payload",
     sourceOwner: "installed_operator",
     requiredForPresentEdge: false,
     malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/hook-postflight"
+    admissionRef: "admission://odd-sdlc/operator-run/hook-diagnostics"
   }),
   row({
     artifactRef: "operator-run-artifact://worker-report-admission-postflight",

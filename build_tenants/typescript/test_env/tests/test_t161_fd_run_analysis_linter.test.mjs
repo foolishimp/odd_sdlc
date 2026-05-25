@@ -232,7 +232,13 @@ function buildSyntheticT132Archive(opts) {
       operatorRunRoot,
       "design_depth_fp_evaluator_register.json"
     );
+    const designDepthContentLedgerPath = path.join(
+      operatorRunRoot,
+      "design_depth_fp_evaluator_content_ledger.json"
+    );
     const designDepthRegisterRef = pathToFileURL(designDepthRegisterPath).href;
+    const designDepthContentLedgerRef =
+      pathToFileURL(designDepthContentLedgerPath).href;
     const defaultExecutionCommand = edge.target === "test_execution_result_surface"
       ? "node --test test/hello.test.js"
       : "node build_tenants/hello_world_javascript/src/hello.js";
@@ -448,8 +454,14 @@ function buildSyntheticT132Archive(opts) {
                     `finding://synthetic/${edge.name}/${index}/design-depth-register`,
                   compositionRef,
                   compositionDigest,
-                  authorityRefs: [designDepthRegisterRef],
-                  evidenceRefs: [designDepthRegisterRef]
+                  authorityRefs: [
+                    designDepthContentLedgerRef,
+                    designDepthRegisterRef
+                  ],
+                  evidenceRefs: [
+                    designDepthContentLedgerRef,
+                    designDepthRegisterRef
+                  ]
                 }
               ]
             : [],
@@ -466,7 +478,7 @@ function buildSyntheticT132Archive(opts) {
           postflightStatus,
           blockingReasons: blockingReasonCodes,
           evidenceRefs: edge.target === "implementation_design_surface"
-            ? [designDepthRegisterRef]
+            ? [designDepthContentLedgerRef, designDepthRegisterRef]
             : []
         },
         dirMtimeMs
@@ -476,9 +488,7 @@ function buildSyntheticT132Archive(opts) {
         (_, i) => `target_asset:${edge.target}/${i}`
       );
       if (edge.target === "implementation_design_surface") {
-        writeJson(
-          designDepthRegisterPath,
-          {
+        const designDepthRegisterPayload = {
             kind: "sdlc_design_depth_register",
             registerVersion: "ts-design-depth-v1",
             targetAssetType: "implementation_design_surface",
@@ -537,7 +547,43 @@ function buildSyntheticT132Archive(opts) {
               }
             ],
             designCompletenessVerdict: null
+          };
+        writeJson(
+          designDepthContentLedgerPath,
+          {
+            kind: "sdlc_evaluate_content_ledger",
+            ledgerVersion: "ts-evaluate-content-v1",
+            stage: "evaluate.C",
+            ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+            ruleRole: "semantic_judgment",
+            computeMeans: "F_P",
+            authorityFunction: "synthesize_model",
+            selectedCompositionRef: compositionRef,
+            selectedCompositionDigest: compositionDigest,
+            selectedCompositionSelectionRef: compositionSelectionRef,
+            selectedRegimeBindingRef,
+            compositionContributionRef: selectedRegimeBindingRef,
+            sourceBasisRefs: [pathToFileURL(operatorRunRoot).href],
+            candidateArtifactRefs: [pathToFileURL(operatorRunRoot).href],
+            evidenceRefs: [pathToFileURL(operatorRunRoot).href],
+            contentRows: [
+              {
+                kind: "sdlc_evaluate_content_ledger_row",
+                rowRef: `evaluate-content-row://synthetic/${edge.name}/${index}/design-depth-register`,
+                authorityFunction: "synthesize_model",
+                carrierFamily: "ProductAssetModel",
+                contentKind: "sdlc_design_depth_register",
+                payload: designDepthRegisterPayload,
+                sourceBasisRefs: [pathToFileURL(operatorRunRoot).href],
+                evidenceRefs: [pathToFileURL(operatorRunRoot).href]
+              }
+            ]
           },
+          dirMtimeMs
+        );
+        writeJson(
+          designDepthRegisterPath,
+          designDepthRegisterPayload,
           dirMtimeMs
         );
       }

@@ -62,6 +62,281 @@ effect when one of those common surfaces can be extended. If a new common
 surface is required, it must name producers, consumers, admission, effects, and
 proof before implementation closure.
 
+## Handoff Removal Rule
+
+`operator/handoff.ts` is not an owning design module and is not an accepted
+long-term adapter. It is a deletion target. Any remaining code there is open
+T-183 migration debt, permitted only while it is a thin worker-launch bridge
+with no prompt semantics, evaluator semantics, ledger semantics, consequence
+selection, product topology, stack policy, or closure authority. Logic formerly
+collected there has these homes:
+
+| former handoff concern | owning RC3 surface |
+| --- | --- |
+| worker launch manifests, prompt source carriers, transform request/result refs | `operator/plugins/transform/*` |
+| selected F_P evaluator sidecar admission, design-depth pressure maps, review-grade findings | `operator/plugins/evaluate/*` |
+| deterministic evidence/postflight guards | `postflight/*` and `operator/plugins/evaluate/postflight.ts` |
+| tenant stack authority and effective runtime/build/test contracts | `build_tenants/<tenant>/spec/TECH_STACK.json` as product authority, with generic transform/evaluate enforcement under `operator/plugins/transform/*` and `operator/plugins/evaluate/*` |
+| archive/file/process side effects | `effects/*` plus catalog-backed archive helpers |
+| ABG/system ledger write candidates and gap dossiers | `operator/ledgers/*`, `assurance_gate.ts`, and `traversal_consequence.ts` until split |
+| deterministic continuation projection | `operator/plugins/consequence/*` and `traversal_consequence.ts` |
+
+New code must not add prompt, semantic evaluation, ledger, consequence, stack,
+or topology logic to `handoff.ts`. If a helper is still imported from
+`handoff.ts`, it must either be the thin worker-launch bridge with a named T-183
+deletion row, or the design is not closed. Passing tests through a remaining
+handoff semantic path are non-closure evidence, not compatibility proof.
+
+## Canonical Prompt-Source Carrier
+
+`worker_construction_brief.json` is the canonical worker prompt-source carrier.
+It must carry typed obligation pressure, not only ids, counts, or prose
+summaries. The required pressure fields are:
+
+- `obligations.inlineObligations[]`: compact typed rows for structural and
+  high-signal requirement pressure in the active edge.
+- `obligations.inlineRequirementPressureRows[]`: the requirement-only work
+  queue the worker/evaluator must map before claiming completion.
+- `obligations.requirementTraceObligationIds[]`: compact lineage/id index, not
+  a replacement for the typed rows.
+
+`worker_invocation_package.json` may retain the same rows as an archive/audit
+projection, but it is not the worker's primary work queue when the construction
+brief is available.
+
+## SDLC Node Rule
+
+An SDLC node is not an imperative operator helper. It is a graph-stage
+computation over an input asset and its dependency pressure:
+
+```text
+A -> dependencies(A) -> selected F_P traversal/evaluation -> admitted B
+```
+
+The product-owned node declares the source asset type, target asset type,
+dependency/pressure inputs, target carrier, and selected compute-stage
+composition. F_P owns ambiguous traversal, construction, and semantic
+evaluation over that dependency pressure. F_D may build read-only dependency
+indexes, package prompts, admit carrier shape/provenance, execute declared
+commands, write ABG/system ledgers, and project consequence. F_D must not
+replace the selected F_P traversal/evaluation by inferring semantic node output
+from filenames, logs, language conventions, or historical archive shape.
+
+The TypeScript operator folder should therefore converge toward:
+
+- `operator/nodes/*`: SDLC graph node declarations and dependency pressure
+  inputs.
+- `operator/plugins/transform/*`: `transform.C` adapters for F_P construction
+  work.
+- `operator/plugins/evaluate/*`: `evaluate.C` adapters for F_P semantic
+  traversal/evaluation and F_D admission guards.
+- `operator/plugins/consequence/*`: `consequence.C` deterministic projection
+  over admitted state.
+- `operator/ledgers/*` and `effects/*`: ABG/system-owned writes and side
+  effects.
+
+Any node-specific semantic rule remaining in `handoff.ts`,
+`installed_operator.ts`, or a generic admission file is migration debt unless it
+is an F_D guard over an admitted F_P/project carrier.
+
+## ODD Authority Mapping
+
+ODD_SDLC remains the practical implementation of ODD methodology. ODD's older
+function labels map onto the current post-transform compute process as
+authority functions inside selected `evaluate.C`, not as a new runtime layer:
+
+| ODD authority function | RC3 compute-stage spelling | admitted carrier family |
+| --- | --- | --- |
+| `synthesize_model` | `synthesize_model.C/F_P` as a selected `evaluate.C` rule when model meaning is ambiguous | `ProductAssetModel` |
+| `eval_gap` | `eval_gap.C/F_P` as a selected `evaluate.C` rule over declared lineage-reachable ledger snapshots | `ObservationSnapshot` and `GapPressureRow` |
+| `evaluate_action` | `evaluate_action.C/F_P` or disambiguated `F_D` policy inside selected `evaluate.C` | `EdgeFulfillmentLedger` and `EdgeClosureDecision` |
+| `evaluate_next` | `evaluate_next.C/F_D` or `F_P` policy after admitted closure truth | `NextActionProjection` over `ActionCatalog` |
+
+`evaluate.C` is the compute-stage container. It is not a single semantic
+authority. Each rule declares which ODD authority function it realizes or
+consumes, and every output admits into the corresponding constitutional carrier
+family before ABG/system F_D writes events, ledgers, projection, or replay
+truth.
+
+## Design Surface Pressure Chain
+
+Design surfaces are not passive assets and are not closure tokens. They are the
+pressure chain the SDLC uses to keep intent, requirement, design, test, code,
+execution, and release obligations alive across the graph.
+
+Each design surface has two roles:
+
+- it is an admitted product surface for its own graph edge
+- it is a pressure source for downstream register construction
+
+The downstream register is therefore not produced from filenames, test logs, or
+operator-local heuristics. It is produced by selected F_P evaluation over the
+incoming design surface plus its dependency pressure:
+
+```text
+design_surface(A) + dependencies(A)
+  -> declared lineage-reachable ledger snapshot
+  -> selected evaluate.C authority rule
+  -> constitutional carrier candidate
+  -> F_D admission
+  -> ABG/system ledger truth
+```
+
+This is the same work a human operator would do when prompting an agent: carry
+the upstream design pressure forward, ask what obligations remain active, and
+turn that pressure into the next typed register. The system implementation must
+make that chain explicit. A register without a selected upstream design surface
+and dependency-pressure basis is not an admissible semantic register. A design
+surface that is generated and then ignored by the downstream register path is a
+broken pressure chain.
+
+## Existing Requirement-To-Function Fulfillment
+
+Product/materialization evidence is not the same as product fulfillment. The
+runtime may observe files, paths, tags, digests, execution logs, and materialized
+product-file roles, but those observations are only evidence candidates. This
+section restates existing `odd_sdlc` product and requirement law as an RC3
+implementation boundary; it does not introduce a new product purpose.
+
+Generated code fulfillment requires an admitted semantic binding:
+
+```text
+Requirement
+  -> product requirement row
+  -> design requirement / design obligation row
+  -> component or module responsibility
+  -> declared product target
+  -> code symbol, callable function, exported API, route, CLI, or executable entrypoint
+  -> test function, test case, execution evidence, or review-grade evaluator finding
+  -> EdgeFulfillmentLedger
+  -> EdgeClosureDecision
+```
+
+Every evaluator in this chain exists to preserve lineage pressure. The evaluator
+receives the accumulated requirements and design obligations for its stage,
+subdivides or checks them at the next stage boundary, and emits rows that keep
+the path from requirement to design to module to function visible. At the code
+stage, closure is the admitted relationship `fn() == test.fn()` or the
+equivalent public/executable behavior matched to its test or execution
+evidence.
+
+Failed tests are negative fulfillment evidence in that same relationship. A
+failed test must bind back to the requirement, product/design obligation,
+function or entrypoint, and test function it falsifies. The admitted evaluator
+pressure then forces `EdgeClosureDecision` to repair, retry, block, or reprice,
+and `NextActionProjection` loops through the published graph action. A raw
+failure count or local retry flag is not enough.
+
+The selected `evaluate_action.C/F_P` rule, or explicit project-declared
+structured authority, owns that binding. F_D may verify that referenced files,
+symbols, digests, test outputs, and evidence refs exist and are internally
+consistent. F_D must not infer from a changed file or requirement tag that a
+requirement has reached coded fulfillment.
+
+The generic row shape for coded fulfillment is:
+
+```text
+requirementRef
+productRequirementRef
+designObligationRef
+componentRef
+productTargetRef
+codeSurfaceRef
+functionOrEntrypointRef
+realizationEvidenceRefs
+testOrExecutionEvidenceRefs
+evaluatorFindingRef
+```
+
+`functionOrEntrypointRef` is the key distinction. Without it, the system has
+only boundary tracking: it knows a file changed, but not that a product
+requirement is realized by a function, API, route, command, or executable
+entrypoint.
+
+## Algorithmic Definitions
+
+The generic SDLC node algorithm is:
+
+```text
+node(A, B):
+  basis = admitted A + declared lineage-reachable ledger snapshot
+    + admitted dependency pressure for A
+  transform_candidate = transform.C(basis)
+  authority_output = evaluate.C authority rule over basis + transform_candidate
+  admitted_pressure = ABG/system F_D admission over authority_output
+  B = admitted target carrier + admitted pressure ledgers
+  next_action = consequence.C(admitted ABG state)
+```
+
+For an asset chain:
+
+```text
+A -> B -> C -> D
+```
+
+the obligations for `D` are the active pressure carried by `(A, B, C)`.
+Delivery of `D` is not evaluated only against its local output. It is evaluated
+against the dependency pressure created by the upstream admitted surfaces.
+
+The ledger algorithm is:
+
+```text
+evaluate.C authority rule
+  -> constitutional carrier candidate
+  -> sdlc_evaluate_content_ledger
+  -> ABG/system F_D admission
+  -> ABG/system F_D ledger writer
+  -> admitted ledger
+```
+
+`sdlc_evaluate_content_ledger` is the concrete TypeScript migration carrier for
+F_P-generated semantic content. Legacy `*_register.json` artifacts are exact
+projections of admitted content-ledger rows while downstream consumers are being
+split. They are not primary truth and cannot satisfy authority without the
+selected content ledger that produced them.
+
+The delete rule is equally explicit: any F_D helper that turns filenames, logs,
+language conventions, historical archives, prior test output, or deterministic
+test success into semantic register rows is not an optimization. It is a second
+truth surface and must be removed or demoted to non-authoritative diagnostics.
+
+## Bad Register Elimination
+
+The RC3 implementation eliminates false-assurance registers. A false-assurance
+register is any register, ledger, sidecar, parser result, archive artifact, or
+read model that can influence close, retry, repair, re-entry, reprice, next
+action, analyzer truth, or public gap truth without selected F_P semantic
+evaluation or explicit project-declared authority.
+
+Every candidate surface must be traced as:
+
+```text
+producer
+  -> compute means
+  -> selected composition / regime evidence
+  -> admission helper
+  -> consumed-by surfaces
+  -> closure, retry, repair, next-action, analyzer, or gap effect
+```
+
+The only generic semantic funnel is:
+
+```text
+transform.C output / admitted evidence / lineage snapshot
+  -> selected evaluate.C/F_P authority rule
+  -> content ledger or typed evaluator finding
+  -> F_D admission guard
+  -> ABG/system ledger writer
+  -> EdgeFulfillmentLedger / EdgeClosureDecision / NextActionProjection
+```
+
+Deterministic producers may create evidence, diagnostics, projections,
+admission decisions, command execution records, and ABG/system side effects.
+They must not create semantic assurance rows for ambiguous SDLC work. A
+compatibility register may remain only as an exact projection of admitted F_P
+truth with selected composition, selected regime, evaluator, and admission
+evidence preserved.
+
 ## Target Flow
 
 ```text
@@ -159,7 +434,7 @@ Forbidden:
 Purpose: bind SDLC ambiguous evaluation to `plugin.evaluate.C`.
 
 The general SDLC path is GTL-composed and F_P-formed because it maps ambiguity
-across transform work, deterministic evidence registers, pressure, and intent
+across transform work, deterministic evidence admissions, pressure, and intent
 fit. ABG selects/admit the composed `evaluate.C` stage; SDLC does not create a
 second local evaluation runtime.
 
@@ -167,17 +442,23 @@ Inputs:
 
 - selected composition identity and regime binding
 - admitted transform refs
-- retained F_D evidence registers
+- retained deterministic evidence admissions and process observations
 - edge assurance contract refs
 - target carrier admission summaries
 - materialization refs
 - T-174 frontier refs when applicable
 - ABG causality/replay refs
+- admitted upstream design surfaces and dependency-pressure refs
 
 Outputs:
 
 - `GtlEvaluationFindingRef[]`
 - `GtlEvaluation`
+- authority-function carrier candidates:
+  `ProductAssetModel`, `ObservationSnapshot`, `GapPressureRow`,
+  `EdgeFulfillmentLedger`, `EdgeClosureDecision`, and
+  `NextActionProjection` refs as appropriate to the declared evaluator rule
+- semantic pressure maps and typed ledger candidates as subordinate payloads
 - `SdlcDesignDepthRegister` evaluator-rule candidate when the selected rule is
   the implementation-design depth register pilot
 - metrics refs
@@ -206,7 +487,8 @@ The implementation-design depth register pilot promotes one concrete
 
 - Interface: `EnginePluginInput` plus selected composition identity, admitted
   transform refs, construction brief refs, invocation package refs, manifest
-  refs, and retained deterministic evidence registers.
+  refs, deterministic evidence admissions, upstream design-surface refs, and
+  dependency-pressure refs.
 - Adapter: `SdlcEvaluatePluginAdapter`.
 - Candidate carrier: `SdlcDesignDepthRegister` serialized as
   `design_depth_fp_evaluator_register.json`.
@@ -226,18 +508,23 @@ The implementation-design depth register pilot promotes one concrete
   design-depth truth for closure.
 
 The sidecar is not a final ledger write, not closure authority, and not a
-product design surface. For the pilot path, selected `evaluate.C/F_P` over the
-workspace is the highest semantic/product judgment truth for the register
-content. F_D admission guards shape, identity, completeness, provenance, and
-fail-closed consistency. ABG owns event, ledger, admission, provenance, and
-replay truth; it records the selected evaluation as runtime truth and does not
-semantically override the selected F_P judgment.
+product design surface. For the pilot path, selected `evaluate.C/F_P` over a
+declared lineage-reachable ledger snapshot is the highest semantic/product
+judgment truth for the register content. Raw workspace observations must first
+enter admitted evidence or `ObservationSnapshot` truth before they become
+evaluator authority input. F_D admission guards shape, identity, completeness,
+provenance, and fail-closed consistency. ABG owns event, ledger, admission,
+provenance, and replay truth; it records the selected evaluation as runtime
+truth and does not semantically override the selected F_P judgment.
 
 The consumed register flow is therefore:
 
 ```text
-workspace -> selected evaluate.C/F_P -> evaluator sidecar candidate
-  -> F_D admission guard -> ABG ledger/provenance/replay
+workspace observations -> admitted evidence or ObservationSnapshot
+  -> declared lineage-reachable ledger snapshot
+  -> selected evaluate.C/F_P design-depth rule
+  -> evaluator sidecar candidate -> F_D admission guard
+  -> ABG ledger/provenance/replay
 ```
 
 The forbidden flow is:
@@ -388,10 +675,12 @@ Purpose: prove the installed hello-world lane follows the RC3 staged boundary.
 The proof must run only after semantic tests pass. It must fail if hello-world
 output is produced through the old bundled SDLC adapter path.
 
-## F_D Register Preservation
+## F_D Evidence Preservation
 
-The migration keeps current deterministic register/process value, but changes
-its authority.
+The migration keeps deterministic evidence/process value, but deletes its
+semantic-register authority. These retained facts can inform selected
+`evaluate.C/F_P` and ABG/system admission, but they do not construct semantic
+rows.
 
 Retained as evidence:
 
@@ -406,6 +695,8 @@ Retained as evidence:
 
 Not retained as authority:
 
+- deterministic design-depth, repair, test-schedule, review-grade, or
+  obligation-row synthesis
 - local closure decision as final closure truth
 - local next-action projection as traversal authority
 - local ledger write as ABG ledger truth

@@ -50,14 +50,7 @@ function componentDepthArtifact(register) {
   const filePath = join(root, `${register.targetAssetType}.md`);
   writeFileSync(
     filePath,
-    [
-      `# ${register.targetAssetType}`,
-      "",
-      "```component_depth_register",
-      JSON.stringify(register, null, 2),
-      "```",
-      ""
-    ].join("\n"),
+    `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
   return filePath;
@@ -65,17 +58,10 @@ function componentDepthArtifact(register) {
 
 function designDepthArtifact(register) {
   const root = mkdtempSync(join(tmpdir(), "odd-sdlc-design-depth-"));
-  const filePath = join(root, `${register.targetAssetType}.md`);
+  const filePath = join(root, `${register.targetAssetType}.json`);
   writeFileSync(
     filePath,
-    [
-      `# ${register.targetAssetType}`,
-      "",
-      "```design_depth_register",
-      JSON.stringify(register, null, 2),
-      "```",
-      ""
-    ].join("\n"),
+    `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
   return filePath;

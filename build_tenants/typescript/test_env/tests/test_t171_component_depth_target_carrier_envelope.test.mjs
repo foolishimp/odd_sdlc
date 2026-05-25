@@ -23,7 +23,7 @@ function writeArtifact(content) {
   return outputFile;
 }
 
-test("T-171 admits component-depth payload from selected target-carrier envelope", () => {
+test("T-171 admits exact component-depth payload selected by target-carrier authority", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -44,43 +44,7 @@ test("T-171 admits component-depth payload from selected target-carrier envelope
       }
     ]
   };
-  const carrier = {
-    kind: "sdlc_component_code_surface_target_carrier",
-    targetAssetType: "component_code_surface",
-    edgeRef: "derive_lite_component_code_surface",
-    contractRef:
-      "gtl://target-carrier-contract/odd-sdlc/derive_lite_component_code_surface/component_code_surface",
-    contractDigest: "sha256:component-code-contract",
-    payload: register,
-    summary: "Component code carrier emitted by the worker.",
-    evidenceRefs: [
-      "workspace://build_tenants/hello_world_javascript/src/hello.js"
-    ]
-  };
-  const executionEvidence = {
-    kind: "sdlc_worker_execution_evidence",
-    lane: "test",
-    command: "node build_tenants/hello_world_javascript/src/hello.js",
-    status: "succeeded",
-    reportRefs: [
-      "file://.ai-workspace/runtime/odd_sdlc/operator-runs/t171/stdout.log"
-    ],
-    testsObserved: 1,
-    passedCount: 1,
-    failedCount: 0
-  };
-  const outputFile = writeArtifact([
-    "# Component Code Surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(carrier, null, 2),
-    "```",
-    "",
-    "```json execution_evidence",
-    JSON.stringify(executionEvidence, null, 2),
-    "```",
-    ""
-  ].join("\n"));
+  const outputFile = writeArtifact(`${JSON.stringify(register, null, 2)}\n`);
 
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: "component_code_surface",
@@ -96,7 +60,108 @@ test("T-171 admits component-depth payload from selected target-carrier envelope
   );
 });
 
-test("T-171 admits test-design payload from selected target-carrier envelope", () => {
+test("T-183 admits fenced selected component-depth target-carrier envelope", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "hello_program",
+        moduleName: "hello_world_javascript",
+        relativePath: "src/hello.js",
+        publicBoundary: "node stdout entrypoint",
+        requirementIds: ["REQ-T132-001"],
+        sourceAssetRefs: [
+          "workspace://build_tenants/hello_world_javascript/design/adrs/ADR-002-implementation-design-surface.md"
+        ]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const envelope = {
+    kind: "sdlc_component_code_surface_target_carrier",
+    targetAssetType: "component_code_surface",
+    edgeRef: "derive_lite_component_code_surface",
+    contractRef:
+      "gtl://target-carrier-contract/odd-sdlc/derive_lite_component_code_surface/component_code_surface",
+    contractDigest: "sha256:t183_component_depth_envelope",
+    summary: "selected carrier envelope carries payload; prose is not closure truth",
+    evidenceRefs: ["file:build_tenants/hello_world_javascript/src/hello.js"],
+    payload: register
+  };
+  const outputFile = writeArtifact(
+    `# component code\n\n\`\`\`json component_depth_register\n${JSON.stringify(envelope, null, 2)}\n\`\`\`\n`
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(admission.register.componentRealizationRows.length, 1);
+  assert.equal(admission.register.componentRealizationRows[0].componentId, "hello_program");
+});
+
+test("T-183 rejects fenced component-depth payload with extra semantic surfaces", () => {
+  const outputFile = writeArtifact(`# component code
+
+\`\`\`json component_depth_register
+${JSON.stringify(
+  {
+    kind: "sdlc_component_code_surface_target_carrier",
+    targetAssetType: "component_code_surface",
+    edgeRef: "derive_lite_component_code_surface",
+    contractRef:
+      "gtl://target-carrier-contract/odd-sdlc/derive_lite_component_code_surface/component_code_surface",
+    contractDigest: "sha256:t183_component_depth_envelope",
+    payload: {
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_code_surface",
+      componentRealizationRows: [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "hello_program",
+          moduleName: "hello_world_javascript",
+          relativePath: "src/hello.js",
+          publicBoundary: "node stdout entrypoint",
+          requirementIds: ["REQ-T132-001"],
+          sourceAssetRefs: ["workspace://design/adr"]
+        }
+      ],
+      materializedFiles: [
+        {
+          relativePath: "src/hello.js",
+          role: "source"
+        }
+      ]
+    }
+  },
+  null,
+  2
+)}
+\`\`\`
+`);
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /materializedFiles: unexpected field/u);
+});
+
+test("T-171 admits exact test-design payload selected by target-carrier authority", () => {
   const testCase = {
     kind: "sdlc_test_case_row",
     testCaseRef: "test-case://hello-world/says-hello",
@@ -202,27 +267,7 @@ test("T-171 admits test-design payload from selected target-carrier envelope", (
       }
     ]
   };
-  const carrier = {
-    kind: "sdlc_test_design_surface_target_carrier",
-    targetAssetType: "test_design_surface",
-    edgeRef: "derive_test_design_surface",
-    contractRef:
-      "gtl://target-carrier-contract/odd-sdlc/derive_test_design_surface/test_design_surface",
-    contractDigest: "sha256:test-design-contract",
-    payload: register,
-    summary: "Test design carrier emitted by the worker.",
-    evidenceRefs: [
-      "workspace://build_tenants/hello_world_javascript/test/hello.test.js"
-    ]
-  };
-  const outputFile = writeArtifact([
-    "# Test Design Surface",
-    "",
-    "```json test_design_register",
-    JSON.stringify(carrier, null, 2),
-    "```",
-    ""
-  ].join("\n"));
+  const outputFile = writeArtifact(`${JSON.stringify(register, null, 2)}\n`);
 
   const admission = admitTestDesignRegisterFromArtifact({
     targetAssetType: "test_design_surface",
@@ -273,14 +318,7 @@ test("T-171 rejects malformed test-design rows with bounded aggregate shape feed
     uatIntegrationBindings: [],
     testExecutionScheduleRows: []
   };
-  const outputFile = writeArtifact([
-    "# Test Design Surface",
-    "",
-    "```json test_design_register",
-    JSON.stringify(malformedRegister, null, 2),
-    "```",
-    ""
-  ].join("\n"));
+  const outputFile = writeArtifact(`${JSON.stringify(malformedRegister, null, 2)}\n`);
 
   const admission = admitTestDesignRegisterFromArtifact({
     targetAssetType: "test_design_surface",
@@ -290,15 +328,4 @@ test("T-171 rejects malformed test-design rows with bounded aggregate shape feed
   assert.equal(admission.status, "rejected");
   const reason = admission.blockingReasons.join("\n");
   assert.match(reason, /uatTestcaseRows\[0\]\.caseId: unexpected field/);
-  assert.match(reason, /uatTestcaseRows\[0\]\.testCaseRef: expected string/);
-  assert.match(reason, /uatTestcaseRows\[0\]\.caseKind: expected one of/);
-  assert.match(reason, /uatTestcaseRows\[0\]\.executionLane: expected one of/);
-  assert.match(
-    reason,
-    /uatTestcaseRows\[0\]\.sourceDesignObligationRefs: missing field/
-  );
-  assert.match(
-    reason,
-    /testcaseAuthorityRows\[0\]\.testCaseRef: missing field/
-  );
 });

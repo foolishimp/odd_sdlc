@@ -109,29 +109,39 @@ by configured `F_P` under an explicit output contract.
   `F_P` construction is non-close pressure unless the edge is explicitly
   declared deterministic, projection-only, or no-close
 
-### REQ-F-ODDSDLC-015 — layered F_D governs universal, specialized, postflight, and operational truth
+### REQ-F-ODDSDLC-015 — layered F_D governs admission, evidence, fold, and operational truth
 
 `odd_sdlc` uses layered deterministic authority around software-domain work.
+That authority is a guard and side-effect boundary. It is not the generic
+semantic source for ambiguous SDLC registers, obligation maps, repair rows, test
+schedules, design-depth rows, review-grade findings, or asset adequacy
+judgment.
 
 **Acceptance Criteria**:
 - AC-1: `Core F_D` checks bindings, identity, provenance, report shape,
   evidence presence, and cross-surface consistency
 - AC-2: `Capability F_D` can be attached for stack- or subsystem-specific
-  deterministic authority without changing the regime model
+  deterministic admission, evidence, execution, or projection authority without
+  changing the regime model; it cannot supply hidden semantic row meaning for a
+  generic SDLC edge
 - AC-3: `Postflight F_D` is required before proof can count for
   `F_P`-supervised traversal
 - AC-4: `Operational F_D` validates returned runtime, release, and maintenance
   evidence where those surfaces are in scope
-- AC-5: `Obligation F_D` folds declared obligations, worker fulfillment
+- AC-5: `Obligation F_D` folds admitted obligations, selected evaluator
   assessments, requirement closure registers, prior gap ledgers, and
   materialized evidence into explicit close, retry, blocked, or reprice truth
-  before an edge can converge
+  before an edge can converge; it does not create the semantic obligation map it
+  folds
 - AC-6: for the generic SDLC product path, `F_D` optimizes, admits, validates,
   folds, and routes around admitted `F_P` work; it does not replace configured
   `F_P` as the constructive regime for open-ended traversal
 - AC-7: optimized domains may use `F_D` for performance and cost only when the
   domain declares deterministic authority, deterministic transform law, and
-  deterministic closure evidence as product-owned contract truth
+  deterministic closure evidence as product-owned contract truth; this
+  declaration is explicit product authority and cannot be inferred from a
+  previously observed language, framework, test harness, archive, or local
+  helper
 
 ### REQ-F-ODDSDLC-016 — runtime-returned evidence is a first-class governed domain input
 
@@ -371,7 +381,7 @@ unresolved live requirements as active future pressure across bounded waves.
   them without re-inferring them from one blended status
 - AC-8: the closure register is part of the traversal obligation context for
   downstream realization edges; unresolved live requirements remain input
-  pressure to later `F_P` traversals and later `F_D` evaluators
+  pressure to later `F_P` traversals and later F_D admission/fold guards
 
 ### REQ-F-ODDSDLC-030 — generated source and test surfaces carry explicit trace authority
 

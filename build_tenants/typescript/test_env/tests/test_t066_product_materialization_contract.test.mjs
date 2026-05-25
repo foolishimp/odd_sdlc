@@ -132,6 +132,32 @@ function makeWorkspace() {
   return root;
 }
 
+function makeExecutionWorkspace() {
+  const root = makeWorkspace();
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t066_execution_fixture",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - full-suite"
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: root });
+  writeAdmittedStagedAuthoritySurfaces(root);
+  return root;
+}
+
 function selectedCompositionForManifest(manifest) {
   return deriveSdlcSelectedAbgFnCompositionIdentity({
     graphFunctionRef: manifest.graphFunctionName,
@@ -163,9 +189,53 @@ function writeAdmittedImplementationDesignArchive({
     prior.archiveRoot,
     "design_depth_fp_evaluator_register.json"
   );
+  const contentLedgerPath = path.join(
+    prior.archiveRoot,
+    "design_depth_fp_evaluator_content_ledger.json"
+  );
   const registerRef = pathToFileURL(registerPath).href;
+  const contentLedgerRef = pathToFileURL(contentLedgerPath).href;
   writeFileSync(registerPath, `${JSON.stringify(register, null, 2)}\n`, "utf8");
   const selectedComposition = selectedCompositionForManifest(prior);
+  writeFileSync(
+    contentLedgerPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_evaluate_content_ledger",
+        ledgerVersion: "ts-evaluate-content-v1",
+        stage: "evaluate.C",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        authorityFunction: "synthesize_model",
+        selectedCompositionRef: selectedComposition.compositionRef,
+        selectedCompositionDigest: selectedComposition.compositionDigest,
+        selectedCompositionSelectionRef: selectedComposition.compositionSelectionRef,
+        selectedRegimeBindingRef: selectedComposition.selectedRegimeBindingRef,
+        compositionContributionRef:
+          selectedComposition.selectedRegimeBindingRef ??
+          selectedComposition.compositionSelectionRef,
+        sourceBasisRefs: [pathToFileURL(prior.outputFile).href],
+        candidateArtifactRefs: [pathToFileURL(prior.outputFile).href],
+        evidenceRefs: [pathToFileURL(prior.outputFile).href],
+        contentRows: [
+          {
+            kind: "sdlc_evaluate_content_ledger_row",
+            rowRef: "evaluate-content-row://t066/design-depth-register",
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register",
+            payload: register,
+            sourceBasisRefs: [pathToFileURL(prior.outputFile).href],
+            evidenceRefs: [pathToFileURL(prior.outputFile).href]
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
   writeFileSync(
     path.join(prior.archiveRoot, "fp_evaluate_result.json"),
     `${JSON.stringify(
@@ -185,8 +255,8 @@ function writeAdmittedImplementationDesignArchive({
             findingRef: "finding://t066/evaluate/design-depth-register",
             compositionRef: selectedComposition.compositionRef,
             compositionDigest: selectedComposition.compositionDigest,
-            authorityRefs: [registerRef],
-            evidenceRefs: [registerRef]
+            authorityRefs: [contentLedgerRef, registerRef],
+            evidenceRefs: [contentLedgerRef, registerRef]
           }
         ],
         evaluation: {
@@ -197,7 +267,7 @@ function writeAdmittedImplementationDesignArchive({
         status: "passed",
         postflightStatus: "passed",
         blockingReasons: [],
-        evidenceRefs: [registerRef]
+        evidenceRefs: [contentLedgerRef, registerRef]
       },
       null,
       2
@@ -229,7 +299,7 @@ function writeAdmittedImplementationDesignArchive({
             kind: "sdlc_worker_obligation_assessment",
             obligationId: obligation.obligationId,
             fulfillmentStatus: "fulfilled",
-            evidenceRefs: [registerRef, ...obligation.evidenceRefs],
+            evidenceRefs: [contentLedgerRef, registerRef, ...obligation.evidenceRefs],
             blockingReasons: []
           })
         ),
@@ -767,8 +837,7 @@ function writePlaceholderWorkerScript(workspaceRoot) {
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
       "appendImplementationDesignAdr(outputLines);",
-      "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
-      "const output = outputLines.join('\\n') + '\\n';",
+      "const output = componentRegister !== null ? `${JSON.stringify(componentRegister, null, 2)}\\n` : outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const tenantRelative = sourceRelative;",
@@ -838,9 +907,8 @@ function writeCapabilityMissingWorkerScript(workspaceRoot) {
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
       "const testRegister = testDesignRegister();",
-      "if (testRegister !== null) outputLines.push('', '```test_design_register', JSON.stringify(testRegister, null, 2), '```');",
-      "if (register !== null) outputLines.push('', '```component_depth_register', JSON.stringify(register, null, 2), '```');",
-      "const output = outputLines.join('\\n') + '\\n';",
+      "const exactOutputRegister = testRegister ?? register;",
+      "const output = exactOutputRegister !== null ? `${JSON.stringify(exactOutputRegister, null, 2)}\\n` : outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const tenantRelative = sourceRelative;",
@@ -1175,11 +1243,21 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "}",
       "const testExecutionRegister = testExecutionSurfaceRegister();",
       "const evaluateStage = process.env.ODD_SDLC_EVALUATE_STAGE || '';",
-      "if (evaluateStage === 'design_depth_register') {",
+      "if (evaluateStage === 'design_depth_content_ledger') {",
       "  const register = designDepthRegister();",
       "  if (register === null) throw new Error(`design depth register not available for ${manifest.targetAssetType}`);",
-      "  const registerPath = path.join(manifest.archiveRoot, 'design_depth_fp_evaluator_register.json');",
-      "  writeFileSync(registerPath, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
+      "  const contentLedgerPath = process.env.ODD_SDLC_EVALUATOR_CONTENT_LEDGER;",
+      "  if (typeof contentLedgerPath !== 'string' || contentLedgerPath.length === 0) throw new Error('ODD_SDLC_EVALUATOR_CONTENT_LEDGER is required');",
+      "  const selectedCompositionRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_REF;",
+      "  const selectedCompositionDigest = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_DIGEST;",
+      "  const selectedCompositionSelectionRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_SELECTION_REF;",
+      "  if (!selectedCompositionRef || !selectedCompositionDigest || !selectedCompositionSelectionRef) throw new Error('selected composition environment is required');",
+      "  const selectedRegimeBindingRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_REGIME_BINDING_REF || null;",
+      "  const compositionContributionRef = process.env.ODD_SDLC_EVALUATOR_COMPOSITION_CONTRIBUTION_REF || selectedRegimeBindingRef || selectedCompositionRef;",
+      "  const sourceRef = pathToFileURL(manifest.outputFile).href;",
+      "  const ledger = { kind: 'sdlc_evaluate_content_ledger', ledgerVersion: 'ts-evaluate-content-v1', stage: 'evaluate.C', ruleRef: 'evaluation-rule://odd-sdlc/design-depth-register/fp', ruleRole: 'semantic_judgment', computeMeans: 'F_P', authorityFunction: 'synthesize_model', selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs: [sourceRef], candidateArtifactRefs: [sourceRef], evidenceRefs: [sourceRef], contentRows: [{ kind: 'sdlc_evaluate_content_ledger_row', rowRef: 'evaluate-content-row://t066/data-mapper/design-depth-register', authorityFunction: 'synthesize_model', carrierFamily: 'ProductAssetModel', contentKind: 'sdlc_design_depth_register', payload: register, sourceBasisRefs: [sourceRef], evidenceRefs: [sourceRef] }] };",
+      "  mkdirSync(dirname(contentLedgerPath), { recursive: true });",
+      "  writeFileSync(contentLedgerPath, `${JSON.stringify(ledger, null, 2)}\\n`, 'utf8');",
       "  process.exit(0);",
       "}",
       "if (evaluateStage === 'review_grade_edge_fulfillment') {",
@@ -1215,10 +1293,8 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "if (manifest.outputFile.split(path.sep).join('/').includes('/design/adrs/')) outputLines.push('', '| Field | Value |', '|-------|-------|', '| `Status:` | `active` |', `| \\`Implements:\\` | ${requirementIds} |`, `| \\`Derives from:\\` | ${manifest.graphFunctionName} / ${manifest.edgeName} |`, '| `Supersedes:` | none |', '| `Superseded by:` | none |', '| `Retained special case:` | none |');",
       "outputLines.push('', `edge: ${manifest.edgeName}`, '', '## Inputs', ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`), '', '## Requirement Trace', requirementTraceHeader);",
       "appendImplementationDesignAdr(outputLines);",
-      "if (testRegister !== null) outputLines.push('', '```test_design_register', JSON.stringify(testRegister, null, 2), '```');",
-      "if (testExecutionRegister !== null) outputLines.push('', '```json test_execution_surface_register', JSON.stringify(testExecutionRegister, null, 2), '```');",
-      "if (componentRegister !== null) outputLines.push('', '```component_depth_register', JSON.stringify(componentRegister, null, 2), '```');",
-      "const output = outputLines.join('\\n') + '\\n';",
+      "const exactOutputRegister = testRegister ?? testExecutionRegister ?? componentRegister;",
+      "const output = exactOutputRegister !== null ? `${JSON.stringify(exactOutputRegister, null, 2)}\\n` : outputLines.join('\\n') + '\\n';",
       "mkdirSync(dirname(manifest.outputFile), { recursive: true });",
       "writeFileSync(manifest.outputFile, output, 'utf8');",
       "const materializedFiles = [];",
@@ -3063,33 +3139,26 @@ test("T-144 invalid component-depth register blocks fulfilled product materializ
   const sourceContent = "console.log('Hello, world!');\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
   writeFileSync(sourcePath, sourceContent, "utf8");
-  const invalidRegisterArtifact = [
-    "# component_code_surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(
-      {
-        kind: "sdlc_component_depth_register",
-        registerVersion: "ts-component-depth-v1",
-        targetAssetType: "component_code_surface",
-        componentRealizationRows: [
-          {
-            kind: "sdlc_component_realization_row",
-            componentId: "component:hello",
-            moduleName: "hello_world_javascript",
-            relativePath: "src/hello.js",
-            publicBoundary: 3,
-            requirementIds: ["REQ-T066-001"],
-            sourceAssetRefs: ["fixture://t144"]
-          }
-        ]
-      },
-      null,
-      2
-    ),
-    "```",
-    ""
-  ].join("\n");
+  const invalidRegisterArtifact = `${JSON.stringify(
+    {
+      kind: "sdlc_component_depth_register",
+      registerVersion: "ts-component-depth-v1",
+      targetAssetType: "component_code_surface",
+      componentRealizationRows: [
+        {
+          kind: "sdlc_component_realization_row",
+          componentId: "component:hello",
+          moduleName: "hello_world_javascript",
+          relativePath: "src/hello.js",
+          publicBoundary: 3,
+          requirementIds: ["REQ-T066-001"],
+          sourceAssetRefs: ["fixture://t144"]
+        }
+      ]
+    },
+    null,
+    2
+  )}\n`;
   mkdirSync(dirname(manifest.outputFile), { recursive: true });
   writeFileSync(manifest.outputFile, invalidRegisterArtifact, "utf8");
   writeReport({
@@ -6050,14 +6119,7 @@ test("T-131 component-depth assurance admits already-materialized declared produ
       }
     ]
   };
-  const artifact = [
-    "# component_code_surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
+  const artifact = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(dirname(manifest.outputFile), { recursive: true });
   writeFileSync(manifest.outputFile, artifact, "utf8");
   writeReport({
@@ -6141,14 +6203,7 @@ test("T-159 component-depth assurance admits workspace-relative declared product
       }
     ]
   };
-  const artifact = [
-    "# component_code_surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```",
-    ""
-  ].join("\n");
+  const artifact = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(dirname(manifest.outputFile), { recursive: true });
   writeFileSync(manifest.outputFile, artifact, "utf8");
   writeReport({
@@ -6281,7 +6336,7 @@ test("T-173 framework-smoke Min(F_P) component-code consumes implementation-desi
   );
   assert.ok(
     invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes("package.json with type=module")
+      directive.includes("Tenant stack authority must match the product files actually emitted")
     )
   );
 });
@@ -6378,22 +6433,30 @@ test("T-102 post-transform observation ignores component-test build byproducts",
     manifest.productMaterialization
   );
   writeHandoffFiles(manifest);
+  const testRelativePath =
+    "cdme-compiler/src/test/scala/cdme/compiler/GeneratedSpec.scala";
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "GeneratedSpec",
+        relativePath: testRelativePath,
+        testcaseIds: ["TC-T066-001"],
+        componentIds: ["cdme-compiler"],
+        requirementIds: ["REQ-T066-001"],
+        shardId: "test-shard-generated"
+      }
+    ]
+  };
   mkdirSync(dirname(manifest.outputFile), { recursive: true });
   writeFileSync(
     manifest.outputFile,
-    [
-      "# component_test_surface",
-      "",
-      "edge: derive_component_test_surface",
-      "",
-      "This transform writes one test and a build tool emits target files.",
-      "",
-      "REQ-T066-001"
-    ].join("\n") + "\n",
+    `${JSON.stringify(register, null, 2)}\n`,
     "utf8"
   );
-  const testRelativePath =
-    "cdme-compiler/src/test/scala/cdme/compiler/GeneratedSpec.scala";
   const testPath = path.join(
     manifest.productMaterialization.tenantRoot,
     testRelativePath
@@ -6489,15 +6552,7 @@ test("T-168 component-test materialization binds tests to design-derived targets
     componentRepairSchedule: null,
     releaseDepthParity: null
   };
-  const output = [
-    "# component_test_surface",
-    "",
-    "edge: derive_component_test_surface",
-    "",
-    "```json component_depth_register",
-    JSON.stringify(register, null, 2),
-    "```"
-  ].join("\n") + "\n";
+  const output = `${JSON.stringify(register, null, 2)}\n`;
   mkdirSync(dirname(manifest.outputFile), { recursive: true });
   writeFileSync(manifest.outputFile, output, "utf8");
   const testPath = path.join(
@@ -6530,7 +6585,7 @@ test("T-168 component-test materialization binds tests to design-derived targets
   assert.equal(postflight.status, "passed");
 });
 
-test("T-168 component-test materialization admits live row alias and rejects asset archive substitution", () => {
+test("T-168 component-test materialization admits exact live row and rejects asset archive substitution", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_test_surface");
@@ -6552,13 +6607,13 @@ test("T-168 component-test materialization admits live row alias and rejects ass
     testComponentTopologyRows: [],
     componentTestRows: [
       {
-        kind: "sdlc_component_test_row",
+        kind: "sdlc_component_test_realization_row",
         testClassId: "LiveAliasTest",
         relativePath: "test/live_alias.test.js",
         testcaseIds: ["TC-T168-ALIAS"],
         componentIds: ["cdme-core"],
         requirementIds: ["REQ-T066-001"],
-        shard: "test-shard-01"
+        shardId: "test-shard-01"
       }
     ],
     componentTestQualificationRows: [],
@@ -6569,13 +6624,7 @@ test("T-168 component-test materialization admits live row alias and rejects ass
   mkdirSync(dirname(productManifest.outputFile), { recursive: true });
   writeFileSync(
     productManifest.outputFile,
-    [
-      "# component_test_surface",
-      "",
-      "```json component_depth_register",
-      JSON.stringify(productRegister, null, 2),
-      "```"
-    ].join("\n") + "\n",
+    `${JSON.stringify(productRegister, null, 2)}\n`,
     "utf8"
   );
   assert.deepStrictEqual(declaredProductFileTargets(productManifest), [
@@ -6604,13 +6653,7 @@ test("T-168 component-test materialization admits live row alias and rejects ass
   mkdirSync(dirname(assetManifest.outputFile), { recursive: true });
   writeFileSync(
     assetManifest.outputFile,
-    [
-      "# component_test_surface",
-      "",
-      "```json component_depth_register",
-      JSON.stringify(assetRegister, null, 2),
-      "```"
-    ].join("\n") + "\n",
+    `${JSON.stringify(assetRegister, null, 2)}\n`,
     "utf8"
   );
   assert.deepStrictEqual(declaredProductFileTargets(assetManifest), []);
@@ -6895,7 +6938,7 @@ test("T-104 test-run archive is surface-only and does not require fresh executio
 });
 
 test("T-104 test-run archive closure depends on cited execution-result truth", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
   const executionManifest = deriveWorkerHandoffManifest({
@@ -7097,7 +7140,7 @@ test("T-104 test-run archive closure depends on cited execution-result truth", (
 });
 
 test("T-102 test-run archive validates execution evidence against source edge shards", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
   const baseExecutionManifest = deriveWorkerHandoffManifest({
@@ -7315,7 +7358,7 @@ test("T-102 post-close target-next same-vector projection falls through to overl
 });
 
 test("T-115 test-run archive admits structurally valid failed execution evidence", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
   const executionManifest = deriveWorkerHandoffManifest({
@@ -7773,7 +7816,7 @@ test("B-072 post-transform test execution result admits embedded execution evide
 });
 
 test("B-084 post-transform execution evidence drops worker-local metadata from typed carrier", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -7873,7 +7916,7 @@ test("B-084 post-transform execution evidence drops worker-local metadata from t
 });
 
 test("T-115 failed execution evidence with zero observed tests is admitted for repair qualification", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -7939,7 +7982,7 @@ test("T-115 failed execution evidence with zero observed tests is admitted for r
 });
 
 test("T-083 failed execution-result evidence closes the execution source for downstream repair", () => {
-  const workspace = makeWorkspace();
+  const workspace = makeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const hookContract = hookContractByEdgeName("derive_test_execution_result_surface");
   const edgeGainContract = resolveSdlcEdgeGainClosureContract(
@@ -8138,103 +8181,6 @@ test("T-083 component-code admits sbt build plugin targets declared by implement
       "materialized_product_file_unbound_to_declared_target"
     ),
     false,
-    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
-  );
-});
-
-test("T-164 component-code postflight rejects SBT Security Manager JVM options before test repair", () => {
-  const workspace = makeWorkspace();
-  declareScalaSbtTestRunner(workspace);
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const implementationDesignFile = path.join(
-    workspace,
-    constraints.selectedOutputRoot,
-    "design/adrs/ADR-002-implementation-design-surface.md"
-  );
-  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
-  register.fileTargetRows = [
-    ...register.fileTargetRows,
-    {
-      kind: "sdlc_file_target_row",
-      relativePath: "build_tenants/scala_spark/build.sbt",
-      role: "build-config"
-    }
-  ];
-  writeFileSync(
-    implementationDesignFile,
-    `${JSON.stringify(register, null, 2)}\n`,
-    "utf8"
-  );
-  writeAdmittedImplementationDesignArchive({
-    workspaceRoot: workspace,
-    register,
-    outputContent: `${JSON.stringify(register, null, 2)}\n`
-  });
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 23,
-    contract,
-    projectConstraints: constraints,
-    runId: "t164-sbt-security-manager-postflight"
-  });
-  const handoffFiles = writeHandoffFiles(manifest);
-  const prompt = readFileSync(handoffFiles.promptPath, "utf8");
-
-  assert.match(prompt, /SBT\/JDK compatibility law/u);
-  assert.match(prompt, /do not write `-Djava\.security\.manager`/u);
-  assert.match(prompt, /Could not accept connection from test agent/u);
-
-  const before = snapshotProductMaterializationRoot(
-    manifest.productMaterialization
-  );
-  writeOutputSurface(manifest, "component_code_surface");
-  const files = new Map([
-    [
-      "build.sbt",
-      [
-        ...requirementTraceLines(manifest),
-        'ThisBuild / scalaVersion := "2.12.18"',
-        "Test / fork := true",
-        'Test / javaOptions += "-Djava.security.manager=allow"',
-        'libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test'
-      ].join("\n") + "\n"
-    ],
-    [
-      "src/main/scala/generated/DataMapper.scala",
-      [
-        ...requirementTraceLines(manifest),
-        "package generated",
-        "object DataMapper"
-      ].join("\n") + "\n"
-    ]
-  ]);
-  for (const [relativePath, content] of files.entries()) {
-    const absolutePath = path.join(
-      manifest.productMaterialization.tenantRoot,
-      relativePath
-    );
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, content, "utf8");
-  }
-
-  const report = buildPostTransformWorkerResultReport({ manifest, before });
-  const buildFile = report.materializedFiles.find(
-    (file) => file.relativePath === "build.sbt"
-  );
-  assert(buildFile);
-
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.some((reason) =>
-      reason.startsWith("sbt_security_manager_option_unsupported")
-    ),
-    true,
     JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
@@ -8839,6 +8785,167 @@ test("B-072 malformed transform execution result evidence becomes typed invalid 
   assert.match(invalidReason?.detail ?? "", /command/);
 });
 
+test("B-081 test execution preparation carries admitted schedule commands", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: b081_admitted_schedule_command",
+      "active_tenant: scala_spark",
+      "selected_output_root: build_tenants/scala_spark",
+      "ambiguity_risk_appetite: medium",
+      "build_tenants:",
+      "  scala_spark:",
+      "    output_dir: build_tenants/scala_spark/",
+      "    language: Scala",
+      "    build_tool: sbt",
+      "    test_runner: sbt test",
+      "    module_structure:",
+      "      - analytics-core",
+      "      - streaming-runtime"
+    ].join("\n"),
+    "utf8"
+  );
+  const tenantRoot = path.join(workspace, "build_tenants/scala_spark");
+  const testDesignFile = path.join(
+    tenantRoot,
+    "design/adrs/ADR-003-test-design-surface.md"
+  );
+  mkdirSync(dirname(testDesignFile), { recursive: true });
+  writeFileSync(
+    testDesignFile,
+    stableJsonForTest({
+      kind: "sdlc_test_design_register",
+      registerVersion: "ts-test-design-v1",
+      targetAssetType: "test_design_surface",
+      designConsumptionRows: [
+        {
+          kind: "sdlc_design_consumption_contract",
+          contractRef: "design-consumption://b081/schedule-authority",
+          sourceDesignObligationRefs: ["REQ-B081-SCHEDULE"],
+          authorityBasisRefs: ["asset-type://test_design_surface"],
+          consumerGraphFunctionRefs: [
+            "prepare_test_execution_surface",
+            "derive_test_execution_result_surface"
+          ]
+        }
+      ],
+      uatTestcaseRows: [
+        {
+          kind: "sdlc_test_case_row",
+          testCaseRef: "TC-B081-001",
+          caseKind: "regression",
+          executionLane: "unit",
+          sourceDesignObligationRefs: ["REQ-B081-SCHEDULE"],
+          testcaseAuthorityRefs: ["testcase-authority://b081/schedule"],
+          expectedBehavior: "Prepared execution uses the admitted schedule command."
+        }
+      ],
+      testcaseAuthorityRows: [
+        {
+          kind: "sdlc_test_case_row",
+          testCaseRef: "TC-B081-001",
+          caseKind: "regression",
+          executionLane: "unit",
+          sourceDesignObligationRefs: ["REQ-B081-SCHEDULE"],
+          testcaseAuthorityRefs: ["testcase-authority://b081/schedule"],
+          expectedBehavior: "Prepared execution uses the admitted schedule command."
+        }
+      ],
+      testStackProfileRows: [
+        {
+          kind: "sdlc_test_stack_profile_row",
+          stackRef: "stack://b081/sbt",
+          frameworkRef: "framework://scalatest",
+          buildTool: "sbt"
+        }
+      ],
+      testModuleRows: [
+        {
+          kind: "sdlc_test_module_row",
+          moduleName: "analytics-core",
+          moduleRef: "module://b081/analytics-core",
+          testRoot: "analytics-core/src/test/scala"
+        }
+      ],
+      testComponentTopologyRows: [
+        {
+          kind: "sdlc_test_component_topology_row",
+          testClassId: "AnalyticsCoreSpec",
+          relativePath: "analytics-core/src/test/scala/AnalyticsCoreSpec.scala",
+          testcaseIds: ["TC-B081-001"],
+          componentIds: ["analytics-core"],
+          requirementIds: ["REQ-B081-SCHEDULE"],
+          shardId: "test-shard-01-analytics-core"
+        }
+      ],
+      testDataBindings: [
+        {
+          kind: "sdlc_test_data_binding",
+          testDataRef: "test-data://b081/default",
+          testCaseRef: "TC-B081-001",
+          inputFixtureRefs: ["fixture://b081/default"],
+          generationPolicyRef: "generation-policy://b081/static",
+          expectedResultRef: "expected-result://b081/TC-B081-001",
+          sourceDesignObligationRefs: ["REQ-B081-SCHEDULE"]
+        }
+      ],
+      expectedResultBindings: [
+        {
+          kind: "sdlc_expected_result_binding",
+          expectedResultRef: "expected-result://b081/TC-B081-001",
+          testCaseRef: "TC-B081-001",
+          assertionRefs: ["assertion://b081/schedule-command"],
+          expectedResultSummary: "The schedule command is preserved.",
+          verificationPolicyRef: "verification-policy://b081/schedule"
+        }
+      ],
+      uatIntegrationBindings: [
+        {
+          kind: "sdlc_uat_integration_binding",
+          uatTestCaseRef: "TC-B081-001",
+          integrationTestCaseRef: "TC-B081-001",
+          executionLane: "unit"
+        }
+      ],
+      testExecutionScheduleRows: [
+        {
+          kind: "sdlc_test_execution_schedule_row",
+          scheduleRef: "test-schedule://b081/analytics-core",
+          testCaseRefs: ["TC-B081-001"],
+          command: 'sbt "coreModel/test"',
+          frameworkRef: "framework://scalatest",
+          shardId: "test-shard-01-analytics-core"
+        }
+      ]
+    }),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("prepare_test_execution_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    projectConstraints: constraints,
+    runId: "b081-admitted-schedule-command"
+  });
+  assert.equal(
+    manifest.productMaterialization.executionShards[0]?.command,
+    "sbt test"
+  );
+  assert.equal(writeInstalledOperatorOwnedEvaluationArtifact({ manifest }), manifest.outputFile);
+  const payload = JSON.parse(readFileSync(manifest.outputFile, "utf8"));
+  assert.deepStrictEqual(
+    payload.testExecutionPreparationRows.map((row) => row.command),
+    ['sbt "coreModel/test"']
+  );
+});
+
 test("B-079 execution-result postflight requires registered shard evidence", () => {
   const workspace = makeWorkspace();
   writeFileSync(
@@ -8879,7 +8986,7 @@ test("B-079 execution-result postflight requires registered shard evidence", () 
   );
   assert.deepStrictEqual(
     manifest.productMaterialization.executionShards.map((shard) => shard.command),
-    ['sbt "cdme-compiler/test"', 'sbt "cdme-engine/test"']
+    ["sbt test", "sbt test"]
   );
   writeHandoffFiles(manifest);
   const output = writeOutputSurface(manifest, "test_execution_result_surface");

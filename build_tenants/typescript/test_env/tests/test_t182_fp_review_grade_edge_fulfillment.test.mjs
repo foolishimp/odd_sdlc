@@ -14,25 +14,35 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  admitSdlcEdgeEvidence,
   REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   constructSdlcGtlModule,
   constructSdlcProductGraphContractCatalog,
   constructSdlcTargetCarrierRegistry,
   constructSdlcTraversalOverlayCatalog,
-  designDepthFpEvaluatorRegisterPath,
+  deriveSdlcEdgeAssuranceCloseDecision,
+  deriveSdlcEdgeObligations,
+  deriveSdlcEdgeResidualPressure,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   isSdlcOperatorRunArtifactRequiredForContext,
   materializeSdlcProjectConformance,
+  measureSdlcEdgeGain,
   requireSdlcProductGraphContractRow,
   reviewGradeEdgeFulfillmentAssessmentRequired,
+  reviewGradeEdgeFulfillmentOpenPressureRefs,
+  reviewGradeFindingsAreDownstreamStagePressure,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
   writeHandoffFiles
 } from "../../build/semantic/code/src/index.js";
-import { admitImplementationDesignRegisterCandidateForManifest } from "../../build/semantic/code/src/operator/handoff.js";
+import {
+  admitImplementationDesignRegisterCandidateForManifest,
+  admitImplementationDesignRegisterForManifest,
+  designDepthFpEvaluatorRegisterPath
+} from "../../build/semantic/code/src/operator/plugins/evaluate/design_depth_register.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -133,6 +143,24 @@ function reviewGradeAssessment(manifest, overrides = {}) {
     requiredAction: null,
     evidenceRefs: [evidenceRef],
     acceptedAuthorityRefs: [acceptedAuthorityRef],
+    fulfillmentBinding:
+      manifest.targetAssetType === "component_code_surface"
+        ? {
+            kind: "sdlc_requirement_function_fulfillment_binding",
+            requirementRef: obligationId,
+            productRequirementRef: obligationId,
+            designObligationRef: acceptedAuthorityRef,
+            componentRef: "component://t182/app",
+            productTargetRef: pathToFileURL(manifest.outputFile).href,
+            codeSurfaceRef: "code-surface://t182/src/app.js",
+            functionOrEntrypointRef: "entrypoint://t182/app-main",
+            realizationEvidenceRefs: [evidenceRef],
+            testOrExecutionEvidenceRefs: [
+              `finding://t182/review-grade/${encodeURIComponent(obligationId)}`
+            ],
+            evaluatorFindingRef: `finding://t182/review-grade/${encodeURIComponent(obligationId)}`
+          }
+        : null,
     rationale:
       "Reviewed generated asset semantics against the accepted implementation-depth authority row."
   }));
@@ -219,18 +247,18 @@ function shallowImplementationDesignRegister(manifest) {
   };
 }
 
-test("T-182 ticket and design declare one review-grade fulfillment surface", () => {
+test("T-183 ticket absorbs review-grade fulfillment into the one edge ledger surface", () => {
   const ticket = readRepoFile(
-    ".ai-workspace/tickets/active/T-182-strengthen-fp-review-grade-edge-fulfillment-assessments.md"
+    ".ai-workspace/tickets/active/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md"
   );
   const design = readRepoFile(
     "build_tenants/typescript/design/ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
   );
 
-  assert.match(ticket, /There is no new `code_review_ledger`/u);
-  assert.match(ticket, /SdlcWorkerObligationAssessment rows/u);
+  assert.match(ticket, /review-grade asset adequacy/u);
   assert.match(ticket, /SdlcEdgeFulfillmentLedger/u);
-  assert.match(ticket, /F_P owns semantic asset adequacy review/u);
+  assert.match(ticket, /F_P evaluates ambiguity/u);
+  assert.match(ticket, /Do not create a second review ledger/u);
   assert.match(design, /#### Review-Grade Edge Fulfillment Rule/u);
   assert.match(design, /SdlcReviewGradeEdgeFulfillmentAssessment/u);
   assert.match(
@@ -262,10 +290,19 @@ test("T-182 review-grade assessment is required for generated worker assets", ()
       "derive_implementation_design_surface",
       "t182-required-design"
     );
+    const codeProjectionManifest = manifestForEdge(
+      workspaceRoot,
+      "derive_code_surface",
+      "t182-projection-code"
+    );
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(intentManifest), true);
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(codeManifest), true);
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(testManifest), true);
     assert.equal(reviewGradeEdgeFulfillmentAssessmentRequired(designManifest), true);
+    assert.equal(
+      reviewGradeEdgeFulfillmentAssessmentRequired(codeProjectionManifest),
+      false
+    );
 
     const artifact = SDLC_OPERATOR_RUN_ARTIFACT_CATALOG.find(
       (row) =>
@@ -388,8 +425,34 @@ test("T-182 admits full review-grade findings and rejects missing or weak assess
     assert.equal(accepted.status, "admitted");
     assert.equal(accepted.assessment.status, "passed");
     assert.equal(accepted.blockingReasons.length, 0);
+    assert.equal(
+      accepted.assessment.findings[0].fulfillmentBinding.functionOrEntrypointRef,
+      "entrypoint://t182/app-main"
+    );
 
     const base = reviewGradeAssessment(manifest);
+    const missingFunctionBinding = {
+      ...base,
+      findings: base.findings.map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              fulfillmentBinding: null
+            }
+          : finding
+      )
+    };
+    const missingBindingPath = writeAssessment(manifest, missingFunctionBinding);
+    const missingBinding = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+      manifest,
+      outputFile: missingBindingPath
+    });
+    assert.equal(missingBinding.status, "rejected");
+    assert.match(
+      missingBinding.blockingReasons.join("\n"),
+      /review_grade_function_binding_missing/u
+    );
+
     const missingReviewed = {
       ...base,
       reviewedObligationIds: base.reviewedObligationIds.slice(1)
@@ -500,6 +563,171 @@ test("T-182 admits blocked semantic review as retry pressure with required actio
   }
 });
 
+test("T-183 edge closure requires review-grade F_P evidence for generated assets", () => {
+  const contract = SDLC_EDGE_GAIN_CLOSURE_CONTRACTS.find(
+    (candidate) => candidate.edgeRef === "derive_component_code_surface"
+  );
+  assert.ok(contract);
+  const obligationRefs = ["requirement://t183/review-grade-required"];
+  const obligations = deriveSdlcEdgeObligations({
+    contract,
+    obligationRefs
+  });
+  const ledgerInputs = contract.ledgerInputKinds.map((ledgerInputKind) => ({
+    kind: "sdlc_edge_ledger_input_ref",
+    ledgerInputKind,
+    ledgerRef: `ledger://t183/review-grade-required/${ledgerInputKind}`
+  }));
+
+  const rawWorkerAdmission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t183/raw-worker-self-assessment",
+        sourceKind: "worker_assessment",
+        obligationRefs,
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  assert.equal(rawWorkerAdmission.admittedEvidence.length, 1);
+  const rawWorkerGain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: rawWorkerAdmission.admittedEvidence,
+    ledgerInputs,
+    requiredEvidenceSourceKinds: ["review_grade_assessment"]
+  });
+  const rawWorkerResidual = deriveSdlcEdgeResidualPressure(rawWorkerGain);
+  const rawWorkerDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: rawWorkerGain,
+    residualPressure: rawWorkerResidual
+  });
+  assert.equal(rawWorkerDecision.disposition, "retry");
+  assert.ok(
+    rawWorkerGain.residualPressureRefs.some((ref) =>
+      ref.includes("missing-evidence-source") && ref.includes("review_grade_assessment")
+    )
+  );
+
+  const reviewGradeAdmission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t183/selected-fp-review-grade-assessment",
+        sourceKind: "review_grade_assessment",
+        obligationRefs,
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const reviewGradeGain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: reviewGradeAdmission.admittedEvidence,
+    ledgerInputs,
+    requiredEvidenceSourceKinds: ["review_grade_assessment"]
+  });
+  const reviewGradeResidual = deriveSdlcEdgeResidualPressure(reviewGradeGain);
+  const reviewGradeDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain: reviewGradeGain,
+    residualPressure: reviewGradeResidual
+  });
+  assert.equal(reviewGradeDecision.disposition, "close");
+});
+
+test("T-182 wrong-stage review findings are downstream pressure, not same-edge retry", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_test_design_surface",
+      "t182-wrong-stage-pressure"
+    );
+    const base = reviewGradeAssessment(manifest);
+    const wrongStageFindings = base.findings.slice(0, 2).map((finding) => ({
+      ...finding,
+      fulfillmentStatus: "partial",
+      failureClass: "wrong_stage",
+      requiredAction:
+        "Carry this implementation obligation to the component code surface; the current test-design surface may only reference the test topology."
+    }));
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure(wrongStageFindings),
+      true
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([
+        {
+          ...wrongStageFindings[0],
+          failureClass: "trace_missing",
+          requiredAction:
+            "Add missing accepted requirement trace evidence to the current asset."
+        }
+      ]),
+      false
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([
+        {
+          ...wrongStageFindings[0],
+          fulfillmentStatus: "blocked"
+        }
+      ]),
+      false
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-183 scalar F_P evaluation carries open review-grade pressure", () => {
+  const pressureRefs = reviewGradeEdgeFulfillmentOpenPressureRefs({
+    runRef: "t183-scalar-review-grade",
+    assessments: [
+      {
+        kind: "sdlc_worker_obligation_assessment",
+        obligationId: "requirement://t183/raw-worker-blocked",
+        fulfillmentStatus: "blocked",
+        evidenceRefs: ["evidence://t183/raw-worker"],
+        blockingReasons: ["raw_worker_blocked"]
+      },
+      {
+        kind: "sdlc_worker_obligation_assessment",
+        obligationId: "requirement://t183/review-grade-open",
+        fulfillmentStatus: "partial",
+        evidenceRefs: ["evidence://t183/review-grade"],
+        blockingReasons: ["semantic_not_realized"],
+        reviewGrade: true,
+        reviewFailureClass: "semantic_not_realized",
+        requiredAction: "Connect the accepted requirement to the public runtime entrypoint.",
+        semanticEvidenceRefs: ["evidence://t183/review-grade/finding"],
+        acceptedAuthorityRefs: ["requirement://t183/review-grade-open"]
+      },
+      {
+        kind: "sdlc_worker_obligation_assessment",
+        obligationId: "requirement://t183/review-grade-fulfilled",
+        fulfillmentStatus: "fulfilled",
+        evidenceRefs: ["evidence://t183/review-grade/fulfilled"],
+        blockingReasons: [],
+        reviewGrade: true,
+        reviewFailureClass: null,
+        requiredAction: null,
+        semanticEvidenceRefs: ["evidence://t183/review-grade/fulfilled/finding"],
+        acceptedAuthorityRefs: ["requirement://t183/review-grade-fulfilled"]
+      }
+    ]
+  });
+
+  assert.deepEqual(pressureRefs, [
+    "pressure://odd-sdlc/review-grade/t183-scalar-review-grade/requirement%3A%2F%2Ft183%2Freview-grade-open"
+  ]);
+});
+
 test("T-182 transformer prompts use accepted authority rows and evaluated gaps as the work queue", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -515,6 +743,8 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(prompt, /work queue/u);
     assert.match(prompt, /Do not return success while required checklist rows are unmapped/u);
     assert.match(prompt, /materialize or repair the named source file/u);
+    assert.match(prompt, /runtime entrypoint/u);
+    assert.match(prompt, /Tenant stack authority must match the product files actually emitted/u);
     assert.match(prompt, /Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade/u);
 
     const installedOperatorSource = readRepoFile(
@@ -530,12 +760,52 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
       installedOperatorSource,
       /Verify every finding key set is exactly kind, obligationId, fulfillmentStatus/u
     );
+    assert.match(
+      installedOperatorSource,
+      /If reviewedObligationIds is large, create the assessment with a short local script/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Do not manually type or stream a large findings array through stdout/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Every finding must include at least one acceptedAuthorityRef/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /For target_asset findings, use the construction brief targetCarrierProjection/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /every fulfilled finding must provide it, including target_asset, source_asset, module/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /module-level or source-asset-level carryover/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /source only exports a helper or function and has no entrypoint path/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /tenant stack authority contradicts emitted product files/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Requirement lineage is transformer-owned semantic evidence/u
+    );
+    assert.match(
+      installedOperatorSource,
+      /Mark trace_missing when a generated product file is used as fulfillment evidence/u
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
 });
 
-test("T-182 design-depth admission rejects source rows without accepted evidence refs", () => {
+test("T-183 design-depth structural admission does not become semantic evidence review", () => {
   const workspaceRoot = makeWorkspace();
   try {
     const manifest = manifestForEdge(
@@ -556,11 +826,14 @@ test("T-182 design-depth admission rejects source rows without accepted evidence
     const admission = admitImplementationDesignRegisterCandidateForManifest({
       manifest
     });
-    assert.equal(admission.status, "rejected");
-    assert.match(
-      admission.blockingReasons.join("\n"),
-      /component_topology_evidence_refs_missing:app/u
-    );
+    assert.equal(admission.status, "admitted");
+    const runtimeAdmission = admitImplementationDesignRegisterForManifest({
+      manifest
+    });
+    assert.equal(runtimeAdmission.status, "rejected");
+    assert.deepEqual(runtimeAdmission.blockingReasons, [
+      "design_depth_fp_evaluator_register_unadmitted"
+    ]);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
