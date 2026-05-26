@@ -55,6 +55,10 @@ import {
   constructSdlcProcessRunPlan,
   executeSdlcProcessRunPlan
 } from "../../../effects/process_runner.js";
+import {
+  constructSdlcWriteTextFilePlan,
+  executeSdlcFileStoreEffectPlan
+} from "../../../effects/file_store.js";
 import { decideSdlcTenantStackAuthorityStatus } from "../../../contracts/blocking_reason_catalog.js";
 import {
   constructSdlcTenantTechnologyStackAuthority,
@@ -10806,11 +10810,22 @@ function writeStableJsonFile(input: {
   readonly filePath: string;
   readonly payload: unknown;
 }): void {
-  writeSdlcSystemArtifact({
-    archiveRoot: input.archiveRoot,
-    absolutePath: input.filePath,
-    payload: input.payload
+  writeWorkspaceTargetFile({
+    filePath: input.filePath,
+    content: stableSdlcSystemArtifactJson(input.payload)
   });
+}
+
+function writeWorkspaceTargetFile(input: {
+  readonly filePath: string;
+  readonly content: string;
+}): void {
+  executeSdlcFileStoreEffectPlan(
+    constructSdlcWriteTextFilePlan({
+      absolutePath: input.filePath,
+      content: input.content
+    })
+  );
 }
 
 function componentDepthSurfaceFile(
@@ -11338,10 +11353,9 @@ function writeInstalledOperatorTestRunArchiveSurface(
     ...(executionEvidenceLines.length === 0 ? ["- none"] : executionEvidenceLines),
     ""
   ].join("\n");
-  writeSdlcSystemArtifact({
-    archiveRoot: manifest.archiveRoot,
-    absolutePath: manifest.outputFile,
-    payload: content
+  writeWorkspaceTargetFile({
+    filePath: manifest.outputFile,
+    content
   });
 }
 

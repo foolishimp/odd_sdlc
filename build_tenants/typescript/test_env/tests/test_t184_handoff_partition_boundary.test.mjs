@@ -19,7 +19,8 @@ import {
   constructPostflightGapDossier,
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
-  hookContractByEdgeName
+  hookContractByEdgeName,
+  writeInstalledOperatorOwnedEvaluationArtifact
 } from "../../build/semantic/code/src/index.js";
 
 const PACKAGE_ROOT = process.cwd();
@@ -155,4 +156,32 @@ test("T-184 retryable provider connection failures remain same-edge retry", () =
   );
   assert.equal(dossier.retryEligible, true);
   assert.deepEqual(dossier.nextLawfulActions, ["retry_same_edge"]);
+});
+
+test("T-184 installed-operator product surfaces write to workspace target path", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("qualify_component_realization_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: contract.edgeName,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t184-workspace-target-surface"
+  });
+
+  assert.equal(
+    writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
+    manifest.outputFile
+  );
+  assert.equal(existsSync(manifest.outputFile), true);
+  assert.equal(
+    manifest.outputFile.startsWith(`${manifest.archiveRoot}${path.sep}`),
+    false,
+    "workspace target surfaces are product artifacts, not operator-run archive artifacts"
+  );
+
+  const payload = JSON.parse(readFileSync(manifest.outputFile, "utf8"));
+  assert.equal(payload.kind, "sdlc_component_depth_register");
+  assert.equal(payload.targetAssetType, "component_realization_qualification_surface");
 });
