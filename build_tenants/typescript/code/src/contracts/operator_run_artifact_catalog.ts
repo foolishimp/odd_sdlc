@@ -393,6 +393,16 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/postflight"
   }),
   row({
+    artifactRef: "operator-run-artifact://postflight-gap-dossier",
+    relativePath: "gap_dossier.json",
+    carrierKind: "sdlc_postflight_gap_dossier",
+    role: "authority_admission",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/postflight-gap-dossier"
+  }),
+  row({
     artifactRef: "operator-run-artifact://edge-closure",
     relativePath: "sdlc_edge_closure_decision.json",
     carrierKind: "sdlc_edge_closure_decision",

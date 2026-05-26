@@ -6770,7 +6770,7 @@ function outcomeDirectivesForWorker(
       "Product materialization is REQUIRED for this edge.",
       `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}.`,
       `Selected output root: ${manifest.productMaterialization.selectedOutputRoot}.`,
-      `materializedFiles.relativePath basis: ${manifest.productMaterialization.relativePathBasis}.`,
+      `Framework-observed materializedFiles.relativePath basis after worker exit: ${manifest.productMaterialization.relativePathBasis}.`,
       scopedMaterialization
         ? `Included modules for this edge: ${listForPrompt(manifest.featureScope.includedModuleNames)}.`
         : `Declared modules: ${listForPrompt(manifest.productMaterialization.declaredModuleNames)}.`,
@@ -6805,9 +6805,10 @@ function outcomeDirectivesForWorker(
       "Apply requirementTraceObligationIds as the prompt-visible required product-file requirement tag set for this edge.",
       "On retry, requirement ids named by Current evaluated gaps are also admissible repair tags even when they are omitted from the prompt-limited requirementTraceObligationIds list; do not remove a current evaluated gap id solely because it is absent from that list.",
       "Do not expand product file tags from traversal_intent_package alone; it is audit context for the broader graph.",
-      "Every materializedFiles[] row for a declared product file target with role source, test, or build_config must carry requirementTraceObligationIds when that file supports an active requirement. Build_config files are not exempt.",
-      "For product files that cannot carry native comments, such as structured configuration files, carry lineage in the target carrier/table and materializedFiles[].requirementTraceObligationIds; do not leave the materializedFiles entry empty.",
-      "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file and list the cited obligation ids on materializedFiles[].requirementTraceObligationIds.",
+      "Do not author materializedFiles[] rows. The framework derives materializedFiles after this worker exits from observed product-file writes, file content, and admitted carriers.",
+      "For every declared product file target with role source, test, or build_config that supports an active requirement, embed parseable requirement tags in the file when the file syntax permits and mirror the same obligation ids in the target carrier/component rows. Build_config files are not exempt.",
+      "For product files that cannot carry native comments, such as strict structured configuration files, carry lineage in the target carrier/table using component/file rows and evidence refs; do not rely on worker prose.",
+      "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file when syntax permits and cite the same obligation ids in the target carrier/component rows.",
       "For source files, put the requirement tags at the top of the file using valid native comment syntax, one exact id per line, for example `// requirement:<canonical-id>`; do not rely on the report alone for product-file lineage."
     );
     directives.push(
@@ -6847,8 +6848,8 @@ function outcomeDirectivesForWorker(
         directives.push(
           "Treat the admitted design-depth evaluator register as the highest implementation-design semantic pressure; read construction_brief.stagePressure.designDepthEvaluatorRegisterRefs before source edits.",
           "Use its source-role fileTargetRows/componentRealizationRows as source targets; if absent, report missing admitted design pressure.",
-          "For each source-role realization, materialize or repair the named source file and carry componentId, publicBoundary, requirementIds, source tags, and materializedFiles[].requirementTraceObligationIds.",
-      "For each supporting build_config or test product target declared by admitted design authority, list the same active requirement ids in materializedFiles[].requirementTraceObligationIds when that supporting file participates in the proof contract.",
+          "For each source-role realization, materialize or repair the named source file and carry componentId, publicBoundary, requirementIds, source tags, and target-carrier component trace rows.",
+      "For each supporting build_config or test product target declared by admitted design authority, embed or mirror the same active requirement ids in file-native comments when legal and target-carrier rows when that supporting file participates in the proof contract.",
       "If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, connect the product behavior to that source file's runtime entrypoint. An exported helper that only works when called by a test does not satisfy executable product materialization.",
       "Before writing or repairing source/test files, read the tenant stack authority surface when present. Treat it as the accepted runtime/build/test authority unless it is impossible under the effective workspace runtime, in which case repair that authority surface before product files.",
       "Tenant stack authority must match the product files actually emitted. If source syntax, test syntax, module/runtime system, build tool, or test runner differs from the seeded stack authority, repair the tenant stack authority or product files instead of documenting a local override in prose.",
@@ -7640,9 +7641,9 @@ function currentEvaluatedGapPromptLines(
           "  - Treat the blocked requirement obligations as your agentic repair ledger and work queue, not a one-shot answer prompt.",
           "  - Build a Current Gap Repair Checklist from every blocked requirement obligation above before editing.",
           "  - Work through the checklist in bounded batches: choose rows, repair artifacts, update trace evidence, run the local coverage check, then continue with remaining rows.",
-          "  - For each blocked requirement obligation, assign an owning componentId, source file path, source requirement tag, componentRealizationRows entry, and materializedFiles[].requirementTraceObligationIds entry.",
+          "  - For each blocked requirement obligation, assign an owning componentId, source file path, source requirement tag, and componentRealizationRows entry.",
           "  - Do not return while any blocked requirement obligation is unmapped. If an obligation cannot lawfully be mapped on this edge, report it as explicit blocked residual pressure with evidence refs.",
-          "  - Before final response, run a local check over the changed source files and result report proving every blocked requirement obligation is present in source tags and materialization trace entries.",
+          "  - Before final response, run a local check over the changed source files and target carrier proving every blocked requirement obligation is present in source tags and component trace entries.",
           "  - Final response must give counts only: gapObligations=<n> mapped=<n> blocked=<n> sourceFilesTouched=<n>."
         ]
       : []),

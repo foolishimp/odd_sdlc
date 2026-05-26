@@ -53,6 +53,7 @@ import type {
   SdlcMinFpPressurePreservationDecision,
   SdlcMinFpPressurePreservationMechanism,
   SdlcModuleDependencyMap,
+  SdlcPostflightGapDossier,
   SdlcReviewGradeEdgeFulfillmentAssessment,
   SdlcReviewGradeObligationFinding,
   SdlcTestDependencyMap,
@@ -413,6 +414,10 @@ const WORKER_RUN_GUARD: (value: unknown) => value is WorkerRunRecord =
 const POSTFLIGHT_GUARD: (value: unknown) => value is PostflightRecord =
   guardKind<PostflightRecord>("sdlc_operator_postflight_result");
 
+const POSTFLIGHT_GAP_DOSSIER_GUARD:
+  (value: unknown) => value is SdlcPostflightGapDossier =
+  guardKind<SdlcPostflightGapDossier>("sdlc_postflight_gap_dossier");
+
 const EDGE_CLOSURE_GUARD: (value: unknown) => value is EdgeClosureDecisionRecord =
   recordShape<EdgeClosureDecisionRecord>({
     kind: "sdlc_edge_closure_decision",
@@ -758,6 +763,7 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
     "operator-run-artifact://operator-summary": OPERATOR_SUMMARY_GUARD,
     "operator-run-artifact://worker-run": WORKER_RUN_GUARD,
     "operator-run-artifact://postflight": POSTFLIGHT_GUARD,
+    "operator-run-artifact://postflight-gap-dossier": POSTFLIGHT_GAP_DOSSIER_GUARD,
     "operator-run-artifact://edge-closure": EDGE_CLOSURE_GUARD,
     "operator-run-artifact://edge-fulfillment-ledger": EDGE_FULFILLMENT_GUARD,
     "operator-run-artifact://edge-gain": EDGE_GAIN_GUARD,

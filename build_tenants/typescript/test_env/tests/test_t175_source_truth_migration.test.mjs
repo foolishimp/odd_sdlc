@@ -421,6 +421,31 @@ test("T-175 archive writes are catalog-enforced for authoritative artifacts", ()
       /does not match catalog carrier kind/u
     );
 
+    const gapDossierRow = operatorRunArtifactRowForRelativePath("gap_dossier.json");
+    assert.equal(
+      gapDossierRow?.artifactRef,
+      "operator-run-artifact://postflight-gap-dossier"
+    );
+    const gapDossierPath = writeSdlcSystemArtifact({
+      archiveRoot: root,
+      relativePath: "gap_dossier.json",
+      payload: {
+        kind: "sdlc_postflight_gap_dossier",
+        status: "open",
+        graphFunctionName: "fixture_graph",
+        edgeName: "fixture_edge",
+        vectorIndex: 0,
+        targetAssetType: "fixture_surface",
+        reasons: [],
+        evidenceRefs: [],
+        priorManifestId: "file:///fixture/handoff_manifest.json",
+        currentGapDossierRef: "file:///fixture/gap_dossier.json",
+        retryEligible: false,
+        nextLawfulActions: []
+      }
+    });
+    assert.equal(existsSync(gapDossierPath), true);
+
     const written = writeSdlcSystemArtifact({
       archiveRoot: root,
       artifactRef: "operator-run-artifact://live-fp-parallel-materialization-frontier",

@@ -450,6 +450,27 @@ export function installedReentryAttemptLimit(
   return MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS;
 }
 
+export function installedReentryGuardScopeForAttempt(input: {
+  readonly disposition: SdlcInstalledReentryDisposition;
+  readonly currentEdge?: string | null;
+  readonly nextLawfulAction?: string | null;
+  readonly reentryBasisRef?: string | null;
+}): string {
+  const currentEdge = input.currentEdge?.trim();
+  if (currentEdge !== undefined && currentEdge.length > 0) {
+    return `${input.disposition}:edge:${currentEdge}`;
+  }
+  const nextLawfulAction = input.nextLawfulAction?.trim();
+  if (nextLawfulAction !== undefined && nextLawfulAction.length > 0) {
+    return `${input.disposition}:action:${nextLawfulAction}`;
+  }
+  const reentryBasisRef = input.reentryBasisRef?.trim();
+  if (reentryBasisRef !== undefined && reentryBasisRef.length > 0) {
+    return `${input.disposition}:basis:${reentryBasisRef}`;
+  }
+  return `${input.disposition}:unknown`;
+}
+
 function installedReentryBasisRef(
   outcome: SdlcInstalledOperatorStartOutcome
 ): string | null {
@@ -3613,6 +3634,8 @@ function designDepthFpEvaluatorPrompt(input: {
     "- componentRealizationRows[] with kind, componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs",
     "- fileTargetRows[] with kind, relativePath, role",
     "- designCompletenessVerdict with entity, attribute, and flow axis verdicts.",
+    "- designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow. Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts, or any extra designCompletenessVerdict fields.",
+    "- Each designCompletenessVerdict axis object is closed with exactly kind, axis, status, reasons, evidenceRefs. Do not add summaries, scores, counts, confidence, coverage, missingItems, or nested axis-specific objects.",
     `- Allowed componentTopologyRows[].concernRole values: ${SDLC_COMPONENT_CONCERN_ROLES.join(", ")}`,
     `- Allowed designCompletenessVerdict.*.status values: ${SDLC_DESIGN_COMPLETENESS_STATUSES.join(", ")}. Use "satisfied" for a complete axis; never use "complete".`,
     "",
@@ -3626,7 +3649,7 @@ function designDepthFpEvaluatorPrompt(input: {
     "- aggregateDomainModel.entities[].attributes[] must contain full closed sdlc_domain_attribute objects. Copy or adapt the owning module schema attribute objects; never emit attribute id strings, names, or summaries in this array. If no valid aggregate attributes are needed, use an empty array.",
     "- aggregateDomainModel.crossModuleReferences[] must contain closed objects with fromModuleName, toModuleName, entityId.",
     "- aggregateSunnyDaySequence.steps[] must contain closed sdlc_sunny_day_sequence_step objects with kind, stepId, moduleName, operationId, inputEntityIds, outputEntityIds, stateTransitionIds.",
-    `- designCompletenessVerdict must include kind, verdictVersion, and entity/attribute/flow closed axis verdict objects with kind, axis, status, reasons, evidenceRefs. verdictVersion must be exactly "ts-design-depth-v1". Axis status must be satisfied, partial, or blocked.`,
+    `- designCompletenessVerdict must include exactly kind, verdictVersion, entity, attribute, flow. The entity/attribute/flow values must be closed axis verdict objects with exactly kind, axis, status, reasons, evidenceRefs. verdictVersion must be exactly "ts-design-depth-v1". Axis status must be satisfied, partial, or blocked.`,
     "",
     "Minimal nested examples:",
     "- entity: {\"kind\":\"sdlc_domain_entity\",\"entityId\":\"entity:<module>.<name>\",\"moduleName\":\"<module>\",\"ownership\":\"owned\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"attr:<module>.<name>.<field>\",\"name\":\"<field>\",\"valueType\":\"string\",\"cardinality\":\"one\",\"invariantRefs\":[]}],\"invariants\":[],\"sourceAssetRefs\":[\"file://...\"]}",
@@ -3682,7 +3705,7 @@ function designDepthFpEvaluatorPrompt(input: {
     "- Before the final response, run a bounded path-integrity self-check: every source-role fileTargetRows[].relativePath and every component source relativePath must either appear in the transform artifact target/component tables or be justified by a higher source authority ref cited in sourceBasisRefs/evidenceRefs.",
     "- The path-integrity self-check is mandatory even when the first ledger was structurally valid; structural validity alone is not enough if exact product file paths drift from the admitted design/source authority.",
     "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 8 or fewer requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
-    `- Required self-check before final response: run a local JSON check over the content ledger file and rewrite until it passes. At minimum, verify contentRows[0] has exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs; verify payload.registerVersion, payload.aggregateDomainModel.modelVersion, payload.aggregateSunnyDaySequence.sequenceVersion, and payload.designCompletenessVerdict.verdictVersion are exactly "ts-design-depth-v1"; verify contentRows[0].payload arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities, aggregateDomainModel.entities[].attributes, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.`,
+    `- Required self-check before final response: run a local JSON check over the content ledger file and rewrite until it passes. At minimum, verify contentRows[0] has exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs; verify payload.registerVersion, payload.aggregateDomainModel.modelVersion, payload.aggregateSunnyDaySequence.sequenceVersion, and payload.designCompletenessVerdict.verdictVersion are exactly "ts-design-depth-v1"; verify Object.keys(payload.designCompletenessVerdict).sort() is exactly ["attribute","entity","flow","kind","verdictVersion"]; verify each axis object at payload.designCompletenessVerdict.entity, .attribute, and .flow has exactly ["axis","evidenceRefs","kind","reasons","status"]; verify contentRows[0].payload arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities, aggregateDomainModel.entities[].attributes, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.`,
     "- Do not run another exploratory command after deciding the component/module set; write the content ledger file first, then validate that file.",
     `- Self-check target file: ${input.contentLedgerPath}`,
     "- Do not include Markdown fences, explanation, comments, or trailing prose in the content ledger file.",
@@ -4130,6 +4153,8 @@ function reviewGradeEdgeFulfillmentPrompt(input: {
     "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
     "- If reviewedObligationIds is large, create the assessment with a short local script: load worker_result_report, map every fulfilled carryover row to a compact fulfilled finding, explicitly override only open findings, write JSON to the assessment path, then parse it back.",
     "- Do not manually type or stream a large findings array through stdout. Write the durable JSON file and print only compact status counts.",
+    "- Do not leave background jobs running. If an executable/service must be started to gather evidence, run it inside one bounded shell block, store its PID in a variable, install a trap that kills and waits for that PID on exit, and print only the observed exit/status summary.",
+    "- Do not use shell job-control cleanup such as `kill %1` or Claude background tasks for execution probes. A passed assessment is invalid if a spawned service/process remains live after the probe.",
     "",
     `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
     "",
@@ -9078,11 +9103,7 @@ export async function executeInstalledOperatorStartWithReentry(input: {
   let retryGuardExhausted = false;
   let exhaustedDisposition: SdlcInstalledReentryDisposition | null = null;
   let retryContextOverride: SdlcWorkerRetryContext | undefined;
-  const reentryDispositionCounts: Record<SdlcInstalledReentryDisposition, number> = {
-    retry: 0,
-    yield: 0,
-    other: 0
-  };
+  const reentryDispositionCountsByScope = new Map<string, number>();
   const maxLoopAttempts =
     input.requestedUntil === "converged"
       ? MAX_INSTALLED_CONVERGENCE_ATTEMPTS
@@ -9106,12 +9127,11 @@ export async function executeInstalledOperatorStartWithReentry(input: {
         ? {}
         : { requireInstalledTopology: input.requireInstalledTopology })
     });
-    attempts.push(
-      installedStartLoopAttemptFor({
-        outcome: latest,
-        attemptIndex
-      })
-    );
+    const loopAttempt = installedStartLoopAttemptFor({
+      outcome: latest,
+      attemptIndex
+    });
+    attempts.push(loopAttempt);
     if (
       input.requestedUntil === "first_traversal" &&
       latest.traversalConsequence !== null
@@ -9135,10 +9155,17 @@ export async function executeInstalledOperatorStartWithReentry(input: {
     if (countsAgainstReentryGuard) {
       const reentryDisposition =
         installedReentryDispositionForOutcome(latest) ?? "other";
-      reentryDispositionCounts[reentryDisposition] += 1;
+      const guardScope = installedReentryGuardScopeForAttempt({
+        disposition: reentryDisposition,
+        currentEdge: loopAttempt.currentEdge,
+        nextLawfulAction: loopAttempt.nextLawfulAction,
+        reentryBasisRef: loopAttempt.reentryBasisRef
+      });
+      const reentryDispositionCount =
+        (reentryDispositionCountsByScope.get(guardScope) ?? 0) + 1;
+      reentryDispositionCountsByScope.set(guardScope, reentryDispositionCount);
       if (
-        reentryDispositionCounts[reentryDisposition] >=
-        installedReentryAttemptLimit(reentryDisposition)
+        reentryDispositionCount >= installedReentryAttemptLimit(reentryDisposition)
       ) {
         retryGuardExhausted = true;
         exhaustedDisposition = reentryDisposition;

@@ -1157,6 +1157,11 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /evaluationRules: Object\.freeze\(\[\s*designDepthFpEvaluatorRule,\s*reviewGradeEdgeFulfillmentRule\s*\]\)/u);
   assert.match(source, /requiredEvaluationRuleRefs: Object\.freeze\(\[/u);
   assert.match(source, /REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF/u);
+  assert.match(source, /Do not leave background jobs running/u);
+  assert.match(source, /store its PID in a variable/u);
+  assert.match(source, /trap that kills and waits for that PID/u);
+  assert.match(source, /Do not use shell job-control cleanup such as `kill %1`/u);
+  assert.match(source, /A passed assessment is invalid if a spawned service\/process remains live/u);
   assert.doesNotMatch(source, /designDepthFpEvaluatorRuleEnabled/u);
   assert.doesNotMatch(handoffSource, /designDepthFpEvaluatorRegistersEnabled/u);
   assert.doesNotMatch(handoffSource, /allowLegacyImplementationDesignDerivation/u);
@@ -1297,6 +1302,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /aggregateDomainModel\.modelVersion must be exactly "ts-design-depth-v1"/u);
   assert.match(source, /aggregateSunnyDaySequence\.sequenceVersion must be exactly "ts-design-depth-v1"/u);
   assert.match(source, /verdictVersion must be exactly "ts-design-depth-v1"/u);
+  assert.match(source, /designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow/u);
+  assert.match(source, /Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts/u);
+  assert.match(source, /Each designCompletenessVerdict axis object is closed with exactly kind, axis, status, reasons, evidenceRefs/u);
   assert.match(source, /Allowed designCompletenessVerdict\.\*\.status values/u);
   assert.match(source, /Use "satisfied" for a complete axis; never use "complete"/u);
   assert.match(source, /re-open the JSON you wrote and verify that every typed nested item above is an object/u);
@@ -1305,6 +1313,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(source, /Required self-check before final response/u);
   assert.match(source, /contentRows\[0\] has exactly kind, rowRef, authorityFunction/u);
   assert.match(source, /payload\.aggregateDomainModel\.modelVersion/u);
+  assert.match(source, /Object\.keys\(payload\.designCompletenessVerdict\)\.sort\(\)/u);
+  assert.match(source, /\["attribute","entity","flow","kind","verdictVersion"\]/u);
+  assert.match(source, /payload\.designCompletenessVerdict\.entity, \.attribute, and \.flow has exactly/u);
   assert.match(source, /aggregateDomainModel\.entities\[\]\.attributes, aggregateDomainModel\.operations/u);
   assert.match(source, /Do not mark an axis partial or blocked merely because/u);
   assert.doesNotMatch(

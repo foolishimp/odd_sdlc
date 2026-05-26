@@ -27,6 +27,7 @@ import {
   hookContractByEdgeName,
   installedReentryAttemptLimit,
   installedReentryDispositionForOutcome,
+  installedReentryGuardScopeForAttempt,
   observeProductMaterializationDelta,
   promptForHandoff,
   readWorkerResultReport,
@@ -583,6 +584,32 @@ test("T-143 installed loop circuit breakers distinguish retry and yield", () => 
   assert.equal(installedReentryAttemptLimit("other"), 5);
 });
 
+test("T-143 installed loop retry guard is scoped per graph edge", () => {
+  assert.equal(
+    installedReentryGuardScopeForAttempt({
+      disposition: "retry",
+      currentEdge: "derive_design_surface",
+      nextLawfulAction: "construction-action://retry/design",
+      reentryBasisRef: "basis://design"
+    }),
+    "retry:edge:derive_design_surface"
+  );
+  assert.notEqual(
+    installedReentryGuardScopeForAttempt({
+      disposition: "retry",
+      currentEdge: "derive_design_surface",
+      nextLawfulAction: "construction-action://retry/design",
+      reentryBasisRef: "basis://design"
+    }),
+    installedReentryGuardScopeForAttempt({
+      disposition: "retry",
+      currentEdge: "derive_requirement_surface",
+      nextLawfulAction: "construction-action://retry/requirements",
+      reentryBasisRef: "basis://requirements"
+    })
+  );
+});
+
 test("T-143 installed loop classifies closure disposition for re-entry budget", () => {
   assert.equal(
     installedReentryDispositionForOutcome({
@@ -625,7 +652,8 @@ test("T-143 installed loop classifies closure disposition for re-entry budget", 
 test("T-143 installed loop records exhausted retry or yield disposition", () => {
   const source = installedOperatorSource();
 
-  assert.equal(source.includes("reentryDispositionCounts"), true);
+  assert.equal(source.includes("reentryDispositionCountsByScope"), true);
+  assert.equal(source.includes("installedReentryGuardScopeForAttempt"), true);
   assert.equal(source.includes("yield_guard_exhausted"), true);
   assert.equal(source.includes("retry_guard_exhausted"), true);
   assert.equal(source.includes("exhaustedDisposition"), true);
@@ -1505,7 +1533,7 @@ test("T-143 Rust component-code report rejects runner-prefixed execution evidenc
   );
 });
 
-test("T-143 component-code transform artifact carrying execution evidence is rejected by postflight", () => {
+test("T-143 component-code transform artifact execution evidence is diagnostic-only", () => {
   const workspace = workspaceWithRustExpectedFilesAuthority();
   writeJsonExpectedFiles(workspace, [
     "build_tenants/hello_world_rust/Cargo.toml",
@@ -1572,7 +1600,7 @@ test("T-143 component-code transform artifact carrying execution evidence is rej
     report.executionEvidenceErrors.join("\n"),
     /non-execution edge/u
   );
-  assert.equal(postflight.status, "blocked");
+  assert.equal(postflight.status, "passed");
   assert.equal(
     postflight.blockingReasonCarriers.some(
       (reason) =>
