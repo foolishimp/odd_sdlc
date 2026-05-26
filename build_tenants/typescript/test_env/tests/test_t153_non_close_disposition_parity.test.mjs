@@ -322,6 +322,45 @@ for (const scenario of [
   });
 }
 
+test("T-153 explicit retry pressure outranks diagnostic assurance block", () => {
+  const rows = context("retry-over-assurance-block", blockedCounts());
+  const retryReasonRef =
+    "blocking-reason://t153/retry-over-assurance-block/worker_output_limit_exceeded";
+  const assuranceBlockReasonRef =
+    "pressure://t153/retry-over-assurance-block/target-carrier/missing_admission";
+  const decision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://t153/retry-over-assurance-block",
+    ledger: rows.edgeFulfillmentLedger,
+    currentEdgeLawful: true,
+    edgeAssuranceCloseDecision: {
+      kind: "sdlc_edge_assurance_close_decision",
+      decisionRef:
+        "edge-assurance-close://t153/retry-over-assurance-block/target-carrier",
+      contractRef: "contract://t153/retry-over-assurance-block",
+      contractDigest: "sha256:t153-retry-over-assurance-block",
+      edgeRef: rows.edgeFulfillmentLedger.edgeRef,
+      disposition: "block",
+      targetCarrierContractRef: null,
+      targetCarrierContractDigest: null,
+      targetCarrierAdmissionStatus:
+        rows.edgeFulfillmentLedger.targetCarrierAdmissionStatus,
+      gainRef: "edge-gain://t153/retry-over-assurance-block",
+      residualPressureRef:
+        "edge-residual-pressure://t153/retry-over-assurance-block",
+      basisRefs: ["basis://t153/retry-over-assurance-block/assurance"],
+      reasonRefs: [assuranceBlockReasonRef]
+    },
+    retryReasonRefs: [retryReasonRef]
+  });
+  const projection = evaluatorProjection(rows, decision, "continue_graph_call");
+  const result = replay(rows, decision, projection);
+
+  assert.equal(decision.disposition, "retry");
+  assert.equal(decision.reasonRefs.includes(retryReasonRef), true);
+  assert.equal(decision.reasonRefs.includes(assuranceBlockReasonRef), true);
+  assert.equal(result.nextActionProjection.choosesNextTraversal, true);
+});
+
 test("T-153 reprice is replay-visible and cannot dispatch a repair action", () => {
   const rows = context("reprice", blockedCounts());
   const decision = deriveSdlcEdgeClosureDecision({

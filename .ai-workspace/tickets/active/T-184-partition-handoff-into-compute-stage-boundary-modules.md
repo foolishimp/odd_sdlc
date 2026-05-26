@@ -142,6 +142,7 @@ Current suspect side effects to eliminate or rehome:
 | H-120 | Run clean JS hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260525T183305414Z_pid95270`; bug fixed where design-depth evaluate.C/F_P shortened exact source paths from the admitted design artifact |
 | H-130 | Run clean Rust server hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t133_hello_world_rust_live/20260525T190915811Z_pid70152`; byproducts remain by execution policy only and are not admitted as product-file truth |
 | H-140 | Run clean data mapper live with PTY. | final close or lawful block, no source-specific F_D compensations | planned |
+| H-141 | Audit worker-runtime blocking reasons through the common consequence path. | `worker_output_limit_exceeded` and similar retryable process failures write diagnostics but select `retry`, not terminal `block`; hard protocol blocks remain protected | in progress: fixed closure disposition so explicit same-edge retry pressure outranks diagnostic assurance block; covered by `test:t153`; data-mapper live must be resumed |
 
 ## Closure Checklist
 

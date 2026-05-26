@@ -1047,12 +1047,17 @@ export function deriveSdlcEdgeClosureDecision(input: {
       throw new TypeError("edge assurance close decision target carrier admission drift");
     }
   }
+  const retryReasonRefs = uniqueSorted(input.retryReasonRefs ?? []);
+  const repairReasonRefs = uniqueSorted(input.repairReasonRefs ?? []);
+  const reenterReasonRefs = uniqueSorted(input.reenterReasonRefs ?? []);
+  const repriceReasonRefs = uniqueSorted(input.repriceReasonRefs ?? []);
+  const blockReasonRefs = uniqueSorted(input.blockReasonRefs ?? []);
   const openReasonRefs = uniqueSorted([
-    ...(input.retryReasonRefs ?? []),
-    ...(input.repairReasonRefs ?? []),
-    ...(input.reenterReasonRefs ?? []),
-    ...(input.repriceReasonRefs ?? []),
-    ...(input.blockReasonRefs ?? [])
+    ...retryReasonRefs,
+    ...repairReasonRefs,
+    ...reenterReasonRefs,
+    ...repriceReasonRefs,
+    ...blockReasonRefs
   ]);
   const closureAllowed = openReasonRefs.length === 0;
   const candidates = new Set<SdlcEdgeClosureDisposition>(["block"]);
@@ -1069,20 +1074,24 @@ export function deriveSdlcEdgeClosureDecision(input: {
   } else if (edgeAssuranceCloseDecision.disposition === "retry") {
     candidates.add("retry");
   }
-  if (edgeAssuranceCloseDecision?.disposition !== "block") {
+  if (edgeAssuranceCloseDecision?.disposition === "block") {
+    if (retryReasonRefs.length > 0) {
+      candidates.add("retry");
+    }
+  } else {
     if (yieldResumeBasis !== null) {
       candidates.add("yield");
     }
-    if ((input.repriceReasonRefs ?? []).length > 0) {
+    if (repriceReasonRefs.length > 0) {
       candidates.add("reprice");
     }
-    if ((input.repairReasonRefs ?? []).length > 0) {
+    if (repairReasonRefs.length > 0) {
       candidates.add("repair");
     }
-    if ((input.reenterReasonRefs ?? []).length > 0) {
+    if (reenterReasonRefs.length > 0) {
       candidates.add("re-enter");
     }
-    if ((input.retryReasonRefs ?? []).length > 0) {
+    if (retryReasonRefs.length > 0) {
       candidates.add("retry");
     }
   }
@@ -1090,11 +1099,11 @@ export function deriveSdlcEdgeClosureDecision(input: {
   const disposition = dispositionFromPolicy({ policy, candidates });
   const reasonRefs = uniqueSorted([
     ...(edgeAssuranceCloseDecision?.reasonRefs ?? []),
-    ...(input.retryReasonRefs ?? []),
-    ...(input.repairReasonRefs ?? []),
-    ...(input.reenterReasonRefs ?? []),
-    ...(input.repriceReasonRefs ?? []),
-    ...(input.blockReasonRefs ?? []),
+    ...retryReasonRefs,
+    ...repairReasonRefs,
+    ...reenterReasonRefs,
+    ...repriceReasonRefs,
+    ...blockReasonRefs,
     ...(yieldResumeBasis?.admittedProgressRefs ?? [])
   ]);
   const normalizedYieldResumeBasis =
