@@ -161,7 +161,7 @@ import {
   snapshotProductMaterializationRoot,
   stableOperatorJson,
   workerResultReportWithFpStageRefs,
-  writeInstalledOperatorOwnedEvaluationArtifact,
+  writeDeclaredEdgeProjectionOutput,
   writeHandoffFiles,
   writePostflightGapDossier,
   writeWorkerFpTransformResult,
@@ -1755,42 +1755,6 @@ function runtimeFailureArtifact(input: {
   });
 }
 
-function writeInstalledOperatorNoDispatchArtifact(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly edgeAccountingRow: SdlcExecutiveEdgeAccountingRow;
-}): string {
-  const content = [
-    `# ${input.manifest.targetAssetType}`,
-    "",
-    `graph_function: ${input.manifest.graphFunctionName}`,
-    `edge: ${input.manifest.edgeName}`,
-    "source_function: installed_operator.deterministic_edge",
-    "worker_dispatch_allowed: false",
-    `edge_accounting_disposition: ${input.edgeAccountingRow.disposition}`,
-    `edge_accounting_rationale: ${input.edgeAccountingRow.rationale}`,
-    "",
-    "## Authority Outputs",
-    "",
-    ...input.edgeAccountingRow.authorityOutputRefs.map((ref) => `- ${ref}`),
-    "",
-    "## Closure Evidence",
-    "",
-    ...(input.edgeAccountingRow.closureEvidenceRefs.length === 0
-      ? ["- projection/no-close"]
-      : input.edgeAccountingRow.closureEvidenceRefs.map((ref) => `- ${ref}`)),
-    "",
-    "## Source Authority",
-    "",
-    ...input.manifest.traversalObligationContext.authorityRefs.map((ref) => `- ${ref}`)
-  ].join("\n");
-  writeSdlcSystemArtifact({
-    archiveRoot: input.manifest.archiveRoot,
-    absolutePath: input.manifest.outputFile,
-    payload: content
-  });
-  return input.manifest.outputFile;
-}
-
 function noDispatchReport(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
@@ -1798,7 +1762,7 @@ function noDispatchReport(input: {
   return Object.freeze({
     ...input.report,
     summary:
-      "framework-generated deterministic no-dispatch report from observed artifacts",
+      "system projection report from declared edge-output policy",
     fpTransformRequestRef: null,
     fpTransformResultRef: null,
     fpTransformStatusSnapshot: null
@@ -8307,28 +8271,23 @@ function compactRuntimeEventArchivePayload(
       const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(pluginInput.edge);
       const workerDispatchAllowed = edgeAccountingRow?.workerDispatchAllowed ?? true;
       if (!workerDispatchAllowed) {
-        const frameworkOwnedEvaluationArtifact =
-          writeInstalledOperatorOwnedEvaluationArtifact({ manifest });
-        if (frameworkOwnedEvaluationArtifact === null) {
-          if (edgeAccountingRow === null) {
-            throw new TypeError(`missing edge accounting row for ${pluginInput.edge}`);
-          }
-          writeInstalledOperatorNoDispatchArtifact({
-            manifest,
-            edgeAccountingRow
-          });
-        } else {
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "installed_operator_evaluation_artifact.json",
-            payload: {
-              kind: "sdlc_installed_operator_evaluation_artifact",
-              writerInterface: "writeInstalledOperatorOwnedEvaluationArtifact",
-              targetAssetType: manifest.targetAssetType,
-              outputFile: frameworkOwnedEvaluationArtifact
-            }
-          });
+        const edgePolicyProjectionArtifact =
+          writeDeclaredEdgeProjectionOutput({ manifest });
+        if (edgePolicyProjectionArtifact === null) {
+          throw new TypeError(
+            `${pluginInput.edge}: no-dispatch edge is missing declared edge-output projection policy`
+          );
         }
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "installed_operator_evaluation_artifact.json",
+          payload: {
+            kind: "sdlc_installed_operator_evaluation_artifact",
+            writerInterface: "writeDeclaredEdgeProjectionOutput",
+            targetAssetType: manifest.targetAssetType,
+            outputFile: edgePolicyProjectionArtifact
+          }
+        });
         let workerReport: SdlcWorkerResultReport | null = null;
         try {
           workerReport = noDispatchReport({
@@ -8348,11 +8307,8 @@ function compactRuntimeEventArchivePayload(
             relativePath: "post_transform_observation.json",
             payload: {
               kind: "sdlc_post_transform_observation",
-              sourceFunction: "installed_operator.deterministic_edge",
-              generatedFunction:
-                frameworkOwnedEvaluationArtifact === null
-                  ? "writeInstalledOperatorNoDispatchArtifact"
-                  : "writeInstalledOperatorOwnedEvaluationArtifact",
+              sourceFunction: "system.edge_policy_projection",
+              generatedFunction: "edge_policy.writeDeclaredEdgeProjectionOutput",
               previousReportAdmissionError: null,
               materializedFileCount: workerReport.materializedFiles.length,
               outputFile: workerReport.outputFile,
@@ -8484,17 +8440,17 @@ function compactRuntimeEventArchivePayload(
           reason: failurePostflight.blockingReasons.join(",")
         });
       }
-      const frameworkOwnedEvaluationArtifact =
-        writeInstalledOperatorOwnedEvaluationArtifact({ manifest });
-      if (frameworkOwnedEvaluationArtifact !== null) {
+      const edgePolicyProjectionArtifact =
+        writeDeclaredEdgeProjectionOutput({ manifest });
+      if (edgePolicyProjectionArtifact !== null) {
         writeSdlcSystemArtifact({
           archiveRoot: manifest.archiveRoot,
           relativePath: "installed_operator_evaluation_artifact.json",
           payload: {
             kind: "sdlc_installed_operator_evaluation_artifact",
-            writerInterface: "writeInstalledOperatorOwnedEvaluationArtifact",
+            writerInterface: "writeDeclaredEdgeProjectionOutput",
             targetAssetType: manifest.targetAssetType,
-            outputFile: frameworkOwnedEvaluationArtifact
+            outputFile: edgePolicyProjectionArtifact
           }
         });
       }
@@ -8516,9 +8472,9 @@ function compactRuntimeEventArchivePayload(
             kind: "sdlc_post_transform_observation",
             sourceFunction: "worker.F_P.transform",
             generatedFunction:
-              frameworkOwnedEvaluationArtifact === null
+              edgePolicyProjectionArtifact === null
                 ? "buildPostTransformWorkerResultReport"
-                : "installed_operator.writeInstalledOperatorOwnedEvaluationArtifact",
+                : "edge_policy.writeDeclaredEdgeProjectionOutput",
             previousReportAdmissionError: null,
             materializedFileCount: workerReport.materializedFiles.length,
             outputFile: workerReport.outputFile,

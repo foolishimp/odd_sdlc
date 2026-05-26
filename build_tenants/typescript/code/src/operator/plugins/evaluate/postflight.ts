@@ -17,17 +17,17 @@ import {
   type SdlcSelectedAbgFnCompositionIdentity
 } from "../../composition_identity.js";
 import {
-  __handoffEvaluateAdrOutputArtifact,
-  __handoffEvaluateExecutionEvidence,
-  __handoffEvaluateMaterializedProductFiles,
-  __handoffEvaluateObligationAssessments,
-  __handoffEvaluateStagedConstructionAuthority,
-  __handoffEvaluateWorkerAuthorityReadBoundary,
-  __handoffInstalledOperatorOwnsEvaluationOutput,
-  __handoffPathIsInside,
-  __handoffResolveProductMaterializationReplay,
+  evaluateAdrOutputArtifact,
+  evaluateExecutionEvidence,
+  evaluateMaterializedProductFiles,
+  evaluateObligationAssessments,
+  evaluateStagedConstructionAuthority,
+  evaluateWorkerAuthorityReadBoundary,
+  pathIsInside,
+  resolveProductMaterializationReplay,
   sha256Text
 } from "../transform/launch_contract.js";
+import { sdlcInstalledOperatorProjectsOutput } from "../../edge_output_policy.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
 import {
   admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
@@ -49,7 +49,7 @@ export function evaluateSdlcComputeStage(input: {
   readonly report: SdlcWorkerResultReport;
   readonly fpEvaluatorAdmissionEvidenceRefs?: readonly string[] | undefined;
 }): SdlcPostflightResult {
-  const replayResolution = __handoffResolveProductMaterializationReplay(input);
+  const replayResolution = resolveProductMaterializationReplay(input);
   const report = replayResolution.report;
   const blockingReasonCarriers: SdlcBlockingReason[] = [];
   const materializationDiagnostics = report.materializationDiagnostics ?? [];
@@ -71,12 +71,12 @@ export function evaluateSdlcComputeStage(input: {
       })
     );
   }
-  __handoffEvaluateWorkerAuthorityReadBoundary({
+  evaluateWorkerAuthorityReadBoundary({
     manifest: input.manifest,
     blockingReasonCarriers
   });
   if (!shouldDeferImplementationDesignRegisterToFpEvaluator(input.manifest)) {
-    __handoffEvaluateStagedConstructionAuthority({
+    evaluateStagedConstructionAuthority({
       manifest: input.manifest,
       blockingReasonCarriers,
       fpEvaluatorAdmissionEvidenceRefs:
@@ -93,13 +93,13 @@ export function evaluateSdlcComputeStage(input: {
       })
     );
   }
-  const frameworkOwnedEvaluationOutput =
-    __handoffInstalledOperatorOwnsEvaluationOutput(input.manifest.targetAssetType) &&
+  const edgePolicyProjectionOutput =
+    sdlcInstalledOperatorProjectsOutput(input.manifest.targetAssetType) &&
     outputFile === resolve(input.manifest.outputFile);
   if (
-    !frameworkOwnedEvaluationOutput &&
+    !edgePolicyProjectionOutput &&
     !input.manifest.allowedWriteRoots.some((root) =>
-      __handoffPathIsInside(outputFile, root)
+      pathIsInside(outputFile, root)
     )
   ) {
     blockingReasonCarriers.push(
@@ -133,7 +133,7 @@ export function evaluateSdlcComputeStage(input: {
         })
       );
     }
-    __handoffEvaluateAdrOutputArtifact({
+    evaluateAdrOutputArtifact({
       manifest: input.manifest,
       outputFile,
       blockingReasonCarriers
@@ -147,7 +147,7 @@ export function evaluateSdlcComputeStage(input: {
       );
     }
   }
-  __handoffEvaluateMaterializedProductFiles({
+  evaluateMaterializedProductFiles({
     manifest: input.manifest,
     report,
     blockingReasonCarriers
@@ -164,13 +164,13 @@ export function evaluateSdlcComputeStage(input: {
       pathToFileURL(file.absolutePath).href
     )
   ];
-  __handoffEvaluateExecutionEvidence({
+  evaluateExecutionEvidence({
     manifest: input.manifest,
     report,
     blockingReasonCarriers,
     evidenceRefs
   });
-  __handoffEvaluateObligationAssessments({
+  evaluateObligationAssessments({
     manifest: input.manifest,
     report,
     blockingReasonCarriers

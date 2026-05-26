@@ -60,7 +60,7 @@ test("T-171 admits exact component-depth payload selected by target-carrier auth
   );
 });
 
-test("T-183 admits fenced selected component-depth target-carrier envelope", () => {
+test("T-183 admits exact selected component-depth target-carrier envelope", () => {
   const register = {
     kind: "sdlc_component_depth_register",
     registerVersion: "ts-component-depth-v1",
@@ -97,9 +97,7 @@ test("T-183 admits fenced selected component-depth target-carrier envelope", () 
     evidenceRefs: ["file:build_tenants/hello_world_javascript/src/hello.js"],
     payload: register
   };
-  const outputFile = writeArtifact(
-    `# component code\n\n\`\`\`json component_depth_register\n${JSON.stringify(envelope, null, 2)}\n\`\`\`\n`
-  );
+  const outputFile = writeArtifact(`${JSON.stringify(envelope, null, 2)}\n`);
 
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: "component_code_surface",
@@ -111,7 +109,7 @@ test("T-183 admits fenced selected component-depth target-carrier envelope", () 
   assert.equal(admission.register.componentRealizationRows[0].componentId, "hello_program");
 });
 
-test("T-183 rejects fenced component-depth payload with extra semantic surfaces", () => {
+test("T-183 rejects fenced component-depth bridge carriers", () => {
   const outputFile = writeArtifact(`# component code
 
 \`\`\`json component_depth_register
@@ -151,6 +149,51 @@ ${JSON.stringify(
 )}
 \`\`\`
 `);
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_code_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "rejected");
+  assert.match(admission.blockingReasons.join("\n"), /component_depth_register_missing/u);
+});
+
+test("T-183 rejects exact component-depth payload with extra semantic surfaces", () => {
+  const outputFile = writeArtifact(`${JSON.stringify(
+    {
+      kind: "sdlc_component_code_surface_target_carrier",
+      targetAssetType: "component_code_surface",
+      edgeRef: "derive_lite_component_code_surface",
+      contractRef:
+        "gtl://target-carrier-contract/odd-sdlc/derive_lite_component_code_surface/component_code_surface",
+      contractDigest: "sha256:t183_component_depth_envelope",
+      payload: {
+        kind: "sdlc_component_depth_register",
+        registerVersion: "ts-component-depth-v1",
+        targetAssetType: "component_code_surface",
+        componentRealizationRows: [
+          {
+            kind: "sdlc_component_realization_row",
+            componentId: "hello_program",
+            moduleName: "hello_world_javascript",
+            relativePath: "src/hello.js",
+            publicBoundary: "node stdout entrypoint",
+            requirementIds: ["REQ-T132-001"],
+            sourceAssetRefs: ["workspace://design/adr"]
+          }
+        ],
+        materializedFiles: [
+          {
+            relativePath: "src/hello.js",
+            role: "source"
+          }
+        ]
+      }
+    },
+    null,
+    2
+  )}\n`);
 
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: "component_code_surface",

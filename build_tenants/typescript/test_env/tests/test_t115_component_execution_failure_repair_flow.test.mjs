@@ -21,7 +21,7 @@ import {
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   sha256Text,
-  writeInstalledOperatorOwnedEvaluationArtifact
+  writeDeclaredEdgeProjectionOutput
 } from "../../build/semantic/code/src/index.js";
 
 function workspace() {
@@ -850,7 +850,7 @@ test("T-173 release-depth parity retires stale repair schedule after newer passi
   );
 
   const releaseHandoff = manifest(root, "derive_release_depth_parity_surface");
-  writeInstalledOperatorOwnedEvaluationArtifact({ manifest: releaseHandoff });
+  writeDeclaredEdgeProjectionOutput({ manifest: releaseHandoff });
 
   const admission = admitComponentDepthRegisterFromArtifact({
     targetAssetType: releaseHandoff.targetAssetType,

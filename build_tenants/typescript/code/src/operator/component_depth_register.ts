@@ -594,29 +594,8 @@ function parseJsonCandidates(input: string, label: string): readonly unknown[] {
   }
 }
 
-function fencedComponentDepthCandidates(content: string): readonly unknown[] {
-  const candidates: unknown[] = [];
-  const fencePattern =
-    /```(?:json[ \t]+component_depth_register|component_depth_register)[^\r\n]*\r?\n([\s\S]*?)```/gu;
-  for (const match of content.matchAll(fencePattern)) {
-    const block = match[1] ?? "";
-    candidates.push(
-      ...parseJsonCandidates(block.trim(), "component_depth_register_envelope")
-    );
-  }
-  return Object.freeze(candidates);
-}
-
 function jsonCandidates(content: string): readonly unknown[] {
-  const wholeFileCandidates = parseJsonCandidates(content, "component_depth_register");
-  if (wholeFileCandidates.length > 0) {
-    return wholeFileCandidates;
-  }
-  try {
-    return fencedComponentDepthCandidates(content);
-  } catch {
-    return Object.freeze([]);
-  }
+  return parseJsonCandidates(content, "component_depth_register");
 }
 
 function requiredRowsPresent(input: {

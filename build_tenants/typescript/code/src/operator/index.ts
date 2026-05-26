@@ -20,10 +20,10 @@ export {
   snapshotProductMaterializationRoot,
   deriveSdlcStagedConstructionAuditCarriers,
   observeProductMaterializationDelta,
-  writeInstalledOperatorOwnedEvaluationArtifact,
   buildPostTransformWorkerResultReport,
   workerResultReportWithReplayedProductMaterialization,
   workerResultReportWithFpStageRefs,
+  writeDeclaredEdgeProjectionOutput,
   constructWorkerFpTransformResult,
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest,
@@ -40,6 +40,7 @@ export {
   type SdlcProductMaterializationSnapshot
 } from "./plugins/transform/launch_contract.js";
 export * from "./system_artifacts.js";
+export * from "./edge_output_policy.js";
 export * from "./plugins/evaluate/index.js";
 export * from "./work_category_governance.js";
 export * from "./feature_scope.js";

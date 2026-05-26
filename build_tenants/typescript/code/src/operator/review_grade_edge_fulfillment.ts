@@ -17,6 +17,9 @@ import {
   type SdlcWorkerObligationAssessment,
   type SdlcWorkerHandoffManifest
 } from "./carriers.js";
+import {
+  sdlcReviewGradeEdgeFulfillmentAssessmentRequired
+} from "./edge_output_policy.js";
 
 export const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE =
   "review_grade_edge_fulfillment_assessment.json";
@@ -24,27 +27,10 @@ export const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE =
 export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
   "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp";
 
-function frameworkOwnedEvaluationTarget(targetAssetType: string): boolean {
-  return (
-    targetAssetType === "code_surface" ||
-    targetAssetType === "component_realization_qualification_surface" ||
-    targetAssetType === "test_execution_surface" ||
-    targetAssetType === "test_execution_result_surface" ||
-    targetAssetType === "component_test_qualification_surface" ||
-    targetAssetType === "test_run_archive_surface" ||
-    targetAssetType === "release_depth_parity_surface"
-  );
-}
-
 export function reviewGradeEdgeFulfillmentAssessmentRequired(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
-  return (
-    manifest.fpTransformRequest !== null &&
-    !frameworkOwnedEvaluationTarget(manifest.targetAssetType) &&
-    manifest.outputFile.trim().length > 0 &&
-    manifest.traversalObligationContext.obligations.length > 0
-  );
+  return sdlcReviewGradeEdgeFulfillmentAssessmentRequired(manifest);
 }
 
 export function reviewGradeFindingsAreDownstreamStagePressure(

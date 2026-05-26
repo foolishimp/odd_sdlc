@@ -12,6 +12,21 @@ this means a graph function is a best fit operator to fulfill a->g
 that the evaluator is a configured call out
 
 
+The Probability Engine
+
+GTL graph function edge
+    -> SDLC EdgePolicy
+    -> ABG selected composition
+    -> plugin.transform.C
+    -> system admission/write
+    -> plugin.evaluate.C
+    -> system admission/write
+    -> plugin.consequence.C
+    -> traversal transition
+
+
+
+
 --- claude ---
 
 Reading this as a constitutional refinement of ODD_METHOD §5 (Graph Functions) and §11.5D (the eval_gap / evaluate_next / evaluate_action loop). Four claims, each load-bearing.

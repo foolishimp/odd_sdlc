@@ -137,8 +137,8 @@ test("T-180 live evaluate and consequence paths do not synthesize selected compo
   );
   assert.doesNotMatch(handoff, /deriveSdlcSelectedAbgFnCompositionIdentity/u);
   assert.match(publicStart, /deriveSdlcPreRuntimePlanningCompositionIdentity/u);
-  assert.match(traversal, /legacyReplayOnlyCompositionIdentityForInput/u);
-  assert.match(traversal, /Migration-only support for historical tests\/replay fixtures/u);
+  assert.doesNotMatch(traversal, /legacyReplayOnlyCompositionIdentityForInput/u);
+  assert.doesNotMatch(traversal, /Migration-only support for historical tests\/replay fixtures/u);
 });
 
 test("T-180 analyzer admits and renders RC3 stage truth", () => {

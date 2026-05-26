@@ -20,7 +20,8 @@ import {
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
-  writeInstalledOperatorOwnedEvaluationArtifact
+  SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING,
+  sdlcEdgeOutputPolicyForTargetAssetType
 } from "../../build/semantic/code/src/index.js";
 
 const PACKAGE_ROOT = process.cwd();
@@ -69,6 +70,12 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
     assert.doesNotMatch(source, /from "\.\/handoff\.js"/u, filePath);
     assert.doesNotMatch(source, /from "\.\.\/handoff\.js"/u, filePath);
     assert.doesNotMatch(source, /writeOperatorArchiveFile/u, filePath);
+    assert.doesNotMatch(source, /writeInstalledOperatorNoDispatchArtifact/u, filePath);
+    assert.doesNotMatch(source, /ensureObservedTransformOutput/u, filePath);
+    assert.doesNotMatch(source, /__handoff/u, filePath);
+    assert.doesNotMatch(source, /target_asset_catalog_fallback/u, filePath);
+    assert.doesNotMatch(source, /legacyReplayOnlyCompositionIdentityForInput/u, filePath);
+    assert.doesNotMatch(source, /installedOperatorOwnsEvaluationOutput/u, filePath);
     assert.doesNotMatch(source, /\bwriteFileSync\b/u, filePath);
     assert.doesNotMatch(source, /\bappendFileSync\b/u, filePath);
     assert.doesNotMatch(source, /\bcreateWriteStream\b/u, filePath);
@@ -158,7 +165,7 @@ test("T-184 retryable provider connection failures remain same-edge retry", () =
   assert.deepEqual(dossier.nextLawfulActions, ["retry_same_edge"]);
 });
 
-test("T-184 installed-operator product surfaces write to workspace target path", () => {
+test("T-184 projection surfaces are declared by edge-output policy", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("qualify_component_realization_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -169,19 +176,37 @@ test("T-184 installed-operator product surfaces write to workspace target path",
     contract,
     runId: "t184-workspace-target-surface"
   });
+  const policy = sdlcEdgeOutputPolicyForTargetAssetType(manifest.targetAssetType);
 
   assert.equal(
-    writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
-    manifest.outputFile
+    policy.outputProducer,
+    "system_projection",
+    "qualification surfaces are projection outputs declared by shared edge policy"
   );
-  assert.equal(existsSync(manifest.outputFile), true);
-  assert.equal(
-    manifest.outputFile.startsWith(`${manifest.archiveRoot}${path.sep}`),
-    false,
-    "workspace target surfaces are product artifacts, not operator-run archive artifacts"
-  );
+  assert.equal(policy.reviewGradeAssessmentExempt, true);
+  assert.equal(policy.workerAuthoredTargetCarrierProtocolRequired, false);
+  assert.equal(existsSync(manifest.outputFile), false);
+});
 
-  const payload = JSON.parse(readFileSync(manifest.outputFile, "utf8"));
-  assert.equal(payload.kind, "sdlc_component_depth_register");
-  assert.equal(payload.targetAssetType, "component_realization_qualification_surface");
+test("T-184 every no-dispatch edge uses system projection policy", () => {
+  const workspace = makeWorkspace();
+  for (const row of SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING.filter(
+    (edgeAccountingRow) => !edgeAccountingRow.workerDispatchAllowed
+  )) {
+    const contract = hookContractByEdgeName(row.edgeName);
+    const manifest = deriveWorkerHandoffManifest({
+      workspaceRoot: workspace,
+      graphFunctionName: contract.edgeName,
+      edgeName: contract.edgeName,
+      vectorIndex: 0,
+      contract,
+      runId: `t184-${row.edgeName}`
+    });
+    const policy = sdlcEdgeOutputPolicyForTargetAssetType(manifest.targetAssetType);
+    assert.equal(
+      policy.outputProducer,
+      "system_projection",
+      `${row.edgeName} (${manifest.targetAssetType}) must not fall back to a no-dispatch artifact writer`
+    );
+  }
 });

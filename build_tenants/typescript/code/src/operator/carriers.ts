@@ -1775,9 +1775,7 @@ export interface SdlcWorkerWorkCategoryGovernanceSelection {
   readonly category: SdlcWorkCategoryGovernanceCategory;
   readonly configRef: string;
   readonly workerPath: string;
-  readonly selectionSource:
-    | "graph_function_catalog"
-    | "target_asset_catalog_fallback";
+  readonly selectionSource: "graph_function_catalog";
   readonly edgeName: string;
   readonly targetAssetType: string;
 }

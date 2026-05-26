@@ -9,10 +9,7 @@ import type {
   SdlcEdgeAssuranceCloseDecision,
   SdlcTargetCarrierClosureStatus
 } from "./edge_gain_closure.js";
-import {
-  deriveLegacyReplayOnlySdlcSelectedAbgFnCompositionIdentity,
-  type SdlcSelectedAbgFnCompositionIdentity
-} from "./composition_identity.js";
+import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
 
 export type SdlcEdgeClosureDisposition =
   | "close"
@@ -297,20 +294,6 @@ function nonNegativeInteger(value: number, label: string): number {
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort());
-}
-
-function legacyReplayOnlyCompositionIdentityForInput(input: {
-  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity | undefined;
-  readonly fallbackScopeRef: string;
-}): SdlcSelectedAbgFnCompositionIdentity {
-  // Migration-only support for historical tests/replay fixtures. Live runtime
-  // callers pass ABG-selected identity from EnginePluginInput.
-  return (
-    input.selectedComposition ??
-    deriveLegacyReplayOnlySdlcSelectedAbgFnCompositionIdentity({
-      scopeRef: input.fallbackScopeRef
-    })
-  );
 }
 
 function obligationReasonRef(input: {
@@ -731,7 +714,7 @@ export function constructSdlcWorksiteEvidence(input: {
 }
 
 export function constructSdlcEdgeFulfillmentLedger(input: {
-  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity;
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
   readonly ledgerRef: string;
   readonly ledgerVersionRef: string;
   readonly overlayRef?: string | null;
@@ -807,10 +790,7 @@ export function constructSdlcEdgeFulfillmentLedger(input: {
         : "not_required"
       : input.targetCarrierAdmissionStatus;
   const edgeRef = requireNonEmptyString(input.edgeRef, "edgeRef");
-  const selectedComposition = legacyReplayOnlyCompositionIdentityForInput({
-    selectedComposition: input.selectedComposition,
-    fallbackScopeRef: edgeRef
-  });
+  const selectedComposition = input.selectedComposition;
   const targetCarrierPressureRefs = targetCarrierAdmissionPressureRefs({
     edgeRef,
     status: targetCarrierAdmissionStatus
@@ -1341,7 +1321,7 @@ export function constructSdlcOverlaySegmentCompletion(input: {
 }
 
 export function constructSdlcNextActionProjection(input: {
-  readonly selectedComposition?: SdlcSelectedAbgFnCompositionIdentity;
+  readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
   readonly nextActionProjectionRef: string;
   readonly nextActionBasisKind?: SdlcNextActionBasisKind;
   readonly intentEventRefs: readonly string[];
@@ -1370,11 +1350,7 @@ export function constructSdlcNextActionProjection(input: {
     input.nextActionProjectionRef,
     "nextActionProjectionRef"
   );
-  const selectedComposition = legacyReplayOnlyCompositionIdentityForInput({
-    selectedComposition:
-      input.selectedComposition ?? input.closureDecision?.selectedComposition,
-    fallbackScopeRef: nextActionProjectionRef
-  });
+  const selectedComposition = input.selectedComposition;
   const nextGraphFunctionRef = input.nextGraphFunctionRef ?? null;
   const nextGraphVectorRef = input.nextGraphVectorRef ?? null;
   const intentEventRefs = nonEmptyUniqueSorted(

@@ -59,6 +59,53 @@ ABG.start(fn<A, B>.C)
 
 T-184 must make the file/module topology reflect that flow.
 
+## Probability Engine Invariant
+
+Every live SDLC edge must conform to this single functional interface:
+
+```text
+GTL graph function edge
+  -> SDLC EdgePolicy
+  -> ABG selected composition
+  -> plugin.transform.C
+  -> system admission/write
+  -> plugin.evaluate.C
+  -> system admission/write
+  -> plugin.consequence.C
+  -> traversal transition
+```
+
+Anything that cannot be classified as one of those binds, or as declarative
+policy consumed by one of those binds, is T-184 tech debt. The generic common
+solution must provide equivalent capability for all current edge situations by
+moving variation into declared `SDLC EdgePolicy` / node policy / plugin policy,
+not by preserving target-specific imperative branches.
+
+## Defect Shape
+
+The live data-mapper run made the recurring defect shape concrete. The bug is
+not one failed writer or one bad target surface. The defect class is any code
+path that can interpret, materialize, admit, close, retry, or route an SDLC edge
+outside the single compute-stage spine.
+
+The recurring shapes are:
+
+- generic launch/evaluate/consequence code branching on target asset names
+  instead of consuming an edge-declared producer/evaluator/projection policy
+- framework F_D code writing work-surface product artifacts or transform output
+  candidates that should be written by `transform.C` / selected project policy
+- parser bridges accepting stale, fenced, wrapped, aliased, or legacy carrier
+  shapes as authority
+- selected composition identity synthesized locally instead of consumed from ABG
+- deterministic diagnostic/postflight carriers able to become block/retry/close
+  pressure before selected `evaluate.C/F_P` authority evaluates the work
+- tests importing or constructing legacy helpers and thereby preserving the old
+  surface as executable proof
+
+The deletion rule is therefore broader than deleting `handoff.ts`: any remaining
+helper must name its owning stage and must not create a second truth surface for
+the same edge decision.
+
 ## Known Current Side Effects
 
 Current legitimate side effects:
@@ -78,9 +125,13 @@ Current suspect side effects to eliminate or rehome:
   no-dispatch work-surface artifacts
 - `writeInstalledOperatorOwnedEvaluationArtifact(...)` writes multiple target
   outputs from framework code
-- `writeStableJsonFile(...)` is a local writer bypassing the system artifact
-  boundary
-- `handoff.ts` still imports `writeFileSync`
+- `writeWorkspaceTargetJsonFile(...)` is a local product-surface writer that
+  should collapse behind the generic edge-output projection/materialization
+  surface
+- `plugins/evaluate/postflight.ts` still imports `__handoff*` helpers from the
+  transform launch module
+- selected-composition fallback helpers still exist for replay/test paths and
+  must be removed from live closure paths
 
 ## Target Module Ownership
 
@@ -139,10 +190,20 @@ Current suspect side effects to eliminate or rehome:
 | H-090 | Replace `writeOperatorArchiveFile` with direct `writeSdlcSystemArtifact` imports. | grep proves no `writeOperatorArchiveFile` export/import remains | done: source imports direct system writer and public wrapper export is removed |
 | H-100 | Delete `handoff.ts` and update `operator/index.ts`. | build fails if any consumer imports `./handoff.js`; file removed | done: `operator/index.ts` exports the transform launch contract and system artifact writer directly |
 | H-110 | Add raw-write audit tests for operator modules. | raw writes only in effect executors or approved product transformer/evaluator boundary | done for operator source: T-184 test rejects `writeFileSync`, `appendFileSync`, and `createWriteStream` in `operator/` |
-| H-120 | Run clean JS hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260525T183305414Z_pid95270`; bug fixed where design-depth evaluate.C/F_P shortened exact source paths from the admitted design artifact |
-| H-130 | Run clean Rust server hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t133_hello_world_rust_live/20260525T190915811Z_pid70152`; byproducts remain by execution policy only and are not admitted as product-file truth |
+| H-120 | Run clean JS hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: current clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260526T123226778Z_pid20615` after the edge-output-policy refactor; prior clean pass at `20260525T183305414Z_pid95270` remains historical evidence |
+| H-130 | Run clean Rust server hello-world live with PTY. | final close, no retry/block, expected CLIs/evaluator artifacts | done: current clean PTY live pass at `build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260526T124757862Z_pid37895`; product files were materialized by transform.C and closure passed through F_P evaluate/review-grade artifacts |
 | H-140 | Run clean data mapper live with PTY. | final close or lawful block, no source-specific F_D compensations | in progress: `20260526T050928948Z_pid56692` reached `qualify_component_realization_surface` after implementation-design/component-code retries, then failed on a generic workspace/system artifact writer bug; patch landed locally, fresh live rerun required |
 | H-141 | Audit worker-runtime blocking reasons through the common consequence path. | `worker_output_limit_exceeded`, provider connection failures, and similar retryable process failures write diagnostics but select `retry`, not terminal `block`; hard protocol blocks remain protected | in progress: fixed closure disposition so explicit same-edge retry pressure outranks diagnostic assurance block; added `worker_connection_failed` for `ECONNRESET`/socket failures; covered by `test:t153` and `test:t184`; data-mapper live must be rerun |
+| H-150 | Collapse stage-boundary aliases left after `handoff.ts` deletion. | no `__handoff*` export/import remains; evaluate/postflight imports owning evaluate, product-materialization, postflight, or effect modules directly | fixed: `__handoff*` aliases removed; postflight imports direct helpers; source grep covered by `test:t184` |
+| H-160 | Remove bridge parser admission for component-depth carriers. | component-depth target carriers are admitted from exact whole-file/project/evaluator carrier truth only; stale fenced JSON under fresh prose cannot satisfy authority | fixed: fenced component-depth bridge parsing removed; T-171/T-183 tests now admit exact whole-file carrier and reject fenced carriers |
+| H-170 | Delete live selected-composition synthesis fallback. | runtime closure and next-action projections fail closed without ABG-selected composition ref/digest/selection/regime identity; replay fixtures use explicit fixture identity only | fixed: closure/next-action construction now require selected composition identity and the legacy replay-only fallback is removed |
+| H-180 | Remove target-asset governance fallback from live prompt category selection. | every live edge resolves work-category governance from graph/function catalog authority; missing catalog row fails closed or emits diagnostic, not hidden target fallback | fixed: work-category governance now comes only from graph/function catalog; missing row throws |
+| H-190 | Remove framework-generated transform-output synthesis. | if the worker/evaluator did not write the contracted output, the run carries diagnostic evidence and selected evaluate/consequence decides; F_D does not create a substitute output artifact | fixed: `ensureObservedTransformOutput(...)` deleted; missing output artifact remains diagnostic evidence |
+| H-200 | Reclassify deterministic no-dispatch edge output. | no-dispatch edges are declared projection edges with a generic edge-output projector, not installed-operator-owned ad hoc markdown/product writers | fixed: `writeInstalledOperatorNoDispatchArtifact(...)` deleted; every no-dispatch edge must resolve to shared `system_projection` edge-output policy or fail closed |
+| H-210 | Collapse framework-owned evaluation target policy to one edge policy surface. | `installedOperatorOwnsEvaluationOutput`, review-grade required/exempt logic, postflight output exceptions, and artifact writer policy read one cataloged edge-output policy | partial: operator review-grade/postflight/writer decisions use `sdlcEdgeOutputPolicyForTargetAssetType(...)`; product graph contract catalog still carries a separate projection/review-grade exemption list and must be collapsed into a pure contract-level policy module |
+| H-220 | Move installed-operator plugin prompts/contracts into plugin modules or plugin-set factory. | `installed_operator.ts` wires ABG plugin set from `operator/plugins/*` surfaces; it does not own F_P evaluator prompts, rule contracts, or semantic rule selection | discovered: design-depth/review-grade prompts and plugin contracts remain in `installed_operator.ts` |
+| H-230 | Audit F_D postflight/blocking carriers as diagnostic-only. | deterministic report/admission failures are system diagnostics or ABG contract failures only; product retry/block/close still derives from selected evaluate/consequence authority | discovered: worker report admission postflight functions still return `status: "blocked"` with `legacyBlockingReasonCode(...)` |
+| H-240 | Refactor compatibility tests that preserve legacy surfaces. | tests exercise production-path carriers or are deleted; no test imports public legacy writer helpers or embeds fenced component-depth carriers as accepted proof | discovered: `test:t184` imports `writeInstalledOperatorOwnedEvaluationArtifact`, and older tests still emit fenced `component_depth_register` blocks |
 
 ## Live Discovery Ledger
 
@@ -157,28 +218,83 @@ or duplicate surface discovered during the live run is tracked here.
 | LD-003 | `t164_data_mapper_full_capability_live/20260526T050928948Z_pid56692`, run `20260526T101301157Z_pid56862` | `component_realization_qualification_surface.md` was a workspace product target but was written through the system artifact writer, which enforces operator-run archive containment. | `.ai-workspace` runtime artifacts use `writeSdlcSystemArtifact`; declared workspace product targets use the file-store effect at `manifest.outputFile`. | fixed: workspace target JSON writer uses file-store effect; covered by `test:t184` |
 | LD-004 | code trace in `operator/plugins/transform/launch_contract.ts` around installed-operator-owned evaluation artifacts | no-dispatch qualification/projection surfaces are implemented as target-specific branches (`component_realization_qualification_surface`, `component_test_qualification_surface`, `release_depth_parity_surface`) even though they share the same A -> B projection pattern. | multi-surface projection code is legacy debt; every edge should use one generic edge-output projection/materialization flow with edge-declared producer policy. | open: collapse into `edge_projection` / product-materialization projection module; no new target-specific branch allowed |
 | LD-005 | code trace in `operator/plugins/transform/launch_contract.ts` | local helper name `writeStableJsonFile` hid the system/workspace boundary after LD-003. | helper names must expose authority boundary, not serialization detail. | fixed locally: renamed to `writeWorkspaceTargetJsonFile`; covered by source grep and `test:t184` |
+| LD-006 | source trace: `operator/plugins/evaluate/postflight.ts` imports `__handoffEvaluate*`, `__handoffResolveProductMaterializationReplay`, and `__handoffInstalledOperatorOwnsEvaluationOutput` from `operator/plugins/transform/launch_contract.ts` | deleting `handoff.ts` moved the coupling but did not fully partition it; evaluate/postflight still reaches through transform launch internals for replay, diagnostics, and framework-owned output policy. | stage modules must bind through owning surfaces: transform launch, product-materialization observation/replay, evaluate/postflight diagnostics, and effects. Cross-stage `__handoff*` aliases are compatibility debt. | fixed: `__handoff` source grep is clean and `test:t184` enforces it |
+| LD-007 | source trace: `operator/component_depth_register.ts` `fencedComponentDepthCandidates(...)` and `jsonCandidates(...)` | component-depth admission still accepts fenced JSON blocks when whole-file JSON parsing fails. That can preserve the stale-structured-carrier-under-fresh-prose failure pattern T-183 was meant to delete. | semantic component-depth rows must come from selected `evaluate.C/F_P` content ledger or explicit project authority, then be admitted as exact carrier truth; Markdown/fenced bridge parsing cannot satisfy authority. | fixed: fenced bridge removed; `test:t183` now rejects fenced component-depth carriers |
+| LD-008 | source trace: `operator/traversal_consequence.ts` `legacyReplayOnlyCompositionIdentityForInput(...)`; design acceptance at `ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md` says synthesized identity fails closed | closure and next-action projections can still fall back to locally synthesized selected composition identity when no ABG-selected identity is supplied. | live runtime closure must preserve ABG-selected `abg.fn_composition` ref/digest/selection/regime identity; replay fixture support must not be reachable from live closure. | fixed: selected composition is required in closure/next-action constructors; legacy fallback removed |
+| LD-009 | source trace: `operator/work_category_governance.ts` `TARGET_ASSET_GOVERNANCE_CATEGORY` and `target_asset_catalog_fallback` | prompt governance category can be selected from a target-asset fallback map when the graph/function catalog has no entry. This is a second categorization surface beside the graph catalog. | live edge work-category governance should come from graph/function catalog truth; target fallback is at most a migration diagnostic or test fixture behavior. | fixed: target-asset fallback removed; graph/function catalog is required |
+| LD-010 | source trace: `operator/index.ts` still exports `writeInstalledOperatorOwnedEvaluationArtifact`; `test_t184_handoff_partition_boundary.test.mjs` imports it as public API | the framework-owned product-surface writer is still a public operator API and is currently blessed by T-184 tests. | product-surface projection/materialization should be selected by the edge-output projection surface, not a public helper named for installed-operator ownership. | fixed: old public writer export removed; tests consume shared edge-output policy |
+| LD-011 | source trace: `operator/plugins/transform/launch_contract.ts` `componentDepthFieldSetForTarget(...)`, `compactComponentDepthDirective(...)`, and target-specific outcome directives | node/asset-specific prompt semantics still live inside the generic transform launch contract, including stale repair-schedule instructions as prose. | prompt semantics must be declared by node/edge pressure modules or selected evaluate/transform rule configuration; generic launch code should package declared pressure, not own semantic target rules. | open: move per-target directives into `operator/nodes/*` or catalog-backed prompt fragments and add source proof that launch contract has no semantic target switch |
+| LD-012 | source trace: `operator/plugins/transform/launch_contract.ts` `ensureObservedTransformOutput(...)` writes `manifest.outputFile` when it is missing | if a worker materializes files but omits the contracted transform artifact, F_D can synthesize an output artifact from observed filesystem state. | transform output candidates belong to `transform.C`; F_D materialization observation may write diagnostics but must not substitute the transform artifact. | fixed: synthesis helper deleted; missing output artifact is not replaced |
+| LD-013 | source trace: `operator/installed_operator.ts` `writeInstalledOperatorNoDispatchArtifact(...)` and `noDispatchReport(...)` | no-dispatch edges can synthesize markdown output and worker-result reports under installed-operator authority. | no-dispatch is a declared projection/qualification policy, not a special installed-operator product writer. It must route through the same generic edge-output projection surface as every other A -> B edge. | fixed for product output: no-dispatch artifact writer deleted; report is diagnostic projection over `writeDeclaredEdgeProjectionOutput(...)` |
+| LD-014 | source trace: `operator/review_grade_edge_fulfillment.ts` `frameworkOwnedEvaluationTarget(...)`; compare `operator/plugins/transform/launch_contract.ts` `installedOperatorOwnsEvaluationOutput(...)` | framework-owned target sets are duplicated in separate modules, so review-grade requirement policy can drift from output-writer policy. | one edge-output policy surface must say whether an edge is worker-authored, evaluator-authored, projection-only, review-grade-required, or no-close. | partial: operator decisions consume `edge_output_policy.ts`; remaining duplicate lives in `contracts/product_graph_contract_catalog.ts` and should be moved to a pure contract-level policy |
+| LD-015 | source trace: `operator/installed_operator.ts` `fpDispatchPluginContract()`, `fpEvaluatorPluginContract()`, `designDepthFpEvaluatorPrompt(...)`, and `reviewGradeEdgeFulfillmentPrompt(...)` | `installed_operator.ts` still owns plugin contracts and evaluator prompts instead of consuming a plugin-set boundary from `operator/plugins/*`. | installed operator should bind ABG to declared plugin modules; F_P evaluator prompts and rule contracts belong to `plugins/evaluate/*`, not the runtime loop file. | open: introduce `createSdlcAbgPluginSet()` / plugin registry module and move prompts/contracts under owning plugin modules |
+| LD-016 | source trace: `operator/assurance_gate.ts` builds materialization, shallow-realization, capability, obligation, component-depth, design-completeness, requirement-closure, and carry ledgers, then marks them diagnostic-only | the ledgers no longer block directly, but the file still contains target-specific semantic-looking F_D evaluations that can be accidentally promoted again. | F_D assurance ledgers must be explicit diagnostics/read models; any semantic adequacy judgment must be selected `evaluate.C/F_P` output. | open: split diagnostic writers by owner, add source proof that assurance ledgers cannot feed required closure dimensions |
+| LD-017 | source trace: `operator/installed_operator.ts` `workerReportAdmissionPostflight(...)` and `deterministicReportAdmissionPostflight(...)` return `status: "blocked"` using `legacyBlockingReasonCode(...)` | deterministic report/admission failures still look like postflight closure blockers in the runtime state shape. | malformed reports are system contract diagnostics or ABG admission failures; they must not be confused with product semantic block/retry authority. | open: classify these through one system-failure consequence path with explicit non-semantic status |
+| LD-018 | source trace: `build_tenants/typescript/test_env/tests/test_t184_handoff_partition_boundary.test.mjs` imports `writeInstalledOperatorOwnedEvaluationArtifact`; older tests such as `test_t076...` and `test_t120...` embed fenced `component_depth_register` blocks | some tests still prove compatibility with the very surfaces T-184 is deleting. | tests are proof surfaces; if they require legacy interfaces, the legacy interface remains alive. Refactor to production-path fixtures or delete redundant tests. | fixed for focused proof: `test:t184` rejects old public writer imports and `test:t183` rejects fenced component-depth bridges; broader legacy fixture sweep remains in LD-019 if future full suite exposes more |
+| LD-019 | source/test audit after deleting fenced component-depth admission | other historical tests may still carry legacy fenced component-depth fixtures even if focused T-183/T-184 proof is now corrected. | stale tests must be refactored to exact carriers or deleted when discovered; no test may keep a deleted authority path alive. | open watch item: run broader semantic suite before ticket closure and update/delete any stale fixture that fails due to the intended bridge removal |
+| LD-020 | data-mapper live trace `20260526T131037710Z_pid64804`, retry run `20260526T132002672Z_pid64999`; source trace `operator/plugins/transform/launch_contract.ts` retry instructions | retry prompt called selected review-grade residual pressure a "prior deterministic defect" even though the retry came from `evaluate.C/F_P`. | prompt language is part of the authority boundary; F_D diagnostics can write facts, but retry work queues are evaluated residual pressure from selected evaluation/consequence truth. | fixed: shared retry instruction now says "evaluated residual pressure" and `npm run build:semantic` passes after the patch |
+
+## Source Walkthrough Audit
+
+| path | current observation | verdict |
+| --- | --- | --- |
+| `installed_operator.ts` plugin setup | ABG plugin contracts, design-depth prompt, review-grade prompt, no-dispatch writer, worker report admission, and many system artifact writes remain in one runtime loop file. | runtime loop still owns too much; split into plugin registry, effects, diagnostics, and consequence modules |
+| `plugins/transform/launch_contract.ts` | former handoff body now carries transform launch, prompt fragments, materialization observation/replay, component-depth admission calls, execution evidence, target-specific writers, postflight helper exports, and product materialization manifest writing. | file move deleted the old name, not the old coupling; this is the main partition target |
+| `plugins/evaluate/postflight.ts` | evaluate/postflight imports direct helper names and no `__handoff*` aliases remain. | fixed for alias surface; still needs deeper partition of product-materialization replay helpers out of transform launch |
+| `component_depth_register.ts` | exact parser remains; fenced Markdown candidates no longer admit. | fixed for bridge admission |
+| `review_grade_edge_fulfillment.ts` | review-grade required/exempt policy now delegates to operator edge-output policy. | fixed inside operator; remaining duplicate in product graph contract catalog |
+| `work_category_governance.ts` | graph catalog category lookup is required; target-asset fallback removed. | fixed for live prompt governance |
+| `traversal_consequence.ts` | closure/next-action projection requires selected composition identity. | fixed for live selected-composition truth |
+| `assurance_gate.ts` | deterministic ledgers are now forced diagnostic-only, but semantic-looking F_D ledgers remain. | keep as transitional diagnostics only; split and prove non-closure |
+| `test_env/tests/*` | focused T-183/T-184 tests now reject old public writer names and fenced component-depth bridges; broader T-066/T-115 still encode old F_D-blocking expectations. | remaining test debt; refactor/delete stale broad fixtures without restoring F_D semantic authority |
+
+## Current Verification
+
+- `npm run build:semantic`: pass
+- `npm run test:t183`: pass, 63 tests
+- `npm run test:t184`: pass, 5 tests
+- `npm run lint:semantic`: pass
+- `git diff --check`: pass
+- `npm run build:semantic`: pass after LD-020 retry wording fix
+- JS hello-world live, PTY Claude Sonnet 4.6 xhigh:
+  `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260526T123226778Z_pid20615`
+  passed in `861476.893417ms`; both implementation-design and component-code
+  edges ran through transform/evaluate/consequence with F_P review-grade
+  evaluator artifacts present.
+- Rust service hello-world live, PTY Claude Sonnet 4.6 xhigh:
+  `build_tenants/typescript/test_env/test_runs/scenario_t164_rust_hello_service_lite_live/20260526T124757862Z_pid37895`
+  passed in `1297255.520666ms`; the service lane materialized `Cargo.toml`
+  and `src/main.rs`, then closed through F_P evaluate/review-grade and live
+  HTTP proof.
+- Targeted stale-test probe:
+  `node --test test_env/tests/test_t066_product_materialization_contract.test.mjs test_env/tests/test_t115_component_execution_failure_repair_flow.test.mjs test_env/tests/test_t180_abg_3_9_rc3_staged_compute_boundary.test.mjs`
+  now compiles/imports the generic projection surface, but still fails old
+  T-066/T-115 expectations that deterministic diagnostics, repair schedules,
+  and materialization replay block directly. Those failures are tracked under
+  LD-019/LD-017 as stale proof surfaces to refactor or delete before final
+  closure; they should not be used to restore F_D semantic authority.
 
 ## Closure Checklist
 
-- [ ] `handoff.ts` has no public exports and is deleted or empty.
-- [ ] `operator/index.ts` no longer re-exports from `./handoff.js`.
+- [x] `handoff.ts` has no public exports and is deleted or empty.
+- [x] `operator/index.ts` no longer re-exports from `./handoff.js`.
 - [ ] `installed_operator.ts` imports transform launch, result projection,
   materialization, postflight, consequence, and system artifact helpers from
   their owning modules.
-- [ ] No `writeFileSync` remains in `operator/` except approved process-local
+- [x] No `writeFileSync` remains in `operator/` except approved process-local
   transformer/evaluator output handling if explicitly documented.
-- [ ] `.ai-workspace` artifacts route through `writeSdlcSystemArtifact(...)`
+- [x] `.ai-workspace` artifacts route through `writeSdlcSystemArtifact(...)`
   and catalog validation where applicable.
-- [ ] No framework helper writes a transform output because a worker omitted it.
+- [x] No framework helper writes a transform output because a worker omitted it.
 - [ ] No F_D installed-operator helper writes semantic work-surface truth.
 - [ ] Product materialization observation is read-only and diagnostic-only.
 - [ ] Generated-asset closure still requires selected `evaluate.C/F_P`
   evidence.
-- [ ] `npm run build:semantic` passes.
-- [ ] `npm run test:t183` passes.
-- [ ] `npm run test:t184` exists and passes.
-- [ ] `npm run lint:semantic` passes.
-- [ ] `git diff --check` passes.
+- [x] `npm run build:semantic` passes.
+- [x] `npm run test:t183` passes.
+- [x] `npm run test:t184` exists and passes.
+- [x] `npm run lint:semantic` passes.
+- [x] `git diff --check` passes.
 - [x] JS hello-world live is clean.
 - [x] Rust server hello-world live is clean.
 - [ ] Data mapper live is clean or blocks lawfully without source-specific F_D

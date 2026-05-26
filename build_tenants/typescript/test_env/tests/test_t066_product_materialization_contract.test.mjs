@@ -82,7 +82,7 @@ import {
   sha256Text,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
-  writeInstalledOperatorOwnedEvaluationArtifact,
+  writeDeclaredEdgeProjectionOutput,
   writeProductMaterializationManifest
 } from "../../build/semantic/code/src/index.js";
 
@@ -7585,7 +7585,7 @@ test("T-094/T-095 test execution result rejects non-contract not-run status", ()
   const handoffFiles = writeHandoffFiles(manifest);
   const prompt = readFileSync(handoffFiles.promptPath, "utf8");
 
-  assert.match(prompt, /Framework-owned evaluation artifact/u);
+  assert.match(prompt, /Edge-policy projection output/u);
   assert.match(
     prompt,
     /The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier/u
@@ -8010,7 +8010,7 @@ test("T-083 failed execution-result evidence closes the execution source for dow
     targetAssetType: manifest.targetAssetType,
     outputFile: manifest.outputFile,
     digest: output.digest,
-    summary: "framework-owned execution evidence observed a failed shard",
+    summary: "edge-policy execution evidence observed a failed shard",
     unresolvedReasons: [],
     materializedFiles: [],
     executionEvidence: {
@@ -8425,7 +8425,7 @@ test("T-115 execution-result prompt allows repair while delegating evidence to i
     manifest.allowedWriteRoots.includes(manifest.productMaterialization.tenantRoot),
     true
   );
-  assert.match(prompt, /Framework-owned evaluation artifact/u);
+  assert.match(prompt, /Edge-policy projection output/u);
   assert.match(
     prompt,
     /The installed operator runs the declared execution shards and publishes the sdlc_worker_execution_evidence carrier/u
@@ -8938,7 +8938,7 @@ test("B-081 test execution preparation carries admitted schedule commands", () =
     manifest.productMaterialization.executionShards[0]?.command,
     "sbt test"
   );
-  assert.equal(writeInstalledOperatorOwnedEvaluationArtifact({ manifest }), manifest.outputFile);
+  assert.equal(writeDeclaredEdgeProjectionOutput({ manifest }), manifest.outputFile);
   const payload = JSON.parse(readFileSync(manifest.outputFile, "utf8"));
   assert.deepStrictEqual(
     payload.testExecutionPreparationRows.map((row) => row.command),
@@ -9591,13 +9591,13 @@ test("T-159 component-depth prompts pin the top-level register envelope on first
 
     if (promptCase.frameworkOwned === true) {
       assert.match(prompt, promptCase.publisherDirective);
-      assert.match(prompt, /Framework-owned evaluation artifact/u);
+      assert.match(prompt, /Edge-policy projection output/u);
       for (const forbiddenDirective of promptCase.forbiddenDirectives ?? []) {
         assert.doesNotMatch(prompt, forbiddenDirective);
       }
       assert.equal(
         invocationPackage.outcomeDirectives.some((directive) =>
-          /Framework-owned evaluation artifact/u.test(directive)
+          /Edge-policy projection output/u.test(directive)
         ),
         true
       );
@@ -10327,7 +10327,7 @@ test("T-102 all published edge transform prompts exclude evaluator work", () => 
       if (contract.targetAssetType === "release_depth_parity_surface") {
         assert.match(
           prompt,
-          /Framework-owned tenant-local SDLC surface path for current replay\/admission/u,
+          /Edge-policy tenant-local SDLC surface path for current replay\/admission/u,
           label
         );
         assert.match(prompt, /do not write this path/u, label);
@@ -10432,7 +10432,7 @@ test("T-102 installed operator interface writes execution evidence carrier", () 
   process.env["NODE_TEST_CONTEXT"] = "1";
   try {
     assert.equal(
-      writeInstalledOperatorOwnedEvaluationArtifact({ manifest }),
+      writeDeclaredEdgeProjectionOutput({ manifest }),
       manifest.outputFile
     );
   } finally {
@@ -10474,11 +10474,11 @@ test("T-171 repair schedule carrier is F_P-owned and ledger-evaluated", () => {
     runId: "t102-installed-operator-repair-schedule"
   });
 
-  assert.equal(writeInstalledOperatorOwnedEvaluationArtifact({ manifest }), null);
+  assert.equal(writeDeclaredEdgeProjectionOutput({ manifest }), null);
 
   const handoffFiles = writeHandoffFiles(manifest);
   const prompt = readFileSync(handoffFiles.promptPath, "utf8");
-  assert.doesNotMatch(prompt, /Framework-owned evaluation artifact/u);
+  assert.doesNotMatch(prompt, /Edge-policy projection output/u);
   assert.match(prompt, /Emit payload\.componentRepairSchedule/u);
   assert.match(prompt, /attributionConfidence=high only when/u);
   assert.match(prompt, /scheduleStatus=triage_gap/u);

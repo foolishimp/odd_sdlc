@@ -42,6 +42,7 @@ import {
   FG_CONFORM_PROJECT_AUTHORITY,
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
   requireSdlcTargetCarrierRow,
+  sdlcExecutiveEdgeAccountingRowFor,
   type SdlcTargetCarrierContractRow
 } from "../../../graph/index.js";
 import {
@@ -80,6 +81,10 @@ import { admitExactContractEnum } from "../../../shared/fd_admission.js";
 import {
   selectSdlcWorkCategoryGovernance
 } from "../../work_category_governance.js";
+import {
+  sdlcEdgeOutputPolicyForTargetAssetType,
+  sdlcInstalledOperatorProjectsOutput
+} from "../../edge_output_policy.js";
 import {
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation,
@@ -423,42 +428,23 @@ function tenantOutputArtifactIsAdr(manifest: SdlcWorkerHandoffManifest): boolean
 function materializationRolesForTarget(
   targetAssetType: string
 ): readonly SdlcMaterializedProductFileRole[] {
-  if (targetAssetType === "component_code_surface") {
-    return Object.freeze(["source"]);
-  }
-  if (targetAssetType === "component_test_surface") {
-    return Object.freeze(["test"]);
-  }
-  return Object.freeze([]);
+  return sdlcEdgeOutputPolicyForTargetAssetType(targetAssetType).materializationRoles;
 }
 
 function targetAdmitsTestExecutionEvidence(targetAssetType: string): boolean {
-  return targetAssetType === "test_execution_result_surface";
+  return sdlcEdgeOutputPolicyForTargetAssetType(targetAssetType)
+    .admitsTestExecutionEvidence;
 }
 
-function installedOperatorOwnsEvaluationOutput(targetAssetType: string): boolean {
-  return (
-    targetAssetType === "component_realization_qualification_surface" ||
-    targetAssetType === "test_execution_surface" ||
-    targetAssetType === "test_execution_result_surface" ||
-    targetAssetType === "component_test_qualification_surface" ||
-    targetAssetType === "test_run_archive_surface" ||
-    targetAssetType === "release_depth_parity_surface"
-  );
+function edgeOutputPolicyProjectsOutput(targetAssetType: string): boolean {
+  return sdlcInstalledOperatorProjectsOutput(targetAssetType);
 }
 
 function workerAuthoredTargetCarrierProtocolRequired(
   manifest: SdlcWorkerHandoffManifest
 ): boolean {
-  if (installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)) {
-    return false;
-  }
-  return (
-    manifest.targetAssetType === "component_code_surface" ||
-    manifest.targetAssetType === "component_test_surface" ||
-    manifest.targetAssetType === "test_design_surface" ||
-    manifest.targetAssetType === "component_repair_schedule_surface"
-  );
+  return sdlcEdgeOutputPolicyForTargetAssetType(manifest.targetAssetType)
+    .workerAuthoredTargetCarrierProtocolRequired;
 }
 
 function declaredExecutionContract(input: string): boolean {
@@ -5340,7 +5326,7 @@ export function deriveWorkerHandoffManifest(input: {
     ) {
       return Object.freeze([outputRoot, archiveRoot, materialization.tenantRoot]);
     }
-    if (installedOperatorOwnsEvaluationOutput(input.contract.targetAssetType)) {
+    if (edgeOutputPolicyProjectsOutput(input.contract.targetAssetType)) {
       return Object.freeze([outputRoot, archiveRoot]);
     }
     if (materialization.required || outputFileIsTenantLocal) {
@@ -6464,7 +6450,7 @@ function compactTestExecutionSurfaceDirective(
   if (manifest.targetAssetType !== "test_execution_surface") {
     return null;
   }
-  if (installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)) {
+  if (edgeOutputPolicyProjectsOutput(manifest.targetAssetType)) {
     return "Test-execution-surface carrier protocol is evaluator-owned; do not emit a selected target-carrier envelope. Read the declared test execution contract and current workspace state only for bounded observations before the installed operator publishes the preparation carrier.";
   }
   const projection = manifest.targetCarrierProjection;
@@ -6627,10 +6613,10 @@ function retryDefectDirectivesForWorker(
     return Object.freeze([]);
   }
   return Object.freeze([
-    "This is a retry/re-entry attempt. Repair the prior deterministic defect before adding new surface area.",
-    ...reasons.slice(0, 6).map((reason) => `Prior defect: ${reason}`),
+    "This is a retry/re-entry attempt. Repair the evaluated residual pressure before adding new surface area.",
+    ...reasons.slice(0, 6).map((reason) => `Evaluated residual pressure: ${reason}`),
     ...(reasons.length > 6
-      ? [`Prior defect count omitted: ${reasons.length - 6}`]
+      ? [`Evaluated residual pressure count omitted: ${reasons.length - 6}`]
       : [])
   ]);
 }
@@ -6638,7 +6624,7 @@ function retryDefectDirectivesForWorker(
 function outcomeDirectivesForWorker(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
-  const frameworkOwnedEvaluationOutput = installedOperatorOwnsEvaluationOutput(
+  const edgePolicyProjectionOutput = edgeOutputPolicyProjectsOutput(
     manifest.targetAssetType
   );
   const workerAuthoredTargetCarrierProtocol =
@@ -6670,11 +6656,11 @@ function outcomeDirectivesForWorker(
         ];
   const directives: string[] = [
     `Outcome: ${manifest.graphFunctionName} -> ${manifest.targetAssetType}.`,
-    ...(frameworkOwnedEvaluationOutput
+    ...(edgePolicyProjectionOutput
       ? [
-          `Framework-owned evaluation artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
+          `Edge-policy projection output: ${workerFacingPath(manifest, manifest.outputFile)}.`,
           "The installed operator derives and writes the selected evaluation artifact after this process exits.",
-          "Return after any allowed repair checks; do not fill target-carrier payload, summary, or evidence fields for this framework-owned artifact."
+          "Return after any allowed repair checks; do not fill target-carrier payload, summary, or evidence fields for this edge-policy projection artifact."
         ]
       : [
           `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
@@ -6718,7 +6704,7 @@ function outcomeDirectivesForWorker(
         `Tenant root: ${workerFacingPath(manifest, manifest.productMaterialization.tenantRoot)}.`,
         `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`
       );
-    } else if (installedOperatorOwnsEvaluationOutput(manifest.targetAssetType)) {
+    } else if (edgeOutputPolicyProjectsOutput(manifest.targetAssetType)) {
       directives.push(
         "Product materialization is not part of this edge.",
         "Worker role is observation over the selected evaluation inputs."
@@ -6730,9 +6716,9 @@ function outcomeDirectivesForWorker(
       );
     }
     if (tenantOutputArtifact !== null) {
-      if (frameworkOwnedEvaluationOutput) {
+      if (edgePolicyProjectionOutput) {
         directives.push(
-          `Framework-owned tenant-local SDLC surface path for current replay/admission: ${tenantOutputArtifact}; do not write this path and do not list it in materializedFiles.`
+          `Edge-policy tenant-local SDLC surface path for current replay/admission: ${tenantOutputArtifact}; do not write this path and do not list it in materializedFiles.`
         );
       } else {
         directives.push(
@@ -8511,7 +8497,7 @@ export function admitWorkerResultReport(
   });
 }
 
-function pathIsInside(child: string, parent: string): boolean {
+export function pathIsInside(child: string, parent: string): boolean {
   const relativePath = relative(parent, child);
   return (
     relativePath.length === 0 ||
@@ -8802,7 +8788,7 @@ function workerAuthorityPayloadsFromEvent(input: unknown): readonly {
   return Object.freeze(payloads);
 }
 
-function evaluateWorkerAuthorityReadBoundary(input: {
+export function evaluateWorkerAuthorityReadBoundary(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
 }): void {
@@ -9702,7 +9688,7 @@ function evaluateTestDesignProducerAuthority(input: {
   }
 }
 
-function evaluateStagedConstructionAuthority(input: {
+export function evaluateStagedConstructionAuthority(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
   readonly fpEvaluatorAdmissionEvidenceRefs: readonly string[];
@@ -10577,39 +10563,6 @@ export function observeProductMaterializationDelta(input: {
   return observeProductMaterializationDeltaWithDiagnostics(input).materializedFiles;
 }
 
-function ensureObservedTransformOutput(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly materializedFiles: readonly SdlcMaterializedProductFile[];
-}): void {
-  if (existsSync(input.manifest.outputFile)) {
-    return;
-  }
-  if (
-    !input.manifest.productMaterialization.required &&
-    input.materializedFiles.length === 0
-  ) {
-    return;
-  }
-  writeSdlcSystemArtifact({
-    archiveRoot: input.manifest.archiveRoot,
-    absolutePath: input.manifest.outputFile,
-    payload: [
-      `# ${input.manifest.targetAssetType}`,
-      "",
-      `graph_function: ${input.manifest.graphFunctionName}`,
-      `edge: ${input.manifest.edgeName}`,
-      `transform_status: observed`,
-      `materialized_file_count: ${input.materializedFiles.length}`,
-      "",
-      "## Materialized Files",
-      "",
-      ...input.materializedFiles.map(
-        (file) => `- ${file.role}: ${file.relativePath} (${file.digest})`
-      )
-    ].join("\n")
-  });
-}
-
 function objectRecord(input: unknown): Record<string, unknown> | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     return null;
@@ -11359,6 +11312,46 @@ function writeInstalledOperatorTestRunArchiveSurface(
   });
 }
 
+function writeDeclaredEdgeProjectionMarkdownSurface(
+  manifest: SdlcWorkerHandoffManifest
+): void {
+  const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(manifest.edgeName);
+  if (edgeAccountingRow === null) {
+    throw new TypeError(
+      `missing edge accounting row for projection edge ${manifest.edgeName}`
+    );
+  }
+  const content = [
+    `# ${manifest.targetAssetType}`,
+    "",
+    `graph_function: ${manifest.graphFunctionName}`,
+    `edge: ${manifest.edgeName}`,
+    "source_function: edge_policy.writeDeclaredEdgeProjectionOutput",
+    "worker_dispatch_allowed: false",
+    `edge_accounting_disposition: ${edgeAccountingRow.disposition}`,
+    `edge_accounting_rationale: ${edgeAccountingRow.rationale}`,
+    "",
+    "## Authority Outputs",
+    "",
+    ...edgeAccountingRow.authorityOutputRefs.map((ref) => `- ${ref}`),
+    "",
+    "## Closure Evidence",
+    "",
+    ...(edgeAccountingRow.closureEvidenceRefs.length === 0
+      ? ["- projection/no-close"]
+      : edgeAccountingRow.closureEvidenceRefs.map((ref) => `- ${ref}`)),
+    "",
+    "## Source Authority",
+    "",
+    ...manifest.traversalObligationContext.authorityRefs.map((ref) => `- ${ref}`),
+    ""
+  ].join("\n");
+  writeWorkspaceTargetFile({
+    filePath: manifest.outputFile,
+    content
+  });
+}
+
 function resolvePreparedExecutionWorkingDirectory(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly workingDirectory: string;
@@ -11780,13 +11773,15 @@ function writeInstalledOperatorComponentEvaluation(
         })
       } satisfies SdlcComponentDepthRegister)
     });
+    return;
   }
+  writeDeclaredEdgeProjectionMarkdownSurface(manifest);
 }
 
-export function writeInstalledOperatorOwnedEvaluationArtifact(input: {
+export function writeDeclaredEdgeProjectionOutput(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
 }): string | null {
-  if (!installedOperatorOwnsEvaluationOutput(input.manifest.targetAssetType)) {
+  if (!edgeOutputPolicyProjectsOutput(input.manifest.targetAssetType)) {
     return null;
   }
   if (input.manifest.targetAssetType === "test_execution_surface") {
@@ -12430,10 +12425,6 @@ export function buildPostTransformWorkerResultReport(input: {
   const materializationObservation =
     observeProductMaterializationDeltaWithDiagnostics(input);
   const materializedFiles = materializationObservation.materializedFiles;
-  ensureObservedTransformOutput({
-    manifest: input.manifest,
-    materializedFiles
-  });
   if (!existsSync(input.manifest.outputFile)) {
     throw new TypeError("post-transform output artifact missing");
   }
@@ -12985,7 +12976,7 @@ function mergeMaterializedProductFiles(input: {
   );
 }
 
-function resolveProductMaterializationReplay(input: {
+export function resolveProductMaterializationReplay(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
 }): {
@@ -13249,7 +13240,7 @@ export function writeWorkerFpTransformResult(input: {
   return result;
 }
 
-function evaluateMaterializedProductFiles(input: {
+export function evaluateMaterializedProductFiles(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
@@ -13547,7 +13538,7 @@ function evaluateMaterializedProductFiles(input: {
   }
 }
 
-function evaluateExecutionEvidence(input: {
+export function evaluateExecutionEvidence(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
@@ -13705,7 +13696,7 @@ function evaluateExecutionEvidence(input: {
   }
 }
 
-function evaluateAdrOutputArtifact(input: {
+export function evaluateAdrOutputArtifact(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly outputFile: string;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
@@ -13945,7 +13936,7 @@ function executionEvidenceContradiction(
   return null;
 }
 
-function evaluateObligationAssessments(input: {
+export function evaluateObligationAssessments(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly report: SdlcWorkerResultReport;
   readonly blockingReasonCarriers: SdlcBlockingReason[];
@@ -14110,18 +14101,6 @@ function evaluateObligationAssessments(input: {
     }
   }
 }
-
-export {
-  evaluateAdrOutputArtifact as __handoffEvaluateAdrOutputArtifact,
-  evaluateExecutionEvidence as __handoffEvaluateExecutionEvidence,
-  evaluateMaterializedProductFiles as __handoffEvaluateMaterializedProductFiles,
-  evaluateObligationAssessments as __handoffEvaluateObligationAssessments,
-  evaluateStagedConstructionAuthority as __handoffEvaluateStagedConstructionAuthority,
-  evaluateWorkerAuthorityReadBoundary as __handoffEvaluateWorkerAuthorityReadBoundary,
-  installedOperatorOwnsEvaluationOutput as __handoffInstalledOperatorOwnsEvaluationOutput,
-  pathIsInside as __handoffPathIsInside,
-  resolveProductMaterializationReplay as __handoffResolveProductMaterializationReplay
-};
 
 export function writeProductMaterializationManifest(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
