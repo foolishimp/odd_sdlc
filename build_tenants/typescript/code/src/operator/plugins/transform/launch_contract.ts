@@ -10805,7 +10805,7 @@ function extractExecutionEvidenceFromTransformArtifact(input: {
   });
 }
 
-function writeStableJsonFile(input: {
+function writeWorkspaceTargetJsonFile(input: {
   readonly archiveRoot: string;
   readonly filePath: string;
   readonly payload: unknown;
@@ -11297,7 +11297,7 @@ function writeInstalledOperatorTestExecutionSurface(
   manifest: SdlcWorkerHandoffManifest
 ): void {
   const preparationRows = testExecutionPreparationRowsForManifest(manifest);
-  writeStableJsonFile({
+  writeWorkspaceTargetJsonFile({
     archiveRoot: manifest.archiveRoot,
     filePath: manifest.outputFile,
     payload: Object.freeze({
@@ -11634,7 +11634,7 @@ function writeInstalledOperatorExecutionEvidence(
     failedCount: aggregate?.failedCount ?? null,
     shardEvidence: Object.freeze(shardEvidence)
   });
-  writeStableJsonFile({
+  writeWorkspaceTargetJsonFile({
     archiveRoot: manifest.archiveRoot,
     filePath: manifest.outputFile,
     payload: executionEvidence
@@ -11651,7 +11651,7 @@ function writeInstalledOperatorComponentEvaluation(
       targetAssetType: "component_code_surface"
     });
     const implementationDesign = readAdmittedImplementationDesign(manifest);
-    writeStableJsonFile({
+    writeWorkspaceTargetJsonFile({
       archiveRoot: manifest.archiveRoot,
       filePath: manifest.outputFile,
       payload: Object.freeze({
@@ -11688,7 +11688,7 @@ function writeInstalledOperatorComponentEvaluation(
       componentTestRows,
       executionEvidence
     });
-    writeStableJsonFile({
+    writeWorkspaceTargetJsonFile({
       archiveRoot: manifest.archiveRoot,
       filePath: manifest.outputFile,
       payload: Object.freeze({
@@ -11750,7 +11750,7 @@ function writeInstalledOperatorComponentEvaluation(
             effectiveSchedule.repairRows.length > 0
           ? Object.freeze(effectiveSchedule.repairRows.map((row) => row.failureId))
           : Object.freeze([]);
-    writeStableJsonFile({
+    writeWorkspaceTargetJsonFile({
       archiveRoot: manifest.archiveRoot,
       filePath: manifest.outputFile,
       payload: Object.freeze({

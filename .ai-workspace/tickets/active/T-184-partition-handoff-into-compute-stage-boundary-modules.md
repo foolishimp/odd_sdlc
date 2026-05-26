@@ -144,6 +144,20 @@ Current suspect side effects to eliminate or rehome:
 | H-140 | Run clean data mapper live with PTY. | final close or lawful block, no source-specific F_D compensations | in progress: `20260526T050928948Z_pid56692` reached `qualify_component_realization_surface` after implementation-design/component-code retries, then failed on a generic workspace/system artifact writer bug; patch landed locally, fresh live rerun required |
 | H-141 | Audit worker-runtime blocking reasons through the common consequence path. | `worker_output_limit_exceeded`, provider connection failures, and similar retryable process failures write diagnostics but select `retry`, not terminal `block`; hard protocol blocks remain protected | in progress: fixed closure disposition so explicit same-edge retry pressure outranks diagnostic assurance block; added `worker_connection_failed` for `ECONNRESET`/socket failures; covered by `test:t153` and `test:t184`; data-mapper live must be rerun |
 
+## Live Discovery Ledger
+
+The data-mapper live lane is a defect-discovery lane for `odd_sdlc`, not a goal
+to finish data mapper by compensating locally. Every block, retry, stale branch,
+or duplicate surface discovered during the live run is tracked here.
+
+| id | archive evidence | discovery | authority verdict | status |
+| --- | --- | --- | --- | --- |
+| LD-001 | `t164_data_mapper_full_capability_live/20260525T231651480Z_pid17089` | `worker_output_limit_exceeded` was typed as retryable worker runtime pressure, but diagnostic target-carrier absence could still suppress retry and terminal-block the edge. | F_D diagnostics may write information only; explicit same-edge retry pressure must flow through the common consequence path. | fixed: retry pressure outranks diagnostic assurance block; covered by `test:t153` |
+| LD-002 | `t164_data_mapper_full_capability_live/20260526T013108934Z_pid89085` | provider `ECONNRESET` was classified as generic `worker_process_failed` and selected terminal inspection/block instead of retry. | transient worker transport failures are runtime pressure, not product semantic failure. | fixed: `worker_connection_failed`; covered by `test:t184` |
+| LD-003 | `t164_data_mapper_full_capability_live/20260526T050928948Z_pid56692`, run `20260526T101301157Z_pid56862` | `component_realization_qualification_surface.md` was a workspace product target but was written through the system artifact writer, which enforces operator-run archive containment. | `.ai-workspace` runtime artifacts use `writeSdlcSystemArtifact`; declared workspace product targets use the file-store effect at `manifest.outputFile`. | fixed: workspace target JSON writer uses file-store effect; covered by `test:t184` |
+| LD-004 | code trace in `operator/plugins/transform/launch_contract.ts` around installed-operator-owned evaluation artifacts | no-dispatch qualification/projection surfaces are implemented as target-specific branches (`component_realization_qualification_surface`, `component_test_qualification_surface`, `release_depth_parity_surface`) even though they share the same A -> B projection pattern. | multi-surface projection code is legacy debt; every edge should use one generic edge-output projection/materialization flow with edge-declared producer policy. | open: collapse into `edge_projection` / product-materialization projection module; no new target-specific branch allowed |
+| LD-005 | code trace in `operator/plugins/transform/launch_contract.ts` | local helper name `writeStableJsonFile` hid the system/workspace boundary after LD-003. | helper names must expose authority boundary, not serialization detail. | fixed locally: renamed to `writeWorkspaceTargetJsonFile`; covered by source grep and `test:t184` |
+
 ## Closure Checklist
 
 - [ ] `handoff.ts` has no public exports and is deleted or empty.
