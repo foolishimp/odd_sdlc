@@ -96,6 +96,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "fp_worker_unattached",
   "worker_output_limit_exceeded",
   "worker_rate_limited",
+  "worker_connection_failed",
   "worker_process_failed",
   "worker_hard_timeout",
   "worker_executor_unavailable",
@@ -492,6 +493,13 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       reasonClass: "worker_runtime",
       lawfulReentryPoint: "same_edge_retry",
       message: "Worker response exceeded the provider or executor output limit before the artifact was admitted."
+    });
+  }
+  if (code === "worker_connection_failed") {
+    return Object.freeze({
+      reasonClass: "worker_runtime",
+      lawfulReentryPoint: "same_edge_retry",
+      message: "Worker provider connection failed before the artifact was admitted."
     });
   }
   if (code === "worker_process_failed") {

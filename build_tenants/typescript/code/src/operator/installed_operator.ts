@@ -807,6 +807,7 @@ function workerFacingGapDossierIsOnlyRuntimeProcessFailure(
         reason.reasonClass === "worker_runtime" &&
         (
           reason.blockingReason.code === "worker_process_failed" ||
+          reason.blockingReason.code === "worker_connection_failed" ||
           reason.blockingReason.code === "worker_hard_timeout" ||
           reason.blockingReason.code === "silent_worker_inactivity" ||
           reason.blockingReason.code === "worker_lost_terminal" ||
@@ -2526,6 +2527,7 @@ function workerFailureRuntimeFailureClass(
   if (
     carrier !== undefined &&
     (carrier.code === "worker_executor_unavailable" ||
+      carrier.code === "worker_connection_failed" ||
       carrier.code === "worker_launch_failed" ||
       carrier.code === "worker_lost_terminal")
   ) {
@@ -7328,6 +7330,18 @@ function workerRunOutputLimitExceeded(workerRun: SdlcWorkerRunResult): boolean {
   );
 }
 
+function workerRunConnectionFailed(workerRun: SdlcWorkerRunResult): boolean {
+  const text = [
+    readOptionalWorkerTextRef(workerRun.finalOutputRef),
+    readOptionalWorkerTextRef(workerRun.traceResultRef),
+    readOptionalWorkerTextPath(workerRun.stdoutPath),
+    readOptionalWorkerTextPath(workerRun.stderrPath)
+  ].join("\n");
+  return /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|socket connection was closed|socket hang up|Unable to connect to API|network error|fetch failed/u.test(
+    text
+  );
+}
+
 function workerFailureCode(input: {
   readonly workerRun: SdlcWorkerRunResult;
   readonly silentInactivity: boolean;
@@ -7337,6 +7351,9 @@ function workerFailureCode(input: {
   }
   if (workerRunRateLimited(input.workerRun)) {
     return "worker_rate_limited";
+  }
+  if (workerRunConnectionFailed(input.workerRun)) {
+    return "worker_connection_failed";
   }
   if (input.workerRun.outcome?.kind === "hard_timeout") {
     return "worker_hard_timeout";

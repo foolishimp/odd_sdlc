@@ -2,14 +2,38 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import {
+  constructPostflightGapDossier,
+  constructWorkerProcessFailurePostflight,
+  deriveWorkerHandoffManifest,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
 
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
 
 function readRepoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
+}
+
+function makeWorkspace() {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t184-"));
+  mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
+  writeFileSync(path.join(root, "README.md"), "# T-184 fixture\n", "utf8");
+  return root;
 }
 
 function walkTsFiles(root) {
@@ -67,4 +91,68 @@ test("T-184 ticket carries the partition inventory and deletion gates", () => {
   assert.match(ticket, /operator\/plugins\/transform\/launch_contract\.ts/u);
   assert.match(ticket, /operator\/system_artifacts\.ts/u);
   assert.match(ticket, /No framework helper writes a transform output/u);
+});
+
+test("T-184 retryable provider connection failures remain same-edge retry", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_intent_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t184-provider-connection"
+  });
+  mkdirSync(manifest.archiveRoot, { recursive: true });
+  const stdoutPath = path.join(manifest.archiveRoot, "worker_stdout.log");
+  const stderrPath = path.join(manifest.archiveRoot, "worker_stderr.log");
+  const finalOutputPath = path.join(manifest.archiveRoot, "final_output.txt");
+  writeFileSync(
+    stdoutPath,
+    JSON.stringify({
+      type: "rate_limit_event",
+      rate_limit_info: { status: "allowed", rateLimitType: "five_hour" }
+    }),
+    "utf8"
+  );
+  writeFileSync(stderrPath, "", "utf8");
+  writeFileSync(
+    finalOutputPath,
+    "API Error: Unable to connect to API (ECONNRESET)\n",
+    "utf8"
+  );
+
+  const postflight = constructWorkerProcessFailurePostflight({
+    manifest,
+    workerRun: {
+      kind: "sdlc_worker_run_result",
+      command: "claude",
+      args: [],
+      cwd: workspace,
+      outcome: { kind: "exited", status: 1 },
+      executorProfile: "pty-terminal",
+      streamModel: "terminal-transcript",
+      finalOutputRef: pathToFileURL(finalOutputPath).href,
+      status: 1,
+      signal: null,
+      elapsedMs: 425253,
+      timedOut: false,
+      stdoutByteCount: 128,
+      stderrByteCount: 0,
+      stdoutPath,
+      stderrPath,
+      outputLastMessagePath: null,
+      error: null
+    }
+  });
+  const dossier = constructPostflightGapDossier({ manifest, postflight });
+
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_connection_failed");
+  assert.equal(
+    postflight.blockingReasonCarriers[0].lawfulReentryPoint,
+    "same_edge_retry"
+  );
+  assert.equal(dossier.retryEligible, true);
+  assert.deepEqual(dossier.nextLawfulActions, ["retry_same_edge"]);
 });

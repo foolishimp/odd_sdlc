@@ -62,6 +62,7 @@ function classifyCause(input: {
   if (
     codes.some((code) =>
       code === "worker_process_failed" ||
+      code === "worker_connection_failed" ||
       code === "worker_hard_timeout" ||
       code === "worker_lost_terminal" ||
       code === "silent_worker_inactivity" ||

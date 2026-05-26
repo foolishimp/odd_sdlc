@@ -1005,10 +1005,10 @@ test("T-171 allowed rate-limit telemetry does not mask socket failures", () => {
     workerRun
   });
 
-  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_process_failed");
+  assert.equal(postflight.blockingReasonCarriers[0].code, "worker_connection_failed");
   assert.equal(
     postflight.blockingReasonCarriers[0].lawfulReentryPoint,
-    "inspect_worker_archive"
+    "same_edge_retry"
   );
 });
 
