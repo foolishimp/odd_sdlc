@@ -9,6 +9,7 @@ export type SdlcOperatorRunArtifactRole =
 
 export type SdlcOperatorRunArtifactSourceOwner =
   | "abg_runtime"
+  | "consequence_projection"
   | "fp_evaluator"
   | "installed_operator"
   | "handoff_projection"
@@ -86,16 +87,6 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: false,
     malformedGapTracked: false,
     admissionRef: "admission://odd-sdlc/operator-run/managed-traversal-manifest"
-  }),
-  row({
-    artifactRef: "operator-run-artifact://managed-traversal-ledger",
-    relativePath: "managed_traversal_ledger.json",
-    carrierKind: null,
-    role: "authority_admission",
-    sourceOwner: "installed_operator",
-    requiredForPresentEdge: false,
-    malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/managed-traversal-ledger"
   }),
   row({
     artifactRef: "operator-run-artifact://conform-project-report",
@@ -291,15 +282,38 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-run"
   }),
   row({
-    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-content-ledger",
-    relativePath: "design_depth_fp_evaluator_content_ledger.json",
-    carrierKind: "sdlc_evaluate_content_ledger",
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-first-update",
+    relativePath: "design_depth_fp_evaluator_first_update.json",
+    carrierKind: "sdlc_design_depth_fp_evaluator_first_update_observation",
+    role: "runtime_fact",
+    sourceOwner: "installed_operator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef:
+      "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-first-update"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-content-register",
+    relativePath: "design_depth_fp_evaluator_content_register.json",
+    carrierKind: "sdlc_evaluate_content_register",
     role: "authority_admission",
     sourceOwner: "fp_evaluator",
     requiredForPresentEdge: false,
     requiredWhen: "implementation_design_surface_present",
     malformedGapTracked: true,
-    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-content-ledger"
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-content-register"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://design-depth-fp-evaluator-rule-outcome",
+    relativePath: "design_depth_fp_evaluator_rule_outcome.json",
+    carrierKind: "evaluation_rule_outcome",
+    role: "authority_admission",
+    sourceOwner: "fp_evaluator",
+    requiredForPresentEdge: false,
+    requiredWhen: "implementation_design_surface_present",
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/design-depth-fp-evaluator-rule-outcome"
   }),
   row({
     artifactRef: "operator-run-artifact://design-depth-fp-evaluator-register",
@@ -524,16 +538,6 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/fp-transform-result"
   }),
   row({
-    artifactRef: "operator-run-artifact://assurance-ledgers",
-    relativePath: "assurance_ledgers.json",
-    carrierKind: "sdlc_assurance_ledgers",
-    role: "authority_admission",
-    sourceOwner: "installed_operator",
-    requiredForPresentEdge: false,
-    malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/assurance-ledgers"
-  }),
-  row({
     artifactRef: "operator-run-artifact://hook-outcome",
     relativePath: "hook_outcome.json",
     carrierKind: "sdlc_hook_turn_outcome",
@@ -685,14 +689,14 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/edge-performance-summary"
   }),
   row({
-    artifactRef: "operator-run-artifact://installed-operator-evaluation-artifact",
-    relativePath: "installed_operator_evaluation_artifact.json",
-    carrierKind: "sdlc_installed_operator_evaluation_artifact",
-    role: "authority_admission",
-    sourceOwner: "installed_operator",
+    artifactRef: "operator-run-artifact://declared-edge-projection-artifact",
+    relativePath: "declared_edge_projection_artifact.json",
+    carrierKind: "sdlc_declared_edge_projection_artifact",
+    role: "read_model",
+    sourceOwner: "consequence_projection",
     requiredForPresentEdge: false,
     malformedGapTracked: false,
-    admissionRef: "admission://odd-sdlc/operator-run/installed-operator-evaluation-artifact"
+    admissionRef: "admission://odd-sdlc/operator-run/declared-edge-projection-artifact"
   }),
   row({
     artifactRef: "operator-run-artifact://frontdoor-decomposition-summary",

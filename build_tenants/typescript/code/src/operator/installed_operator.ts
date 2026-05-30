@@ -9,7 +9,7 @@
 // Implements: REQ-F-ODDSDLC-065
 // Implements: REQ-F-ODDSDLC-066
 
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   existsSync,
@@ -19,7 +19,6 @@ import {
 } from "node:fs";
 import {
   admitGraphSpanAssessment,
-  constructEnginePluginContract,
   constructGraphReentryAppliedEvent,
   constructGraphReentryPlannedEvent,
   constructFdAuthorityOutcomeAdmittedEvent,
@@ -52,6 +51,7 @@ import {
   type EvaluationRuleOutcome,
   type ExecutionBasis,
   type ConsequenceProjectionOutcome,
+  type FpDispatchOutcome,
   type FpEvaluationCloseDisposition,
   type FpEvaluationOutcome,
   type GtlAdmittedStateRef,
@@ -142,10 +142,6 @@ import type {
   SdlcWorkerTransportContract
 } from "./carriers.js";
 import {
-  SDLC_COMPONENT_CONCERN_ROLES,
-  SDLC_DESIGN_COMPLETENESS_STATUSES
-} from "./carriers.js";
-import {
   appendOddSdlcRuntimeEvents,
   oddSdlcRuntimeEventsPath
 } from "./event_store.js";
@@ -156,41 +152,64 @@ import {
   constructorResultFromWorkerOutput,
   deriveSdlcStagedConstructionAuditCarriers,
   deriveWorkerHandoffManifest,
+  gapDossierPathForManifest,
   readPostflightGapDossierRef,
   operatorRunId,
+  sha256Text,
   snapshotProductMaterializationRoot,
   stableOperatorJson,
   workerResultReportWithFpStageRefs,
-  writeDeclaredEdgeProjectionOutput,
   writeHandoffFiles,
   writePostflightGapDossier,
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest,
   type SdlcStagedConstructionAuditCarrier
 } from "./plugins/transform/launch_contract.js";
+import {
+  writeDeclaredEdgeProjectionOutput,
+  writeTestExecutionResultSystemTransformOutput
+} from "./plugins/consequence/edge_projection.js";
+import {
+  sdlcInstalledOperatorProjectsOutput
+} from "./edge_output_policy.js";
 import { writeSdlcSystemArtifact } from "./system_artifacts.js";
+import { sdlcWorkspaceLocalToolEnvironment } from "./tool_environment.js";
 import {
   selectSdlcWorkCategoryGovernance
 } from "./work_category_governance.js";
+import { sdlcOperatorRuntimePolicy } from "./runtime_policy.js";
 import {
-  admitSdlcEvaluateContentLedgerArtifact,
-  designDepthFpEvaluatorContentLedgerPath,
+  createSdlcAbgPluginSet
+} from "./plugins/plugin_set.js";
+import {
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
+  admitSdlcEvaluateContentRegisterArtifact,
+  designDepthFpEvaluatorContentRegisterPath,
   evaluateSdlcComputeStage,
-  writeDesignDepthRegisterProjectionFromEvaluateContentLedger,
+  observeDesignDepthContentRegisterFirstUpdate,
+  writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
   writeSdlcFpEvaluateResult
 } from "./plugins/evaluate/index.js";
 import {
+  DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE,
+  DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
   admitImplementationDesignRegisterCandidateForManifest,
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation,
   designDepthFpEvaluatorRegisterPath
 } from "./plugins/evaluate/design_depth_register.js";
 import {
+  designDepthFpEvaluatorPrompt,
+  reviewGradeEdgeFulfillmentPrompt
+} from "./plugins/evaluate/prompts.js";
+import {
   REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE,
   REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
+  reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
-  reviewGradeEdgeFulfillmentOpenPressureRefs,
   reviewGradeFindingsAreDownstreamStagePressure
 } from "./review_grade_edge_fulfillment.js";
 import {
@@ -220,7 +239,6 @@ import {
 } from "../qualification/index.js";
 import {
   deriveSdlcConformProjectProfileFromWorkspace,
-  deriveConformProjectManagedTraversalLedger,
   deriveConformProjectManagedTraversalManifest,
   materializeSdlcProjectConformance
 } from "../workspace/index.js";
@@ -251,6 +269,7 @@ import {
   measureSdlcEdgeGain,
   resolveSdlcEdgeGainClosureContract,
   sdlcEdgeAssuranceContractRef,
+  withAdditionalSdlcEdgeResidualPressureRefs,
   type SdlcEdgeEvidenceCandidate,
   type SdlcEdgeEvidenceSourceKind,
   type SdlcEdgeLedgerInputRef
@@ -269,10 +288,10 @@ import { admitComponentDepthRegisterFromArtifact } from "./component_depth_regis
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
 
-export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 5;
-export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 20;
-export const MAX_INSTALLED_CONVERGENCE_ATTEMPTS = 200;
-const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 5;
+export const MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS = 100;
+export const MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS = 400;
+export const MAX_INSTALLED_CONVERGENCE_ATTEMPTS = 4000;
+const MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS = 100;
 const EMPTY_SCOPE_PATH: readonly string[] = Object.freeze([]);
 
 export type SdlcInstalledReentryDisposition = "retry" | "yield" | "other";
@@ -282,6 +301,7 @@ function summary(input: {
   readonly graphFunctionName: string | null;
   readonly currentEdge: string | null;
   readonly status: SdlcOperatorSummary["status"];
+  readonly traversalConsequence?: SdlcInstalledOperatorTraversalConsequence | null;
   readonly blockingReason: string | null;
   readonly blockingReasonCarriers?: readonly SdlcBlockingReason[] | undefined;
   readonly nextLawfulAction: string;
@@ -294,12 +314,67 @@ function summary(input: {
       : Object.freeze([
           sdlcBlockingReasonFromLegacy({ reason: input.blockingReason })
         ]));
+  const ledger = input.traversalConsequence?.edgeFulfillmentLedger ?? null;
+  const closureDecision = input.traversalConsequence?.edgeClosureDecision ?? null;
+  const obligationReview: SdlcOperatorSummary["obligationReview"] =
+    ledger === null
+      ? Object.freeze({
+          status: "not_evaluated",
+          expected: 0,
+          fulfilled: 0,
+          partial: 0,
+          blocked: 0,
+          unfulfilled: 0,
+          missing: 0,
+          extra: 0,
+          assessmentCount: 0
+        })
+      : Object.freeze({
+          status:
+            ledger.counts.blocked > 0 ||
+            ledger.counts.partial > 0 ||
+            ledger.counts.unfulfilled > 0
+              ? "blocked"
+              : ledger.counts.missing > 0 || ledger.counts.extra > 0
+                ? "incomplete"
+                : "passed",
+          expected: ledger.counts.expected,
+          fulfilled: ledger.counts.fulfilled,
+          partial: ledger.counts.partial,
+          blocked: ledger.counts.blocked,
+          unfulfilled: ledger.counts.unfulfilled,
+          missing: ledger.counts.missing,
+          extra: ledger.counts.extra,
+          assessmentCount: ledger.assessmentCount
+        });
+  const admittedSemantic: SdlcOperatorSummary["admittedSemantic"] =
+    ledger === null || closureDecision === null
+      ? Object.freeze({
+          status: "not_evaluated",
+          targetCarrierAdmissionStatus: null,
+          edgeConverged: null,
+          closureDisposition: null
+        })
+      : Object.freeze({
+          status:
+            ledger.edgeConverged &&
+            closureDecision.disposition === "close" &&
+            (ledger.targetCarrierAdmissionStatus === "admitted" ||
+              ledger.targetCarrierAdmissionStatus === "not_required")
+              ? "admitted"
+              : "blocked",
+          targetCarrierAdmissionStatus: ledger.targetCarrierAdmissionStatus,
+          edgeConverged: ledger.edgeConverged,
+          closureDisposition: closureDecision.disposition
+        });
   return Object.freeze({
     kind: "sdlc_operator_summary",
     workspaceRoot: input.workspaceRoot,
     graphFunctionName: input.graphFunctionName,
     currentEdge: input.currentEdge,
     status: input.status,
+    obligationReview,
+    admittedSemantic,
     blockingReason: input.blockingReason ?? summarizeBlockingReasons(blockingReasons),
     blockingReasons,
     nextLawfulAction: input.nextLawfulAction,
@@ -339,6 +414,7 @@ function terminalOutcome(input: {
       graphFunctionName,
       currentEdge: input.currentEdge ?? null,
       status: input.status,
+      traversalConsequence: input.traversalConsequence ?? null,
       blockingReason: input.blockingReason,
       blockingReasonCarriers: input.blockingReasonCarriers,
       nextLawfulAction: input.nextLawfulAction,
@@ -543,12 +619,18 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
       sourceProjectionRef
     });
   }
+  const archivedGapDossier =
+    input.outcome.gapDossier === null
+      ? archivedGapDossierForManifest(input.outcome.manifest)
+      : null;
   const priorGapDossiers =
     input.outcome.gapDossier === null
-      ? syntheticGapDossiersFromClosureDecision({
-          outcome: input.outcome,
-          sourceProjectionRef
-        })
+      ? archivedGapDossier === null
+        ? syntheticGapDossiersFromClosureDecision({
+            outcome: input.outcome,
+            sourceProjectionRef
+          })
+        : Object.freeze([archivedGapDossier])
       : Object.freeze([input.outcome.gapDossier]);
   const priorAuthorityRef =
     priorGapDossiers[0]?.currentGapDossierRef ??
@@ -581,6 +663,31 @@ export function deriveSdlcWorkerRetryContextFromTraversalConsequence(input: {
   });
 }
 
+function archivedGapDossierForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcPostflightGapDossier | null {
+  const filePath = gapDossierPathForManifest(manifest);
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const dossier = readPostflightGapDossierRef(pathToFileURL(filePath).href);
+    if (
+      dossier === null ||
+      dossier.edgeName !== manifest.edgeName ||
+      dossier.vectorIndex !== manifest.vectorIndex ||
+      dossier.targetAssetType !== manifest.targetAssetType ||
+      dossier.retryEligible !== true ||
+      dossier.reasons.length === 0
+    ) {
+      return null;
+    }
+    return dossier;
+  } catch {
+    return null;
+  }
+}
+
 function syntheticGapDossiersFromClosureDecision(input: {
   readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly sourceProjectionRef: string;
@@ -605,7 +712,7 @@ function syntheticGapDossiersFromClosureDecision(input: {
         reason: `edge_closure_residual_pressure:${reasonRef}`,
         reasonClass: "assurance" as const,
         blockingReason: makeSdlcBlockingReason({
-          code: "assurance_ledger_reason",
+          code: "edge_closure_residual_pressure",
           reasonClass: "assurance",
           lawfulReentryPoint: "same_edge_retry",
           message: "Edge closure residual pressure requires same-edge repair.",
@@ -729,7 +836,7 @@ function compactSdlcPriorGapReasonForRetryContext(
     blockingReason: makeSdlcBlockingReason({
       code: reason.blockingReason.code,
       detail:
-        reason.blockingReason.code === "assurance_ledger_reason"
+        reason.blockingReason.code === "edge_closure_residual_pressure"
           ? canonicalReason
           : reason.blockingReason.detail,
       reasonClass: reason.blockingReason.reasonClass,
@@ -1670,76 +1777,6 @@ function postActionReentryGraphSpanRuntimeEvents(input: {
   ]);
 }
 
-function fpDispatchPluginContract() {
-  return constructEnginePluginContract({
-    ref: "plugin://odd-sdlc/typescript/installed-operator/fp-dispatch",
-    pluginKind: "fp_dispatch",
-    authority: "effect_plugin",
-    inputCarrier: "EnginePluginInput",
-    outputCarrier: "FpDispatchOutcome",
-    computeStageRole: "transform",
-    computeMeans: "F_P",
-    computeStagePurpose: "candidate_construction"
-  });
-}
-
-function fpEvaluatorPluginContract() {
-  return constructEnginePluginContract({
-    ref: "plugin://odd-sdlc/typescript/installed-operator/fp-evaluator",
-    pluginKind: "fp_evaluator",
-    authority: "effect_plugin",
-    inputCarrier: "EnginePluginInput",
-    outputCarrier: "FpEvaluationOutcome",
-    computeStageRole: "evaluate",
-    computeMeans: "F_P",
-    computeStagePurpose: "candidate_evaluation"
-  });
-}
-
-const DESIGN_DEPTH_FP_EVALUATOR_RULE_REF =
-  "evaluation-rule://odd-sdlc/design-depth-register/fp";
-const DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE =
-  "design_depth_fp_evaluator_rule_outcome.json";
-
-function designDepthFpEvaluatorRuleContract() {
-  return constructEnginePluginContract({
-    ref: "plugin://odd-sdlc/typescript/installed-operator/design-depth-fp-evaluator-register",
-    pluginKind: "fp_evaluator",
-    authority: "effect_plugin",
-    inputCarrier: "EnginePluginInput",
-    outputCarrier: "SdlcDesignDepthRegister",
-    computeStageRole: "evaluate",
-    computeMeans: "F_P",
-    computeStagePurpose: "candidate_evaluation"
-  });
-}
-
-function reviewGradeEdgeFulfillmentRuleContract() {
-  return constructEnginePluginContract({
-    ref: "plugin://odd-sdlc/typescript/installed-operator/review-grade-edge-fulfillment",
-    pluginKind: "fp_evaluator",
-    authority: "effect_plugin",
-    inputCarrier: "EnginePluginInput",
-    outputCarrier: "SdlcReviewGradeEdgeFulfillmentAssessment",
-    computeStageRole: "evaluate",
-    computeMeans: "F_P",
-    computeStagePurpose: "candidate_evaluation"
-  });
-}
-
-function consequenceProjectionPluginContract() {
-  return constructEnginePluginContract({
-    ref: "plugin://odd-sdlc/typescript/installed-operator/consequence-projection",
-    pluginKind: "consequence_projection",
-    authority: "effect_plugin",
-    inputCarrier: "EnginePluginInput",
-    outputCarrier: "ConsequenceProjectionOutcome",
-    computeStageRole: "consequence",
-    computeMeans: "F_D",
-    computeStagePurpose: "consequence_projection"
-  });
-}
-
 function dispatchResultRef(manifest: SdlcWorkerHandoffManifest): string {
   return pathToFileURL(manifest.reportFile).href;
 }
@@ -1767,6 +1804,92 @@ function noDispatchReport(input: {
     fpTransformResultRef: null,
     fpTransformStatusSnapshot: null
   });
+}
+
+function declaredEdgeProjectionPendingAssessment(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly obligation: SdlcTraversalObligation;
+}): SdlcWorkerObligationAssessment {
+  const outputRef = pathToFileURL(input.manifest.outputFile).href;
+  return Object.freeze({
+    kind: "sdlc_worker_obligation_assessment" as const,
+    obligationId: input.obligation.obligationId,
+    fulfillmentStatus: "fulfilled" as const,
+    evidenceRefs: uniqueSorted([outputRef, ...input.obligation.evidenceRefs]),
+    blockingReasons: Object.freeze([])
+  });
+}
+
+function buildDeclaredEdgeProjectionPendingReport(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): SdlcWorkerResultReport {
+  const digestBasis = Object.freeze({
+    kind: "sdlc_declared_edge_projection_pending_report",
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: resolve(input.manifest.outputFile)
+  });
+  return Object.freeze({
+    kind: "odd_sdlc.worker_result_report" as const,
+    projectionRole: "typed_fp_stage_projection" as const,
+    authoritativeStageResultRef: pathToFileURL(
+      input.manifest.fpEvaluateResultFile
+    ).href,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    targetAssetType: input.manifest.targetAssetType,
+    outputFile: resolve(input.manifest.outputFile),
+    digest: sha256Text(stableOperatorJson(digestBasis)),
+    summary:
+      "system projection report for consequence-stage declared edge-output projection",
+    unresolvedReasons: Object.freeze([]),
+    materializedFiles: Object.freeze([]),
+    materializationDiagnostics: Object.freeze([]),
+    executionEvidence: null,
+    executionEvidenceErrors: Object.freeze([]),
+    obligationAssessments: Object.freeze(
+      input.manifest.traversalObligationContext.obligations.map((obligation) =>
+        declaredEdgeProjectionPendingAssessment({
+          manifest: input.manifest,
+          obligation
+        })
+      )
+    ),
+    fpTransformRequestRef: null,
+    fpTransformResultRef: null,
+    fpTransformStatusSnapshot: null,
+    fpEvaluateResultRef: pathToFileURL(input.manifest.fpEvaluateResultFile).href
+  });
+}
+
+function writeDeclaredEdgeProjectionFromConsequence(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): readonly string[] {
+  const outputFile = writeDeclaredEdgeProjectionOutput({
+    manifest: input.manifest
+  });
+  if (outputFile === null) {
+    return Object.freeze([]);
+  }
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    artifactRef: "operator-run-artifact://declared-edge-projection-artifact",
+    payload: {
+      kind: "sdlc_declared_edge_projection_artifact",
+      writerInterface: "plugin.consequence.C.writeDeclaredEdgeProjectionOutput",
+      targetAssetType: input.manifest.targetAssetType,
+      outputFile,
+      outputRef: pathToFileURL(outputFile).href,
+      sourceFunction: "consequence.edge_projection.writeDeclaredEdgeProjectionOutput"
+    }
+  });
+  return uniqueSorted([
+    pathToFileURL(outputFile).href,
+    pathToFileURL(
+      join(input.manifest.archiveRoot, "declared_edge_projection_artifact.json")
+    ).href
+  ]);
 }
 
 function manifestCapabilityValue(
@@ -2566,60 +2689,27 @@ function installedOperatorChildProcessEnvironment(): Record<string, string> {
   return env;
 }
 
-const DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS = 1000 * 60 * 30;
-const DEFAULT_WORKER_TIMEOUT_MS = 1000 * 60 * 60 * 12;
-const DEFAULT_WORKER_HEARTBEAT_MS = 1000 * 30;
-const DEFAULT_WORKER_TERMINATION_GRACE_MS = 1000 * 10;
-const DEFAULT_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS = 1000 * 60 * 15;
-const DEFAULT_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES = 1024 * 1024;
-
-function positiveIntegerFromEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
 function workerInactivityPolicy(): {
   readonly timeoutMs: number;
   readonly inactivityTimeoutMs: number;
   readonly heartbeatMs: number;
   readonly terminationGraceMs: number;
 } {
+  const policy = sdlcOperatorRuntimePolicy();
   return Object.freeze({
-    timeoutMs: positiveIntegerFromEnv(
-      "ODD_SDLC_WORKER_TIMEOUT_MS",
-      DEFAULT_WORKER_TIMEOUT_MS
-    ),
-    inactivityTimeoutMs: positiveIntegerFromEnv(
-      "ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS",
-      DEFAULT_WORKER_INACTIVITY_TIMEOUT_MS
-    ),
-    heartbeatMs: positiveIntegerFromEnv(
-      "ODD_SDLC_WORKER_HEARTBEAT_MS",
-      DEFAULT_WORKER_HEARTBEAT_MS
-    ),
-    terminationGraceMs: positiveIntegerFromEnv(
-      "ODD_SDLC_WORKER_TERMINATION_GRACE_MS",
-      DEFAULT_WORKER_TERMINATION_GRACE_MS
-    )
+    timeoutMs: policy.workerTimeoutMs,
+    inactivityTimeoutMs: policy.workerInactivityTimeoutMs,
+    heartbeatMs: policy.workerHeartbeatMs,
+    terminationGraceMs: policy.workerTerminationGraceMs
   });
 }
 
 function designDepthFpEvaluatorTimeoutMs(): number {
-  return positiveIntegerFromEnv(
-    "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS",
-    DEFAULT_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS
-  );
+  return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorTimeoutMs;
 }
 
 function designDepthFpEvaluatorStdoutBudgetBytes(): number {
-  return positiveIntegerFromEnv(
-    "ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES",
-    DEFAULT_DESIGN_DEPTH_FP_EVALUATOR_STDOUT_BUDGET_BYTES
-  );
+  return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
 
 function fileByteCount(path: string): number {
@@ -2628,6 +2718,68 @@ function fileByteCount(path: string): number {
   } catch {
     return 0;
   }
+}
+
+type SdlcProcessLifecycleArtifactPayload = Readonly<
+  Record<string, unknown> & {
+    readonly kind: string;
+    readonly lifecycleStatus: "started" | "completed" | "interrupted";
+    readonly command: string;
+    readonly args: readonly string[];
+    readonly cwd: string;
+  }
+>;
+
+function writeProcessLifecycleArtifact(input: {
+  readonly archiveRoot: string;
+  readonly relativePath: string;
+  readonly payload: SdlcProcessLifecycleArtifactPayload;
+}): void {
+  writeSdlcSystemArtifact({
+    archiveRoot: input.archiveRoot,
+    relativePath: input.relativePath,
+    payload: input.payload
+  });
+}
+
+function registerProcessInterruptionArtifact(input: {
+  readonly archiveRoot: string;
+  readonly relativePath: string;
+  readonly startedPayload: SdlcProcessLifecycleArtifactPayload;
+}): () => void {
+  const signalHandlers: Array<readonly [NodeJS.Signals, () => void]> = [];
+  const dispose = (): void => {
+    for (const [signal, handler] of signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+  };
+  for (const signal of Object.freeze(["SIGINT", "SIGTERM", "SIGHUP"] as const)) {
+    const handler = (): void => {
+      dispose();
+      try {
+        writeProcessLifecycleArtifact({
+          archiveRoot: input.archiveRoot,
+          relativePath: input.relativePath,
+          payload: Object.freeze({
+            ...input.startedPayload,
+            lifecycleStatus: "interrupted" as const,
+            status: null,
+            signal,
+            timedOut: false,
+            error: "host_signal_before_process_result",
+            interruptionSource: "host_signal",
+            interruptedAt: new Date().toISOString(),
+            hostPid: process.pid
+          })
+        });
+      } finally {
+        process.kill(process.pid, signal);
+      }
+    };
+    signalHandlers.push([signal, handler]);
+    process.once(signal, handler);
+  }
+  return dispose;
 }
 
 function latestProcessHeartbeat(
@@ -3364,8 +3516,42 @@ async function invokeWorkerThroughAbgProcessActor(input: {
     outputLastMessagePath: outputLastMessagePath ?? "",
     executorProfile
   });
-  const processResult: SupervisedProcessActorResult =
-    await invokeSupervisedProcessActor({
+  const workerRunStartedPayload = Object.freeze({
+    kind: "sdlc_worker_run_result",
+    lifecycleStatus: "started" as const,
+    command: processLaunch.command,
+    args: processLaunch.args,
+    cwd: input.manifest.workspaceRoot,
+    executorProfile,
+    traceRoot,
+    status: null,
+    signal: null,
+    elapsedMs: 0,
+    timedOut: false,
+    stdoutByteCount: 0,
+    stderrByteCount: 0,
+    stdoutPath,
+    stderrPath,
+    outputLastMessagePath,
+    error: null,
+    startedAt: new Date().toISOString(),
+    hostPid: process.pid,
+    processEventsRef: pathToFileURL(processEventsPath).href,
+    processStartedRef: pathToFileURL(processStartedPath).href
+  });
+  writeProcessLifecycleArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "worker_run.json",
+    payload: workerRunStartedPayload
+  });
+  const disposeWorkerInterruptionArtifact = registerProcessInterruptionArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "worker_run.json",
+    startedPayload: workerRunStartedPayload
+  });
+  let processResult: SupervisedProcessActorResult;
+  try {
+    processResult = await invokeSupervisedProcessActor({
       invocation: actorInvocationForPluginInput({
         pluginInput: input.pluginInput,
         transport: input.transport
@@ -3373,9 +3559,10 @@ async function invokeWorkerThroughAbgProcessActor(input: {
       command: processLaunch.command,
       args: processLaunch.args,
       cwd: input.manifest.workspaceRoot,
-      environment: {
-        ...installedOperatorChildProcessEnvironment(),
-        ODD_SDLC_OPERATOR_MANIFEST: input.manifestPath,
+	      environment: {
+	        ...installedOperatorChildProcessEnvironment(),
+	        ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
+	        ODD_SDLC_OPERATOR_MANIFEST: input.manifestPath,
         ODD_SDLC_OPERATOR_REPORT: input.manifest.reportFile,
         ODD_SDLC_OPERATOR_OUTPUT: input.manifest.outputFile,
         ODD_SDLC_OPERATOR_MATERIALIZATION_ROOT:
@@ -3414,6 +3601,9 @@ async function invokeWorkerThroughAbgProcessActor(input: {
         input.eventSink(event);
       }
     });
+  } finally {
+    disposeWorkerInterruptionArtifact();
+  }
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
   const traceProjection = traceProjectionFor(traceRoot);
@@ -3422,6 +3612,7 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   );
 	  const workerRun: SdlcWorkerRunResult = Object.freeze({
     kind: "sdlc_worker_run_result",
+    lifecycleStatus: "completed",
     command: processResult.command,
     args: processResult.args,
     cwd: processResult.cwd,
@@ -3474,210 +3665,6 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   return workerRun;
 }
 
-function designDepthFpEvaluatorPrompt(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly manifestPath: string;
-  readonly governanceRef: string;
-  readonly governancePath: string;
-  readonly constructionBriefPath: string;
-  readonly invocationPackagePath: string;
-  readonly workerReportPath: string;
-  readonly workerReportSummaryLines: readonly string[];
-  readonly contentLedgerPath: string;
-  readonly registerProjectionPath: string;
-  readonly selectedCompositionRef: string;
-  readonly selectedCompositionDigest: string;
-  readonly selectedCompositionSelectionRef: string;
-  readonly selectedRegimeBindingRef: string | null;
-}): string {
-  return [
-    "odd_sdlc evaluate.C/F_P design-depth register rule.",
-    "",
-    "Purpose:",
-    "- Populate the implementation design-depth content ledger as the highest semantic design-depth truth for downstream transforms.",
-    "- Evaluate the workspace, admitted transform evidence, worker report, construction brief, invocation package, ADR artifact, and ledger pressure together.",
-    "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
-    "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
-    "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
-    "- The content ledger path is the durable evaluation artifact; the task is not a single-shot JSON response.",
-    "",
-    "Read in order:",
-    `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-    `2. construction brief: ${input.constructionBriefPath}`,
-    "3. write the first design-depth content ledger yourself from the construction brief, admitted transform evidence, and selected authority refs.",
-    `4. inspect and refine the content ledger file only after it exists: ${input.contentLedgerPath}`,
-    "5. only after the first ledger exists, read the ADR or workspace authority refs needed to resolve a specific missing payload section.",
-    "",
-    "Precomputed worker result report summary:",
-    ...input.workerReportSummaryLines.map((line) => `- ${line}`),
-    "",
-    "Hard pre-register limits:",
-    `- Do not use the Read tool on the handoff manifest (${input.manifestPath}). It is too large; summarize selected keys with Node.`,
-    `- Do not inspect the worker result report (${input.workerReportPath}) before the first ledger write. Its compact summary is already in this prompt.`,
-    `- Do not use the Read tool on the worker invocation package (${input.invocationPackagePath}) before the first ledger write. If needed, summarize selected keys with Node.`,
-    `- Do not use the Read tool on the ADR transform artifact (${input.manifest.outputFile}) before the first ledger write. Use bounded search or short Node summaries only when necessary.`,
-    "- Before the first ledger write, do not inspect extra authority files beyond the governance doc and construction brief.",
-    "- The first durable content-ledger write must be your selected evaluate.C/F_P judgment. Do not spend the first pass gathering exhaustive context.",
-    "- Do not run a worker-result-report discovery script before the first ledger write.",
-    "- If you run one bounded summary script for any other input, the next tool call must create or overwrite the content ledger file. Do not say \"writing the ledger\" until that file write has succeeded.",
-    "- You may write temporary Node snippets for bounded summarization or JSON validation only. Do not use scripts to deterministically construct semantic register rows from framework rules.",
-    "",
-    "First register materialization rule:",
-    "- After reading the governance doc and construction brief, create the content ledger file directly as the selected evaluate.C/F_P semantic pressure map.",
-    "- Use admitted upstream design surfaces, dependency pressure, product file targets, tenant stack authority, worker report summary, and specific authority refs as the basis.",
-    "- Do not copy a framework-generated register skeleton as semantic truth. If a section is uncertain, emit a partial or blocked axis with explicit reasons and evidence refs instead of inventing rows.",
-    "- The content ledger carries an embedded ProductAssetModel payload whose contentKind is sdlc_design_depth_register. F_D will only project that exact payload to the legacy register path after admission.",
-    `- Do not write the legacy projection path directly: ${input.registerProjectionPath}`,
-    "- The first ledger can be compact; after it exists, iterate only if validation fails or a specific axis is partial/blocked.",
-    "- After the first ledger exists, perform a mandatory bounded target-path reconciliation pass against the transform artifact and any source authority refs that explicitly name product files.",
-    "- In that reconciliation pass, compare fileTargetRows[].relativePath, componentTopologyRows[].relativePath, componentRealizationRows[].relativePath, and firstProductFileToChange against the transform artifact Product File Targets / Component rows and explicit source-authority file paths.",
-    "- If those sources name exact product paths, the final register must preserve those exact paths unless an admitted later authority supersedes them; do not shorten, normalize away source directories, or invent sibling paths.",
-    "- If the transform artifact and source authority disagree on a target path, cite both refs and choose the path required by the highest source authority. If the conflict cannot be resolved, emit a blocked designCompletenessVerdict axis instead of guessing.",
-    "Reading discipline:",
-    "- Do not print, cat, tail, grep, or paste full authority files into stdout.",
-    "- Do not display worker_invocation_package.json, requirement tables, authority ref arrays, evidence arrays, or full JSON objects in the terminal.",
-    "- Do not use cat, sed, head, tail, grep, jq '.', or any equivalent command to display the five primary inputs.",
-    "- If JSON inspection is needed, run Node snippets that read silently and print only bounded counts, selected keys, or at most 20 short ids.",
-    "- Keep terminal output bounded and purposeful. Stdout is an agent work trace, not evaluation truth.",
-    "- The content ledger file is the evaluation surface. Prefer file writes and local validation over terminal narration.",
-    "",
-    "Agentic F_P work loop:",
-    "- Start by writing a short plan and checklist for the required register sections.",
-    "- Time budget is part of correctness: create the content ledger file before doing deep exploratory review.",
-    "- After the governance doc and construction brief are read, write the first content ledger before deep exploratory action. At most one bounded summary script is allowed before the first ledger write, and it must not inspect worker_result_report.json or dump the ADR.",
-    "- First content-ledger write must happen as soon as stack, module, component, file target, compact schema, compact sequence, and verdict skeletons can be truthfully populated.",
-    "- Then iterate by editing the content ledger file in place: inspect only the authority needed for a specific missing/partial section, update the ledger, then validate the file.",
-    "- Do not spend the run enumerating every requirement id before writing the register. Use worker_result_report counts and high-signal samples for pressure; full trace remains in the admitted ledgers.",
-    "- If time or authority is insufficient, still write a structurally valid content ledger with partial or blocked designCompletenessVerdict axes and explicit reasons. Missing-ledger timeout is worse than an admitted pressure map with honest residual pressure.",
-    "- It is acceptable to rewrite the content ledger multiple times while converging. Do not treat this as a single-shot generation task.",
-    "- Use scripts or targeted commands to summarize authority and validate JSON shape; do not paste large source or ledger bodies into stdout.",
-    "- Script output budget before first ledger write: no more than 40 total stdout lines.",
-    "- If the component/module set is uncertain, encode the uncertainty in partial or blocked designCompletenessVerdict axes and continue with the smallest truthful pressure map.",
-    "- If a referenced authority corpus is large, sample the headings/tables needed for module boundaries and requirement ids; do not dump the corpus into the terminal.",
-    "- Final response is irrelevant unless the content ledger exists and validates. Prioritize writing and validating the file over narrative.",
-    "",
-    `Durable evaluation artifact to create and validate: ${input.contentLedgerPath}`,
-    "",
-    "Required content ledger shape:",
-    "- kind: \"sdlc_evaluate_content_ledger\"",
-    "- ledgerVersion: \"ts-evaluate-content-v1\"",
-    "- stage: \"evaluate.C\"",
-    `- ruleRef: "${DESIGN_DEPTH_FP_EVALUATOR_RULE_REF}"`,
-    "- ruleRole: \"semantic_judgment\"",
-    "- computeMeans: \"F_P\"",
-    "- authorityFunction: \"synthesize_model\"",
-    `- selectedCompositionRef: "${input.selectedCompositionRef}"`,
-    `- selectedCompositionDigest: "${input.selectedCompositionDigest}"`,
-    `- selectedCompositionSelectionRef: "${input.selectedCompositionSelectionRef}"`,
-    `- selectedRegimeBindingRef: ${input.selectedRegimeBindingRef === null ? "null" : JSON.stringify(input.selectedRegimeBindingRef)}`,
-    `- compositionContributionRef: "${input.selectedRegimeBindingRef ?? input.selectedCompositionRef}"`,
-    "- sourceBasisRefs[], candidateArtifactRefs[], evidenceRefs[], contentRows[].",
-    "- contentRows[0].kind: \"sdlc_evaluate_content_ledger_row\"",
-    "- contentRows[0].rowRef: a stable non-empty ref such as \"content-ledger-row://odd-sdlc/design-depth/<edgeName>/1\"",
-    "- contentRows[0].authorityFunction: \"synthesize_model\"",
-    "- contentRows[0].carrierFamily: \"ProductAssetModel\"",
-    "- contentRows[0].contentKind: \"sdlc_design_depth_register\"",
-    "- contentRows[0].payload must be the full design-depth register object below.",
-    "- contentRows[0].sourceBasisRefs[] must cite the construction brief, governance doc, and any bounded authority inspected for this row.",
-    "- contentRows[0].evidenceRefs[] must cite the ADR/transform artifact or other admitted evidence supporting this row.",
-    "- Ledger rows are closed carriers: contentRows[0] must contain exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs.",
-    "",
-    "Embedded ProductAssetModel payload shape:",
-    "- kind: \"sdlc_design_depth_register\"",
-    "- registerVersion: \"ts-design-depth-v1\"",
-    "- targetAssetType: \"implementation_design_surface\"",
-    "- stackProfileRows[] with kind, stackRef, language, buildTool",
-    "- implementationModuleRows[] with kind, moduleName, moduleRef",
-    "- aggregateDomainModelRows[] with kind, modelRef",
-    "- moduleSchemaFragments[] with kind, moduleName, entities, operations, requirementIds, sourceAssetRefs",
-    "- moduleStateDiagramFragments[] with kind, moduleName, entityId, stateless, states, transitions, requirementIds, sourceAssetRefs",
-    "- aggregateDomainModel with kind, modelVersion, entities, operations, crossModuleReferences, evidenceRefs",
-    `- aggregateDomainModel.modelVersion must be exactly "ts-design-depth-v1".`,
-    "- sunnyDaySequenceRows[] with kind, sequenceRef",
-    "- aggregateSunnyDaySequence with kind, sequenceVersion, steps, evidenceRefs",
-    `- aggregateSunnyDaySequence.sequenceVersion must be exactly "ts-design-depth-v1".`,
-    "- componentTopologyRows[] with kind, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, sourceAssetRefs",
-    "- componentRealizationRows[] with kind, componentId, moduleName, relativePath, publicBoundary, trancheId, firstProductFileToChange, upstreamComponentIds, requirementIds, sourceAssetRefs",
-    "- fileTargetRows[] with kind, relativePath, role",
-    "- designCompletenessVerdict with entity, attribute, and flow axis verdicts.",
-    "- designCompletenessVerdict is a closed object with exactly kind, verdictVersion, entity, attribute, flow. Do not emit entityAxis, attributeAxis, flowAxis, axisVerdicts, or any extra designCompletenessVerdict fields.",
-    "- Each designCompletenessVerdict axis object is closed with exactly kind, axis, status, reasons, evidenceRefs. Do not add summaries, scores, counts, confidence, coverage, missingItems, or nested axis-specific objects.",
-    `- Allowed componentTopologyRows[].concernRole values: ${SDLC_COMPONENT_CONCERN_ROLES.join(", ")}`,
-    `- Allowed designCompletenessVerdict.*.status values: ${SDLC_DESIGN_COMPLETENESS_STATUSES.join(", ")}. Use "satisfied" for a complete axis; never use "complete".`,
-    "",
-    "Nested closed-object contract:",
-    "- Do not use string shorthand for typed rows. An array of strings is only valid for fields whose name ends in Ids, Refs, Names, states, reasons, evidenceRefs, sourceAssetRefs, inputEntityIds, outputEntityIds, requiredAttributeIds, invariantRefs, or stateTransitionIds.",
-    "- moduleSchemaFragments[].entities[] must contain closed sdlc_domain_entity objects with kind, entityId, moduleName, ownership, attributes, invariants, sourceAssetRefs.",
-    "- sdlc_domain_entity.attributes[] must contain closed sdlc_domain_attribute objects with kind, attributeId, name, valueType, cardinality, invariantRefs.",
-    "- moduleSchemaFragments[].operations[] and aggregateDomainModel.operations[] must contain closed sdlc_domain_operation objects with kind, operationId, moduleName, inputEntityIds, outputEntityIds, requiredAttributeIds.",
-    "- moduleStateDiagramFragments[].transitions[] must contain closed sdlc_entity_state_transition objects with kind, transitionId, fromState, toState, operationId, entityId.",
-    "- aggregateDomainModel.entities[] must contain closed sdlc_aggregate_domain_entity objects with kind, entityId, ownerModuleName, attributes, sourceModuleNames.",
-    "- aggregateDomainModel.entities[].attributes[] must contain full closed sdlc_domain_attribute objects. Copy or adapt the owning module schema attribute objects; never emit attribute id strings, names, or summaries in this array. If no valid aggregate attributes are needed, use an empty array.",
-    "- aggregateDomainModel.crossModuleReferences[] must contain closed objects with fromModuleName, toModuleName, entityId.",
-    "- aggregateSunnyDaySequence.steps[] must contain closed sdlc_sunny_day_sequence_step objects with kind, stepId, moduleName, operationId, inputEntityIds, outputEntityIds, stateTransitionIds.",
-    `- designCompletenessVerdict must include exactly kind, verdictVersion, entity, attribute, flow. The entity/attribute/flow values must be closed axis verdict objects with exactly kind, axis, status, reasons, evidenceRefs. verdictVersion must be exactly "ts-design-depth-v1". Axis status must be satisfied, partial, or blocked.`,
-    "",
-    "Minimal nested examples:",
-    "- entity: {\"kind\":\"sdlc_domain_entity\",\"entityId\":\"entity:<module>.<name>\",\"moduleName\":\"<module>\",\"ownership\":\"owned\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"attr:<module>.<name>.<field>\",\"name\":\"<field>\",\"valueType\":\"string\",\"cardinality\":\"one\",\"invariantRefs\":[]}],\"invariants\":[],\"sourceAssetRefs\":[\"file://...\"]}",
-    "- operation: {\"kind\":\"sdlc_domain_operation\",\"operationId\":\"operation:<module>.<verb>\",\"moduleName\":\"<module>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"entity:<module>.<name>\"],\"requiredAttributeIds\":[]}",
-    "- aggregate entity: {\"kind\":\"sdlc_aggregate_domain_entity\",\"entityId\":\"entity:<module>.<name>\",\"ownerModuleName\":\"<module>\",\"attributes\":[{\"kind\":\"sdlc_domain_attribute\",\"attributeId\":\"attr:<module>.<name>.<field>\",\"name\":\"<field>\",\"valueType\":\"string\",\"cardinality\":\"one\",\"invariantRefs\":[]}],\"sourceModuleNames\":[\"<module>\"]}",
-    "- transition: {\"kind\":\"sdlc_entity_state_transition\",\"transitionId\":\"transition:<module>.<from>.<to>\",\"fromState\":\"<from>\",\"toState\":\"<to>\",\"operationId\":\"operation:<module>.<verb>\",\"entityId\":\"entity:<module>.<name>\"}",
-    "- sequence step: {\"kind\":\"sdlc_sunny_day_sequence_step\",\"stepId\":\"step:<module>.<verb>\",\"moduleName\":\"<module>\",\"operationId\":\"operation:<module>.<verb>\",\"inputEntityIds\":[],\"outputEntityIds\":[\"entity:<module>.<name>\"],\"stateTransitionIds\":[]}",
-    "- axis verdict: {\"kind\":\"sdlc_design_completeness_axis_verdict\",\"axis\":\"entity\",\"status\":\"satisfied\",\"reasons\":[\"implementation-design register declares owned entities\"],\"evidenceRefs\":[\"file://...\"]}",
-    "",
-    "Rules:",
-    "- The register is the compact pressure map from design state A to implementation state B; downstream transform.C consumes it as implementation-design truth.",
-    "- Prefer a small truthful register over a broad invented architecture, but do not omit source targets, module boundaries, requirement lineage, or stack facts needed to keep pressure on the transformer.",
-    "- Register size budget is part of correctness: this evaluator must produce a bounded pressure map, not an exhaustive copy of every requirement table or design paragraph.",
-    "- Bounded first-pass register target: one stack profile row, one implementation module row per module, one compact schema fragment per module, at most two entities and two operations per module, one state diagram fragment per module, no more than 18 sunny-day steps, 18 to 32 component rows only when the ADR requires them, and file targets copied from the ADR materialization targets.",
-    "- Use feature decomposition rows, ADR component rows, and module/source-root boundaries as the primary component decomposition. Do not derive one component per requirement.",
-    "- For a dense full-breadth product, emit 20 to 32 componentTopologyRows/componentRealizationRows when needed; do not exceed 32 component rows without a hard requirement in the ADR.",
-    "- Keep moduleSchemaFragments compact: one fragment per implementation module, with representative entities and operations sufficient to preserve transformer pressure. Do not model every possible field, proof artifact, or test case as a separate entity.",
-    "- Keep aggregateDomainModel compact: summarize cross-module domain shape with no more than 16 aggregate entities and no more than 24 aggregate operations.",
-    "- Keep aggregateSunnyDaySequence compact: use no more than 18 steps that show the main public happy path and proof-output flow.",
-    "- Requirement ids on component rows are pressure samples for that component, not the full trace ledger. Carry 3 to 8 local/high-signal requirementIds per component row and leave full global trace coverage in the ADR, feature decomposition, and requirement surfaces.",
-    "- Do not repeat the same large requirement id list across many rows.",
-    "- Use the construction brief stagePressure and target carrier refs to decide which staged authority this register must satisfy.",
-    "- Treat the ADR as candidate transform evidence, not the full truth; correct underspecified ADR rows by evaluating the workspace and ledgers.",
-    "- Use the ADR Product File Targets table for fileTargetRows, but keep fileTargetRows to materialized product file roles.",
-    "- Canonical fileTargetRows[].role values are source, test, build_config, design, documentation, or other.",
-    "- A source row marked deferred is still a materialized product target; emit it with role source.",
-    "- For a trivial product, fileTargetRows must name only downstream materialized product targets such as source, test, or build_config files; do not include the current ADR/design document as a file target.",
-    "- componentTopologyRows and componentRealizationRows must not be empty for implementation-design registers.",
-    "- Do not collapse the register to manifest-only when source/runtime requirements are present in the ADR requirement lineage, construction brief, invocation package, or worker stderr.",
-    "- Requirements that imply separable public/runtime/data/test boundaries must become separate component-level realization rows unless the register gives a specific shared-component rationale in publicBoundary and designCompletenessVerdict.reasons.",
-    "- Trivial product override: when the workspace/constraints/ADR identify a trivial product or one tiny executable/script target, keep one componentTopologyRows row and one componentRealizationRows row for the shared source target unless there are separate source files or a hard accepted authority requiring separate product components. Carry runtime, route, response, and proof requirement ids as facets of that one component with an explicit shared-component rationale.",
-    "- If accepted authority says a source target is an executable, script, program, CLI, service entrypoint, or must print/emit/respond when run, preserve that executable-entrypoint obligation in publicBoundary and designCompletenessVerdict reasons. Do not downgrade it to an import-only helper boundary unless an admitted authority explicitly says the product is library-only.",
-    "- Do not split a trivial single-file service into runtime_binding, response, and proof-support components when all behavior is intentionally implemented in the same source file.",
-    "- Fail your own self-check and rewrite if the register assigns unrelated source/runtime/data/test obligations to one coarse component without a specific cohesion rationale.",
-    "- When a requirement lineage row says a source obligation is deferred to a downstream source-materialization edge, create the implementation component topology/realization row for that source target now and carry the deferred requirement id on that component.",
-    "- Staged decomposition admission is mandatory: each componentTopologyRows[] or componentRealizationRows[] row must own no more than 8 requirementIds.",
-    "- If one module or source root owns more than 8 requirement ids, split it into multiple component rows under the same module/source root with distinct componentIds and publicBoundary values.",
-    "- Keep upstreamComponentIds as component ids only; never use requirement ids as upstream component ids.",
-    "- Target enough componentRealizationRows so component-row pressure density remains 8 or less without copying the full global requirement ledger into every row.",
-    "- Before final response, reject and rewrite the register if any component row has more than 8 requirementIds or repeats a global requirement list.",
-    "- Every componentTopologyRows[].relativePath and componentRealizationRows[].relativePath must have a matching fileTargetRows entry with role source.",
-    "- If the ADR repeats the same file path for behavioral roles such as runtime_binding, route, response, smoke proof, execution proof, or deferred implementation behavior, emit one fileTargetRows entry with the materialization role and carry those behavioral requirement ids on componentTopologyRows/componentRealizationRows instead.",
-    "- Use only source/application implementation targets for componentTopologyRows and componentRealizationRows.",
-    "- Do not turn test, proof-test, package, runtime-config, documentation, or build-context targets into implementation components; keep those only in fileTargetRows.",
-    "- componentId and moduleName must be stable identifier tokens without spaces; prefer lowercase words joined by '-' or '_'.",
-    "- publicBoundary must be a meaningful product behavior or module contract from the ADR; do not use placeholders such as implementation-core, module-root, component, or target.",
-    "- concernRole must be one of the allowed values exactly; use \"other\" for simple executable entrypoints or glue unless admitted source authority clearly maps the component to parser, validator, mapper, error_model, io_adapter, reporting, or domain_model.",
-    "- Preserve requirement ids exactly as written in the ADR or construction brief.",
-    "- Use file:// evidence refs for the ADR transform artifact.",
-    "- If the product is trivial, keep the register trivial; do not invent modules, entities, APIs, persistence, or multiple same-file components.",
-    "- designCompletenessVerdict evaluates the implementation-design surface only. Do not mark an axis partial or blocked merely because source materialization, test design, execution, or runtime proof happens on a downstream edge.",
-    "- Before the final response, re-open the JSON you wrote and verify that every typed nested item above is an object with exactly the declared fields, not a string, Markdown paragraph, or partial object.",
-    "- Before the final response, run a bounded path-integrity self-check: every source-role fileTargetRows[].relativePath and every component source relativePath must either appear in the transform artifact target/component tables or be justified by a higher source authority ref cited in sourceBasisRefs/evidenceRefs.",
-    "- The path-integrity self-check is mandatory even when the first ledger was structurally valid; structural validity alone is not enough if exact product file paths drift from the admitted design/source authority.",
-    "- Self-check the size budget before final response: component rows are between 1 and 32, every component row has 8 or fewer requirementIds, aggregate entities are 16 or fewer, aggregate operations are 24 or fewer, and sunny-day steps are 18 or fewer.",
-    `- Required self-check before final response: run a local JSON check over the content ledger file and rewrite until it passes. At minimum, verify contentRows[0] has exactly kind, rowRef, authorityFunction, carrierFamily, contentKind, payload, sourceBasisRefs, evidenceRefs; verify payload.registerVersion, payload.aggregateDomainModel.modelVersion, payload.aggregateSunnyDaySequence.sequenceVersion, and payload.designCompletenessVerdict.verdictVersion are exactly "ts-design-depth-v1"; verify Object.keys(payload.designCompletenessVerdict).sort() is exactly ["attribute","entity","flow","kind","verdictVersion"]; verify each axis object at payload.designCompletenessVerdict.entity, .attribute, and .flow has exactly ["axis","evidenceRefs","kind","reasons","status"]; verify contentRows[0].payload arrays contain objects, not strings: stackProfileRows, implementationModuleRows, aggregateDomainModelRows, moduleSchemaFragments, moduleSchemaFragments[].entities, moduleSchemaFragments[].entities[].attributes, moduleSchemaFragments[].operations, moduleStateDiagramFragments, moduleStateDiagramFragments[].transitions, aggregateDomainModel.entities, aggregateDomainModel.entities[].attributes, aggregateDomainModel.operations, aggregateDomainModel.crossModuleReferences, aggregateSunnyDaySequence.steps, componentTopologyRows, componentRealizationRows, fileTargetRows.`,
-    "- Do not run another exploratory command after deciding the component/module set; write the content ledger file first, then validate that file.",
-    `- Self-check target file: ${input.contentLedgerPath}`,
-    "- Do not include Markdown fences, explanation, comments, or trailing prose in the content ledger file.",
-    "- After writing the content ledger, respond with a one-line summary only."
-  ].join("\n");
-}
 
 function workerResultReportSummaryForDesignDepthPrompt(
   workerReportPath: string
@@ -3739,6 +3726,114 @@ function workerResultReportSummaryForDesignDepthPrompt(
   }
 }
 
+function writeDesignDepthFpEvaluatorDraftContentRegister(input: {
+  readonly archiveRoot: string;
+  readonly contentRegisterPath: string;
+  readonly sourceArtifactPath: string;
+  readonly selectedCompositionRef: string;
+  readonly selectedCompositionDigest: string;
+  readonly selectedCompositionSelectionRef: string;
+  readonly selectedRegimeBindingRef: string | null;
+}): void {
+  const sourceArtifactRef = pathToFileURL(input.sourceArtifactPath).href;
+  const draftContentRows = Object.freeze(
+    SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) =>
+      Object.freeze({
+        kind: "sdlc_evaluate_content_register_row" as const,
+        rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
+        authorityFunction: "synthesize_model" as const,
+        carrierFamily: "ProductAssetModel" as const,
+        contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
+        payload: Object.freeze({
+          kind: "sdlc_design_depth_register_fragment" as const,
+          fragmentVersion: "ts-design-depth-fragment-v1" as const,
+          targetAssetType: "implementation_design_surface",
+          section,
+          sequence: index + 1,
+          mergeMode: "replace" as const,
+          value: draftDesignDepthRegisterFragmentValue({
+            section,
+            sourceArtifactRef
+          })
+        }),
+        sourceBasisRefs: Object.freeze([sourceArtifactRef]),
+        evidenceRefs: Object.freeze([sourceArtifactRef])
+      })
+    )
+  );
+  writeSdlcSystemArtifact({
+    archiveRoot: input.archiveRoot,
+    absolutePath: input.contentRegisterPath,
+    payload: Object.freeze({
+      kind: "sdlc_evaluate_content_register" as const,
+      registerVersion: "ts-evaluate-content-register-v1" as const,
+      stage: "evaluate.C" as const,
+      ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
+      ruleRole: "semantic_judgment" as const,
+      computeMeans: "F_P" as const,
+      authorityFunction: "synthesize_model" as const,
+      selectedCompositionRef: input.selectedCompositionRef,
+      selectedCompositionDigest: input.selectedCompositionDigest,
+      selectedCompositionSelectionRef: input.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.selectedRegimeBindingRef ?? input.selectedCompositionRef,
+      sourceBasisRefs: Object.freeze([sourceArtifactRef]),
+      candidateArtifactRefs: Object.freeze([sourceArtifactRef]),
+      evidenceRefs: Object.freeze([sourceArtifactRef]),
+      contentRows: draftContentRows
+    })
+  });
+}
+
+function writeDesignDepthFirstUpdateObservation(input: {
+  readonly archiveRoot: string;
+  readonly contentRegisterPath: string;
+}): void {
+  writeSdlcSystemArtifact({
+    archiveRoot: input.archiveRoot,
+    relativePath: "design_depth_fp_evaluator_first_update.json",
+    payload: observeDesignDepthContentRegisterFirstUpdate({
+      registerPath: input.contentRegisterPath
+    })
+  });
+}
+
+function draftDesignDepthRegisterFragmentValue(input: {
+  readonly section: (typeof SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS)[number];
+  readonly sourceArtifactRef: string;
+}): unknown {
+  if (
+    input.section === "aggregateDomainModel" ||
+    input.section === "aggregateSunnyDaySequence"
+  ) {
+    return null;
+  }
+  if (input.section === "designCompletenessVerdict") {
+    return Object.freeze({
+      kind: "sdlc_design_completeness_verdict" as const,
+      verdictVersion: "ts-design-depth-v1" as const,
+      entity: draftDesignCompletenessAxis("entity", input.sourceArtifactRef),
+      attribute: draftDesignCompletenessAxis("attribute", input.sourceArtifactRef),
+      flow: draftDesignCompletenessAxis("flow", input.sourceArtifactRef)
+    });
+  }
+  return Object.freeze([]);
+}
+
+function draftDesignCompletenessAxis(
+  axis: "entity" | "attribute" | "flow",
+  sourceArtifactRef: string
+): unknown {
+  return Object.freeze({
+    kind: "sdlc_design_completeness_axis_verdict" as const,
+    axis,
+    status: "blocked" as const,
+    reasons: Object.freeze(["draft row awaiting evaluate.C/F_P section update"]),
+    evidenceRefs: Object.freeze([sourceArtifactRef])
+  });
+}
+
 async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   readonly transport: SdlcWorkerTransportContract;
   readonly manifest: SdlcWorkerHandoffManifest;
@@ -3761,7 +3856,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     input.manifest.workspaceRoot,
     workCategoryGovernance.workerPath
   );
-  const contentLedgerPath = designDepthFpEvaluatorContentLedgerPath({
+  const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
     archiveRoot: input.manifest.archiveRoot
   });
   const registerPath = designDepthFpEvaluatorRegisterPath(input.manifest);
@@ -3769,6 +3864,20 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     "design_depth_fp_evaluator_prompt.md"
   );
+  writeDesignDepthFpEvaluatorDraftContentRegister({
+    archiveRoot: input.manifest.archiveRoot,
+    contentRegisterPath,
+    sourceArtifactPath: input.manifest.outputFile,
+    selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+    selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+    selectedCompositionSelectionRef:
+      input.pluginInput.selectedCompositionSelectionRef,
+    selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef ?? null
+  });
+  writeDesignDepthFirstUpdateObservation({
+    archiveRoot: input.manifest.archiveRoot,
+    contentRegisterPath
+  });
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "design_depth_fp_evaluator_prompt.md",
@@ -3782,7 +3891,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       workerReportPath,
       workerReportSummaryLines:
         workerResultReportSummaryForDesignDepthPrompt(workerReportPath),
-      contentLedgerPath,
+      contentRegisterPath,
       registerProjectionPath: registerPath,
       selectedCompositionRef: input.pluginInput.selectedCompositionRef,
       selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
@@ -3824,7 +3933,47 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
   const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
-  const processResult = await invokeSupervisedProcessActor({
+  const designDepthRunStartedPayload = Object.freeze({
+    kind: "sdlc_design_depth_fp_evaluator_run",
+    lifecycleStatus: "started" as const,
+    command: processLaunch.command,
+    args: processLaunch.args,
+    cwd: input.manifest.workspaceRoot,
+    status: null,
+    signal: null,
+    elapsedMs: 0,
+    timedOut: false,
+    error: null,
+    timeoutMs: evaluatorTimeoutMs,
+    workerTimeoutMs: inactivityPolicy.timeoutMs,
+    stdoutBudgetBytes,
+    stdoutByteCount: 0,
+    stderrByteCount: 0,
+    stdoutRef: pathToFileURL(stdoutPath).href,
+    stderrRef: pathToFileURL(stderrPath).href,
+    promptRef: pathToFileURL(promptPath).href,
+    contentRegisterRef: pathToFileURL(contentRegisterPath).href,
+    registerProjectionRef: pathToFileURL(registerPath).href,
+    processEventsRef: pathToFileURL(processEventsPath).href,
+    processStartedRef: pathToFileURL(processStartedPath).href,
+    traceRoot,
+    traceResultRef: fileRef(traceResultPath(traceRoot)),
+    startedAt: new Date().toISOString(),
+    hostPid: process.pid
+  });
+  writeProcessLifecycleArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "design_depth_fp_evaluator_run.json",
+    payload: designDepthRunStartedPayload
+  });
+  const disposeDesignDepthInterruptionArtifact = registerProcessInterruptionArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "design_depth_fp_evaluator_run.json",
+    startedPayload: designDepthRunStartedPayload
+  });
+  let processResult: SupervisedProcessActorResult;
+  try {
+    processResult = await invokeSupervisedProcessActor({
     invocation: actorInvocationForPluginInput({
       pluginInput: input.pluginInput,
       transport: input.transport
@@ -3832,10 +3981,14 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     command: processLaunch.command,
     args: processLaunch.args,
     cwd: input.manifest.workspaceRoot,
-    environment: {
-      ...installedOperatorChildProcessEnvironment(),
-      ODD_SDLC_EVALUATE_STAGE: "design_depth_content_ledger",
-      ODD_SDLC_EVALUATOR_CONTENT_LEDGER: contentLedgerPath,
+	    environment: {
+	      ...installedOperatorChildProcessEnvironment(),
+	      ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
+	      ODD_SDLC_EVALUATE_STAGE: "design_depth_content_register",
+      ODD_SDLC_EVALUATOR_CONTENT_REGISTER: contentRegisterPath,
+      ODD_SDLC_EVALUATOR_INCREMENTAL_REGISTER: "1",
+      ODD_SDLC_EVALUATOR_INCREMENTAL_FRAGMENT_KIND:
+        SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
       ODD_SDLC_EVALUATOR_REGISTER_PROJECTION: registerPath,
       ODD_SDLC_EVALUATOR_PROMPT: promptPath,
       ODD_SDLC_EVALUATOR_SOURCE_ARTIFACT: input.manifest.outputFile,
@@ -3866,6 +4019,13 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
   });
+  } finally {
+    disposeDesignDepthInterruptionArtifact();
+  }
+  writeDesignDepthFirstUpdateObservation({
+    archiveRoot: input.manifest.archiveRoot,
+    contentRegisterPath
+  });
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
   const runRef = pathToFileURL(
@@ -3876,6 +4036,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     relativePath: "design_depth_fp_evaluator_run.json",
     payload: Object.freeze({
       kind: "sdlc_design_depth_fp_evaluator_run",
+      lifecycleStatus: "completed",
       command: processResult.command,
       args: processResult.args,
       cwd: processResult.cwd,
@@ -3892,7 +4053,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       stdoutRef: pathToFileURL(stdoutPath).href,
       stderrRef: pathToFileURL(stderrPath).href,
       promptRef: pathToFileURL(promptPath).href,
-      contentLedgerRef: pathToFileURL(contentLedgerPath).href,
+      contentRegisterRef: pathToFileURL(contentRegisterPath).href,
       registerProjectionRef: pathToFileURL(registerPath).href,
       processEventsRef: pathToFileURL(processEventsPath).href,
       traceRoot,
@@ -3926,23 +4087,23 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       reason: "design_depth_fp_evaluator_process_failed"
     });
   }
-  const contentLedgerAdmission = admitSdlcEvaluateContentLedgerArtifact({
-    ledgerPath: contentLedgerPath,
+  const contentRegisterAdmission = admitSdlcEvaluateContentRegisterArtifact({
+    registerPath: contentRegisterPath,
     pluginInput: input.pluginInput,
     ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
     authorityFunction: "synthesize_model",
     computeMeans: "F_P"
   });
   if (
-    contentLedgerAdmission.status !== "admitted" ||
-    contentLedgerAdmission.ledger === null
+    contentRegisterAdmission.status !== "admitted" ||
+    contentRegisterAdmission.register === null
   ) {
     const diagnosticRefs = uniqueSorted([
       ...evidenceRefs,
-      ...contentLedgerAdmission.evidenceRefs
+      ...contentRegisterAdmission.evidenceRefs
     ]);
     const residualPressureRefs = [
-      ...contentLedgerAdmission.blockingReasons.map(
+      ...contentRegisterAdmission.blockingReasons.map(
         (reason: string) =>
           `pressure://odd-sdlc/design-depth-fp-evaluator/${encodeURIComponent(reason)}`
       ),
@@ -3968,13 +4129,13 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       compositionContributionRef:
         input.pluginInput.selectedRegimeBindingRef ??
         input.pluginInput.selectedCompositionRef,
-      reason: contentLedgerAdmission.blockingReasons.join(",") || "design_depth_fp_evaluator_content_ledger_rejected"
+      reason: contentRegisterAdmission.blockingReasons.join(",") || "design_depth_fp_evaluator_content_register_rejected"
     });
   }
   let registerProjectionRef: string;
   try {
-    registerProjectionRef = writeDesignDepthRegisterProjectionFromEvaluateContentLedger({
-      ledger: contentLedgerAdmission.ledger,
+    registerProjectionRef = writeDesignDepthRegisterProjectionFromEvaluateContentRegister({
+      register: contentRegisterAdmission.register,
       archiveRoot: input.manifest.archiveRoot,
       registerPath
     });
@@ -3983,7 +4144,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       error instanceof Error ? error.message : "design_depth_register_projection_failed";
     const diagnosticRefs = uniqueSorted([
       ...evidenceRefs,
-      ...contentLedgerAdmission.evidenceRefs
+      ...contentRegisterAdmission.evidenceRefs
     ]);
     return constructEvaluationRuleOutcome({
       status: "blocked",
@@ -4012,7 +4173,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   if (admission.status !== "admitted" || admission.register === null) {
     const diagnosticRefs = uniqueSorted([
       ...evidenceRefs,
-      ...contentLedgerAdmission.evidenceRefs,
+      ...contentRegisterAdmission.evidenceRefs,
       ...admission.evidenceRefs
     ]);
     const residualPressureRefs = [
@@ -4051,12 +4212,12 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
     ruleRole: "semantic_judgment",
     computeMeans: "F_P",
     producedRegisterRefs: Object.freeze([
-      pathToFileURL(contentLedgerPath).href,
+      pathToFileURL(contentRegisterPath).href,
       registerProjectionRef
     ]),
     evidenceRefs: uniqueSorted([
       ...evidenceRefs,
-      ...contentLedgerAdmission.evidenceRefs,
+      ...contentRegisterAdmission.evidenceRefs,
       ...admission.evidenceRefs
     ]),
     findingRefs: Object.freeze([
@@ -4087,111 +4248,6 @@ function writeDesignDepthFpEvaluatorRuleOutcomeProof(input: {
   ).href;
 }
 
-function reviewGradeEdgeFulfillmentPrompt(input: {
-  readonly manifest: SdlcWorkerHandoffManifest;
-  readonly governanceRef: string;
-  readonly governancePath: string;
-  readonly constructionBriefPath: string;
-  readonly invocationPackagePath: string;
-  readonly workerReportPath: string;
-  readonly assessmentPath: string;
-}): string {
-  return [
-    "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
-    "",
-    "Purpose:",
-    "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
-    "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
-    "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
-    "",
-    "Read in order:",
-    `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
-    `2. construction brief: ${input.constructionBriefPath}`,
-    `3. invocation package: ${input.invocationPackagePath}`,
-    `4. worker result report: ${input.workerReportPath}`,
-    "5. generated asset artifacts named by worker_result_report.materializedFiles.",
-    "6. product_materialization_manifest.json in the same archive when present.",
-    "7. accepted design-depth register refs from construction_brief.stagePressure.designDepthEvaluatorRegisterRefs when present.",
-    "",
-    "Reading discipline:",
-    "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
-    "- Use targeted scripts that print compact counts or short ids only.",
-    "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
-    "- If reviewedObligationIds is large, create the assessment with a short local script: load worker_result_report, map every fulfilled carryover row to a compact fulfilled finding, explicitly override only open findings, write JSON to the assessment path, then parse it back.",
-    "- Do not manually type or stream a large findings array through stdout. Write the durable JSON file and print only compact status counts.",
-    "- Do not leave background jobs running. If an executable/service must be started to gather evidence, run it inside one bounded shell block, store its PID in a variable, install a trap that kills and waits for that PID on exit, and print only the observed exit/status summary.",
-    "- Do not use shell job-control cleanup such as `kill %1` or Claude background tasks for execution probes. A passed assessment is invalid if a spawned service/process remains live after the probe.",
-    "",
-    `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
-    "",
-    "Required JSON shape:",
-    "- kind: \"sdlc_review_grade_edge_fulfillment_assessment\"",
-    "- assessmentVersion: \"ts-review-grade-v1\"",
-    `- graphFunctionName: ${JSON.stringify(input.manifest.graphFunctionName)}`,
-    `- edgeName: ${JSON.stringify(input.manifest.edgeName)}`,
-    `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
-    "- status: \"passed\" or \"blocked\"",
-    "- reviewedObligationIds: every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations",
-    "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
-    "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
-    "- summary: one compact sentence",
-    "- No other top-level keys are allowed.",
-    "",
-    "Finding shape:",
-    "- kind: \"sdlc_review_grade_obligation_finding\"",
-    "- obligationId: exact obligation id",
-    "- fulfillmentStatus: fulfilled, partial, blocked, or unassessed",
-    "- failureClass: null when fulfilled, otherwise one of trace_missing, semantic_not_realized, boundary_collapsed, wrong_stage, schema_invalid, execution_environment, test_overlap_missing",
-    "- requiredAction: null when fulfilled, otherwise the concrete work item the next transform must complete",
-    "- evidenceRefs: generated asset refs and diagnostic refs used for this judgment",
-    "- acceptedAuthorityRefs: non-empty requirement/design/depth/test/target-carrier authority refs used for this judgment",
-    "- fulfillmentBinding: null unless this finding is a fulfilled component_code_surface finding. On component_code_surface, every fulfilled finding must provide it, including target_asset, source_asset, module, source_set, inline, aggregate, and requirement rows.",
-    "- rationale: compact reason for the judgment",
-    "- No other finding keys are allowed. Do not add helper booleans, carryover flags, scores, sourceAssetCarryover, sourceAssetStatus, confidence, or notes fields.",
-    "",
-    "fulfillmentBinding shape when required:",
-    "- kind: \"sdlc_requirement_function_fulfillment_binding\"",
-    "- requirementRef: exact obligation id",
-    "- productRequirementRef: accepted product requirement ref or exact obligation id when no narrower product-requirement ref exists",
-    "- designObligationRef: accepted design/depth/component row ref that assigned the obligation",
-    "- componentRef: accepted component/module ref",
-    "- productTargetRef: target carrier or declared product-file target ref",
-    "- codeSurfaceRef: generated source file/API/route/CLI/service ref",
-    "- functionOrEntrypointRef: concrete function, exported API, route, CLI command, service entrypoint, executable script, or equivalent public behavior ref",
-    "- realizationEvidenceRefs: source/runtime evidence refs proving the binding",
-    "- testOrExecutionEvidenceRefs: test, execution, or evaluator evidence refs that hold the binding to account",
-    "- evaluatorFindingRef: stable finding ref for this evaluation finding",
-    "",
-    "Review rules:",
-    "- A requirement tag, file path, schema-valid report, or passing smoke output is evidence, not proof by itself.",
-    "- Every finding must include at least one acceptedAuthorityRef. Do not emit an empty acceptedAuthorityRefs array for target_asset, source_set, inline, or aggregate findings.",
-    "- For target_asset findings, use the construction brief targetCarrierProjection target carrier refs plus the accepted authority files that governed the generated asset.",
-    "- Mark partial or blocked when an asset exists but does not plausibly implement the accepted responsibility.",
-    "- Mark boundary_collapsed when generated source collapses multiple accepted component rows back into a coarse facade.",
-    "- Mark semantic_not_realized when requirement tags are present but the behavior is absent, stubbed, placeholder, or not connected to the exported/public boundary.",
-    "- Mark semantic_not_realized when accepted authority requires executable/script/program behavior but the source only exports a helper or function and has no entrypoint path that runs the product behavior when the file is invoked. A test calling a helper is overlap evidence, not executable-product proof.",
-    "- Requirement lineage is transformer-owned semantic evidence, not a postflight closure shortcut. Inspect worker_result_report.materializedFiles, product_materialization_manifest.files, selected target-carrier materializedFiles, and native file tags/comments where the file format permits them.",
-    "- Mark trace_missing when a generated product file is used as fulfillment evidence but carries no lineage in the asset itself, selected target carrier, worker report, or materialization manifest. Do not pass by file existence, digest, or test success alone.",
-    "- For every component_code_surface fulfilled finding, bind obligationId -> product requirement when available -> design/depth obligation -> component/product target -> function/API/route/CLI/entrypoint -> evidence in fulfillmentBinding.",
-    "- For component_code_surface source_asset, module, target_asset, source_set, inline, or aggregate findings, use the exact obligationId as requirementRef and productRequirementRef when no narrower product requirement exists, but still bind the finding to the concrete generated entrypoint/public behavior and evidence.",
-    "- A fulfilled component_code_surface finding with fulfillmentBinding:null is invalid and will be retried, even when the obligation is module-level or source-asset-level carryover.",
-    "- Mark semantic_not_realized or schema_invalid when tenant stack authority contradicts emitted product files, for example declaring one module system while generated source/test syntax requires another. The worker must repair the authority surface or the product files; documenting an override in prose is not enough.",
-    "- When the generated asset includes a declared executable or test execution contract that can run locally without network or destructive side effects, execute it from the declared working directory and use the observed exit/stdout/stderr as evaluation evidence. If it fails, mark the relevant obligation blocked with execution_environment or semantic_not_realized instead of passing by inspection.",
-    "- Mark test_overlap_missing when accepted depth requires test overlap and the generated tests do not exercise the responsibility.",
-    "- For component_code_surface, compare source files to accepted design-depth componentRealizationRows and fileTargetRows.",
-    "- For materialization-required component_code_surface, compare worker_result_report.materializedFiles and product_materialization_manifest files to declared product-file targets.",
-    "- Mark boundary_collapsed or wrong_stage when worker_result_report.materializedFiles or product_materialization_manifest files list undeclared build/test byproducts or extra product files as materialized product truth.",
-    "- Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof unless they are declared product targets. Allowed execution byproducts may remain only as byproducts, not as product-file fulfillment evidence.",
-    "- For component_test_surface, compare generated tests to accepted testcase/test-design authority and source responsibilities.",
-    "- For every other target asset type, compare the generated asset to incoming obligations, accepted upstream authority, target carrier expectations, stage boundary, and evidence overlap.",
-    "- If all reviewed obligations are fulfilled, status must be passed and every finding failureClass/requiredAction must be null.",
-    "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction.",
-    "- Before final response, re-open and parse the assessment JSON. Verify the top-level key set is exactly kind, assessmentVersion, graphFunctionName, edgeName, targetAssetType, status, reviewedObligationIds, findings, evidenceRefs, summary.",
-    "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, fulfillmentBinding, rationale.",
-    "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
-    "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
-  ].join("\n");
-}
 
 function workerReportWithReviewGradeAssessment(input: {
   readonly report: SdlcWorkerResultReport;
@@ -4232,6 +4288,10 @@ function workerReportWithReviewGradeAssessment(input: {
       return [];
     }
     const existing = existingById.get(obligationId);
+    const isDownstreamStagePressure =
+      obligationId.startsWith("requirement:") &&
+      finding.fulfillmentStatus === "partial" &&
+      finding.failureClass === "wrong_stage";
     const existingStatus =
       existing === undefined
         ? "fulfilled"
@@ -4247,6 +4307,10 @@ function workerReportWithReviewGradeAssessment(input: {
       ...(existing?.blockingReasons ?? Object.freeze([])),
       ...(finding.fulfillmentStatus === "fulfilled"
         ? Object.freeze([])
+        : isDownstreamStagePressure
+          ? Object.freeze([
+              `requirement_carried_for_downstream_closure:${obligationId.replace(/^requirement:/u, "")}`
+            ])
         : Object.freeze([
             finding.failureClass ?? "review_grade_open",
             finding.requiredAction ?? "required_action_missing"
@@ -4378,7 +4442,46 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
   const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
   const traceRoot = `${processEventsPath}.trace`;
-  const processResult = await invokeSupervisedProcessActor({
+  const reviewGradeRunStartedPayload = Object.freeze({
+    kind: "sdlc_review_grade_edge_fulfillment_run",
+    lifecycleStatus: "started" as const,
+    command: processLaunch.command,
+    args: processLaunch.args,
+    cwd: input.manifest.workspaceRoot,
+    status: null,
+    signal: null,
+    elapsedMs: 0,
+    timedOut: false,
+    error: null,
+    timeoutMs: evaluatorTimeoutMs,
+    workerTimeoutMs: inactivityPolicy.timeoutMs,
+    stdoutBudgetBytes,
+    stdoutByteCount: 0,
+    stderrByteCount: 0,
+    stdoutRef: pathToFileURL(stdoutPath).href,
+    stderrRef: pathToFileURL(stderrPath).href,
+    promptRef: pathToFileURL(promptPath).href,
+    assessmentRef: pathToFileURL(assessmentPath).href,
+    processEventsRef: pathToFileURL(processEventsPath).href,
+    processStartedRef: pathToFileURL(processStartedPath).href,
+    traceRoot,
+    traceResultRef: fileRef(traceResultPath(traceRoot)),
+    startedAt: new Date().toISOString(),
+    hostPid: process.pid
+  });
+  writeProcessLifecycleArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "review_grade_edge_fulfillment_run.json",
+    payload: reviewGradeRunStartedPayload
+  });
+  const disposeReviewGradeInterruptionArtifact = registerProcessInterruptionArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    relativePath: "review_grade_edge_fulfillment_run.json",
+    startedPayload: reviewGradeRunStartedPayload
+  });
+  let processResult: SupervisedProcessActorResult;
+  try {
+    processResult = await invokeSupervisedProcessActor({
     invocation: actorInvocationForPluginInput({
       pluginInput: input.pluginInput,
       transport: input.transport
@@ -4386,9 +4489,10 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     command: processLaunch.command,
     args: processLaunch.args,
     cwd: input.manifest.workspaceRoot,
-    environment: {
-      ...installedOperatorChildProcessEnvironment(),
-      ODD_SDLC_EVALUATE_STAGE: "review_grade_edge_fulfillment",
+	    environment: {
+	      ...installedOperatorChildProcessEnvironment(),
+	      ...sdlcWorkspaceLocalToolEnvironment(input.manifest.workspaceRoot),
+	      ODD_SDLC_EVALUATE_STAGE: "review_grade_edge_fulfillment",
       ODD_SDLC_EVALUATOR_ASSESSMENT: assessmentPath,
       ODD_SDLC_EVALUATOR_PROMPT: promptPath,
       ODD_SDLC_EVALUATOR_WORKER_REPORT: workerReportPath
@@ -4408,6 +4512,9 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     heartbeatMs: inactivityPolicy.heartbeatMs,
     eventSink: input.eventSink
   });
+  } finally {
+    disposeReviewGradeInterruptionArtifact();
+  }
   const stdoutByteCount = fileByteCount(stdoutPath);
   const stderrByteCount = fileByteCount(stderrPath);
   const runRef = pathToFileURL(
@@ -4418,6 +4525,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     relativePath: "review_grade_edge_fulfillment_run.json",
     payload: Object.freeze({
       kind: "sdlc_review_grade_edge_fulfillment_run",
+      lifecycleStatus: "completed",
       command: processResult.command,
       args: processResult.args,
       cwd: processResult.cwd,
@@ -4554,7 +4662,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     (finding) => finding.fulfillmentStatus !== "fulfilled"
   );
   if (reviewGradeFindingsAreDownstreamStagePressure(openFindings)) {
-    const residualPressureRefs = uniqueSorted(
+    const downstreamPressureRefs = uniqueSorted(
       openFindings.map(
         (finding) =>
           `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/${encodeURIComponent(finding.obligationId)}`
@@ -4566,8 +4674,7 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ruleRole: "semantic_judgment",
       computeMeans: "F_P",
       evidenceRefs: uniqueSorted([...evidenceRefs, ...admission.evidenceRefs]),
-      residualPressureRefs,
-      diagnosticRefs: residualPressureRefs,
+      diagnosticRefs: downstreamPressureRefs,
       findingRefs: Object.freeze([
         `finding://odd-sdlc/${manifestRefSegment(input.manifest)}/evaluate/review-grade-edge-fulfillment/downstream-stage-pressure`
       ]),
@@ -4789,12 +4896,13 @@ function workerReportAdmissionPostflight(input: {
   const carrier = makeSdlcBlockingReason({
     code: "worker_report_admission_failed",
     detail: input.reason,
+    lawfulReentryPoint: "operator_blocked",
     evidenceRefs
   });
   return Object.freeze({
     kind: "sdlc_operator_postflight_result" as const,
-    status: "blocked" as const,
-    blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+    status: "diagnostic" as const,
+    blockingReasons: Object.freeze([]),
     blockingReasonCarriers: Object.freeze([carrier]),
     evidenceRefs
   });
@@ -4814,12 +4922,13 @@ function deterministicReportAdmissionPostflight(input: {
   const carrier = makeSdlcBlockingReason({
     code: "worker_report_admission_failed",
     detail: input.reason,
+    lawfulReentryPoint: "operator_blocked",
     evidenceRefs
   });
   return Object.freeze({
     kind: "sdlc_operator_postflight_result" as const,
-    status: "blocked" as const,
-    blockingReasons: Object.freeze([legacyBlockingReasonCode(carrier)]),
+    status: "diagnostic" as const,
+    blockingReasons: Object.freeze([]),
     blockingReasonCarriers: Object.freeze([carrier]),
     evidenceRefs
   });
@@ -4930,12 +5039,35 @@ function fpEvaluateResultRefsForState(
 function reviewGradeResidualPressureRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
-  return state.workerReport === null
-    ? Object.freeze([])
-    : reviewGradeEdgeFulfillmentOpenPressureRefs({
-        runRef: manifestRefSegment(state.manifest),
-        assessments: state.workerReport.obligationAssessments
-      });
+  if (!reviewGradeEdgeFulfillmentAssessmentRequired(state.manifest)) {
+    return Object.freeze([]);
+  }
+  const runRef = manifestRefSegment(state.manifest);
+  const assessmentPath = join(
+    state.manifest.archiveRoot,
+    REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
+  );
+  if (!existsSync(assessmentPath)) {
+    return Object.freeze([
+      `pressure://odd-sdlc/review-grade/${runRef}/assessment-missing`
+    ]);
+  }
+  const admission = admitReviewGradeEdgeFulfillmentAssessmentFromArtifact({
+    manifest: state.manifest,
+    outputFile: assessmentPath
+  });
+  if (admission.status !== "admitted" || admission.assessment === null) {
+    return uniqueSorted(
+      admission.blockingReasons.map(
+        (reason) =>
+          `pressure://odd-sdlc/review-grade/${runRef}/${encodeURIComponent(reason)}`
+      )
+    );
+  }
+  return reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+    runRef,
+    assessment: admission.assessment
+  });
 }
 
 function fpEvaluationCloseDispositionForState(
@@ -5084,11 +5216,6 @@ async function runSdlcPostTransformDiagnosticFlow(input: {
     relativePath: "assurance_satisfaction.json",
     payload: assuranceGate.satisfaction
   });
-  writeSdlcSystemArtifact({
-    archiveRoot: input.state.manifest.archiveRoot,
-    relativePath: "assurance_ledgers.json",
-    payload: assuranceGate.ledgers
-  });
   return Object.freeze({
     postflight,
     assuranceGate
@@ -5139,9 +5266,10 @@ function shouldDeferDispatchConsequenceToFpEvaluator(
   state: SdlcAbgOwnedFpDispatchState
 ): boolean {
   return (
-    (state.manifest.targetAssetType === "implementation_design_surface" ||
+    sdlcInstalledOperatorProjectsOutput(state.manifest.targetAssetType) ||
+    ((state.manifest.targetAssetType === "implementation_design_surface" ||
       reviewGradeEdgeFulfillmentAssessmentRequired(state.manifest)) &&
-    state.workerReport !== null
+      state.workerReport !== null)
   );
 }
 
@@ -6723,21 +6851,28 @@ type SdlcAbgTerminalTransitionProjection = {
   readonly reason?: string | null;
 };
 
-function evaluationSetTerminalRetryReasonRefs(input: {
+function abgTerminalRetryReasonRefs(input: {
   readonly runRef: string;
   readonly terminal: SdlcAbgTerminalTransitionProjection | null;
 }): readonly string[] {
+  const terminalKind = input.terminal?.terminalKind ?? null;
+  if (terminalKind === null) {
+    return Object.freeze([]);
+  }
   const reason =
-    typeof input.terminal?.reason === "string" ? input.terminal.reason : null;
-  if (
-    input.terminal?.terminalKind !== "gap_stop" ||
-    reason === null ||
-    !reason.includes("evaluation_set_incomplete")
-  ) {
+    typeof input.terminal?.reason === "string"
+      ? input.terminal.reason
+      : terminalKind;
+  const retryableTerminal =
+    terminalKind === "yielded" ||
+    (terminalKind === "gap_stop" && reason.includes("evaluation_set_incomplete"));
+  if (!retryableTerminal) {
     return Object.freeze([]);
   }
   return Object.freeze([
-    `retry://odd-sdlc/${input.runRef}/abg-evaluation-set/${encodeURIComponent(reason)}`
+    `retry://odd-sdlc/${input.runRef}/abg-terminal/${encodeURIComponent(
+      terminalKind
+    )}/${encodeURIComponent(reason)}`
   ]);
 }
 
@@ -6881,22 +7016,21 @@ function deriveInstalledTraversalConsequence(input: {
     targetCarrierRequired: true,
     requiredEvidenceSourceKinds: requiredEvidenceSourceKindsForState(input.state)
   });
-  const edgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
+  const measuredEdgeResidualPressure = deriveSdlcEdgeResidualPressure(edgeGain);
+  const selectedEvaluationResidualPressureRefs =
+    fpEvaluationResidualPressureRefsForState(input.state);
+  const edgeResidualPressure = withAdditionalSdlcEdgeResidualPressureRefs({
+    residualPressure: measuredEdgeResidualPressure,
+    requiredPressureRefs: selectedEvaluationResidualPressureRefs
+  });
   const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
     gain: edgeGain,
     residualPressure: edgeResidualPressure
   });
-  const abgEvaluationSetRetryReasonRefs = evaluationSetTerminalRetryReasonRefs({
+  const rawAbgTerminalRetryRefs = abgTerminalRetryReasonRefs({
     runRef,
     terminal: input.engineTerminal
   });
-  const retryReasonRefs = uniqueSorted([
-    ...blockingReasonRefsForReentry({
-      state: input.state,
-      lawfulReentryPoint: "same_edge_retry"
-    }),
-    ...abgEvaluationSetRetryReasonRefs
-  ]);
   const repairReasonRefs = blockingReasonRefsForReentry({
     state: input.state,
     lawfulReentryPoint: "repair_worker_output"
@@ -6951,10 +7085,21 @@ function deriveInstalledTraversalConsequence(input: {
       ...input.start.executionContract.nextActionProjection.targetBindingRefs
     ])
   });
+  const abgTerminalRetryRefs =
+    ledger.edgeConverged && edgeAssuranceCloseDecision.disposition === "close"
+      ? Object.freeze([])
+      : rawAbgTerminalRetryRefs;
+  const retryReasonRefs = uniqueSorted([
+    ...blockingReasonRefsForReentry({
+      state: input.state,
+      lawfulReentryPoint: "same_edge_retry"
+    }),
+    ...abgTerminalRetryRefs
+  ]);
   const currentEdgeLawful =
     input.state.status !== "worker_report_rejected" &&
     repriceReasonRefs.length === 0 &&
-    abgEvaluationSetRetryReasonRefs.length === 0;
+    abgTerminalRetryRefs.length === 0;
   const yieldResumeBasis = currentEdgeLawful
     ? deriveSdlcProductLineageYieldResumeBasis({
         runRef,
@@ -7848,20 +7993,10 @@ function compactRuntimeEventArchivePayload(
       workspaceRoot: input.workspaceRoot,
       sourceWorkspaceRoot
     });
-    const managedTraversalLedger = deriveConformProjectManagedTraversalLedger({
-      workspaceRoot: input.workspaceRoot,
-      manifest: managedTraversalManifest,
-      report
-    });
     writeSdlcSystemArtifact({
       archiveRoot,
       relativePath: "managed_traversal_manifest.json",
       payload: managedTraversalManifest
-    });
-    writeSdlcSystemArtifact({
-      archiveRoot,
-      relativePath: "managed_traversal_ledger.json",
-      payload: managedTraversalLedger
     });
     writeSdlcSystemArtifact({
       archiveRoot,
@@ -7935,10 +8070,8 @@ function compactRuntimeEventArchivePayload(
         `status: ${outcome.status}`,
         `graph_function: ${outcome.summary.graphFunctionName ?? "n/a"}`,
         `current_edge: ${outcome.summary.currentEdge ?? "n/a"}`,
-        `managed_traversal: ${managedTraversalLedger.status}`,
         `conformance: ${report.status}`,
         `conformance_gaps: ${report.conformanceGaps.join(",") || "none"}`,
-        `managed_residual_gaps: ${managedTraversalLedger.residualGaps.join(",") || "none"}`,
         `event_sequence: ${outcome.emittedRuntimeEventKinds.join(" -> ")}`,
         `event_log: ${outcome.eventLogPath}`,
         ""
@@ -8034,9 +8167,9 @@ function compactRuntimeEventArchivePayload(
     dispatchState.current = state;
     return admitDispatchConsequence(state);
   };
-  const fpDispatch = Object.freeze({
-    contract: fpDispatchPluginContract(),
-    dispatch: async (pluginInput: EnginePluginInput) => {
+  const dispatchThroughInstalledOperator = async (
+    pluginInput: EnginePluginInput
+  ): Promise<FpDispatchOutcome> => {
       const selectedComposition =
         sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
       const contract = hookContractByEdgeName(pluginInput.edge);
@@ -8132,6 +8265,7 @@ function compactRuntimeEventArchivePayload(
         readonly workerReport: SdlcWorkerResultReport;
         readonly hookWorkerContractRef: string;
         readonly passedFulfillmentDetail: string;
+        readonly deferConstructorUntilConsequence?: boolean | undefined;
       }) => {
         const diagnosticState: SdlcAbgOwnedFpDispatchState = {
           status: "worker_invoked",
@@ -8160,61 +8294,68 @@ function compactRuntimeEventArchivePayload(
         const postflight = diagnostics.postflight;
         const assuranceGate = diagnostics.assuranceGate;
 
-        const constructorResult = constructorResultFromWorkerOutput({
-          manifest,
-          report: input.workerReport,
-          operationType: defaultOperationForTarget(contract.targetAssetType)
-        });
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "constructor_result.json",
-          payload: constructorResult
-        });
-        const hookOutcome = runSdlcHookTurn({
-          contract,
-          invocation: minimalSdlcHookInvocationForContract({
-            contract,
-            targetAssetId: constructorResult.outputIdentity.assetId,
-            fpWorkerContractRef: input.hookWorkerContractRef
-          }),
-          constructorResult
-        });
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "hook_outcome.json",
-          payload: hookOutcome
-        });
-        if (hookOutcome.postflight?.status !== "passed") {
-          const hookDiagnosticReasonCarriers = Object.freeze(
-            hookOutcome.postflight === null || hookOutcome.postflight === undefined
-              ? [
-                  makeSdlcBlockingReason({
-                    code: "hook_diagnostic_missing",
-                    evidenceRefs: [
-                      pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
-                    ]
-                  })
-                ]
-                : hookOutcome.postflight.blockingReasons.map((reason) =>
-                  makeSdlcBlockingReason({
-                    code: "hook_diagnostic_failed",
-                    detail: reason,
-                      evidenceRefs: hookOutcome.postflight?.evidenceRefs ?? []
-                    })
-                )
-          );
-          const hookDiagnostics = Object.freeze({
-            kind: "sdlc_operator_postflight_result" as const,
-            status: "passed" as const,
-            blockingReasons: Object.freeze([]),
-            blockingReasonCarriers: hookDiagnosticReasonCarriers,
-            evidenceRefs: Object.freeze([...(hookOutcome.postflight?.evidenceRefs ?? [])])
+        let hookOutcome: SdlcHookTurnOutcome | null = null;
+        if (input.deferConstructorUntilConsequence !== true) {
+          const constructorResult = constructorResultFromWorkerOutput({
+            manifest,
+            report: input.workerReport,
+            operationType: defaultOperationForTarget(contract.targetAssetType)
           });
           writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
-            relativePath: "hook_diagnostics.json",
-            payload: hookDiagnostics
+            relativePath: "constructor_result.json",
+            payload: constructorResult
           });
+          const currentHookOutcome = runSdlcHookTurn({
+            contract,
+            invocation: minimalSdlcHookInvocationForContract({
+              contract,
+              targetAssetId: constructorResult.outputIdentity.assetId,
+              fpWorkerContractRef: input.hookWorkerContractRef
+            }),
+            constructorResult
+          });
+          hookOutcome = currentHookOutcome;
+          writeSdlcSystemArtifact({
+            archiveRoot: manifest.archiveRoot,
+            relativePath: "hook_outcome.json",
+            payload: currentHookOutcome
+          });
+          if (currentHookOutcome.postflight?.status !== "passed") {
+            const hookDiagnosticReasonCarriers = Object.freeze(
+              currentHookOutcome.postflight === null ||
+                currentHookOutcome.postflight === undefined
+                ? [
+                    makeSdlcBlockingReason({
+                      code: "hook_diagnostic_missing",
+                      evidenceRefs: [
+                        pathToFileURL(join(manifest.archiveRoot, "hook_outcome.json")).href
+                      ]
+                    })
+                  ]
+                : currentHookOutcome.postflight.blockingReasons.map((reason) =>
+                    makeSdlcBlockingReason({
+                      code: "hook_diagnostic_failed",
+                      detail: reason,
+                      evidenceRefs: currentHookOutcome.postflight?.evidenceRefs ?? []
+                    })
+                  )
+            );
+            const hookDiagnostics = Object.freeze({
+              kind: "sdlc_operator_postflight_result" as const,
+              status: "passed" as const,
+              blockingReasons: Object.freeze([]),
+              blockingReasonCarriers: hookDiagnosticReasonCarriers,
+              evidenceRefs: Object.freeze([
+                ...(currentHookOutcome.postflight?.evidenceRefs ?? [])
+              ])
+            });
+            writeSdlcSystemArtifact({
+              archiveRoot: manifest.archiveRoot,
+              relativePath: "hook_diagnostics.json",
+              payload: hookDiagnostics
+            });
+          }
         }
         const current: SdlcAbgOwnedFpDispatchState = {
           status: "worker_invoked",
@@ -8227,7 +8368,7 @@ function compactRuntimeEventArchivePayload(
           gapDossier: null,
           hookOutcome,
           blockingReason: null,
-          blockingReasonCarriers: Object.freeze([]),
+          blockingReasonCarriers: postflight.blockingReasonCarriers,
           currentEdge: null
         };
         const consequence = shouldDeferDispatchConsequenceToFpEvaluator(current)
@@ -8264,38 +8405,78 @@ function compactRuntimeEventArchivePayload(
             ...postflight.evidenceRefs,
             ...(consequence === null
               ? [pathToFileURL(input.workerReport.outputFile).href]
-              : [consequence.nextActionProjection.nextActionProjectionRef])
+            : [consequence.nextActionProjection.nextActionProjectionRef])
           ])
+        });
+      };
+      const reportAdmissionDiagnosticReason = (
+        postflight: SdlcPostflightResult
+      ): string =>
+        postflight.blockingReasonCarriers
+          .map((carrier) => legacyBlockingReasonCode(carrier))
+          .join(",") || "worker_report_admission_failed";
+      const completeReportAdmissionFailure = (input: {
+        readonly workerRun: SdlcWorkerRunResult | null;
+        readonly postflight: SdlcPostflightResult;
+      }): FpDispatchOutcome => {
+        writeSdlcSystemArtifact({
+          archiveRoot: manifest.archiveRoot,
+          relativePath: "worker_report_admission_postflight.json",
+          payload: input.postflight
+        });
+        const current: SdlcAbgOwnedFpDispatchState = {
+          status: "worker_report_rejected",
+          manifest,
+          selectedComposition,
+          workerRun: input.workerRun,
+          workerReport: null,
+          postflight: input.postflight,
+          assuranceSatisfaction: null,
+          gapDossier: null,
+          hookOutcome: null,
+          blockingReason: null,
+          blockingReasonCarriers: input.postflight.blockingReasonCarriers,
+          currentEdge: pluginInput.edge
+        };
+        const consequence = publishDispatchState(current);
+        const reason = reportAdmissionDiagnosticReason(input.postflight);
+        return constructFpDispatchOutcome({
+          status: "blocked",
+          resultRef: consequence.nextActionProjection.nextActionProjectionRef,
+          attachedResultArtifact: runtimeFailureArtifact({
+            failureClass: "contract_failure",
+            detail: reason
+          }),
+          evidenceRefs: uniqueSorted([
+            ...input.postflight.evidenceRefs,
+            consequence.nextActionProjection.nextActionProjectionRef
+          ]),
+          reason
         });
       };
       const edgeAccountingRow = sdlcExecutiveEdgeAccountingRowFor(pluginInput.edge);
       const workerDispatchAllowed = edgeAccountingRow?.workerDispatchAllowed ?? true;
       if (!workerDispatchAllowed) {
-        const edgePolicyProjectionArtifact =
-          writeDeclaredEdgeProjectionOutput({ manifest });
-        if (edgePolicyProjectionArtifact === null) {
+        if (!sdlcInstalledOperatorProjectsOutput(manifest.targetAssetType)) {
           throw new TypeError(
             `${pluginInput.edge}: no-dispatch edge is missing declared edge-output projection policy`
           );
         }
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "installed_operator_evaluation_artifact.json",
-          payload: {
-            kind: "sdlc_installed_operator_evaluation_artifact",
-            writerInterface: "writeDeclaredEdgeProjectionOutput",
-            targetAssetType: manifest.targetAssetType,
-            outputFile: edgePolicyProjectionArtifact
-          }
-        });
         let workerReport: SdlcWorkerResultReport | null = null;
         try {
+          const systemTransformOutput =
+            manifest.targetAssetType === "test_execution_result_surface"
+              ? writeTestExecutionResultSystemTransformOutput({ manifest })
+              : null;
           workerReport = noDispatchReport({
             manifest,
-            report: buildPostTransformWorkerResultReport({
-              manifest,
-              before: beforeMaterialization
-            })
+            report:
+              systemTransformOutput === null
+                ? buildDeclaredEdgeProjectionPendingReport({ manifest })
+                : buildPostTransformWorkerResultReport({
+                    manifest,
+                    before: beforeMaterialization
+                  })
           });
           writeSdlcSystemArtifact({
             archiveRoot: manifest.archiveRoot,
@@ -8308,7 +8489,10 @@ function compactRuntimeEventArchivePayload(
             payload: {
               kind: "sdlc_post_transform_observation",
               sourceFunction: "system.edge_policy_projection",
-              generatedFunction: "edge_policy.writeDeclaredEdgeProjectionOutput",
+              generatedFunction:
+                systemTransformOutput === null
+                  ? "consequence.edge_projection.writeDeclaredEdgeProjectionOutput"
+                  : "system.transform.writeTestExecutionResultSystemTransformOutput",
               previousReportAdmissionError: null,
               materializedFileCount: workerReport.materializedFiles.length,
               outputFile: workerReport.outputFile,
@@ -8321,43 +8505,9 @@ function compactRuntimeEventArchivePayload(
             reason:
               error instanceof Error ? error.message : "worker_report_rejected"
           });
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "worker_report_admission_postflight.json",
-            payload: rejectionPostflight
-          });
-          const gapDossier = constructPostflightGapDossier({
-            manifest,
-            postflight: rejectionPostflight
-          });
-          writePostflightGapDossier({ manifest, gapDossier });
-          const current: SdlcAbgOwnedFpDispatchState = {
-            status: "worker_report_rejected",
-            manifest,
-            selectedComposition,
+          return completeReportAdmissionFailure({
             workerRun: null,
-            workerReport: null,
-            postflight: rejectionPostflight,
-            assuranceSatisfaction: null,
-            gapDossier,
-            hookOutcome: null,
-            blockingReason: rejectionPostflight.blockingReasons.join(","),
-            blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
-            currentEdge: pluginInput.edge
-          };
-          const consequence = publishDispatchState(current);
-          return constructFpDispatchOutcome({
-            status: "blocked",
-            resultRef: gapDossier.currentGapDossierRef,
-            attachedResultArtifact: runtimeFailureArtifact({
-              failureClass: "contract_failure",
-              detail: rejectionPostflight.blockingReasons.join(",")
-            }),
-            evidenceRefs: uniqueSorted([
-              ...rejectionPostflight.evidenceRefs,
-              consequence.nextActionProjection.nextActionProjectionRef
-            ]),
-            reason: rejectionPostflight.blockingReasons.join(",")
+            postflight: rejectionPostflight
           });
         }
         workerReport = workerResultReportWithFpStageRefs({
@@ -8374,7 +8524,8 @@ function compactRuntimeEventArchivePayload(
           workerRun: null,
           workerReport,
           hookWorkerContractRef: "worker-dispatch://installed-operator/no-dispatch",
-          passedFulfillmentDetail: "installed operator deterministic edge passed"
+          passedFulfillmentDetail: "installed operator deterministic edge passed",
+          deferConstructorUntilConsequence: true
         });
       }
       if (transport === null) {
@@ -8440,20 +8591,6 @@ function compactRuntimeEventArchivePayload(
           reason: failurePostflight.blockingReasons.join(",")
         });
       }
-      const edgePolicyProjectionArtifact =
-        writeDeclaredEdgeProjectionOutput({ manifest });
-      if (edgePolicyProjectionArtifact !== null) {
-        writeSdlcSystemArtifact({
-          archiveRoot: manifest.archiveRoot,
-          relativePath: "installed_operator_evaluation_artifact.json",
-          payload: {
-            kind: "sdlc_installed_operator_evaluation_artifact",
-            writerInterface: "writeDeclaredEdgeProjectionOutput",
-            targetAssetType: manifest.targetAssetType,
-            outputFile: edgePolicyProjectionArtifact
-          }
-        });
-      }
       let workerReport: SdlcWorkerResultReport | null = null;
       try {
         workerReport = buildPostTransformWorkerResultReport({
@@ -8471,10 +8608,7 @@ function compactRuntimeEventArchivePayload(
           payload: {
             kind: "sdlc_post_transform_observation",
             sourceFunction: "worker.F_P.transform",
-            generatedFunction:
-              edgePolicyProjectionArtifact === null
-                ? "buildPostTransformWorkerResultReport"
-                : "edge_policy.writeDeclaredEdgeProjectionOutput",
+            generatedFunction: "buildPostTransformWorkerResultReport",
             previousReportAdmissionError: null,
             materializedFileCount: workerReport.materializedFiles.length,
             outputFile: workerReport.outputFile,
@@ -8489,43 +8623,9 @@ function compactRuntimeEventArchivePayload(
             reason:
               error instanceof Error ? error.message : "worker_report_rejected"
           });
-          writeSdlcSystemArtifact({
-            archiveRoot: manifest.archiveRoot,
-            relativePath: "worker_report_admission_postflight.json",
-            payload: rejectionPostflight
-          });
-          const gapDossier = constructPostflightGapDossier({
-            manifest,
-            postflight: rejectionPostflight
-          });
-          writePostflightGapDossier({ manifest, gapDossier });
-          const current: SdlcAbgOwnedFpDispatchState = {
-            status: "worker_report_rejected",
-            manifest,
-            selectedComposition,
+          return completeReportAdmissionFailure({
             workerRun,
-            workerReport: null,
-            postflight: rejectionPostflight,
-            assuranceSatisfaction: null,
-            gapDossier,
-            hookOutcome: null,
-            blockingReason: rejectionPostflight.blockingReasons.join(","),
-            blockingReasonCarriers: rejectionPostflight.blockingReasonCarriers,
-            currentEdge: pluginInput.edge
-          };
-          const consequence = publishDispatchState(current);
-          return constructFpDispatchOutcome({
-            status: "blocked",
-            resultRef: gapDossier.currentGapDossierRef,
-            attachedResultArtifact: runtimeFailureArtifact({
-              failureClass: "contract_failure",
-              detail: rejectionPostflight.blockingReasons.join(",")
-            }),
-            evidenceRefs: uniqueSorted([
-              ...rejectionPostflight.evidenceRefs,
-              consequence.nextActionProjection.nextActionProjectionRef
-            ]),
-            reason: rejectionPostflight.blockingReasons.join(",")
+            postflight: rejectionPostflight
           });
         }
       }
@@ -8560,15 +8660,14 @@ function compactRuntimeEventArchivePayload(
         hookWorkerContractRef: transport.raw,
         passedFulfillmentDetail: "installed operator postflight passed"
       });
-    }
-  });
+  };
   const designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot = new Map<
     string,
     readonly string[]
   >();
-  const fpEvaluator = Object.freeze({
-    contract: fpEvaluatorPluginContract(),
-    evaluate: async (pluginInput: EnginePluginInput): Promise<FpEvaluationOutcome> => {
+  const evaluateFpForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<FpEvaluationOutcome> => {
       if (dispatchState.current === null) {
         return constructFpEvaluationOutcome({
           status: "blocked",
@@ -8595,11 +8694,10 @@ function compactRuntimeEventArchivePayload(
         pluginInput,
         state: dispatchState.current
       });
-    }
-  });
-  const consequenceProjection = Object.freeze({
-    contract: consequenceProjectionPluginContract(),
-    project: (pluginInput: EnginePluginInput): ConsequenceProjectionOutcome => {
+  };
+  const projectConsequenceForInstalledOperatorState = (
+    pluginInput: EnginePluginInput
+  ): ConsequenceProjectionOutcome => {
       if (dispatchState.current === null) {
         return constructConsequenceProjectionOutcome({
           status: "blocked",
@@ -8619,6 +8717,20 @@ function compactRuntimeEventArchivePayload(
         return constructConsequenceProjectionOutcome({
           status: "blocked",
           reason: "selected composition drift for consequence.C"
+        });
+      }
+      let declaredEdgeProjectionRefs: readonly string[];
+      try {
+        declaredEdgeProjectionRefs = writeDeclaredEdgeProjectionFromConsequence({
+          manifest: dispatchState.current.manifest
+        });
+      } catch (error: unknown) {
+        return constructConsequenceProjectionOutcome({
+          status: "blocked",
+          reason:
+            error instanceof Error
+              ? error.message
+              : "declared edge-output projection failed"
         });
       }
       const consequence = deriveInstalledTraversalConsequence({
@@ -8641,24 +8753,22 @@ function compactRuntimeEventArchivePayload(
       return constructConsequenceProjectionOutcome({
         status: "projected",
         consequenceRef: consequence.consequenceProjection.consequenceRef,
-        domainReadModelRefs:
-          consequence.consequenceProjection.domainReadModelRefs,
+        domainReadModelRefs: uniqueSorted([
+          ...consequence.consequenceProjection.domainReadModelRefs,
+          ...declaredEdgeProjectionRefs
+        ]),
         evidenceRefs: uniqueSorted([
           pluginInput.sourceProjectionRef,
           consequence.admittedStateRef.compositionRef,
           consequence.consequenceProjection.consequenceRef,
-          ...consequence.consequenceProjection.domainReadModelRefs
+          ...consequence.consequenceProjection.domainReadModelRefs,
+          ...declaredEdgeProjectionRefs
         ])
       });
-    }
-  });
-  const designDepthFpEvaluatorRule = Object.freeze({
-    contract: designDepthFpEvaluatorRuleContract(),
-    ruleRef: DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-    ruleRole: "semantic_judgment" as const,
-    required: true,
-    outputCarrierRefs: Object.freeze(["SdlcDesignDepthRegister"]),
-    evaluate: async (pluginInput: EnginePluginInput): Promise<EvaluationRuleOutcome> => {
+  };
+  const evaluateDesignDepthForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<EvaluationRuleOutcome> => {
       if (dispatchState.current === null) {
         return constructEvaluationRuleOutcome({
           status: "accepted",
@@ -8731,26 +8841,21 @@ function compactRuntimeEventArchivePayload(
           emitted.push(event);
         }
       });
+      const ruleOutcomeRef = writeDesignDepthFpEvaluatorRuleOutcomeProof({
+        manifest: dispatchState.current.manifest,
+        outcome
+      });
       if (outcome.status === "accepted") {
-        const ruleOutcomeRef = writeDesignDepthFpEvaluatorRuleOutcomeProof({
-          manifest: dispatchState.current.manifest,
-          outcome
-        });
         designDepthFpEvaluatorAdmissionEvidenceByArchiveRoot.set(
           dispatchState.current.manifest.archiveRoot,
           Object.freeze([ruleOutcomeRef])
         );
       }
       return outcome;
-    }
-  });
-  const reviewGradeEdgeFulfillmentRule = Object.freeze({
-    contract: reviewGradeEdgeFulfillmentRuleContract(),
-    ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
-    ruleRole: "semantic_judgment" as const,
-    required: true,
-    outputCarrierRefs: Object.freeze(["SdlcReviewGradeEdgeFulfillmentAssessment"]),
-    evaluate: async (pluginInput: EnginePluginInput): Promise<EvaluationRuleOutcome> => {
+  };
+  const evaluateReviewGradeForInstalledOperatorState = async (
+    pluginInput: EnginePluginInput
+  ): Promise<EvaluationRuleOutcome> => {
       if (dispatchState.current === null) {
         return constructEvaluationRuleOutcome({
           status: "accepted",
@@ -8848,27 +8953,21 @@ function compactRuntimeEventArchivePayload(
         }
       }
       return outcome;
-    }
-  });
+  };
   const engineResult = await runEngineIterateAsync({
     basis,
     runtimeEvents: effectiveReplayEvents,
     eventSink: (event) => {
       emitted.push(event);
     },
-    plugins: {
-      fpDispatch,
-      fpEvaluator,
-      consequenceProjection,
-      evaluationRules: Object.freeze([
-        designDepthFpEvaluatorRule,
-        reviewGradeEdgeFulfillmentRule
-      ]),
-      requiredEvaluationRuleRefs: Object.freeze([
-        DESIGN_DEPTH_FP_EVALUATOR_RULE_REF,
-        REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF
-      ])
-    },
+    plugins: createSdlcAbgPluginSet({
+      dispatch: dispatchThroughInstalledOperator,
+      evaluateFp: evaluateFpForInstalledOperatorState,
+      projectConsequence: projectConsequenceForInstalledOperatorState,
+      evaluateDesignDepth: evaluateDesignDepthForInstalledOperatorState,
+      evaluateReviewGradeEdgeFulfillment:
+        evaluateReviewGradeForInstalledOperatorState
+    }),
     maxAttachedFpAttempts: 3
   });
   const completedDispatchState = dispatchState.current;
@@ -8988,6 +9087,19 @@ function compactRuntimeEventArchivePayload(
       ? terminal.reason
       : completedDispatchState.blockingReason;
   const nextLawfulAction = nextLawfulActionFromConsequence(traversalConsequence);
+  const currentEdgeFromConsequence =
+    traversalConsequence.nextActionProjection.nextGraphVectorRef ??
+    completedDispatchState.manifest.edgeName;
+  const currentEdgeFromAcceptedClose =
+    nextVector ?? traversalConsequence.nextActionProjection.nextGraphVectorRef;
+  const currentEdge =
+    status === "converged"
+      ? null
+      : completedDispatchState.status === "worker_invoked"
+        ? closureDisposition === "close"
+          ? currentEdgeFromAcceptedClose
+          : currentEdgeFromConsequence
+        : completedDispatchState.currentEdge;
   const outcome = terminalOutcome({
     workspaceRoot: input.workspaceRoot,
     status,
@@ -9010,12 +9122,7 @@ function compactRuntimeEventArchivePayload(
     blockingReasonCarriers: completedDispatchState.blockingReasonCarriers,
     nextLawfulAction,
     traversalConsequence,
-    currentEdge:
-      status === "converged"
-        ? null
-        : completedDispatchState.status === "worker_invoked"
-        ? nextVector ?? traversalConsequence.nextActionProjection.nextGraphVectorRef
-        : completedDispatchState.currentEdge
+    currentEdge
   });
   writeSdlcSystemArtifact({
     archiveRoot: completedDispatchState.manifest.archiveRoot,

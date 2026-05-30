@@ -2,6 +2,7 @@
 
 import {
   assertRuntimeEvent,
+  emit,
   type RuntimeEvent
 } from "@abiogenesis/typescript-tenant";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
@@ -41,10 +42,7 @@ export function readOddSdlcRuntimeEventsSync(
   if (!existsSync(eventLogPath)) {
     return Object.freeze([]);
   }
-  return parseRuntimeEventsText(
-    readFileSync(eventLogPath, "utf8"),
-    eventLogPath
-  );
+  return parseRuntimeEventsText(readFileSync(eventLogPath, "utf8"), eventLogPath);
 }
 
 export async function readOddSdlcRuntimeEvents(
@@ -62,13 +60,17 @@ export async function appendOddSdlcRuntimeEvents(input: {
   readonly events: readonly RuntimeEvent[];
 }): Promise<string> {
   const eventLogPath = oddSdlcRuntimeEventsPath(input.workspaceRoot);
-  if (input.events.length === 0) {
+  const emitted: RuntimeEvent[] = [];
+  emit(input.events, (event) => {
+    emitted.push(event);
+  });
+  if (emitted.length === 0) {
     return eventLogPath;
   }
   await mkdir(dirname(eventLogPath), { recursive: true });
   await appendFile(
     eventLogPath,
-    `${input.events.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    `${emitted.map((event) => JSON.stringify(event)).join("\n")}\n`,
     "utf8"
   );
   return eventLogPath;

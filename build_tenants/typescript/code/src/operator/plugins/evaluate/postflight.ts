@@ -96,6 +96,8 @@ export function evaluateSdlcComputeStage(input: {
   const edgePolicyProjectionOutput =
     sdlcInstalledOperatorProjectsOutput(input.manifest.targetAssetType) &&
     outputFile === resolve(input.manifest.outputFile);
+  const edgePolicyProjectionPending =
+    edgePolicyProjectionOutput && !existsSync(outputFile);
   if (
     !edgePolicyProjectionOutput &&
     !input.manifest.allowedWriteRoots.some((root) =>
@@ -110,12 +112,14 @@ export function evaluateSdlcComputeStage(input: {
     );
   }
   if (!existsSync(outputFile)) {
-    blockingReasonCarriers.push(
-      makeSdlcBlockingReason({
-        code: "output_file_missing",
-        evidenceRefs: [outputEvidenceRef]
-      })
-    );
+    if (!edgePolicyProjectionOutput) {
+      blockingReasonCarriers.push(
+        makeSdlcBlockingReason({
+          code: "output_file_missing",
+          evidenceRefs: [outputEvidenceRef]
+        })
+      );
+    }
   } else if (!statSync(outputFile).isFile()) {
     blockingReasonCarriers.push(
       makeSdlcBlockingReason({
@@ -133,12 +137,14 @@ export function evaluateSdlcComputeStage(input: {
         })
       );
     }
-    evaluateAdrOutputArtifact({
-      manifest: input.manifest,
-      outputFile,
-      blockingReasonCarriers
-    });
-    if (sha256Text(content) !== report.digest) {
+    if (!edgePolicyProjectionOutput) {
+      evaluateAdrOutputArtifact({
+        manifest: input.manifest,
+        outputFile,
+        blockingReasonCarriers
+      });
+    }
+    if (!edgePolicyProjectionOutput && sha256Text(content) !== report.digest) {
       blockingReasonCarriers.push(
         makeSdlcBlockingReason({
           code: "output_digest_mismatch",
@@ -170,11 +176,13 @@ export function evaluateSdlcComputeStage(input: {
     blockingReasonCarriers,
     evidenceRefs
   });
-  evaluateObligationAssessments({
-    manifest: input.manifest,
-    report,
-    blockingReasonCarriers
-  });
+  if (!edgePolicyProjectionPending) {
+    evaluateObligationAssessments({
+      manifest: input.manifest,
+      report,
+      blockingReasonCarriers
+    });
+  }
   return Object.freeze({
     kind: "sdlc_operator_postflight_result",
     status: "passed",
@@ -294,7 +302,7 @@ function constructGtlFpEvaluation(input: {
       ...(input.transformResultRef === null ? [] : [input.transformResultRef]),
       ...input.postflight.evidenceRefs.filter((ref) =>
         ref.includes("design_depth_fp_evaluator_register.json") ||
-        ref.includes("design_depth_fp_evaluator_content_ledger.json")
+        ref.includes("design_depth_fp_evaluator_content_register.json")
       )
     ]),
     compositionContributionRef:

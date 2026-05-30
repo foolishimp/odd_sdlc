@@ -53,7 +53,8 @@ import {
   SDLC_EDGE_GAIN_CLOSURE_CATEGORY_TEMPLATES,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
-  sdlcEdgeAssuranceContractRef
+  sdlcEdgeAssuranceContractRef,
+  withAdditionalSdlcEdgeResidualPressureRefs
 } from "../../build/semantic/code/src/index.js";
 
 function overlayByRef(catalog, overlayRef) {
@@ -65,6 +66,13 @@ function overlayByRef(catalog, overlayRef) {
 function unique(values) {
   return [...new Set(values)];
 }
+
+const T164_SELECTED_COMPOSITION = Object.freeze({
+  compositionRef: "composition://odd-sdlc/t164/test",
+  compositionDigest: "sha256:t164-test-composition",
+  compositionSelectionRef: "composition-selection://odd-sdlc/t164/test",
+  selectedRegimeBindingRef: null
+});
 
 function moduleGraphFunctionByName(module, name) {
   const graphFunction = module.graphFunctions.find((candidate) => candidate.name === name);
@@ -126,6 +134,7 @@ function edgeAssuranceClosureContext(edgeRef, closeReady) {
     residualPressure
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: T164_SELECTED_COMPOSITION,
     ledgerRef: `ledger://odd-sdlc/t164/${edgeRef}/edge-fulfillment`,
     ledgerVersionRef: `ledger-version://odd-sdlc/t164/${edgeRef}/edge-fulfillment/1`,
     edgeAssuranceContractRef: gain.contractRef,
@@ -698,6 +707,92 @@ test("T-164 edge gain is measured by admitted obligation evidence not worker per
   assert.equal(closeDecision.disposition, "close");
 });
 
+test("T-184 selected F_P residual pressure prevents consequence edge close", () => {
+  const contract = contractByEdge("derive_product_surface");
+  const obligationRef = "requirement://t184/selected-fp-pressure";
+  const obligations = deriveSdlcEdgeObligations({
+    contract,
+    obligationRefs: [obligationRef]
+  });
+  const admission = admitSdlcEdgeEvidence({
+    contract,
+    obligations,
+    candidates: [
+      {
+        kind: "sdlc_edge_evidence_candidate",
+        evidenceRef: "evidence://t184/review-grade/fulfilled-row",
+        sourceKind: "review_grade_assessment",
+        obligationRefs: [obligationRef],
+        supportsBehavioralFulfillment: true
+      }
+    ]
+  });
+  const gain = measureSdlcEdgeGain({
+    contract,
+    obligations,
+    admittedEvidence: admission.admittedEvidence,
+    ledgerInputs: allLedgerInputsFor(contract)
+  });
+  const measuredResidual = deriveSdlcEdgeResidualPressure(gain);
+  const selectedFpPressureRefs = [
+    "pressure://odd-sdlc/review-grade/t184-live/requirement%3A%2F%2Ft184%2Fselected-fp-pressure"
+  ];
+  const residual = withAdditionalSdlcEdgeResidualPressureRefs({
+    residualPressure: measuredResidual,
+    requiredPressureRefs: selectedFpPressureRefs
+  });
+  const edgeAssuranceCloseDecision = deriveSdlcEdgeAssuranceCloseDecision({
+    gain,
+    residualPressure: residual
+  });
+  const selectedComposition = {
+    compositionRef: "composition://odd-sdlc/t184/selected-fp-pressure",
+    compositionDigest: "sha256:t184-selected-fp-pressure",
+    compositionSelectionRef: "composition-selection://odd-sdlc/t184/selected-fp-pressure",
+    selectedRegimeBindingRef: null
+  };
+  const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition,
+    ledgerRef: "ledger://odd-sdlc/t184/selected-fp-pressure",
+    ledgerVersionRef: "ledger-version://odd-sdlc/t184/selected-fp-pressure/1",
+    edgeAssuranceContractRef: gain.contractRef,
+    edgeAssuranceContractDigest: gain.contractDigest,
+    targetCarrierAdmissionStatus: gain.targetCarrierAdmissionStatus,
+    targetCarrierAdmissionRef: gain.targetCarrierAdmissionRef,
+    edgeGainRef: gain.gainRef,
+    edgeResidualPressureRefs: residual.requiredPressureRefs,
+    edgeRef: "edge://odd-sdlc/t184/selected-fp-pressure",
+    attemptRef: "attempt://odd-sdlc/t184/selected-fp-pressure/1",
+    targetBindingRefs: ["target-binding://odd-sdlc/t184/selected-fp-pressure"],
+    evidenceBundleRefs: ["evidence://odd-sdlc/t184/selected-fp-pressure"],
+    counts: {
+      expected: 1,
+      fulfilled: 1,
+      partial: 0,
+      blocked: 0,
+      unfulfilled: 0,
+      missing: 0,
+      extra: 0
+    }
+  });
+  const closureDecision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://odd-sdlc/t184/selected-fp-pressure",
+    ledger,
+    edgeClosureFunctionRef: gain.closureFunctionRef,
+    edgeAssuranceCloseDecision,
+    currentEdgeLawful: true
+  });
+
+  assert.equal(gain.obligationsAndLedgersComplete, true);
+  assert.equal(measuredResidual.clear, true);
+  assert.equal(residual.clear, false);
+  assert.deepEqual(residual.requiredPressureRefs, selectedFpPressureRefs);
+  assert.equal(edgeAssuranceCloseDecision.disposition, "retry");
+  assert.equal(ledger.edgeConverged, false);
+  assert.equal(closureDecision.disposition, "retry");
+  assert.deepEqual(closureDecision.edgeResidualPressureRefs, selectedFpPressureRefs);
+});
+
 test("T-164 obligation derivation fails closed when traversal obligations are absent", () => {
   const contract = contractByEdge("derive_requirement_surface");
   assert.throws(
@@ -1101,6 +1196,7 @@ test("T-164 installed closure dispositions are governed by edge assurance close 
     residualPressure: blockedResidualPressure
   });
   const blockedLedger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: T164_SELECTED_COMPOSITION,
     ledgerRef: "ledger://odd-sdlc/t164/block/edge-fulfillment",
     ledgerVersionRef: "ledger-version://odd-sdlc/t164/block/edge-fulfillment/1",
     edgeAssuranceContractRef: blockedGain.contractRef,
@@ -1142,6 +1238,7 @@ test("T-164 consequence carriers retain gain close and residual pressure identit
   const edgeGainRef = "edge-gain://odd-sdlc/t164/design";
   const residualPressureRefs = ["pressure://odd-sdlc/t164/design/missing-proof"];
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: T164_SELECTED_COMPOSITION,
     ledgerRef: "ledger://odd-sdlc/t164/edge-fulfillment",
     ledgerVersionRef: "ledger-version://odd-sdlc/t164/edge-fulfillment/1",
     overlayRef: "overlay://odd-sdlc/t164",
@@ -1177,6 +1274,7 @@ test("T-164 consequence carriers retain gain close and residual pressure identit
     blockReasonRefs: residualPressureRefs
   });
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: T164_SELECTED_COMPOSITION,
     nextActionProjectionRef: "next-action://odd-sdlc/t164/block",
     intentEventRefs: ["intent-event://odd-sdlc/t164/1"],
     productAssetModelRef: "product-asset-model://odd-sdlc/t164",

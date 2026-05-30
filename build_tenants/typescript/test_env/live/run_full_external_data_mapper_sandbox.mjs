@@ -12,9 +12,14 @@ import {
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  configuredLiveTimeoutMs,
+  liveOperatorRuntimePolicy
+} from "./operator_runtime_policy.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SCRIPT_DIR, "../..");
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
@@ -34,9 +39,9 @@ const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_STEPS"] ?? "56",
   10
 );
-const COMMAND_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS"] ?? `${1000 * 60 * 45}`,
-  10
+const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_DATA_MAPPER_COMMAND_TIMEOUT_MS",
+  RUNTIME_POLICY.liveHarnessCommandTimeoutMs
 );
 
 function archiveTimestamp() {
@@ -77,6 +82,24 @@ function freshWorkspace(archiveRoot) {
 
 function runCommand(input) {
   const startedAt = new Date().toISOString();
+  const processRecordPath = path.join(input.archiveRoot, `${input.label}.process.json`);
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_live_sandbox_process_result",
+    lifecycleStatus: "started",
+    label: input.label,
+    command: input.command,
+    args: input.args,
+    cwd: input.cwd,
+    status: null,
+    signal: null,
+    error: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
+    startedAt,
+    endedAt: null,
+    hostPid: process.pid
+  });
   const result = spawnSync(input.command, input.args, {
     cwd: input.cwd,
     encoding: "utf8",
@@ -87,6 +110,7 @@ function runCommand(input) {
   const endedAt = new Date().toISOString();
   const record = {
     kind: "odd_sdlc_live_sandbox_process_result",
+    lifecycleStatus: "completed",
     label: input.label,
     command: input.command,
     args: input.args,
@@ -96,10 +120,12 @@ function runCommand(input) {
     error: result.error?.message ?? null,
     stdoutBytes: Buffer.byteLength(result.stdout ?? "", "utf8"),
     stderrBytes: Buffer.byteLength(result.stderr ?? "", "utf8"),
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
     startedAt,
-    endedAt
+    endedAt,
+    hostPid: process.pid
   };
-  writeJson(path.join(input.archiveRoot, `${input.label}.process.json`), record);
+  writeJson(processRecordPath, record);
   writeFileSync(
     path.join(input.archiveRoot, `${input.label}.stdout.json`),
     result.stdout ?? "",

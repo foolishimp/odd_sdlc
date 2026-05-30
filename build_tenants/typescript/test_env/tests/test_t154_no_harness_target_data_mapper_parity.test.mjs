@@ -98,6 +98,20 @@ function moduleBasis(workspaceRoot, caseId) {
   });
 }
 
+function selectedComposition(caseId, graphFunctionRef = FG_CONFORM_PROJECT_AUTHORITY) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t154/${caseId}`,
+    compositionDigest: `digest://t154/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t154/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t154/${caseId}/evaluate/fp`,
+    graphFunctionRef,
+    graphVectorRef: `graph-vector://t154/${caseId}`,
+    basisRef: `basis://t154/${caseId}`
+  });
+}
+
 function uniqueRequirementAuthorities(authorities) {
   return [
     ...new Map(
@@ -250,6 +264,7 @@ function authorityConsequence(context) {
     ]
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("source-spec-authority"),
     ledgerRef: "ledger://t154/source-spec-authority",
     ledgerVersionRef: "ledger-version://t154/source-spec-authority/1",
     edgeRef: `edge://t154/${FG_CONFORM_PROJECT_AUTHORITY}`,
@@ -306,6 +321,7 @@ function authorityConsequence(context) {
     actions: [action]
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: ledger.selectedComposition,
     nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
     nextActionBasisKind: evaluator.nextActionBasisKind,
     intentEventRefs: evaluator.intentEventRefs,
@@ -396,6 +412,10 @@ function materializationConsequence(context, authority) {
     predecessorRefs: [authority.nextActionProjection.nextActionProjectionRef]
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition(
+      "materialize-data-mapper",
+      FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
+    ),
     ledgerRef: "ledger://t154/materialize-data-mapper",
     ledgerVersionRef: "ledger-version://t154/materialize-data-mapper/1",
     edgeRef: `edge://t154/${FG_MATERIALIZE_DECLARED_PRODUCT_ASSET}`,
@@ -425,6 +445,7 @@ function materializationConsequence(context, authority) {
     currentEdgeLawful: true
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: ledger.selectedComposition,
     nextActionProjectionRef: "next-action://t154/materialize-data-mapper/post-close",
     nextActionBasisKind: "post_close_graph_continuation",
     intentEventRefs: constructionIntent.intentEventRefs,

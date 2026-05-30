@@ -15,7 +15,6 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  deriveConformProjectManagedTraversalLedger,
   deriveConformProjectManagedTraversalManifest,
   FG_CONFORM_PROJECT,
   installOddSdlcTypescript,
@@ -62,7 +61,7 @@ function makeWorkspace() {
   return root;
 }
 
-test("T-097 archives managed traversal manifest and ledger for bootstrap hop", async () => {
+test("T-097 archives bootstrap manifest without legacy managed traversal ledger", async () => {
   const workspace = makeWorkspace();
   const install = await installOddSdlcTypescript({
     targetRoot: workspace,
@@ -75,10 +74,6 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   const manifestBefore = deriveConformProjectManagedTraversalManifest({
     workspaceRoot: workspace
   });
-  const ledgerBefore = deriveConformProjectManagedTraversalLedger({
-    workspaceRoot: workspace,
-    manifest: manifestBefore
-  });
   assert.equal(manifestBefore.kind, "sdlc_managed_traversal_manifest");
   assert.equal(manifestBefore.graphFunctionName, FG_CONFORM_PROJECT);
   assert.equal(manifestBefore.sourceType, "unordered_source_set");
@@ -86,18 +81,6 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   assert.deepStrictEqual(
     manifestBefore.phaseContracts.map((contract) => contract.phase),
     ["prestep", "execute", "postprocess"]
-  );
-  assert.equal(ledgerBefore.status, "blocked");
-  assert(
-    ledgerBefore.residualGaps.includes(
-      "missing_output:.ai-workspace/context/project_bootstrap.md"
-    )
-  );
-  assert.equal(
-    ledgerBefore.residualGaps.includes(
-      "missing_output:specification/INTENT.md"
-    ),
-    false
   );
 
   const induction = await invokeOddSdlcSpecMethodCommand(["start", "--workspace", workspace]);
@@ -109,15 +92,13 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
     induction.payload.archiveRoot,
     "managed_traversal_manifest.json"
   );
-  const ledgerPath = path.join(
-    induction.payload.archiveRoot,
-    "managed_traversal_ledger.json"
-  );
   assert.equal(existsSync(manifestPath), true);
-  assert.equal(existsSync(ledgerPath), true);
+  assert.equal(
+    existsSync(path.join(induction.payload.archiveRoot, "managed_traversal_ledger.json")),
+    false
+  );
 
   const archivedManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const archivedLedger = JSON.parse(readFileSync(ledgerPath, "utf8"));
   assert.equal(archivedManifest.kind, "sdlc_managed_traversal_manifest");
   assert.equal(archivedManifest.graphFunctionName, FG_CONFORM_PROJECT);
   assert.deepStrictEqual(archivedManifest.expectedOutputRelativePaths, [
@@ -128,26 +109,6 @@ test("T-097 archives managed traversal manifest and ledger for bootstrap hop", a
   assert(
     archivedManifest.sourceRefs.some((ref) =>
       ref.endsWith("incoming/notes/source.md")
-    )
-  );
-
-  assert.equal(archivedLedger.kind, "sdlc_managed_traversal_ledger");
-  assert.equal(archivedLedger.status, "satisfied");
-  assert.deepStrictEqual(archivedLedger.residualGaps, []);
-  assert.deepStrictEqual(
-    archivedLedger.phaseVerdicts.map((verdict) => [
-      verdict.phase,
-      verdict.status
-    ]),
-    [
-      ["prestep", "satisfied"],
-      ["execute", "satisfied"],
-      ["postprocess", "satisfied"]
-    ]
-  );
-  assert(
-    archivedLedger.actualOutputRefs.some((ref) =>
-      ref.endsWith(".ai-workspace/context/project_bootstrap.md")
     )
   );
 });

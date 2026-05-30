@@ -146,26 +146,6 @@ export interface SdlcManagedTraversalManifest {
   readonly phaseContracts: readonly SdlcManagedTraversalPhaseContract[];
 }
 
-export interface SdlcManagedTraversalPhaseVerdict {
-  readonly kind: "sdlc_managed_traversal_phase_verdict";
-  readonly phase: SdlcManagedTraversalPhase;
-  readonly status: "satisfied" | "blocked";
-  readonly evidenceRefs: readonly string[];
-  readonly gaps: readonly string[];
-}
-
-export interface SdlcManagedTraversalLedger {
-  readonly kind: "sdlc_managed_traversal_ledger";
-  readonly graphFunctionName: typeof FG_CONFORM_PROJECT;
-  readonly sourceType: "unordered_source_set";
-  readonly targetType: "constitutional_bootstrap";
-  readonly status: "satisfied" | "blocked";
-  readonly workspaceRootUri: string;
-  readonly actualOutputRefs: readonly string[];
-  readonly phaseVerdicts: readonly SdlcManagedTraversalPhaseVerdict[];
-  readonly residualGaps: readonly string[];
-}
-
 export interface SdlcImportedRequirementAuthority {
   readonly kind: "sdlc_imported_requirement_authority";
   /**

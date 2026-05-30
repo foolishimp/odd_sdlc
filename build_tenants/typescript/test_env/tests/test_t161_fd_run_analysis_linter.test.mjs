@@ -232,13 +232,19 @@ function buildSyntheticT132Archive(opts) {
       operatorRunRoot,
       "design_depth_fp_evaluator_register.json"
     );
-    const designDepthContentLedgerPath = path.join(
+    const designDepthContentRegisterPath = path.join(
       operatorRunRoot,
-      "design_depth_fp_evaluator_content_ledger.json"
+      "design_depth_fp_evaluator_content_register.json"
+    );
+    const designDepthRuleOutcomePath = path.join(
+      operatorRunRoot,
+      "design_depth_fp_evaluator_rule_outcome.json"
     );
     const designDepthRegisterRef = pathToFileURL(designDepthRegisterPath).href;
-    const designDepthContentLedgerRef =
-      pathToFileURL(designDepthContentLedgerPath).href;
+    const designDepthContentRegisterRef =
+      pathToFileURL(designDepthContentRegisterPath).href;
+    const designDepthRuleOutcomeRef =
+      pathToFileURL(designDepthRuleOutcomePath).href;
     const defaultExecutionCommand = edge.target === "test_execution_result_surface"
       ? "node --test test/hello.test.js"
       : "node build_tenants/hello_world_javascript/src/hello.js";
@@ -455,11 +461,11 @@ function buildSyntheticT132Archive(opts) {
                   compositionRef,
                   compositionDigest,
                   authorityRefs: [
-                    designDepthContentLedgerRef,
+                    designDepthContentRegisterRef,
                     designDepthRegisterRef
                   ],
                   evidenceRefs: [
-                    designDepthContentLedgerRef,
+                    designDepthContentRegisterRef,
                     designDepthRegisterRef
                   ]
                 }
@@ -478,7 +484,11 @@ function buildSyntheticT132Archive(opts) {
           postflightStatus,
           blockingReasons: blockingReasonCodes,
           evidenceRefs: edge.target === "implementation_design_surface"
-            ? [designDepthContentLedgerRef, designDepthRegisterRef]
+            ? [
+                designDepthRuleOutcomeRef,
+                designDepthContentRegisterRef,
+                designDepthRegisterRef
+              ]
             : []
         },
         dirMtimeMs
@@ -549,10 +559,10 @@ function buildSyntheticT132Archive(opts) {
             designCompletenessVerdict: null
           };
         writeJson(
-          designDepthContentLedgerPath,
+          designDepthContentRegisterPath,
           {
-            kind: "sdlc_evaluate_content_ledger",
-            ledgerVersion: "ts-evaluate-content-v1",
+            kind: "sdlc_evaluate_content_register",
+            registerVersion: "ts-evaluate-content-register-v1",
             stage: "evaluate.C",
             ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
             ruleRole: "semantic_judgment",
@@ -568,7 +578,7 @@ function buildSyntheticT132Archive(opts) {
             evidenceRefs: [pathToFileURL(operatorRunRoot).href],
             contentRows: [
               {
-                kind: "sdlc_evaluate_content_ledger_row",
+                kind: "sdlc_evaluate_content_register_row",
                 rowRef: `evaluate-content-row://synthetic/${edge.name}/${index}/design-depth-register`,
                 authorityFunction: "synthesize_model",
                 carrierFamily: "ProductAssetModel",
@@ -584,6 +594,38 @@ function buildSyntheticT132Archive(opts) {
         writeJson(
           designDepthRegisterPath,
           designDepthRegisterPayload,
+          dirMtimeMs
+        );
+        writeJson(
+          designDepthRuleOutcomePath,
+          {
+            kind: "evaluation_rule_outcome",
+            status: "accepted",
+            ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+            ruleRole: "semantic_judgment",
+            computeMeans: "F_P",
+            producedRegisterRefs: [
+              designDepthContentRegisterRef,
+              designDepthRegisterRef
+            ],
+            evidenceRefs: [
+              designDepthContentRegisterRef,
+              designDepthRegisterRef
+            ],
+            findingRefs: [
+              `finding://synthetic/${edge.name}/${index}/design-depth-register`
+            ],
+            humanResponseRefs: [],
+            residualPressureRefs: [],
+            continuationRefs: [],
+            diagnosticRefs: [],
+            selectedCompositionRef: compositionRef,
+            selectedCompositionDigest: compositionDigest,
+            selectedCompositionSelectionRef: compositionSelectionRef,
+            selectedRegimeBindingRef,
+            compositionContributionRef: selectedRegimeBindingRef,
+            reason: null
+          },
           dirMtimeMs
         );
       }

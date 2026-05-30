@@ -75,7 +75,10 @@ function retryDossier() {
         kind: "sdlc_postflight_gap_reason",
         reason,
         reasonClass: "assurance",
-        blockingReason
+        blockingReason: {
+          ...blockingReason,
+          evidenceRefs: ["file:///tmp/t120/component_code_surface.md"]
+        }
       }
     ],
     evidenceRefs: [
@@ -103,7 +106,9 @@ function retryDossierWithReasons(ref, reasons) {
       reasonClass: "assurance",
       blockingReason: {
         ...sdlcBlockingReasonFromLegacy({ reason }),
-        code: "assurance_ledger_reason",
+        code: "edge_closure_residual_pressure",
+        reasonClass: "assurance",
+        message: "Edge closure residual pressure requires same-edge repair.",
         detail: reason,
         lawfulReentryPoint: "repair_worker_output"
       }
@@ -398,61 +403,51 @@ function componentRepairRowOpenRetryManifest() {
   );
   writeFileSync(
     releaseDepthPath,
-    [
-      "# Release Depth Parity Surface",
-      "",
-      "```json component_depth_register",
-      JSON.stringify(
-        {
-          kind: "sdlc_component_depth_register",
+    JSON.stringify(
+      {
+        kind: "sdlc_component_depth_register",
+        registerVersion: "ts-component-depth-v1",
+        targetAssetType: "release_depth_parity_surface",
+        componentRepairSchedule: {
+          kind: "sdlc_component_repair_schedule",
           registerVersion: "ts-component-depth-v1",
-          targetAssetType: "release_depth_parity_surface",
-          componentRepairSchedule: {
-            kind: "sdlc_component_repair_schedule",
-            registerVersion: "ts-component-depth-v1",
-            scheduleStatus: "repair_required",
-            repairRows: [
-              {
-                kind: "sdlc_component_repair_schedule_row",
-                scheduleId: "schedule.compiler.diagnostics.scalac.001",
-                failureId: "fail.compiler.diagnostics.scalac.001",
-                repairTarget:
-                  "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala",
-                lawfulReentryPoint: "realization_refactor",
-                attributionConfidence: "high",
-                testcaseIds: ["TC-DM-DIAG-001"],
-                componentIds: ["cdme-diagnostics"],
-                requirementIds: ["REQ-T115-001"],
-                sourceRefs: [
-                  "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala"
-                ],
-                testRefs: [
-                  "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala"
-                ],
-                evidenceRefs: [`file://${testExecutionPath}`]
-              }
-            ],
-            evidenceRefs: [`file://${testExecutionPath}`]
-          },
-          releaseDepthParity: {
-            kind: "sdlc_release_depth_parity_assessment",
-            status: "blocked",
-            scope: "release_surface",
-            blockerCodes: [
-              "shard_compile_failed_no_test_evidence",
-              "blocked_test_classes_have_no_pass_evidence"
-            ],
-            blockerDetail: "test shard failed at test_compile",
-            decisionBasis: [`file://${testExecutionPath}`],
-            metPrecondition: false,
-            repricedRequested: false
-          }
+          scheduleStatus: "repair_required",
+          repairRows: [
+            {
+              kind: "sdlc_component_repair_schedule_row",
+              scheduleId: "schedule.compiler.diagnostics.scalac.001",
+              failureId: "fail.compiler.diagnostics.scalac.001",
+              repairTarget: "component_test",
+              lawfulReentryPoint: "realization_refactor",
+              attributionConfidence: "high",
+              testcaseIds: ["TC-DM-DIAG-001"],
+              componentIds: ["cdme-diagnostics"],
+              requirementIds: ["REQ-T115-001"],
+              sourceRefs: [
+                "build_tenants/scala_spark/cdme-compiler/src/main/scala/cdme/compiler/diagnostics/CompileDiagnostic.scala"
+              ],
+              testRefs: [
+                "build_tenants/scala_spark/cdme-compiler/src/test/scala/cdme/compiler/diagnostics/DiagnosticsFinalizeSpec.scala"
+              ],
+              evidenceRefs: [`file://${testExecutionPath}`]
+            }
+          ],
+          evidenceRefs: [`file://${testExecutionPath}`]
         },
-        null,
-        2
-      ),
-      "```"
-    ].join("\n"),
+        releaseDepthParity: {
+          kind: "sdlc_release_depth_parity_assessment",
+          status: "blocked",
+          summary: "test shard failed at test_compile",
+          blockingReasons: [
+            "shard_compile_failed_no_test_evidence",
+            "blocked_test_classes_have_no_pass_evidence"
+          ],
+          evidenceRefs: [`file://${testExecutionPath}`]
+        }
+      },
+      null,
+      2
+    ),
     "utf8"
   );
   writeFileSync(
@@ -497,7 +492,9 @@ function componentRepairRowOpenRetryManifest() {
               reasonClass: "assurance",
               blockingReason: {
                 ...sdlcBlockingReasonFromLegacy({ reason }),
-                code: "assurance_ledger_reason",
+                code: "edge_closure_residual_pressure",
+                reasonClass: "assurance",
+                message: "Edge closure residual pressure requires same-edge repair.",
                 detail: reason,
                 evidenceRefs,
                 lawfulReentryPoint: "repair_worker_output"
@@ -630,7 +627,8 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
   const contract = hookContractByEdgeName("derive_component_code_surface");
   const reasons = [
     "obligation_assessment_blocked:requirement:workspace.requirements.req_dq_003",
-    "obligation_assessment_blocked:requirement:workspace.stage_15_trv_requirements.req_trv_005_b"
+    "obligation_assessment_blocked:requirement:workspace.stage_15_trv_requirements.req_trv_005_b",
+    "edge_closure_residual_pressure:obligation://odd-sdlc/requirement%3Aworkspace.requirements.req_pdm_006/blocked"
   ];
   const manifest = deriveWorkerHandoffManifest({
     workspaceRoot: workspaceRoot(),
@@ -655,7 +653,9 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
             reasonClass: "assurance",
             blockingReason: {
               ...sdlcBlockingReasonFromLegacy({ reason }),
-              code: "assurance_ledger_reason",
+              code: "edge_closure_residual_pressure",
+              reasonClass: "assurance",
+              message: "Edge closure residual pressure requires same-edge repair.",
               detail: reason,
               evidenceRefs: ["file:///tmp/t164/fp_evaluate_result.json"],
               lawfulReentryPoint: "repair_worker_output"
@@ -682,12 +682,12 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
   );
   assert.match(
     prompt,
-    /Every materializedFiles\[\] row for a declared product file target with role source, test, or build_config must carry requirementTraceObligationIds/u
+    /For every declared product file target with role source, test, or build_config that supports an active requirement, embed parseable requirement tags/u
   );
   assert.match(prompt, /Build_config files are not exempt/u);
   assert.match(
     prompt,
-    /For product files that cannot carry native comments, such as structured configuration files, carry lineage in the target carrier\/table and materializedFiles\[\]\.requirementTraceObligationIds/u
+    /For product files that cannot carry native comments, such as strict structured configuration files, carry lineage in the target carrier\/table/u
   );
   assert.match(
     prompt,
@@ -700,8 +700,102 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
     prompt,
     /requirement:workspace\.stage_15_trv_requirements\.req_trv_005_b/u
   );
-  assert.match(prompt, /assurance_ledger_reason/u);
+  assert.match(prompt, /requirement:workspace\.requirements\.req_pdm_006/u);
+  assert.doesNotMatch(prompt, /requirement:Aworkspace/u);
+  assert.match(prompt, /edge_closure_residual_pressure/u);
+  assert.doesNotMatch(prompt, /assurance_ledger_reason/u);
   assert.match(prompt, /file:\/\/\/tmp\/t164\/fp_evaluate_result\.json/u);
+});
+
+test("T-184 retry repair instructions consolidate residual pressure with bounded causal evidence", () => {
+  const contract = hookContractByEdgeName("derive_requirement_surface");
+  const reasonRefs = Array.from(
+    { length: 1200 },
+    (_, index) =>
+      `obligation://odd-sdlc/requirement%3Aworkspace.requirements.req_${String(
+        index
+      ).padStart(3, "0")}/blocked`
+  );
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 17,
+          targetAssetType: "requirement_surface",
+          reasons: reasonRefs.map((reasonRef) => ({
+            kind: "sdlc_postflight_gap_reason",
+            reason: `edge_closure_residual_pressure:${reasonRef}`,
+            reasonClass: "assurance",
+            blockingReason: {
+              kind: "sdlc_blocking_reason",
+              code: "edge_closure_residual_pressure",
+              reasonClass: "assurance",
+              lawfulReentryPoint: "same_edge_retry",
+              message: "Edge closure residual pressure requires same-edge repair.",
+              detail: reasonRef,
+              evidenceRefs: [
+                "closure-decision://odd-sdlc/t184/requirement-surface",
+                reasonRef
+              ]
+            }
+          })),
+          evidenceRefs: [
+            "file:///tmp/t184/review_grade_edge_fulfillment_assessment.json",
+            "file:///tmp/t184/sdlc_edge_closure_decision.json",
+            ...reasonRefs
+          ],
+          priorManifestId: "file:///tmp/t184/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t184/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t184-reason-local-retry-instructions"
+  });
+  const files = writeHandoffFiles(manifest);
+  const invocationPackageText = readFileSync(files.invocationPackagePath, "utf8");
+  const invocationPackage = JSON.parse(invocationPackageText);
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.equal(invocationPackage.retryRepairInstructions.length, 1);
+  assert.match(
+    invocationPackage.retryRepairInstructions[0].blockingReasonDetail,
+    /requiredResidualPressureRefCount=1200/u
+  );
+  assert.match(
+    invocationPackage.retryRepairInstructions[0].blockingReasonDetail,
+    /omittedRequiredPressureRefCount=960/u
+  );
+  assert.deepEqual(
+    invocationPackage.retryRepairInstructions[0].rejectedArtifactRefs.slice(0, 2),
+    ["closure-decision://odd-sdlc/t184/requirement-surface", "file:///tmp/t184/gap_dossier.json"]
+  );
+  assert(
+    !invocationPackage.retryRepairInstructions[0].rejectedArtifactRefs.includes(
+      reasonRefs[reasonRefs.length - 1]
+    )
+  );
+  assert(
+    !invocationPackage.retryRepairInstructions[0].rejectedArtifactRefs.includes(
+      "file:///tmp/t184/review_grade_edge_fulfillment_assessment.json"
+    )
+  );
+  assert.match(prompt, /reasonCount=1; rawReasonCount=1200/u);
+  assert.match(prompt, /requiredResidualPressureRefCount=1200/u);
+  assert.match(prompt, /omittedRequiredPressureRefCount=960/u);
+  assert.doesNotMatch(prompt, /omitted reason count: 56/u);
 });
 
 test("T-164 retry prompt preserves workspace-relative diagnostic paths", () => {

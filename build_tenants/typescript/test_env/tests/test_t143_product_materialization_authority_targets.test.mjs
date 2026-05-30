@@ -17,6 +17,7 @@ import { pathToFileURL } from "node:url";
 
 import {
   FG_MATERIALIZE_DECLARED_PRODUCT_ASSET,
+  MAX_INSTALLED_CONVERGENCE_ATTEMPTS,
   MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS,
   MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS,
   buildPostTransformWorkerResultReport,
@@ -33,6 +34,7 @@ import {
   readWorkerResultReport,
   reconcileSdlcProductMaterializationAuthority,
   sha256Text,
+  sdlcWorkspaceLocalToolEnvironment,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
   writeProductMaterializationManifest,
@@ -404,6 +406,19 @@ function writeTenantTechStackSpec(workspaceRoot, tenantRoot, buildConfigTargets)
       {
         kind: "sdlc_tenant_technology_stack_description",
         buildConfigTargets,
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/example-tool",
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/example-home"
+          ],
+          environmentVariables: {
+            EXAMPLE_TOOL_HOME:
+              "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/example-home",
+            EXAMPLE_TOOL_OPTS:
+              "-Dexample.cache=${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/example-tool"
+          }
+        },
         testingTechStack: {
           testRunner: "declared-test-runner",
           testRoots: ["src/test"],
@@ -577,11 +592,42 @@ function writeWorkerResultReport(input) {
 }
 
 test("T-143 installed loop circuit breakers distinguish retry and yield", () => {
-  assert.equal(MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS, 5);
-  assert.equal(MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS, 20);
-  assert.equal(installedReentryAttemptLimit("retry"), 5);
-  assert.equal(installedReentryAttemptLimit("yield"), 20);
-  assert.equal(installedReentryAttemptLimit("other"), 5);
+  assert.equal(MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS, 100);
+  assert.equal(MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS, 400);
+  assert.equal(MAX_INSTALLED_CONVERGENCE_ATTEMPTS, 4000);
+  assert.equal(installedReentryAttemptLimit("retry"), 100);
+  assert.equal(installedReentryAttemptLimit("yield"), 400);
+  assert.equal(installedReentryAttemptLimit("other"), 100);
+});
+
+test("T-143 installed tool execution uses tenant tech-stack environment declarations", () => {
+  const workspace = workspaceWithProductAuthority();
+  const env = sdlcWorkspaceLocalToolEnvironment(workspace);
+  const toolCacheRoot = path.join(
+    workspace,
+    ".ai-workspace",
+    "runtime",
+    "odd_sdlc",
+    "tool-cache"
+  );
+
+  assert.equal(
+    env.EXAMPLE_TOOL_HOME,
+    path.join(toolCacheRoot, "example-home")
+  );
+  assert.match(
+    env.EXAMPLE_TOOL_OPTS,
+    new RegExp(
+      `${toolCacheRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}/example-tool`,
+      "u"
+    )
+  );
+  assert.deepEqual(Object.keys(env).sort(), [
+    "EXAMPLE_TOOL_HOME",
+    "EXAMPLE_TOOL_OPTS"
+  ]);
+  assert.equal(existsSync(path.join(toolCacheRoot, "example-tool")), true);
+  assert.equal(existsSync(path.join(toolCacheRoot, "example-home")), true);
 });
 
 test("T-143 installed loop retry guard is scoped per graph edge", () => {
@@ -758,6 +804,14 @@ test("T-180 tenant stack repair routes to canonical tenant spec authority", () =
     prompt,
     /Do not embed tenant-stack authority inside component_depth_register/u
   );
+  assert.match(
+    prompt,
+    /If the initial bootstrap names or implies stack-specific construction pressure/u
+  );
+  assert.match(
+    prompt,
+    /create or repair the tenant TECH_STACK\/TESTING_TECH_STACK authority from bootstrap facts and ADR\/design decisions/u
+  );
 });
 
 test("T-172 semantically empty tenant stack authority blocks executable materialization admission", () => {
@@ -833,6 +887,10 @@ test("T-172 tenant stack markdown admits tenant-relative testing build-config ta
     [
       "# Testing Tech Stack",
       "",
+      "## Execution Environment",
+      "",
+      "- workspaceLocalDirectories: `.ai-workspace/runtime/odd_sdlc/tool-cache/test-stack`",
+      "",
       "## Testing Build Config Targets",
       "",
       "- TestHarness.fake"
@@ -863,6 +921,16 @@ test("T-172 combined tenant stack keeps implementation role when testing shares 
       {
         kind: "sdlc_tenant_technology_stack_description",
         buildConfigTargets: ["package.json"],
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/js-stack"
+          ],
+          environmentVariables: {
+            JS_STACK_HOME:
+              "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/js-stack"
+          }
+        },
         testingTechStack: {
           testRunner: "node --test",
           testRoots: ["test"],

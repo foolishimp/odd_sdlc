@@ -31,8 +31,23 @@ function nextActionBasis() {
   };
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t136/${caseId}`,
+    compositionDigest: `digest://t136/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t136/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t136/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t136/${caseId}`,
+    graphVectorRef: `graph-vector://t136/${caseId}`,
+    basisRef: `basis://t136/${caseId}`
+  });
+}
+
 function openLedger() {
   return constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("edge-1"),
     ledgerRef: "ledger://t136/edge-1",
     ledgerVersionRef: "ledger-version://t136/edge-1/attempt-1",
     edgeRef: "edge://t136/current",
@@ -85,6 +100,7 @@ test("T-136 yield is a first-class closure disposition with replay-visible resum
   assert.equal(decision.predecessorRefs.includes(ledger.ledgerVersionRef), true);
 
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: ledger.selectedComposition,
     nextActionProjectionRef: "next-action://t136/yield-view",
     nextActionBasisKind: "post_yield_resume",
     ...nextActionBasis(),
@@ -100,6 +116,7 @@ test("T-136 yield is a first-class closure disposition with replay-visible resum
   assert.throws(
     () =>
       constructSdlcNextActionProjection({
+        selectedComposition: ledger.selectedComposition,
         nextActionProjectionRef: "next-action://t136/yield-with-action",
         nextActionBasisKind: "post_yield_resume",
         ...nextActionBasis(),
@@ -175,6 +192,7 @@ test("T-136 yield rejects liveness-only progress aliases", () => {
 
 test("T-136 liveness interruption alone does not close semantic truth", () => {
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("liveness-only"),
     ledgerRef: "ledger://t136/liveness-only",
     ledgerVersionRef: "ledger-version://t136/liveness-only/attempt-1",
     edgeRef: "edge://t136/current",
@@ -206,6 +224,7 @@ test("T-136 liveness interruption alone does not close semantic truth", () => {
 
 test("T-136 close can select graph continuation only through post-close evaluate_next basis", () => {
   const closedLedger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("closed"),
     ledgerRef: "ledger://t136/closed",
     ledgerVersionRef: "ledger-version://t136/closed/attempt-1",
     edgeRef: "edge://t136/current",
@@ -235,6 +254,7 @@ test("T-136 close can select graph continuation only through post-close evaluate
   assert.equal(closedLedger.targetCertificationPassed, true);
   assert.equal(closedLedger.fdRecheckPassed, true);
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: closedLedger.selectedComposition,
     nextActionProjectionRef: "next-action://t136/closed-with-action",
     nextActionBasisKind: "post_close_graph_continuation",
     ...nextActionBasis(),
@@ -253,6 +273,7 @@ test("T-136 close can select graph continuation only through post-close evaluate
   assert.throws(
     () =>
       constructSdlcNextActionProjection({
+        selectedComposition: closedLedger.selectedComposition,
         nextActionProjectionRef: "next-action://t136/closed-wrong-basis",
         nextActionBasisKind: "post_retry",
         ...nextActionBasis(),
@@ -268,6 +289,7 @@ test("T-136 close can select graph continuation only through post-close evaluate
 
 test("T-136 close requires carry, admission, target certification, and F_D recheck gates", () => {
   const withExtra = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("extra"),
     ledgerRef: "ledger://t136/extra",
     ledgerVersionRef: "ledger-version://t136/extra/attempt-1",
     edgeRef: "edge://t136/current",
@@ -289,6 +311,7 @@ test("T-136 close requires carry, admission, target certification, and F_D reche
   assert.equal(withExtra.edgeConverged, false);
 
   const notAdmitted = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("not-admitted"),
     ledgerRef: "ledger://t136/not-admitted",
     ledgerVersionRef: "ledger-version://t136/not-admitted/attempt-1",
     edgeRef: "edge://t136/current",
@@ -313,6 +336,7 @@ test("T-136 close requires carry, admission, target certification, and F_D reche
   assert.equal(notAdmitted.edgeConverged, false);
 
   const noTargetCertification = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("no-target-certification"),
     ledgerRef: "ledger://t136/no-target-certification",
     ledgerVersionRef: "ledger-version://t136/no-target-certification/attempt-1",
     edgeRef: "edge://t136/current",
@@ -333,6 +357,7 @@ test("T-136 close requires carry, admission, target certification, and F_D reche
   assert.equal(noTargetCertification.edgeConverged, false);
 
   const noFdRecheck = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("no-fd-recheck"),
     ledgerRef: "ledger://t136/no-fd-recheck",
     ledgerVersionRef: "ledger-version://t136/no-fd-recheck/attempt-1",
     edgeRef: "edge://t136/current",

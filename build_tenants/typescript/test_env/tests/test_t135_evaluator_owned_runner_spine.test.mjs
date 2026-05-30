@@ -62,6 +62,20 @@ function context(activeTenant = "typescript") {
   return { module, queryDomain, conformedProject, workspaceRoot };
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t135/${caseId}`,
+    compositionDigest: `digest://t135/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t135/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t135/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t135/${caseId}`,
+    graphVectorRef: `graph-vector://t135/${caseId}`,
+    basisRef: `basis://t135/${caseId}`
+  });
+}
+
 function writeRequirementWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t135-req-"));
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
@@ -272,6 +286,7 @@ test("T-135 evaluate_action ledger counts admitted obligation assessments, not w
   });
 
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("requirement-edge"),
     ledgerRef: "ledger://t135/requirement-edge",
     ledgerVersionRef: "ledger-version://t135/requirement-edge/1",
     edgeRef: "edge://t135/derive_requirement_surface",
@@ -339,6 +354,7 @@ test("T-135 evaluate_action fails closed without declared obligations", () => {
   );
 
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("no-declared-obligations"),
     ledgerRef: "ledger://t135/no-declared-obligations",
     ledgerVersionRef: "ledger-version://t135/no-declared-obligations/1",
     edgeRef: "edge://t135/no-declared-obligations",

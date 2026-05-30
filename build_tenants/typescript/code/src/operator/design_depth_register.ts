@@ -9,6 +9,7 @@ import {
   parseBoolean,
   parseClosedRecord,
   parseEnumValue,
+  parseOptionalArray as parseArray,
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
@@ -57,22 +58,6 @@ function isDesignDepthTarget(
   return DESIGN_DEPTH_TARGETS.some((target) => target === targetAssetType);
 }
 
-function parseArray<T>(
-  input: unknown,
-  label: string,
-  parseItem: (item: unknown, itemLabel: string) => T
-): readonly T[] {
-  if (input === undefined) {
-    return Object.freeze([]);
-  }
-  if (!Array.isArray(input)) {
-    throw new TypeError(`${label}: expected array`);
-  }
-  return Object.freeze(
-    input.map((item, index) => parseItem(item, `${label}[${index}]`))
-  );
-}
-
 function mutableRecord(input: unknown): Record<string, unknown> | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     return null;
@@ -80,7 +65,7 @@ function mutableRecord(input: unknown): Record<string, unknown> | null {
   return Object.fromEntries(Object.entries(input));
 }
 
-// F_D admission is exact; semantic normalization belongs to selected evaluate.C/F_P content ledgers.
+// F_D admission is exact; semantic normalization belongs to selected evaluate.C/F_P content registers.
 
 function parseStackProfileRow(
   input: unknown,
@@ -647,6 +632,12 @@ function parseRegister(input: unknown, label: string): SdlcDesignDepthRegister {
       `${label}.designCompletenessVerdict`
     )
   });
+}
+
+export function parseDesignDepthRegisterPayload(
+  input: unknown
+): SdlcDesignDepthRegister {
+  return parseRegister(input, "design_depth_register");
 }
 
 function objectRecord(input: unknown): Record<string, unknown> | null {

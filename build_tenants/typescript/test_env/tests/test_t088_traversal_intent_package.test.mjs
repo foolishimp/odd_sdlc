@@ -129,10 +129,10 @@ function gapDossier(ref, reasons) {
       reasonClass: "assurance",
       blockingReason: {
         kind: "sdlc_blocking_reason",
-        code: "assurance_ledger_reason",
+        code: "edge_closure_residual_pressure",
         reasonClass: "assurance",
         lawfulReentryPoint: "same_edge_retry",
-        message: "Assurance ledger fold blocked traversal closure.",
+        message: "Edge closure residual pressure requires same-edge repair.",
         detail: reason,
         evidenceRefs: [ref]
       }
@@ -300,7 +300,9 @@ test("T-088 retry pressure stays linked and does not expand into prior-gap oblig
     "proof://gap-a",
     "proof://gap-b"
   ]);
-  assert.match(prompt, /Prior defect:/u);
+  assert.match(prompt, /Evaluated residual pressure:/u);
+  assert.match(prompt, /edge_closure_residual_pressure/u);
+  assert.doesNotMatch(prompt, /assurance_ledger_reason/u);
   assert.match(prompt, /retryRepairInstructions and repairReentryPlans when present/u);
   assert(
     invocationPackage.retryRepairInstructions.length > 0,

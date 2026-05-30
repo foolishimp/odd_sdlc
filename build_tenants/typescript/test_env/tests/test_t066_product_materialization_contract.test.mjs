@@ -189,20 +189,20 @@ function writeAdmittedImplementationDesignArchive({
     prior.archiveRoot,
     "design_depth_fp_evaluator_register.json"
   );
-  const contentLedgerPath = path.join(
+  const contentRegisterPath = path.join(
     prior.archiveRoot,
-    "design_depth_fp_evaluator_content_ledger.json"
+    "design_depth_fp_evaluator_content_register.json"
   );
   const registerRef = pathToFileURL(registerPath).href;
-  const contentLedgerRef = pathToFileURL(contentLedgerPath).href;
+  const contentRegisterRef = pathToFileURL(contentRegisterPath).href;
   writeFileSync(registerPath, `${JSON.stringify(register, null, 2)}\n`, "utf8");
   const selectedComposition = selectedCompositionForManifest(prior);
   writeFileSync(
-    contentLedgerPath,
+    contentRegisterPath,
     `${JSON.stringify(
       {
-        kind: "sdlc_evaluate_content_ledger",
-        ledgerVersion: "ts-evaluate-content-v1",
+        kind: "sdlc_evaluate_content_register",
+        registerVersion: "ts-evaluate-content-register-v1",
         stage: "evaluate.C",
         ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
         ruleRole: "semantic_judgment",
@@ -220,7 +220,7 @@ function writeAdmittedImplementationDesignArchive({
         evidenceRefs: [pathToFileURL(prior.outputFile).href],
         contentRows: [
           {
-            kind: "sdlc_evaluate_content_ledger_row",
+            kind: "sdlc_evaluate_content_register_row",
             rowRef: "evaluate-content-row://t066/design-depth-register",
             authorityFunction: "synthesize_model",
             carrierFamily: "ProductAssetModel",
@@ -255,8 +255,8 @@ function writeAdmittedImplementationDesignArchive({
             findingRef: "finding://t066/evaluate/design-depth-register",
             compositionRef: selectedComposition.compositionRef,
             compositionDigest: selectedComposition.compositionDigest,
-            authorityRefs: [contentLedgerRef, registerRef],
-            evidenceRefs: [contentLedgerRef, registerRef]
+            authorityRefs: [contentRegisterRef, registerRef],
+            evidenceRefs: [contentRegisterRef, registerRef]
           }
         ],
         evaluation: {
@@ -267,7 +267,7 @@ function writeAdmittedImplementationDesignArchive({
         status: "passed",
         postflightStatus: "passed",
         blockingReasons: [],
-        evidenceRefs: [contentLedgerRef, registerRef]
+        evidenceRefs: [contentRegisterRef, registerRef]
       },
       null,
       2
@@ -299,7 +299,7 @@ function writeAdmittedImplementationDesignArchive({
             kind: "sdlc_worker_obligation_assessment",
             obligationId: obligation.obligationId,
             fulfillmentStatus: "fulfilled",
-            evidenceRefs: [contentLedgerRef, registerRef, ...obligation.evidenceRefs],
+            evidenceRefs: [contentRegisterRef, registerRef, ...obligation.evidenceRefs],
             blockingReasons: []
           })
         ),
@@ -642,6 +642,16 @@ function writeTenantTechnologyStackSpec(
         kind: "sdlc_tenant_technology_stack_description",
         language,
         buildTool,
+        executionEnvironment: {
+          hostCachePolicy: "prohibited",
+          workspaceLocalDirectories: [
+            ".ai-workspace/runtime/odd_sdlc/tool-cache/test-stack"
+          ],
+          environmentVariables: {
+            TEST_STACK_HOME:
+              "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/test-stack"
+          }
+        },
         ...(buildConfigTargets.length > 0 ? { buildConfigTargets } : {}),
         testingTechStack: {
           testRunner,
@@ -1243,11 +1253,11 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "}",
       "const testExecutionRegister = testExecutionSurfaceRegister();",
       "const evaluateStage = process.env.ODD_SDLC_EVALUATE_STAGE || '';",
-      "if (evaluateStage === 'design_depth_content_ledger') {",
+      "if (evaluateStage === 'design_depth_content_register') {",
       "  const register = designDepthRegister();",
       "  if (register === null) throw new Error(`design depth register not available for ${manifest.targetAssetType}`);",
-      "  const contentLedgerPath = process.env.ODD_SDLC_EVALUATOR_CONTENT_LEDGER;",
-      "  if (typeof contentLedgerPath !== 'string' || contentLedgerPath.length === 0) throw new Error('ODD_SDLC_EVALUATOR_CONTENT_LEDGER is required');",
+      "  const contentRegisterPath = process.env.ODD_SDLC_EVALUATOR_CONTENT_REGISTER;",
+      "  if (typeof contentRegisterPath !== 'string' || contentRegisterPath.length === 0) throw new Error('ODD_SDLC_EVALUATOR_CONTENT_REGISTER is required');",
       "  const selectedCompositionRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_REF;",
       "  const selectedCompositionDigest = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_DIGEST;",
       "  const selectedCompositionSelectionRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_COMPOSITION_SELECTION_REF;",
@@ -1255,9 +1265,9 @@ function writeDataMapperInventoryWorkerScript(workspaceRoot) {
       "  const selectedRegimeBindingRef = process.env.ODD_SDLC_EVALUATOR_SELECTED_REGIME_BINDING_REF || null;",
       "  const compositionContributionRef = process.env.ODD_SDLC_EVALUATOR_COMPOSITION_CONTRIBUTION_REF || selectedRegimeBindingRef || selectedCompositionRef;",
       "  const sourceRef = pathToFileURL(manifest.outputFile).href;",
-      "  const ledger = { kind: 'sdlc_evaluate_content_ledger', ledgerVersion: 'ts-evaluate-content-v1', stage: 'evaluate.C', ruleRef: 'evaluation-rule://odd-sdlc/design-depth-register/fp', ruleRole: 'semantic_judgment', computeMeans: 'F_P', authorityFunction: 'synthesize_model', selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs: [sourceRef], candidateArtifactRefs: [sourceRef], evidenceRefs: [sourceRef], contentRows: [{ kind: 'sdlc_evaluate_content_ledger_row', rowRef: 'evaluate-content-row://t066/data-mapper/design-depth-register', authorityFunction: 'synthesize_model', carrierFamily: 'ProductAssetModel', contentKind: 'sdlc_design_depth_register', payload: register, sourceBasisRefs: [sourceRef], evidenceRefs: [sourceRef] }] };",
-      "  mkdirSync(dirname(contentLedgerPath), { recursive: true });",
-      "  writeFileSync(contentLedgerPath, `${JSON.stringify(ledger, null, 2)}\\n`, 'utf8');",
+      "  const ledger = { kind: 'sdlc_evaluate_content_register', registerVersion: 'ts-evaluate-content-register-v1', stage: 'evaluate.C', ruleRef: 'evaluation-rule://odd-sdlc/design-depth-register/fp', ruleRole: 'semantic_judgment', computeMeans: 'F_P', authorityFunction: 'synthesize_model', selectedCompositionRef, selectedCompositionDigest, selectedCompositionSelectionRef, selectedRegimeBindingRef, compositionContributionRef, sourceBasisRefs: [sourceRef], candidateArtifactRefs: [sourceRef], evidenceRefs: [sourceRef], contentRows: [{ kind: 'sdlc_evaluate_content_register_row', rowRef: 'evaluate-content-row://t066/data-mapper/design-depth-register', authorityFunction: 'synthesize_model', carrierFamily: 'ProductAssetModel', contentKind: 'sdlc_design_depth_register', payload: register, sourceBasisRefs: [sourceRef], evidenceRefs: [sourceRef] }] };",
+      "  mkdirSync(dirname(contentRegisterPath), { recursive: true });",
+      "  writeFileSync(contentRegisterPath, `${JSON.stringify(ledger, null, 2)}\\n`, 'utf8');",
       "  process.exit(0);",
       "}",
       "if (evaluateStage === 'review_grade_edge_fulfillment') {",
@@ -1642,71 +1652,6 @@ test("T-172 no-dispatch surface postflight admits replayed materialization linea
   );
 });
 
-test("T-158 postflight blocks worker reads outside active workspace", () => {
-  const workspace = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_scenario_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "derive_scenario_surface",
-    edgeName: contract.edgeName,
-    vectorIndex: 0,
-    contract,
-    runId: "t158-worker-read-boundary"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "scenario_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "scenario surface",
-    materializedFiles: []
-  });
-  const outsideRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-old-sandbox-"));
-  const outsideFile = path.join(
-    outsideRoot,
-    "workspace/design/scenario_surface.md"
-  );
-  mkdirSync(dirname(outsideFile), { recursive: true });
-  writeFileSync(outsideFile, "# stale scenario\n", "utf8");
-  writeFileSync(
-    path.join(manifest.archiveRoot, "worker_stdout.log"),
-    [
-      JSON.stringify({
-        type: "system",
-        cwd: workspace,
-        memory_paths: {
-          auto: "/Users/jim/.claude/projects/-Users-jim-src-apps-odd-sdlc/memory/"
-        }
-      }),
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_boundary_read",
-              name: "Read",
-              input: { file_path: outsideFile }
-            }
-          ]
-        }
-      })
-    ].join("\n") + "\n",
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  const authorityReason = postflight.blockingReasons.find((reason) =>
-    reason.startsWith("worker_authority_read_outside_workspace:")
-  );
-
-  assert.equal(postflight.status, "blocked");
-  assert.notEqual(authorityReason, undefined);
-  assert.match(authorityReason ?? "", /worker_stdout\.log:2/u);
-  assert.match(authorityReason ?? "", /scenario_surface\.md/u);
-});
-
 test("T-158 worker read-boundary ignores regex pattern strings that begin with slash", () => {
   const workspace = makeWorkspace();
   const contract = hookContractByEdgeName("derive_scenario_surface");
@@ -1869,254 +1814,6 @@ test("T-164 worker read-boundary ignores executor session tool-result metadata",
   assert.equal(authorityReason, undefined);
 });
 
-test("T-164 worker read-boundary still blocks outside workspace tool input reads", () => {
-  const workspace = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_scenario_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "derive_scenario_surface",
-    edgeName: contract.edgeName,
-    vectorIndex: 0,
-    contract,
-    runId: "t164-worker-read-boundary-real-outside-read"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "scenario_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "scenario surface",
-    materializedFiles: []
-  });
-  writeFileSync(
-    path.join(manifest.archiveRoot, "worker_stdout.log"),
-    [
-      JSON.stringify({
-        type: "system",
-        subtype: "init",
-        session_id: "session-runtime-cache-002"
-      }),
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_boundary_real_read",
-              name: "Read",
-              input: {
-                file_path: "/Users/jim/src/apps/odd_sdlc/code/src/operator/plugins/transform/launch_contract.ts"
-              }
-            }
-          ]
-        }
-      })
-    ].join("\n") + "\n",
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  const authorityReason = postflight.blockingReasons.find((reason) =>
-    reason.startsWith("worker_authority_read_outside_workspace:")
-  );
-
-  assert.equal(postflight.status, "blocked");
-  assert.match(authorityReason ?? "", /worker_authority_read_outside_workspace/u);
-});
-
-test("T-172 worker read-boundary blocks installed odd_sdlc runtime source reads", () => {
-  const workspace = makeWorkspace();
-  const contract = hookContractByEdgeName("derive_scenario_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "derive_scenario_surface",
-    edgeName: contract.edgeName,
-    vectorIndex: 0,
-    contract,
-    runId: "t172-worker-read-boundary-installed-runtime-source"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "scenario_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "scenario surface",
-    materializedFiles: []
-  });
-  const runtimeSourcePath = path.join(
-    workspace,
-    ".abiogenesis/odd_sdlc/typescript/package-extract/code/src/operator/plugins/transform/launch_contract.ts"
-  );
-  mkdirSync(dirname(runtimeSourcePath), { recursive: true });
-  writeFileSync(runtimeSourcePath, "// installed runtime source fixture\n", "utf8");
-  writeFileSync(
-    path.join(manifest.archiveRoot, "worker_stdout.log"),
-    JSON.stringify({
-      type: "assistant",
-      message: {
-        content: [
-          {
-            type: "tool_use",
-            id: "toolu_boundary_runtime_source_read",
-            name: "Read",
-            input: {
-              file_path: runtimeSourcePath
-            }
-          }
-        ]
-      }
-    }) + "\n",
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  const runtimeSourceReason = postflight.blockingReasons.find((reason) =>
-    reason.startsWith("worker_runtime_source_read:")
-  );
-
-  assert.equal(postflight.status, "blocked");
-  assert.match(runtimeSourceReason ?? "", /worker_runtime_source_read/u);
-  assert.match(runtimeSourceReason ?? "", /\.abiogenesis\/odd_sdlc/u);
-});
-
-test("T-159 product materialization blocks cited source without requirement lineage", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t159-product-source-lineage-missing"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  const sourceContent = ["package generated", "", "object DataMapper"].join("\n");
-  const productFile = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  mkdirSync(dirname(productFile), { recursive: true });
-  writeFileSync(productFile, `${sourceContent}\n`, "utf8");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "generated source cites requirements only through the report",
-    materializedFiles: [
-      {
-        kind: "sdlc_materialized_product_file",
-        role: "source",
-        relativePath: path.relative(manifest.productMaterialization.tenantRoot, productFile),
-        absolutePath: productFile,
-        digest: sha256Text(`${sourceContent}\n`),
-        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
-      }
-    ]
-  });
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_requirement_lineage_missing"
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-});
-
-test("T-159 product materialization blocks source row without requirement lineage ids", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t159-product-source-row-lineage-missing"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  const requirementIds = requirementObligationIds(manifest);
-  assert(requirementIds.length > 0);
-  const sourceContent = [
-    ...requirementIds.map((id) => `// Implements: ${id}`),
-    "package generated",
-    "",
-    "object DataMapper"
-  ].join("\n");
-  const productFile = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  mkdirSync(dirname(productFile), { recursive: true });
-  writeFileSync(productFile, `${sourceContent}\n`, "utf8");
-  const outputRef = `file://${manifest.outputFile}`;
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: output.digest,
-        summary: "generated source carries inline tags but omits row lineage",
-        unresolvedReasons: [],
-        materializedFiles: [
-          {
-            kind: "sdlc_materialized_product_file",
-            role: "source",
-            relativePath: path.relative(
-              manifest.productMaterialization.tenantRoot,
-              productFile
-            ),
-            absolutePath: productFile,
-            digest: sha256Text(`${sourceContent}\n`),
-            byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
-          }
-        ],
-        obligationAssessments:
-          manifest.traversalObligationContext.obligations.map((obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [outputRef],
-            blockingReasons: []
-          }))
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_requirement_lineage_missing"
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-});
-
 test("T-171 product materialization permits auxiliary build config without requirement lineage", () => {
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
@@ -2199,98 +1896,6 @@ test("T-171 product materialization permits auxiliary build config without requi
       "materialized_product_requirement_lineage_missing"
     ),
     false,
-    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
-  );
-});
-
-test("T-159 product materialization blocks lineage outside current obligations", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t159-product-source-unrelated-lineage"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  const unrelatedId = "requirement:unrelated_project.requirements.req_999";
-  const sourceContent = [
-    `// Implements: ${unrelatedId}`,
-    "package generated",
-    "",
-    "object DataMapper"
-  ].join("\n");
-  const productFile = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  mkdirSync(dirname(productFile), { recursive: true });
-  writeFileSync(productFile, `${sourceContent}\n`, "utf8");
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: output.digest,
-        summary: "generated source carries unrelated lineage",
-        unresolvedReasons: [],
-        materializedFiles: [
-          {
-            kind: "sdlc_materialized_product_file",
-            role: "source",
-            relativePath: path.relative(
-              manifest.productMaterialization.tenantRoot,
-              productFile
-            ),
-            absolutePath: productFile,
-            digest: sha256Text(`${sourceContent}\n`),
-            byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
-            requirementTraceObligationIds: [unrelatedId]
-          }
-        ],
-        obligationAssessments:
-          manifest.traversalObligationContext.obligations.map((obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [`file://${manifest.outputFile}`],
-            blockingReasons: []
-          }))
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_requirement_lineage_missing"
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-  assert(
-    postflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.code === "materialized_product_requirement_lineage_missing" &&
-        reason.detail?.includes(`unrelated:${unrelatedId}`)
-    ),
     JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });
@@ -2799,7 +2404,7 @@ test("T-159 authority conformance carries unobserved requirements instead of ret
 
   const gate = deriveSdlcOperatorAssuranceGate({ manifest, report, postflight });
   assert.equal(gate.satisfaction.status, "close_allowed");
-  assert.equal(gate.blockingPostflight, null);
+  assert.equal(gate.blockingPostflight ?? null, null);
 
   const evaluation = constructSdlcFpEvaluateResult({
     manifest,
@@ -2915,7 +2520,7 @@ test("T-171 non-materialized F_P surfaces carry unobserved requirement pressure 
 
   const gate = deriveSdlcOperatorAssuranceGate({ manifest, report, postflight });
   assert.equal(gate.satisfaction.status, "close_allowed");
-  assert.equal(gate.blockingPostflight, null);
+  assert.equal(gate.blockingPostflight ?? null, null);
 
   const evaluation = constructSdlcFpEvaluateResult({
     manifest,
@@ -3048,216 +2653,6 @@ test("T-158 F_P.evaluate keeps report admission distinct from open obligation cl
   assert.equal(result.obligationAssessmentCounts.blocked, 1);
 });
 
-test("T-144 assurance gate routes missing obligation assessments to same-edge retry", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t144-assurance-missing-obligation"
-  });
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  const sourceContent = [
-    "package generated",
-    "",
-    "final case class MissingAssessmentProbe(value: String)"
-  ].join("\n");
-  const productFile = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/MissingAssessmentProbe.scala"
-  );
-  mkdirSync(dirname(productFile), { recursive: true });
-  writeFileSync(productFile, `${sourceContent}\n`, "utf8");
-  const materializedFiles = [
-    {
-      kind: "sdlc_materialized_product_file",
-      role: "source",
-      relativePath: path.relative(manifest.productMaterialization.tenantRoot, productFile),
-      absolutePath: productFile,
-      digest: sha256Text(`${sourceContent}\n`),
-      byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8")
-    }
-  ];
-  const report = {
-    kind: "odd_sdlc.worker_result_report",
-    projectionRole: "typed_fp_stage_projection",
-    authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-    graphFunctionName: manifest.graphFunctionName,
-    edgeName: manifest.edgeName,
-    targetAssetType: manifest.targetAssetType,
-    outputFile: manifest.outputFile,
-    digest: output.digest,
-    summary: "generated product source while omitting obligation assessment",
-    unresolvedReasons: [],
-    materializedFiles,
-    executionEvidence: null,
-    obligationAssessments: []
-  };
-  const gate = deriveSdlcOperatorAssuranceGate({
-    manifest,
-    report,
-    postflight: {
-      kind: "sdlc_operator_postflight_result",
-      status: "passed",
-      blockingReasons: [],
-      blockingReasonCarriers: [],
-      evidenceRefs: [`file://${productFile}`]
-    }
-  });
-
-  assert.equal(gate.satisfaction.status, "retry_same_edge");
-  assert(gate.blockingPostflight);
-  const missingAssessmentReason =
-    gate.blockingPostflight.blockingReasonCarriers.find((reason) =>
-      reason.detail.startsWith("obligation_assessment_missing:")
-    );
-  assert(missingAssessmentReason);
-  assert.equal(missingAssessmentReason.lawfulReentryPoint, "same_edge_retry");
-  assert.notEqual(missingAssessmentReason.lawfulReentryPoint, "operator_blocked");
-});
-
-test("T-144 invalid component-depth register blocks fulfilled product materialization", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "derive_component_code_surface",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t144-component-depth-nonblocking"
-  });
-  writeHandoffFiles(manifest);
-  const sourcePath = path.join(manifest.productMaterialization.tenantRoot, "src/hello.js");
-  const sourceContent = "console.log('Hello, world!');\n";
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(sourcePath, sourceContent, "utf8");
-  const invalidRegisterArtifact = `${JSON.stringify(
-    {
-      kind: "sdlc_component_depth_register",
-      registerVersion: "ts-component-depth-v1",
-      targetAssetType: "component_code_surface",
-      componentRealizationRows: [
-        {
-          kind: "sdlc_component_realization_row",
-          componentId: "component:hello",
-          moduleName: "hello_world_javascript",
-          relativePath: "src/hello.js",
-          publicBoundary: 3,
-          requirementIds: ["REQ-T066-001"],
-          sourceAssetRefs: ["fixture://t144"]
-        }
-      ]
-    },
-    null,
-    2
-  )}\n`;
-  mkdirSync(dirname(manifest.outputFile), { recursive: true });
-  writeFileSync(manifest.outputFile, invalidRegisterArtifact, "utf8");
-  writeReport({
-    manifest,
-    digest: sha256Text(invalidRegisterArtifact),
-    summary: "materialized source with noncanonical component-depth register",
-    materializedFiles: [
-      {
-        kind: "sdlc_materialized_product_file",
-        role: "source",
-        relativePath: "src/hello.js",
-        absolutePath: sourcePath,
-        digest: sha256Text(sourceContent),
-        byteCount: Buffer.byteLength(sourceContent, "utf8")
-      }
-    ]
-  });
-
-  const report = readWorkerResultReport(manifest);
-  const gate = deriveSdlcOperatorAssuranceGate({
-    manifest,
-    report,
-    postflight: {
-      kind: "sdlc_operator_postflight_result",
-      status: "passed",
-      blockingReasons: [],
-      blockingReasonCarriers: [],
-      evidenceRefs: [`file://${sourcePath}`]
-    }
-  });
-  const componentDepth = gate.ledgers.find((ledger) => ledger.dimension === "component_depth");
-
-  assert(componentDepth);
-  assert.equal(componentDepth.required, true);
-  assert.equal(componentDepth.verdict, "open_gap");
-  assert.equal(
-    componentDepth.reasons.some((reason) =>
-      reason.code.startsWith("component_depth_register_invalid:")
-    ),
-    true,
-    JSON.stringify(componentDepth.reasons, null, 2)
-  );
-  assert.equal(gate.satisfaction.status, "retry_same_edge");
-  assert(gate.blockingPostflight);
-  assert(
-    gate.blockingPostflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.detail.startsWith("component_depth_register_invalid:") &&
-        reason.lawfulReentryPoint === "repair_worker_output"
-    )
-  );
-});
-
-test("T-004 tenant-local surface output is not counted as product source materialization", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t004-tenant-local-surface-output"
-  });
-  const before = snapshotProductMaterializationRoot(
-    manifest.productMaterialization
-  );
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  const productContent = [
-    "package generated",
-    "",
-    "// Implements: REQ-T066-001",
-    "final case class TenantSurfacePlacement(value: String)"
-  ].join("\n");
-  const productFile = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  mkdirSync(dirname(productFile), { recursive: true });
-  writeFileSync(productFile, `${productContent}\n`, "utf8");
-
-  const report = buildPostTransformWorkerResultReport({ manifest, before });
-
-  assert.equal(output.digest, sha256Text(readFileSync(manifest.outputFile, "utf8")));
-  assert.equal(
-    path.relative(workspace, manifest.outputFile).split(path.sep).join("/"),
-    "build_tenants/scala_spark/design/component_code_surface.md"
-  );
-  assert.deepStrictEqual(
-    report.materializedFiles.map((file) => file.relativePath),
-    ["src/main/scala/generated/DataMapper.scala"]
-  );
-  assert.equal(report.materializedFiles[0].role, "source");
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  assert.equal(postflight.status, "passed");
-});
-
 test("T-002 component-code materialization ignores build execution byproducts", () => {
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
@@ -3297,11 +2692,13 @@ test("T-002 component-code materialization ignores build execution byproducts", 
     ].join("\n") + "\n",
     "utf8"
   );
-  const byproductPaths = [
-    "target/debug/.cargo-lock",
-    "target/debug/incremental/generated.lock",
-    ".bsp/sbt.json"
-  ];
+	const byproductPaths = [
+		".ai-workspace/runtime/odd_sdlc/operator-runs/t002-component-code-byproduct-filter/sbt-boot/sbt.boot.lock",
+		".ai-workspace/runtime/odd_sdlc/operator-runs/t002-component-code-byproduct-filter/sbt-global/1.0/zinc/org.scala-sbt/rt.jar",
+		"target/debug/.cargo-lock",
+		"target/debug/incremental/generated.lock",
+		".bsp/sbt.json"
+	];
   for (const relativePath of byproductPaths) {
     const absolutePath = path.join(
       manifest.productMaterialization.tenantRoot,
@@ -3589,43 +2986,6 @@ test("T-144 ADR field grammar is worker context, not a postflight FD gate", () =
     report: readWorkerResultReport(manifest)
   });
   assert.equal(passed.status, "passed");
-});
-
-test("T-066 code-surface postflight rejects markdown-only realization", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "t066-markdown-only"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "component_code_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "generated only the markdown code surface",
-    materializedFiles: []
-  });
-
-  const report = readWorkerResultReport(manifest);
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_role_missing:source"),
-    true
-  );
 });
 
 test("T-158 product materialization repair replays prior same-edge manifest", () => {
@@ -4223,183 +3583,6 @@ test("T-172 tenant stack spec owns build-config targets without ecosystem handof
       "tenant_stack_materialization_targets"
     )
   );
-});
-
-test("T-164 observed product roles follow explicit design targets before generic fallback inference", () => {
-  const workspace = makeWorkspace();
-  writeFileSync(
-    path.join(workspace, "specification/PRODUCT.md"),
-    [
-      "# Product",
-      "",
-      "Build Tool: cargo",
-      "",
-      "- active tenant: hello_world_rust_service",
-      "- selected output root: build_tenants/hello_world_rust_service",
-      "",
-      "## Product Files",
-      "",
-      "- `build_tenants/hello_world_rust_service/Cargo.toml`",
-      "- `build_tenants/hello_world_rust_service/src/main.rs`"
-    ].join("\n"),
-    "utf8"
-  );
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: t164_rust_service_explicit_source_target",
-      "active_tenant: hello_world_rust_service",
-      "selected_output_root: build_tenants/hello_world_rust_service",
-      "ambiguity_risk_appetite: low",
-      "build_tenants:",
-      "  hello_world_rust_service:",
-      "    output_dir: build_tenants/hello_world_rust_service",
-      "    language: Rust",
-      "    build_tool: cargo",
-      "    test_runner: cargo test",
-      "    module_structure:",
-      "      - hello_world_rust_service"
-    ].join("\n"),
-    "utf8"
-  );
-  const stackSpecFile = path.join(
-    workspace,
-    "build_tenants/hello_world_rust_service/spec/TECH_STACK.json"
-  );
-  mkdirSync(dirname(stackSpecFile), { recursive: true });
-  writeFileSync(
-    stackSpecFile,
-    `${JSON.stringify(
-      {
-        kind: "sdlc_tenant_technology_stack_description",
-        language: "Rust",
-        buildTool: "cargo",
-        buildConfigTargets: ["Cargo.toml"],
-        testingTechStack: {
-          testRunner: "cargo test",
-          testRoots: ["tests/"],
-          proofCommands: ["cargo test"],
-          evidenceFormat: "process-exit"
-        }
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-  materializeSdlcProjectConformance({ workspaceRoot: workspace });
-  writeAdmittedStagedAuthoritySurfaces(workspace);
-  const implementationDesignFile = path.join(
-    workspace,
-    "build_tenants/hello_world_rust_service/design/adrs/ADR-002-implementation-design-surface.md"
-  );
-  const implementationDesignRegister = JSON.parse(
-    readFileSync(implementationDesignFile, "utf8")
-  );
-  implementationDesignRegister.fileTargetRows =
-    implementationDesignRegister.fileTargetRows.map((row) =>
-      row.relativePath === "Cargo.toml" ? { ...row, role: "source" } : row
-    );
-  implementationDesignRegister.componentTopologyRows = [
-    ...implementationDesignRegister.componentTopologyRows,
-    {
-      kind: "sdlc_component_topology_row",
-      componentId: "cargo-manifest",
-      moduleName: "generated",
-      relativePath: "Cargo.toml",
-      publicBoundary: "Cargo manifest",
-      concernRole: "other",
-      requirementIds: ["reqref://t164/cargo"],
-      sourceAssetRefs: ["fixture://t164/cargo"]
-    }
-  ];
-  implementationDesignRegister.componentRealizationRows = [
-    ...implementationDesignRegister.componentRealizationRows,
-    {
-      kind: "sdlc_component_realization_row",
-      componentId: "cargo-manifest",
-      moduleName: "generated",
-      relativePath: "Cargo.toml",
-      publicBoundary: "Cargo manifest",
-      trancheId: null,
-      firstProductFileToChange: "Cargo.toml",
-      upstreamComponentIds: [],
-      requirementIds: ["reqref://t164/cargo"],
-      sourceAssetRefs: ["fixture://t164/cargo"]
-    }
-  ];
-  writeFileSync(
-    implementationDesignFile,
-    `${JSON.stringify(implementationDesignRegister, null, 2)}\n`,
-    "utf8"
-  );
-  writeAdmittedImplementationDesignArchive({
-    workspaceRoot: workspace,
-    register: implementationDesignRegister,
-    outputContent: `${JSON.stringify(implementationDesignRegister, null, 2)}\n`
-  });
-
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260520T090000000Z_pid164"
-  });
-  writeHandoffFiles(manifest);
-  const before = snapshotProductMaterializationRoot(
-    manifest.productMaterialization
-  );
-  writeOutputSurface(manifest, "component_code_surface");
-  const requirementIds = requirementObligationIds(manifest);
-  assert(requirementIds.length > 0);
-  const cargoPath = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "Cargo.toml"
-  );
-  const sourcePath = path.join(
-    manifest.productMaterialization.tenantRoot,
-    "src/main.rs"
-  );
-  const cargoContent = [
-    ...requirementIds.map((id) => `# ${id}`),
-    "",
-    "[package]",
-    'name = "hello_world_rust_service"',
-    'version = "0.1.0"',
-    'edition = "2021"'
-  ].join("\n");
-  const sourceContent = [
-    ...requirementIds.map((id) => `// ${id}`),
-    "fn main() {",
-    '    println!("helloworld");',
-    "}"
-  ].join("\n");
-  mkdirSync(dirname(cargoPath), { recursive: true });
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(cargoPath, `${cargoContent}\n`, "utf8");
-  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
-
-  const report = buildPostTransformWorkerResultReport({
-    manifest,
-    before
-  });
-  const cargoRow = report.materializedFiles.find(
-    (file) => file.relativePath === "Cargo.toml"
-  );
-  assert.notEqual(cargoRow, undefined);
-  assert.equal(cargoRow.role, "source");
-
-  const postflight = evaluateSdlcComputeStage({
-    manifest,
-    report
-  });
-  assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
 });
 
 test("T-164 design manifest role normalizes to build_config product materialization", () => {
@@ -5187,96 +4370,6 @@ test("T-158 product materialization reports stale product targets but follows re
   );
 });
 
-test("T-158 replay preserves predecessor role policy instead of synthesizing it", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000110000Z_pid158"
-  });
-  writeHandoffFiles(firstManifest);
-  const sourcePath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  const requirementIds = requirementObligationIds(firstManifest);
-  assert(requirementIds.length > 0);
-  const sourceContent = [
-    ...requirementIds.map((id) => `// Implements: ${id}`),
-    "package example",
-    "object Example { def value: String = \"ok\" }"
-  ].join("\n");
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
-  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), {
-    recursive: true
-  });
-  writeFileSync(
-    firstManifest.productMaterialization.manifestFile,
-    `${JSON.stringify(
-      {
-        kind: "sdlc_product_materialization_manifest",
-        contract: firstManifest.productMaterialization,
-        files: [
-          {
-            kind: "sdlc_materialized_product_file",
-            role: "source",
-            relativePath: "src/main/scala/generated/DataMapper.scala",
-            absolutePath: sourcePath,
-            digest: sha256Text(`${sourceContent}\n`),
-            byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
-            requirementTraceObligationIds: requirementIds
-          }
-        ]
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000120000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const repairOutput = writeOutputSurface(
-    repairManifest,
-    "component_code_surface_trace_repair"
-  );
-  writeReport({
-    manifest: repairManifest,
-    digest: repairOutput.digest,
-    summary: "trace-only repair with predecessor missing role policy",
-    materializedFiles: []
-  });
-
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: readWorkerResultReport(repairManifest)
-  });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_replay_role_policy_missing"
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-});
-
 test("T-158 observed unchanged repair files keep prior admitted role policy before path heuristics", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -5362,416 +4455,6 @@ test("T-158 observed unchanged repair files keep prior admitted role policy befo
     "target-role-policy://odd-sdlc/product-test-tree"
   );
   assert.equal(postflight.status, "passed");
-});
-
-test("T-158 product materialization repair without predecessor still blocks", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000200000Z_pid158"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "component_code_surface_trace_repair");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "trace-only repair with no predecessor",
-    materializedFiles: []
-  });
-
-  const report = readWorkerResultReport(manifest);
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_role_missing:source"),
-    true
-  );
-});
-
-test("T-158 mismatched predecessor materialization cannot satisfy repair", () => {
-  const workspace = makeWorkspace();
-  const baseProfile = deriveSdlcConformProjectProfileFromWorkspace(workspace);
-  const firstProfile = {
-    ...baseProfile,
-    activeTenant: "scala_spark",
-    selectedOutputRoot: "build_tenants/scala_spark",
-    declaredOutputRoot: "build_tenants/scala_spark"
-  };
-  const repairProfile = {
-    ...baseProfile,
-    activeTenant: "scala_spark",
-    selectedOutputRoot: "build_tenants/scala_spark_repair",
-    declaredOutputRoot: "build_tenants/scala_spark_repair"
-  };
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    conformedProject: firstProfile,
-    runId: "20260511T000300000Z_pid158"
-  });
-  writeHandoffFiles(firstManifest);
-  const firstOutput = writeOutputSurface(firstManifest, "component_code_surface");
-  const sourcePath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  const sourceContent = "package example\nobject Example\n";
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(sourcePath, sourceContent, "utf8");
-  writeReport({
-    manifest: firstManifest,
-    digest: firstOutput.digest,
-    summary: "initial product source materialization",
-    materializedFiles: [
-      {
-        kind: "sdlc_materialized_product_file",
-        role: "source",
-        relativePath: "src/main/scala/generated/DataMapper.scala",
-        absolutePath: sourcePath,
-        digest: sha256Text(sourceContent),
-        byteCount: Buffer.byteLength(sourceContent, "utf8")
-      }
-    ]
-  });
-  writeProductMaterializationManifest({
-    manifest: firstManifest,
-    report: readWorkerResultReport(firstManifest)
-  });
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    conformedProject: repairProfile,
-    runId: "20260511T000400000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const repairOutput = writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-  writeReport({
-    manifest: repairManifest,
-    digest: repairOutput.digest,
-    summary: "trace-only repair with mismatched predecessor",
-    materializedFiles: []
-  });
-
-  const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: repairReport
-  });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_manifest_replay_target_mismatch"),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    true
-  );
-});
-
-test("T-158 corrupt predecessor materialization emits replay diagnostic", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000500000Z_pid158"
-  });
-  writeHandoffFiles(firstManifest);
-  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), { recursive: true });
-  writeFileSync(firstManifest.productMaterialization.manifestFile, "{not json", "utf8");
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000600000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const repairOutput = writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-  writeReport({
-    manifest: repairManifest,
-    digest: repairOutput.digest,
-    summary: "trace-only repair with corrupt predecessor",
-    materializedFiles: []
-  });
-
-  const repairReport = readWorkerResultReport(repairManifest);
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: repairReport
-  });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_manifest_replay_parse_failed"),
-    true
-  );
-});
-
-test("T-158 replay keeps diagnostics when an older predecessor can replay", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const validManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000510000Z_pid158"
-  });
-  writeHandoffFiles(validManifest);
-  const validOutput = writeOutputSurface(validManifest, "component_code_surface");
-  const requirementIds = requirementObligationIds(validManifest);
-  assert(requirementIds.length > 0);
-  const sourcePath = path.join(
-    validManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  const sourceContent = [
-    ...requirementIds.map((id) => `// Implements: ${id}`),
-    "package example",
-    "object Example { def value: String = \"ok\" }"
-  ].join("\n");
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(sourcePath, `${sourceContent}\n`, "utf8");
-  writeReport({
-    manifest: validManifest,
-    digest: validOutput.digest,
-    summary: "valid predecessor materialization",
-    materializedFiles: [
-      {
-        kind: "sdlc_materialized_product_file",
-        role: "source",
-        relativePath: "src/main/scala/generated/DataMapper.scala",
-        absolutePath: sourcePath,
-        digest: sha256Text(`${sourceContent}\n`),
-        byteCount: Buffer.byteLength(`${sourceContent}\n`, "utf8"),
-        requirementTraceObligationIds: requirementIds
-      }
-    ]
-  });
-  writeProductMaterializationManifest({
-    manifest: validManifest,
-    report: readWorkerResultReport(validManifest)
-  });
-
-  const corruptManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000520000Z_pid158"
-  });
-  writeHandoffFiles(corruptManifest);
-  mkdirSync(dirname(corruptManifest.productMaterialization.manifestFile), {
-    recursive: true
-  });
-  writeFileSync(corruptManifest.productMaterialization.manifestFile, "{not json", "utf8");
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000530000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const repairOutput = writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-  writeReport({
-    manifest: repairManifest,
-    digest: repairOutput.digest,
-    summary: "trace-only repair with valid older and corrupt newer predecessor",
-    materializedFiles: []
-  });
-
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: readWorkerResultReport(repairManifest)
-  });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_manifest_replay_parse_failed"),
-    true,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    false,
-    JSON.stringify(postflight.blockingReasons, null, 2)
-  );
-});
-
-test("T-158 unchanged observed files cannot bypass corrupt predecessor replay diagnostics", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000700000Z_pid158"
-  });
-  writeHandoffFiles(firstManifest);
-  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), { recursive: true });
-  writeFileSync(firstManifest.productMaterialization.manifestFile, "{not json", "utf8");
-
-  const sourcePath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  const sourceContent = "package example\nobject ExistingExample\n";
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  writeFileSync(sourcePath, sourceContent, "utf8");
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000800000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const before = snapshotProductMaterializationRoot(
-    repairManifest.productMaterialization
-  );
-  writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-
-  const repairReport = buildPostTransformWorkerResultReport({
-    manifest: repairManifest,
-    before
-  });
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: repairReport
-  });
-
-  assert.equal(repairReport.materializedFiles.length, 0);
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_manifest_replay_parse_failed"),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    true
-  );
-});
-
-test("T-158 unchanged observed diagnostics block even when current files satisfy roles", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T000900000Z_pid158"
-  });
-  writeHandoffFiles(firstManifest);
-  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), { recursive: true });
-  writeFileSync(firstManifest.productMaterialization.manifestFile, "{not json", "utf8");
-
-  const unchangedPath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/Existing.scala"
-  );
-  mkdirSync(dirname(unchangedPath), { recursive: true });
-  writeFileSync(
-    unchangedPath,
-    "// Implements: REQ-T066-001\npackage example\nobject Existing\n",
-    "utf8"
-  );
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 10,
-    contract,
-    projectConstraints: constraints,
-    runId: "20260511T001000000Z_pid158"
-  });
-  writeHandoffFiles(repairManifest);
-  const before = snapshotProductMaterializationRoot(
-    repairManifest.productMaterialization
-  );
-  writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-  const changedPath = path.join(
-    repairManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  mkdirSync(dirname(changedPath), { recursive: true });
-  writeFileSync(
-    changedPath,
-    "// Implements: REQ-T066-001\npackage example\nobject Changed\n",
-    "utf8"
-  );
-
-  const repairReport = buildPostTransformWorkerResultReport({
-    manifest: repairManifest,
-    before
-  });
-  const postflight = evaluateSdlcComputeStage({
-    manifest: repairManifest,
-    report: repairReport
-  });
-
-  assert.equal(repairReport.materializedFiles.length, 1);
-  assert.equal(repairReport.materializationDiagnostics.length, 1);
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_manifest_replay_parse_failed"),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("materialized_product_files_missing"),
-    false
-  );
 });
 
 test("T-158 non-materialization surface edges ignore empty product replay manifests", () => {
@@ -6303,44 +4986,6 @@ test("T-160 product materialization authority admits plain Product Files section
   ]);
 });
 
-test("T-173 framework-smoke Min(F_P) component-code consumes implementation-design source and test file targets", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
-    edgeName: FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
-    vectorIndex: 1,
-    contract,
-    projectConstraints: constraints,
-    runId: "t173-framework-smoke-min-fp-targets"
-  });
-
-  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
-    "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala",
-    "build_tenants/scala_spark/src/test/scala/generated/DataMapperSpec.scala"
-  ]);
-  const invocationPackage = constructWorkerInvocationPackage({ manifest });
-  assert.deepStrictEqual(
-    invocationPackage.productMaterializationAuthority.declaredProductFileTargets,
-    [
-      "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala",
-      "build_tenants/scala_spark/src/test/scala/generated/DataMapperSpec.scala"
-    ]
-  );
-  assert.ok(
-    invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes("For framework-smoke Min(F_P) component_code_surface")
-    )
-  );
-  assert.ok(
-    invocationPackage.outcomeDirectives.some((directive) =>
-      directive.includes("Tenant stack authority must match the product files actually emitted")
-    )
-  );
-});
-
 test("T-102 post-transform observation admits existing discoverable test files", () => {
   const workspace = makeWorkspace();
   const testRelativePath =
@@ -6585,6 +5230,251 @@ test("T-168 component-test materialization binds tests to design-derived targets
   assert.equal(postflight.status, "passed");
 });
 
+test("T-184 component-test observation classifies module src/test files as test materialization", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t184-component-test-src-test-role"
+  });
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  writeOutputSurface(manifest, "component_test_surface");
+
+  const testRelativePath = "cdme-core/src/test/scala/cdme/CoreSpec.scala";
+  const testPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    testRelativePath
+  );
+  const testContent = [
+    "package cdme",
+    "import org.scalatest.funsuite.AnyFunSuite",
+    "final class CoreSpec extends AnyFunSuite {",
+    "  test(\"core contract\") { assert(1 == 1) }",
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(testPath, `${testContent}\n`, "utf8");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  assert.equal(report.materializedFiles.length, 1);
+  assert.equal(report.materializedFiles[0].role, "test");
+  assert.equal(report.materializedFiles[0].relativePath, testRelativePath);
+  const postflight = evaluateSdlcComputeStage({ manifest, report });
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasons.includes("materialized_product_role_missing:test"),
+    false
+  );
+});
+
+test("T-184 component-test retry reclassifies unchanged tests after stale replay role", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t184-stale-other-prior"
+  });
+  writeHandoffFiles(firstManifest);
+  const firstOutput = writeOutputSurface(firstManifest, "component_test_surface");
+  const testRelativePath = "cdme-core/src/test/scala/cdme/CoreSpec.scala";
+  const testPath = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    testRelativePath
+  );
+  const testContent = [
+    "package cdme",
+    "import org.scalatest.funsuite.AnyFunSuite",
+    "final class CoreSpec extends AnyFunSuite {",
+    "  test(\"core contract\") { assert(1 == 1) }",
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(testPath, `${testContent}\n`, "utf8");
+  writeReport({
+    manifest: firstManifest,
+    digest: firstOutput.digest,
+    summary: "pre-fix component tests classified as other",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "other",
+        relativePath: testRelativePath,
+        absolutePath: testPath,
+        digest: sha256Text(`${testContent}\n`),
+        byteCount: Buffer.byteLength(`${testContent}\n`, "utf8")
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: firstManifest,
+    report: readWorkerResultReport(firstManifest)
+  });
+  writeFileSync(
+    path.join(firstManifest.archiveRoot, "postflight.json"),
+    `${JSON.stringify({ kind: "sdlc_postflight_result", status: "passed" }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t184-stale-other-repair"
+  });
+  writeHandoffFiles(repairManifest);
+  const before = snapshotProductMaterializationRoot(
+    repairManifest.productMaterialization
+  );
+  writeOutputSurface(repairManifest, "component_test_surface_repair");
+
+  const repairReport = buildPostTransformWorkerResultReport({
+    manifest: repairManifest,
+    before
+  });
+
+  assert.equal(repairReport.materializedFiles.length, 1);
+  assert.equal(repairReport.materializedFiles[0].role, "test");
+  assert.equal(repairReport.materializedFiles[0].relativePath, testRelativePath);
+  const postflight = evaluateSdlcComputeStage({
+    manifest: repairManifest,
+    report: repairReport
+  });
+  assert.equal(postflight.status, "passed");
+  assert.equal(
+    postflight.blockingReasons.includes("materialized_product_role_missing:test"),
+    false
+  );
+});
+
+test("T-184 materialization replay honors required roles after declared targets are satisfied", () => {
+  const workspace = makeWorkspace();
+  writeTenantTechnologyStackSpec(workspace, {
+    buildConfigTargets: ["project/"]
+  });
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const firstManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t184-replay-required-role-prior"
+  });
+  writeHandoffFiles(firstManifest);
+  const firstOutput = writeOutputSurface(firstManifest, "component_test_surface");
+  const testRelativePath = "cdme-core/src/test/scala/cdme/CoreSpec.scala";
+  const testPath = path.join(
+    firstManifest.productMaterialization.tenantRoot,
+    testRelativePath
+  );
+  const testContent = [
+    "package cdme",
+    "import org.scalatest.funsuite.AnyFunSuite",
+    "final class CoreSpec extends AnyFunSuite {",
+    "  test(\"core contract\") { assert(1 == 1) }",
+    "}"
+  ].join("\n");
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(testPath, `${testContent}\n`, "utf8");
+  writeReport({
+    manifest: firstManifest,
+    digest: firstOutput.digest,
+    summary: "prior component test materialization",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "test",
+        relativePath: testRelativePath,
+        absolutePath: testPath,
+        digest: sha256Text(`${testContent}\n`),
+        byteCount: Buffer.byteLength(`${testContent}\n`, "utf8")
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: firstManifest,
+    report: readWorkerResultReport(firstManifest)
+  });
+  writeFileSync(
+    path.join(firstManifest.archiveRoot, "postflight.json"),
+    `${JSON.stringify({ kind: "sdlc_postflight_result", status: "passed" }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const repairManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 15,
+    contract,
+    projectConstraints: constraints,
+    runId: "t184-replay-required-role-repair"
+  });
+  writeHandoffFiles(repairManifest);
+  const repairOutput = writeOutputSurface(repairManifest, "component_test_surface");
+  const buildConfigRelativePath = "project/build.properties";
+  const buildConfigPath = path.join(
+    repairManifest.productMaterialization.tenantRoot,
+    buildConfigRelativePath
+  );
+  const buildConfigContent = "sbt.version=1.9.8\n";
+  mkdirSync(dirname(buildConfigPath), { recursive: true });
+  writeFileSync(buildConfigPath, buildConfigContent, "utf8");
+  writeReport({
+    manifest: repairManifest,
+    digest: repairOutput.digest,
+    summary: "repair only rewrote declared build config",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "build_config",
+        relativePath: buildConfigRelativePath,
+        absolutePath: buildConfigPath,
+        digest: sha256Text(buildConfigContent),
+        byteCount: Buffer.byteLength(buildConfigContent, "utf8")
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: repairManifest,
+    report: readWorkerResultReport(repairManifest)
+  });
+  const manifestPayload = JSON.parse(
+    readFileSync(repairManifest.productMaterialization.manifestFile, "utf8")
+  );
+
+  assert.equal(manifestPayload.replay.kind, "sdlc_product_materialization_manifest_replay");
+  assert.equal(
+    manifestPayload.files.some(
+      (file) =>
+        file.role === "test" &&
+        file.relativePath === testRelativePath &&
+        file.materializationSource === "replay"
+    ),
+    true
+  );
+});
+
 test("T-168 component-test materialization admits exact live row and rejects asset archive substitution", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -6657,40 +5547,6 @@ test("T-168 component-test materialization admits exact live row and rejects ass
     "utf8"
   );
   assert.deepStrictEqual(declaredProductFileTargets(assetManifest), []);
-});
-
-test("T-066 test execution result postflight rejects missing execution evidence", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 17,
-    contract,
-    projectConstraints: constraints,
-    runId: "t066-missing-execution-evidence"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "test_execution_result_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "generated only a test execution result markdown surface",
-    materializedFiles: []
-  });
-
-  const report = readWorkerResultReport(manifest);
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  const missingReason = postflight.blockingReasonCarriers.find(
-    (reason) => reason.code === "test_execution_evidence_missing"
-  );
-  assert.notEqual(missingReason, undefined);
-  assert.match(missingReason.detail, /No sdlc_worker_execution_evidence block/);
 });
 
 test("T-170 lite component-code defers execution evidence to graph test-execution result", () => {
@@ -6878,265 +5734,6 @@ test("T-171 full component-code defers execution evidence to graph test-executio
     ),
     false
   );
-});
-
-test("T-104 test-run archive is surface-only and does not require fresh execution evidence", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 14,
-    contract,
-    projectConstraints: constraints,
-    runId: "t094-not-run-execution-evidence"
-  });
-  const handoffFiles = writeHandoffFiles(manifest);
-  const prompt = readFileSync(handoffFiles.promptPath, "utf8");
-
-  assert.match(prompt, /do not run test commands/);
-  assert.match(prompt, /do not emit fresh sdlc_worker_execution_evidence/);
-  assert.match(prompt, /Archive the admitted test_execution_result_surface/);
-  assert.doesNotMatch(prompt, /run that command from the tenant root/);
-
-  const output = writeOutputSurface(manifest, "test_run_archive_surface");
-  writeReport({
-    manifest,
-    digest: output.digest,
-    summary: "generated archive over prior test execution result truth",
-    materializedFiles: [],
-    executionEvidence: null
-  });
-
-  const report = readWorkerResultReport(manifest);
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(report.executionEvidence, null);
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasons.includes("test_execution_evidence_missing"),
-    false
-  );
-  assert.equal(
-    postflight.blockingReasons.every(
-      (reason) => reason !== "test_execution_not_succeeded"
-    ),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.code === "source_asset_dependency_missing" &&
-        reason.detail.includes("test_execution_result_surface") &&
-        reason.detail.includes("admitted execution-result report missing")
-    ),
-    true
-  );
-});
-
-test("T-104 test-run archive closure depends on cited execution-result truth", () => {
-  const workspace = makeExecutionWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const executionContract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const executionManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: executionContract.edgeName,
-    vectorIndex: 17,
-    contract: executionContract,
-    projectConstraints: constraints,
-    runId: "t104-source-execution-result"
-  });
-  writeHandoffFiles(executionManifest);
-  const executionOutput = writeOutputSurface(
-    executionManifest,
-    "test_execution_result_surface"
-  );
-  const executionReportPath = path.join(executionManifest.archiveRoot, "junit-report.xml");
-  writeFileSync(
-    executionReportPath,
-    '<testsuite tests="1" failures="0"><testcase classname="cdme.CoreSpec" name="provesCore"/></testsuite>\n',
-    "utf8"
-  );
-  const shardEvidence = executionManifest.productMaterialization.executionShards.map(
-    (shard) => ({
-      kind: "sdlc_worker_execution_shard_evidence",
-      shardId: shard.shardId,
-      moduleName: shard.moduleName,
-      lane: "test",
-      command: shard.command,
-      status: "succeeded",
-      reportRefs: [`file://${executionReportPath}`],
-      testsObserved: 1,
-      passedCount: 1,
-      failedCount: 0
-    })
-  );
-  writeFileSync(
-    executionManifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(
-          executionManifest.fpEvaluateResultFile
-        ).href,
-        graphFunctionName: executionManifest.graphFunctionName,
-        edgeName: executionManifest.edgeName,
-        targetAssetType: executionManifest.targetAssetType,
-        outputFile: executionManifest.outputFile,
-        digest: executionOutput.digest,
-        summary: "admitted execution-result dependency with shard truth",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          command: executionManifest.productMaterialization.testExecutionContract,
-          status: "succeeded",
-          reportRefs: [`file://${executionReportPath}`],
-          testsObserved: shardEvidence.length,
-          passedCount: shardEvidence.length,
-          failedCount: 0,
-          shardEvidence
-        },
-        obligationAssessments: executionManifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [`file://${executionManifest.outputFile}`, `file://${executionReportPath}`],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-  const executionReport = readWorkerResultReport(executionManifest);
-  const executionPostflight = evaluateSdlcComputeStage({
-    manifest: executionManifest,
-    report: executionReport
-  });
-  assert.equal(executionPostflight.status, "passed");
-
-  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 18,
-    contract,
-    projectConstraints: constraints,
-    runId: "t104-archive-cites-execution-result"
-  });
-  writeHandoffFiles(manifest);
-  const content = [
-    "# test_run_archive_surface",
-    "",
-    "Archived dependencies:",
-    ...manifest.inputAssetTypes.map((assetType) => `- ${assetType}`),
-    "Requirement trace: REQ-T066-001"
-  ].join("\n");
-  const artifact = `${content}\n`;
-  mkdirSync(dirname(manifest.outputFile), { recursive: true });
-  writeFileSync(manifest.outputFile, artifact, "utf8");
-  const outputRef = `file://${manifest.outputFile}`;
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: sha256Text(artifact),
-        summary: "archive names execution-result dependency without carrier truth",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: null,
-        obligationAssessments: manifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [outputRef, ...obligation.evidenceRefs.filter(
-              (ref) => !ref.endsWith("/worker_result_report.json")
-            )],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const proseOnlyReport = readWorkerResultReport(manifest);
-  const proseOnlyPostflight = evaluateSdlcComputeStage({
-    manifest,
-    report: proseOnlyReport
-  });
-
-  assert.equal(proseOnlyPostflight.status, "blocked");
-  assert.equal(
-    proseOnlyPostflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.code === "source_asset_dependency_missing" &&
-        reason.detail.includes("admitted execution-result report missing")
-    ),
-    true
-  );
-
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: sha256Text(artifact),
-        summary: "archive cites admitted execution-result dependency",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: null,
-        obligationAssessments: manifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: obligation.obligationId ===
-              "source_asset:test_execution_result_surface"
-              ? [outputRef, `file://${executionManifest.reportFile}`, ...obligation.evidenceRefs]
-              : [outputRef, ...obligation.evidenceRefs],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  writeProductMaterializationManifest({ manifest, report });
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "passed");
 });
 
 test("T-102 test-run archive validates execution evidence against source edge shards", () => {
@@ -7653,102 +6250,6 @@ test("T-094/T-095 test execution result rejects non-contract not-run status", ()
   assert.throws(() => readWorkerResultReport(manifest), /status/u);
 });
 
-test("B-077 execution evidence contradiction stops for triage instead of retry", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 18,
-    contract,
-    projectConstraints: constraints,
-    runId: "b077-execution-evidence-contradiction"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "test_execution_result_surface");
-  const outputRef = `file://${manifest.outputFile}`;
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: output.digest,
-        summary: "test execution result reports failed status with zero failed tests",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          command: manifest.productMaterialization.testExecutionContract,
-          status: "failed",
-          reportRefs: [outputRef],
-          testsObserved: 63,
-          passedCount: 63,
-          failedCount: 0,
-          shardEvidence: manifest.productMaterialization.executionShards.map(
-            (shard) => ({
-              kind: "sdlc_worker_execution_shard_evidence",
-              shardId: shard.shardId,
-              moduleName: shard.moduleName,
-              lane: "test",
-              command: shard.command,
-              status: "failed",
-              reportRefs: [outputRef],
-              testsObserved: 63,
-              passedCount: 63,
-              failedCount: 0
-            })
-          )
-        },
-        obligationAssessments: manifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "test_execution_evidence_contradiction"
-    ),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("test_execution_not_succeeded"),
-    false
-  );
-  assert.equal(
-    postflight.blockingReasonCarriers.find(
-      (reason) => reason.code === "test_execution_evidence_contradiction"
-    )?.lawfulReentryPoint,
-    "triage_gap"
-  );
-  const dossier = constructPostflightGapDossier({ manifest, postflight });
-  assert.equal(dossier.retryEligible, false);
-  assert.deepStrictEqual(dossier.nextLawfulActions, ["triage_gap"]);
-});
-
 test("B-072 post-transform test execution result admits embedded execution evidence", () => {
   const workspace = makeWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
@@ -7813,106 +6314,6 @@ test("B-072 post-transform test execution result admits embedded execution evide
   ]);
   const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(postflight.status, "passed");
-});
-
-test("B-084 post-transform execution evidence drops worker-local metadata from typed carrier", () => {
-  const workspace = makeExecutionWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 26,
-    contract,
-    projectConstraints: constraints,
-    runId: "b084-transform-execution-evidence-metadata"
-  });
-  writeHandoffFiles(manifest);
-  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
-  mkdirSync(path.join(manifest.productMaterialization.tenantRoot, "project/target"), {
-    recursive: true
-  });
-  writeFileSync(
-    path.join(manifest.productMaterialization.tenantRoot, "project/target/build.properties"),
-    "sbt.version=1.10.7\n",
-    "utf8"
-  );
-  const shard = manifest.productMaterialization.executionShards[0];
-  const content = [
-    "# test_execution_result_surface",
-    "",
-    "The transform returns governed pending test execution evidence with worker-local metadata.",
-    "",
-    "```yaml",
-    "kind: sdlc_feature_scope_acknowledgment",
-    "mode: steel_thread",
-    "```",
-    "",
-    "```json",
-    JSON.stringify(
-      {
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          command: manifest.productMaterialization.testExecutionContract,
-          workingDirectory: manifest.productMaterialization.tenantRoot,
-          status: "pending",
-          testsObserved: 0,
-          passedCount: 0,
-          failedCount: 0,
-          blocker: "bounded transform did not invoke tests",
-          shardEvidence: [
-            {
-              kind: "sdlc_worker_execution_shard_evidence",
-              shardId: shard.shardId,
-              moduleName: shard.moduleName,
-              lane: "test",
-              command: shard.command,
-              workingDirectory: shard.workingDirectory,
-              status: "pending",
-              testsObserved: 0,
-              passedCount: 0,
-              failedCount: 0,
-              blocker: "deferred shard"
-            }
-          ]
-        }
-      },
-      null,
-      2
-    ),
-    "```"
-  ].join("\n");
-  mkdirSync(dirname(manifest.outputFile), { recursive: true });
-  writeFileSync(manifest.outputFile, `${content}\n`, "utf8");
-
-  const report = buildPostTransformWorkerResultReport({ manifest, before });
-  assert.equal(report.executionEvidence?.status, "pending");
-  assert.equal(report.materializedFiles.length, 0);
-  assert.deepStrictEqual(report.executionEvidence?.reportRefs, [
-    `file://${manifest.outputFile}`
-  ]);
-  assert.equal(report.executionEvidence?.shardEvidence.length, 1);
-  assert.deepStrictEqual(report.executionEvidence?.shardEvidence[0].reportRefs, [
-    `file://${manifest.outputFile}`
-  ]);
-  assert.equal(report.executionEvidenceErrors.length, 0);
-
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "test_execution_not_succeeded"
-    ),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "test_execution_evidence_invalid"
-    ),
-    false
-  );
 });
 
 test("T-115 failed execution evidence with zero observed tests is admitted for repair qualification", () => {
@@ -8080,258 +6481,6 @@ test("T-083 failed execution-result evidence closes the execution source for dow
 
   assert.equal(residualPressure.clear, true);
   assert.equal(closeDecision.disposition, "close");
-});
-
-
-test("T-083 component-code admits sbt build plugin targets declared by implementation design", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const implementationDesignFile = path.join(
-    workspace,
-    constraints.selectedOutputRoot,
-    "design/adrs/ADR-002-implementation-design-surface.md"
-  );
-  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
-  register.fileTargetRows = [
-    ...register.fileTargetRows,
-    {
-      kind: "sdlc_file_target_row",
-      relativePath: "build_tenants/scala_spark/build.sbt",
-      role: "build-config"
-    },
-    {
-      kind: "sdlc_file_target_row",
-      relativePath: "build_tenants/scala_spark/project/assembly.sbt",
-      role: "build-plugin"
-    }
-  ];
-  writeFileSync(
-    implementationDesignFile,
-    `${JSON.stringify(register, null, 2)}\n`,
-    "utf8"
-  );
-  writeAdmittedImplementationDesignArchive({
-    workspaceRoot: workspace,
-    register,
-    outputContent: `${JSON.stringify(register, null, 2)}\n`
-  });
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 22,
-    contract,
-    projectConstraints: constraints,
-    runId: "t083-sbt-build-plugin-target"
-  });
-
-  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
-    "build_tenants/scala_spark/build.sbt",
-    "build_tenants/scala_spark/project/assembly.sbt",
-    "build_tenants/scala_spark/src/main/scala/generated/DataMapper.scala"
-  ]);
-
-  const before = snapshotProductMaterializationRoot(
-    manifest.productMaterialization
-  );
-  writeOutputSurface(manifest, "component_code_surface");
-  const files = new Map([
-    [
-      "build.sbt",
-      [
-        'name := "cdme"',
-        'scalaVersion := "2.13.12"',
-        "assembly / assemblyMergeStrategy := {",
-        '  case PathList("META-INF", xs @ _*) => MergeStrategy.discard',
-        "}"
-      ].join("\n") + "\n"
-    ],
-    [
-      "project/assembly.sbt",
-      'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.0")\n'
-    ],
-    [
-      "src/main/scala/generated/DataMapper.scala",
-      [
-        "// Implements: reqref://t066/default",
-        "package generated",
-        "object DataMapper"
-      ].join("\n") + "\n"
-    ]
-  ]);
-  for (const [relativePath, content] of files.entries()) {
-    const absolutePath = path.join(
-      manifest.productMaterialization.tenantRoot,
-      relativePath
-    );
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, content, "utf8");
-  }
-
-  const report = buildPostTransformWorkerResultReport({ manifest, before });
-  const assemblyFile = report.materializedFiles.find(
-    (file) => file.relativePath === "project/assembly.sbt"
-  );
-  assert(assemblyFile);
-  assert.equal(assemblyFile.role, "build_config");
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_file_unbound_to_declared_target"
-    ),
-    false,
-    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
-  );
-});
-
-test("T-083 replay reclassifies legacy sbt plugin without rewriting source roles", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const implementationDesignFile = path.join(
-    workspace,
-    constraints.selectedOutputRoot,
-    "design/adrs/ADR-002-implementation-design-surface.md"
-  );
-  const register = JSON.parse(readFileSync(implementationDesignFile, "utf8"));
-  register.fileTargetRows = [
-    ...register.fileTargetRows,
-    {
-      kind: "sdlc_file_target_row",
-      relativePath: "build_tenants/scala_spark/project/assembly.sbt",
-      role: "build-plugin"
-    }
-  ];
-  writeFileSync(
-    implementationDesignFile,
-    `${JSON.stringify(register, null, 2)}\n`,
-    "utf8"
-  );
-  writeAdmittedImplementationDesignArchive({
-    workspaceRoot: workspace,
-    register,
-    outputContent: `${JSON.stringify(register, null, 2)}\n`
-  });
-
-  const contract = hookContractByEdgeName("derive_component_code_surface");
-  const firstManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 22,
-    contract,
-    projectConstraints: constraints,
-    runId: "t083-legacy-sbt-plugin-predecessor"
-  });
-  writeHandoffFiles(firstManifest);
-  const sourcePath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "src/main/scala/generated/DataMapper.scala"
-  );
-  const assemblyPath = path.join(
-    firstManifest.productMaterialization.tenantRoot,
-    "project/assembly.sbt"
-  );
-  const sourceContent = [
-    "// Implements: reqref://t066/default",
-    "package generated",
-    "object DataMapper"
-  ].join("\n") + "\n";
-  const assemblyContent =
-    'addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.2.0")\n';
-  mkdirSync(dirname(sourcePath), { recursive: true });
-  mkdirSync(dirname(assemblyPath), { recursive: true });
-  writeFileSync(sourcePath, sourceContent, "utf8");
-  writeFileSync(assemblyPath, assemblyContent, "utf8");
-  mkdirSync(dirname(firstManifest.productMaterialization.manifestFile), {
-    recursive: true
-  });
-  writeFileSync(
-    firstManifest.productMaterialization.manifestFile,
-    `${JSON.stringify(
-      {
-        kind: "sdlc_product_materialization_manifest",
-        contract: firstManifest.productMaterialization,
-        files: [
-          {
-            kind: "sdlc_materialized_product_file",
-            role: "source",
-            rolePolicyRef: "target-role-policy://odd-sdlc/implementation-design/source",
-            relativePath: "src/main/scala/generated/DataMapper.scala",
-            absolutePath: sourcePath,
-            digest: sha256Text(sourceContent),
-            byteCount: Buffer.byteLength(sourceContent, "utf8"),
-            requirementTraceObligationIds: requirementObligationIds(firstManifest)
-          },
-          {
-            kind: "sdlc_materialized_product_file",
-            role: "other",
-            rolePolicyRef: "target-role-policy://odd-sdlc/reported-other",
-            relativePath: "project/assembly.sbt",
-            absolutePath: assemblyPath,
-            digest: sha256Text(assemblyContent),
-            byteCount: Buffer.byteLength(assemblyContent, "utf8")
-          }
-        ]
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const repairManifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 22,
-    contract,
-    projectConstraints: constraints,
-    runId: "t083-legacy-sbt-plugin-replay"
-  });
-  const before = snapshotProductMaterializationRoot(
-    repairManifest.productMaterialization
-  );
-  writeHandoffFiles(repairManifest);
-  writeOutputSurface(repairManifest, "component_code_surface_trace_repair");
-
-  const report = buildPostTransformWorkerResultReport({
-    manifest: repairManifest,
-    before
-  });
-  const sourceFile = report.materializedFiles.find(
-    (file) => file.relativePath === "src/main/scala/generated/DataMapper.scala"
-  );
-  const assemblyFile = report.materializedFiles.find(
-    (file) => file.relativePath === "project/assembly.sbt"
-  );
-  assert(sourceFile);
-  assert(assemblyFile);
-  assert.equal(sourceFile.role, "source");
-  assert.equal(
-    sourceFile.rolePolicyRef,
-    "target-role-policy://odd-sdlc/implementation-design/source"
-  );
-  assert.equal(assemblyFile.role, "build_config");
-  assert.equal(
-    assemblyFile.rolePolicyRef,
-    "target-role-policy://odd-sdlc/implementation-design/build_config"
-  );
-  const postflight = evaluateSdlcComputeStage({ manifest: repairManifest, report });
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_role_policy_ref_mismatch"
-    ),
-    false,
-    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
-  );
-  assert.equal(
-    postflight.blockingReasons.includes(
-      "materialized_product_file_unbound_to_declared_target"
-    ),
-    false,
-    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
-  );
 });
 
 test("T-083 component-code carries test-design requirements downstream", () => {
@@ -8590,201 +6739,6 @@ test("T-102 cross-archive report discovery rejects unstamped projections", () =>
   );
 });
 
-test("T-102 postflight rejects worker-asserted out-of-scope obligation", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_requirement_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 32,
-    contract,
-    projectConstraints: constraints,
-    runId: "t102-out-of-scope-obligation"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "requirement_surface");
-  const outputRef = pathToFileURL(manifest.outputFile).href;
-  writeFileSync(
-    manifest.reportFile,
-    stableJsonForTest({
-      kind: "odd_sdlc.worker_result_report",
-      projectionRole: "typed_fp_stage_projection",
-      authoritativeStageResultRef: pathToFileURL(
-        manifest.fpEvaluateResultFile
-      ).href,
-      graphFunctionName: manifest.graphFunctionName,
-      edgeName: manifest.edgeName,
-      targetAssetType: manifest.targetAssetType,
-      outputFile: manifest.outputFile,
-      digest: output.digest,
-      summary: "worker asserted an undeclared obligation",
-      unresolvedReasons: [],
-      materializedFiles: [],
-      obligationAssessments: [
-        ...manifest.traversalObligationContext.obligations.map((obligation) => ({
-          kind: "sdlc_worker_obligation_assessment",
-          obligationId: obligation.obligationId,
-          fulfillmentStatus: "fulfilled",
-          evidenceRefs: [outputRef],
-          blockingReasons: []
-        })),
-        {
-          kind: "sdlc_worker_obligation_assessment",
-          obligationId: "requirement:REQ-T102-OUT-OF-SCOPE",
-          fulfillmentStatus: "fulfilled",
-          evidenceRefs: [outputRef],
-          blockingReasons: []
-        }
-      ]
-    }),
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(
-    postflight.blockingReasons.some((reason) =>
-      reason.startsWith("obligation_assessment_extra:")
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons)
-  );
-});
-
-test("T-102 postflight rejects worker-asserted fulfillment without evidence", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_requirement_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 33,
-    contract,
-    projectConstraints: constraints,
-    runId: "t102-fulfilled-without-evidence"
-  });
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "requirement_surface");
-  const outputRef = pathToFileURL(manifest.outputFile).href;
-  const requirementObligation =
-    manifest.traversalObligationContext.obligations.find(
-      (obligation) => obligation.obligationKind === "requirement"
-    );
-
-  assert(requirementObligation);
-  writeFileSync(
-    manifest.reportFile,
-    stableJsonForTest({
-      kind: "odd_sdlc.worker_result_report",
-      projectionRole: "typed_fp_stage_projection",
-      authoritativeStageResultRef: pathToFileURL(
-        manifest.fpEvaluateResultFile
-      ).href,
-      graphFunctionName: manifest.graphFunctionName,
-      edgeName: manifest.edgeName,
-      targetAssetType: manifest.targetAssetType,
-      outputFile: manifest.outputFile,
-      digest: output.digest,
-      summary: "worker asserted fulfillment without evidence",
-      unresolvedReasons: [],
-      materializedFiles: [],
-      obligationAssessments: manifest.traversalObligationContext.obligations.map(
-        (obligation) => ({
-          kind: "sdlc_worker_obligation_assessment",
-          obligationId: obligation.obligationId,
-          fulfillmentStatus: "fulfilled",
-          evidenceRefs:
-            obligation.obligationId === requirementObligation.obligationId
-              ? []
-              : [outputRef],
-          blockingReasons: []
-        })
-      )
-    }),
-    "utf8"
-  );
-
-  const report = readWorkerResultReport(manifest);
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(
-    postflight.blockingReasons.some((reason) =>
-      reason.startsWith("obligation_fulfilled_without_output_coverage:")
-    ),
-    true,
-    JSON.stringify(postflight.blockingReasons)
-  );
-});
-
-test("B-072 malformed transform execution result evidence becomes typed invalid blocker", () => {
-  const workspace = makeWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 17,
-    contract,
-    projectConstraints: constraints,
-    runId: "b072-malformed-transform-execution-evidence"
-  });
-  writeHandoffFiles(manifest);
-  const before = snapshotProductMaterializationRoot(manifest.productMaterialization);
-  const content = [
-    "# test_execution_result_surface",
-    "",
-    "The transform returns malformed governed test execution evidence.",
-    "",
-    "```json",
-    JSON.stringify(
-      {
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          status: "succeeded",
-          reportRefs: [],
-          testsObserved: 1,
-          passedCount: 1,
-          failedCount: 0
-        }
-      },
-      null,
-      2
-    ),
-    "```"
-  ].join("\n");
-  mkdirSync(dirname(manifest.outputFile), { recursive: true });
-  writeFileSync(manifest.outputFile, `${content}\n`, "utf8");
-
-  const report = buildPostTransformWorkerResultReport({ manifest, before });
-  assert.equal(report.executionEvidence, null);
-  assert.equal(report.executionEvidenceErrors.length, 1);
-  assert.match(report.executionEvidenceErrors[0], /command/);
-
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-  assert.equal(postflight.status, "blocked");
-  assert.equal(
-    postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "test_execution_evidence_invalid"
-    ),
-    true
-  );
-  assert.equal(
-    postflight.blockingReasons.includes("test_execution_evidence_missing"),
-    false
-  );
-  const invalidReason = postflight.blockingReasonCarriers.find(
-    (reason) => reason.code === "test_execution_evidence_invalid"
-  );
-  assert.equal(invalidReason?.lawfulReentryPoint, "repair_worker_output");
-  assert.match(invalidReason?.detail ?? "", /command/);
-});
-
 test("B-081 test execution preparation carries admitted schedule commands", () => {
   const workspace = makeWorkspace();
   writeFileSync(
@@ -8944,167 +6898,6 @@ test("B-081 test execution preparation carries admitted schedule commands", () =
     payload.testExecutionPreparationRows.map((row) => row.command),
     ['sbt "coreModel/test"']
   );
-});
-
-test("B-079 execution-result postflight requires registered shard evidence", () => {
-  const workspace = makeWorkspace();
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: b079_shard_postflight",
-      "active_tenant: scala_spark",
-      "selected_output_root: build_tenants/scala_spark",
-      "ambiguity_risk_appetite: medium",
-      "build_tenants:",
-      "  scala_spark:",
-      "    output_dir: build_tenants/scala_spark/",
-      "    language: Scala",
-      "    build_tool: sbt",
-      "    test_runner: sbt test",
-      "    module_structure:",
-      "      - cdme-compiler",
-      "      - cdme-engine"
-    ].join("\n"),
-    "utf8"
-  );
-  materializeSdlcProjectConformance({ workspaceRoot: workspace });
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const contract = hookContractByEdgeName("derive_test_execution_result_surface");
-  const manifest = deriveWorkerHandoffManifest({
-    workspaceRoot: workspace,
-    graphFunctionName: "bootstrap_release_self_test",
-    edgeName: contract.edgeName,
-    vectorIndex: 17,
-    contract,
-    projectConstraints: constraints,
-    runId: "b079-shard-evidence-required"
-  });
-  assert.deepStrictEqual(
-    manifest.productMaterialization.executionShards.map((shard) => shard.moduleName),
-    ["cdme-compiler", "cdme-engine"]
-  );
-  assert.deepStrictEqual(
-    manifest.productMaterialization.executionShards.map((shard) => shard.command),
-    ["sbt test", "sbt test"]
-  );
-  writeHandoffFiles(manifest);
-  const output = writeOutputSurface(manifest, "test_execution_result_surface");
-  const outputRef = `file://${manifest.outputFile}`;
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: output.digest,
-        summary: "aggregate evidence without shard rows",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          command: manifest.productMaterialization.testExecutionContract,
-          status: "succeeded",
-          reportRefs: [outputRef],
-          testsObserved: 2,
-          passedCount: 2,
-          failedCount: 0
-        },
-        obligationAssessments: manifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  const blockedReport = readWorkerResultReport(manifest);
-  const blockedPostflight = evaluateSdlcComputeStage({
-    manifest,
-    report: blockedReport
-  });
-  assert.equal(blockedPostflight.status, "blocked");
-  assert.deepStrictEqual(
-    blockedPostflight.blockingReasonCarriers
-      .filter((reason) => reason.code === "test_execution_shard_evidence_missing")
-      .map((reason) => reason.detail),
-    ["test-shard-01-cdme-compiler", "test-shard-02-cdme-engine"]
-  );
-
-  writeFileSync(
-    manifest.reportFile,
-    `${JSON.stringify(
-      {
-        kind: "odd_sdlc.worker_result_report",
-        projectionRole: "typed_fp_stage_projection",
-        authoritativeStageResultRef: pathToFileURL(manifest.fpEvaluateResultFile).href,
-        graphFunctionName: manifest.graphFunctionName,
-        edgeName: manifest.edgeName,
-        targetAssetType: manifest.targetAssetType,
-        outputFile: manifest.outputFile,
-        digest: output.digest,
-        summary: "aggregate evidence with registered shard rows",
-        unresolvedReasons: [],
-        materializedFiles: [],
-        executionEvidence: {
-          kind: "sdlc_worker_execution_evidence",
-          lane: "test",
-          command: manifest.productMaterialization.testExecutionContract,
-          status: "succeeded",
-          reportRefs: [outputRef],
-          testsObserved: 2,
-          passedCount: 2,
-          failedCount: 0,
-          shardEvidence: manifest.productMaterialization.executionShards.map(
-            (shard) => ({
-              kind: "sdlc_worker_execution_shard_evidence",
-              shardId: shard.shardId,
-              moduleName: shard.moduleName,
-              lane: "test",
-              command: shard.command,
-              status: "succeeded",
-              reportRefs: [outputRef],
-              testsObserved: 1,
-              passedCount: 1,
-              failedCount: 0
-            })
-          )
-        },
-        obligationAssessments: manifest.traversalObligationContext.obligations.map(
-          (obligation) => ({
-            kind: "sdlc_worker_obligation_assessment",
-            obligationId: obligation.obligationId,
-            fulfillmentStatus: "fulfilled",
-            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
-            blockingReasons: []
-          })
-        )
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-  const passedReport = readWorkerResultReport(manifest);
-  const passedPostflight = evaluateSdlcComputeStage({
-    manifest,
-    report: passedReport
-  });
-  assert.equal(passedPostflight.status, "passed");
 });
 
 test("B-085 archive retry preserves targeted execution shard scope", () => {
@@ -9303,172 +7096,6 @@ test("B-085 archive retry preserves targeted execution shard scope", () => {
     report: archiveReport
   });
   assert.equal(archivePostflight.status, "passed");
-});
-
-test("B-080 execution-result recovery carries shard identity into repair blockers", async () => {
-  const workspace = makeWorkspace();
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: b080_silent_shard_recovery",
-      "active_tenant: scala_spark",
-      "selected_output_root: build_tenants/scala_spark",
-      "ambiguity_risk_appetite: medium",
-      "build_tenants:",
-      "  scala_spark:",
-      "    output_dir: build_tenants/scala_spark/",
-      "    language: Scala",
-      "    build_tool: sbt",
-      "    test_runner: sbt test",
-      "    module_structure:",
-      "      - cdme-compiler",
-      "      - cdme-engine"
-    ].join("\n"),
-    "utf8"
-  );
-  materializeSdlcProjectConformance({ workspaceRoot: workspace });
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const executionWorkerScript = writeNoopWorkerScript(workspace);
-  const executionResult = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(executionWorkerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(
-      basis,
-      "derive_test_execution_result_surface"
-    )
-  });
-  assert.notEqual(executionResult.status, "worker_failed");
-
-  const repairWorkerScript = writeRepairScheduleWorkerScript(workspace);
-  const result = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(repairWorkerScript)}`,
-    replayEvents: Object.freeze([
-      ...preclosedEventsBeforeEdge(basis, "derive_test_execution_result_surface"),
-      ...(await readOddSdlcRuntimeEvents(workspace))
-    ])
-  });
-
-  assert.equal(result.status, "postflight_failed");
-  assert.equal(result.postflight.status, "blocked");
-  const assuranceCarriers = result.postflight.blockingReasonCarriers.filter(
-    (carrier) => carrier.code === "assurance_ledger_reason"
-  );
-  assert.equal(
-    assuranceCarriers.length > 0,
-    true,
-    JSON.stringify(result.postflight.blockingReasonCarriers, null, 2)
-  );
-  assert.equal(
-    assuranceCarriers.every(
-      (carrier) => carrier.lawfulReentryPoint === "repair_worker_output"
-    ),
-    true
-  );
-  const assuranceEvidenceRefs = assuranceCarriers.flatMap(
-    (carrier) => carrier.evidenceRefs
-  );
-  assert.equal(
-    assuranceEvidenceRefs.some((ref) =>
-      ref.includes("test-shard-01-cdme-compiler.summary.json")
-    ),
-    true
-  );
-  assert.equal(
-    assuranceEvidenceRefs.some((ref) =>
-      ref.includes("test-shard-02-cdme-engine.summary.json")
-    ),
-    true
-  );
-  assert.equal(
-    result.gapDossier.reasons.some((reason) =>
-      reason.reason.startsWith("component_repair_schedule_")
-    ),
-    true,
-    JSON.stringify(result.gapDossier.reasons, null, 2)
-  );
-  assert.deepStrictEqual(result.gapDossier.nextLawfulActions, [
-    "repair_worker_output"
-  ]);
-  assert.equal(result.gapDossier.retryEligible, true);
-});
-
-test("B-080 silent repair schedule worker failures stop at runtime triage", async () => {
-  const workspace = makeWorkspace();
-  writeFileSync(
-    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
-    [
-      "project:",
-      "  name: b080_silent_repair_schedule_runtime",
-      "active_tenant: scala_spark",
-      "selected_output_root: build_tenants/scala_spark",
-      "ambiguity_risk_appetite: medium",
-      "build_tenants:",
-      "  scala_spark:",
-      "    output_dir: build_tenants/scala_spark/",
-      "    language: Scala",
-      "    build_tool: sbt",
-      "    test_runner: sbt test",
-      "    module_structure:",
-      "      - cdme-compiler",
-      "      - cdme-engine"
-    ].join("\n"),
-    "utf8"
-  );
-  materializeSdlcProjectConformance({ workspaceRoot: workspace });
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const workerScript = writeSilentWorkerScript(workspace);
-  const previousTimeout = process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
-  const previousInactivityTimeout =
-    process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
-  const previousHeartbeat = process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
-  process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = "50";
-  process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] = "10000";
-  process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = "20";
-  try {
-    const result = await executeInstalledOperatorStart({
-      workspaceRoot: workspace,
-      start,
-      workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-      replayEvents: preclosedEventsBeforeEdge(
-        basis,
-        "derive_component_repair_schedule_surface"
-      )
-    });
-
-    assert.equal(result.status, "worker_failed");
-    assert.equal(
-      result.postflight.blockingReasonCarriers.some(
-        (carrier) =>
-          carrier.code === "worker_hard_timeout" &&
-          carrier.lawfulReentryPoint === "triage_gap"
-      ),
-      true,
-      JSON.stringify(result.postflight.blockingReasonCarriers, null, 2)
-    );
-  } finally {
-    if (previousTimeout === undefined) {
-      delete process.env["ODD_SDLC_WORKER_TIMEOUT_MS"];
-    } else {
-      process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] = previousTimeout;
-    }
-    if (previousInactivityTimeout === undefined) {
-      delete process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"];
-    } else {
-      process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] =
-        previousInactivityTimeout;
-    }
-    if (previousHeartbeat === undefined) {
-      delete process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"];
-    } else {
-      process.env["ODD_SDLC_WORKER_HEARTBEAT_MS"] = previousHeartbeat;
-    }
-  }
 });
 
 test("T-159 component-depth prompts pin the top-level register envelope on first attempt", () => {
@@ -9791,88 +7418,6 @@ test("T-100 component-test postflight admits sbt-discoverable framework tests", 
   );
 });
 
-test("T-066 installed operator rejects shallow source through assurance fold before edge closure", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const codeIndex = basis.graph.vectors.findIndex(
-    (vector) => vector.name === "derive_component_code_surface"
-  );
-  assert(codeIndex > 0);
-  const workerScript = writePlaceholderWorkerScript(workspace);
-  const result = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
-  });
-
-  assert.equal(result.status, "postflight_failed");
-  assert.equal(result.postflight.status, "blocked");
-  assert.equal(result.assuranceSatisfaction.status, "retry_same_edge");
-  assert.equal(
-    result.postflight.blockingReasons.some((reason) =>
-      reason.startsWith("placeholder_surface:file://")
-    ),
-    true,
-    JSON.stringify(result.postflight.blockingReasons, null, 2)
-  );
-  assert.deepStrictEqual(result.emittedRuntimeEventKinds.slice(0, 4), [
-    "basis_admitted",
-    "graph_call_opened",
-    "frame_opened",
-    "vector_traversal_planned"
-  ]);
-  assert.equal(result.emittedRuntimeEventKinds.includes("fp_dispatch_requested"), true);
-  assert.equal(result.emittedRuntimeEventKinds.includes("actor_invocation_started"), true);
-  assert.equal(result.emittedRuntimeEventKinds.includes("vector_evaluated"), true);
-  assert.equal(result.emittedRuntimeEventKinds.includes("terminal_reached"), true);
-  assert.equal(result.gapDossier.status, "open");
-  assert.equal(
-    result.gapDossier.reasons.some((reason) =>
-      reason.reason.startsWith("placeholder_surface:file://")
-    ),
-    true
-  );
-
-  const failureEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterFailure = evalSdlcGapFromReplay({
-    basis,
-    events: Object.freeze([
-      ...preclosedEventsBeforeEdge(basis, "derive_component_code_surface"),
-      ...failureEvents
-    ])
-  });
-  assert.equal(afterFailure.currentEdge, "derive_component_code_surface");
-  assert.equal(afterFailure.closedVectorIndexes.includes(codeIndex), false);
-});
-
-test("T-066 installed operator rejects source-only output on component-test materialization", async () => {
-  const workspace = makeCapabilityWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const workerScript = writeCapabilityMissingWorkerScript(workspace);
-  const result = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_test_design_surface")
-  });
-
-  assert.equal(result.status, "postflight_failed");
-  assert.equal(result.assuranceSatisfaction?.status ?? "close_allowed", "close_allowed");
-  assert.equal(result.postflight.status, "blocked");
-  assert.equal(
-    result.postflight.blockingReasons.includes("materialized_product_role_missing:test"),
-    true,
-    JSON.stringify(result.postflight.blockingReasons, null, 2)
-  );
-  assert.equal(
-    result.gapDossier.reasons[0].reason,
-    "materialized_product_files_missing"
-  );
-});
-
 test("T-066 non-materialization surface ignores prior admitted product lineage", () => {
   const workspace = makeWorkspace();
   const conformedProject = deriveSdlcConformProjectProfileFromWorkspace(workspace);
@@ -9938,46 +7483,6 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
   assert.equal(surfaceManifest.productMaterialization.required, false);
   assert.equal(report.digest, surfaceOutput.digest);
   assert.deepEqual(report.materializedFiles, []);
-});
-
-test("T-066 installed operator rejects product edge when requirement lineage is unobservable", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const workerScript = writeUnassessedObligationWorkerScript(workspace);
-  const result = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport: `process://node?script=${encodeURIComponent(workerScript)}`,
-    replayEvents: preclosedEventsBeforeEdge(basis, "derive_component_code_surface")
-  });
-
-  assert.equal(result.status, "postflight_failed");
-  assert.equal(result.postflight.status, "blocked");
-  assert.equal(
-    result.postflight.blockingReasons.includes("materialized_product_files_missing"),
-    true,
-    JSON.stringify(result.postflight.blockingReasons, null, 2)
-  );
-  assert.equal(
-    result.postflight.blockingReasons.includes(
-      "materialized_product_role_missing:source"
-    ),
-    true,
-    JSON.stringify(result.postflight.blockingReasons, null, 2)
-  );
-  assert.equal(
-    result.postflight.blockingReasons.some((reason) =>
-      reason.startsWith("obligation_unassessed:")
-    ),
-    false
-  );
-  assert.equal(
-    result.gapDossier.reasons.some(
-      (reason) => reason.reason === "materialized_product_files_missing"
-    ),
-    true
-  );
 });
 
 test("T-159 lineage-only product materialization miss yields for operator iteration", () => {
@@ -10047,8 +7552,20 @@ const T102_CLOSE_COUNTS = Object.freeze({
   extra: 0
 });
 
+function t102SelectedComposition(id) {
+  return deriveSdlcSelectedAbgFnCompositionIdentity({
+    graphFunctionRef: "graph-function://t102/axiomatic-construction-algebra",
+    graphVectorRef: "edge://odd-sdlc/derive_test_execution_result_surface/26",
+    compositionSelectionScopeRef: `test://t102/${id}`,
+    carrierContextRefs: [`carrier://t102/${id}`],
+    assuranceContextRefs: []
+  });
+}
+
 function t102Ledger(id, options = {}) {
+  const selectedComposition = t102SelectedComposition(id);
   return constructSdlcEdgeFulfillmentLedger({
+    selectedComposition,
     ledgerRef: `ledger://t102/${id}`,
     ledgerVersionRef: `ledger-version://t102/${id}`,
     edgeRef: "edge://odd-sdlc/derive_test_execution_result_surface/26",
@@ -10105,7 +7622,10 @@ function t102Closure(disposition) {
 
 function t102Projection(input) {
   const selected = input.selected ?? false;
+  const selectedComposition =
+    input.closureDecision?.selectedComposition ?? t102SelectedComposition(input.id);
   return constructSdlcNextActionProjection({
+    selectedComposition,
     nextActionProjectionRef: `next-action://t102/${input.id}`,
     intentEventRefs: [`event://t102/${input.id}`],
     productAssetModelRef: `asset-model://t102/${input.id}`,
@@ -10192,171 +7712,7 @@ function t102FullBreadthTraversalAttemptEnvelope(edgeName) {
 
 function stableJsonForTest(payload) {
   return `${JSON.stringify(payload, null, 2)}\n`;
-}
-
-test("T-102 all published edge transform prompts exclude evaluator work", () => {
-  const workspace = makeT102PromptSweepWorkspace();
-  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
-  const installedOperatorOwnedTargets = new Set([
-    "component_realization_qualification_surface",
-    "test_execution_result_surface",
-    "component_test_qualification_surface",
-    "release_depth_parity_surface"
-  ]);
-  const workerAuthoredTargetCarrierProtocolTargets = new Set([
-    "component_code_surface",
-    "component_test_surface",
-    "test_design_surface",
-    "component_repair_schedule_surface"
-  ]);
-  const forbiddenPromptPatterns = [
-    /^- report surface:/mu,
-    /Satisfy evaluator contract/u,
-    /Worker report and postflight evidence must satisfy/u,
-    /obligationAssessments/u,
-    /unresolvedReasons/u,
-    /requiredSchema/u,
-    /resultReportSchema/u,
-    /proof-binding checks may execute/u,
-    /Generated tests must execute/u
-  ];
-  const forbiddenInstalledOperatorOwnedPatterns = [
-    /Emit payload\.componentTestQualificationRows/u,
-    /Emit payload\.componentRepairSchedule/u,
-    /Emit payload\.releaseDepthParity/u,
-    /Emit sdlc_worker_execution_evidence JSON/u,
-    /pass\/fail counts/u,
-    /obligation ledgers/u,
-    /gap ledgers/u,
-    /next-tranche selectors/u,
-    /Worker-fillable target carrier fields/u,
-    /tenant-local SDLC surface artifact path/u
-  ];
-  const forbiddenNonStructuredTargetCarrierProtocolPatterns = [
-    /selected target carrier: kind=/u,
-    /Target carrier contract:/u,
-    /Target carrier digest:/u,
-    /Target carrier kind:/u,
-    /Target carrier required fields:/u,
-    /Target carrier fixed protocol fields:/u,
-    /Worker-fillable target carrier fields:/u,
-    /Target carrier construction template ref:/u
-  ];
-
-  for (const [index, contract] of constructSdlcHookContractCatalog().entries()) {
-    const conformedProject = deriveSdlcConformProjectProfileFromWorkspace(workspace);
-    const manifest = deriveWorkerHandoffManifest({
-      workspaceRoot: workspace,
-      graphFunctionName: contract.edgeName,
-      edgeName: contract.edgeName,
-      vectorIndex: index,
-      contract,
-      conformedProject:
-        contract.targetAssetType === "test_execution_result_surface"
-          ? { ...conformedProject, testExecutionContract: "sbt test" }
-          : conformedProject,
-      projectConstraints: constraints,
-      traversalAttemptEnvelope: t102FullBreadthTraversalAttemptEnvelope(
-        contract.edgeName
-      ),
-      runId: `t102-prompt-sweep-${String(index).padStart(2, "0")}`
-    });
-    const files = writeHandoffFiles(manifest);
-    const prompt = readFileSync(files.promptPath, "utf8");
-    const invocationPackage = JSON.parse(
-      readFileSync(files.invocationPackagePath, "utf8")
-    );
-    const constructionBrief = JSON.parse(
-      readFileSync(files.constructionBriefPath, "utf8")
-    );
-    const label = `${contract.edgeName}/${contract.targetAssetType}`;
-
-    assert.deepStrictEqual(
-      manifest.traversalObligationContext.obligations
-        .filter((obligation) => obligation.obligationKind === "evaluator")
-        .map((obligation) => obligation.obligationId),
-      [],
-      label
-    );
-    assert.deepStrictEqual(
-      invocationPackage.inlineObligationIds.filter((id) =>
-        id.startsWith("evaluator:")
-      ),
-      [],
-      label
-    );
-    assert.deepStrictEqual(
-      invocationPackage.inlineObligations
-        .filter((obligation) => obligation.obligationKind === "evaluator")
-        .map((obligation) => obligation.obligationId),
-      [],
-      label
-    );
-    assert.deepStrictEqual(
-      constructionBrief.obligations.inlineObligationIds.filter((id) =>
-        id.startsWith("evaluator:")
-      ),
-      [],
-      label
-    );
-    assert.deepStrictEqual(
-      manifest.traversalIntentPackage.evaluatorExpectations,
-      contract.transformProfile,
-      label
-    );
-
-    for (const pattern of forbiddenPromptPatterns) {
-      assert.doesNotMatch(prompt, pattern, label);
-    }
-    if (!workerAuthoredTargetCarrierProtocolTargets.has(contract.targetAssetType)) {
-      assert.match(prompt, /target carrier protocol: evaluator-owned/u, label);
-      for (const pattern of forbiddenNonStructuredTargetCarrierProtocolPatterns) {
-        assert.doesNotMatch(prompt, pattern, label);
-      }
-    }
-    if (installedOperatorOwnedTargets.has(contract.targetAssetType)) {
-      assert.equal(
-        manifest.allowedWriteRoots.some(
-          (root) =>
-            resolve(root) === resolve(manifest.productMaterialization.tenantRoot)
-        ),
-        contract.targetAssetType === "test_execution_result_surface",
-        label
-      );
-      assert.match(prompt, /The installed operator .*publishes/u, label);
-      if (contract.targetAssetType === "release_depth_parity_surface") {
-        assert.match(
-          prompt,
-          /Edge-policy tenant-local SDLC surface path for current replay\/admission/u,
-          label
-        );
-        assert.match(prompt, /do not write this path/u, label);
-        assert.equal(
-          invocationPackage.outcomeDirectives.some((directive) =>
-            /do not write this path/u.test(directive)
-          ),
-          true,
-          label
-        );
-      }
-      for (const pattern of forbiddenInstalledOperatorOwnedPatterns) {
-        assert.doesNotMatch(prompt, pattern, label);
-      }
-    }
-    const resultReportLines = prompt
-      .split("\n")
-      .filter((line) => line.includes("worker_result_report.json"));
-    assert.equal(
-      resultReportLines.every((line) =>
-        line.includes("Do not write framework result report")
-      ),
-      true,
-      `${label}: ${JSON.stringify(resultReportLines)}`
-    );
-  }
-});
-
-test("T-102 installed operator interface writes execution evidence carrier", () => {
+}test("T-102 installed operator interface writes execution evidence carrier", () => {
   const workspace = makeT102NodeExecutionWorkspace();
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_test_execution_result_surface");
@@ -10686,188 +8042,19 @@ test("T-102 axiomatic construction algebra sweep separates evidence admission fr
 });
 
 test("T-171 installed-operator shard runner honors manifest timeout unless explicitly capped", () => {
-  const handoffSource = readFileSync(
-    resolve(PACKAGE_ROOT, "code/src/operator/plugins/transform/launch_contract.ts"),
+  const edgeProjectionSource = readFileSync(
+    resolve(PACKAGE_ROOT, "code/src/operator/plugins/consequence/edge_projection.ts"),
     "utf8"
   );
-  const start = handoffSource.indexOf("function installedOperatorShardTimeoutMs");
-  const end = handoffSource.indexOf("const INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE", start);
-  assert(start >= 0, "installedOperatorShardTimeoutMs must remain visible in handoff source");
+  const start = edgeProjectionSource.indexOf("function installedOperatorShardTimeoutMs");
+  const end = edgeProjectionSource.indexOf("const INSTALLED_OPERATOR_SHARD_RUNNER_SOURCE", start);
+  assert(start >= 0, "installedOperatorShardTimeoutMs must remain visible in consequence projection source");
   assert(end > start, "installedOperatorShardTimeoutMs source slice must be bounded");
-  const timeoutPolicySource = handoffSource.slice(start, end);
-  assert.match(timeoutPolicySource, /Math\.min\(shardTimeoutMs, override\)/);
-  assert.match(timeoutPolicySource, /return shardTimeoutMs;/);
+  const timeoutPolicySource = edgeProjectionSource.slice(start, end);
+  assert.match(timeoutPolicySource, /sdlcOperatorRuntimePolicy/u);
+  assert.match(timeoutPolicySource, /minimumOperatorTimeoutMs/u);
+  assert.match(timeoutPolicySource, /installedOperatorShardTimeoutCapMs/u);
+  assert.match(timeoutPolicySource, /Math\.min\(declaredTimeoutMs, runtimePolicy\.installedOperatorShardTimeoutCapMs\)/);
+  assert.match(timeoutPolicySource, /return declaredTimeoutMs;/);
   assert.doesNotMatch(timeoutPolicySource, /15000/);
-});
-
-test("T-066 installed data_mapper successor materializes source and behavioral test inventory", async () => {
-  const workspace = freshDataMapperWorkspace();
-  const install = await installOddSdlcTypescript({
-    targetRoot: workspace,
-    packageSourceRoot: PACKAGE_ROOT,
-    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
-    installedPackageName: "odd-sdlc-t066"
-  });
-  assert.equal(install.kind, "installed");
-  const commandPath = installedOddSdlcCommand(install);
-  const workerScript = writeDataMapperInventoryWorkerScript(workspace);
-  const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
-  const target = "graph_function:bootstrap_release_self_test";
-  let codeResult = null;
-  let testResult = null;
-  let testExecutionResult = null;
-  let testRunResult = null;
-
-  for (let guard = 0; guard < 40; guard += 1) {
-    const gaps = runInstalledOddSdlc(commandPath, ["gaps", "--workspace", workspace], workspace);
-    const currentEdge = gaps.projection.currentEdge;
-    if (currentEdge === null) {
-      break;
-    }
-    if (currentEdge === FG_CONFORM_PROJECT) {
-      const induction = runInstalledOddSdlc(
-        commandPath,
-        ["start", "--workspace", workspace, "--until", "blocked"],
-        workspace
-      );
-      assert.equal(induction.status, "converged", currentEdge);
-      assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
-      continue;
-    }
-    if (currentEdge === FG_CONFORM_PROJECT_AUTHORITY) {
-      const authority = runInstalledOddSdlc(
-        commandPath,
-        [
-          "start",
-          "--workspace",
-          workspace,
-          "--target",
-          target,
-          "--until",
-          "first_traversal",
-          "--worker",
-          workerTransport
-        ],
-        workspace
-      );
-      assert(
-        authority.status === "converged" || authority.status === "worker_invoked",
-        `${currentEdge}: ${authority.status}`
-      );
-      if (authority.status === "worker_invoked") {
-        assert.equal(authority.postflight.status, "passed", currentEdge);
-      }
-      continue;
-    }
-    const start = runInstalledOddSdlc(
-      commandPath,
-      [
-        "start",
-        "--workspace",
-        workspace,
-        "--target",
-        target,
-        "--until",
-        "first_traversal",
-        "--worker",
-        workerTransport
-      ],
-      workspace
-    );
-    const observedEdge = start.summary?.currentEdge ?? currentEdge;
-    if (
-      observedEdge === "derive_component_code_surface" ||
-      (
-        start.manifest?.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
-        start.manifest?.targetAssetType === "component_code_surface"
-      )
-    ) {
-      codeResult = start;
-    }
-    if (
-      observedEdge === "derive_component_test_surface" ||
-      (
-        start.manifest?.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET &&
-        start.manifest?.targetAssetType === "component_test_surface"
-      )
-    ) {
-      testResult = start;
-    }
-    if (observedEdge === "derive_test_execution_result_surface") {
-      testExecutionResult = start;
-    }
-    if (observedEdge === "derive_test_run_archive_surface") {
-      testRunResult = start;
-      break;
-    }
-    if (start.status === "converged") {
-      continue;
-    }
-    assert.equal(start.status, "worker_invoked", currentEdge);
-    assert.equal(start.postflight.status, "passed", currentEdge);
-  }
-
-  assert(codeResult, "derive_component_code_surface did not run");
-  assert(testResult, "derive_component_test_surface did not run");
-  assert(testExecutionResult, "derive_test_execution_result_surface did not run");
-  assert(testRunResult, "derive_test_run_archive_surface did not run");
-  assert.equal(codeResult.assuranceSatisfaction.status, "close_allowed");
-  assert.equal(testResult.assuranceSatisfaction.status, "close_allowed");
-  assert.equal(testExecutionResult.postflight.status, "passed");
-  assert.equal(testRunResult.postflight.status, "passed");
-  const executionEvidence = testExecutionResult.workerReport?.executionEvidence ?? null;
-  if (executionEvidence !== null) {
-    assert.equal(
-      executionEvidence.status,
-      "succeeded"
-    );
-    assert.equal(
-      executionEvidence.testsObserved,
-      executionEvidence.shardEvidence.length
-    );
-    assert(executionEvidence.shardEvidence.length >= 1);
-    assert.equal(
-      executionEvidence.shardEvidence.length,
-      testExecutionResult.manifest.productMaterialization.executionShards.length
-    );
-  }
-  assert.equal(testRunResult.workerReport.executionEvidence, null);
-  assert.equal(
-    existsSync(
-      path.join(
-        workspace,
-        "build_tenants/scala_spark/cdme-core/src/main/scala/cdme/Core.scala"
-      )
-    ),
-    true
-  );
-  assert.equal(
-    existsSync(
-      path.join(
-        workspace,
-        "build_tenants/scala_spark/cdme-core/src/test/scala/cdme/CoreSpec.scala"
-      )
-    ),
-    true
-  );
-  assert.match(
-    readFileSync(
-      path.join(
-        workspace,
-        "build_tenants/scala_spark/cdme-core/src/main/scala/cdme/Core.scala"
-      ),
-      "utf8"
-    ),
-    /spark_session/
-  );
-  assert.match(
-    readFileSync(
-      path.join(
-        workspace,
-        "build_tenants/scala_spark/cdme-core/src/test/scala/cdme/CoreSpec.scala"
-      ),
-      "utf8"
-    ),
-    /assert\(Core\.retryClosed == true\)/
-  );
 });

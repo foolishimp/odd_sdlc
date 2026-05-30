@@ -69,7 +69,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
   "source_asset_dependency_missing",
-  "assurance_ledger_reason",
+  "edge_closure_residual_pressure",
   "hook_diagnostic_failed",
   "hook_diagnostic_missing",
   "installed_topology_invalid",
@@ -370,11 +370,11 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
       message: "Worker obligation assessment does not satisfy traversal pressure."
     });
   }
-  if (code === "assurance_ledger_reason") {
+  if (code === "edge_closure_residual_pressure") {
     return Object.freeze({
       reasonClass: "assurance",
       lawfulReentryPoint: "same_edge_retry",
-      message: "Assurance ledger fold blocked traversal closure."
+      message: "Edge closure residual pressure requires same-edge repair."
     });
   }
   if (code === "hook_diagnostic_failed" || code === "hook_diagnostic_missing") {
@@ -633,7 +633,7 @@ export function legacyBlockingReasonCode(reason: SdlcBlockingReason): string {
   if (reason.code === "hook_diagnostic_missing") {
     return "hook_diagnostic:hook_diagnostic_missing";
   }
-  if (reason.code === "assurance_ledger_reason") {
+  if (reason.code === "edge_closure_residual_pressure") {
     return reason.detail;
   }
   return reason.code;

@@ -46,6 +46,20 @@ function overlayByRef(catalog, ref) {
   return overlay;
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t168/${caseId}`,
+    compositionDigest: `digest://t168/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t168/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t168/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t168/${caseId}`,
+    graphVectorRef: `graph-vector://t168/${caseId}`,
+    basisRef: `basis://t168/${caseId}`
+  });
+}
+
 function fullGraphVectorNames() {
   const module = constructSdlcGtlModule();
   const graphFunction = module.graphFunctions.find(
@@ -283,6 +297,7 @@ test("T-168 overlay convergence cannot collapse component code into product clos
   );
 
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("full-overlay"),
     ledgerRef: "ledger://odd-sdlc/t168/full",
     ledgerVersionRef: "ledger-version://odd-sdlc/t168/full/1",
     overlayRef: SDLC_CURRENT_FULL_TRAVERSAL_OVERLAY_REF,

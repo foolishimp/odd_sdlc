@@ -25,6 +25,72 @@ GTL graph function edge
     -> traversal transition
 
 
+GTL graph function edge
+    -> SDLC EdgePolicy ### system event
+    -> ABG selected composition ### system event
+    -> plugin.transform.C ### UPDATES WORKSPACE MODEL, not a system event
+    -> system admission/write ### system event
+    -> plugin.evaluate.C ### system ledger from .C return --- consequence needs to evluate
+    -> system admission/write ### system event
+    -> plugin.consequence.C 
+    -> traversal transition ### system event
+
+If anyone of the plugins failed the system events are deterministic and can't fail through normal operation
+The consequence plugin which is deterministic and then trigger the appropriate state change
+
+ Use this as the corrected reference shape:
+
+  GTL graph function edge
+    -> ABG start / frame open                         ### system event
+    -> SDLC EdgePolicy selected                       ### admitted policy fact
+    -> ABG selected composition                       ### system event / admitted composition identity
+    -> plugin.transform.C                             ### candidate construction + declared workspace/product effects
+    -> system admission/write transform result         ### validates/adopts transform carriers, refs, events
+    -> system plan evaluation set                      ### deterministic rule plan from edge policy + selected composition
+    -> plugin.evaluate.C.rule[*]                       ### evaluation findings/outcomes, no workspace mutation
+    -> system admission/write evaluation outcomes      ### accepts or blocks rule outcomes, persists evidence
+    -> system collect evaluation set                   ### deterministic admitted evaluation projection
+    -> system assurance / closure fold                 ### deterministic fold over admitted transform + evaluation state
+    -> plugin.consequence.C                            ### deterministic projection over admitted state
+    -> system admission/write consequence projection   ### admits next-action/read-model projection
+
+    
+    -> traversal transition                            ### ABG-owned system event
+
+  Important distinctions:
+
+  plugin.transform.C
+    = may produce workspace/product candidates and declared artifacts
+    != ABG truth until admitted
+
+  plugin.evaluate.C
+    = returns rule outcomes, findings, diagnostics, residual pressure
+    != F_D semantic ledger
+    != workspace mutation
+
+  system admission/write
+    = deterministic ABG/system boundary
+    = records accepted/blocked/malformed outcomes
+    != semantic invention
+
+  plugin.consequence.C
+    = deterministic projection over admitted facts
+    = chooses/proposes next action from admitted state
+    != independent semantic evaluator
+
+  Failure shape:
+
+  any plugin fails / times out / returns malformed carrier
+    -> system records runtime event + diagnostic evidence
+    -> system admission rejects or blocks that payload
+    -> evaluation/closure fold sees admitted failure state
+    -> consequence projects retry / block / inspect / re-enter
+    -> traversal transition records the chosen state change
+
+  That is why deleting fake F_D semantic ledgers should not reduce reliability: deterministic visibility remains at every boundary, but
+  F_D no longer invents design-depth or semantic closure.
+
+
 
 
 --- claude ---

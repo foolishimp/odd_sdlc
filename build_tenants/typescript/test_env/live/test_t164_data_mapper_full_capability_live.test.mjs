@@ -21,9 +21,14 @@ import { fileURLToPath } from "node:url";
 import {
   OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS
 } from "../../build/semantic/code/src/index.js";
+import {
+  configuredLiveTimeoutMs,
+  liveOperatorRuntimePolicy
+} from "./operator_runtime_policy.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
@@ -41,25 +46,20 @@ const LIVE_TEST_RUN_ROOT =
   process.env["ODD_SDLC_TS_LIVE_TEST_RUN_ROOT"] ??
   process.env["ODD_SDLC_TS_TEST_RUN_ROOT"] ??
   path.join(PACKAGE_ROOT, "test_env/test_runs");
-const COMMAND_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_TIMEOUT_MS"] ??
-    `${1000 * 60 * 60 * 12}`,
-  10
+const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_TIMEOUT_MS",
+  RUNTIME_POLICY.liveHarnessFullCapabilityCommandTimeoutMs
 );
-const WORKER_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_TIMEOUT_MS"] ??
-    process.env["ODD_SDLC_WORKER_TIMEOUT_MS"] ??
-    `${COMMAND_TIMEOUT_MS}`,
-  10
+const WORKER_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_TIMEOUT_MS",
+  RUNTIME_POLICY.workerTimeoutMs
 );
-const WORKER_INACTIVITY_TIMEOUT_MS = Number.parseInt(
-  process.env[
-    "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_INACTIVITY_TIMEOUT_MS"
-  ] ??
-    process.env["ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS"] ??
-    `${1000 * 60 * 30}`,
-  10
+const WORKER_INACTIVITY_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER_INACTIVITY_TIMEOUT_MS",
+  RUNTIME_POLICY.workerInactivityTimeoutMs
 );
+const DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS =
+  RUNTIME_POLICY.designDepthFpEvaluatorTimeoutMs;
 
 const REQUIRED_FULL_GRAPH_EDGES = Object.freeze([
   ...OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS
@@ -125,6 +125,27 @@ function freshDataMapperWorkspace(archiveRoot) {
 
 function runCommand(input) {
   const startedAt = new Date().toISOString();
+  const processRecordPath = path.join(input.archiveRoot, `${input.label}.process.json`);
+  writeJson(processRecordPath, {
+    kind: "odd_sdlc_t164_full_capability_process_result",
+    lifecycleStatus: "started",
+    label: input.label,
+    command: input.command,
+    args: input.args,
+    cwd: input.cwd,
+    status: null,
+    signal: null,
+    error: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
+    workerTimeoutMs: WORKER_TIMEOUT_MS,
+    workerInactivityTimeoutMs: WORKER_INACTIVITY_TIMEOUT_MS,
+    designDepthFpEvaluatorTimeoutMs: DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS,
+    startedAt,
+    endedAt: null,
+    hostPid: process.pid
+  });
   const run = spawnSync(input.command, input.args, {
     cwd: input.cwd,
     encoding: "utf8",
@@ -136,6 +157,9 @@ function runCommand(input) {
       ODD_SDLC_WORKER_TIMEOUT_MS: String(WORKER_TIMEOUT_MS),
       ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: String(
         WORKER_INACTIVITY_TIMEOUT_MS
+      ),
+      ODD_SDLC_DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS: String(
+        DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS
       )
     },
     maxBuffer: 1024 * 1024 * 100,
@@ -144,6 +168,7 @@ function runCommand(input) {
   const endedAt = new Date().toISOString();
   const record = {
     kind: "odd_sdlc_t164_full_capability_process_result",
+    lifecycleStatus: "completed",
     label: input.label,
     command: input.command,
     args: input.args,
@@ -153,10 +178,15 @@ function runCommand(input) {
     error: run.error?.message ?? null,
     stdoutBytes: Buffer.byteLength(run.stdout ?? "", "utf8"),
     stderrBytes: Buffer.byteLength(run.stderr ?? "", "utf8"),
+    commandTimeoutMs: COMMAND_TIMEOUT_MS,
+    workerTimeoutMs: WORKER_TIMEOUT_MS,
+    workerInactivityTimeoutMs: WORKER_INACTIVITY_TIMEOUT_MS,
+    designDepthFpEvaluatorTimeoutMs: DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS,
     startedAt,
-    endedAt
+    endedAt,
+    hostPid: process.pid
   };
-  writeJson(path.join(input.archiveRoot, `${input.label}.process.json`), record);
+  writeJson(processRecordPath, record);
   writeFileSync(
     path.join(input.archiveRoot, `${input.label}.stdout.json`),
     run.stdout ?? "",
@@ -490,6 +520,7 @@ test(
       commandTimeoutMs: COMMAND_TIMEOUT_MS,
       workerTimeoutMs: WORKER_TIMEOUT_MS,
       workerInactivityTimeoutMs: WORKER_INACTIVITY_TIMEOUT_MS,
+      designDepthFpEvaluatorTimeoutMs: DESIGN_DEPTH_FP_EVALUATOR_TIMEOUT_MS,
       requiredEdges: REQUIRED_FULL_GRAPH_EDGES
     };
     writeJson(path.join(archiveRoot, "run_summary.json"), summary);

@@ -44,6 +44,20 @@ function admittedTargetCarrier(contract) {
   };
 }
 
+function selectedComposition(edgeRef) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t171/${edgeRef}`,
+    compositionDigest: `digest://t171/${edgeRef}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t171/${edgeRef}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t171/${edgeRef}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t171/${edgeRef}`,
+    graphVectorRef: `graph-vector://t171/${edgeRef}`,
+    basisRef: `basis://t171/${edgeRef}`
+  });
+}
+
 function gainFor(input) {
   const contract = contractByEdge(input.edgeRef);
   const obligations = deriveSdlcEdgeObligations({
@@ -75,6 +89,7 @@ function gainFor(input) {
 
 function closureDecisionFor(input) {
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition(input.gain.edgeRef),
     ledgerRef: `ledger://t171/${input.gain.edgeRef}/edge-fulfillment`,
     ledgerVersionRef: `ledger-version://t171/${input.gain.edgeRef}/1`,
     edgeAssuranceContractRef: input.gain.contractRef,
@@ -191,6 +206,7 @@ test("T-171 explicit residual pressure survives fulfilled counts", () => {
     ]
   });
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("residual-survives"),
     ledgerRef: "ledger://t171/residual-survives",
     ledgerVersionRef: "ledger-version://t171/residual-survives/1",
     edgeAssuranceContractRef: fulfilled.gain.contractRef,

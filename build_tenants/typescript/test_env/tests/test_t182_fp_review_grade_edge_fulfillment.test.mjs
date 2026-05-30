@@ -30,6 +30,7 @@ import {
   materializeSdlcProjectConformance,
   measureSdlcEdgeGain,
   requireSdlcProductGraphContractRow,
+  reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
   reviewGradeFindingsAreDownstreamStagePressure,
@@ -649,7 +650,11 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       "t182-wrong-stage-pressure"
     );
     const base = reviewGradeAssessment(manifest);
-    const wrongStageFindings = base.findings.slice(0, 2).map((finding) => ({
+    const requirementFinding = base.findings.find((finding) =>
+      finding.obligationId.startsWith("requirement:")
+    );
+    assert.notEqual(requirementFinding, undefined);
+    const wrongStageFindings = [requirementFinding].map((finding) => ({
       ...finding,
       fulfillmentStatus: "partial",
       failureClass: "wrong_stage",
@@ -675,14 +680,83 @@ test("T-182 wrong-stage review findings are downstream pressure, not same-edge r
       reviewGradeFindingsAreDownstreamStagePressure([
         {
           ...wrongStageFindings[0],
+          obligationId: "target_asset:test_design_surface",
+          requiredAction:
+            "Carry this target-asset problem to a downstream surface."
+        }
+      ]),
+      false
+    );
+    assert.equal(
+      reviewGradeFindingsAreDownstreamStagePressure([
+        {
+          ...wrongStageFindings[0],
           fulfillmentStatus: "blocked"
         }
       ]),
       false
     );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+        runRef: "t182-wrong-stage-pressure",
+        assessment: {
+          ...base,
+          status: "blocked",
+          findings: wrongStageFindings
+        }
+      }),
+      []
+    );
+    assert.deepEqual(
+      reviewGradeEdgeFulfillmentOpenPressureRefs({
+        runRef: "t182-wrong-stage-pressure",
+        assessments: wrongStageFindings.map((finding) => ({
+          kind: "sdlc_worker_obligation_assessment",
+          obligationId: finding.obligationId,
+          fulfillmentStatus: finding.fulfillmentStatus,
+          evidenceRefs: finding.evidenceRefs,
+          blockingReasons: [
+            `requirement_carried_for_downstream_closure:${finding.obligationId.replace(/^requirement:/u, "")}`
+          ],
+          reviewGrade: true,
+          reviewFailureClass: finding.failureClass,
+          requiredAction: finding.requiredAction,
+          semanticEvidenceRefs: finding.evidenceRefs,
+          acceptedAuthorityRefs: finding.acceptedAuthorityRefs,
+          fulfillmentBinding: null
+        }))
+      }),
+      []
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
+});
+
+test("T-182 review-grade prompt routes lawful downstream carryover through wrong_stage", () => {
+  const source = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+  assert.match(
+    source,
+    /requirement_carried_for_downstream_closure:/u
+  );
+  assert.match(
+    source,
+    /requirement_recorded_for_future_closure:/u
+  );
+  assert.match(
+    source,
+    /exact worker_result_report obligation assessment with requirement_recorded_for_future_closure:/u
+  );
+  assert.match(
+    source,
+    /mark that finding partial with failureClass wrong_stage/u
+  );
+  assert.match(
+    source,
+    /wrong_stage is only for lawful downstream carryover/u
+  );
 });
 
 test("T-183 scalar F_P evaluation carries open review-grade pressure", () => {
@@ -728,6 +802,62 @@ test("T-183 scalar F_P evaluation carries open review-grade pressure", () => {
   ]);
 });
 
+test("T-184 consequence pressure follows selected review-grade assessment truth", () => {
+  const fulfilledFinding = {
+    kind: "sdlc_review_grade_obligation_finding",
+    obligationId: "requirement://t184/review-grade-selected",
+    fulfillmentStatus: "fulfilled",
+    failureClass: null,
+    requiredAction: null,
+    evidenceRefs: ["evidence://t184/selected-review"],
+    acceptedAuthorityRefs: ["authority://t184/selected-review"],
+    fulfillmentBinding: null,
+    rationale: "selected review-grade evaluator accepted the obligation"
+  };
+  const passedAssessment = {
+    kind: "sdlc_review_grade_edge_fulfillment_assessment",
+    assessmentVersion: "ts-review-grade-v1",
+    graphFunctionName: "derive_intent_surface",
+    edgeName: "derive_intent_surface",
+    targetAssetType: "intent_surface",
+    status: "passed",
+    reviewedObligationIds: [fulfilledFinding.obligationId],
+    findings: [fulfilledFinding],
+    evidenceRefs: ["evidence://t184/selected-review"],
+    summary: "selected review-grade assessment passed"
+  };
+  assert.deepEqual(
+    reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+      runRef: "t184-selected-review",
+      assessment: passedAssessment
+    }),
+    []
+  );
+
+  const blockedAssessment = {
+    ...passedAssessment,
+    status: "blocked",
+    findings: [
+      {
+        ...fulfilledFinding,
+        fulfillmentStatus: "partial",
+        failureClass: "semantic_not_realized",
+        requiredAction: "publish the accepted requirement in the target surface",
+        rationale: "selected review-grade evaluator found residual pressure"
+      }
+    ]
+  };
+  assert.deepEqual(
+    reviewGradeEdgeFulfillmentAssessmentPressureRefs({
+      runRef: "t184-selected-review",
+      assessment: blockedAssessment
+    }),
+    [
+      "pressure://odd-sdlc/review-grade/t184-selected-review/requirement%3A%2F%2Ft184%2Freview-grade-selected"
+    ]
+  );
+});
+
 test("T-182 transformer prompts use accepted authority rows and evaluated gaps as the work queue", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -747,73 +877,73 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     assert.match(prompt, /Tenant stack authority must match the product files actually emitted/u);
     assert.match(prompt, /Do not satisfy multiple accepted component rows by collapsing them back into one coarse facade/u);
 
-    const installedOperatorSource = readRepoFile(
-      "build_tenants/typescript/code/src/operator/installed_operator.ts"
+    const promptSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
     );
-    assert.match(installedOperatorSource, /No other top-level keys are allowed/u);
-    assert.match(installedOperatorSource, /No other finding keys are allowed/u);
+    assert.match(promptSource, /No other top-level keys are allowed/u);
+    assert.match(promptSource, /No other finding keys are allowed/u);
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /sourceAssetCarryover, sourceAssetStatus, confidence/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Verify every finding key set is exactly kind, obligationId, fulfillmentStatus/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /If reviewedObligationIds is large, create the assessment with a short local script/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Do not manually type or stream a large findings array through stdout/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Every finding must include at least one acceptedAuthorityRef/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /For target_asset findings, use the construction brief targetCarrierProjection/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /every fulfilled finding must provide it, including target_asset, source_asset, module/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /module-level or source-asset-level carryover/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /source only exports a helper or function and has no entrypoint path/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /tenant stack authority contradicts emitted product files/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Requirement lineage is transformer-owned semantic evidence/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Mark trace_missing when a generated product file is used as fulfillment evidence/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /compare worker_result_report\.materializedFiles and product_materialization_manifest files to declared product-file targets/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /undeclared build\/test byproducts or extra product files as materialized product truth/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Build outputs, dependency caches, lockfiles, coverage directories, and transient execution artifacts are not fulfillment proof/u
     );
     assert.match(
-      installedOperatorSource,
+      promptSource,
       /Allowed execution byproducts may remain only as byproducts/u
     );
   } finally {

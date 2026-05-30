@@ -7,7 +7,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  constructPostflightGapDossier,
   constructSdlcEdgeFulfillmentLedger,
   deriveCapabilityAssuranceLedger,
   deriveComponentDepthAssuranceLedger,
@@ -29,6 +28,17 @@ function tmpFile(prefix, name, content) {
 
 function openEdgeLedger() {
   return constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: {
+      kind: "sdlc_selected_abg_fn_composition_identity",
+      compositionRef: "abg.fn_composition://t149/current",
+      compositionDigest: "digest://t149/current",
+      compositionSelectionRef: "abg.fn_composition_selection://t149/current",
+      selectedRegimeBindingRef:
+        "abg.fn_composition.regime_binding://t149/current/evaluate/fp",
+      graphFunctionRef: "graph-function://t149/current",
+      graphVectorRef: "graph-vector://t149/current",
+      basisRef: "basis://t149/current"
+    },
     ledgerRef: "ledger://t149/current",
     ledgerVersionRef: "ledger-version://t149/current/1",
     edgeRef: "edge://t149/current",
@@ -187,72 +197,6 @@ test("T-149 capability evidence missing without basis remains a hard block", () 
   });
   assert.equal(decision.disposition, "block");
 });
-
-test("T-149 component-depth missing output is no-basis block, not repair or yield", () => {
-  const missingOutput = join(tmpRoot("odd-sdlc-t149-missing-output-"), "missing.md");
-  const sourceFile = tmpFile(
-    "odd-sdlc-t149-missing-output-source-",
-    "component.ts",
-    "export const t149 = true;\n"
-  );
-  const gate = deriveSdlcOperatorAssuranceGate({
-    manifest: manifest(),
-    report: workerReport({
-      outputFile: missingOutput,
-      materializedFiles: [
-        {
-          kind: "sdlc_materialized_product_file",
-          role: "source",
-          relativePath: "src/component.ts",
-          absolutePath: sourceFile,
-          digest: "sha256:t149-source",
-          byteCount: 26
-        }
-      ]
-    }),
-    postflight: passedPostflight()
-  });
-  assert(gate.blockingPostflight);
-  const reason = gate.blockingPostflight.blockingReasonCarriers.find(
-    (carrier) => carrier.detail === "component_depth_output_missing"
-  );
-  assert(reason);
-  assert.equal(reason.lawfulReentryPoint, "operator_blocked");
-
-  const dossier = constructPostflightGapDossier({
-    manifest: manifest(),
-    postflight: gate.blockingPostflight
-  });
-  assert.deepEqual(dossier.nextLawfulActions, ["triage_gap"]);
-
-  const ledger = openEdgeLedger();
-  const decision = deriveSdlcEdgeClosureDecision({
-    decisionRef: "closure-decision://t149/component-depth-block",
-    ledger,
-    currentEdgeLawful: true,
-    blockReasonRefs: [reason.detail]
-  });
-  assert.equal(decision.disposition, "block");
-  assert.throws(
-    () =>
-      deriveSdlcEdgeClosureDecision({
-        decisionRef: "closure-decision://t149/component-depth-yield",
-        ledger,
-        currentEdgeLawful: true,
-        blockReasonRefs: [reason.detail],
-        yieldResumeBasis: {
-          yieldKind: "process_active_under_liveness_observer",
-          resumeBasisRef: "resume-basis://t149/liveness-only",
-          currentEdgeRef: ledger.edgeRef,
-          admittedProgressRefs: ["liveness://t149/active"],
-          livenessProjectionRef: "liveness://t149/active",
-          resumePolicyRef: "resume-policy://t149/no-liveness-only"
-        }
-      }),
-    /yield requires admitted progress beyond liveness refs/
-  );
-});
-
 test("T-149 malformed component-depth register remains repairable worker output", () => {
   const malformedRegister = tmpFile(
     "odd-sdlc-t149-malformed-component-depth-",

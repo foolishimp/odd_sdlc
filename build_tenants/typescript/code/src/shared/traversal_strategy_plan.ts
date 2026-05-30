@@ -17,9 +17,6 @@ export const ODD_SDLC_TRAVERSAL_STRATEGY_PROFILE_VALUES = Object.freeze([
   "steel_thread_after_requirements"
 ] as const);
 
-export type OddSdlcTraversalStrategyProfile =
-  (typeof ODD_SDLC_TRAVERSAL_STRATEGY_PROFILE_VALUES)[number];
-
 const ODD_SDLC_DEFAULT_TRAVERSAL_EDGE_STRATEGIES: Readonly<
   Record<string, OddSdlcDefaultTraversalStrategy>
 > = Object.freeze({

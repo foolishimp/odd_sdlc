@@ -92,7 +92,7 @@ Resulting layout (the install resolver depends on this sibling shape):
 <APPS>/
 ├── abiogenesis/                   # GTL/ABG substrate snapshots/docs (required)
 │   ├── docs/
-│   └── release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/
+│   └── release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/
 ├── odd_sdlc/                      # odd_sdlc domain source          (required)
 │   └── build_tenants/typescript/
 ├── specification_methodology/     # constitutional method standards (required)
@@ -104,7 +104,7 @@ Resulting layout (the install resolver depends on this sibling shape):
 Verify:
 
 ```bash
-ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/abiogenesis-typescript-tenant-3.9.0-rc.5.tgz
 ls "$APPS"/odd_sdlc/build_tenants/typescript/package.json
 ls "$APPS"/specification_methodology/specification/standards/SPEC_METHOD.md
 ```
@@ -123,15 +123,15 @@ clone before continuing — the resolver will not find ABG otherwise.
 ## 2. Verify the pinned ABIogenesis TypeScript release snapshot
 
 ```bash
-ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/release-snapshot-manifest.json
-ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/checksums.sha256
-ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.8.0-rc.3/abiogenesis-typescript-tenant-3.8.0-rc.3.tgz
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/release-snapshot-manifest.json
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/checksums.sha256
+ls "$APPS"/abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/abiogenesis-typescript-tenant-3.9.0-rc.5.tgz
 ```
 
 The current pinned ABG package is:
 
 ```text
-@abiogenesis/typescript-tenant@3.8.0-rc.3
+@abiogenesis/typescript-tenant@3.9.0-rc.5
 ```
 
 Do not rebuild ABIogenesis as part of normal odd_sdlc setup. Rebuilding ABG is
@@ -175,7 +175,7 @@ npm run test:t058    # spec method entrypoint smoke
 > Build the odd_sdlc TypeScript tenant at
 > `$APPS/odd_sdlc/build_tenants/typescript`. Run `npm install` then
 > `npm run build:semantic`. Verify `node_modules/@abiogenesis/typescript-tenant/package.json`
-> reports version `3.8.0-rc.3` and that
+> reports version `3.9.0-rc.5` and that
 > `build/semantic/code/src/cli/main.js` exists. Then run `npm run test:t058`
 > as a smoke check.
 
@@ -227,7 +227,7 @@ node "$APPS/odd_sdlc/build_tenants/typescript/build/semantic/code/src/cli/main.j
 
 The defaults for `--package-source` and `--abg-package-source` resolve to the
 odd_sdlc package root and its package-local ABIogenesis dependency. That
-dependency is installed from the ABIogenesis `3.8.0-rc.3` release snapshot, so
+dependency is installed from the ABIogenesis `3.9.0-rc.5` release snapshot, so
 you do **not** need to pass either flag explicitly.
 
 After the install completes, the project workspace contains:

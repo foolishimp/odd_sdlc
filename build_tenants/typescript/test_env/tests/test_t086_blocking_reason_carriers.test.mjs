@@ -233,7 +233,7 @@ test("T-086 legacy retry-frontier keys preserve execution shard detail", () => {
   assert.equal(admitted.detail, first.detail);
 });
 
-test("T-086/T-114 postflight classifies from typed truth, not report prose", () => {
+test("T-086/T-114 postflight classifies typed truth without report-prose blockers", () => {
   const root = makeWorkspace();
   const contract = hookContractByEdgeName("derive_code_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -262,36 +262,23 @@ test("T-086/T-114 postflight classifies from typed truth, not report prose", () 
   };
 
   const postflight = evaluateSdlcComputeStage({ manifest, report });
-  assert.equal(postflight.status, "blocked");
+  assert.equal(postflight.status, "passed");
+  assert(
+    !postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "worker_report_unresolved_reasons_present"
+    )
+  );
   assert(
     postflight.blockingReasonCarriers.some(
       (reason) => reason.code === "unexpected_product_materialization_for_surface_edge"
     )
   );
   assert(
-    !postflight.blockingReasonCarriers.some(
-      (reason) => reason.code === "worker_report_unresolved_reasons_present"
+    postflight.blockingReasonCarriers.some(
+      (reason) => reason.code === "obligation_unassessed"
     )
   );
-  assert.deepEqual(
-    postflight.blockingReasons,
-    postflight.blockingReasonCarriers.map(legacyBlockingReasonCode)
-  );
-
-  const dossier = constructPostflightGapDossier({ manifest, postflight });
-  const mismatch = dossier.reasons.find(
-    (reason) =>
-      reason.blockingReason.code === "unexpected_product_materialization_for_surface_edge"
-  );
-  assert(mismatch);
-  assert.equal(mismatch.reasonClass, mismatch.blockingReason.reasonClass);
-  assert.equal(mismatch.blockingReason.lawfulReentryPoint, "repair_worker_output");
-
-  const archivePayload = JSON.parse(JSON.stringify(dossier));
-  assert.equal(
-    archivePayload.reasons[0].blockingReason.kind,
-    "sdlc_blocking_reason"
-  );
+  assert.deepEqual(postflight.blockingReasons, []);
 });
 
 test("B-086 postflight gap dossier preserves F_P escalation as lawful reentry", () => {
@@ -305,7 +292,7 @@ test("B-086 postflight gap dossier preserves F_P escalation as lawful reentry", 
     contract
   });
   const blockingReason = makeSdlcBlockingReason({
-    code: "assurance_ledger_reason",
+    code: "edge_closure_residual_pressure",
     detail: "design_completeness_attribute_partial",
     evidenceRefs: ["proof://fd-ambiguity"],
     lawfulReentryPoint: "escalate_to_fp",

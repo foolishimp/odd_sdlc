@@ -23,7 +23,6 @@ export {
   buildPostTransformWorkerResultReport,
   workerResultReportWithReplayedProductMaterialization,
   workerResultReportWithFpStageRefs,
-  writeDeclaredEdgeProjectionOutput,
   constructWorkerFpTransformResult,
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest,
@@ -39,10 +38,15 @@ export {
   type SdlcStagedConstructionAuditCarrier,
   type SdlcProductMaterializationSnapshot
 } from "./plugins/transform/launch_contract.js";
+export {
+  writeDeclaredEdgeProjectionOutput
+} from "./plugins/consequence/edge_projection.js";
 export * from "./system_artifacts.js";
 export * from "./edge_output_policy.js";
 export * from "./plugins/evaluate/index.js";
 export * from "./work_category_governance.js";
+export * from "./runtime_policy.js";
+export * from "./tool_environment.js";
 export * from "./feature_scope.js";
 export * from "./traversal_strategy.js";
 export * from "./traversal_consequence.js";

@@ -75,6 +75,20 @@ function makeWorkspace() {
   return root;
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t169/${caseId}`,
+    compositionDigest: `digest://t169/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t169/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t169/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t169/${caseId}`,
+    graphVectorRef: `graph-vector://t169/${caseId}`,
+    basisRef: `basis://t169/${caseId}`
+  });
+}
+
 function materializedVectorsForModule(module) {
   return module.graphFunctions.flatMap((graphFunction) =>
     materializeGraphFunction(graphFunction).vectors
@@ -373,6 +387,7 @@ test("T-170 rejected or missing target carrier admission preserves protocol pres
 
   const contract = resolveSdlcEdgeGainClosureContract(edgeRef);
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("derive-code"),
     ledgerRef: "ledger://t169/derive-code/edge-fulfillment",
     ledgerVersionRef: "ledger-version://t169/derive-code/edge-fulfillment/1",
     edgeAssuranceContractRef: sdlcEdgeAssuranceContractRef(contract),
@@ -432,6 +447,7 @@ test("T-170 rejected or missing target carrier admission preserves protocol pres
   );
 
   const omittedCarrierLedger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("derive-code/omitted-carrier"),
     ledgerRef: "ledger://t169/derive-code/edge-fulfillment/omitted-carrier",
     ledgerVersionRef:
       "ledger-version://t169/derive-code/edge-fulfillment/omitted-carrier/1",

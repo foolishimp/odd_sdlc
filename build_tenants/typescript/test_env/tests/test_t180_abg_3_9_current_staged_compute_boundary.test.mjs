@@ -12,6 +12,9 @@ import {
   sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput
 } from "../../build/semantic/code/src/index.js";
 
+const ABG_RC_VERSION = "3.9.0-rc.5";
+const ABG_DEPENDENCY_REF = `file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RC_VERSION}/abiogenesis-typescript-tenant-${ABG_RC_VERSION}.tgz`;
+
 const PACKAGE_ROOT = process.cwd();
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
 
@@ -23,27 +26,25 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
-test("T-180 pins the TypeScript tenant to ABG 3.9.0-rc.4", () => {
+test(`T-180 pins the TypeScript tenant to ABG ${ABG_RC_VERSION}`, () => {
   const packageJson = readPackageJson("package.json");
   const packageLock = readPackageJson("package-lock.json");
-  const dependencyRef =
-    "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.4/abiogenesis-typescript-tenant-3.9.0-rc.4.tgz";
 
   assert.equal(
     packageJson.dependencies["@abiogenesis/typescript-tenant"],
-    dependencyRef
+    ABG_DEPENDENCY_REF
   );
   assert.equal(
     packageLock.packages[""].dependencies["@abiogenesis/typescript-tenant"],
-    dependencyRef
+    ABG_DEPENDENCY_REF
   );
   assert.equal(
     packageLock.packages["node_modules/@abiogenesis/typescript-tenant"].version,
-    "3.9.0-rc.4"
+    ABG_RC_VERSION
   );
   assert.equal(
     ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT.packageVersion,
-    "3.9.0-rc.4"
+    ABG_RC_VERSION
   );
 });
 
@@ -104,21 +105,32 @@ test("T-180 installed operator uses ABG plugin input for traversal consequence c
 });
 
 test("T-180 installed operator binds distinct transform, evaluate, and consequence plugins", () => {
-  const source = readRepoFile("build_tenants/typescript/code/src/operator/installed_operator.ts");
+  const installedOperator = readRepoFile("build_tenants/typescript/code/src/operator/installed_operator.ts");
+  const pluginContracts = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/plugin_contracts.ts"
+  );
+  const pluginSet = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/plugin_set.ts"
+  );
 
-  assert.match(source, /function fpDispatchPluginContract\(\)/u);
-  assert.match(source, /computeStageRole: "transform"/u);
-  assert.match(source, /computeStagePurpose: "candidate_construction"/u);
-  assert.match(source, /function fpEvaluatorPluginContract\(\)/u);
-  assert.match(source, /pluginKind: "fp_evaluator"/u);
-  assert.match(source, /computeStageRole: "evaluate"/u);
-  assert.match(source, /computeStagePurpose: "candidate_evaluation"/u);
-  assert.match(source, /function consequenceProjectionPluginContract\(\)/u);
-  assert.match(source, /pluginKind: "consequence_projection"/u);
-  assert.match(source, /computeStageRole: "consequence"/u);
-  assert.match(source, /computeStagePurpose: "consequence_projection"/u);
-  assert.match(source, /fpDispatch,\s+fpEvaluator,\s+consequenceProjection,/u);
-  assert.doesNotMatch(source, /plugins: \{ fpDispatch \}/u);
+  assert.match(pluginContracts, /function fpDispatchPluginContract\(\)/u);
+  assert.match(pluginContracts, /computeStageRole: "transform"/u);
+  assert.match(pluginContracts, /computeStagePurpose: "candidate_construction"/u);
+  assert.match(pluginContracts, /function fpEvaluatorPluginContract\(\)/u);
+  assert.match(pluginContracts, /pluginKind: "fp_evaluator"/u);
+  assert.match(pluginContracts, /computeStageRole: "evaluate"/u);
+  assert.match(pluginContracts, /computeStagePurpose: "candidate_evaluation"/u);
+  assert.match(pluginContracts, /function consequenceProjectionPluginContract\(\)/u);
+  assert.match(pluginContracts, /pluginKind: "consequence_projection"/u);
+  assert.match(pluginContracts, /computeStageRole: "consequence"/u);
+  assert.match(pluginContracts, /computeStagePurpose: "consequence_projection"/u);
+  assert.match(pluginSet, /function createSdlcAbgPluginSet\(/u);
+  assert.match(pluginSet, /fpDispatch:\s+Object\.freeze/u);
+  assert.match(pluginSet, /fpEvaluator:\s+Object\.freeze/u);
+  assert.match(pluginSet, /consequenceProjection:\s+Object\.freeze/u);
+  assert.match(installedOperator, /createSdlcAbgPluginSet\(/u);
+  assert.doesNotMatch(installedOperator, /function fpDispatchPluginContract\(\)/u);
+  assert.doesNotMatch(installedOperator, /plugins: \{ fpDispatch \}/u);
 });
 
 test("T-180 live evaluate and consequence paths do not synthesize selected composition", () => {

@@ -988,14 +988,6 @@ export function publicRequirementStatusToClosureRegisterStatus(
   return status;
 }
 
-export function assessmentStatusToClosureRegisterStatus(
-  status: SdlcEdgeFulfillmentAssessmentStatus
-): SdlcRequirementFulfillmentStatus {
-  return publicRequirementStatusToClosureRegisterStatus(
-    publicStatusFromAssessment(status)
-  );
-}
-
 export function projectSdlcRequirementFulfillmentPublicViewFromAssessments(input: {
   readonly closureRegister: SdlcRequirementClosureRegister;
   readonly assessments: readonly SdlcRequirementFulfillmentAssessmentPublicInput[];

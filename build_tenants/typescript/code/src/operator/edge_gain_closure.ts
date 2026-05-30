@@ -494,6 +494,26 @@ export function deriveSdlcEdgeResidualPressure(
   });
 }
 
+export function withAdditionalSdlcEdgeResidualPressureRefs(input: {
+  readonly residualPressure: SdlcEdgeResidualPressure;
+  readonly requiredPressureRefs?: readonly string[];
+  readonly informationalPressureRefs?: readonly string[];
+}): SdlcEdgeResidualPressure {
+  const requiredPressureRefs = uniqueSorted([
+    ...input.residualPressure.requiredPressureRefs,
+    ...(input.requiredPressureRefs ?? [])
+  ]);
+  return Object.freeze({
+    ...input.residualPressure,
+    requiredPressureRefs,
+    informationalPressureRefs: uniqueSorted([
+      ...input.residualPressure.informationalPressureRefs,
+      ...(input.informationalPressureRefs ?? [])
+    ]),
+    clear: requiredPressureRefs.length === 0
+  });
+}
+
 export function deriveSdlcEdgeAssuranceCloseDecision(input: {
   readonly gain: SdlcEdgeGain;
   readonly residualPressure: SdlcEdgeResidualPressure;

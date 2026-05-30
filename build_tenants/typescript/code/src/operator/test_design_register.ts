@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import {
   parseClosedRecord,
   parseEnumValue,
+  parseOptionalArray as parseArray,
   parseNonEmptyString,
   parseNullableNonEmptyString,
   parseStringList
@@ -38,22 +39,6 @@ function isTestDesignTarget(
   targetAssetType: string
 ): targetAssetType is TestDesignTarget {
   return TEST_DESIGN_TARGETS.some((target) => target === targetAssetType);
-}
-
-function parseArray<T>(
-  input: unknown,
-  label: string,
-  parseItem: (item: unknown, itemLabel: string) => T
-): readonly T[] {
-  if (input === undefined) {
-    return Object.freeze([]);
-  }
-  if (!Array.isArray(input)) {
-    throw new TypeError(`${label}: expected array`);
-  }
-  return Object.freeze(
-    input.map((item, index) => parseItem(item, `${label}[${index}]`))
-  );
 }
 
 function parseDesignConsumptionRow(
@@ -391,14 +376,31 @@ function parseRegister(input: unknown, label: string): SdlcTestDesignRegister {
   });
 }
 
-// F_D test-design admission is exact; schedule/test semantic defaults belong to selected evaluate.C/F_P content ledgers.
+// F_D test-design admission is exact; schedule/test semantic defaults belong to selected evaluate.C/F_P content registers.
+
+function pushParsedJsonCandidate(
+  candidates: unknown[],
+  content: string
+): void {
+  try {
+    candidates.push(JSON.parse(content));
+  } catch {
+    // Not every markdown fence is JSON. The admission error below reports
+    // whether no parseable register candidate was present.
+  }
+}
 
 function jsonCandidates(content: string): readonly unknown[] {
-  try {
-    return Object.freeze([JSON.parse(content)]);
-  } catch {
-    return Object.freeze([]);
+  const candidates: unknown[] = [];
+  pushParsedJsonCandidate(candidates, content);
+  const fencePattern = /```[^\n]*\n([\s\S]*?)```/gu;
+  for (const match of content.matchAll(fencePattern)) {
+    const block = match[1];
+    if (block !== undefined) {
+      pushParsedJsonCandidate(candidates, block.trim());
+    }
   }
+  return Object.freeze(candidates);
 }
 
 function requiredRowsPresent(

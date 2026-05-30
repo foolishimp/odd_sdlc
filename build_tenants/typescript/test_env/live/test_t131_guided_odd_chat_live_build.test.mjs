@@ -26,9 +26,14 @@ import {
   ODD_SDLC_TRANSFORM_ASSET_ROOT_RELATIVE_PATH
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import {
+  configuredLiveTimeoutMs,
+  liveOperatorRuntimePolicy
+} from "./operator_runtime_policy.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
@@ -49,14 +54,21 @@ const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_MAX_STEPS"] ?? "40",
   10
 );
-const INSTALL_COMMAND_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_COMMAND_TIMEOUT_MS"] ?? `${1000 * 60 * 20}`,
-  10
+const INSTALL_COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_COMMAND_TIMEOUT_MS",
+  RUNTIME_POLICY.liveHarnessCommandTimeoutMs
 );
-const INSTALLED_COMMAND_TIMEOUT_MS = Number.parseInt(
+const REQUESTED_INSTALLED_COMMAND_TIMEOUT_MS = Number.parseInt(
   process.env["ODD_SDLC_TS_T131_GUIDED_ODD_CHAT_INSTALLED_COMMAND_TIMEOUT_MS"] ?? "0",
   10
 );
+const INSTALLED_COMMAND_TIMEOUT_MS =
+  REQUESTED_INSTALLED_COMMAND_TIMEOUT_MS > 0
+    ? Math.max(
+        RUNTIME_POLICY.minimumOperatorTimeoutMs,
+        REQUESTED_INSTALLED_COMMAND_TIMEOUT_MS
+      )
+    : 0;
 
 function archiveTimestamp() {
   return new Date().toISOString().replaceAll("-", "").replaceAll(":", "").replace(".", "");

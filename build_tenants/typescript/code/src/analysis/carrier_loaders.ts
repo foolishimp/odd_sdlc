@@ -195,20 +195,21 @@ export interface FpEvaluateResultRecord {
 
 export interface DesignDepthFpEvaluatorRunRecord {
   readonly kind: "sdlc_design_depth_fp_evaluator_run";
+  readonly lifecycleStatus?: "started" | "completed" | "interrupted";
   readonly status?: number | null;
   readonly signal?: string | null;
   readonly elapsedMs?: number;
   readonly timedOut?: boolean;
   readonly promptRef?: string;
-  readonly contentLedgerRef?: string;
+  readonly contentRegisterRef?: string;
   readonly registerProjectionRef?: string;
   readonly registerRef?: string;
   readonly processEventsRef?: string;
 }
 
-export interface EvaluateContentLedgerRecord {
-  readonly kind: "sdlc_evaluate_content_ledger";
-  readonly ledgerVersion?: string;
+export interface EvaluateContentRegisterRecord {
+  readonly kind: "sdlc_evaluate_content_register";
+  readonly registerVersion?: string;
   readonly stage?: string;
   readonly ruleRef?: string;
   readonly authorityFunction?: string;
@@ -216,6 +217,7 @@ export interface EvaluateContentLedgerRecord {
 
 export interface ReviewGradeEdgeFulfillmentRunRecord {
   readonly kind: "sdlc_review_grade_edge_fulfillment_run";
+  readonly lifecycleStatus?: "started" | "completed" | "interrupted";
   readonly status?: number | null;
   readonly signal?: string | null;
   readonly elapsedMs?: number;
@@ -373,7 +375,6 @@ export interface OperatorRunFileSizes {
   readonly productMaterializationManifest: number;
   readonly fpTransformRequest: number;
   readonly fpTransformResult: number;
-  readonly assuranceLedgers: number;
   readonly hookOutcome: number;
   readonly postTransformObservation: number;
   readonly sdlcWorksiteEvidence: number;
@@ -471,10 +472,10 @@ const DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD: (
 ) => value is DesignDepthFpEvaluatorRunRecord =
   guardKind<DesignDepthFpEvaluatorRunRecord>("sdlc_design_depth_fp_evaluator_run");
 
-const EVALUATE_CONTENT_LEDGER_GUARD: (
+const EVALUATE_CONTENT_REGISTER_GUARD: (
   value: unknown
-) => value is EvaluateContentLedgerRecord =
-  guardKind<EvaluateContentLedgerRecord>("sdlc_evaluate_content_ledger");
+) => value is EvaluateContentRegisterRecord =
+  guardKind<EvaluateContentRegisterRecord>("sdlc_evaluate_content_register");
 
 const REVIEW_GRADE_EDGE_FULFILLMENT_RUN_GUARD: (
   value: unknown
@@ -782,8 +783,8 @@ const OPERATOR_RUN_JSON_GUARDS: Readonly<Record<string, JsonGuard<unknown>>> =
       POSTFLIGHT_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-run":
       DESIGN_DEPTH_FP_EVALUATOR_RUN_GUARD,
-    "operator-run-artifact://design-depth-fp-evaluator-content-ledger":
-      EVALUATE_CONTENT_LEDGER_GUARD,
+    "operator-run-artifact://design-depth-fp-evaluator-content-register":
+      EVALUATE_CONTENT_REGISTER_GUARD,
     "operator-run-artifact://design-depth-fp-evaluator-process-started":
       WORKER_PROCESS_STARTED_GUARD,
     "operator-run-artifact://fp-evaluator-postflight": POSTFLIGHT_GUARD,
@@ -952,7 +953,6 @@ export function readOperatorRunCarriers(operatorRunRoot: string): OperatorRunCar
     productMaterializationManifest: sizeOfArtifact("operator-run-artifact://product-materialization-manifest"),
     fpTransformRequest: sizeOfArtifact("operator-run-artifact://fp-transform-request"),
     fpTransformResult: sizeOfArtifact("operator-run-artifact://fp-transform-result"),
-    assuranceLedgers: sizeOfArtifact("operator-run-artifact://assurance-ledgers"),
     hookOutcome: sizeOfArtifact("operator-run-artifact://hook-outcome"),
     postTransformObservation: sizeOfArtifact("operator-run-artifact://post-transform-observation"),
     sdlcWorksiteEvidence: sizeOfArtifact("operator-run-artifact://worksite-evidence"),

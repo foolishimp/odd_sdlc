@@ -1058,6 +1058,14 @@ export function deriveSdlcEdgeClosureDecision(input: {
     if (retryReasonRefs.length > 0) {
       candidates.add("retry");
     }
+    if (
+      repairReasonRefs.length > 0 &&
+      edgeAssuranceCloseDecision.reasonRefs.some((ref) =>
+        ref.includes("/target-carrier/")
+      )
+    ) {
+      candidates.add("repair");
+    }
   } else {
     if (yieldResumeBasis !== null) {
       candidates.add("yield");

@@ -11,14 +11,14 @@ import {
   admitDesignDepthRegisterFromArtifact
 } from "../../design_depth_register.js";
 import {
-  admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity
-} from "./content_ledger.js";
+  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity
+} from "./content_register.js";
 
 export const DESIGN_DEPTH_FP_EVALUATOR_RULE_REF =
   "evaluation-rule://odd-sdlc/design-depth-register/fp" as const;
 
-const DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE =
-  "design_depth_fp_evaluator_rule_outcome.json";
+export const DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE =
+  "design_depth_fp_evaluator_rule_outcome.json" as const;
 
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right)));
@@ -117,37 +117,37 @@ function designDepthFpEvaluatorRegisterPathForArchiveRoot(
   return join(archiveRoot, "design_depth_fp_evaluator_register.json");
 }
 
-function designDepthFpEvaluatorContentLedgerPathForArchiveRoot(
+function designDepthFpEvaluatorContentRegisterPathForArchiveRoot(
   archiveRoot: string
 ): string {
-  return join(archiveRoot, "design_depth_fp_evaluator_content_ledger.json");
+  return join(archiveRoot, "design_depth_fp_evaluator_content_register.json");
 }
 
-function contentLedgerRefForRegisterPath(registerPath: string): string {
+function contentRegisterRefForRegisterPath(registerPath: string): string {
   return pathToFileURL(
-    designDepthFpEvaluatorContentLedgerPathForArchiveRoot(dirname(registerPath))
+    designDepthFpEvaluatorContentRegisterPathForArchiveRoot(dirname(registerPath))
   ).href;
 }
 
-function contentLedgerExistsForRegisterPath(registerPath: string): boolean {
-  const contentLedgerPath = designDepthFpEvaluatorContentLedgerPathForArchiveRoot(
+function contentRegisterExistsForRegisterPath(registerPath: string): boolean {
+  const contentRegisterPath = designDepthFpEvaluatorContentRegisterPathForArchiveRoot(
     dirname(registerPath)
   );
-  return existsSync(contentLedgerPath) && statSync(contentLedgerPath).isFile();
+  return existsSync(contentRegisterPath) && statSync(contentRegisterPath).isFile();
 }
 
-function admitContentLedgerForRegisterPath(input: {
+function admitContentRegisterForRegisterPath(input: {
   readonly registerPath: string;
   readonly selectedCompositionRef: string;
   readonly selectedCompositionDigest: string;
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
 }): readonly string[] {
-  const contentLedgerPath = designDepthFpEvaluatorContentLedgerPathForArchiveRoot(
+  const contentRegisterPath = designDepthFpEvaluatorContentRegisterPathForArchiveRoot(
     dirname(input.registerPath)
   );
-  const admission = admitSdlcEvaluateContentLedgerArtifactForSelectedIdentity({
-    ledgerPath: contentLedgerPath,
+  const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+    registerPath: contentRegisterPath,
     selectedIdentity: Object.freeze({
       selectedCompositionRef: input.selectedCompositionRef,
       selectedCompositionDigest: input.selectedCompositionDigest,
@@ -250,11 +250,11 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
   readonly registerPath: string;
 }): readonly string[] {
   const registerRef = pathToFileURL(input.registerPath).href;
-  const contentLedgerRef = contentLedgerRefForRegisterPath(input.registerPath);
+  const contentRegisterRef = contentRegisterRefForRegisterPath(input.registerPath);
   const ruleOutcomeRef = pathToFileURL(
     join(dirname(input.registerPath), DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE)
   ).href;
-  if (!contentLedgerExistsForRegisterPath(input.registerPath)) {
+  if (!contentRegisterExistsForRegisterPath(input.registerPath)) {
     return Object.freeze([]);
   }
   const fpEvaluateResultPath = join(dirname(input.registerPath), "fp_evaluate_result.json");
@@ -306,7 +306,7 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
       ? record["findings"]
       : Object.freeze([]);
     const topLevelEvidenceRefs = stringListFromUnknown(record["evidenceRefs"]);
-    if (!topLevelEvidenceRefs.includes(contentLedgerRef)) {
+    if (!topLevelEvidenceRefs.includes(contentRegisterRef)) {
       return Object.freeze([]);
     }
     if (!topLevelEvidenceRefs.includes(ruleOutcomeRef)) {
@@ -319,10 +319,10 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
     if (evaluationRuleOutcomeEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
-    const contentLedgerEvidenceRefs = evaluationRuleOutcomeEvidenceRefs.filter(
-      (ref) => ref === contentLedgerRef || ref === registerRef
+    const contentRegisterEvidenceRefs = evaluationRuleOutcomeEvidenceRefs.filter(
+      (ref) => ref === contentRegisterRef || ref === registerRef
     );
-    const admittedContentLedgerEvidenceRefs = admitContentLedgerForRegisterPath({
+    const admittedContentRegisterEvidenceRefs = admitContentRegisterForRegisterPath({
       registerPath: input.registerPath,
       selectedCompositionRef: compositionRef,
       selectedCompositionDigest: compositionDigest,
@@ -342,7 +342,7 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
         )["selectedRegimeBindingRef"]
       )
     });
-    if (admittedContentLedgerEvidenceRefs.length === 0) {
+    if (admittedContentRegisterEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
     const matchingFindingRefs: string[] = [];
@@ -366,7 +366,7 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
       ];
       if (
         !selectedEvidenceRefs.includes(registerRef) ||
-        !selectedEvidenceRefs.includes(contentLedgerRef)
+        !selectedEvidenceRefs.includes(contentRegisterRef)
       ) {
         continue;
       }
@@ -381,11 +381,11 @@ function selectedFpEvaluateResultEvidenceRefs(input: {
     }
     return uniqueSorted([
       pathToFileURL(fpEvaluateResultPath).href,
-      contentLedgerRef,
+      contentRegisterRef,
       registerRef,
       ...evaluationRuleOutcomeEvidenceRefs,
-      ...admittedContentLedgerEvidenceRefs,
-      ...contentLedgerEvidenceRefs,
+      ...admittedContentRegisterEvidenceRefs,
+      ...contentRegisterEvidenceRefs,
       ...topLevelEvidenceRefs,
       ...matchingFindingRefs
     ]);
@@ -399,8 +399,8 @@ function evaluationRuleOutcomeEvidenceRefsForFile(input: {
   readonly filePath: string;
 }): readonly string[] {
   const registerRef = pathToFileURL(input.registerPath).href;
-  const contentLedgerRef = contentLedgerRefForRegisterPath(input.registerPath);
-  if (!contentLedgerExistsForRegisterPath(input.registerPath)) {
+  const contentRegisterRef = contentRegisterRefForRegisterPath(input.registerPath);
+  if (!contentRegisterExistsForRegisterPath(input.registerPath)) {
     return Object.freeze([]);
   }
   try {
@@ -420,7 +420,7 @@ function evaluationRuleOutcomeEvidenceRefsForFile(input: {
     const producedRegisterRefs = stringListFromUnknown(record["producedRegisterRefs"]);
     if (
       !producedRegisterRefs.includes(registerRef) ||
-      !producedRegisterRefs.includes(contentLedgerRef)
+      !producedRegisterRefs.includes(contentRegisterRef)
     ) {
       return Object.freeze([]);
     }
@@ -443,21 +443,21 @@ function evaluationRuleOutcomeEvidenceRefsForFile(input: {
     ) {
       return Object.freeze([]);
     }
-    const contentLedgerEvidenceRefs = admitContentLedgerForRegisterPath({
+    const contentRegisterEvidenceRefs = admitContentRegisterForRegisterPath({
       registerPath: input.registerPath,
       selectedCompositionRef,
       selectedCompositionDigest,
       selectedCompositionSelectionRef,
       selectedRegimeBindingRef
     });
-    if (contentLedgerEvidenceRefs.length === 0) {
+    if (contentRegisterEvidenceRefs.length === 0) {
       return Object.freeze([]);
     }
     return uniqueSorted([
       pathToFileURL(input.filePath).href,
-      contentLedgerRef,
+      contentRegisterRef,
       registerRef,
-      ...contentLedgerEvidenceRefs,
+      ...contentRegisterEvidenceRefs,
       ...producedRegisterRefs,
       ...stringListFromUnknown(record["evidenceRefs"]),
       ...stringListFromUnknown(record["findingRefs"])

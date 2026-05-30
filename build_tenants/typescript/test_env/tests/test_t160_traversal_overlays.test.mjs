@@ -69,6 +69,20 @@ function startContext(workspaceRoot = "/workspace/t160") {
   return { module, queryDomain, conformedProject, workspaceRoot };
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t160/${caseId}`,
+    compositionDigest: `digest://t160/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t160/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t160/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t160/${caseId}`,
+    graphVectorRef: `graph-vector://t160/${caseId}`,
+    basisRef: `basis://t160/${caseId}`
+  });
+}
+
 test("T-160 publishes governed traversal overlays with boundary refs", () => {
   const module = constructSdlcGtlModule();
   const catalog = constructSdlcTraversalOverlayCatalog({ module });
@@ -788,6 +802,7 @@ test("T-160 stale overlay binding replay fails closed", () => {
 
 test("T-160 consequence carriers preserve overlay binding identity", () => {
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("lite"),
     ledgerRef: "ledger://odd-sdlc/t160",
     ledgerVersionRef: "ledger-version://odd-sdlc/t160/1",
     overlayRef: SDLC_LITE_DESIGN_MODULE_IMPLEMENTATION_OVERLAY_REF,
@@ -813,6 +828,7 @@ test("T-160 consequence carriers preserve overlay binding identity", () => {
     currentEdgeLawful: true
   });
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: ledger.selectedComposition,
     nextActionProjectionRef: "next-action://odd-sdlc/t160",
     intentEventRefs: ["event://odd-sdlc/t160"],
     productAssetModelRef: "product-asset-model://odd-sdlc/t160",
@@ -841,6 +857,7 @@ test("T-160 overlay segment completion is separate from product convergence", ()
     const overlay = catalog.overlays.find((candidate) => candidate.overlayRef === overlayRef);
     assert(overlay);
     const ledger = constructSdlcEdgeFulfillmentLedger({
+      selectedComposition: selectedComposition(`segment/${overlay.name}`),
       ledgerRef: `ledger://odd-sdlc/t160/segment/${encodeURIComponent(overlay.name)}`,
       ledgerVersionRef: `ledger-version://odd-sdlc/t160/segment/${encodeURIComponent(overlay.name)}/1`,
       overlayRef: overlay.overlayRef,
@@ -877,6 +894,7 @@ test("T-160 overlay segment completion is separate from product convergence", ()
       nextEligibleOverlayRefs: overlay.termination.nextEligibleOverlayRefs
     });
     const projection = constructSdlcNextActionProjection({
+      selectedComposition: ledger.selectedComposition,
       nextActionProjectionRef: `next-action://odd-sdlc/t160/segment/${encodeURIComponent(overlay.name)}`,
       intentEventRefs: [`event://odd-sdlc/t160/segment/${encodeURIComponent(overlay.name)}`],
       productAssetModelRef: `product-asset-model://odd-sdlc/t160/segment/${encodeURIComponent(overlay.name)}`,

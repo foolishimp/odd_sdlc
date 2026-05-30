@@ -4,6 +4,7 @@
 
 import {
   parseBoolean,
+  parseArray,
   parseClosedRecord,
   parseEnumValue,
   parseKind,
@@ -40,19 +41,6 @@ function parseNonNegativeInteger(input: unknown, label: string): number {
     throw new TypeError(`${label}: expected non-negative integer`);
   }
   return input;
-}
-
-function parseArray<T>(
-  input: unknown,
-  label: string,
-  parseItem: (item: unknown, itemLabel: string) => T
-): readonly T[] {
-  if (!Array.isArray(input)) {
-    throw new TypeError(`${label}: expected array`);
-  }
-  return Object.freeze(
-    input.map((item, index) => parseItem(item, `${label}[${index}]`))
-  );
 }
 
 export function admitSdlcAssetIdentity(

@@ -10,9 +10,9 @@ shared `specification/` surface.
 Use [TENANT_REGISTRY.md](./TENANT_REGISTRY.md) as the canonical registry of
 realization roots, tenant families, variants, and lifecycle status.
 
-The current active realization line is:
+The current realization layout is:
 
 - shared realization law in `common/`
-- the first live software-domain realization in `odd_sdlc/python/`
-- the active ODD-native TypeScript build line in `typescript/`
+- disabled legacy Python discovery/comparison evidence in `python/`
+- the active ODD-native TypeScript realization line in `typescript/`
 - the incubating service realization in `odd_service/python/`

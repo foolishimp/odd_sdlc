@@ -6,7 +6,8 @@ export const SDLC_TENANT_STACK_AUTHORITY_DEFECT_REASON_PREFIXES = Object.freeze(
 ] as const);
 
 export const SDLC_TENANT_STACK_AUTHORITY_DEFECT_REASON_CODES = Object.freeze([
-  "tenant_stack_spec_not_object"
+  "tenant_stack_spec_not_object",
+  "tenant_stack_execution_environment_missing"
 ] as const);
 
 export const SDLC_TENANT_STACK_AUTHORITY_UNDEFINED_REASON =

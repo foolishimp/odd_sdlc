@@ -164,6 +164,7 @@ test("T-110 timed worker projects ABG hard timeout instead of generic worker fai
     {
       ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
       ABG_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
+      ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS: "1",
       ODD_SDLC_WORKER_TIMEOUT_MS: "1000",
       ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: "10000",
       ODD_SDLC_WORKER_HEARTBEAT_MS: "250"
@@ -216,6 +217,7 @@ test("T-129 installed odd_sdlc run keeps active worker alive past inactivity lea
     {
       ODD_SDLC_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
       ABG_TS_AGENT_EXECUTOR_PROFILE: "local-spawn",
+      ODD_SDLC_TEST_ONLY_MINIMUM_OPERATOR_TIMEOUT_MS: "1",
       ODD_SDLC_WORKER_TIMEOUT_MS: "2000",
       ODD_SDLC_WORKER_INACTIVITY_TIMEOUT_MS: "100",
       ODD_SDLC_WORKER_HEARTBEAT_MS: "25"

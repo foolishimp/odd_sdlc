@@ -29,11 +29,8 @@ import {
   type SdlcCapabilityContract,
   type SdlcConformProjectProfile,
   type SdlcConformProjectReport,
-  type SdlcManagedTraversalLedger,
   type SdlcManagedTraversalManifest,
-  type SdlcManagedTraversalPhase,
   type SdlcManagedTraversalPhaseContract,
-  type SdlcManagedTraversalPhaseVerdict,
   type SdlcProjectConstraints,
   type SdlcRealizationMode
 } from "./carriers.js";
@@ -944,96 +941,6 @@ export function deriveConformProjectManagedTraversalManifest(input: {
       ...CONFORM_PROJECT_EXPECTED_OUTPUT_RELATIVE_PATHS
     ]),
     phaseContracts: Object.freeze([...CONFORM_PROJECT_PHASE_CONTRACTS])
-  });
-}
-
-function existingOutputRefs(input: {
-  readonly workspaceRoot: string;
-  readonly relativePaths: readonly string[];
-}): readonly string[] {
-  return Object.freeze(
-    input.relativePaths.flatMap((relativePath) => {
-      const absolutePath = path.join(input.workspaceRoot, relativePath);
-      return existsSync(absolutePath) && statSync(absolutePath).isFile()
-        ? [pathToFileURL(absolutePath).href]
-        : [];
-    })
-  );
-}
-
-function missingOutputRelativePaths(input: {
-  readonly workspaceRoot: string;
-  readonly relativePaths: readonly string[];
-}): readonly string[] {
-  return Object.freeze(
-    input.relativePaths.filter((relativePath) => {
-      const absolutePath = path.join(input.workspaceRoot, relativePath);
-      return !existsSync(absolutePath) || !statSync(absolutePath).isFile();
-    })
-  );
-}
-
-function managedTraversalPhaseVerdict(input: {
-  readonly phase: SdlcManagedTraversalPhase;
-  readonly evidenceRefs: readonly string[];
-  readonly gaps: readonly string[];
-}): SdlcManagedTraversalPhaseVerdict {
-  return Object.freeze({
-    kind: "sdlc_managed_traversal_phase_verdict",
-    phase: input.phase,
-    status: input.gaps.length === 0 ? "satisfied" : "blocked",
-    evidenceRefs: Object.freeze([...input.evidenceRefs]),
-    gaps: Object.freeze([...input.gaps])
-  });
-}
-
-export function deriveConformProjectManagedTraversalLedger(input: {
-  readonly workspaceRoot: string;
-  readonly manifest: SdlcManagedTraversalManifest;
-  readonly report?: SdlcConformProjectReport;
-}): SdlcManagedTraversalLedger {
-  const report =
-    input.report ?? deriveSdlcConformProjectReportFromWorkspace(input.workspaceRoot);
-  const missingOutputs = missingOutputRelativePaths({
-    workspaceRoot: input.workspaceRoot,
-    relativePaths: input.manifest.expectedOutputRelativePaths
-  });
-  const actualOutputRefs = existingOutputRefs({
-    workspaceRoot: input.workspaceRoot,
-    relativePaths: input.manifest.expectedOutputRelativePaths
-  });
-  const phaseVerdicts = Object.freeze([
-    managedTraversalPhaseVerdict({
-      phase: "prestep",
-      evidenceRefs: input.manifest.sourceRefs,
-      gaps: input.manifest.sourceRefs.length === 0
-        ? Object.freeze(["unordered_source_set_missing"])
-        : Object.freeze([])
-    }),
-    managedTraversalPhaseVerdict({
-      phase: "execute",
-      evidenceRefs: actualOutputRefs,
-      gaps: missingOutputs.map((relativePath) => `missing_output:${relativePath}`)
-    }),
-    managedTraversalPhaseVerdict({
-      phase: "postprocess",
-      evidenceRefs: report.materializedTopologyRefs,
-      gaps: report.conformanceGaps
-    })
-  ]);
-  const residualGaps = Object.freeze([
-    ...new Set(phaseVerdicts.flatMap((verdict) => verdict.gaps))
-  ].sort());
-  return Object.freeze({
-    kind: "sdlc_managed_traversal_ledger",
-    graphFunctionName: input.manifest.graphFunctionName,
-    sourceType: input.manifest.sourceType,
-    targetType: input.manifest.targetType,
-    status: residualGaps.length === 0 ? "satisfied" : "blocked",
-    workspaceRootUri: input.manifest.workspaceRootUri,
-    actualOutputRefs,
-    phaseVerdicts,
-    residualGaps
   });
 }
 

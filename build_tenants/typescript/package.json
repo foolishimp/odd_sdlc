@@ -151,7 +151,7 @@
     "test:t174:four-lane-live": "npm run test:scenario:t174-four-lane-hello-world-js-live",
     "test:t175": "npm run build:semantic && node --test test_env/tests/test_t175_source_truth_migration.test.mjs",
     "test:t179": "npm run build:semantic && node --test test_env/tests/test_t179_epistemology_compliance.test.mjs",
-    "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_3_9_rc3_staged_compute_boundary.test.mjs",
+    "test:t180": "npm run build:semantic && node --test test_env/tests/test_t180_abg_3_9_current_staged_compute_boundary.test.mjs",
     "test:t181": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs",
     "test:t182": "npm run build:semantic && node --test test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs",
     "test:t183": "npm run build:semantic && node --test test_env/tests/test_t181_fp_evaluator_design_register.test.mjs test_env/tests/test_t182_fp_review_grade_edge_fulfillment.test.mjs test_env/tests/test_t183_plugin_trace_ledger.test.mjs test_env/tests/test_t171_component_depth_target_carrier_envelope.test.mjs test_env/tests/test_t116_design_depth_steel_thread.test.mjs test_env/tests/test_b086_fd_disambiguation_sweep.test.mjs",
@@ -181,6 +181,6 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.4/abiogenesis-typescript-tenant-3.9.0-rc.4.tgz"
+    "@abiogenesis/typescript-tenant": "file:../../../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/3.9.0-rc.5/abiogenesis-typescript-tenant-3.9.0-rc.5.tgz"
   }
 }

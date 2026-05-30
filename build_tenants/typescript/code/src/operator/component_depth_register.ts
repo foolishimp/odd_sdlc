@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   parseClosedRecord,
+  parseOptionalArray as parseArray,
   parseNonEmptyString,
   parseNullableNonEmptyString,
   parseStringList
@@ -50,22 +51,6 @@ function isComponentDepthTarget(
   targetAssetType: string
 ): targetAssetType is ComponentDepthTarget {
   return COMPONENT_DEPTH_TARGETS.some((target) => target === targetAssetType);
-}
-
-function parseArray<T>(
-  input: unknown,
-  label: string,
-  parseItem: (item: unknown, itemLabel: string) => T
-): readonly T[] {
-  if (input === undefined) {
-    return Object.freeze([]);
-  }
-  if (!Array.isArray(input)) {
-    throw new TypeError(`${label}: expected array`);
-  }
-  return Object.freeze(
-    input.map((item, index) => parseItem(item, `${label}[${index}]`))
-  );
 }
 
 export function parseComponentTopologyRow(
@@ -548,7 +533,7 @@ function parseRegister(input: unknown, label: string): SdlcComponentDepthRegiste
   });
 }
 
-// F_D component-depth admission is exact; semantic aliases belong to selected evaluate.C/F_P content ledgers.
+// F_D component-depth admission is exact; semantic aliases belong to selected evaluate.C/F_P content registers.
 
 function recordValue(input: unknown): Readonly<Record<string, unknown>> | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {

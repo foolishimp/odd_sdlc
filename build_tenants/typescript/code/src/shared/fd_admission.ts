@@ -5,13 +5,6 @@ import {
   parseNonEmptyString
 } from "./validation.js";
 
-export type SdlcFdFieldClass =
-  | "exact_protocol"
-  | "exact_contract"
-  | "alias_admissible"
-  | "fp_escalation"
-  | "reject";
-
 export function admitExactProtocolString(input: {
   readonly value: unknown;
   readonly label: string;
@@ -44,18 +37,4 @@ export function admitExactContractEnum<T extends string>(
   }
 ): T {
   return parseEnumValue(input.value, input.label, input.values);
-}
-
-export function admitDeclaredAlias<T extends string>(input: {
-  readonly value: unknown;
-  readonly label: string;
-  readonly values: readonly T[];
-  readonly aliases?: Readonly<Record<string, T>>;
-}): T {
-  const value = parseNonEmptyString(input.value, input.label);
-  const alias = input.aliases?.[value];
-  if (alias !== undefined) {
-    return parseEnumValue(alias, `${input.label}.alias`, input.values);
-  }
-  return parseEnumValue(value, input.label, input.values);
 }

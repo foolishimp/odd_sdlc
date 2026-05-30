@@ -60,11 +60,3 @@ export function buildDiagnostics(
     drafts.map((draft) => buildDiagnostic(draft, policyStatus))
   );
 }
-
-export function hasFailingDiagnostic(
-  diagnostics: readonly SdlcFdRunAnalysisDiagnostic[]
-): boolean {
-  return diagnostics.some((diagnostic) =>
-    diagnostic.severity === "error" || diagnostic.severity === "warn"
-  );
-}

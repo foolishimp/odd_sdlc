@@ -81,6 +81,20 @@ function moduleBasis() {
   });
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t152/${caseId}`,
+    compositionDigest: `digest://t152/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t152/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t152/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t152/${caseId}`,
+    graphVectorRef: `graph-vector://t152/${caseId}`,
+    basisRef: `basis://t152/${caseId}`
+  });
+}
+
 function downstreamPressureRef(obligationId) {
   return [
     "obligation://odd-sdlc",
@@ -171,6 +185,7 @@ test("T-152 data_mapper-scale downstream obligations do not block local edge clo
   assert.deepEqual(counts.downstreamTargetBindingRefs, [DATA_MAPPER_TARGET_BINDING]);
 
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("data-mapper"),
     ledgerRef: "ledger://t152/data-mapper/edge",
     ledgerVersionRef: "ledger-version://t152/data-mapper/edge/1",
     edgeRef: "edge://t152/data-mapper/requirements-design",

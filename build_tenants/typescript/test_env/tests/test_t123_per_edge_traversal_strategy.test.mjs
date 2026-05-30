@@ -621,7 +621,7 @@ test("T-123 same-edge retry scope does not widen from evidence refs", () => {
   );
   const prompt = promptForHandoff(manifest);
   assert.match(prompt, /This is a retry\/re-entry attempt/u);
-  assert.match(prompt, /Prior defect: same_edge_retry/u);
+  assert.match(prompt, /Evaluated residual pressure: same_edge_retry/u);
   assert.match(prompt, /Accounting file contains placeholder implementation text/u);
 });
 

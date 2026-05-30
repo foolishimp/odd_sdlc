@@ -16,6 +16,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { emit } from "@abiogenesis/typescript-tenant";
+
 import {
   OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS,
   SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING,
@@ -265,12 +267,17 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
     (vector) => vector.name === edgeName
   );
   assert.notEqual(targetIndex, -1, `${edgeName} vector must exist`);
-  return Object.freeze(
-    basis.graph.vectors.slice(0, targetIndex).flatMap((vector, index) => [
+  const preclosedEvents = basis.graph.vectors
+    .slice(0, targetIndex)
+    .flatMap((vector, index) => [
       assessedEventForVector(basis, vector, index),
       vectorClosedEventForVector(basis, vector, index)
-    ])
-  );
+    ]);
+  const emitted = [];
+  emit(preclosedEvents, (event) => {
+    emitted.push(event);
+  });
+  return Object.freeze(emitted);
 }
 
 test("T-172 accounts for every selected full traversal edge", () => {
@@ -445,6 +452,15 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
     assert.equal(report.fpTransformRequestRef, null, edgeName);
     assert.equal(report.fpTransformResultRef, null, edgeName);
     assert.equal(report.fpTransformStatusSnapshot, null, edgeName);
+    if (edgeName === "derive_test_execution_result_surface") {
+      assert.equal(
+        report.executionEvidence?.kind,
+        "sdlc_worker_execution_evidence",
+        edgeName
+      );
+      assert.notEqual(report.executionEvidence?.status, "pending", edgeName);
+      assert.equal(report.executionEvidenceErrors?.length ?? 0, 0, edgeName);
+    }
 
     const closureDecision = JSON.parse(
       readFileSync(path.join(outcome.archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
@@ -454,6 +470,9 @@ test("T-172 installed operator executes no-dispatch edges without worker_run", a
       "admitted",
       edgeName
     );
+    if (edgeName === "derive_test_execution_result_surface") {
+      assert.notEqual(closureDecision.disposition, "retry", edgeName);
+    }
 
     const analysis = analyzeSdlcFdRunArchive({
       inspectedRoot: workspaceRoot,

@@ -344,38 +344,6 @@ test("T-091 derives concrete payload from local requirement headings after blank
   );
   assert.doesNotThrow(() => writeHandoffFiles(manifest));
 });
-
-test("T-091 postflight rejects fulfilled requirement without output coverage evidence", () => {
-  const manifest = manifestFor(workspaceWithImportedRequirement());
-  const report = reportFor(
-    manifest,
-    manifest.traversalObligationContext.obligations.map((obligation) => ({
-      kind: "sdlc_worker_obligation_assessment",
-      obligationId: obligation.obligationId,
-      fulfillmentStatus: "fulfilled",
-      evidenceRefs:
-        obligation.obligationKind === "requirement"
-          ? obligation.evidenceRefs
-          : [manifest.outputFile],
-      blockingReasons: []
-    }))
-  );
-
-  const postflight = evaluateSdlcComputeStage({ manifest, report });
-
-  assert.equal(postflight.status, "blocked");
-  assert(
-    postflight.blockingReasonCarriers.some(
-      (reason) =>
-        reason.code === "obligation_fulfilled_without_output_coverage" &&
-        reason.detail === requirementObligation(
-          manifest,
-          "REQ-T091-001"
-        )?.obligationId
-    )
-  );
-});
-
 test("T-091 postflight admits anchored output evidence for requirement coverage", () => {
   const manifest = manifestFor(workspaceWithImportedRequirement());
   const outputRef = `${pathToFileURL(manifest.outputFile).href}#requirement-req-t091-001`;

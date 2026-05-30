@@ -34,7 +34,9 @@ import {
   provisionAbgInstalledSandbox
 } from "../sandbox/abg_installed_workspace.mjs";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import { liveOperatorRuntimePolicy } from "./operator_runtime_policy.mjs";
 
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_LIVE_FP"] === "1";
 const DATA_MAPPER_TEMPLATE_ROOT =
   process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
@@ -191,7 +193,7 @@ function runLiveWorker(input) {
     cwd: input.workspaceRoot,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
-    timeout: 1000 * 60 * 10
+    timeout: RUNTIME_POLICY.liveHarnessCommandTimeoutMs
   });
   const elapsedMs = performance.now() - startedAt;
   const payload = {

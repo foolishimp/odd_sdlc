@@ -66,10 +66,25 @@ function graphFunctionRefFor(caseId) {
   return graphFunction.name;
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t153/${caseId}`,
+    compositionDigest: `digest://t153/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t153/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t153/${caseId}/evaluate/fp`,
+    graphFunctionRef: graphFunctionRefFor(caseId),
+    graphVectorRef: `graph-vector://t153/${caseId}/current`,
+    basisRef: `basis://t153/${caseId}`
+  });
+}
+
 function context(caseId, counts) {
   const intentEventRefs = [`event://t153/${caseId}/intent`];
   const productAssetModelRef = `product-asset-model://t153/${caseId}`;
   const targetBindingRefs = [`target-binding://t153/${caseId}/current-edge`];
+  const selected = selectedComposition(caseId);
   const constructionIntent = constructSdlcConstructionIntent({
     intentRef: `intent://t153/${caseId}/selected`,
     intentEventRefs,
@@ -95,6 +110,7 @@ function context(caseId, counts) {
     predecessorRefs: [constructionIntent.nextActionProjectionRef]
   });
   const edgeFulfillmentLedger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selected,
     ledgerRef: `ledger://t153/${caseId}/edge`,
     ledgerVersionRef: `ledger-version://t153/${caseId}/edge/1`,
     edgeRef: `edge://t153/${caseId}/current`,
@@ -149,6 +165,7 @@ function blockedCounts() {
 
 function noActionProjection(rows, decision) {
   return constructSdlcNextActionProjection({
+    selectedComposition: rows.edgeFulfillmentLedger.selectedComposition,
     nextActionProjectionRef: `next-action://t153/${rows.caseId}/${decision.disposition}/no-action`,
     intentEventRefs: rows.intentEventRefs,
     productAssetModelRef: rows.productAssetModelRef,
@@ -206,6 +223,7 @@ function evaluatorProjection(rows, decision, actionKind) {
   assert.notDeepEqual(evaluator.targetBindingRefs, rows.targetBindingRefs);
 
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: rows.edgeFulfillmentLedger.selectedComposition,
     nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
     nextActionBasisKind: evaluator.nextActionBasisKind,
     intentEventRefs: evaluator.intentEventRefs,
@@ -357,6 +375,45 @@ test("T-153 explicit retry pressure outranks diagnostic assurance block", () => 
 
   assert.equal(decision.disposition, "retry");
   assert.equal(decision.reasonRefs.includes(retryReasonRef), true);
+  assert.equal(decision.reasonRefs.includes(assuranceBlockReasonRef), true);
+  assert.equal(result.nextActionProjection.choosesNextTraversal, true);
+});
+
+test("T-153 repair pressure can repair target-carrier assurance block", () => {
+  const rows = context("repair-over-target-carrier-block", blockedCounts());
+  const repairReasonRef =
+    "blocking-reason://t153/repair-over-target-carrier-block/staged_authority_admission_invalid";
+  const assuranceBlockReasonRef =
+    "pressure://t153/repair-over-target-carrier-block/target-carrier/rejected_admission";
+  const decision = deriveSdlcEdgeClosureDecision({
+    decisionRef: "closure-decision://t153/repair-over-target-carrier-block",
+    ledger: rows.edgeFulfillmentLedger,
+    currentEdgeLawful: true,
+    edgeAssuranceCloseDecision: {
+      kind: "sdlc_edge_assurance_close_decision",
+      decisionRef:
+        "edge-assurance-close://t153/repair-over-target-carrier-block/target-carrier",
+      contractRef: "contract://t153/repair-over-target-carrier-block",
+      contractDigest: "sha256:t153-repair-over-target-carrier-block",
+      edgeRef: rows.edgeFulfillmentLedger.edgeRef,
+      disposition: "block",
+      targetCarrierContractRef: null,
+      targetCarrierContractDigest: null,
+      targetCarrierAdmissionStatus:
+        rows.edgeFulfillmentLedger.targetCarrierAdmissionStatus,
+      gainRef: "edge-gain://t153/repair-over-target-carrier-block",
+      residualPressureRef:
+        "edge-residual-pressure://t153/repair-over-target-carrier-block",
+      basisRefs: ["basis://t153/repair-over-target-carrier-block/assurance"],
+      reasonRefs: [assuranceBlockReasonRef]
+    },
+    repairReasonRefs: [repairReasonRef]
+  });
+  const projection = evaluatorProjection(rows, decision, "repair_same_edge");
+  const result = replay(rows, decision, projection);
+
+  assert.equal(decision.disposition, "repair");
+  assert.equal(decision.reasonRefs.includes(repairReasonRef), true);
   assert.equal(decision.reasonRefs.includes(assuranceBlockReasonRef), true);
   assert.equal(result.nextActionProjection.choosesNextTraversal, true);
 });

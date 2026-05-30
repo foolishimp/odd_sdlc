@@ -10,6 +10,9 @@ project:
   language: "Scala"
   test_runner: "sbt test"
 
+active_tenant: "scala_spark"
+selected_output_root: "build_tenants/scala_spark"
+
 # Mandatory dimensions — bound from INTENT.md v7.2 constraints + test09 design phase
 constraints:
   ecosystem_compatibility:
@@ -51,6 +54,28 @@ constraints:
 structure:
   design_tenants:
     - name: "scala_spark"
-      output_dir: "imp_scala_spark/"
+      output_dir: "build_tenants/scala_spark/"
       description: "Scala 2.13 + Apache Spark 3.5 implementation"
+    - name: "python"
+      output_dir: "build_tenants/python/"
+      status: "disabled"
+      description: "Disabled legacy discovery/comparison evidence only; not an active operator, install, gap, start, or qualification surface."
   root_code_policy: reject
+
+build_tenants:
+  scala_spark:
+    output_dir: "build_tenants/scala_spark"
+    status: "active"
+    language: "scala"
+    build_tool: "sbt"
+    version: "2.13.12"
+    test_runner: "sbt test"
+    build_execution_contract: "sbt clean assembly"
+    test_execution_contract: "sbt test"
+    deployment_contract: "spark-submit"
+    runtime_observation_contract: "ledger.json"
+  python:
+    output_dir: "build_tenants/python"
+    status: "disabled"
+    language: "python"
+    description: "Legacy discovery/comparison evidence only."

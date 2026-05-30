@@ -505,8 +505,22 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
     ".ai-workspace/runtime/odd_sdlc/operator-runs/20260523T000000000Z_pid174"
   );
   mkdirSync(archiveRoot, { recursive: true });
+  const designOutputFile = path.join(
+    root,
+    "build_tenants/parallel_hello_world/design/implementation_design_surface.md"
+  );
   const registerPath = path.join(archiveRoot, "design_depth_fp_evaluator_register.json");
+  const contentRegisterPath = path.join(
+    archiveRoot,
+    "design_depth_fp_evaluator_content_register.json"
+  );
+  const ruleOutcomePath = path.join(
+    archiveRoot,
+    "design_depth_fp_evaluator_rule_outcome.json"
+  );
   const registerRef = pathToFileURL(registerPath).href;
+  const contentRegisterRef = pathToFileURL(contentRegisterPath).href;
+  const ruleOutcomeRef = pathToFileURL(ruleOutcomePath).href;
   const composition = {
     kind: "sdlc_selected_abg_fn_composition_identity",
     compositionRef: "abg.fn_composition://t174/implementation-design",
@@ -607,14 +621,68 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
         vectorIndex: 0,
         inputAssetTypes: ["scenario_surface"],
         targetAssetType: "implementation_design_surface",
-        outputFile: path.join(
-          root,
-          "build_tenants/parallel_hello_world/design/implementation_design_surface.md"
-        ),
+        outputFile: designOutputFile,
         reportFile: path.join(archiveRoot, "worker_result_report.json"),
         productMaterialization: {
           tenantRoot: manifest.productMaterialization.tenantRoot
         }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    contentRegisterPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_evaluate_content_register",
+        registerVersion: "ts-evaluate-content-register-v1",
+        stage: "evaluate.C",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        authorityFunction: "synthesize_model",
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        compositionContributionRef: composition.selectedRegimeBindingRef,
+        sourceBasisRefs: [pathToFileURL(designOutputFile).href],
+        candidateArtifactRefs: [pathToFileURL(designOutputFile).href],
+        evidenceRefs: [pathToFileURL(designOutputFile).href],
+        contentRows: [
+          {
+            kind: "sdlc_evaluate_content_register_row",
+            rowRef: "evaluate-content-row://t174/design-depth-register",
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register",
+            payload: {
+              kind: "sdlc_design_depth_register",
+              registerVersion: "ts-design-depth-v1",
+              targetAssetType: "implementation_design_surface",
+              stackProfileRows: [],
+              implementationModuleRows: [],
+              aggregateDomainModelRows: [],
+              moduleSchemaFragments: [],
+              moduleStateDiagramFragments: [],
+              aggregateDomainModel: null,
+              sunnyDaySequenceRows: [],
+              aggregateSunnyDaySequence: null,
+              componentTopologyRows: topologyRows,
+              componentRealizationRows: realizationRows,
+              fileTargetRows: componentRows.map((row) => ({
+                kind: "sdlc_file_target_row",
+                relativePath: row.relativePath,
+                role: row.targetRole
+              })),
+              designCompletenessVerdict: null
+            },
+            sourceBasisRefs: [pathToFileURL(designOutputFile).href],
+            evidenceRefs: [pathToFileURL(designOutputFile).href]
+          }
+        ]
       },
       null,
       2
@@ -687,8 +755,8 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
             findingRef: "finding://t174/implementation-design/depth-register",
             compositionRef: composition.compositionRef,
             compositionDigest: composition.compositionDigest,
-            authorityRefs: [registerRef],
-            evidenceRefs: [registerRef]
+            authorityRefs: [contentRegisterRef, registerRef],
+            evidenceRefs: [contentRegisterRef, registerRef]
           }
         ],
         evaluation: {
@@ -699,7 +767,35 @@ function writeT174AdmittedImplementationDesignArchive(root, manifest) {
         status: "passed",
         postflightStatus: "passed",
         blockingReasons: [],
-        evidenceRefs: [registerRef]
+        evidenceRefs: [ruleOutcomeRef, contentRegisterRef, registerRef]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    ruleOutcomePath,
+    `${JSON.stringify(
+      {
+        kind: "evaluation_rule_outcome",
+        status: "accepted",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        producedRegisterRefs: [contentRegisterRef, registerRef],
+        evidenceRefs: [contentRegisterRef, registerRef],
+        findingRefs: ["finding://t174/implementation-design/depth-register"],
+        humanResponseRefs: [],
+        residualPressureRefs: [],
+        continuationRefs: [],
+        diagnosticRefs: [],
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        compositionContributionRef: composition.selectedRegimeBindingRef,
+        reason: null
       },
       null,
       2

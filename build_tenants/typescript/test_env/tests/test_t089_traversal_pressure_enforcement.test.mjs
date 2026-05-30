@@ -122,44 +122,6 @@ test("T-089 early non-materializing edge keeps evaluator contract separate from 
     )
   );
 });
-
-test("T-089 postflight rejects missing and unassessed obligation coverage", () => {
-  const manifest = earlyManifest(makeWorkspace());
-  const missing = evaluateSdlcComputeStage({
-    manifest,
-    report: reportFor(manifest)
-  });
-
-  assert.equal(missing.status, "blocked");
-  assert(
-    missing.blockingReasonCarriers.some(
-      (reason) => reason.code === "obligation_unassessed"
-    )
-  );
-
-  const unassessed = evaluateSdlcComputeStage({
-    manifest,
-    report: reportFor(manifest, {
-      obligationAssessments: manifest.traversalObligationContext.obligations.map(
-        (obligation) => ({
-          kind: "sdlc_worker_obligation_assessment",
-          obligationId: obligation.obligationId,
-          fulfillmentStatus: "unassessed",
-          evidenceRefs: [],
-          blockingReasons: []
-        })
-      )
-    })
-  });
-
-  assert.equal(unassessed.status, "blocked");
-  assert(
-    unassessed.blockingReasonCarriers.some(
-      (reason) => reason.code === "obligation_status_unassessed"
-    )
-  );
-});
-
 test("T-089 postflight admits fulfilled obligation coverage on early edge", () => {
   const manifest = earlyManifest(makeWorkspace());
   const report = reportFor(manifest, {

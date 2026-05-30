@@ -32,7 +32,22 @@ function nextActionBasis() {
   };
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t138/${caseId}`,
+    compositionDigest: `digest://t138/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t138/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t138/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t138/${caseId}`,
+    graphVectorRef: `graph-vector://t138/${caseId}`,
+    basisRef: `basis://t138/${caseId}`
+  });
+}
+
 function consequence() {
+  const composition = selectedComposition("current-edge");
   const constructionIntent = constructSdlcConstructionIntent({
     intentRef: "intent://t138/selected",
     ...intentBasis(),
@@ -51,6 +66,7 @@ function consequence() {
     livenessProjectionRefs: ["liveness://t138/active"]
   });
   const edgeFulfillmentLedger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: composition,
     ledgerRef: "ledger://t138/current-edge",
     ledgerVersionRef: "ledger-version://t138/current-edge/attempt-1",
     edgeRef: "edge://t138/current",
@@ -84,6 +100,7 @@ function consequence() {
     }
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: composition,
     nextActionProjectionRef: "next-action://t138/post-evidence",
     ...nextActionBasis(),
     closureDecision: edgeClosureDecision,
@@ -141,6 +158,7 @@ test("T-138 replay reconstructs the full causal chain from predecessor refs", ()
 
 test("T-138 initial next-action selection has no synthetic closure decision", () => {
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: selectedComposition("initial"),
     nextActionProjectionRef: "next-action://t138/initial",
     nextActionBasisKind: "initial_selection",
     ...nextActionBasis(),
@@ -195,7 +213,9 @@ test("T-138 broken ledger predecessor refs fail replayability", () => {
 test("T-138 replay validates every evidence bundle referenced by the ledger", () => {
   const rows = consequence();
   const extraEvidence = secondEvidenceFor(rows.constructionIntent.intentRef);
+  const composition = selectedComposition("multi-evidence");
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: composition,
     ledgerRef: "ledger://t138/multi-evidence",
     ledgerVersionRef: "ledger-version://t138/multi-evidence/attempt-1",
     edgeRef: "edge://t138/current",
@@ -222,6 +242,7 @@ test("T-138 replay validates every evidence bundle referenced by the ledger", ()
     retryReasonRefs: ["retry://t138/multi-evidence"]
   });
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: composition,
     nextActionProjectionRef: "next-action://t138/multi-evidence",
     ...nextActionBasis(),
     closureDecision: decision,
@@ -251,6 +272,7 @@ test("T-138 replay validates every evidence bundle referenced by the ledger", ()
 
 test("T-138 replay rejects multi-evidence ledgers that mix intents", () => {
   const rows = consequence();
+  const composition = selectedComposition("mixed-intents");
   const unrelatedIntent = constructSdlcConstructionIntent({
     intentRef: "intent://t138/other",
     ...intentBasis(),
@@ -261,6 +283,7 @@ test("T-138 replay rejects multi-evidence ledgers that mix intents", () => {
   });
   const unrelatedEvidence = secondEvidenceFor(unrelatedIntent.intentRef);
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: composition,
     ledgerRef: "ledger://t138/mixed-intents",
     ledgerVersionRef: "ledger-version://t138/mixed-intents/attempt-1",
     edgeRef: "edge://t138/current",
@@ -287,6 +310,7 @@ test("T-138 replay rejects multi-evidence ledgers that mix intents", () => {
     retryReasonRefs: ["retry://t138/mixed-intents"]
   });
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: composition,
     nextActionProjectionRef: "next-action://t138/mixed-intents",
     ...nextActionBasis(),
     closureDecision: decision,

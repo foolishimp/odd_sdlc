@@ -244,6 +244,7 @@ test("T-179 consequence carriers preserve selected composition through ledgers a
     currentEdgeLawful: true
   });
   const projection = constructSdlcNextActionProjection({
+    selectedComposition: selected,
     nextActionProjectionRef: "next-action://t179/post-close",
     intentEventRefs: ["event://t179/intent"],
     productAssetModelRef: "asset-model://t179/product",

@@ -26,9 +26,14 @@ import {
   installOddSdlcTypescript
 } from "../../build/semantic/code/src/index.js";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import {
+  configuredLiveTimeoutMs,
+  liveOperatorRuntimePolicy
+} from "./operator_runtime_policy.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
@@ -44,9 +49,9 @@ const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_T109_DATA_MAPPER_MAX_STEPS"] ?? "56",
   10
 );
-const COMMAND_TIMEOUT_MS = Number.parseInt(
-  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_COMMAND_TIMEOUT_MS"] ?? `${1000 * 60 * 20}`,
-  10
+const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
+  "ODD_SDLC_TS_T109_DATA_MAPPER_COMMAND_TIMEOUT_MS",
+  RUNTIME_POLICY.liveHarnessCommandTimeoutMs
 );
 
 function archiveTimestamp() {

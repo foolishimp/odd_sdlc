@@ -11,10 +11,7 @@ import {
   type SdlcAssuranceLedgerReason,
   type SdlcAssuranceLedgerVerdict
 } from "./carriers.js";
-
-export function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
-}
+export { uniqueSorted } from "../shared/collections.js";
 
 export function assuranceReason(input: {
   readonly code: string;

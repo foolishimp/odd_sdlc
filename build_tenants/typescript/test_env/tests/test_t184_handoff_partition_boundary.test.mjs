@@ -16,10 +16,24 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  admitExecutionBasis,
+  admitResolvedPolicyIdentity,
+  admitResolvedRuntimeIdentity,
+  admitStartIntent,
+  constructFrameOpenedEvent,
+  constructGraphCallOpenedEvent,
+  constructVectorClosedEvent,
+  constructVectorTraversalPlannedEvent
+} from "@abiogenesis/typescript-tenant";
+
+import {
+  appendOddSdlcRuntimeEvents,
   constructPostflightGapDossier,
+  constructSdlcGtlModule,
   constructWorkerProcessFailurePostflight,
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
+  readOddSdlcRuntimeEventsSync,
   SDLC_T172_FULL_TRAVERSAL_EDGE_ACCOUNTING,
   sdlcEdgeOutputPolicyForTargetAssetType
 } from "../../build/semantic/code/src/index.js";
@@ -36,6 +50,41 @@ function makeWorkspace() {
   mkdirSync(path.join(root, "specification/requirements"), { recursive: true });
   writeFileSync(path.join(root, "README.md"), "# T-184 fixture\n", "utf8");
   return root;
+}
+
+function moduleBasis(handle = "derive_intent_surface") {
+  const module = constructSdlcGtlModule();
+  return admitExecutionBasis({
+    startIntent: admitStartIntent({
+      scope: {
+        kind: "workspace",
+        workspaceRoot: "/workspace/t184",
+        moduleName: module.name
+      },
+      target: {
+        kind: "graph_function",
+        handle
+      },
+      until: "converged"
+    }),
+    module,
+    runtimeIdentity: admitResolvedRuntimeIdentity({
+      workerId: "worker://odd-sdlc/typescript",
+      backendId: "backend://node",
+      buildId: "build://odd-sdlc/typescript",
+      resolvedRuntimeRef: "runtime://abiogenesis/typescript"
+    }),
+    resolvedPolicy: admitResolvedPolicyIdentity({
+      resolvedPolicyBundleRef: "policy://odd-sdlc/t184/F_P",
+      defaultRegime: "F_P",
+      dispatchRef: "dispatch://odd-sdlc/t184",
+      approvalSubjectRef: null
+    }),
+    runId: "run://odd-sdlc/t184",
+    workKey: "wk://odd-sdlc/t184",
+    frameId: null,
+    frameLineageId: null
+  });
 }
 
 function walkTsFiles(root) {
@@ -89,6 +138,233 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
   assert.doesNotMatch(operatorIndex, /handoff\.js/u);
 });
 
+test("T-184 runtime event persistence is an ABG append sink", () => {
+  const eventStoreSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/event_store.ts"
+  );
+
+  assert.match(eventStoreSource, /\bemit\b/u);
+  assert.match(eventStoreSource, /emit\(input\.events/u);
+  assert.match(eventStoreSource, /\bappendFile\b/u);
+  assert.doesNotMatch(eventStoreSource, /\bwriteFile\b/u);
+  assert.doesNotMatch(eventStoreSource, /uniqueRuntimeEventsInReplayOrder/u);
+  assert.doesNotMatch(eventStoreSource, /eventAdmissionOrdinal/u);
+  assert.doesNotMatch(eventStoreSource, /replayOrderedEvents/u);
+  assert.doesNotMatch(eventStoreSource, /readOddSdlcRuntimeEvents\(input\.workspaceRoot\)/u);
+});
+
+test("T-184 runtime event persistence appends and reads archive order", async () => {
+  const workspaceRoot = makeWorkspace();
+  const basis = moduleBasis();
+  const events = [
+    constructGraphCallOpenedEvent(basis),
+    constructFrameOpenedEvent(basis),
+    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 }),
+    constructVectorClosedEvent({ basis, vectorIndex: 0, closureKind: "advanced" })
+  ].map((event, index) => {
+    const eventTime = new Date(Date.UTC(2026, 4, 28, 0, 0, 0, index)).toISOString();
+    return {
+      ...event,
+      eventId: `runtime-event:t184:${index}`,
+      eventTime,
+      eventTimeUnixMs: Date.parse(eventTime),
+      eventAdmissionOrdinal: index
+    };
+  });
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot,
+    events: [events[2], events[0]]
+  });
+  const eventLogPath = path.join(
+    workspaceRoot,
+    ".ai-workspace",
+    "events",
+    "events.jsonl"
+  );
+  const firstRawEventLog = readFileSync(eventLogPath, "utf8");
+  assert.deepEqual(
+    firstRawEventLog
+      .trim()
+      .split(/\r?\n/u)
+      .map((line) => JSON.parse(line).eventAdmissionOrdinal),
+    [2, 0]
+  );
+
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot,
+    events: [events[3], events[1]]
+  });
+  const secondRawEventLog = readFileSync(eventLogPath, "utf8");
+  assert.equal(
+    secondRawEventLog.startsWith(firstRawEventLog),
+    true,
+    "runtime event persistence must append to the existing stream"
+  );
+  assert.deepEqual(
+    secondRawEventLog
+      .trim()
+      .split(/\r?\n/u)
+      .map((line) => JSON.parse(line).eventAdmissionOrdinal),
+    [2, 0, 3, 1]
+  );
+
+  const stored = readOddSdlcRuntimeEventsSync(workspaceRoot);
+  assert.deepEqual(
+    stored.map((event) => event.eventAdmissionOrdinal),
+    [2, 0, 3, 1]
+  );
+  assert.deepEqual(
+    stored.map((event) => event.eventId),
+    [events[2], events[0], events[3], events[1]].map((event) => event.eventId)
+  );
+});
+
+test("T-184 runtime event persistence never rewrites or de-dupes existing archive truth", async () => {
+  const workspaceRoot = makeWorkspace();
+  const basis = moduleBasis();
+  const events = [
+    constructGraphCallOpenedEvent(basis),
+    constructFrameOpenedEvent(basis),
+    constructVectorTraversalPlannedEvent({ basis, vectorIndex: 0 })
+  ].map((event, index) => {
+    const eventTime = new Date(Date.UTC(2026, 4, 28, 0, 0, 1, index)).toISOString();
+    return {
+      ...event,
+      eventId: `runtime-event:t184-append-only:${index}`,
+      eventTime,
+      eventTimeUnixMs: Date.parse(eventTime),
+      eventAdmissionOrdinal: 30 - index
+    };
+  });
+  const eventLogPath = path.join(
+    workspaceRoot,
+    ".ai-workspace",
+    "events",
+    "events.jsonl"
+  );
+  mkdirSync(path.dirname(eventLogPath), { recursive: true });
+  const existingArchiveTruth = `${JSON.stringify(events[0])}\n`;
+  writeFileSync(eventLogPath, existingArchiveTruth, "utf8");
+
+  await appendOddSdlcRuntimeEvents({
+    workspaceRoot,
+    events: [events[0], events[2], events[1]]
+  });
+
+  const rawEventLog = readFileSync(eventLogPath, "utf8");
+  assert.equal(
+    rawEventLog.startsWith(existingArchiveTruth),
+    true,
+    "event sink must preserve prior archive bytes exactly"
+  );
+  const rawEvents = rawEventLog
+    .trim()
+    .split(/\r?\n/u)
+    .map((line) => JSON.parse(line));
+  assert.deepEqual(
+    rawEvents.map((event) => event.eventId),
+    [events[0], events[0], events[2], events[1]].map((event) => event.eventId)
+  );
+  assert.deepEqual(
+    rawEvents.map((event) => event.eventAdmissionOrdinal),
+    [30, 30, 28, 29]
+  );
+  assert.equal(
+    rawEvents.filter((event) => event.eventId === events[0].eventId).length,
+    2,
+    "event sink must not perform cross-archive duplicate suppression"
+  );
+});
+
+test("T-184 product materialization observation and replay live under product modules", () => {
+  const launchContractSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
+  );
+  const observationSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/product_materialization/observation.ts"
+  );
+  const replaySource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/product_materialization/replay.ts"
+  );
+  const manifestSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/product_materialization/manifest.ts"
+  );
+
+  assert.match(launchContractSource, /product_materialization\/observation\.js/u);
+  assert.match(launchContractSource, /product_materialization\/replay\.js/u);
+  assert.match(launchContractSource, /product_materialization\/manifest\.js/u);
+  assert.match(observationSource, /function walkFiles/u);
+  assert.match(observationSource, /observeProductMaterializationDeltaWithDiagnostics/u);
+  assert.match(replaySource, /readProductMaterializationReplayManifest/u);
+  assert.match(replaySource, /resolveProductMaterializationReplay/u);
+  assert.match(manifestSource, /writeProductMaterializationManifest/u);
+
+  assert.doesNotMatch(launchContractSource, /function walkFiles/u);
+  assert.doesNotMatch(
+    launchContractSource,
+    /function readProductMaterializationReplayManifest/u
+  );
+  assert.doesNotMatch(launchContractSource, /function productMaterializationReplayArchives/u);
+  assert.doesNotMatch(launchContractSource, /function replayArchivePostflightStatus/u);
+  assert.doesNotMatch(launchContractSource, /function mergeMaterializedProductFiles/u);
+});
+
+test("T-184 ABG terminal truth controls non-close traversal", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(installedOperatorSource, /function abgTerminalRetryReasonRefs/u);
+  assert.match(installedOperatorSource, /terminalKind === "yielded"/u);
+  assert.match(installedOperatorSource, /abg-terminal/u);
+  assert.match(
+    installedOperatorSource,
+    /const rawAbgTerminalRetryRefs = abgTerminalRetryReasonRefs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /ledger\.edgeConverged && edgeAssuranceCloseDecision\.disposition === "close"\s*\?\s*Object\.freeze\(\[\]\)\s*:\s*rawAbgTerminalRetryRefs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /closureDisposition === "close"\s*\?\s*currentEdgeFromAcceptedClose\s*:\s*currentEdgeFromConsequence/u
+  );
+  assert.doesNotMatch(
+    installedOperatorSource,
+    /nextVector \?\? traversalConsequence\.nextActionProjection\.nextGraphVectorRef\s*:\s*completedDispatchState\.currentEdge/u
+  );
+});
+
+test("T-184 selected evaluate.C residual pressure enters consequence closure", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const edgeGainClosureSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/edge_gain_closure.ts"
+  );
+
+  assert.match(
+    edgeGainClosureSource,
+    /function withAdditionalSdlcEdgeResidualPressureRefs/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /const selectedEvaluationResidualPressureRefs =\s*fpEvaluationResidualPressureRefsForState\(input\.state\)/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /withAdditionalSdlcEdgeResidualPressureRefs\(\{\s*residualPressure: measuredEdgeResidualPressure,\s*requiredPressureRefs: selectedEvaluationResidualPressureRefs\s*\}\)/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /deriveSdlcEdgeAssuranceCloseDecision\(\{\s*gain: edgeGain,\s*residualPressure: edgeResidualPressure\s*\}\)/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /edgeResidualPressureRefs: edgeResidualPressure\.requiredPressureRefs/u
+  );
+});
+
 test("T-184 ticket carries the partition inventory and deletion gates", () => {
   const ticket = readRepoFile(
     ".ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md"
@@ -99,6 +375,401 @@ test("T-184 ticket carries the partition inventory and deletion gates", () => {
   assert.match(ticket, /operator\/plugins\/transform\/launch_contract\.ts/u);
   assert.match(ticket, /operator\/system_artifacts\.ts/u);
   assert.match(ticket, /No framework helper writes a transform output/u);
+});
+
+test("T-184 legacy managed traversal ledger is deleted", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const projectProfileSource = readRepoFile(
+    "build_tenants/typescript/code/src/workspace/project_profile.ts"
+  );
+  const workspaceCarriersSource = readRepoFile(
+    "build_tenants/typescript/code/src/workspace/carriers.ts"
+  );
+  const artifactCatalogSource = readRepoFile(
+    "build_tenants/typescript/code/src/contracts/operator_run_artifact_catalog.ts"
+  );
+
+  for (const source of [
+    installedOperatorSource,
+    projectProfileSource,
+    workspaceCarriersSource,
+    artifactCatalogSource
+  ]) {
+    assert.doesNotMatch(source, /SdlcManagedTraversalLedger/u);
+    assert.doesNotMatch(source, /deriveConformProjectManagedTraversalLedger/u);
+    assert.doesNotMatch(source, /sdlc_managed_traversal_ledger/u);
+    assert.doesNotMatch(source, /managed_traversal_ledger\.json/u);
+  }
+});
+
+test("T-184 operator timeout policy is tenant configuration, not handoff glue", () => {
+  const runtimePolicy = JSON.parse(
+    readRepoFile("build_tenants/typescript/config/operator-runtime-policy.json")
+  );
+  assert.equal(runtimePolicy.kind, "odd_sdlc_operator_runtime_policy");
+  assert.equal(
+    runtimePolicy.policyRef,
+    "config://odd-sdlc/operator-runtime-policy/v1"
+  );
+  assert.equal(
+    runtimePolicy.worker.inactivityTimeoutMs,
+    runtimePolicy.minimumOperatorTimeoutMs
+  );
+  assert.equal(
+    runtimePolicy.designDepthFpEvaluator.timeoutMs,
+    runtimePolicy.minimumOperatorTimeoutMs
+  );
+  assert.equal(
+    runtimePolicy.executionShard.timeoutMs,
+    runtimePolicy.minimumOperatorTimeoutMs
+  );
+
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const launchContractSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
+  );
+  const runtimePolicySource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/runtime_policy.ts"
+  );
+  assert.match(installedOperatorSource, /sdlcOperatorRuntimePolicy/u);
+  assert.match(launchContractSource, /sdlcOperatorRuntimePolicy/u);
+  assert.match(runtimePolicySource, /operator-runtime-policy\.json/u);
+  assert.doesNotMatch(installedOperatorSource, /1000 \* 60 \* (15|30|60)/u);
+  assert.doesNotMatch(launchContractSource, /1000 \* 60 \* (10|30|60)/u);
+});
+
+test("T-184 long process archives have durable started/interrupted lifecycle facts", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const t164LiveSource = readRepoFile(
+    "build_tenants/typescript/test_env/live/test_t164_data_mapper_full_capability_live.test.mjs"
+  );
+  const resumeSource = readRepoFile(
+    "build_tenants/typescript/test_env/live/resume_t164_data_mapper_full_capability_live.mjs"
+  );
+  const externalRunnerSource = readRepoFile(
+    "build_tenants/typescript/test_env/live/run_full_external_data_mapper_sandbox.mjs"
+  );
+
+  assert.match(installedOperatorSource, /registerProcessInterruptionArtifact/u);
+  assert.match(installedOperatorSource, /lifecycleStatus: "started"/u);
+  assert.match(installedOperatorSource, /lifecycleStatus: "completed"/u);
+  assert.match(installedOperatorSource, /lifecycleStatus: "interrupted"/u);
+  assert.match(installedOperatorSource, /host_signal_before_process_result/u);
+  for (const artifactPath of [
+    "worker_run.json",
+    "design_depth_fp_evaluator_run.json",
+    "review_grade_edge_fulfillment_run.json"
+  ]) {
+    assert.match(installedOperatorSource, new RegExp(artifactPath, "u"));
+  }
+
+  for (const source of [t164LiveSource, resumeSource, externalRunnerSource]) {
+    assert.match(source, /lifecycleStatus: "started"/u);
+    assert.match(source, /lifecycleStatus: "completed"/u);
+    assert.match(source, /status: null/u);
+    assert.match(source, /endedAt: null/u);
+    assert.match(source, /hostPid: process\.pid/u);
+  }
+});
+
+test("T-184 operator summary separates obligation review from semantic admission", () => {
+  const carriersSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/carriers.ts"
+  );
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  assert.match(carriersSource, /readonly obligationReview/u);
+  assert.match(carriersSource, /readonly admittedSemantic/u);
+  assert.match(installedOperatorSource, /targetCarrierAdmissionStatus/u);
+  assert.match(installedOperatorSource, /ledger\.edgeConverged/u);
+  assert.match(installedOperatorSource, /closureDecision\.disposition/u);
+  assert.match(
+    installedOperatorSource,
+    /ledger\.targetCarrierAdmissionStatus === "admitted"[\s\S]*ledger\.targetCarrierAdmissionStatus === "not_required"/u
+  );
+});
+
+test("T-184 F_P evaluator prompt uses incremental content register writes", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const evaluatorPromptSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+  const contentRegisterSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/content_register.ts"
+  );
+
+  assert.match(
+    evaluatorPromptSource,
+    /After the first evaluator update exists, write a short plan/u
+  );
+  assert.match(evaluatorPromptSource, /Execute the plan incrementally/u);
+  assert.match(evaluatorPromptSource, /First-update admission policy/u);
+  assert.match(evaluatorPromptSource, /publish the same register path atomically/u);
+  assert.match(evaluatorPromptSource, /first mechanical draft-row conversion/u);
+  assert.match(evaluatorPromptSource, /Exact first update command pattern/u);
+  assert.match(evaluatorPromptSource, /node --input-type=module/u);
+  assert.match(installedOperatorSource, /writeDesignDepthFpEvaluatorDraftContentRegister/u);
+  assert.match(installedOperatorSource, /writeDesignDepthFirstUpdateObservation/u);
+  assert.match(installedOperatorSource, /design_depth_fp_evaluator_first_update\.json/u);
+  assert.match(contentRegisterSource, /observeDesignDepthContentRegisterFirstUpdate/u);
+  assert.match(
+    evaluatorPromptSource,
+    /SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND/u
+  );
+  assert.match(contentRegisterSource, /sdlc_design_depth_register_fragment_draft/u);
+  assert.match(evaluatorPromptSource, /content-register-row-draft:\/\//u);
+  assert.match(evaluatorPromptSource, /sdlc_design_depth_register_fragment/u);
+  assert.match(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_REGISTER/u);
+  assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_INCREMENTAL_LEDGER/u);
+  assert.doesNotMatch(installedOperatorSource, /ODD_SDLC_EVALUATOR_CONTENT_LEDGER/u);
+  assert.doesNotMatch(evaluatorPromptSource, /content-ledger/u);
+  assert.doesNotMatch(contentRegisterSource, /sdlc_evaluate_content_ledger/u);
+  assert.doesNotMatch(
+    evaluatorPromptSource,
+    /contentRows\[0\]\.payload must be the full design-depth register object/u
+  );
+  assert.match(contentRegisterSource, /designDepthRegisterPayloadFromFragments/u);
+  assert.match(contentRegisterSource, /SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS/u);
+});
+
+test("T-184 installed operator consumes plugin-owned contracts and plugin set", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const pluginContractsSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/plugin_contracts.ts"
+  );
+  const pluginSetSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/plugin_set.ts"
+  );
+  const evaluatorPromptSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts"
+  );
+
+  assert.match(installedOperatorSource, /createSdlcAbgPluginSet/u);
+  assert.match(pluginSetSource, /createSdlcAbgPluginSet/u);
+  for (const ownedName of [
+    "fpDispatchPluginContract",
+    "fpEvaluatorPluginContract",
+    "designDepthFpEvaluatorRuleContract",
+    "reviewGradeEdgeFulfillmentRuleContract",
+    "consequenceProjectionPluginContract"
+  ]) {
+    assert.doesNotMatch(
+      installedOperatorSource,
+      new RegExp(`function ${ownedName}`, "u"),
+      `${ownedName} must be plugin-owned`
+    );
+    assert.match(pluginContractsSource, new RegExp(`function ${ownedName}`, "u"));
+  }
+
+  assert.doesNotMatch(
+    installedOperatorSource,
+    /function designDepthFpEvaluatorPrompt/u
+  );
+  assert.doesNotMatch(
+    installedOperatorSource,
+    /function reviewGradeEdgeFulfillmentPrompt/u
+  );
+  assert.match(evaluatorPromptSource, /function designDepthFpEvaluatorPrompt/u);
+  assert.match(evaluatorPromptSource, /function reviewGradeEdgeFulfillmentPrompt/u);
+  assert.doesNotMatch(installedOperatorSource, /evaluationRules: Object\.freeze/u);
+  assert.doesNotMatch(installedOperatorSource, /requiredEvaluationRuleRefs/u);
+  assert.match(pluginSetSource, /evaluationRules: Object\.freeze/u);
+  assert.match(pluginSetSource, /requiredEvaluationRuleRefs/u);
+});
+
+test("T-184 declared edge-output projection is consequence-owned", () => {
+  const launchContractSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts"
+  );
+  const edgeProjectionSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/plugins/consequence/edge_projection.ts"
+  );
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const operatorIndexSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/index.ts"
+  );
+  const artifactCatalogSource = readRepoFile(
+    "build_tenants/typescript/code/src/contracts/operator_run_artifact_catalog.ts"
+  );
+
+  assert.doesNotMatch(launchContractSource, /writeDeclaredEdgeProjectionOutput/u);
+  for (const movedProjectionName of [
+    "writeTestExecutionSurfaceProjection",
+    "writeTestRunArchiveProjection",
+    "writeTestExecutionResultProjection",
+    "writeComponentDepthProjection"
+  ]) {
+    assert.match(
+      edgeProjectionSource,
+      new RegExp(`function ${movedProjectionName}`, "u")
+    );
+    assert.doesNotMatch(
+      launchContractSource,
+      new RegExp(`function ${movedProjectionName}`, "u")
+    );
+  }
+  assert.match(
+    edgeProjectionSource,
+    /export function writeDeclaredEdgeProjectionOutput/u
+  );
+  assert.match(edgeProjectionSource, /sdlcInstalledOperatorProjectsOutput/u);
+  assert.doesNotMatch(edgeProjectionSource, /launch_contract\.js/u);
+  assert.match(
+    installedOperatorSource,
+    /from "\.\/plugins\/consequence\/edge_projection\.js"/u
+  );
+  assert.match(
+    operatorIndexSource,
+    /from "\.\/plugins\/consequence\/edge_projection\.js"/u
+  );
+
+  const dispatchSource = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("const dispatchThroughInstalledOperator"),
+    installedOperatorSource.indexOf("const evaluateFpForInstalledOperatorState")
+  );
+  const consequenceSource = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("const projectConsequenceForInstalledOperatorState"),
+    installedOperatorSource.indexOf("const evaluateDesignDepthForInstalledOperatorState")
+  );
+  const deferSource = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("function shouldDeferDispatchConsequenceToFpEvaluator"),
+    installedOperatorSource.indexOf("function manifestRefSegment")
+  );
+  assert.doesNotMatch(dispatchSource, /writeDeclaredEdgeProjectionOutput\(/u);
+  assert.doesNotMatch(dispatchSource, /declared_edge_projection_artifact/u);
+  assert.match(consequenceSource, /writeDeclaredEdgeProjectionFromConsequence/u);
+  assert.match(deferSource, /sdlcInstalledOperatorProjectsOutput/u);
+  assert.doesNotMatch(installedOperatorSource, /installed_operator_evaluation_artifact/u);
+  assert.doesNotMatch(
+    installedOperatorSource,
+    /sdlc_installed_operator_evaluation_artifact/u
+  );
+  assert.match(
+    artifactCatalogSource,
+    /artifactRef:\s*"operator-run-artifact:\/\/declared-edge-projection-artifact"/u
+  );
+  assert.match(artifactCatalogSource, /role:\s*"read_model"/u);
+  assert.match(artifactCatalogSource, /sourceOwner:\s*"consequence_projection"/u);
+  assert.doesNotMatch(
+    artifactCatalogSource,
+    /installed-operator-evaluation-artifact|installed_operator_evaluation_artifact|sdlc_installed_operator_evaluation_artifact/u
+  );
+});
+
+test("T-184 no-dispatch projection defers output reads until consequence", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+
+  const completionStart = installedOperatorSource.indexOf(
+    "const completeReportDispatch = async"
+  );
+  const completionEnd = installedOperatorSource.indexOf(
+    "const reportAdmissionDiagnosticReason",
+    completionStart
+  );
+  const completionSource = installedOperatorSource.slice(
+    completionStart,
+    completionEnd
+  );
+  const noDispatchStart = installedOperatorSource.indexOf(
+    "if (!workerDispatchAllowed)"
+  );
+  const noDispatchEnd = installedOperatorSource.indexOf(
+    "if (transport === null)",
+    noDispatchStart
+  );
+  const noDispatchSource = installedOperatorSource.slice(
+    noDispatchStart,
+    noDispatchEnd
+  );
+
+  assert.match(
+    completionSource,
+    /deferConstructorUntilConsequence\?: boolean \| undefined/u
+  );
+  assert.match(
+    completionSource,
+    /if \(input\.deferConstructorUntilConsequence !== true\)/u
+  );
+  assert.match(completionSource, /constructorResultFromWorkerOutput/u);
+  assert.match(
+    completionSource,
+    /blockingReasonCarriers:\s*postflight\.blockingReasonCarriers/u
+  );
+  assert.match(noDispatchSource, /buildDeclaredEdgeProjectionPendingReport/u);
+  assert.match(noDispatchSource, /deferConstructorUntilConsequence: true/u);
+  assert.doesNotMatch(noDispatchSource, /constructorResultFromWorkerOutput/u);
+  assert.doesNotMatch(noDispatchSource, /runSdlcHookTurn/u);
+});
+
+test("T-184 report admission failures are diagnostic-only postflight", () => {
+  const installedOperatorSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/installed_operator.ts"
+  );
+  const carriersSource = readRepoFile(
+    "build_tenants/typescript/code/src/operator/carriers.ts"
+  );
+
+  const workerPostflightStart = installedOperatorSource.indexOf(
+    "function workerReportAdmissionPostflight"
+  );
+  const deterministicPostflightStart = installedOperatorSource.indexOf(
+    "function deterministicReportAdmissionPostflight"
+  );
+  const workerPostflightSource = installedOperatorSource.slice(
+    workerPostflightStart,
+    deterministicPostflightStart
+  );
+  const deterministicPostflightSource = installedOperatorSource.slice(
+    deterministicPostflightStart,
+    installedOperatorSource.indexOf(
+      "function workerProcessEvidenceRefs",
+      deterministicPostflightStart
+    )
+  );
+  for (const source of [workerPostflightSource, deterministicPostflightSource]) {
+    assert.match(source, /status:\s*"diagnostic" as const/u);
+    assert.match(source, /blockingReasons:\s*Object\.freeze\(\[\]\)/u);
+    assert.match(source, /lawfulReentryPoint:\s*"operator_blocked"/u);
+    assert.doesNotMatch(source, /status:\s*"blocked" as const/u);
+  }
+
+  const reportAdmissionFailureSource = installedOperatorSource.slice(
+    installedOperatorSource.indexOf("const completeReportAdmissionFailure"),
+    installedOperatorSource.indexOf("const edgeAccountingRow")
+  );
+  assert.match(reportAdmissionFailureSource, /gapDossier:\s*null/u);
+  assert.match(
+    reportAdmissionFailureSource,
+    /resultRef:\s*consequence\.nextActionProjection\.nextActionProjectionRef/u
+  );
+  assert.doesNotMatch(reportAdmissionFailureSource, /constructPostflightGapDossier/u);
+  assert.doesNotMatch(reportAdmissionFailureSource, /writePostflightGapDossier/u);
+  assert.doesNotMatch(reportAdmissionFailureSource, /gapDossier\.currentGapDossierRef/u);
+  assert.equal(
+    (installedOperatorSource.match(/completeReportAdmissionFailure\(/gu) ?? [])
+      .length,
+    2
+  );
+  assert.match(
+    carriersSource,
+    /export type SdlcPostflightResultStatus = "passed" \| "blocked" \| "diagnostic"/u
+  );
 });
 
 test("T-184 retryable provider connection failures remain same-edge retry", () => {

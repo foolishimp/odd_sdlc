@@ -4,6 +4,10 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  configuredLiveTimeoutMs,
+  liveOperatorRuntimePolicy
+} from "./operator_runtime_policy.mjs";
 
 import {
   analyzeSdlcFdRunArchive,
@@ -13,6 +17,7 @@ import {
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SCRIPT_DIR, "../..");
 const RUNNER = resolve(SCRIPT_DIR, "run_full_external_data_mapper_sandbox.mjs");
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 
 const REQUIRED_EDGE_ORDER = Object.freeze([
   "derive_intent_surface",
@@ -174,10 +179,9 @@ function main() {
     encoding: "utf8",
     env,
     maxBuffer: 1024 * 1024 * 200,
-    timeout: Number.parseInt(
-      process.env["ODD_SDLC_TS_T171_LIFECYCLE_TIMEOUT_MS"] ??
-        `${1000 * 60 * 60 * 6}`,
-      10
+    timeout: configuredLiveTimeoutMs(
+      "ODD_SDLC_TS_T171_LIFECYCLE_TIMEOUT_MS",
+      RUNTIME_POLICY.liveHarnessLifecycleCommandTimeoutMs
     )
   });
   writeFileSync(

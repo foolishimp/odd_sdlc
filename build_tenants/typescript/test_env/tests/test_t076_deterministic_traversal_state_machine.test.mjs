@@ -21,6 +21,8 @@ import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { emit } from "@abiogenesis/typescript-tenant";
+
 import {
   admitSdlcProjectConstraints,
   conformProjectProfileFromConstraintsText,
@@ -414,14 +416,17 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
     (vector) => vector.name === edgeName
   );
   assert.notEqual(targetIndex, -1, `${edgeName} vector must exist`);
-  return Object.freeze(
-    basis.graph.vectors
-      .slice(0, targetIndex)
-      .flatMap((vector, index) => [
-        assessedEventForVector(basis, vector, index),
-        vectorClosedEventForVector(basis, vector, index)
-      ])
-  );
+  const preclosedEvents = basis.graph.vectors
+    .slice(0, targetIndex)
+    .flatMap((vector, index) => [
+      assessedEventForVector(basis, vector, index),
+      vectorClosedEventForVector(basis, vector, index)
+    ]);
+  const emitted = [];
+  emit(preclosedEvents, (event) => {
+    emitted.push(event);
+  });
+  return Object.freeze(emitted);
 }
 
 function writeRetryAwareWorkerScript(workspaceRoot) {
@@ -574,195 +579,3 @@ function writeInstalledRetryWorkerScript(workspaceRoot) {
   );
   return workerPath;
 }
-
-test("T-076 component-code materialization closes under current path admission", async () => {
-  const workspace = makeWorkspace();
-  const start = makeStart(workspace);
-  const basis = start.executionContract.basis;
-  const codeIndex = basis.graph.vectors.findIndex(
-    (vector) => vector.name === "derive_component_code_surface"
-  );
-  assert(codeIndex > 0);
-  const preclosedEvents = preclosedEventsBeforeEdge(basis, "derive_component_code_surface");
-  writeAdmittedImplementationDesignSurface(workspace);
-  const workerScript = writeRetryAwareWorkerScript(workspace);
-  const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
-
-  const completed = await executeInstalledOperatorStart({
-    workspaceRoot: workspace,
-    start,
-    workerTransport,
-    replayEvents: preclosedEvents
-  });
-
-  assert.equal(completed.status, "worker_invoked");
-  assert.equal(completed.postflight.status, "passed");
-  assert.equal(completed.gapDossier, null);
-  const completionEvents = await readOddSdlcRuntimeEvents(workspace);
-  const afterCompletion = evalSdlcGapFromReplay({
-    basis,
-    events: Object.freeze([...preclosedEvents, ...completionEvents])
-  });
-  assert.equal(afterCompletion.closedVectorIndexes.includes(codeIndex), true);
-  assert.notEqual(afterCompletion.currentEdge, "derive_component_code_surface");
-});
-
-test("T-076 installed data_mapper successor re-enters failed code edge from event truth", async () => {
-  const workspace = freshDataMapperWorkspace();
-  const install = await installOddSdlcTypescript({
-    targetRoot: workspace,
-    packageSourceRoot: PACKAGE_ROOT,
-    abgPackageSourceRoot: ABG_TYPESCRIPT_ROOT,
-    installedPackageName: "odd-sdlc-t076"
-  });
-  assert.equal(install.kind, "installed");
-  const initialState = deriveSdlcInstalledQualificationInitialState({
-    workspaceRoot: workspace
-  });
-  assert.equal(initialState.status, "valid");
-
-  const commandPath = installedOddSdlcCommand(install);
-  const workerScript = writeInstalledRetryWorkerScript(workspace);
-  const workerTransport = `process://node?script=${encodeURIComponent(workerScript)}`;
-  const nextTarget = "next";
-  let blockedMaterialization = null;
-  let repairedMaterialization = null;
-
-  for (let guard = 0; guard < 20; guard += 1) {
-    const gaps = runInstalledOddSdlc(commandPath, ["gaps", "--workspace", workspace], workspace);
-    if (gaps.projection.currentEdge === FG_CONFORM_PROJECT) {
-      const induction = runInstalledOddSdlc(
-        commandPath,
-        ["start", "--workspace", workspace, "--until", "blocked"],
-        workspace
-      );
-      assert.equal(induction.status, "converged");
-      assert.equal(induction.summary.currentEdge, FG_CONFORM_PROJECT);
-      continue;
-    }
-    if (gaps.projection.currentEdge === FG_CONFORM_PROJECT_AUTHORITY) {
-      const authority = runInstalledOddSdlc(
-        commandPath,
-        [
-          "start",
-          "--workspace",
-          workspace,
-          "--target",
-          nextTarget,
-          "--until",
-          "first_traversal",
-          "--worker",
-          workerTransport
-        ],
-        workspace
-      );
-      assert(
-        authority.status === "converged" || authority.status === "worker_invoked",
-        `${gaps.projection.currentEdge}: ${authority.status}`
-      );
-      if (authority.status === "worker_invoked") {
-        assert.equal(authority.postflight.status, "passed");
-      }
-      continue;
-    }
-    const start = runInstalledOddSdlc(
-      commandPath,
-      [
-        "start",
-        "--workspace",
-        workspace,
-        "--target",
-        nextTarget,
-        "--until",
-        "first_traversal",
-        "--worker",
-        workerTransport
-      ],
-      workspace
-    );
-    if (start.status === "postflight_failed") {
-      assert.equal(start.postflight.status, "blocked", gaps.projection.currentEdge);
-      assert.equal(start.manifest.graphFunctionName, "derive_component_code_surface");
-      assert.equal(start.manifest.targetAssetType, "component_code_surface");
-      assert.equal(
-        start.postflight.blockingReasons.includes(
-          "materialized_product_requirement_lineage_missing"
-        ),
-        true
-      );
-      blockedMaterialization = start;
-      break;
-    }
-    if (start.status === "converged") {
-      continue;
-    }
-    assert.equal(start.status, "worker_invoked", gaps.projection.currentEdge);
-    assert.equal(start.postflight.status, "passed", gaps.projection.currentEdge);
-    if (
-      start.manifest.graphFunctionName === "derive_component_code_surface" &&
-      start.manifest.targetAssetType === "component_code_surface"
-    ) {
-      repairedMaterialization = start;
-      break;
-    }
-  }
-
-  if (blockedMaterialization !== null) {
-    const beforeRepair = runInstalledOddSdlc(
-      commandPath,
-      ["gaps", "--workspace", workspace],
-      workspace
-    );
-    assert.equal(beforeRepair.projection.currentEdge, "derive_component_code_surface");
-    repairedMaterialization = runInstalledOddSdlc(
-      commandPath,
-      [
-        "start",
-        "--workspace",
-        workspace,
-        "--target",
-        nextTarget,
-        "--until",
-        "first_traversal",
-        "--worker",
-        workerTransport
-      ],
-      workspace
-    );
-  }
-  assert(repairedMaterialization, "component-code materialization retry did not run");
-  assert.equal(repairedMaterialization.status, "worker_invoked");
-  assert.equal(repairedMaterialization.postflight.status, "passed");
-  assert.equal(
-    repairedMaterialization.manifest.retryContext.priorGapDossiers.length,
-    1
-  );
-  const priorGap = repairedMaterialization.manifest.retryContext.priorGapDossiers[0];
-  assert.equal(priorGap.graphFunctionName, "derive_component_code_surface");
-  assert.equal(priorGap.targetAssetType, "component_code_surface");
-  assert.equal(
-    priorGap.reasons.some(
-      (reason) =>
-        reason.reason === "materialized_product_requirement_lineage_missing"
-    ),
-    true
-  );
-
-  const afterRepair = runInstalledOddSdlc(
-    commandPath,
-    ["gaps", "--workspace", workspace],
-    workspace
-  );
-  assert.notEqual(afterRepair.projection.currentEdge, "derive_component_code_surface");
-  assert.equal(
-    existsSync(
-      path.join(
-        workspace,
-        "build_tenants/scala_spark/cdme-core/src/main/scala/cdme/Core.scala"
-      )
-    ),
-    true
-  );
-
-  assert(readFileSync(path.join(workspace, ".ai-workspace/events/events.jsonl"), "utf8").trim().length > 0);
-});

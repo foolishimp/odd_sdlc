@@ -83,6 +83,23 @@ export interface SdlcOperatorSummary {
   readonly graphFunctionName: string | null;
   readonly currentEdge: string | null;
   readonly status: SdlcInstalledOperatorStatus | "dispatch_required";
+  readonly obligationReview: {
+    readonly status: "not_evaluated" | "passed" | "incomplete" | "blocked";
+    readonly expected: number;
+    readonly fulfilled: number;
+    readonly partial: number;
+    readonly blocked: number;
+    readonly unfulfilled: number;
+    readonly missing: number;
+    readonly extra: number;
+    readonly assessmentCount: number;
+  };
+  readonly admittedSemantic: {
+    readonly status: "not_evaluated" | "admitted" | "blocked";
+    readonly targetCarrierAdmissionStatus: string | null;
+    readonly edgeConverged: boolean | null;
+    readonly closureDisposition: string | null;
+  };
   readonly blockingReason: string | null;
   readonly blockingReasons: readonly SdlcBlockingReason[];
   readonly nextLawfulAction: string;
@@ -151,6 +168,7 @@ export interface SdlcWorkerTransportContract {
 
 export interface SdlcWorkerRunResult {
   readonly kind: "sdlc_worker_run_result";
+  readonly lifecycleStatus?: "started" | "completed" | "interrupted";
   readonly command: string;
   readonly args: readonly string[];
   readonly cwd: string;
@@ -1957,9 +1975,16 @@ export interface SdlcWorkerResultMaterializationDiagnostic {
   readonly evidenceRefs: readonly string[];
 }
 
+export type SdlcPostflightResultStatus = "passed" | "blocked" | "diagnostic";
+
+export type SdlcFpEvaluateResultStatus =
+  | "passed"
+  | "blocked"
+  | "admitted_with_open_obligations";
+
 export interface SdlcPostflightResult {
   readonly kind: "sdlc_operator_postflight_result";
-  readonly status: "passed" | "blocked";
+  readonly status: SdlcPostflightResultStatus;
   readonly blockingReasons: readonly string[];
   readonly blockingReasonCarriers: readonly SdlcBlockingReason[];
   readonly evidenceRefs: readonly string[];
@@ -1981,9 +2006,7 @@ export interface SdlcFpEvaluateResult {
   readonly evaluationRef: string;
   readonly findings: readonly GtlEvaluationFindingRef[];
   readonly evaluation: GtlEvaluation;
-  readonly status:
-    | SdlcPostflightResult["status"]
-    | "admitted_with_open_obligations";
+  readonly status: SdlcFpEvaluateResultStatus;
   readonly postflightStatus: SdlcPostflightResult["status"];
   readonly blockingReasons: readonly string[];
   readonly evidenceRefs: readonly string[];

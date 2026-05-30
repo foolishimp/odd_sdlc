@@ -44,7 +44,9 @@ import {
   evaluateSemanticRows
 } from "../fixtures/t102_t109_abg37_mini_sdlc_lifecycle.mjs";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
+import { liveOperatorRuntimePolicy } from "./operator_runtime_policy.mjs";
 
+const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_LIVE"] === "1";
 const WORKER_COMMAND = process.env["ODD_SDLC_TS_LIVE_WORKER_COMMAND"] ?? "codex";
 const CODEX_MODEL = process.env["ODD_SDLC_TS_LIVE_CODEX_MODEL"] ?? "gpt-5.3-codex";
@@ -322,7 +324,7 @@ function runLiveWorker(input) {
   const run = spawnSync(WORKER_COMMAND, args, {
     cwd: input.outputWorkspaceRoot,
     encoding: "utf8",
-    timeout: 1000 * 60 * 10,
+    timeout: RUNTIME_POLICY.liveHarnessCommandTimeoutMs,
     maxBuffer: 1024 * 1024 * 20
   });
   const elapsedMs = performance.now() - startedAt;

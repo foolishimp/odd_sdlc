@@ -15,7 +15,8 @@ The constitutional `specification/` surface is singleton project truth.
 ## Structure
 
 - `common/` holds shared realization/design law adopted across realizations.
-- `python/` is the primary realization of `odd_sdlc`.
+- `python/` is disabled and retained only as legacy discovery/comparison
+  evidence.
 - `typescript/` is the active ODD-native TypeScript build line for
   `odd_sdlc`.
 - additional tenant-local roots may be added alongside when a realization needs
@@ -26,19 +27,19 @@ The constitutional `specification/` surface is singleton project truth.
 | Entry | Kind | Path | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `common` | shared root | `build_tenants/common/` | Active | Shared realization root |
-| `python` | primary realization | `build_tenants/python/` | Active | Primary `odd_sdlc` realization |
-| `typescript` | tenant realization | `build_tenants/typescript/` | Build active | ODD-native TypeScript rebuild line over the singleton specification; Python is discovery evidence, not architecture authority |
+| `python` | disabled legacy realization | `build_tenants/python/` | Disabled | Retained as legacy discovery/comparison evidence only; not an active operator, install, gap, start, or qualification surface |
+| `typescript` | tenant realization | `build_tenants/typescript/` | Active | ODD-native TypeScript line over the singleton specification; Python is discovery evidence, not architecture authority |
 | `odd_service` | service realization | `build_tenants/odd_service/python/` | Incubating | Proposed enduring orchestration plane above `odd_sdlc`, still subordinate to ABG runtime truth |
 
 ## Active Focus
 
-`python/` is the active realization of `odd_sdlc`.
+`python/` is disabled. It remains in the repository as legacy discovery and
+comparison evidence, but current work must not treat Python commands, installer
+paths, gap/start behavior, or merge-conflicted Python source as the active
+operator surface.
 
-`typescript/` is the active build line for the ODD-native
-TypeScript tenant. It may not claim realization closure until package,
-substrate-binding, domain-carrier, graph-publication, public-start,
-constructor/evaluator, projection, operational-return, and RC qualification
-tickets close under STDO governance.
+`typescript/` is the active realization line for the ODD-native TypeScript
+tenant.
 
 `common/` is the shared realization root.
 

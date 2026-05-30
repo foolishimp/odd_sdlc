@@ -374,7 +374,7 @@ test("T-147 declared unknown file family satisfies product source role by policy
   );
 });
 
-test("T-147 known ecosystem file is evaluate.C pressure, not an F_D unbound blocker", () => {
+test("T-147 known ecosystem file is evaluate.C pressure beside F_D admission", () => {
   const workspace = makeWorkspace({
     activeTenant: "scala_spark",
     language: "scala",
@@ -402,7 +402,7 @@ test("T-147 known ecosystem file is evaluate.C pressure, not an F_D unbound bloc
   });
   const postflight = evaluateSdlcComputeStage({ manifest, report });
 
-  assert.equal(postflight.status, "blocked");
+  assert.equal(postflight.status, "passed");
   assert.equal(
     postflight.blockingReasonCarriers.some(
       (reason) => reason.code === "materialized_product_file_unbound_to_declared_target"
@@ -412,7 +412,7 @@ test("T-147 known ecosystem file is evaluate.C pressure, not an F_D unbound bloc
   );
 });
 
-test("T-147 context expected files alone cannot define materialization targets", () => {
+test("T-147 context expected files remain observation without owning materialization authority", () => {
   const workspace = makeWorkspace({
     activeTenant: "scala_spark",
     language: "scala",
@@ -462,11 +462,13 @@ test("T-147 context expected files alone cannot define materialization targets",
   assert.deepEqual(reconciliation.contextExpectedFileTargets, [
     "build_tenants/scala_spark/src/main/scala/App.scala"
   ]);
-  assert.equal(postflight.status, "blocked");
-  assert(
+  assert.equal(postflight.status, "passed");
+  assert.equal(
     postflight.blockingReasonCarriers.some(
       (reason) =>
         reason.code === "context_expected_files_not_materialization_authority"
-    )
+    ),
+    true,
+    JSON.stringify(postflight.blockingReasonCarriers, null, 2)
   );
 });

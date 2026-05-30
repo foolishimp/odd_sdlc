@@ -183,12 +183,6 @@ export function resolveSdlcFdRunAnalysisRoot(inspectedRoot: string): SdlcFdRunAn
   });
 }
 
-export function operatorRunRootsOldestFirst(
-  resolved: SdlcFdRunAnalysisResolvedRoot
-): readonly string[] {
-  return Object.freeze([...resolved.operatorRunRoots].reverse());
-}
-
 export function fileSizeOrZero(filePath: string): number {
   const stats = statOrNull(filePath);
   return stats === null || !stats.isFile() ? 0 : stats.size;

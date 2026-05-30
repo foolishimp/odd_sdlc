@@ -59,6 +59,20 @@ function executionBasis() {
   return { basis, module };
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t142/${caseId}`,
+    compositionDigest: `digest://t142/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t142/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t142/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t142/${caseId}`,
+    graphVectorRef: `graph-vector://t142/${caseId}`,
+    basisRef: `basis://t142/${caseId}`
+  });
+}
+
 test("T-142 authority conformance can close while requirements carry product materialization pressure", () => {
   const { basis, module } = executionBasis();
   const materializeGraphFunction = module.graphFunctions.find(
@@ -125,6 +139,7 @@ test("T-142 authority conformance can close while requirements carry product mat
   );
 
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: selectedComposition("authority-conformance"),
     ledgerRef: "ledger://t142/authority-conformance",
     ledgerVersionRef: "ledger-version://t142/authority-conformance/1",
     edgeRef: `edge://t142/${FG_CONFORM_PROJECT_AUTHORITY}`,
@@ -198,6 +213,7 @@ test("T-142 authority conformance can close while requirements carry product mat
     ]
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: ledger.selectedComposition,
     nextActionProjectionRef: evaluator.priorityProjection.projectionRef,
     nextActionBasisKind: "post_close_graph_continuation",
     intentEventRefs: evaluator.intentEventRefs,

@@ -584,5 +584,5 @@ test("T-173 installed operator archives traversal selection and emits typed audi
   assert.match(source, /constructFdAuthorityOutcomeAdmittedEvent/u);
   assert.match(source, /odd-sdlc-frontdoor-traversal-hop-selection/u);
   assert.match(source, /emitted\.push\(frontDoorTraversalAuditEvent\)/u);
-  assert.match(source, /emitted\.push\(traversalAuditEvent\)/u);
+  assert.match(source, /input\.eventSink\(traversalAuditEvent\)/u);
 });

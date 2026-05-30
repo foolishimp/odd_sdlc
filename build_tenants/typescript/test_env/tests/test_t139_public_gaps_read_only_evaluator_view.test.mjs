@@ -98,6 +98,20 @@ function queryDomain() {
   });
 }
 
+function selectedComposition(caseId) {
+  return Object.freeze({
+    kind: "sdlc_selected_abg_fn_composition_identity",
+    compositionRef: `abg.fn_composition://t139/${caseId}`,
+    compositionDigest: `digest://t139/${caseId}`,
+    compositionSelectionRef: `abg.fn_composition_selection://t139/${caseId}`,
+    selectedRegimeBindingRef:
+      `abg.fn_composition.regime_binding://t139/${caseId}/evaluate/fp`,
+    graphFunctionRef: `graph-function://t139/${caseId}`,
+    graphVectorRef: `graph-vector://t139/${caseId}`,
+    basisRef: `basis://t139/${caseId}`
+  });
+}
+
 function rowByDisplayId(projection, requirementDisplayId) {
   const row = projection.rows.find(
     (candidate) => candidate.requirementDisplayId === requirementDisplayId
@@ -252,7 +266,9 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
   };
   const req001 = rowByDisplayId(domain.requirementFulfillment, "REQ-T139-001");
   const req002 = rowByDisplayId(domain.requirementFulfillment, "REQ-T139-002");
+  const composition = selectedComposition("edge");
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: composition,
     ledgerRef: "ledger://t139/edge",
     ledgerVersionRef: "ledger-version://t139/edge/1",
     edgeRef: "edge://t139/derive_requirement_surface",
@@ -282,6 +298,7 @@ test("T-139 public rows can project T-135 ledger, closure, and evaluator refs", 
     blockReasonRefs: ["requirement-open://t139/REQ-T139-002/partial"]
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: composition,
     nextActionProjectionRef: "next-action://t139/edge/block",
     intentEventRefs: ["event://t139/intent"],
     productAssetModelRef: "product-asset-model://t139",
@@ -355,6 +372,7 @@ test("T-139 public projection constructors converge on the same logical state", 
       blockingReasons: row.openReasons
     })),
     edgeFulfillmentLedger: constructSdlcEdgeFulfillmentLedger({
+      selectedComposition: selectedComposition("convergence"),
       ledgerRef: "ledger://t139/convergence",
       ledgerVersionRef: "ledger-version://t139/convergence/1",
       edgeRef: "edge://t139/convergence",
@@ -378,6 +396,7 @@ test("T-139 public projection constructors converge on the same logical state", 
     edgeClosureDecision: deriveSdlcEdgeClosureDecision({
       decisionRef: "closure-decision://t139/convergence",
       ledger: constructSdlcEdgeFulfillmentLedger({
+        selectedComposition: selectedComposition("convergence"),
         ledgerRef: "ledger://t139/convergence",
         ledgerVersionRef: "ledger-version://t139/convergence/1",
         edgeRef: "edge://t139/convergence",
@@ -402,6 +421,7 @@ test("T-139 public projection constructors converge on the same logical state", 
       blockReasonRefs: ["requirement-open://t139/convergence"]
     }),
     nextActionProjection: constructSdlcNextActionProjection({
+      selectedComposition: selectedComposition("convergence"),
       nextActionProjectionRef: "next-action://t139/convergence",
       intentEventRefs: ["event://t139/intent"],
       productAssetModelRef: "product-asset-model://t139",
@@ -410,6 +430,7 @@ test("T-139 public projection constructors converge on the same logical state", 
       closureDecision: deriveSdlcEdgeClosureDecision({
         decisionRef: "closure-decision://t139/convergence",
         ledger: constructSdlcEdgeFulfillmentLedger({
+          selectedComposition: selectedComposition("convergence"),
           ledgerRef: "ledger://t139/convergence",
           ledgerVersionRef: "ledger-version://t139/convergence/1",
           edgeRef: "edge://t139/convergence",
@@ -458,7 +479,9 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
     ".ai-workspace/runtime/odd_sdlc/operator-runs/t139-archived-run"
   );
   mkdirSync(operatorRunRoot, { recursive: true });
+  const composition = selectedComposition("archive");
   const ledger = constructSdlcEdgeFulfillmentLedger({
+    selectedComposition: composition,
     ledgerRef: "ledger://t139/archive",
     ledgerVersionRef: "ledger-version://t139/archive/1",
     edgeRef: "edge://t139/archive",
@@ -488,6 +511,7 @@ test("T-139 Spec Method gaps rehydrates installed traversal consequence archives
     blockReasonRefs: ["requirement-open://t139/REQ-T139-002/partial"]
   });
   const nextActionProjection = constructSdlcNextActionProjection({
+    selectedComposition: composition,
     nextActionProjectionRef: "next-action://t139/archive",
     intentEventRefs: ["event://t139/intent"],
     productAssetModelRef: "product-asset-model://t139",

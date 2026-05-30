@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import path, { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { emit } from "@abiogenesis/typescript-tenant";
+
 import {
   admitSdlcProjectConstraints,
   constructSdlcGtlModule,
@@ -156,7 +158,17 @@ function writeImplementationDesignAuthority(workspaceRoot) {
   );
   mkdirSync(archiveRoot, { recursive: true });
   const registerPath = path.join(archiveRoot, "design_depth_fp_evaluator_register.json");
+  const contentRegisterPath = path.join(
+    archiveRoot,
+    "design_depth_fp_evaluator_content_register.json"
+  );
+  const ruleOutcomePath = path.join(
+    archiveRoot,
+    "design_depth_fp_evaluator_rule_outcome.json"
+  );
   const registerRef = pathToFileURL(registerPath).href;
+  const contentRegisterRef = pathToFileURL(contentRegisterPath).href;
+  const ruleOutcomeRef = pathToFileURL(ruleOutcomePath).href;
   const fpEvaluateResultPath = path.join(archiveRoot, "fp_evaluate_result.json");
   const composition = {
     kind: "sdlc_selected_abg_fn_composition_identity",
@@ -232,6 +244,71 @@ function writeImplementationDesignAuthority(workspaceRoot) {
   };
   writeFileSync(registerPath, `${JSON.stringify(sidecarRegister, null, 2)}\n`, "utf8");
   writeFileSync(
+    contentRegisterPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_evaluate_content_register",
+        registerVersion: "ts-evaluate-content-register-v1",
+        stage: "evaluate.C",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        authorityFunction: "synthesize_model",
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        compositionContributionRef: composition.selectedRegimeBindingRef,
+        sourceBasisRefs: [pathToFileURL(outputFile).href],
+        candidateArtifactRefs: [pathToFileURL(outputFile).href],
+        evidenceRefs: [pathToFileURL(outputFile).href],
+        contentRows: [
+          {
+            kind: "sdlc_evaluate_content_register_row",
+            rowRef: "evaluate-content-row://t151/design-depth-register",
+            authorityFunction: "synthesize_model",
+            carrierFamily: "ProductAssetModel",
+            contentKind: "sdlc_design_depth_register",
+            payload: sidecarRegister,
+            sourceBasisRefs: [pathToFileURL(outputFile).href],
+            evidenceRefs: [pathToFileURL(outputFile).href]
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    ruleOutcomePath,
+    `${JSON.stringify(
+      {
+        kind: "evaluation_rule_outcome",
+        status: "accepted",
+        ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+        ruleRole: "semantic_judgment",
+        computeMeans: "F_P",
+        producedRegisterRefs: [contentRegisterRef, registerRef],
+        evidenceRefs: [contentRegisterRef, registerRef],
+        findingRefs: ["finding://t151/implementation-design/depth-register"],
+        humanResponseRefs: [],
+        residualPressureRefs: [],
+        continuationRefs: [],
+        diagnosticRefs: [],
+        selectedCompositionRef: composition.compositionRef,
+        selectedCompositionDigest: composition.compositionDigest,
+        selectedCompositionSelectionRef: composition.compositionSelectionRef,
+        selectedRegimeBindingRef: composition.selectedRegimeBindingRef,
+        compositionContributionRef: composition.selectedRegimeBindingRef,
+        reason: null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
     path.join(archiveRoot, "handoff_manifest.json"),
     `${JSON.stringify(
       {
@@ -274,8 +351,8 @@ function writeImplementationDesignAuthority(workspaceRoot) {
             findingRef: "finding://t151/implementation-design/depth-register",
             compositionRef: composition.compositionRef,
             compositionDigest: composition.compositionDigest,
-            authorityRefs: [registerRef],
-            evidenceRefs: [registerRef]
+            authorityRefs: [contentRegisterRef, registerRef],
+            evidenceRefs: [contentRegisterRef, registerRef]
           }
         ],
         evaluation: {
@@ -286,7 +363,7 @@ function writeImplementationDesignAuthority(workspaceRoot) {
         status: "passed",
         postflightStatus: "passed",
         blockingReasons: [],
-        evidenceRefs: [registerRef]
+        evidenceRefs: [contentRegisterRef, registerRef, ruleOutcomeRef]
       },
       null,
       2
@@ -494,14 +571,17 @@ function preclosedEventsBeforeEdge(basis, edgeName) {
     (vector) => vector.name === edgeName
   );
   assert.notEqual(targetIndex, -1, `${edgeName} vector must exist`);
-  return Object.freeze(
-    basis.graph.vectors
-      .slice(0, targetIndex)
-      .flatMap((vector, index) => [
-        assessedEventForVector(basis, vector, index),
-        vectorClosedEventForVector(basis, vector, index)
-      ])
-  );
+  const preclosedEvents = basis.graph.vectors
+    .slice(0, targetIndex)
+    .flatMap((vector, index) => [
+      assessedEventForVector(basis, vector, index),
+      vectorClosedEventForVector(basis, vector, index)
+    ]);
+  const emitted = [];
+  emit(preclosedEvents, (event) => {
+    emitted.push(event);
+  });
+  return Object.freeze(emitted);
 }
 
 function writeUnassessedObligationWorkerScript(workspaceRoot) {
@@ -518,8 +598,18 @@ function writeUnassessedObligationWorkerScript(workspaceRoot) {
       "  const outputRef = pathToFileURL(manifest.outputFile).href;",
       "  const reportRef = pathToFileURL(manifest.reportFile).href;",
       "  const reviewedObligationIds = manifest.traversalObligationContext.obligations.map((obligation) => obligation.obligationId);",
-      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({ kind: 'sdlc_review_grade_obligation_finding', obligationId: obligation.obligationId, fulfillmentStatus: 'fulfilled', failureClass: null, requiredAction: null, evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)], acceptedAuthorityRefs: [outputRef, reportRef], rationale: 'synthetic evaluator admits semantic review so the test isolates worker obligation assessment retry law' }));",
-      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'passed', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment passed for obligation retry test' };",
+      "  const findings = manifest.traversalObligationContext.obligations.map((obligation) => ({",
+      "    kind: 'sdlc_review_grade_obligation_finding',",
+      "    obligationId: obligation.obligationId,",
+      "    fulfillmentStatus: 'partial',",
+      "    failureClass: 'semantic_not_realized',",
+      "    requiredAction: 'retry the current edge with selected review-grade pressure',",
+      "    evidenceRefs: [outputRef, reportRef, ...obligation.evidenceRefs.slice(0, 2)],",
+      "    acceptedAuthorityRefs: [outputRef, reportRef],",
+      "    fulfillmentBinding: null,",
+      "    rationale: 'synthetic evaluator emits accepted review-grade pressure so the test isolates first non-close consequence return'",
+      "  }));",
+      "  const assessment = { kind: 'sdlc_review_grade_edge_fulfillment_assessment', assessmentVersion: 'ts-review-grade-v1', graphFunctionName: manifest.graphFunctionName, edgeName: manifest.edgeName, targetAssetType: manifest.targetAssetType, status: 'blocked', reviewedObligationIds, findings, evidenceRefs: [outputRef, reportRef], summary: 'synthetic review-grade assessment blocks for first non-close consequence test' };",
       "  writeFileSync(path.join(manifest.archiveRoot, 'review_grade_edge_fulfillment_assessment.json'), `${JSON.stringify(assessment, null, 2)}\\n`, 'utf8');",
       "  process.exit(0);",
       "}",
@@ -562,24 +652,18 @@ test("T-151 first_traversal returns the first admitted non-close consequence", a
 
   assert.equal(refreshCalls, 0);
   assert.equal("loop" in outcome, false);
-  assert.equal(outcome.status, "postflight_failed");
+  assert.equal(outcome.status, "blocked");
   assert.equal(outcome.summary.currentEdge, "derive_component_code_surface");
-  assert.equal(outcome.postflight.status, "blocked");
-  assert(
-    outcome.postflight.blockingReasonCarriers.some(
-      (reason) => reason.code.startsWith("materialized_product_")
-    )
-  );
+  assert.equal(outcome.postflight.status, "passed");
   assert(outcome.traversalConsequence);
-  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "yield");
-  assert(outcome.traversalConsequence.edgeClosureDecision.yieldResumeBasis);
+  assert.equal(outcome.traversalConsequence.edgeClosureDecision.disposition, "retry");
   assert.equal(
     outcome.traversalConsequence.nextActionProjection.choosesNextTraversal,
-    false
+    true
   );
-  assert.equal(
+  assert.match(
     outcome.summary.nextLawfulAction,
-    "disposition://yield"
+    /post_retry\/derive_component_code_surface/u
   );
   assert.equal(
     outcome.traversalConsequence.nextActionProjection.predecessorRefs.includes(

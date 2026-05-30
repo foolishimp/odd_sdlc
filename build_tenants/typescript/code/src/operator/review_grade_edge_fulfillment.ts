@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
+  parseArray,
   parseClosedRecord,
   parseEnumValue,
   parseNonEmptyString,
@@ -40,6 +41,7 @@ export function reviewGradeFindingsAreDownstreamStagePressure(
     findings.length > 0 &&
     findings.every(
       (finding) =>
+        finding.obligationId.startsWith("requirement:") &&
         finding.fulfillmentStatus === "partial" &&
         finding.failureClass === "wrong_stage"
     )
@@ -53,7 +55,11 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
   return uniqueSorted(
     input.assessments.flatMap((assessment) =>
       assessment.reviewGrade === true &&
-      assessment.fulfillmentStatus !== "fulfilled"
+      assessment.fulfillmentStatus !== "fulfilled" &&
+      !(
+        assessment.fulfillmentStatus === "partial" &&
+        assessment.reviewFailureClass === "wrong_stage"
+      )
         ? [
             `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(assessment.obligationId)}`
           ]
@@ -62,17 +68,30 @@ export function reviewGradeEdgeFulfillmentOpenPressureRefs(input: {
   );
 }
 
-function parseArray<T>(
-  input: unknown,
-  label: string,
-  parseItem: (item: unknown, itemLabel: string) => T
-): readonly T[] {
-  if (!Array.isArray(input)) {
-    throw new TypeError(`${label}: expected array`);
-  }
-  return Object.freeze(
-    input.map((item, index) => parseItem(item, `${label}[${index}]`))
+export function reviewGradeEdgeFulfillmentAssessmentPressureRefs(input: {
+  readonly runRef: string;
+  readonly assessment: SdlcReviewGradeEdgeFulfillmentAssessment;
+}): readonly string[] {
+  const openFindings = input.assessment.findings.filter(
+    (finding) => finding.fulfillmentStatus !== "fulfilled"
   );
+  if (reviewGradeFindingsAreDownstreamStagePressure(openFindings)) {
+    return Object.freeze([]);
+  }
+  if (openFindings.length === 0 && input.assessment.status === "passed") {
+    return Object.freeze([]);
+  }
+  const openPressureRefs = uniqueSorted(
+    openFindings.map(
+      (finding) =>
+        `pressure://odd-sdlc/review-grade/${input.runRef}/${encodeURIComponent(finding.obligationId)}`
+    )
+  );
+  return openPressureRefs.length > 0
+    ? openPressureRefs
+    : Object.freeze([
+        `pressure://odd-sdlc/review-grade/${input.runRef}/assessment-status/${input.assessment.status}`
+      ]);
 }
 
 function parseNullableFailureClass(

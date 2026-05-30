@@ -76,6 +76,30 @@ export function parseStringList(
   );
 }
 
+export function parseArray<T>(
+  input: unknown,
+  label: string,
+  parseItem: (item: unknown, itemLabel: string) => T
+): readonly T[] {
+  if (!Array.isArray(input)) {
+    throw new TypeError(`${label}: expected array`);
+  }
+  return Object.freeze(
+    input.map((item, index) => parseItem(item, `${label}[${index}]`))
+  );
+}
+
+export function parseOptionalArray<T>(
+  input: unknown,
+  label: string,
+  parseItem: (item: unknown, itemLabel: string) => T
+): readonly T[] {
+  if (input === undefined) {
+    return Object.freeze([]);
+  }
+  return parseArray(input, label, parseItem);
+}
+
 export function parseEnumValue<T extends string>(
   input: unknown,
   label: string,
