@@ -3,12 +3,12 @@ id: T-176
 title: Ratify ODD project constitutional structure and derived starter surfaces
 type: method_reprice
 ticket_category: shared_method_migration
-status: active
+status: backlog
 proof_status: method_structure_not_started
 priority: high
 owner: odd_sdlc
 created_at: 2026-05-22
-updated_at: 2026-05-22
+updated_at: 2026-05-30
 triaged_at: 2026-05-22
 activated_at: 2026-05-22
 goal: promote the T-175 source-of-truth cleanup from an odd_sdlc repair into shared ODD project construction law and derived starter material
