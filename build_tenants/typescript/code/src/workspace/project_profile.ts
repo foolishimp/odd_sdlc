@@ -4,7 +4,6 @@
 // Implements: REQ-F-ODDSDLC-032
 // Implements: REQ-F-ODDSDLC-053
 
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -24,6 +23,7 @@ import {
   parseString,
   parseStringList
 } from "../shared/validation.js";
+import { sha256Text } from "../shared/digest.js";
 import {
   SDLC_REALIZATION_MODE_VALUES,
   type SdlcCapabilityContract,
@@ -143,10 +143,6 @@ interface ParsedConstraints {
   readonly values: Record<string, string>;
   readonly buildTenants: readonly MutableTenant[];
   readonly designTenants: readonly MutableTenant[];
-}
-
-function sha256Text(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
 function stripScalarQuotes(value: string): string {

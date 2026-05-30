@@ -20,6 +20,7 @@ import {
   SOFTWARE_DOMAIN_ASSET_TYPES,
   SOFTWARE_DOMAIN_WORK_ACT_TYPES
 } from "../domain/index.js";
+import { sortedStrings } from "../shared/collections.js";
 import {
   constructSdlcGraphFunctionCatalog,
   constructSdlcTraversalOverlayCatalog,
@@ -746,10 +747,6 @@ interface GraphFunctionStructuralSignature {
   readonly declarationSignature: string;
   readonly tags: readonly string[];
   readonly effects: readonly string[];
-}
-
-function sortedStrings(values: readonly string[]): readonly string[] {
-  return Object.freeze([...values].sort());
 }
 
 function requirementOpenReasonRef(input: {

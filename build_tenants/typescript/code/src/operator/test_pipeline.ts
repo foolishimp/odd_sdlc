@@ -6,6 +6,7 @@
 // Investigates: T-168
 
 import type { SdlcGraphFunctionCatalog } from "../graph/index.js";
+import { uniquePresentSorted as uniqueSorted } from "../shared/collections.js";
 import type {
   SdlcCoAffirmationLedger,
   SdlcExpectedResultBinding,
@@ -122,10 +123,6 @@ function requireNonEmptyString(value: string, label: string): string {
     throw new TypeError(`${label} must be a non-empty string`);
   }
   return trimmed;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values.filter((value) => value.length > 0))].sort());
 }
 
 function requireRefs(values: readonly string[], label: string): readonly string[] {

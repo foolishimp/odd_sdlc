@@ -6,6 +6,7 @@ import {
   packNodePackage,
   readNodePackageIdentity
 } from "../package_binding/index.js";
+import { isRecord as isPlainRecord } from "../admission/codecs.js";
 import type {
   OddSdlcTypescriptReleaseCutManifest,
   OddSdlcTypescriptReleaseCutOutcome,
@@ -14,10 +15,6 @@ import type {
 
 function stableJson(payload: unknown): string {
   return `${JSON.stringify(payload, null, 2)}\n`;
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {

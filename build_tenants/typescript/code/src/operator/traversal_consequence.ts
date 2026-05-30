@@ -10,6 +10,7 @@ import type {
   SdlcTargetCarrierClosureStatus
 } from "./edge_gain_closure.js";
 import type { SdlcSelectedAbgFnCompositionIdentity } from "./composition_identity.js";
+import { uniqueSorted } from "../shared/collections.js";
 
 export type SdlcEdgeClosureDisposition =
   | "close"
@@ -290,10 +291,6 @@ function nonNegativeInteger(value: number, label: string): number {
     throw new TypeError(`${label} must be a non-negative integer`);
   }
   return value;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
 }
 
 function obligationReasonRef(input: {

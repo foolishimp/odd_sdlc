@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { EnginePluginInput, RuntimeRegime } from "@abiogenesis/typescript-tenant";
+import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
 import type { SdlcDesignDepthRegister } from "../../carriers.js";
 import { parseDesignDepthRegisterPayload } from "../../design_depth_register.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
@@ -137,10 +138,6 @@ function stableJson(input: unknown): string {
 
 function prettyStableJson(input: unknown): string {
   return `${JSON.stringify(JSON.parse(stableJson(input)), null, 2)}\n`;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right)));
 }
 
 function objectRecord(input: unknown): Record<string, unknown> | null {

@@ -17,6 +17,7 @@ import {
   readFileSync,
   statSync
 } from "node:fs";
+import { uniqueSorted } from "../shared/collections.js";
 import {
   admitGraphSpanAssessment,
   constructGraphReentryAppliedEvent,
@@ -819,10 +820,6 @@ function vectorEvaluatorNames(input: {
     throw new TypeError("Installed operator vector index outside basis");
   }
   return Object.freeze(vector.evaluators.map((evaluator) => evaluator.name));
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
 }
 
 function compactSdlcPriorGapReasonForRetryContext(

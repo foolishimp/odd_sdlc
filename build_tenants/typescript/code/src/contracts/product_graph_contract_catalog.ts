@@ -7,6 +7,7 @@ import type {
   SdlcEdgeGainClosureContract
 } from "../graph/edge_gain_closure_contracts.js";
 import type { SdlcTargetCarrierContractRow } from "../graph/target_carrier_contracts.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 export type SdlcProductGraphWorkerDispatchPolicy =
   | "single_worker_handoff"
@@ -67,12 +68,6 @@ export interface SdlcProductGraphContractCatalog {
 export interface SdlcProductGraphOverlaySource {
   readonly overlayRef: string;
   readonly graphVectorRefs: readonly string[];
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))].sort()
-  );
 }
 
 function edgeAssuranceContractRef(

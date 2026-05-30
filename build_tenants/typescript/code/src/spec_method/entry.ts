@@ -99,6 +99,7 @@ import {
   type SdlcSourceInput,
   type SdlcWorkspaceIngressReport
 } from "../workspace/index.js";
+import { isRecord } from "../admission/codecs.js";
 
 export const ODD_SDLC_SPEC_METHOD_COMMAND_VALUES = Object.freeze([
   "catalog",
@@ -2336,10 +2337,6 @@ function isAnalyzeRunCliEnvelope(value: unknown): value is SdlcAnalyzeRunCliEnve
     !Array.isArray(value) &&
     Reflect.get(value, "kind") === "sdlc_analyze_run_cli_envelope"
   );
-}
-
-function isRecord(input: unknown): input is Readonly<Record<string, unknown>> {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
 }
 
 function isUnknownArray(input: unknown): input is readonly unknown[] {

@@ -2,7 +2,6 @@
 // Implements: REQ-F-ODDSDLC-012
 // Implements: REQ-F-ODDSDLC-022
 
-import { createHash } from "node:crypto";
 import {
   parseClosedRecord,
   parseEnumValue,
@@ -10,6 +9,8 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import { uniqueSorted } from "../shared/collections.js";
+import { sha256Digest } from "../shared/digest.js";
 import {
   SDLC_AMBIGUITY_KIND_VALUES,
   SDLC_SOURCE_INPUT_ROLE_VALUES,
@@ -19,6 +20,9 @@ import {
   type SdlcSourceInputSnapshot
 } from "./carriers.js";
 
+export { uniqueSorted } from "../shared/collections.js";
+export { sha256Digest } from "../shared/digest.js";
+
 export function fnv1aDigest(content: string): string {
   let hash = 0x811c9dc5;
   for (let index = 0; index < content.length; index += 1) {
@@ -26,14 +30,6 @@ export function fnv1aDigest(content: string): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-export function sha256Digest(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
-}
-
-export function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
 }
 
 function detectRole(relativePath: string): SdlcSourceInputRole {

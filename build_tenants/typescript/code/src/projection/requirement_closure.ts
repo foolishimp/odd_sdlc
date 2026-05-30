@@ -9,6 +9,7 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import { uniqueSorted } from "../shared/collections.js";
 import type { SdlcWorkReport } from "../hooks/index.js";
 import type { SdlcWorkspaceIngressReport } from "../workspace/index.js";
 
@@ -154,10 +155,6 @@ export interface SdlcRepairFrontier {
 }
 
 const EMPTY_RUNTIME_EVENT_KINDS: readonly [] = Object.freeze([]);
-
-function uniqueSorted<T extends string>(values: readonly T[]): readonly T[] {
-  return Object.freeze([...new Set(values)].sort());
-}
 
 export function admitSdlcRequirementProofClaim(
   input: unknown,

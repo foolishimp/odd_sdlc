@@ -8,7 +8,6 @@
 // Implements: REQ-F-ODDSDLC-063
 // Implements: REQ-F-ODDSDLC-064
 
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -66,6 +65,9 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../../../shared/validation.js";
+import { uniqueSorted } from "../../../shared/collections.js";
+import { sha256Text } from "../../../shared/digest.js";
+import { pathIsInside } from "../../../shared/path.js";
 import { admitExactContractEnum } from "../../../shared/fd_admission.js";
 import {
   selectSdlcWorkCategoryGovernance
@@ -101,6 +103,8 @@ export type {
   SdlcObservedProductFileSnapshot,
   SdlcProductMaterializationSnapshot
 } from "../../product_materialization/observation.js";
+export { sha256Text } from "../../../shared/digest.js";
+export { pathIsInside } from "../../../shared/path.js";
 import {
   admitImplementationDesignRegisterForManifest,
   admitImplementationDesignRegisterForRuntimeEvaluation,
@@ -340,10 +344,6 @@ const TRAVERSAL_RUNTIME_CONTEXT_PATHS = Object.freeze([
 
 export function stableOperatorJson(payload: unknown): string {
   return stableSdlcSystemArtifactJson(payload);
-}
-
-export function sha256Text(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
 export function sha256File(filePath: string): string {
@@ -4084,10 +4084,6 @@ function executionShardsFor(input: {
       })
     )
   );
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
 }
 
 function assertEdgeAssuranceSourceAssetPolicy(input: {
@@ -8623,14 +8619,6 @@ export function admitWorkerResultReport(
       "SdlcWorkerResultReport.fpEvaluateResultRef"
     )
   });
-}
-
-export function pathIsInside(child: string, parent: string): boolean {
-  const relativePath = relative(parent, child);
-  return (
-    relativePath.length === 0 ||
-    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
-  );
 }
 
 const WORKER_AUTHORITY_READ_LOG_FILES = Object.freeze([

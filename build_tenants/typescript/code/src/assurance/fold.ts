@@ -13,10 +13,7 @@ import {
   type SdlcTraversalRequirementSatisfaction,
   type SdlcTraversalRequirementSatisfactionStatus
 } from "./carriers.js";
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
-}
+import { uniqueSorted } from "../shared/collections.js";
 
 function requiredDimensionsFor(
   input: SdlcAssuranceFoldInput

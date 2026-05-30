@@ -1,10 +1,10 @@
-import { createHash } from "node:crypto";
 import {
   materializeGraphFunction,
   type GraphFunction,
   type Module
 } from "@abiogenesis/typescript-tenant";
 import { parseNonEmptyString } from "../shared/validation.js";
+import { sha256Text } from "../shared/digest.js";
 import {
   FG_BOOTSTRAP_REQUIREMENTS_EXECUTIVE,
   FG_DERIVE_LITE_COMPONENT_CODE_SURFACE,
@@ -234,10 +234,6 @@ interface OverlayDefinition {
   }[];
   readonly predecessorOverlayRefs?: readonly SdlcTraversalOverlayRef[];
   readonly nextEligibleOverlayRefs?: readonly SdlcTraversalOverlayRef[];
-}
-
-function sha256Text(value: string): string {
-  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
 function graphFunctionByName(module: Module): ReadonlyMap<string, GraphFunction> {

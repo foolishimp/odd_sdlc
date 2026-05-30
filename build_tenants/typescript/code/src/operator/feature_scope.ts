@@ -5,6 +5,7 @@ import type {
   SdlcTraversalObligation,
   SdlcTraversalStrategy
 } from "./carriers.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 export interface SdlcFeatureScopeDerivationInput {
   readonly targetAssetType: string;
@@ -15,12 +16,6 @@ export interface SdlcFeatureScopeDerivationInput {
   readonly declaredModuleNames: readonly string[];
   readonly materializedEntityIds: readonly string[];
   readonly materializedOperationIds: readonly string[];
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
-  );
 }
 
 function uniqueInOrder(values: readonly string[]): readonly string[] {

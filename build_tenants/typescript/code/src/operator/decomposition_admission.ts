@@ -14,6 +14,7 @@ import type {
   SdlcTestDependencyMap,
   SdlcTestDesignRegister
 } from "./carriers.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 export interface SdlcDecompositionSummaryCandidateRow {
   readonly downstreamId: string;
@@ -74,12 +75,6 @@ export const SDLC_DEFAULT_DECOMPOSITION_SUMMARY_THRESHOLDS =
     maxOwnedUpstreamPerDownstream: 8,
     maxOwnedUpstreamWithoutBoundary: 1
   } satisfies SdlcDecompositionSummaryThresholds);
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))].sort()
-  );
-}
 
 function invalidReferenceFields(input: {
   readonly rows: readonly SdlcDecompositionSummaryCandidateRow[];

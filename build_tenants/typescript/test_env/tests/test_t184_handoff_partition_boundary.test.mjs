@@ -134,7 +134,9 @@ test("T-184 removes handoff.ts as a public operator surface", () => {
     "build_tenants/typescript/code/src/operator/index.ts"
   );
   assert.match(operatorIndex, /from "\.\/plugins\/transform\/launch_contract\.js"/u);
-  assert.match(operatorIndex, /export \* from "\.\/system_artifacts\.js"/u);
+  assert.match(operatorIndex, /stableSdlcSystemArtifactJson/u);
+  assert.match(operatorIndex, /writeSdlcSystemArtifact/u);
+  assert.doesNotMatch(operatorIndex, /export \* from "\.\/system_artifacts\.js"/u);
   assert.doesNotMatch(operatorIndex, /handoff\.js/u);
 });
 

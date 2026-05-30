@@ -1,6 +1,5 @@
 // Implements: T-134
 
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -12,6 +11,7 @@ import {
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { FG_CONFORM_PROJECT_AUTHORITY } from "../graph/library.js";
+import { sha256Text } from "../shared/digest.js";
 import type { SdlcTargetObligationBinding } from "../projection/query_domain.js";
 import type { SdlcConformProjectReport } from "./carriers.js";
 
@@ -552,10 +552,6 @@ export function deriveSdlcProjectAuthorityConformanceProjection(input: {
     constructsProductFiles: false,
     nextActionRows
   });
-}
-
-function sha256Text(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
 function requireWorkspaceRelativePath(relativePath: string): string {

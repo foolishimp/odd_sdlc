@@ -13,6 +13,7 @@ import {
   type SdlcEdgeGainClosureContract,
   type SdlcTargetCarrierCandidateAdmission
 } from "../graph/index.js";
+import { uniquePresentSorted as uniqueSorted } from "../shared/collections.js";
 
 export type SdlcTargetCarrierClosureStatus =
   | SdlcTargetCarrierCandidateAdmission["status"]
@@ -176,10 +177,6 @@ function stableJson(input: unknown): string {
 
 function digestForValue(input: unknown): string {
   return `sha256:${createHash("sha256").update(stableJson(input)).digest("hex")}`;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values.filter((value) => value.length > 0))].sort());
 }
 
 function edgeScopedRef(input: {

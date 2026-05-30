@@ -13,16 +13,13 @@ import {
 import {
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity
 } from "./content_register.js";
+import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
 
 export const DESIGN_DEPTH_FP_EVALUATOR_RULE_REF =
   "evaluation-rule://odd-sdlc/design-depth-register/fp" as const;
 
 export const DESIGN_DEPTH_FP_EVALUATOR_RULE_OUTCOME_FILE =
   "design_depth_fp_evaluator_rule_outcome.json" as const;
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right)));
-}
 
 function objectRecord(input: unknown): Record<string, unknown> | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path, { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,6 +8,7 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../../shared/validation.js";
+import { sha256Text } from "../../shared/digest.js";
 import type {
   SdlcMaterializedProductFile,
   SdlcMaterializedProductFileRole,
@@ -168,10 +168,6 @@ export interface ProductMaterializationObservationDeps {
   }) => SdlcMaterializedProductFile;
   readonly handoffManifestRefForArchiveRoot: (archiveRoot: string) => string;
   readonly attemptRefForArchiveRoot: (archiveRoot: string) => string;
-}
-
-function sha256Text(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
 function walkFiles(root: string): readonly string[] {

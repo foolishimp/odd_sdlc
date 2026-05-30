@@ -9,6 +9,7 @@ import {
   parseNonEmptyString,
   parseStringList
 } from "../shared/validation.js";
+import { uniqueLocaleSorted as uniqueSorted } from "../shared/collections.js";
 import {
   SDLC_REVIEW_GRADE_FAILURE_CLASSES,
   type SdlcReviewGradeEdgeFulfillmentAdmission,
@@ -280,10 +281,6 @@ function parseReviewAssessment(
     evidenceRefs: parseStringList(record["evidenceRefs"], `${label}.evidenceRefs`),
     summary: parseNonEmptyString(record["summary"], `${label}.summary`)
   });
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right)));
 }
 
 function assessmentValidationErrors(input: {

@@ -52,7 +52,10 @@ function makeWorkspace(input = {}) {
       {
         kind: "sdlc_tenant_technology_stack_description",
         language: input.language ?? "custom",
-        buildTool: input.buildTool ?? "custom"
+        buildTool: input.buildTool ?? "custom",
+        executionEnvironment: {
+          host: "workspace-local"
+        }
       },
       null,
       2

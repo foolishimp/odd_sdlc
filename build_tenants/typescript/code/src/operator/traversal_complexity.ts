@@ -14,6 +14,7 @@ import type {
 import {
   SDLC_MIN_FP_PERMITTED_OUTCOME_CLASSES
 } from "../contracts/carrier_domain_catalog.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 export interface SdlcTraversalHopSelectionInput {
   readonly selectionRef: string;
@@ -52,12 +53,6 @@ export const SDLC_DEFAULT_TRAVERSAL_COMPLEXITY_THRESHOLDS = Object.freeze({
   maxResidualRefsForSmallHop: 0,
   maxResidualOutsideSubsurfaceRefsForSmallHop: 0
 } satisfies SdlcTraversalComplexityThresholds);
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))].sort()
-  );
-}
 
 function decompositionSummaryRef(summary: SdlcDecompositionSummary | null): string | null {
   return summary === null

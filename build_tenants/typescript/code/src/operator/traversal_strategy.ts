@@ -9,6 +9,7 @@ import type {
 import {
   activeOddSdlcTraversalStrategyPlan
 } from "../shared/traversal_strategy_plan.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 export {
   ODD_SDLC_DEFAULT_TRAVERSAL_STRATEGY_PLAN,
@@ -17,12 +18,6 @@ export {
   activeOddSdlcTraversalStrategyPlan,
   resolveOddSdlcTraversalStrategyPlan
 } from "../shared/traversal_strategy_plan.js";
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
-  );
-}
 
 export function parseSdlcTraversalStrategyDirective(
   strategyDirectiveRef: string | null

@@ -1,9 +1,4 @@
-function isStringRecord(input: object): input is Readonly<Record<string, unknown>> {
-  return (
-    Object.getPrototypeOf(input) === Object.prototype ||
-    Object.getPrototypeOf(input) === null
-  );
-}
+import { isPlainRecord } from "../admission/codecs.js";
 
 export function parseClosedRecord(
   input: unknown,
@@ -13,7 +8,7 @@ export function parseClosedRecord(
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new TypeError(`${label}: expected closed object`);
   }
-  if (!isStringRecord(input)) {
+  if (!isPlainRecord(input)) {
     throw new TypeError(`${label}: expected plain object`);
   }
   const record = input;

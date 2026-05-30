@@ -28,13 +28,10 @@ import {
   type SdlcTriageClassificationCondition,
   type SdlcTriageRoutePolicyEntry
 } from "./policy.js";
+import { uniqueSorted } from "../shared/collections.js";
 
 const EMPTY_RUNTIME_EVENT_KINDS: readonly [] = Object.freeze([]);
 const EMPTY_LINEAGE_AUTHORITY_REFS: readonly string[] = Object.freeze([]);
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
-}
 
 function observationId(input: {
   readonly analysisRef: string;

@@ -13,6 +13,7 @@ import {
   writeFile
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { isRecord } from "../admission/codecs.js";
 import type {
   OddSdlcTypescriptReleaseSnapshotAbgSubstrate,
   OddSdlcTypescriptReleaseSnapshotArtifactKind,
@@ -44,10 +45,6 @@ interface AdmittedReleaseSnapshotRequest
   readonly releaseNotePath: string | null;
   readonly npmCacheRoot: string | null;
   readonly createdAt: string;
-}
-
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
 }
 
 function requiredString(

@@ -65,6 +65,7 @@ import type {
   SdlcTraversalHopSelection,
   SdlcTraversalOutcomeClass
 } from "../operator/carriers.js";
+import { isRecord } from "../admission/codecs.js";
 import type { SdlcConformProjectProfile } from "../workspace/index.js";
 import { publicStartTargetPolicyFor } from "./policy.js";
 
@@ -289,10 +290,6 @@ interface PublicStartEvaluation {
   readonly constructionIntent: SdlcConstructionIntent | null;
   readonly traversalDecompositionSummary: SdlcDecompositionSummary | null;
   readonly traversalHopSelection: SdlcTraversalHopSelection | null;
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function statSafe(target: string) {

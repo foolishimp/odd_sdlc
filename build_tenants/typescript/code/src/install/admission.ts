@@ -2,10 +2,7 @@
 
 import { resolve } from "node:path";
 import type { OddSdlcTypescriptInstallRequest } from "./carriers.js";
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isRecord as isPlainRecord } from "../admission/codecs.js";
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isPlainRecord(value)) {

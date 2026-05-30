@@ -1543,7 +1543,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(handoffSource, /SBT\/JDK/u);
   assert.doesNotMatch(handoffSource, /java\.security\.manager/u);
   assert.doesNotMatch(operatorIndex, /admitImplementationDesignRegisterForManifest/u);
-  assert.match(operatorIndex, /export \* from "\.\/plugins\/evaluate\/index\.js"/u);
+  assert.match(operatorIndex, /evaluateSdlcComputeStage/u);
+  assert.match(operatorIndex, /SDLC_EVALUATE_C_PLUGIN_SURFACE/u);
+  assert.doesNotMatch(operatorIndex, /export \* from "\.\/plugins\/evaluate\/index\.js"/u);
   assert.doesNotMatch(operatorIndex, /export \* from "\.\/handoff\.js"/u);
   assert.match(evaluatePluginSource, /SDLC_EVALUATE_C_PLUGIN_SURFACE/u);
   assert.match(evaluatePluginSource, /evaluateSdlcComputeStage/u);

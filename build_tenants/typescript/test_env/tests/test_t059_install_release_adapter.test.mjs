@@ -41,7 +41,7 @@ const ABG_RELEASE_VERSION = "3.9.0-rc.5";
 const ABG_RELEASE_SOURCE_REF = "main";
 const ABG_RELEASE_SOURCE_COMMIT = "ab52599203d83e223d1493b8250eff90a2a46bef";
 const ABG_RELEASE_TARBALL_SHA256 =
-  "4499fcc1622275a352680fc3217cb66056db08d57af58f6fe9339326653bb46a";
+  "589436751ab75bfbf8212b5e4102d72ec11cc5408bff60400555cbe6afe49700";
 const ABG_RELEASE_SNAPSHOT_ROOT = resolve(
   REPO_ROOT,
   `../abiogenesis/release_snapshots/abiogenesis-typescript-tenant/${ABG_RELEASE_VERSION}`

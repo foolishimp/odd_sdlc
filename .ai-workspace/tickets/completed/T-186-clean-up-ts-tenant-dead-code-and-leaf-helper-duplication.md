@@ -3,7 +3,7 @@ id: T-186
 title: Clean up TS tenant dead code, barrel leaks, and leaf-helper duplication
 type: chore
 ticket_category: ordinary
-status: backlog
+status: completed
 build_tenant: typescript
 owner: odd_sdlc
 goal: reduce-realization-entropy-without-changing-product-or-runtime-authority
@@ -82,24 +82,40 @@ preserved.
 ## Sequencing vs T-184
 
 Non-operator work (the dead exports in `analysis/`, and the leaf-helper dedup
-across `analysis`/`release`/`start`/`install`/`workspace`/`graph`) is
-independent and may proceed now. The operator-touching rows (`operator/index.ts`
-barrel, leaf-helper copies inside operator files) **sequence behind T-184**,
-which is actively partitioning the operator surface; do not edit operator files
-T-184 is mid-flight in. Those rows are marked `[after T-184]`.
+across `analysis`/`release`/`start`/`install`/`workspace`/`graph`) was
+independent. The operator-touching rows (`operator/index.ts` barrel,
+leaf-helper copies inside operator files) were completed after the T-184
+checkpoint commit `0d1ea89`, preserving the active T-184 code state instead of
+running a new `data_mapper` lane.
 
 ## Work Ledger (this ticket's closure scope only)
 
 | id | task | audit ref | closure proof | seq | status |
 | --- | --- | --- | --- | --- | --- |
-| C-01 | Delete dead exported helpers `operatorRunRootsOldestFirst` (analysis/archive_reader.ts), `hasFailingDiagnostic` (analysis/diagnostics.ts). | DC-01 | grep: 0 references in src + real tests; build/test green | now | planned |
-| C-02 | Delete dead `assessmentStatusToClosureRegisterStatus`, `OddSdlcTraversalStrategyProfile`, and the dead `shared/fd_admission` B-086 `admitDeclaredAlias`/`SdlcFdFieldClass`. | DC-01 | grep 0-ref; build/test green | now | planned |
-| C-03 | Remove the dead `operator/product_materialization/index.ts` barrel (0 importers; launch_contract imports the unit modules directly). | DC-01 | grep proves no importer; build green | [after T-184] | planned |
-| C-04 | Consolidate `isRecord`/`isPlainRecord`/`isStringRecord` to the canonical `admission/codecs.ts` guard; redirect the ~10 copies. | CN-04 | one definition; copies import it; identical body; test green | now | planned |
-| C-05 | Lift `uniqueSorted`/`sortedStrings` into `shared/`; delete the ~23 per-file copies and redirect. | CN-01 | one definition in shared/; 0 private copies; test green | partial [op rows after T-184] | planned |
-| C-06 | Lift `parseArray<T>` (4 byte-identical register copies + hooks/admission) into `shared/`; redirect. | CN-02 | one definition; byte-identical bodies removed; test green | [after T-184] | planned |
-| C-07 | Lift `sha256Text`/`sha256Digest` (6 sites) and `pathIsInside`/containment guard (byte-identical) into `shared/`; redirect. | CN-03, CN-06 | one definition each; copies removed; test green | partial [op rows after T-184] | planned |
-| C-08 | Narrow blanket `export *` to explicit named re-exports on the barrels that leak only test-only / monolith-internal symbols: `qualification/index.ts` (~30 test-only incl. sandbox_proof/enterprise_core), `operator/index.ts` (monolith internals). Preserve every spine-reachable and genuinely-public export. | DC-04, TD-04 | each removed name: 0 consumer in src + real tests, not reachable from a package.json export root; build/test green | [after T-184] | planned |
+| C-01 | Delete dead exported helpers `operatorRunRootsOldestFirst` (analysis/archive_reader.ts), `hasFailingDiagnostic` (analysis/diagnostics.ts). | DC-01 | grep: 0 references in src + real tests; build/test green | now | completed |
+| C-02 | Delete dead `assessmentStatusToClosureRegisterStatus`, `OddSdlcTraversalStrategyProfile`, and the dead `shared/fd_admission` B-086 `admitDeclaredAlias`/`SdlcFdFieldClass`. | DC-01 | grep 0-ref; build/test green | now | completed |
+| C-03 | Remove the dead `operator/product_materialization/index.ts` barrel (0 importers; launch_contract imports the unit modules directly). | DC-01 | grep proves no importer; build green | after T-184 checkpoint | completed |
+| C-04 | Consolidate `isRecord`/`isPlainRecord`/`isStringRecord` to the canonical `admission/codecs.ts` guard; redirect the ~10 copies. | CN-04 | one definition; copies import it; identical body; test green | now | completed |
+| C-05 | Lift `uniqueSorted`/`sortedStrings` into `shared/`; delete the ~23 per-file copies and redirect. | CN-01 | one definition in shared/; 0 private copies; test green | after T-184 checkpoint | completed |
+| C-06 | Lift `parseArray<T>` (4 byte-identical register copies + hooks/admission) into `shared/`; redirect. | CN-02 | one definition; byte-identical bodies removed; test green | after T-184 checkpoint | completed |
+| C-07 | Lift `sha256Text`/`sha256Digest` (6 sites) and `pathIsInside`/containment guard (byte-identical) into `shared/`; redirect. | CN-03, CN-06 | one definition each; copies removed; test green | after T-184 checkpoint | completed |
+| C-08 | Narrow blanket `export *` to explicit named re-exports on the barrels that leak only test-only / monolith-internal symbols: `qualification/index.ts` (~30 test-only incl. sandbox_proof/enterprise_core), `operator/index.ts` (monolith internals). Preserve every spine-reachable and genuinely-public export. | DC-04, TD-04 | each removed name: 0 consumer in src + real tests, not reachable from a package.json export root; build/test green | after T-184 checkpoint | completed |
+
+## Completion Evidence - 2026-05-30
+
+- `npm run build:semantic` passed.
+- `npm run test:semantic` passed: 808 tests, 808 pass, 0 fail.
+- Focused T-186/T-184/T-181/T-147/T-059 affected suites passed:
+  dead-export, helper consolidation, explicit-barrel, tenant tech-stack, and
+  release-adapter guards.
+- Grep proof found the deleted DC-01 symbols absent from `code/src` and found
+  one canonical definition for each consolidated helper family:
+  `admission/codecs.ts` for record guards, `shared/collections.ts` for sorted
+  string helpers, `shared/validation.ts` for `parseArray`, `shared/digest.ts`
+  for SHA-256 helpers, and `shared/path.ts` for containment checks.
+- `operator/index.ts` and `qualification/index.ts` use explicit named exports;
+  no blanket `export *` remains on those narrowed barrels.
+- No `data_mapper` live run was started as part of this closure.
 
 ## Out Of Scope (flagged follow-ups, different change class — do NOT fold in)
 

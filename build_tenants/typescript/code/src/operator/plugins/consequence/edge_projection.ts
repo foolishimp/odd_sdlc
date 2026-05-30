@@ -18,13 +18,14 @@ import {
   executeSdlcFileStoreEffectPlan
 } from "../../../effects/file_store.js";
 import {
-  parseArray,
   parseClosedRecord,
   parseEnumValue,
   parseNonEmptyString,
   parseOptionalArray,
   parseStringList
 } from "../../../shared/validation.js";
+import { uniqueSorted } from "../../../shared/collections.js";
+import { pathIsInside } from "../../../shared/path.js";
 import { admitExactContractEnum } from "../../../shared/fd_admission.js";
 import { deriveSdlcConformProjectProfileFromWorkspace } from "../../../workspace/index.js";
 import type {
@@ -104,10 +105,6 @@ const TENANT_LOCAL_SDLC_SURFACE_OUTPUT_PATHS = Object.freeze({
   ticket_work_item_route_surface: "design/ticket_work_item_route_surface.md",
   gap_retirement_surface: "design/gap_retirement_surface.md"
 } as const satisfies Record<string, string>);
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort());
-}
 
 function objectRecord(input: unknown): Record<string, unknown> | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
@@ -795,16 +792,6 @@ function testExecutionFrameworkRef(manifest: SdlcWorkerHandoffManifest): string 
     return profileRef;
   }
   return "framework://declared-test-runner";
-}
-
-function pathIsInside(child: string, parent: string): boolean {
-  const resolvedChild = resolve(child);
-  const resolvedParent = resolve(parent);
-  const relativePath = relative(resolvedParent, resolvedChild);
-  return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
-  );
 }
 
 function workspaceRelativeExecutionDirectory(input: {

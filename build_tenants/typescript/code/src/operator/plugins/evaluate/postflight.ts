@@ -12,6 +12,9 @@ import {
   makeSdlcBlockingReason,
   type SdlcBlockingReason
 } from "../../../shared/blocking_reason.js";
+import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
+import { sha256Text } from "../../../shared/digest.js";
+import { pathIsInside } from "../../../shared/path.js";
 import {
   sdlcRunRefSegmentFromArchiveRoot,
   type SdlcSelectedAbgFnCompositionIdentity
@@ -23,9 +26,7 @@ import {
   evaluateObligationAssessments,
   evaluateStagedConstructionAuthority,
   evaluateWorkerAuthorityReadBoundary,
-  pathIsInside,
-  resolveProductMaterializationReplay,
-  sha256Text
+  resolveProductMaterializationReplay
 } from "../transform/launch_contract.js";
 import { sdlcInstalledOperatorProjectsOutput } from "../../edge_output_policy.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
@@ -39,10 +40,6 @@ import type {
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultReport
 } from "../../carriers.js";
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right)));
-}
 
 export function evaluateSdlcComputeStage(input: {
   readonly manifest: SdlcWorkerHandoffManifest;

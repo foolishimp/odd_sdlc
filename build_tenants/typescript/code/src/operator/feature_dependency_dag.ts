@@ -21,6 +21,7 @@ import type {
   SdlcModuleDependencyMap,
   SdlcTestDependencyMap
 } from "./carriers.js";
+import { uniqueTrimmedSorted as uniqueSorted } from "../shared/collections.js";
 
 const EMPTY_STRING_ARRAY: readonly string[] = Object.freeze([]);
 const EMPTY_DAG_NODE_ARRAY: readonly SdlcFeatureDependencyDagNode[] =
@@ -62,12 +63,6 @@ export interface SdlcAbgFrontierCompilationInput {
   readonly basisRefs?: readonly string[] | undefined;
   readonly branchKeyByNodeRef?: Readonly<Record<string, string>> | undefined;
   readonly branchRefByNodeRef?: Readonly<Record<string, string>> | undefined;
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))].sort()
-  );
 }
 
 function slugRefPart(input: string): string {

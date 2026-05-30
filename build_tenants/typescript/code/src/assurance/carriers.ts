@@ -2,6 +2,8 @@
 // Implements: REQ-F-ODDSDLC-051
 // Implements: REQ-F-ODDSDLC-055
 
+import { uniquePresentSorted as uniqueSorted } from "../shared/collections.js";
+
 export const SDLC_ASSURANCE_LEDGER_DIMENSIONS = Object.freeze([
   "materialization",
   "semantic_convergence",
@@ -129,10 +131,6 @@ export interface SdlcTraversalRequirementSatisfaction {
 export interface SdlcAssuranceFoldInput {
   readonly ledgers: readonly SdlcAssuranceLedger[];
   readonly requiredDimensions?: readonly SdlcAssuranceLedgerDimension[];
-}
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values.filter((value) => value.length > 0))].sort());
 }
 
 export function makeSdlcAssuranceLedger(

@@ -18,6 +18,7 @@ import type {
   NodePackageIdentity,
   PackedNodePackage
 } from "./carriers.js";
+import { isRecord as isPlainRecord } from "../admission/codecs.js";
 
 export interface PackNodePackageInput {
   readonly packageSourceRoot: string;
@@ -41,10 +42,6 @@ function isNodeErrorCode(error: unknown, code: string): boolean {
     "code" in error &&
     error["code"] === code
   );
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function assertPlainRecord(value: unknown, label: string): Record<string, unknown> {

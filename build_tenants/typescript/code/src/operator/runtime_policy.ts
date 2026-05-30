@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isRecord } from "../admission/codecs.js";
 
 export interface SdlcOperatorRuntimePolicy {
   readonly kind: "odd_sdlc_operator_runtime_policy";
@@ -48,10 +49,6 @@ interface SdlcOperatorRuntimePolicyConfig {
 }
 
 let cachedConfig: SdlcOperatorRuntimePolicyConfig | null = null;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function recordField(
   record: Record<string, unknown>,

@@ -2,6 +2,7 @@
 // Implements: REQ-F-ODDSDLC-081
 
 import { OPTIMIZED_FULL_TRAVERSAL_EXECUTIVE_STEPS } from "./catalog.js";
+import { uniqueNonEmptySorted as uniqueSorted } from "../shared/collections.js";
 
 export type SdlcExecutiveEdgeAccountingDisposition =
   | "required"
@@ -68,12 +69,6 @@ const CLOSE_CAPABLE_DISPOSITIONS: readonly SdlcExecutiveEdgeAccountingDispositio
     "required",
     "conditional"
   ] satisfies readonly SdlcExecutiveEdgeAccountingDisposition[]);
-
-function uniqueSorted(values: readonly string[]): readonly string[] {
-  return Object.freeze(
-    [...new Set(values.filter((value) => value.trim().length > 0))].sort()
-  );
-}
 
 function neighbors(edgeName: string): {
   readonly predecessorEdgeNames: readonly string[];

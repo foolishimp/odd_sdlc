@@ -1,6 +1,7 @@
 // Implements: T-161
 
 import path from "node:path";
+import { isRecord } from "../admission/codecs.js";
 
 import {
   dirMtimeMsOrNull,
@@ -22,10 +23,6 @@ import type {
   SdlcFdRunAnalysisRc3StageTruth,
   SdlcFdRunAnalysisStageClass
 } from "./types.js";
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function stringField(
   record: Readonly<Record<string, unknown>>,

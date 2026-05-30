@@ -23,6 +23,7 @@ import {
   makeSdlcBlockingReason
 } from "../shared/blocking_reason.js";
 import { appendOddSdlcRuntimeEvents } from "../operator/event_store.js";
+import { isRecord as isPlainRecord } from "../admission/codecs.js";
 
 export const ODD_SDLC_TYPESCRIPT_INSTALLER_ECOSYSTEM = "odd_sdlc_typescript" as const;
 
@@ -117,10 +118,6 @@ function stableJson(payload: unknown): string {
 async function writeTextFile(targetPath: string, content: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true });
   await writeFile(targetPath, content, "utf8");
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function fileDependencyRef(targetRoot: string, tarballPath: string): string {
