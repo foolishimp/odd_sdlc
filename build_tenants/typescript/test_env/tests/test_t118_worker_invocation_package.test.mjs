@@ -441,15 +441,15 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.match(prompt, /Apply worker_construction_brief\.json as the single prompt source carrier/u);
   assert.match(prompt, /Read boundary: stay under the current workspace/u);
   assert.match(prompt, /Control boundary: do not run `odd-sdlc-ts`/u);
-  assert.match(prompt, /Do not spawn another worker or resume traversal/u);
-  assert.match(prompt, /This process is the worker/u);
+  assert.match(prompt, /Do not spawn an odd_sdlc\/ABG worker, start another traversal/u);
+  assert.match(prompt, /parent transform turn/u);
   assert.match(
     prompt,
     /framework evaluates the artifact after this process exits/u
   );
   assert.match(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].join("\n"),
-    /Do not spawn another worker or resume traversal/u
+    /Do not spawn an odd_sdlc\/ABG worker, start another traversal/u
   );
   assert.doesNotMatch(
     [...invocationPackage.transformAxioms, ...invocationPackage.outcomeDirectives].join("\n"),

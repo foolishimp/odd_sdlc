@@ -25,6 +25,7 @@ export function designDepthFpEvaluatorPrompt(input: {
   readonly workerReportSummaryLines: readonly string[];
   readonly contentRegisterPath: string;
   readonly registerProjectionPath: string;
+  readonly subworkstreamManifestPath: string;
   readonly selectedCompositionRef: string;
   readonly selectedCompositionDigest: string;
   readonly selectedCompositionSelectionRef: string;
@@ -39,6 +40,9 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- Treat depth as the priority F_P judgment: decide whether the component/module decomposition, source ownership, public boundaries, and residual pressure are proportionate to the requirements.",
     "- For each requirement or requirement group, decide whether it requires separable_public_boundary, shared_component, test_boundary, data_contract_boundary, runtime_or_persistence_boundary, human_review, or blocked handling. Encode that decision in component row publicBoundary/rationale text and designCompletenessVerdict reasons.",
     "- This is evaluation work. Do not rewrite the ADR, source files, tests, package files, or product materialization outputs.",
+    "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, interfaces, obligation slices, or evidence packets.",
+    `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, stay read-only over workspace/product files, and remain observation only.`,
+    "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
     "- The content register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
     `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
     "",
@@ -365,6 +369,7 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
   readonly invocationPackagePath: string;
   readonly workerReportPath: string;
   readonly assessmentPath: string;
+  readonly subworkstreamManifestPath: string;
 }): string {
   return [
     "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
@@ -372,6 +377,9 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "Purpose:",
     "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
     "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
+    "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
+    `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
+    "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
     "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
     "",
     "Read in order:",

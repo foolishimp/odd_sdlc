@@ -125,3 +125,19 @@ first-read inputs unless current gap evidence explicitly cites them.
 The worker may open referenced authority documents when the local slice is
 insufficient. The evaluator still judges the worker report against the complete
 manifest obligation context.
+
+## Phase 1 Compute Subworkstreams
+
+Prompt-bearing workers may use agent-internal subagents or parallel
+workstreams as local compute strategy when the construction brief exposes
+admitted schedule, dependency, tranche, target-carrier, and authority pressure.
+That is a parent-agent optimization only. It does not replace the schedule
+surface, ABG frontier execution, vector closure, retry, replay, or
+continuation truth.
+
+The observable carrier is `SdlcComputeSubworkstreamManifest`. Each row cites
+the dependency and authority refs that justified the split, plus predecessor,
+read, write-territory, output-allocation, idempotency, and fan-in fields where
+known. `transform.C` rows may name changed/proposed files inside the active
+edge write roots. `evaluate.C` rows are read-only and leave write/output fields
+empty.

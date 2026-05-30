@@ -31,6 +31,12 @@ import {
 import { sdlcInstalledOperatorProjectsOutput } from "../../edge_output_policy.js";
 import { writeSdlcSystemArtifact } from "../../system_artifacts.js";
 import {
+  admitComputeSubworkstreamManifest,
+  computeSubworkstreamCounts,
+  defaultComputeSubworkstreamManifest,
+  SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+} from "../../compute_subworkstreams.js";
+import {
   admittedDesignDepthFpEvaluatorRegisterEvidenceRefs,
   shouldDeferImplementationDesignRegisterToFpEvaluator
 } from "./design_depth_register.js";
@@ -324,6 +330,38 @@ function constructGtlFpEvaluation(input: {
   });
 }
 
+function evaluateComputeSubworkstreamManifestPath(
+  manifest: SdlcWorkerHandoffManifest
+): string {
+  return join(manifest.archiveRoot, SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE);
+}
+
+function fpEvaluateResultPath(manifest: SdlcWorkerHandoffManifest): string {
+  return manifest.fpEvaluateResultFile ?? join(manifest.archiveRoot, "fp_evaluate_result.json");
+}
+
+function evaluateComputeSubworkstreamManifest(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+}): SdlcFpEvaluateResult["subworkstreamManifest"] {
+  const parentResultRef = pathToFileURL(fpEvaluateResultPath(input.manifest)).href;
+  const manifestPath = evaluateComputeSubworkstreamManifestPath(input.manifest);
+  if (!existsSync(manifestPath)) {
+    return defaultComputeSubworkstreamManifest({
+      manifest: input.manifest,
+      stageRef: "evaluate.C",
+      source: "system_default",
+      parentResultRef
+    });
+  }
+  return admitComputeSubworkstreamManifest({
+    value: JSON.parse(readFileSync(manifestPath, "utf8")),
+    manifest: input.manifest,
+    stageRef: "evaluate.C",
+    source: "parent_evaluate_report",
+    parentResultRef
+  });
+}
+
 export function constructSdlcFpEvaluateResult(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly selectedComposition: SdlcSelectedAbgFnCompositionIdentity;
@@ -358,6 +396,12 @@ export function constructSdlcFpEvaluateResult(input: {
     postflight: input.postflight,
     counts
   });
+  const subworkstreamManifest = evaluateComputeSubworkstreamManifest({
+    manifest: input.manifest
+  });
+  const subworkstreamManifestRef = pathToFileURL(
+    evaluateComputeSubworkstreamManifestPath(input.manifest)
+  ).href;
   return Object.freeze({
     kind: "sdlc_fp_evaluate_result" as const,
     stage: "F_P.evaluate" as const,
@@ -380,6 +424,9 @@ export function constructSdlcFpEvaluateResult(input: {
     postflightStatus: input.postflight.status,
     blockingReasons: input.postflight.blockingReasons,
     evidenceRefs: input.postflight.evidenceRefs,
+    subworkstreamManifestRef,
+    subworkstreamManifest,
+    subworkstreamCounts: computeSubworkstreamCounts(subworkstreamManifest),
     obligationAssessmentCounts: counts,
     executionEvidenceStatusSnapshot: input.report.executionEvidence?.status ?? null
   });
@@ -393,9 +440,19 @@ export function writeSdlcFpEvaluateResult(input: {
   readonly postflightRef?: string | undefined;
 }): SdlcFpEvaluateResult {
   const result = constructSdlcFpEvaluateResult(input);
+  const subworkstreamManifestPath = evaluateComputeSubworkstreamManifestPath(
+    input.manifest
+  );
+  if (!existsSync(subworkstreamManifestPath)) {
+    writeSdlcSystemArtifact({
+      archiveRoot: input.manifest.archiveRoot,
+      absolutePath: subworkstreamManifestPath,
+      payload: result.subworkstreamManifest
+    });
+  }
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
-    absolutePath: input.manifest.fpEvaluateResultFile,
+    absolutePath: fpEvaluateResultPath(input.manifest),
     payload: result
   });
   return result;

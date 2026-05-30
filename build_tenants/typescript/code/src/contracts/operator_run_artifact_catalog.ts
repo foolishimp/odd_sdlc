@@ -179,6 +179,17 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     admissionRef: "admission://odd-sdlc/operator-run/fp-evaluate-result"
   }),
   row({
+    artifactRef: "operator-run-artifact://evaluate-compute-subworkstream-manifest",
+    relativePath: "evaluate_compute_subworkstream_manifest.json",
+    carrierKind: "sdlc_compute_subworkstream_manifest",
+    role: "read_model",
+    sourceOwner: "fp_evaluator",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef:
+      "admission://odd-sdlc/operator-run/evaluate-compute-subworkstream-manifest"
+  }),
+  row({
     artifactRef: "operator-run-artifact://review-grade-edge-fulfillment-assessment",
     relativePath: "review_grade_edge_fulfillment_assessment.json",
     carrierKind: "sdlc_review_grade_edge_fulfillment_assessment",
@@ -506,6 +517,16 @@ export const SDLC_OPERATOR_RUN_ARTIFACT_CATALOG = Object.freeze([
     requiredForPresentEdge: false,
     malformedGapTracked: false,
     admissionRef: "admission://odd-sdlc/operator-run/worker-result-report"
+  }),
+  row({
+    artifactRef: "operator-run-artifact://compute-subworkstream-manifest",
+    relativePath: "compute_subworkstream_manifest.json",
+    carrierKind: "sdlc_compute_subworkstream_manifest",
+    role: "worker_projection",
+    sourceOwner: "worker_process",
+    requiredForPresentEdge: false,
+    malformedGapTracked: true,
+    admissionRef: "admission://odd-sdlc/operator-run/compute-subworkstream-manifest"
   }),
   row({
     artifactRef: "operator-run-artifact://worker-construction-brief",

@@ -104,6 +104,79 @@ summaries. The required pressure fields are:
 projection, but it is not the worker's primary work queue when the construction
 brief is available.
 
+## Phase 1 Parent-Agent Subworkstreams
+
+Agent-internal subworkstreams are a compute-stage acceleration strategy inside
+one selected `.C` invocation. They are not an ABG branch family, not a second
+scheduler, and not closure authority.
+
+The parent `transform.C/F_P` or read-only `evaluate.C/F_P` worker may split its
+own work by admitted work-plan, dependency-map, target-carrier, tranche,
+authority, or obligation pressure. The framework publishes the observable WHAT
+and the typed observation carrier. It does not prescribe HOW the agent
+decomposes the work.
+
+The Phase 1 carrier is `SdlcComputeSubworkstreamManifest`:
+
+```text
+sdlc_compute_subworkstream_manifest
+  phase: phase_1_parent_agent_internal
+  authority: observation_only_parent_plugin_result
+  stageRef: transform.C | evaluate.C
+  selectedEdgeRef
+  targetCarrierRef
+  subworkstreams[]
+    workstreamRef
+    targetModuleRef | targetInterfaceRef
+    predecessorWorkstreamRefs
+    dependencyInputRefs
+    authorityInputRefs
+    evidenceRefs
+    readRefs
+    writeTerritoryRefs
+    outputAllocationRefs
+    idempotencyKey
+    fanInScopeRef
+    changedFileRefs | proposedFileRefs
+    status
+    blockingReasonRefs
+    residualGapRefs
+    mergeDisposition
+  mergeResult
+    mergedOutputRefs
+    conflictRefs
+    discardedOutputRefs
+    carryForwardGapRefs
+    parentResultRef
+```
+
+The manifest is admitted only as part of the parent plugin result path:
+
+```text
+transform.C parent result
+  -> worker_result_report.subworkstreamManifest
+  -> fp_transform_result evidence candidate refs
+  -> normal evaluate.C/admission/consequence lifecycle
+
+evaluate.C parent result
+  -> fp_evaluate_result.subworkstreamManifest
+  -> normal ABG/system admission and consequence lifecycle
+```
+
+Forbidden:
+
+- subworkstreams emitting runtime events, ledgers, closure decisions,
+  consequence projections, traversal transitions, or ABG branch leases
+- `evaluate.C` subworkstreams writing workspace/product files
+- treating subworkstream success as edge closure without parent merge,
+  evaluate.C, system admission, consequence.C, and ABG traversal transition
+- presenting this Phase 1 carrier as cloud-native distributed ABG execution
+
+The field names intentionally align with ABG saga-frontier branch declarations
+where possible: predecessor, read, write-territory, output-allocation,
+idempotency, and fan-in refs. Promotion to runtime-visible distributed
+execution is Phase 2 and belongs to ABG frontier semantics.
+
 ## SDLC Node Rule
 
 An SDLC node is not an imperative operator helper. It is a graph-stage

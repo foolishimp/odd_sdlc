@@ -98,6 +98,14 @@ import {
 import {
   writeProductMaterializationManifest as writeProductMaterializationManifestFromModule
 } from "../../product_materialization/manifest.js";
+import {
+  admitComputeSubworkstreamManifest,
+  computeSubworkstreamSelectedEdgeRef,
+  computeSubworkstreamTargetCarrierRef,
+  defaultComputeSubworkstreamManifest,
+  SDLC_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE,
+  SDLC_COMPUTE_SUBWORKSTREAM_ROW_FIELDS
+} from "../../compute_subworkstreams.js";
 
 export type {
   SdlcObservedProductFileSnapshot,
@@ -207,6 +215,8 @@ import type {
   SdlcWorkerRetryContext,
   SdlcWorkerResultMaterializationDiagnostic,
   SdlcWorkerResultReport,
+  SdlcComputeSubworkstreamPolicy,
+  SdlcComputeSubworkstreamStageRef,
   SdlcDecompositionSummary,
   SdlcDependencyTraversalSelection,
   SdlcModuleDependencyMap,
@@ -239,6 +249,7 @@ const REPORT_FIELDS = Object.freeze([
   "executionEvidence",
   "executionEvidenceErrors",
   "obligationAssessments",
+  "subworkstreamManifest",
   "fpTransformRequestRef",
   "fpTransformResultRef",
   "fpTransformStatusSnapshot",
@@ -5317,6 +5328,10 @@ export function deriveWorkerHandoffManifest(input: {
   ]);
   const resultReportSchema = REPORT_FIELDS;
   const reportFile = join(archiveRoot, "worker_result_report.json");
+  const subworkstreamManifestFile = join(
+    archiveRoot,
+    SDLC_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+  );
   const fpTransformRequestFile = join(archiveRoot, "fp_transform_request.json");
   const fpTransformResultFile = join(archiveRoot, "fp_transform_result.json");
   const fpEvaluateResultFile = join(archiveRoot, "fp_evaluate_result.json");
@@ -5449,6 +5464,7 @@ export function deriveWorkerHandoffManifest(input: {
     targetAssetType: input.contract.targetAssetType,
     outputFile,
     reportFile,
+    subworkstreamManifestFile,
     fpTransformRequest: input.fpTransformRequest ?? null,
     fpTransformRequestFile,
     fpTransformResultFile,
@@ -6470,7 +6486,7 @@ function transformAxiomsForWorker(): readonly string[] {
     "F_P.transform only: produce bounded candidate transform evidence.",
     "Do not write ledgers, runtime events, closure decisions, evaluator projections, or framework result carriers.",
     "Do not run odd_sdlc, abiogenesis, genesis, start, gaps, analyze-run, install, traversal, or resume commands; the framework controls traversal after this worker exits.",
-    "Do not spawn another worker or resume traversal; this process is the worker.",
+    "Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; parent-agent subworkstreams remain subordinate to this worker.",
     "worker_construction_brief.json is the single prompt-source carrier. Archive package files are replay/audit projections for evaluator and analyzer surfaces.",
     "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; evaluator-owned carrier contracts stay in framework archives unless this prompt explicitly asks for a structured register carrier.",
     "Do not render target-carrier protocol fields such as kind, contractRef, contractDigest, payload path, construction template refs, targetCarrierProjection, or selected-target-carrier metadata in Markdown product/design surfaces unless an outcome directive explicitly asks for a structured carrier block.",
@@ -7049,6 +7065,11 @@ export function constructWorkerInvocationPackage(input: {
   const productFileTargets =
     productMaterializationAuthority.declaredProductFileTargets;
   const workCategoryGovernance = selectSdlcWorkCategoryGovernance(input.manifest);
+  const computeSubworkstreamPolicy = constructComputeSubworkstreamPolicy({
+    manifest: input.manifest,
+    stageRef: "transform.C",
+    subworkstreamManifestPath: input.manifest.subworkstreamManifestFile
+  });
   const base = Object.freeze({
     kind: "sdlc_worker_invocation_package" as const,
     packageVersion: "ts-invocation-v1" as const,
@@ -7085,10 +7106,15 @@ export function constructWorkerInvocationPackage(input: {
       input.manifest.traversalIntentPackage.packageDigest,
     transformAxioms: transformAxiomsForWorker(),
     outcomeDirectives: outcomeDirectivesForWorker(input.manifest),
+    computeSubworkstreamPolicy,
     outputContract: Object.freeze({
       kind: "sdlc_worker_invocation_output_contract" as const,
       outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
       reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+      subworkstreamManifestFile: workerFacingPath(
+        input.manifest,
+        input.manifest.subworkstreamManifestFile
+      ),
       fpTransformRequestFile: workerFacingPath(
         input.manifest,
         input.manifest.fpTransformRequestFile
@@ -7220,6 +7246,10 @@ export function constructWorkerBrief(input: {
     targetAssetType: input.manifest.targetAssetType,
     outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
     reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+    subworkstreamManifestFile: workerFacingPath(
+      input.manifest,
+      input.manifest.subworkstreamManifestFile
+    ),
     materializationRequired: input.manifest.productMaterialization.required,
     allowedWriteRoots: input.manifest.allowedWriteRoots.map((root) =>
       workerFacingPath(input.manifest, root)
@@ -7346,9 +7376,14 @@ export function constructWorkerConstructionBrief(input: {
             )
           : null
     }),
+    computeSubworkstreamPolicy: input.invocationPackage.computeSubworkstreamPolicy,
     targetState: Object.freeze({
       outputFile: workerFacingPath(input.manifest, input.manifest.outputFile),
       reportFile: workerFacingPath(input.manifest, input.manifest.reportFile),
+      subworkstreamManifestFile: workerFacingPath(
+        input.manifest,
+        input.manifest.subworkstreamManifestFile
+      ),
       materializationRequired: input.manifest.productMaterialization.required,
       tenantRoot: workerFacingPath(
         input.manifest,
@@ -7547,6 +7582,108 @@ function promptSourceRefs(refs: readonly string[]): readonly string[] {
       WORKER_CONSTRUCTION_BRIEF_REF_LIMIT
     )
   );
+}
+
+const COMPUTE_SUBWORKSTREAM_POLICY_REF_LIMIT = 32;
+const COMPUTE_SUBWORKSTREAM_POLICY_REF_MAX_BYTES = 240;
+
+function isComputeSubworkstreamPolicyRef(ref: string): boolean {
+  const trimmed = ref.trim();
+  if (
+    trimmed.length === 0 ||
+    Buffer.byteLength(trimmed, "utf8") >
+      COMPUTE_SUBWORKSTREAM_POLICY_REF_MAX_BYTES ||
+    trimmed.includes("{") ||
+    trimmed.includes("\\\"")
+  ) {
+    return false;
+  }
+  return [
+    "workspace://",
+    "asset://",
+    "requirement:",
+    "surface://",
+    "decomposition-summary://",
+    "edge-assurance-contract://",
+    "gtl://",
+    "strategy-plan://",
+    "scope://",
+    "module:",
+    "source_asset:",
+    "target_asset:",
+    "sha256:"
+  ].some((prefix) => trimmed.startsWith(prefix));
+}
+
+function computeSubworkstreamPolicyRefs(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot">,
+  refs: readonly string[]
+): readonly string[] {
+  return Object.freeze(
+    uniqueSorted(workerFacingRefs(manifest, refs).filter(isComputeSubworkstreamPolicyRef))
+      .slice(0, COMPUTE_SUBWORKSTREAM_POLICY_REF_LIMIT)
+  );
+}
+
+function constructComputeSubworkstreamPolicy(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly stageRef: SdlcComputeSubworkstreamStageRef;
+  readonly subworkstreamManifestPath: string;
+}): SdlcComputeSubworkstreamPolicy {
+  const dependencyInputRefs = computeSubworkstreamPolicyRefs(input.manifest, [
+    ...input.manifest.targetCarrierProjection.requiredStagedAuthorityRefs,
+    ...input.manifest.targetCarrierProjection.producedStagedAuthorityRefs,
+    ...input.manifest.traversalObligationContext.priorEdgeRefs,
+    ...input.manifest.traversalIntentPackage.priorEdgeRefs,
+    input.manifest.traversalStrategyDecision.strategyPlanRef,
+    input.manifest.featureScope.scopeRef
+  ]);
+  const authorityInputRefs = computeSubworkstreamPolicyRefs(input.manifest, [
+    ...(input.manifest.edgeAssuranceContractRef === undefined
+      ? []
+      : [input.manifest.edgeAssuranceContractRef]),
+    input.manifest.targetCarrierProjection.targetCarrierContractRef,
+    ...input.manifest.traversalObligationContext.authorityRefs
+  ]);
+  const derivationBasisRefs = computeSubworkstreamPolicyRefs(input.manifest, [
+    input.manifest.traversalIntentPackage.packageDigest,
+    input.manifest.traversalStrategyDecision.strategyPlanRef,
+    input.manifest.featureScope.scopeRef,
+    ...input.manifest.traversalObligationContext.trancheKeys
+  ]);
+  return Object.freeze({
+    kind: "sdlc_compute_subworkstream_policy" as const,
+    policyVersion: "ts-compute-subworkstream-policy-v1" as const,
+    phase: "phase_1_parent_agent_internal" as const,
+    stageRef: input.stageRef,
+    permission:
+      "agent_internal_subworkstreams_permitted_with_parent_merge" as const,
+    selectedEdgeRef: computeSubworkstreamSelectedEdgeRef(input.manifest),
+    targetCarrierRef: computeSubworkstreamTargetCarrierRef(input.manifest),
+    manifestPath: workerFacingPath(input.manifest, input.subworkstreamManifestPath),
+    manifestRef: workerFacingRef(
+      input.manifest,
+      pathToFileURL(input.subworkstreamManifestPath).href
+    ),
+    derivationBasisRefs,
+    authorityInputRefs,
+    dependencyInputRefs,
+    allowedWriteRoots:
+      input.stageRef === "transform.C"
+        ? input.manifest.allowedWriteRoots.map((root) =>
+            workerFacingPath(input.manifest, root)
+          )
+        : Object.freeze([]),
+    requiredRowFields: SDLC_COMPUTE_SUBWORKSTREAM_ROW_FIELDS,
+    nonAuthorityRules: Object.freeze([
+      "Subworkstreams are parent-agent compute strategy only.",
+      "Subworkstreams do not emit ABG runtime events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases.",
+      "The parent stage owns merge, conflict reporting, typed return, and normal admission through transform.C/evaluate.C/consequence.C.",
+      input.stageRef === "evaluate.C"
+        ? "evaluate.C subworkstreams are read-only over workspace/product files and may only write evaluator-owned sidecar artifacts named by the prompt."
+        : "transform.C subworkstreams may write only inside the active edge permission and allowed write roots."
+    ])
+  });
 }
 
 function omittedPromptSourceRefCount(refs: readonly string[]): number {
@@ -7852,10 +7989,12 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- obligations.inlineRequirementPressureRows typed requirement work queue.",
     "- obligations.requirementTraceObligationIds.",
     "- retry/gap/repair rows when present.",
+    "- computeSubworkstreamPolicy: Phase 1 parent-agent subworkstream permission and non-authority rules.",
     "- traversalIntentPackage ref."
   ];
   const workerPackageFieldLines = [
     "- worker_invocation_package.outcomeDirectives.",
+    "- worker_invocation_package.computeSubworkstreamPolicy.",
     "- retryRepairInstructions and repairReentryPlans when present.",
     "- acceptedCarrierSchemaRef / acceptedCarrierFieldSet.",
     "- traversalIntentPackageRef; do not inline JSON."
@@ -7887,30 +8026,32 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     `- ${declaredProductFileTargetLine}`,
     `- execution contracts: build=${manifest.productMaterialization.buildExecutionContract}; test=${manifest.productMaterialization.testExecutionContract}`,
     `- obligations in scope: ${manifest.traversalObligationContext.obligations.length}; feature scope=${manifest.featureScope.mode}; included modules=${listForPrompt(manifest.featureScope.includedModuleNames)}`,
-    "This section is the core F_P transform. The construction brief carries the structured facts.",
+    "This section is the core F_P transform. The construction brief carries structured facts.",
     "",
     "Read in order:",
-    `1. compressed work-category governance (${workCategoryGovernance.configRef}): ${governancePath}`,
+    `1. compressed work-category governance: ${governancePath}`,
     `2. construction brief: ${workerFacingPath(manifest, constructionBriefPath)}`,
     `3. worker brief projection: ${workerFacingPath(manifest, workerBriefPath)}`,
     `4. invocation package projection: ${workerFacingPath(manifest, invocationPackagePath)}`,
     `5. traversal intent projection: ${workerFacingPath(manifest, traversalIntentPath)}`,
     `6. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
     "7. current authority refs listed by the construction brief for this edge.",
-    "8. declared product/design/tenant files named by the construction brief or current evaluated gap.",
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
     "- Archive package files and manifests are replay/audit projections. Evaluated gaps cite needed diagnostics.",
-    "- Build a Requirement/Authority/Asset Checklist from requirements, authority rows, target rows, expected artifacts, and evaluated gaps.",
+    "- Build a Requirement/Authority/Asset Checklist from requirements, target rows, expected artifacts, and evaluated gaps.",
     "- Treat the checklist as the work queue. Do not return success while required checklist rows are unmapped.",
     "- Keep tool IO bounded: for large authority files, use search plus targeted read ranges.",
-    "- For existing output, use targeted Edit/small operations; do not dump full old/new artifacts to stdout.",
+    "- For existing output, use targeted Edit/small operations; do not dump full old/new artifacts.",
+    "- You may use agent-internal subagents or parallel workstreams inside this transform.C permission; split only from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",
+    `- If used, update ${workerFacingPath(manifest, manifest.subworkstreamManifestFile)}; otherwise leave the default not-started manifest honest.`,
+    "- Subworkstreams are not ABG branches: no runtime events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
     "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas.",
     "- Do not render target-carrier protocol fields unless an outcome directive asks for a structured carrier.",
     "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
-    "- Control boundary: do not run `odd-sdlc-ts`, `abiogenesis-ts`, `genesis-ts`, `start`, `gaps`, `analyze-run`, install, traversal, or resume commands from inside this worker.",
-    "- Do not spawn another worker or resume traversal. This process is the worker.",
+    "- Control boundary: do not run `odd-sdlc-ts`, `abiogenesis-ts`, `genesis-ts`, `start`, `gaps`, `analyze-run`, install, traversal, or resume commands.",
+    "- Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; subworkstreams stay under this parent transform turn.",
     "- Write only the contracted output/product artifacts, then exit; the framework evaluates the artifact after this process exits.",
     "- Do not inspect or act on sibling operator-run directories.",
     "- Do not add local axiom variants from this launch frame.",
@@ -7925,11 +8066,11 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     ...workerPackageFieldLines,
     ...currentEvaluatedGaps,
     "",
-    manifest.productMaterialization.required
-      ? "Product materialization is REQUIRED for this edge."
+    ...(manifest.productMaterialization.required
+      ? ["Product materialization is REQUIRED for this edge."]
       : productMaterializationRequiresTestExecutionEvidence(manifest)
-        ? "Product materialization is execution-repair scoped for this edge."
-        : "Product materialization is not required for this edge.",
+        ? ["Product materialization is execution-repair scoped for this edge."]
+        : []),
     "The framework writes reports, evidence carriers, ledgers, and closure after this process exits."
   ].join("\n");
 }
@@ -7997,6 +8138,17 @@ export function writeHandoffFiles(manifest: SdlcWorkerHandoffManifest): {
     manifest,
     constructionBriefPath,
     stableOperatorJson(constructionBrief)
+  );
+  writeHandoffFile(
+    manifest,
+    manifest.subworkstreamManifestFile,
+    stableOperatorJson(
+      defaultComputeSubworkstreamManifest({
+        manifest,
+        stageRef: "transform.C",
+        source: "parent_checkpoint"
+      })
+    )
   );
   writeHandoffFile(manifest, promptPath, promptForHandoff(manifest));
   writeHandoffFile(
@@ -8602,6 +8754,13 @@ export function admitWorkerResultReport(
       record["obligationAssessments"],
       "SdlcWorkerResultReport.obligationAssessments"
     ),
+    subworkstreamManifest: admitComputeSubworkstreamManifest({
+      value: record["subworkstreamManifest"],
+      manifest,
+      stageRef: "transform.C",
+      source: "parent_transform_report",
+      parentResultRef: pathToFileURL(manifest.reportFile).href
+    }),
     fpTransformRequestRef: parseOptionalNonEmptyString(
       record["fpTransformRequestRef"],
       "SdlcWorkerResultReport.fpTransformRequestRef"
@@ -11077,6 +11236,10 @@ export function buildPostTransformWorkerResultReport(input: {
       manifest: input.manifest,
       materializedFiles
     }),
+    subworkstreamManifest: computeSubworkstreamManifestForTransformReport({
+      manifest: input.manifest,
+      source: "parent_transform_report"
+    }),
     fpTransformRequestRef: input.manifest.fpTransformRequest?.requestRef ?? null,
     fpTransformResultRef:
       input.manifest.fpTransformRequest === null
@@ -11096,6 +11259,7 @@ function reportEvidenceRefs(input: {
   return uniqueSorted([
     pathToFileURL(report.outputFile).href,
     pathToFileURL(input.manifest.reportFile).href,
+    pathToFileURL(input.manifest.subworkstreamManifestFile).href,
     pathToFileURL(input.manifest.productMaterialization.manifestFile).href,
     ...report.materializedFiles.map((file) =>
       pathToFileURL(file.absolutePath).href
@@ -11125,6 +11289,28 @@ function transformReasonForReport(report: SdlcWorkerResultReport): string | null
   return reportOutputArtifactIsAdmitted(report)
     ? null
     : "transform output artifact missing or digest mismatch";
+}
+
+function computeSubworkstreamManifestForTransformReport(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly source?: "parent_transform_report" | "system_default" | undefined;
+}): SdlcWorkerResultReport["subworkstreamManifest"] {
+  const parentResultRef = pathToFileURL(input.manifest.reportFile).href;
+  if (!existsSync(input.manifest.subworkstreamManifestFile)) {
+    return defaultComputeSubworkstreamManifest({
+      manifest: input.manifest,
+      stageRef: "transform.C",
+      source: input.source ?? "system_default",
+      parentResultRef
+    });
+  }
+  return admitComputeSubworkstreamManifest({
+    value: JSON.parse(readFileSync(input.manifest.subworkstreamManifestFile, "utf8")),
+    manifest: input.manifest,
+    stageRef: "transform.C",
+    source: input.source ?? "parent_transform_report",
+    parentResultRef
+  });
 }
 
 function isOpenRecord(input: unknown): input is Record<string, unknown> {

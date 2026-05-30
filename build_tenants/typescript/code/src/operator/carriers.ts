@@ -1245,6 +1245,97 @@ export interface SdlcWorkerExecutionShardEvidence {
   readonly failedCount: number | null;
 }
 
+export type SdlcComputeSubworkstreamStageRef = "transform.C" | "evaluate.C";
+
+export type SdlcComputeSubworkstreamStatus =
+  | "not_started"
+  | "running"
+  | "done"
+  | "blocked"
+  | "failed"
+  | "discarded";
+
+export type SdlcComputeSubworkstreamMergeDisposition =
+  | "not_started"
+  | "merged"
+  | "merged_with_conflicts"
+  | "blocked"
+  | "failed"
+  | "discarded"
+  | "not_applicable";
+
+export interface SdlcComputeSubworkstreamRow {
+  readonly kind: "sdlc_compute_subworkstream_row";
+  readonly workstreamRef: string;
+  readonly stageRef: SdlcComputeSubworkstreamStageRef;
+  readonly selectedEdgeRef: string;
+  readonly targetCarrierRef: string;
+  readonly targetModuleRef: string | null;
+  readonly targetInterfaceRef: string | null;
+  readonly predecessorWorkstreamRefs: readonly string[];
+  readonly dependencyInputRefs: readonly string[];
+  readonly authorityInputRefs: readonly string[];
+  readonly evidenceRefs: readonly string[];
+  readonly readRefs: readonly string[];
+  readonly writeTerritoryRefs: readonly string[];
+  readonly outputAllocationRefs: readonly string[];
+  readonly idempotencyKey: string;
+  readonly fanInScopeRef: string | null;
+  readonly changedFileRefs: readonly string[];
+  readonly proposedFileRefs: readonly string[];
+  readonly status: SdlcComputeSubworkstreamStatus;
+  readonly blockingReasonRefs: readonly string[];
+  readonly residualGapRefs: readonly string[];
+  readonly mergeDisposition: SdlcComputeSubworkstreamMergeDisposition;
+}
+
+export interface SdlcComputeSubworkstreamMergeResult {
+  readonly kind: "sdlc_compute_subworkstream_merge_result";
+  readonly mergedOutputRefs: readonly string[];
+  readonly conflictRefs: readonly string[];
+  readonly discardedOutputRefs: readonly string[];
+  readonly carryForwardGapRefs: readonly string[];
+  readonly parentResultRef: string | null;
+}
+
+export interface SdlcComputeSubworkstreamManifest {
+  readonly kind: "sdlc_compute_subworkstream_manifest";
+  readonly manifestVersion: "ts-compute-subworkstream-v1";
+  readonly phase: "phase_1_parent_agent_internal";
+  readonly authority: "observation_only_parent_plugin_result";
+  readonly stageRef: SdlcComputeSubworkstreamStageRef;
+  readonly selectedEdgeRef: string;
+  readonly targetCarrierRef: string;
+  readonly source:
+    | "system_default"
+    | "parent_transform_report"
+    | "parent_evaluate_report"
+    | "parent_checkpoint";
+  readonly subworkstreams: readonly SdlcComputeSubworkstreamRow[];
+  readonly mergeResult: SdlcComputeSubworkstreamMergeResult;
+  readonly nonAuthority: true;
+  readonly abgDistributedExecutionClaim: false;
+}
+
+export interface SdlcComputeSubworkstreamPolicy {
+  readonly kind: "sdlc_compute_subworkstream_policy";
+  readonly policyVersion: "ts-compute-subworkstream-policy-v1";
+  readonly phase: "phase_1_parent_agent_internal";
+  readonly stageRef: SdlcComputeSubworkstreamStageRef;
+  readonly permission:
+    "agent_internal_subworkstreams_permitted_with_parent_merge";
+  readonly selectedEdgeRef: string;
+  readonly targetCarrierRef: string;
+  readonly manifestPath: string;
+  readonly manifestRef: string;
+  readonly derivationBasisRefs: readonly string[];
+  readonly authorityInputRefs: readonly string[];
+  readonly dependencyInputRefs: readonly string[];
+  readonly allowedWriteRoots: readonly string[];
+  readonly requiredRowFields: readonly string[];
+  readonly nonAuthorityRules: readonly string[];
+}
+
 export type SdlcTraversalObligationKind =
   | "requirement"
   | "source_asset"
@@ -1625,6 +1716,7 @@ export interface SdlcWorkerInvocationOutputContract {
   readonly kind: "sdlc_worker_invocation_output_contract";
   readonly outputFile: string;
   readonly reportFile: string;
+  readonly subworkstreamManifestFile: string;
   readonly fpTransformRequestFile: string;
   readonly fpTransformResultFile: string;
   readonly fpEvaluateResultFile: string;
@@ -1765,6 +1857,7 @@ export interface SdlcWorkerInvocationPackage {
   readonly traversalIntentPackageDigest: string;
   readonly transformAxioms: readonly string[];
   readonly outcomeDirectives: readonly string[];
+  readonly computeSubworkstreamPolicy: SdlcComputeSubworkstreamPolicy;
   readonly outputContract: SdlcWorkerInvocationOutputContract;
   readonly productMaterializationAuthority: SdlcProductMaterializationAuthorityReconciliation;
   readonly allowedWriteRoots: readonly string[];
@@ -1836,9 +1929,11 @@ export interface SdlcWorkerConstructionBrief {
     readonly designDepthEvaluatorRegisterRefs: readonly string[];
     readonly expectedDesignDepthEvaluatorRegisterPath: string | null;
   };
+  readonly computeSubworkstreamPolicy: SdlcComputeSubworkstreamPolicy;
   readonly targetState: {
     readonly outputFile: string;
     readonly reportFile: string;
+    readonly subworkstreamManifestFile: string;
     readonly materializationRequired: boolean;
     readonly tenantRoot: string;
     readonly selectedOutputRoot: string;
@@ -1929,6 +2024,7 @@ export interface SdlcWorkerHandoffManifest {
   readonly targetAssetType: string;
   readonly outputFile: string;
   readonly reportFile: string;
+  readonly subworkstreamManifestFile: string;
   readonly fpTransformRequest: FpTransformRequest | null;
   readonly fpTransformRequestFile: string;
   readonly fpTransformResultFile: string;
@@ -1962,6 +2058,7 @@ export interface SdlcWorkerResultReport {
   readonly executionEvidence: SdlcWorkerExecutionEvidence | null;
   readonly executionEvidenceErrors: readonly string[];
   readonly obligationAssessments: readonly SdlcWorkerObligationAssessment[];
+  readonly subworkstreamManifest: SdlcComputeSubworkstreamManifest;
   readonly fpTransformRequestRef: string | null;
   readonly fpTransformResultRef: string | null;
   readonly fpTransformStatusSnapshot: FpTransformResult["status"] | null;
@@ -2010,6 +2107,15 @@ export interface SdlcFpEvaluateResult {
   readonly postflightStatus: SdlcPostflightResult["status"];
   readonly blockingReasons: readonly string[];
   readonly evidenceRefs: readonly string[];
+  readonly subworkstreamManifestRef: string;
+  readonly subworkstreamManifest: SdlcComputeSubworkstreamManifest;
+  readonly subworkstreamCounts: {
+    readonly total: number;
+    readonly done: number;
+    readonly blocked: number;
+    readonly failed: number;
+    readonly discarded: number;
+  };
   readonly obligationAssessmentCounts: {
     readonly total: number;
     readonly fulfilled: number;

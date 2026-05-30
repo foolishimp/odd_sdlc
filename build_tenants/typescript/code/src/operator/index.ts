@@ -40,6 +40,13 @@ export type {
   SdlcComponentTestQualificationRow,
   SdlcComponentTestRealizationRow,
   SdlcComponentTopologyRow,
+  SdlcComputeSubworkstreamManifest,
+  SdlcComputeSubworkstreamMergeDisposition,
+  SdlcComputeSubworkstreamMergeResult,
+  SdlcComputeSubworkstreamPolicy,
+  SdlcComputeSubworkstreamRow,
+  SdlcComputeSubworkstreamStageRef,
+  SdlcComputeSubworkstreamStatus,
   SdlcCurrentAttemptMaterializedProductFile,
   SdlcDecompositionAdmissionDecision,
   SdlcDecompositionDownstreamKind,
@@ -190,6 +197,17 @@ export {
   readOddSdlcRuntimeEvents,
   readOddSdlcRuntimeEventsSync
 } from "./event_store.js";
+
+export {
+  admitComputeSubworkstreamManifest,
+  computeSubworkstreamCounts,
+  computeSubworkstreamSelectedEdgeRef,
+  computeSubworkstreamTargetCarrierRef,
+  defaultComputeSubworkstreamManifest,
+  SDLC_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE,
+  SDLC_COMPUTE_SUBWORKSTREAM_ROW_FIELDS,
+  SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+} from "./compute_subworkstreams.js";
 
 export {
   stableOperatorJson,

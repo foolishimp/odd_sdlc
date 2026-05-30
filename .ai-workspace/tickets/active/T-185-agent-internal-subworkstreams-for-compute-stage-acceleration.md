@@ -3,7 +3,7 @@ id: T-185
 title: Agent-internal subworkstreams for compute-stage acceleration
 type: feature
 ticket_category: ordinary
-status: backlog
+status: active
 goal: accelerate-heavy-fp-compute-without-replacing-abg-runtime-authority
 build_tenant: typescript
 owner: odd_sdlc
@@ -262,6 +262,36 @@ promotion straightforward.
    fields.
 7. Use a watched data-mapper sandbox/live run as the first high-scale
    exploratory proof.
+
+## Implementation Update 2026-05-30
+
+Phase 1 implementation is landed in the TypeScript tenant.
+
+Implemented surfaces:
+
+- `SdlcComputeSubworkstreamManifest`, row, merge-result, and policy carriers.
+- `compute_subworkstream_manifest.json` for parent `transform.C` worker turns.
+- `evaluate_compute_subworkstream_manifest.json` for read-only `evaluate.C`
+  observation.
+- Transform prompt/package permission for agent-internal subagents and parallel
+  workstreams, bounded to the selected edge and parent merge.
+- Evaluate prompt/result observation for read-only internal review splits.
+- Admission that rejects source-tree-only splits, rejects `evaluate.C` write
+  rows, preserves `nonAuthority`, and forbids ABG distributed-execution claims.
+- Operator-run artifact catalog rows for both subworkstream manifests.
+- Design updates in the compute-stage boundary and scheduling-phase surfaces.
+
+Verification on 2026-05-30:
+
+- `npm run build:semantic` passes.
+- Focused suite passes: T-118/T-179/T-181/T-182/T-184/T-185 = 68/68.
+- Regression suite for installed-operator UX, materialization, liveness,
+  consequence, edge accounting, catalog, and T-185 passes = 130/130.
+- Full semantic suite passes = 812/812.
+
+No data-mapper live or sandbox run was started for this ticket update. The
+first data-mapper run remains the high-scale exploratory proof after this
+implementation checkpoint and the surrounding active gate state are accepted.
 
 ## Product Fit
 

@@ -147,6 +147,10 @@ import {
   oddSdlcRuntimeEventsPath
 } from "./event_store.js";
 import {
+  defaultComputeSubworkstreamManifest,
+  SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+} from "./compute_subworkstreams.js";
+import {
   constructPostflightGapDossier,
   buildPostTransformWorkerResultReport,
   componentRepairReentryPlansForGapDossier,
@@ -1853,6 +1857,12 @@ function buildDeclaredEdgeProjectionPendingReport(input: {
         })
       )
     ),
+    subworkstreamManifest: defaultComputeSubworkstreamManifest({
+      manifest: input.manifest,
+      stageRef: "transform.C",
+      source: "system_default",
+      parentResultRef: pathToFileURL(input.manifest.reportFile).href
+    }),
     fpTransformRequestRef: null,
     fpTransformResultRef: null,
     fpTransformStatusSnapshot: null,
@@ -3856,6 +3866,10 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   const contentRegisterPath = designDepthFpEvaluatorContentRegisterPath({
     archiveRoot: input.manifest.archiveRoot
   });
+  const subworkstreamManifestPath = join(
+    input.manifest.archiveRoot,
+    SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+  );
   const registerPath = designDepthFpEvaluatorRegisterPath(input.manifest);
   const promptPath = join(
     input.manifest.archiveRoot,
@@ -3877,6 +3891,16 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
   });
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
+    absolutePath: subworkstreamManifestPath,
+    payload: defaultComputeSubworkstreamManifest({
+      manifest: input.manifest,
+      stageRef: "evaluate.C",
+      source: "parent_checkpoint",
+      parentResultRef: pathToFileURL(input.manifest.fpEvaluateResultFile).href
+    })
+  });
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
     relativePath: "design_depth_fp_evaluator_prompt.md",
     payload: designDepthFpEvaluatorPrompt({
       manifest: input.manifest,
@@ -3890,6 +3914,7 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
         workerResultReportSummaryForDesignDepthPrompt(workerReportPath),
       contentRegisterPath,
       registerProjectionPath: registerPath,
+      subworkstreamManifestPath,
       selectedCompositionRef: input.pluginInput.selectedCompositionRef,
       selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
       selectedCompositionSelectionRef:
@@ -4389,10 +4414,24 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     input.manifest.archiveRoot,
     REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE
   );
+  const subworkstreamManifestPath = join(
+    input.manifest.archiveRoot,
+    SDLC_EVALUATE_COMPUTE_SUBWORKSTREAM_MANIFEST_FILE
+  );
   const promptPath = join(
     input.manifest.archiveRoot,
     "review_grade_edge_fulfillment_prompt.md"
   );
+  writeSdlcSystemArtifact({
+    archiveRoot: input.manifest.archiveRoot,
+    absolutePath: subworkstreamManifestPath,
+    payload: defaultComputeSubworkstreamManifest({
+      manifest: input.manifest,
+      stageRef: "evaluate.C",
+      source: "parent_checkpoint",
+      parentResultRef: pathToFileURL(input.manifest.fpEvaluateResultFile).href
+    })
+  });
   writeSdlcSystemArtifact({
     archiveRoot: input.manifest.archiveRoot,
     relativePath: "review_grade_edge_fulfillment_prompt.md",
@@ -4403,7 +4442,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       constructionBriefPath,
       invocationPackagePath,
       workerReportPath,
-      assessmentPath
+      assessmentPath,
+      subworkstreamManifestPath
     })
   });
   const stdoutPath = join(
