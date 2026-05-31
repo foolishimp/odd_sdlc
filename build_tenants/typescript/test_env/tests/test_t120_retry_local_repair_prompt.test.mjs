@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   compactSdlcPriorGapDossiersForRetryContext,
@@ -684,6 +685,11 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
     prompt,
     /For every declared product file target with role source, test, or build_config that supports an active requirement, embed parseable requirement tags/u
   );
+  assert.match(
+    prompt,
+    /canonical ids already include the `requirement:` prefix/u
+  );
+  assert.doesNotMatch(prompt, /\/\/ requirement:<canonical-id>/u);
   assert.match(prompt, /Build_config files are not exempt/u);
   assert.match(
     prompt,
@@ -796,6 +802,121 @@ test("T-184 retry repair instructions consolidate residual pressure with bounded
   assert.match(prompt, /requiredResidualPressureRefCount=1200/u);
   assert.match(prompt, /omittedRequiredPressureRefCount=960/u);
   assert.doesNotMatch(prompt, /omitted reason count: 56/u);
+});
+
+test("T-164 retry prompt uses review-grade blocked findings as the repair work queue", () => {
+  const root = workspaceRoot();
+  const contract = hookContractByEdgeName("derive_requirement_surface");
+  const assessmentPath = path.join(root, "review_grade_edge_fulfillment_assessment.json");
+  const blockedIds = [
+    "requirement:data_mapper.requirements.req_dq_004",
+    "requirement:data_mapper.requirements.req_trv_005_a",
+    "requirement:data_mapper.requirements.req_trv_005_b"
+  ];
+  writeFileSync(
+    assessmentPath,
+    `${JSON.stringify(
+      {
+        kind: "sdlc_review_grade_edge_fulfillment_assessment",
+        assessmentVersion: "ts-review-grade-v1",
+        graphFunctionName: "bootstrap_release_self_test",
+        edgeName: contract.edgeName,
+        targetAssetType: "requirement_surface",
+        status: "blocked",
+        reviewedObligationIds: [
+          "requirement:data_mapper.mapper_requirements.req_acc_001",
+          ...blockedIds
+        ],
+        findings: [
+          {
+            kind: "sdlc_review_grade_obligation_finding",
+            obligationId: "requirement:data_mapper.mapper_requirements.req_acc_001",
+            fulfillmentStatus: "partial",
+            failureClass: "wrong_stage",
+            requiredAction: "Carry forward to downstream materialization.",
+            evidenceRefs: [],
+            acceptedAuthorityRefs: [],
+            fulfillmentBinding: null,
+            rationale: "Downstream carryover."
+          },
+          ...blockedIds.map((obligationId) => ({
+            kind: "sdlc_review_grade_obligation_finding",
+            obligationId,
+            fulfillmentStatus: "blocked",
+            failureClass: "trace_missing",
+            requiredAction: "Add explicit requirement-surface lineage.",
+            evidenceRefs: [],
+            acceptedAuthorityRefs: [],
+            fulfillmentBinding: null,
+            rationale: "Trace missing."
+          }))
+        ],
+        evidenceRefs: [],
+        summary: "blocked"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: root,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 17,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 17,
+          targetAssetType: "requirement_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason:
+                "review_grade_edge_fulfillment_blocked:requirement:data_mapper.mapper_requirements.req_acc_001:wrong_stage:Carry forward.",
+              reasonClass: "assurance",
+              blockingReason: {
+                kind: "sdlc_blocking_reason",
+                code: "review_grade_edge_fulfillment_blocked",
+                reasonClass: "assurance",
+                lawfulReentryPoint: "same_edge_retry",
+                message: "Worker obligation assessment does not satisfy traversal pressure.",
+                detail:
+                  "requirement:data_mapper.mapper_requirements.req_acc_001:wrong_stage:Carry forward.",
+                evidenceRefs: [pathToFileURL(assessmentPath).href]
+              }
+            }
+          ],
+          evidenceRefs: [pathToFileURL(assessmentPath).href],
+          priorManifestId: "file:///tmp/t164/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t164/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t164-review-grade-blocked-work-queue"
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+  const invocationPackage = JSON.parse(readFileSync(files.invocationPackagePath, "utf8"));
+  const workQueue = prompt.match(
+    /- blocked requirement obligations:\n(?<rows>(?:  - .+\n)+)- retry coverage contract:/u
+  )?.groups?.rows;
+
+  assert(workQueue);
+  for (const id of blockedIds) {
+    assert.match(workQueue, new RegExp(id.replaceAll(".", "\\."), "u"));
+  }
+  assert.doesNotMatch(workQueue, /requirement:data_mapper\.mapper_requirements\.req_acc_001/u);
+  assert.deepEqual(invocationPackage.requirementTraceObligationIds.slice(0, 3), blockedIds);
 });
 
 test("T-164 retry prompt preserves workspace-relative diagnostic paths", () => {

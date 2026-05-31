@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   admitComputeSubworkstreamManifest,
@@ -32,6 +32,15 @@ import {
 import {
   reviewGradeEdgeFulfillmentPrompt
 } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
+
+const TENANT_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../.."
+);
+
+function tenantFile(...segments) {
+  return path.join(TENANT_ROOT, ...segments);
+}
 
 function writeConstraints(root) {
   mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
@@ -377,4 +386,33 @@ test("T-185 evaluate.C prompt and result carry read-only subworkstream observati
   assert.equal(result.subworkstreamCounts.total, 1);
   assert.equal(result.subworkstreamCounts.done, 1);
   assert.equal(result.subworkstreamManifest.abgDistributedExecutionClaim, false);
+});
+
+test("T-185 design proof records execution authority, IACS, and DAG reconciliation", () => {
+  const computeStageDesign = readFileSync(
+    tenantFile(
+      "design",
+      "ODD_SDLC_TYPESCRIPT_ABG_3_9_RC3_COMPUTE_STAGE_BOUNDARY.md"
+    ),
+    "utf8"
+  );
+  const schedulingDesign = readFileSync(
+    tenantFile("design", "ODD_SDLC_TYPESCRIPT_SCHEDULING_PHASE.md"),
+    "utf8"
+  );
+
+  assert.match(computeStageDesign, /11\.5B Execution Authority Audit/u);
+  assert.match(computeStageDesign, /exactly one execution authority/u);
+  assert.match(computeStageDesign, /No SDLC subagent `spawn`/u);
+  assert.match(computeStageDesign, /invokeWorkerThroughAbgProcessActor/u);
+  assert.match(computeStageDesign, /### SdlcComputeSubworkstreamManifest/u);
+  assert.match(computeStageDesign, /classDiagram/u);
+  assert.match(
+    computeStageDesign,
+    /SdlcComputeSubworkstreamManifest "1" --> "\*" SdlcComputeSubworkstreamRow/u
+  );
+  assert.match(computeStageDesign, /SdlcFeatureDependencyDag/u);
+  assert.match(computeStageDesign, /cannot back-author the DAG/u);
+  assert.match(schedulingDesign, /does not replace `SdlcFeatureDependencyDag`/u);
+  assert.match(schedulingDesign, /cannot back-author schedule/u);
 });

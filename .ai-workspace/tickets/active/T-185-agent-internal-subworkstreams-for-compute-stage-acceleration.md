@@ -13,7 +13,7 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-28
 created_at: 2026-05-28
-updated_at: 2026-05-30
+updated_at: 2026-05-31
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -30,6 +30,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
 related_tickets:
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
+  - .ai-workspace/tickets/active/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
   - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
   - .ai-workspace/tickets/completed/T-173-compile-feature-dependency-dag-for-scheduling.md
   - .ai-workspace/tickets/completed/T-174-publish-live-fp-parallel-materialization-frontier.md
@@ -280,18 +281,39 @@ Implemented surfaces:
   rows, preserves `nonAuthority`, and forbids ABG distributed-execution claims.
 - Operator-run artifact catalog rows for both subworkstream manifests.
 - Design updates in the compute-stage boundary and scheduling-phase surfaces.
+- ODD §11.5B execution-authority audit proving ABG remains the only execution
+  authority and odd_sdlc does not supervise worker-internal subagents.
+- Formal IACS entry and module-bounded structural carrier diagram for
+  `SdlcComputeSubworkstreamManifest`.
+- Explicit T-173/T-174 reconciliation note: `SdlcFeatureDependencyDag` remains
+  schedule truth; the subworkstream manifest is parent-result observation and
+  cannot back-author schedule/frontier authority.
 
 Verification on 2026-05-30:
 
 - `npm run build:semantic` passes.
-- Focused suite passes: T-118/T-179/T-181/T-182/T-184/T-185 = 68/68.
+- Focused suite passes after audit/design proof guard:
+  T-118/T-179/T-181/T-182/T-184/T-185 = 69/69.
 - Regression suite for installed-operator UX, materialization, liveness,
   consequence, edge accounting, catalog, and T-185 passes = 130/130.
 - Full semantic suite passes = 812/812.
+- T-185 deterministic proof rerun after audit/design updates:
+  `test_t185_agent_internal_subworkstreams.test.mjs` passes = 5/5.
 
 No data-mapper live or sandbox run was started for this ticket update. The
 first data-mapper run remains the high-scale exploratory proof after this
 implementation checkpoint and the surrounding active gate state are accepted.
+
+## Prompt-Boundary Cleanup Note 2026-05-31
+
+T-185 is not the source of the design-depth evaluator Node.js prompt recipe.
+The T-185 prompt delta is permission-only: parent-agent subworkstreams may be
+used as local compute strategy, the manifest remains observation-only, and ABG
+keeps execution/event/ledger/closure/traversal authority.
+
+The older design-depth evaluator prompt recipe and its proportionality concern
+are tracked by T-187. Do not use T-185 closure review to accept or reject that
+separate prompt-boundary repair.
 
 ## Product Fit
 

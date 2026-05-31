@@ -141,3 +141,10 @@ read, write-territory, output-allocation, idempotency, and fan-in fields where
 known. `transform.C` rows may name changed/proposed files inside the active
 edge write roots. `evaluate.C` rows are read-only and leave write/output fields
 empty.
+
+This carrier does not replace `SdlcFeatureDependencyDag` or the T-173/T-174
+compiled frontier. The DAG remains admitted schedule truth. The subworkstream
+manifest is parent-result observation over one compute turn; its fields are
+named so a later ABG Phase 2 can promote rows into branch declarations without
+letting Phase 1 back-author schedule, lease, replay, or fan-in authority. It
+cannot back-author schedule truth.

@@ -900,6 +900,39 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
+      /assessment path is output-only and is expected to be absent before evaluation/u
+    );
+    assert.match(
+      promptSource,
+      /do not include it in missing-input checks/u
+    );
+    assert.match(
+      promptSource,
+      /For non-executable planning\/design\/review surfaces, prefer file inspection/u
+    );
+    assert.match(
+      promptSource,
+      /If this executor exposes only shell access, use one bounded local script/u
+    );
+    assert.match(promptSource, /Do not issue parallel tool calls/u);
+    assert.match(
+      promptSource,
+      /correct that helper once using already-read evidence and validation/u
+    );
+    assert.match(
+      promptSource,
+      /Do not convert evaluator helper-script failure into requirement\/product obligation findings/u
+    );
+    assert.match(
+      promptSource,
+      /leave the assessment absent so the framework can classify evaluator failure/u
+    );
+    assert.match(
+      promptSource,
+      /worker_construction_brief\.obligations may be an object map rather than an array/u
+    );
+    assert.match(
+      promptSource,
       /Every finding must include at least one acceptedAuthorityRef/u
     );
     assert.match(
@@ -928,6 +961,18 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(
       promptSource,
+      /for non-materialized planning surfaces, also inspect the declared outputFile when materializedFiles is empty/u
+    );
+    assert.match(
+      promptSource,
+      /the declared output file is the generated asset under review/u
+    );
+    assert.match(
+      promptSource,
+      /materializedFiles=\[\] is not by itself a missing-asset blocker/u
+    );
+    assert.match(
+      promptSource,
       /Mark trace_missing when a generated product file is used as fulfillment evidence/u
     );
     assert.match(
@@ -946,6 +991,16 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
       promptSource,
       /Allowed execution byproducts may remain only as byproducts/u
     );
+
+    const installedOperatorSource = readRepoFile(
+      "build_tenants/typescript/code/src/operator/installed_operator.ts"
+    );
+    assert.match(
+      installedOperatorSource,
+      /constrainReviewGradePlanningEvaluatorTools/u
+    );
+    assert.match(installedOperatorSource, /"--tools", "Read,Write"/u);
+    assert.match(installedOperatorSource, /component_code_surface/u);
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

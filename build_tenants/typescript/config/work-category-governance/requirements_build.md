@@ -14,4 +14,5 @@ Agentic work policy:
 - Plan/checklist, inspect only current-item authority, update, validate, repair, and repeat until valid or honestly blocked.
 - Stdout is work trace only. Durable truth is the contracted artifact plus ABG/system admission.
 - Do not print full ledgers, tables, diffs, JSON bodies, or authority files. Print bounded counts, short ids, and decisions; write durable content to the contracted artifact.
-- Keep tool IO bounded: use search plus targeted read ranges for large authority files, and use targeted edits rather than whole-file replacement for existing artifacts.
+- Requirement-surface trace closure: include a compact Trace Index with every active obligation id from inline obligations, requirementTraceObligationIds, retry repair rows, and prior review gaps. Grouped domain rows are useful, but each id must appear verbatim or the edge will retry.
+- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`. Use targeted edits rather than whole-file replacement for existing artifacts.

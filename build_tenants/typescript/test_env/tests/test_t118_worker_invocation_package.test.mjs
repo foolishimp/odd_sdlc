@@ -433,14 +433,16 @@ test("T-118 prompt points workers to the construction brief and not forensic pac
   assert.doesNotMatch(prompt, /Worker-fillable target carrier fields:/u);
   assert.match(prompt, /This section is the core F_P transform/u);
   assert.match(prompt, /worker_construction_brief\.json/u);
-  assert.match(prompt, /current authority refs listed by the construction brief/u);
+  assert.match(prompt, /construction brief authority refs/u);
   assert.match(prompt, /worker_invocation_package\.json/u);
   assert.match(prompt, /worker_brief\.json/u);
   assert.match(prompt, /forensic manifest only when a package ref requires it/u);
   assert.match(prompt, /Terse axioms:/u);
   assert.match(prompt, /Apply worker_construction_brief\.json as the single prompt source carrier/u);
-  assert.match(prompt, /Read boundary: stay under the current workspace/u);
-  assert.match(prompt, /Control boundary: do not run `odd-sdlc-ts`/u);
+  assert.match(prompt, /Read boundary: use only workspace-relative paths/u);
+  assert.match(prompt, /home memory/u);
+  assert.match(prompt, /outside-workspace absolute paths/u);
+  assert.match(prompt, /Control boundary: do not run odd-sdlc-ts/u);
   assert.match(prompt, /Do not spawn an odd_sdlc\/ABG worker, start another traversal/u);
   assert.match(prompt, /parent transform turn/u);
   assert.match(
@@ -500,7 +502,8 @@ test("T-118 workspace spec prompts derive missing outputs from current authority
     /Current-workspace authority refs and the selected construction template are sufficient when this output is absent/u
   );
   assert.match(directiveSurface, /without mining prior generated examples/u);
-  assert.match(prompt, /Read boundary: stay under the current workspace/u);
+  assert.match(prompt, /Read boundary: use only workspace-relative paths/u);
+  assert.match(prompt, /home memory/u);
 });
 
 test("T-002 worker package and prompt carry declared product file targets", () => {

@@ -159,8 +159,12 @@ test("B-070 process://codex argv shape is preserved (regression guard)", () => {
   });
 
   assert.equal(args[0], "exec");
+  assert.ok(args.includes("--ignore-user-config"));
   assert.ok(args.includes("--skip-git-repo-check"));
   assert.ok(args.includes("--ephemeral"));
+  assert.ok(args.includes("features.memories=false"));
+  assert.ok(args.includes("memories.use_memories=false"));
+  assert.ok(args.includes("memories.generate_memories=false"));
   assert.ok(args.includes("--cd"));
   const cdIndex = args.indexOf("--cd");
   assert.equal(args[cdIndex + 1], fx.workspaceRoot);
@@ -204,6 +208,7 @@ test("B-070 process://codex PTY launch redirects prompt file to stdin without pr
   ]);
   assert.equal(launch.args[4], "codex");
   assert(launch.args.includes("exec"));
+  assert(launch.args.includes("--ignore-user-config"));
   assert.equal(launch.args[launch.args.length - 1], "-");
   assert(!launch.args.includes("CODEX-PTY-PROMPT\n"));
 });
@@ -223,6 +228,7 @@ test("B-070 process://codex local-spawn launch uses stdin pipe", () => {
 
   assert.equal(launch.command, "codex");
   assert.equal(launch.args[0], "exec");
+  assert(launch.args.includes("--ignore-user-config"));
   assert.equal(launch.args[launch.args.length - 1], "-");
   assert.equal(launch.stdin, "CODEX-LOCAL-PROMPT\n");
 });
@@ -244,6 +250,7 @@ test("B-070 process://codex?model=... lowers to codex exec --model", () => {
   });
 
   assert.equal(args[0], "exec");
+  assert.ok(args.includes("--ignore-user-config"));
   assert.ok(args.includes("--model"));
   const modelIndex = args.indexOf("--model");
   assert.equal(args[modelIndex + 1], "gpt-5.3-codex-spark");
@@ -279,12 +286,13 @@ test("B-070 process://codex?model=...&effort=... lowers Codex reasoning effort c
   });
 
   assert.equal(args[0], "exec");
+  assert.ok(args.includes("--ignore-user-config"));
   assert.ok(args.includes("--model"));
   const modelIndex = args.indexOf("--model");
   assert.equal(args[modelIndex + 1], "gpt-5.5");
   assert.ok(args.includes("-c"));
-  const configIndex = args.indexOf("-c");
-  assert.equal(args[configIndex + 1], 'model_reasoning_effort="medium"');
+  assert(args.includes('model_reasoning_effort="medium"'));
+  assert(args.includes("features.memories=false"));
   assert.equal(
     args[args.length - 1],
     "-",

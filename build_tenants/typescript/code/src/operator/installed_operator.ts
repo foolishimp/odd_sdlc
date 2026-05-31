@@ -163,6 +163,7 @@ import {
   sha256Text,
   snapshotProductMaterializationRoot,
   stableOperatorJson,
+  tenantToolEnvironmentProjectionFor,
   workerResultReportWithFpStageRefs,
   writeHandoffFiles,
   writePostflightGapDossier,
@@ -529,6 +530,14 @@ export function installedReentryAttemptLimit(
     return MAX_INSTALLED_RETRY_REENTRY_ATTEMPTS;
   }
   return MAX_INSTALLED_OTHER_REENTRY_ATTEMPTS;
+}
+
+function activePostflightBlockingReasonCarriers(
+  postflight: SdlcPostflightResult
+): readonly SdlcBlockingReason[] {
+  return postflight.status === "passed"
+    ? Object.freeze([])
+    : postflight.blockingReasonCarriers;
 }
 
 export function installedReentryGuardScopeForAttempt(input: {
@@ -2719,6 +2728,36 @@ function designDepthFpEvaluatorStdoutBudgetBytes(): number {
   return sdlcOperatorRuntimePolicy().designDepthFpEvaluatorStdoutBudgetBytes;
 }
 
+function reviewGradeEdgeRequiresShellTool(
+  manifest: SdlcWorkerHandoffManifest
+): boolean {
+  return [
+    "component_code_surface",
+    "component_test_surface",
+    "test_execution_surface",
+    "runtime_execution_surface",
+    "execution_result_surface"
+  ].includes(manifest.targetAssetType);
+}
+
+function constrainReviewGradePlanningEvaluatorTools(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly transport: SdlcWorkerTransportContract;
+  readonly processLaunch: ReturnType<typeof processLaunchForWorker>;
+}): ReturnType<typeof processLaunchForWorker> {
+  if (
+    input.transport.agentKey !== "claude" ||
+    input.transport.args.length > 0 ||
+    reviewGradeEdgeRequiresShellTool(input.manifest)
+  ) {
+    return input.processLaunch;
+  }
+  return Object.freeze({
+    ...input.processLaunch,
+    args: Object.freeze([...input.processLaunch.args, "--tools", "Read,Write"])
+  });
+}
+
 function fileByteCount(path: string): number {
   try {
     return statSync(path).size;
@@ -3919,7 +3958,8 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
       selectedCompositionSelectionRef:
         input.pluginInput.selectedCompositionSelectionRef,
-      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef ?? null
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef ?? null,
+      tenantToolEnvironment: tenantToolEnvironmentProjectionFor(input.manifest)
     })
   });
   const stdoutPath = join(
@@ -4443,7 +4483,8 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       invocationPackagePath,
       workerReportPath,
       assessmentPath,
-      subworkstreamManifestPath
+      subworkstreamManifestPath,
+      tenantToolEnvironment: tenantToolEnvironmentProjectionFor(input.manifest)
     })
   });
   const stdoutPath = join(
@@ -4467,13 +4508,17 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       ? join(input.manifest.archiveRoot, "review_grade_edge_fulfillment_last_message.txt")
       : "";
   const executorProfile = selectedWorkerExecutorProfile();
-  const processLaunch = processLaunchForWorker({
-    transport: input.transport,
-    manifestPath,
+  const processLaunch = constrainReviewGradePlanningEvaluatorTools({
     manifest: input.manifest,
-    promptPath,
-    outputLastMessagePath,
-    executorProfile
+    transport: input.transport,
+    processLaunch: processLaunchForWorker({
+      transport: input.transport,
+      manifestPath,
+      manifest: input.manifest,
+      promptPath,
+      outputLastMessagePath,
+      executorProfile
+    })
   });
   const inactivityPolicy = workerInactivityPolicy();
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
@@ -5127,7 +5172,10 @@ function fpEvaluationResidualPressureRefsForState(
 ): readonly string[] {
   const runRef = manifestRefSegment(state.manifest);
   return uniqueSorted([
-    ...state.blockingReasonCarriers.map(
+    ...(state.postflight === null
+      ? state.blockingReasonCarriers
+      : activePostflightBlockingReasonCarriers(state.postflight)
+    ).map(
       (reason) =>
         `pressure://odd-sdlc/fp-evaluate/${runRef}/${encodeURIComponent(reason.code)}`
     ),
@@ -8246,7 +8294,8 @@ function compactRuntimeEventArchivePayload(
           projected: retryContextWithRuntimeGaps,
           override: input.retryContextOverride,
           vectorIndex: pluginInput.vectorIndex
-        })
+        }),
+        traversalHopSelection: executionContract.traversalHopSelection
       });
       const beforeMaterialization = snapshotProductMaterializationRoot(
         manifest.productMaterialization
@@ -8405,7 +8454,7 @@ function compactRuntimeEventArchivePayload(
           gapDossier: null,
           hookOutcome,
           blockingReason: null,
-          blockingReasonCarriers: postflight.blockingReasonCarriers,
+          blockingReasonCarriers: activePostflightBlockingReasonCarriers(postflight),
           currentEdge: null
         };
         const consequence = shouldDeferDispatchConsequenceToFpEvaluator(current)

@@ -23,6 +23,7 @@ import {
   deriveWorkerHandoffManifest,
   deriveSdlcOperatorAssuranceGate,
   evaluateSdlcComputeStage,
+  FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
   promptForHandoff,
@@ -107,7 +108,11 @@ test("T-181 common config carries one compressed governance doc per work categor
     assert.match(doc, /Agentic work policy:/u);
     assert.match(doc, /one truth/u);
     assert.match(doc, /Stdout is work trace only/u);
-    assert.match(doc, /Keep tool IO bounded/u);
+    assert.match(doc, /IO cap: reads <=80 lines/u);
+    assert.match(doc, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
+    assert.match(doc, /sed is inclusive: end-start\+1<=80/u);
+    assert.match(doc, /`200,299p` invalid \(100\), use `200,279p`/u);
+    assert.match(doc, /no bare jq\/rg\/cat/u);
     assert.match(doc, /targeted edits rather than whole-file replacement/u);
   }
   for (const entry of SDLC_FUNCTION_CATALOG) {
@@ -185,9 +190,11 @@ test("T-181 worker prompts prevent whole-file Write drift in live PTY execution"
     });
     const prompt = promptForHandoff(manifest);
 
-    assert.match(prompt, /Keep tool IO bounded/u);
-    assert.match(prompt, /large authority files/u);
-    assert.match(prompt, /targeted read ranges/u);
+    assert.match(prompt, /IO cap: reads <=80 lines/u);
+    assert.match(prompt, /jq\/rg\/cat\/git diff\/status end `\| head -80`/u);
+    assert.match(prompt, /sed is inclusive: end-start\+1<=80/u);
+    assert.match(prompt, /`200,299p` invalid \(100\), use `200,279p`/u);
+    assert.match(prompt, /no bare jq\/rg\/cat/u);
     assert.match(prompt, /do not use the Claude Write tool for whole-file replacement/u);
     assert.match(prompt, /targeted Edit operations/u);
     assert.doesNotMatch(prompt, /make the file-write operation the next worker action/u);
@@ -1392,6 +1399,30 @@ test("T-181 component edges read evaluator register from source-asset lineage re
   }
 });
 
+test("T-181 framework-smoke component-code prompt does not suppress admitted test execution", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const current = manifestForEdge({
+      workspaceRoot,
+      runId: "20260523T000000002Z_pid18104",
+      graphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+      edgeName: "derive_lite_component_code_surface"
+    });
+    const prompt = promptForHandoff(current);
+
+    assert.match(
+      prompt,
+      /For framework-smoke Min\(F_P\) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure\. When admitted design authority declares role=test product targets for this edge, run the declared test execution contract before returning/u
+    );
+    assert.doesNotMatch(
+      prompt,
+      /Run the declared test contract only when this edge carries execution-repair scope/u
+    );
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
 test("T-181 component-code edge accepts implementation-design evaluator register across graph functions", () => {
   const workspaceRoot = makeWorkspace();
   try {
@@ -1639,9 +1670,14 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.doesNotMatch(evaluatorPromptSource, /model:cdme-data-mapper/u);
   assert.match(evaluatorPromptSource, /First register materialization rule/u);
   assert.match(evaluatorPromptSource, /selected evaluate\.C\/F_P semantic pressure map/u);
-  assert.match(evaluatorPromptSource, /Exact first update command pattern/u);
-  assert.match(evaluatorPromptSource, /maps every draft row to a semantic fragment row/u);
-  assert.match(evaluatorPromptSource, /await rename\(tmp, file\)/u);
+  assert.doesNotMatch(evaluatorPromptSource, /Exact first update command pattern/u);
+  assert.doesNotMatch(evaluatorPromptSource, /Exact second update command pattern/u);
+  assert.doesNotMatch(evaluatorPromptSource, /node --input-type=module/u);
+  assert.doesNotMatch(evaluatorPromptSource, /await rename\(tmp, file\)/u);
+  assert.doesNotMatch(evaluatorPromptSource, /tableRows|sectionText/u);
+  assert.match(evaluatorPromptSource, /no framework-authored recipe for deriving register rows/u);
+  assert.match(evaluatorPromptSource, /the row values are your evaluation/u);
+  assert.match(evaluatorPromptSource, /F_D does not construct semantic register rows/u);
   assert.match(evaluatorPromptSource, /mandatory bounded target-path reconciliation pass/u);
   assert.match(evaluatorPromptSource, /If those sources name exact product paths, the final register must preserve those exact paths/u);
   assert.match(evaluatorPromptSource, /Do not deterministically construct later semantic register rows/u);

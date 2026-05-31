@@ -1,6 +1,9 @@
 // Implements: T-184
 
-import type { SdlcWorkerHandoffManifest } from "../../carriers.js";
+import type {
+  SdlcTenantToolEnvironmentProjection,
+  SdlcWorkerHandoffManifest
+} from "../../carriers.js";
 import {
   SDLC_COMPONENT_CONCERN_ROLES,
   SDLC_DESIGN_COMPLETENESS_STATUSES
@@ -13,6 +16,31 @@ import {
 import {
   DESIGN_DEPTH_FP_EVALUATOR_RULE_REF
 } from "./design_depth_register.js";
+
+function listForPrompt(values: readonly string[]): string {
+  return values.length === 0 ? "none" : values.join(", ");
+}
+
+function tenantToolBoundaryPromptLines(
+  tenantToolEnvironment: SdlcTenantToolEnvironmentProjection | null | undefined
+): readonly string[] {
+  if (
+    tenantToolEnvironment === null ||
+    tenantToolEnvironment === undefined ||
+    tenantToolEnvironment.disabledTools.length === 0
+  ) {
+    return Object.freeze([
+      "- Tenant disabled tools from currentState.tenantToolEnvironment: none."
+    ]);
+  }
+  return Object.freeze([
+    `- Tenant disabled tools from currentState.tenantToolEnvironment: ${listForPrompt(
+      tenantToolEnvironment.disabledTools
+    )}.`,
+    "- Apply currentState.tenantToolEnvironment before choosing any local script runtime, shell helper, evidence probe, or evaluator subworkstream tool.",
+    "- Do not run tenant-disabled tools for assessment JSON writing, summarization, validation, execution probes, or convenience inspection."
+  ]);
+}
 
 export function designDepthFpEvaluatorPrompt(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
@@ -30,6 +58,7 @@ export function designDepthFpEvaluatorPrompt(input: {
   readonly selectedCompositionDigest: string;
   readonly selectedCompositionSelectionRef: string;
   readonly selectedRegimeBindingRef: string | null;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
 }): string {
   return [
     "odd_sdlc evaluate.C/F_P design-depth register rule.",
@@ -45,6 +74,11 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final content-register merge.",
     "- The content register path is the durable evaluation artifact; the task is not a single-shot JSON response.",
     `- The system pre-creates that path as a non-admitted draft with selected composition identity and one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND}" row per register section. Your job is to convert draft rows into semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" rows incrementally.`,
+    "",
+    "Tenant tool boundary:",
+    ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+    "- Read boundary: use only workspace-relative paths or explicit workspace/run-archive paths named in this prompt; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
+    "- IO cap: shell reads print <=80 lines. Prefer bounded Node summaries; no bare cat, jq, rg, git diff, git status, or full-file dumps.",
     "",
     "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
@@ -96,122 +130,12 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- Do not announce, plan, or attempt a full semantic register write in one action after the first update. A hidden full-register synthesis pass violates the content-register visibility contract.",
     "- After the first update, every exploratory read must be paired with the next tool action that writes at least one named non-empty or explicitly blocked register section back to the same content register file.",
     "- The preferred order is stackProfileRows, implementationModuleRows, componentTopologyRows, fileTargetRows, componentRealizationRows, moduleSchemaFragments, moduleStateDiagramFragments, aggregateDomainModelRows, aggregateDomainModel, sunnyDaySequenceRows, aggregateSunnyDaySequence, designCompletenessVerdict.",
-    "- When reading the transform ADR after the first update, read it silently with Node, extract only the table or heading range needed for the next named section, and write that section to the register file; do not print the extracted table.",
+    "- When reading the transform ADR after the first update, read only the authority a given section needs and do not print it; then write that section to the register file. How you inspect the authority is your choice; the framework prescribes the carrier schema and the visibility contract, not the extraction method.",
     "- Time budget is part of correctness: update the draft content register before doing deep exploratory review.",
     "- After the governance doc, construction brief, and draft content register are read, write the first evaluator update before any ADR summary, worker-report inspection, source-authority lookup, or deep exploratory action.",
-    `- First evaluator update must convert the existing draft rows into one "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row for every listed register section. Replace each draft rowRef prefix "content-register-row-draft://" with a stable non-draft rowRef such as "content-register-row://". Use null or [] values for intentionally empty sections and use partial/blocked verdict axes when authority is not yet sufficient.`,
-    "- The first update may be mechanically seeded from the existing draft payload values; that is acceptable because it creates an admitted pressure map with explicit partial/blocked placeholders. The semantic refinement happens in later section-sized writes.",
-    "- First update atomicity shape: read existing JSON, map contentRows so draft contentKind becomes the semantic fragment contentKind, replace the rowRef prefix, preserve selected composition fields, publish the register through an atomic same-path replacement, then print counts only.",
-    "- Exact first update command pattern: use Bash with a Node script that reads the existing content register, maps every draft row to a semantic fragment row, writes a temporary JSON file, renames it over the same path, and prints only row counts.",
-    "```bash",
-    "node --input-type=module <<'NODE'",
-    "import { readFile, writeFile, rename } from 'node:fs/promises';",
-    `const file = ${JSON.stringify(input.contentRegisterPath)};`,
-    `const semanticKind = ${JSON.stringify(SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND)};`,
-    `const targetAssetType = ${JSON.stringify(input.manifest.targetAssetType)};`,
-    "const register = JSON.parse(await readFile(file, 'utf8'));",
-    "let converted = 0;",
-    "register.contentRows = register.contentRows.map((row, index) => {",
-    "  const next = { ...row, payload: { ...row.payload } };",
-    "  if (next.contentKind.endsWith('_draft') || String(next.rowRef).startsWith('content-register-row-draft://')) converted += 1;",
-    "  next.contentKind = semanticKind;",
-    "  next.rowRef = String(next.rowRef).replace(/^content-register-row-draft:\\/\\//u, 'content-register-row://');",
-    "  next.payload.kind = 'sdlc_design_depth_register_fragment';",
-    "  next.payload.fragmentVersion = 'ts-design-depth-fragment-v1';",
-    "  next.payload.targetAssetType = next.payload.targetAssetType ?? targetAssetType;",
-    "  next.payload.sequence = next.payload.sequence ?? index + 1;",
-    "  next.payload.mergeMode = 'replace';",
-    "  return next;",
-    "});",
-    "const tmp = `${file}.tmp-${process.pid}`;",
-    "await writeFile(tmp, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
-    "await rename(tmp, file);",
-    "console.log(JSON.stringify({ converted, rowCount: register.contentRows.length }));",
-    "NODE",
-    "```",
-    "- Exact second update command pattern: immediately after the first update, use Bash with a Node script that reads the ADR silently, extracts only the simple stack/module/component/file-target tables, writes those named section rows to the same content register, and prints counts only. Do not print table content.",
-    "```bash",
-    "node --input-type=module <<'NODE'",
-    "import { readFile, writeFile, rename } from 'node:fs/promises';",
-    `const file = ${JSON.stringify(input.contentRegisterPath)};`,
-    `const adrFile = ${JSON.stringify(input.manifest.outputFile)};`,
-    "const evidenceRef = new URL(`file://${adrFile}`).href;",
-    "const register = JSON.parse(await readFile(file, 'utf8'));",
-    "const adr = await readFile(adrFile, 'utf8');",
-    "const slug = (value) => String(value).toLowerCase().replace(/`/gu, '').replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '');",
-    "const cell = (value) => String(value ?? '').trim().replace(/^`|`$/gu, '').trim();",
-    "const sectionText = (heading) => {",
-    "  const start = adr.indexOf(`## ${heading}`);",
-    "  if (start < 0) return '';",
-    "  const next = adr.slice(start + 3).search(/\\n## /u);",
-    "  return next < 0 ? adr.slice(start) : adr.slice(start, start + 3 + next);",
-    "};",
-    "const tableRows = (heading) => sectionText(heading).split('\\n')",
-    "  .filter((line) => line.trim().startsWith('|'))",
-    "  .filter((line) => !/^\\|\\s*-+/u.test(line.trim()))",
-    "  .slice(1)",
-    "  .map((line) => line.split('|').slice(1, -1).map(cell));",
-    "const stackRows = tableRows('Stack Profile');",
-    "const stack = Object.fromEntries(stackRows.map(([layer, selection]) => [layer, selection]));",
-    "const moduleRows = tableRows('Module Boundary').map(([moduleName]) => ({",
-    "  kind: 'sdlc_implementation_module_row',",
-    "  moduleName: cell(moduleName),",
-    "  moduleRef: `module://odd-sdlc/${slug(moduleName)}`",
-    "}));",
-    "const topologyRows = tableRows('Component Topology').map(([componentId, moduleName, relativePath, publicBoundary]) => ({",
-    "  kind: 'sdlc_component_topology_row',",
-    "  componentId: slug(componentId),",
-    "  moduleName: cell(moduleName),",
-    "  relativePath: cell(relativePath),",
-    "  publicBoundary: cell(publicBoundary),",
-    "  concernRole: 'other',",
-    "  requirementIds: [],",
-    "  sourceAssetRefs: [evidenceRef]",
-    "}));",
-    "const fileTargetRows = tableRows('Product File Targets').map(([relativePath, role]) => ({",
-    "  kind: 'sdlc_file_target_row',",
-    "  relativePath: cell(relativePath),",
-    "  role: cell(role)",
-    "}));",
-    "const replacements = new Map([",
-    "  ['stackProfileRows', [{",
-    "    kind: 'sdlc_stack_profile_row',",
-    "    stackRef: 'stack://odd-sdlc/implementation-design',",
-    "    language: cell(stack.Language ?? 'unknown'),",
-    "    buildTool: cell(stack['Build tool'] ?? 'unknown')",
-    "  }]],",
-    "  ['implementationModuleRows', moduleRows],",
-    "  ['componentTopologyRows', topologyRows],",
-    "  ['fileTargetRows', fileTargetRows]",
-    "]);",
-    "register.contentRows = register.contentRows.map((row) => {",
-    "  const section = row.payload?.section;",
-    "  if (!replacements.has(section)) return row;",
-    "  return {",
-    "    ...row,",
-    "    contentKind: 'sdlc_design_depth_register_fragment',",
-    "    payload: {",
-    "      ...row.payload,",
-    "      kind: 'sdlc_design_depth_register_fragment',",
-    "      fragmentVersion: 'ts-design-depth-fragment-v1',",
-    "      mergeMode: 'replace',",
-    "      value: replacements.get(section)",
-    "    },",
-    "    evidenceRefs: Array.from(new Set([...(row.evidenceRefs ?? []), evidenceRef])),",
-    "    sourceBasisRefs: Array.from(new Set([...(row.sourceBasisRefs ?? []), evidenceRef]))",
-    "  };",
-    "});",
-    "const tmp = `${file}.tmp-${process.pid}`;",
-    "await writeFile(tmp, `${JSON.stringify(register, null, 2)}\\n`, 'utf8');",
-    "await rename(tmp, file);",
-    "console.log(JSON.stringify({",
-    "  stackProfileRows: replacements.get('stackProfileRows').length,",
-    "  implementationModuleRows: moduleRows.length,",
-    "  componentTopologyRows: topologyRows.length,",
-    "  fileTargetRows: fileTargetRows.length",
-    "}));",
-    "NODE",
-    "```",
+    `- First evaluator update: promote each pre-seeded draft section row into a semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row carrying your selected evaluate.C/F_P judgment, using a non-draft rowRef. Emit null or [] for intentionally empty sections and partial/blocked verdict axes where authority is not yet sufficient.`,
+    "- Promotion of the seeded draft scaffolding to fragment rows is carrier mechanics; the row values are your evaluation. There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
+    "- The first update is a bounded same-path atomic write that preserves selected composition identity and prints only compact row counts. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
     "- Then iterate by editing the content register file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
     "- The next tool action after any post-first-update ADR or authority inspection must write the corresponding section row. Do not collect multiple large sections before writing.",
     "- A valid progress write may be intentionally partial or blocked, but it must replace the target section row with explicit value, evidenceRefs, and reasons instead of leaving the run in hidden synthesis.",
@@ -319,6 +243,7 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- Requirement ids on component rows are pressure samples for that component, not a full trace surface. Carry 3 to 8 local/high-signal requirementIds per component row and leave full global trace coverage in the ADR, feature decomposition, and requirement surfaces.",
     "- Do not repeat the same large requirement id list across many rows.",
     "- Use the construction brief stagePressure and target carrier refs to decide which staged authority this register must satisfy.",
+    "- Treat construction_brief.stagePressure.proportionalityProfile as the admitted size budget for this edge: respect its profileClass, maxModules, and maxComponents. A degenerate profile means one module / one component / one function; do not expand the register beyond the admitted budget without a hard ADR requirement. A broad profile permits the full component range.",
     "- Treat the ADR as candidate transform evidence, not the full truth; correct underspecified ADR rows by evaluating the workspace and admitted evidence.",
     "- Use the ADR Product File Targets table for fileTargetRows, but keep fileTargetRows to materialized product file roles.",
     "- Canonical fileTargetRows[].role values are source, test, build_config, design, documentation, or other.",
@@ -370,6 +295,7 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
   readonly workerReportPath: string;
   readonly assessmentPath: string;
   readonly subworkstreamManifestPath: string;
+  readonly tenantToolEnvironment?: SdlcTenantToolEnvironmentProjection;
 }): string {
   return [
     "odd_sdlc evaluate.C/F_P review-grade edge fulfillment rule.",
@@ -382,25 +308,36 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
     "- The assessment file is an evaluation sidecar consumed by the existing SdlcWorkerObligationAssessment -> SdlcEdgeFulfillmentLedger path. It is not a new closure ledger.",
     "",
+    "Tenant tool boundary:",
+    ...tenantToolBoundaryPromptLines(input.tenantToolEnvironment),
+    "",
     "Read in order:",
     `1. compressed work-category governance (${input.governanceRef}): ${input.governancePath}`,
     `2. construction brief: ${input.constructionBriefPath}`,
     `3. invocation package: ${input.invocationPackagePath}`,
     `4. worker result report: ${input.workerReportPath}`,
-    "5. generated asset artifacts named by worker_result_report.materializedFiles.",
+    "5. generated asset artifacts named by worker_result_report.materializedFiles; for non-materialized planning surfaces, also inspect the declared outputFile when materializedFiles is empty.",
     "6. product_materialization_manifest.json in the same archive when present.",
     "7. accepted design-depth register refs from construction_brief.stagePressure.designDepthEvaluatorRegisterRefs when present.",
     "",
     "Reading discipline:",
     "- Do not print full files, full JSON objects, full requirement tables, or full source files to stdout.",
     "- Use targeted scripts that print compact counts or short ids only.",
+    "- For non-executable planning/design/review surfaces, prefer file inspection and assessment writing tools over shell. If this executor exposes only shell access, use one bounded local script that reads silently, writes the durable assessment JSON, and prints compact counts only; do not run convenience grep/count loops or print large payloads.",
+    "- Do not issue parallel tool calls.",
+    "- If a bounded local helper script fails because of evaluator-side quoting, type-shape, key-shape, or schema-inspection assumptions, correct that helper once using already-read evidence and validation. Do not convert evaluator helper-script failure into requirement/product obligation findings.",
+    "- If the generated product execution probe fails, evaluate that product failure normally. If the assessment cannot be safely produced after one local helper correction, stop with the final one-line blocked response and leave the assessment absent so the framework can classify evaluator failure.",
     "- Terminal output is a work trace. The JSON assessment file is the evaluation truth.",
     "- If reviewedObligationIds is large, create the assessment with a short local script: load worker_result_report, map every fulfilled carryover row to a compact fulfilled finding, explicitly override only open findings, write JSON to the assessment path, then parse it back.",
+    "- Treat JSON collections defensively in helper scripts: worker_construction_brief.obligations may be an object map rather than an array; normalize with Array.isArray(value) ? value : value && typeof value === \"object\" ? Object.values(value) : [] before slice, map, or iteration.",
+    "- If you use a Node sidecar script inside a shell heredoc, avoid JavaScript regex literals. Prefer startsWith, includes, endsWith, split, and exact string equality for ref/path classification; regex-literal quoting mistakes are evaluator failures, not product evidence.",
+    "- If pattern matching is unavoidable in a Node sidecar script, construct the RegExp from a quoted string constant and validate it against one sample before writing the assessment JSON.",
     "- Do not manually type or stream a large findings array through stdout. Write the durable JSON file and print only compact status counts.",
     "- Do not leave background jobs running. If an executable/service must be started to gather evidence, run it inside one bounded shell block, store its PID in a variable, install a trap that kills and waits for that PID on exit, and print only the observed exit/status summary.",
     "- Do not use shell job-control cleanup such as `kill %1` or Claude background tasks for execution probes. A passed assessment is invalid if a spawned service/process remains live after the probe.",
     "",
     `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
+    "- The assessment path is output-only and is expected to be absent before evaluation; do not include it in missing-input checks. Create its parent directory if needed, write it, then parse it back.",
     "",
     "Required JSON shape:",
     "- kind: \"sdlc_review_grade_edge_fulfillment_assessment\"",
@@ -410,6 +347,8 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     `- targetAssetType: ${JSON.stringify(input.manifest.targetAssetType)}`,
     "- status: \"passed\" or \"blocked\"",
     "- reviewedObligationIds: every obligation id from worker_result_report.obligationAssessments and invocation package inline obligations",
+    "- reviewedObligationIds must contain only admitted obligation ids from worker_result_report.obligationAssessments[].obligationId, worker_result_report.obligationAssessments[].id, invocationPackage.inlineObligationIds[], invocationPackage.obligationIds[], or invocationPackage.inlineObligations[].obligationId.",
+    "- Do not build reviewedObligationIds by recursively collecting every string in JSON. Authority and evidence refs such as workspace://..., file://..., config://..., schema://..., gtl://..., handoff-projection://..., source-digest://..., and review-evidence://... are evidenceRefs or acceptedAuthorityRefs, not obligations and must not become findings.",
     "- findings[]: one sdlc_review_grade_obligation_finding per reviewed obligation id",
     "- evidenceRefs: refs for the assessment, generated assets, accepted authority, and review evidence",
     "- summary: one compact sentence",
@@ -449,6 +388,7 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- Mark semantic_not_realized when requirement tags are present but the behavior is absent, stubbed, placeholder, or not connected to the exported/public boundary.",
     "- Mark semantic_not_realized when accepted authority requires executable/script/program behavior but the source only exports a helper or function and has no entrypoint path that runs the product behavior when the file is invoked. A test calling a helper is overlap evidence, not executable-product proof.",
     "- For non-materialized planning surfaces such as intent, requirement, design, schedule, or test-design surfaces, do not mark downstream implementation/runtime obligations semantic_not_realized merely because implementation behavior is absent on the current edge.",
+    "- For non-materialized planning surfaces, the declared output file is the generated asset under review. If worker_result_report.materializedFiles is empty, inspect worker_result_report.outputFile or the manifest outputFile before marking trace_missing or semantic_not_realized; materializedFiles=[] is not by itself a missing-asset blocker on these edges.",
     "- When worker_result_report.obligationAssessments already carries a requirement with blockingReasons starting requirement_carried_for_downstream_closure: or requirement_recorded_for_future_closure: and the generated asset, selected target carrier, worker report, or materialization manifest maps that requirement to downstream component/source/realization pressure, mark that finding partial with failureClass wrong_stage and requiredAction naming the downstream materialization/design edge.",
     "- For requirement_surface and other non-materialized planning surfaces, an exact worker_result_report obligation assessment with requirement_recorded_for_future_closure: is accepted lineage for downstream transformation-set carryover; do not require the native markdown asset to repeat every exact requirement id when the report/carrier already preserves the id and accepted authority refs.",
     "- wrong_stage is only for lawful downstream carryover. If the current asset omits the requirement mapping, loses accepted authority, invents an owner, or claims executable fulfillment on the wrong edge, use trace_missing, semantic_not_realized, boundary_collapsed, or schema_invalid instead.",
@@ -470,6 +410,7 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- If any reviewed obligation is partial, blocked, or unassessed, status must be blocked and every non-fulfilled finding must include failureClass and requiredAction.",
     "- Before final response, re-open and parse the assessment JSON. Verify the top-level key set is exactly kind, assessmentVersion, graphFunctionName, edgeName, targetAssetType, status, reviewedObligationIds, findings, evidenceRefs, summary.",
     "- Verify every finding key set is exactly kind, obligationId, fulfillmentStatus, failureClass, requiredAction, evidenceRefs, acceptedAuthorityRefs, fulfillmentBinding, rationale.",
+    "- Verify every finding.obligationId is present in reviewedObligationIds and every reviewedObligationId came from an admitted obligation-id field, not from an authority/evidence ref string.",
     "- Rewrite until it is valid whole-file JSON with no Markdown fences, comments, trailing prose, or extra keys.",
     "- Final response must be one line: reviewStatus=<passed|blocked> reviewed=<n> blocked=<n>."
   ].join("\n");

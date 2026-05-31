@@ -518,8 +518,11 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
   assert.match(evaluatorPromptSource, /First-update admission policy/u);
   assert.match(evaluatorPromptSource, /publish the same register path atomically/u);
   assert.match(evaluatorPromptSource, /first mechanical draft-row conversion/u);
-  assert.match(evaluatorPromptSource, /Exact first update command pattern/u);
-  assert.match(evaluatorPromptSource, /node --input-type=module/u);
+  assert.doesNotMatch(evaluatorPromptSource, /Exact first update command pattern/u);
+  assert.doesNotMatch(evaluatorPromptSource, /Exact second update command pattern/u);
+  assert.doesNotMatch(evaluatorPromptSource, /node --input-type=module/u);
+  assert.match(evaluatorPromptSource, /There is no framework-authored recipe/u);
+  assert.match(evaluatorPromptSource, /F_D does not construct semantic register rows/u);
   assert.match(installedOperatorSource, /writeDesignDepthFpEvaluatorDraftContentRegister/u);
   assert.match(installedOperatorSource, /writeDesignDepthFirstUpdateObservation/u);
   assert.match(installedOperatorSource, /design_depth_fp_evaluator_first_update\.json/u);
@@ -711,7 +714,19 @@ test("T-184 no-dispatch projection defers output reads until consequence", () =>
   assert.match(completionSource, /constructorResultFromWorkerOutput/u);
   assert.match(
     completionSource,
+    /blockingReasonCarriers:\s*activePostflightBlockingReasonCarriers\(postflight\)/u
+  );
+  assert.doesNotMatch(
+    completionSource,
     /blockingReasonCarriers:\s*postflight\.blockingReasonCarriers/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /function activePostflightBlockingReasonCarriers/u
+  );
+  assert.match(
+    installedOperatorSource,
+    /postflight\.status === "passed"\s*\?\s*Object\.freeze\(\[\]\)/u
   );
   assert.match(noDispatchSource, /buildDeclaredEdgeProjectionPendingReport/u);
   assert.match(noDispatchSource, /deferConstructorUntilConsequence: true/u);

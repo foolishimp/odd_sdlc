@@ -150,6 +150,55 @@ sdlc_compute_subworkstream_manifest
     parentResultRef
 ```
 
+Module-bounded carrier diagram:
+
+```mermaid
+classDiagram
+  class SdlcComputeSubworkstreamManifest {
+    kind: sdlc_compute_subworkstream_manifest
+    phase: phase_1_parent_agent_internal
+    authority: observation_only_parent_plugin_result
+    stageRef: transform.C | evaluate.C
+    selectedEdgeRef
+    targetCarrierRef
+    nonAuthority: true
+    abgDistributedExecutionClaim: false
+  }
+  class SdlcComputeSubworkstreamRow {
+    workstreamRef
+    targetModuleRef
+    targetInterfaceRef
+    predecessorWorkstreamRefs
+    dependencyInputRefs
+    authorityInputRefs
+    readRefs
+    writeTerritoryRefs
+    outputAllocationRefs
+    idempotencyKey
+    fanInScopeRef
+    status
+    mergeDisposition
+  }
+  class SdlcComputeSubworkstreamMergeResult {
+    mergedOutputRefs
+    conflictRefs
+    discardedOutputRefs
+    carryForwardGapRefs
+    parentResultRef
+  }
+  class SdlcWorkerResultReport {
+    subworkstreamManifest
+  }
+  class SdlcFpEvaluateResult {
+    subworkstreamManifest
+    subworkstreamCounts
+  }
+  SdlcComputeSubworkstreamManifest "1" --> "*" SdlcComputeSubworkstreamRow
+  SdlcComputeSubworkstreamManifest "1" --> "1" SdlcComputeSubworkstreamMergeResult
+  SdlcWorkerResultReport --> SdlcComputeSubworkstreamManifest
+  SdlcFpEvaluateResult --> SdlcComputeSubworkstreamManifest
+```
+
 The manifest is admitted only as part of the parent plugin result path:
 
 ```text
@@ -176,6 +225,57 @@ The field names intentionally align with ABG saga-frontier branch declarations
 where possible: predecessor, read, write-territory, output-allocation,
 idempotency, and fan-in refs. Promotion to runtime-visible distributed
 execution is Phase 2 and belongs to ABG frontier semantics.
+
+The Phase 1 carrier is deliberately distinct from `SdlcFeatureDependencyDag`.
+`SdlcFeatureDependencyDag` and the T-173/T-174 compiled frontier remain
+admitted schedule and dependency truth. `SdlcComputeSubworkstreamManifest`
+observes what a parent worker reports inside one selected compute turn. A future
+Phase 2 promotion maps `predecessorWorkstreamRefs` to DAG edge predecessors,
+`dependencyInputRefs` and `readRefs` to branch read/dependency refs,
+`writeTerritoryRefs` and `outputAllocationRefs` to branch write leases and
+outputs, and `idempotencyKey` / `fanInScopeRef` to ABG frontier retry and
+fan-in identity. The observation carrier cannot back-author the DAG.
+
+## ODD §11.5B Execution Authority Audit
+
+T-185 changes prompt, carrier, and plugin-result semantics for parent-agent
+compute. It does not add a product-local execution authority.
+
+Static evidence:
+
+- `operator/compute_subworkstreams.ts` defines and admits observation carriers
+  only. It has no process imports, no process launch calls, no retry loop, and
+  no traversal transition.
+- `operator/plugins/transform/launch_contract.ts` grants worker-internal
+  subagents or parallel workstreams in prompt text only, then forbids spawning
+  another `odd_sdlc`/ABG worker, starting traversal, or leaving child processes
+  running.
+- `operator/plugins/evaluate/prompts.ts` grants only read-only compute strategy
+  for evaluator subworkstreams and carries the same no-events/no-ledgers/no-
+  closure/no-traversal/no-branch-lease boundary.
+- `operator/installed_operator.ts` still dispatches the parent worker only
+  through `invokeWorkerThroughAbgProcessActor(...)`; worker dispatch requires an
+  admitted `SdlcWorkerTransportContract`.
+- `operator/transport.ts` still lowers the admitted parent worker transport to
+  the ABG supervised process actor input. T-185 adds no subagent transport,
+  queue, lease, timeout, kill, stdout/stderr supervision, or child-process
+  owner outside that actor seam.
+
+Authority inventory:
+
+| Surface | Owner after T-185 | T-185 role | Local execution authority ruled out |
+| --- | --- | --- | --- |
+| Traversal selection and vector advance | ABG | Carries selected edge refs for observation | No subworkstream row can select next traversal |
+| Actor invocation and process supervision | ABG supervised process actor | Parent worker may internally use its own capabilities | No SDLC subagent `spawn`, queue, lease, timeout, kill, or stdout/stderr supervisor is introduced |
+| Retry, correction, continuation, and re-entry | ABG | Parent result may report blocked/failed/discarded rows | Subworkstream status cannot retry or re-enter independently |
+| Runtime event emission, append, replay, and projection | ABG/system artifact surfaces | Manifest is archive evidence and parent-result payload | Rows cannot emit runtime events or rewrite replay truth |
+| Closure fold and consequence | ABG plus SDLC product policy inputs | Manifest may be cited as evidence by parent evaluate/consequence | Subworkstream success cannot close an edge without parent merge, evaluate.C, admission, consequence.C, and traversal transition |
+
+Conclusion: after T-185 there is still exactly one execution authority for the
+affected traversal: ABG. Subagent spawning and supervision, if a worker uses
+them, remain inside the parent agent process and outside odd_sdlc runtime
+authority. The only admitted runtime boundary visible to odd_sdlc is the parent
+`.C` actor invocation and its parent result.
 
 ## SDLC Node Rule
 
@@ -475,6 +575,48 @@ Owning surfaces:
 
 Acceptance: missing, stale, or locally synthesized selected composition identity
 fails closed.
+
+### SdlcComputeSubworkstreamManifest
+
+Purpose: observe parent-agent internal compute decomposition without creating a
+second execution, scheduling, replay, or closure authority.
+
+Owning surfaces:
+
+- `build_tenants/typescript/code/src/operator/carriers.ts`
+- `build_tenants/typescript/code/src/operator/compute_subworkstreams.ts`
+- `worker_result_report.subworkstreamManifest`
+- `fp_evaluate_result.subworkstreamManifest`
+- operator-run artifact catalog rows for `compute_subworkstream_manifest.json`
+  and `evaluate_compute_subworkstream_manifest.json`
+
+Inputs:
+
+- selected edge and target carrier refs
+- admitted dependency, authority, schedule/tranche, and obligation refs
+- parent worker-reported row status, evidence, read/write territories,
+  output allocations, idempotency, and fan-in refs
+
+Outputs:
+
+- observation-only manifest rows inside the parent transform/evaluate result
+- merge result with merged, conflicted, discarded, and carry-forward refs
+- subworkstream counts on `SdlcFpEvaluateResult`
+
+Forbidden:
+
+- ABG event emission
+- ledger writes
+- traversal selection
+- branch leases
+- retry/re-entry ownership
+- closure or consequence projection
+- workspace/product writes from `evaluate.C`
+
+Acceptance: admission rejects parent edge/target/stage mismatch,
+source-tree-only splits with no dependency or authority refs, evaluate-side
+write/output rows, `nonAuthority=false`, and any ABG distributed execution
+claim.
 
 ### SdlcTransformPluginAdapter
 

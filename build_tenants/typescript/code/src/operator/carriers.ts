@@ -1900,6 +1900,15 @@ export interface SdlcWorkerConstructionBriefPackageDisposition {
   readonly role: string;
 }
 
+export interface SdlcTenantToolEnvironmentProjection {
+  readonly kind: "sdlc_tenant_tool_environment_projection";
+  readonly sourceRefs: readonly string[];
+  readonly disabledTools: readonly string[];
+  readonly allowedTools: readonly string[];
+  readonly workspaceLocalDirectories: readonly string[];
+  readonly environmentVariableNames: readonly string[];
+}
+
 export interface SdlcWorkerConstructionBrief {
   readonly kind: "sdlc_worker_construction_brief";
   readonly briefVersion: "ts-worker-construction-brief-v1";
@@ -1918,6 +1927,8 @@ export interface SdlcWorkerConstructionBrief {
     readonly archiveRoot: string;
     readonly authorityRefs: readonly string[];
     readonly authorityIndex: readonly SdlcAuthorityIndexEntry[];
+    readonly tenantStackAuthorityRefs: readonly string[];
+    readonly tenantToolEnvironment: SdlcTenantToolEnvironmentProjection;
     readonly priorEdgeRefs: readonly string[];
     readonly omittedPriorEdgeRefCount: number;
     readonly runtimeContextRefs: readonly string[];
@@ -1928,6 +1939,7 @@ export interface SdlcWorkerConstructionBrief {
     readonly requiredStagedAuthorityRefs: readonly string[];
     readonly designDepthEvaluatorRegisterRefs: readonly string[];
     readonly expectedDesignDepthEvaluatorRegisterPath: string | null;
+    readonly proportionalityProfile: SdlcComputeProportionalityProfile | null;
   };
   readonly computeSubworkstreamPolicy: SdlcComputeSubworkstreamPolicy;
   readonly targetState: {
@@ -2004,6 +2016,23 @@ export interface SdlcWorkerBrief {
   readonly repairReentryPlanCount: number;
 }
 
+// Compact projection of the admitted SdlcTraversalHopSelection for the
+// worker-facing brief (T-187 A-050). Not an authority carrier: it is a
+// read-model budget derived from the already-admitted hop selection so the
+// brief carries the proportionality/Min(F_P) fact instead of generic prose.
+export interface SdlcComputeProportionalityProfile {
+  readonly kind: "sdlc_compute_proportionality_profile";
+  readonly hopClass: SdlcTraversalHopClass;
+  readonly outcomeClass: SdlcTraversalOutcomeClass;
+  readonly pressureMechanism: SdlcMinFpPressurePreservationMechanism;
+  readonly selectedGraphVariantRef: string;
+  readonly inputObligationCount: number;
+  readonly outputRowCount: number;
+  readonly profileClass: "degenerate" | "compact" | "broad";
+  readonly maxModules: number | null;
+  readonly maxComponents: number;
+}
+
 export interface SdlcWorkerHandoffManifest {
   readonly kind: "sdlc_worker_handoff_manifest";
   readonly contractVersion: "ts-operator-v1";
@@ -2015,6 +2044,7 @@ export interface SdlcWorkerHandoffManifest {
   readonly targetCarrierContractRef?: string;
   readonly targetCarrierContractDigest?: string;
   readonly targetCarrierProjection: SdlcWorkerTargetCarrierProjection;
+  readonly proportionalityProfile?: SdlcComputeProportionalityProfile | null;
   readonly workspaceRoot: string;
   readonly archiveRoot: string;
   readonly graphFunctionName: string;

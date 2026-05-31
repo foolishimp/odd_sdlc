@@ -203,6 +203,7 @@ import type {
   SdlcWorkerTargetCarrierObjectTemplate,
   SdlcWorkerInvocationObligation,
   SdlcWorkerInvocationPackage,
+  SdlcTenantToolEnvironmentProjection,
   SdlcWorkerTargetCarrierProjection,
   SdlcWorkerTargetCarrierPromptProjection,
   SdlcWorkerConstructionBrief,
@@ -217,7 +218,9 @@ import type {
   SdlcWorkerResultReport,
   SdlcComputeSubworkstreamPolicy,
   SdlcComputeSubworkstreamStageRef,
+  SdlcComputeProportionalityProfile,
   SdlcDecompositionSummary,
+  SdlcTraversalHopSelection,
   SdlcDependencyTraversalSelection,
   SdlcModuleDependencyMap,
   SdlcTestDependencyMap
@@ -2894,6 +2897,32 @@ function tenantStackSpecFiles(
   );
 }
 
+function tenantStackSpecRelativePaths(input: {
+  readonly workspaceRoot: string;
+  readonly activeTenant: string;
+}): readonly string[] {
+  const specRoot = join(
+    input.workspaceRoot,
+    `build_tenants/${input.activeTenant}`,
+    "spec"
+  );
+  if (!existsSync(specRoot)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    readdirSync(specRoot, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(specRoot, entry.name))
+      .filter((filePath) =>
+        /(?:^|\/)(?:TECH_STACK|tech_stack|TESTING_TECH_STACK|testing_tech_stack|PRODUCT_TARGETS|product_targets|EXECUTION_CONTRACT|execution_contract)\.(?:json|md|markdown)$/u.test(
+          filePath.split(path.sep).join("/")
+        )
+      )
+      .map((filePath) => relative(input.workspaceRoot, filePath).split(path.sep).join("/"))
+      .sort()
+  );
+}
+
 function stringListFromUnknown(value: unknown): readonly string[] {
   if (Array.isArray(value)) {
     return Object.freeze(
@@ -2919,6 +2948,116 @@ function objectFieldsStringList(
   keys: readonly string[]
 ): readonly string[] {
   return Object.freeze(keys.flatMap((key) => stringListFromUnknown(record[key])));
+}
+
+function environmentVariableNamesFromUnknown(value: unknown): readonly string[] {
+  const record = objectRecord(value);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  return uniqueSorted(
+    Object.keys(record).filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/u.test(name))
+  );
+}
+
+function tenantToolEnvironmentFromUnknown(
+  value: unknown
+): Omit<SdlcTenantToolEnvironmentProjection, "kind" | "sourceRefs"> {
+  const record = objectRecord(value);
+  if (record === null) {
+    return Object.freeze({
+      disabledTools: Object.freeze([]),
+      allowedTools: Object.freeze([]),
+      workspaceLocalDirectories: Object.freeze([]),
+      environmentVariableNames: Object.freeze([])
+    });
+  }
+  const nestedKeys = [
+    "executionEnvironment",
+    "execution_environment",
+    "toolEnvironment",
+    "tool_environment",
+    "testingTechStack",
+    "testing_tech_stack",
+    "testTechStack",
+    "test_tech_stack"
+  ];
+  const nested = nestedKeys.map((key) =>
+    tenantToolEnvironmentFromUnknown(record[key])
+  );
+  return Object.freeze({
+    disabledTools: uniqueSorted([
+      ...objectFieldsStringList(record, [
+        "disabledTools",
+        "disabled_tools",
+        "disallowedTools",
+        "disallowed_tools",
+        "prohibitedTools",
+        "prohibited_tools",
+        "unavailableTools",
+        "unavailable_tools"
+      ]),
+      ...nested.flatMap((entry) => entry.disabledTools)
+    ]),
+    allowedTools: uniqueSorted([
+      ...objectFieldsStringList(record, [
+        "allowedTools",
+        "allowed_tools",
+        "enabledTools",
+        "enabled_tools"
+      ]),
+      ...nested.flatMap((entry) => entry.allowedTools)
+    ]),
+    workspaceLocalDirectories: uniqueSorted([
+      ...objectFieldsStringList(record, [
+        "workspaceLocalDirectories",
+        "workspace_local_directories",
+        "localDirectories",
+        "local_directories",
+        "cacheDirectories",
+        "cache_directories"
+      ]),
+      ...nested.flatMap((entry) => entry.workspaceLocalDirectories)
+    ]),
+    environmentVariableNames: uniqueSorted([
+      ...environmentVariableNamesFromUnknown(record["environmentVariables"]),
+      ...environmentVariableNamesFromUnknown(record["environment_variables"]),
+      ...environmentVariableNamesFromUnknown(record["environment"]),
+      ...environmentVariableNamesFromUnknown(record["env"]),
+      ...nested.flatMap((entry) => entry.environmentVariableNames)
+    ])
+  });
+}
+
+export function tenantToolEnvironmentProjectionFor(
+  manifest: SdlcWorkerHandoffManifest
+): SdlcTenantToolEnvironmentProjection {
+  const sourceRefs = tenantStackSpecFiles(manifest).map((filePath) =>
+    pathToFileURL(filePath).href
+  );
+  const projections = sourceRefs.map((ref) => {
+    const source = readableFileRef(ref);
+    if (source === null) {
+      return tenantToolEnvironmentFromUnknown(null);
+    }
+    try {
+      return tenantToolEnvironmentFromUnknown(JSON.parse(source.content));
+    } catch {
+      return tenantToolEnvironmentFromUnknown(null);
+    }
+  });
+  return Object.freeze({
+    kind: "sdlc_tenant_tool_environment_projection" as const,
+    sourceRefs: Object.freeze(workerFacingRefs(manifest, sourceRefs)),
+    disabledTools: uniqueSorted(projections.flatMap((entry) => entry.disabledTools)),
+    allowedTools: uniqueSorted(projections.flatMap((entry) => entry.allowedTools)),
+    workspaceLocalDirectories: uniqueSorted(
+      projections.flatMap((entry) => entry.workspaceLocalDirectories)
+    ),
+    environmentVariableNames: uniqueSorted(
+      projections.flatMap((entry) => entry.environmentVariableNames)
+    )
+  });
 }
 
 function unknownDeclaresTenantStackSemantics(value: unknown): boolean {
@@ -4428,6 +4567,7 @@ function authorityRefsFor(input: {
     ...markdownFilesIn(input.workspaceRoot, "specification/requirements"),
     ...markdownFilesIn(input.workspaceRoot, "specification/design"),
     ...markdownFilesIn(input.workspaceRoot, "specification/modules"),
+    ...tenantStackSpecRelativePaths(input),
     ...markdownFilesIn(input.workspaceRoot, `build_tenants/${input.activeTenant}/design`),
     ...markdownFilesIn(input.workspaceRoot, `build_tenants/${input.activeTenant}/modules`)
   ]);
@@ -4467,7 +4607,8 @@ function authorityCategoryFor(filePath: string): SdlcAuthorityIndexCategory {
   }
   if (
     filePath.includes("/specification/design/") ||
-    filePath.includes("/build_tenants/") && filePath.includes("/design/")
+    filePath.includes("/build_tenants/") && filePath.includes("/design/") ||
+    filePath.includes("/build_tenants/") && filePath.includes("/spec/")
   ) {
     return "design";
   }
@@ -5252,6 +5393,52 @@ export function assertTraversalIntentPackagePressure(
   }
 }
 
+export function proportionalityProfileFromHopSelection(
+  selection: SdlcTraversalHopSelection | null
+): SdlcComputeProportionalityProfile {
+  if (selection === null) {
+    // No admitted Min(F_P) front-door reduction (the front door returns null
+    // for domain_product / data-mapper-scale edges; the full decomposition is
+    // produced downstream). The admitted budget is therefore the unreduced
+    // broad ceiling, not a degenerate one. This is the honest projection of the
+    // null/unreduced state, not an invented reduction.
+    return Object.freeze({
+      kind: "sdlc_compute_proportionality_profile" as const,
+      hopClass: "staged",
+      outcomeClass: "domain_product",
+      pressureMechanism: "none",
+      selectedGraphVariantRef: "graph-variant://odd-sdlc/unreduced-full",
+      inputObligationCount: 0,
+      outputRowCount: 0,
+      profileClass: "broad",
+      maxModules: null,
+      maxComponents: 32
+    });
+  }
+  const profileClass =
+    selection.hopClass === "single_hop"
+      ? "degenerate"
+      : selection.hopClass === "dual_hop"
+        ? "compact"
+        : "broad";
+  const maxComponents =
+    profileClass === "degenerate" ? 1 : profileClass === "compact" ? 2 : 32;
+  const maxModules =
+    profileClass === "degenerate" ? 1 : profileClass === "compact" ? 2 : null;
+  return Object.freeze({
+    kind: "sdlc_compute_proportionality_profile" as const,
+    hopClass: selection.hopClass,
+    outcomeClass: selection.outcomeClass,
+    pressureMechanism: selection.pressurePreservation.mechanism,
+    selectedGraphVariantRef: selection.selectedGraphVariantRef,
+    inputObligationCount: selection.complexityAssessment.inputObligationCount,
+    outputRowCount: selection.complexityAssessment.outputRowCount,
+    profileClass,
+    maxModules,
+    maxComponents
+  });
+}
+
 export function deriveWorkerHandoffManifest(input: {
   readonly workspaceRoot: string;
   readonly overlayRef?: string | null | undefined;
@@ -5271,6 +5458,7 @@ export function deriveWorkerHandoffManifest(input: {
     SdlcProjectConstraints,
     "activeTenant" | "selectedOutputRoot"
   > | undefined;
+  readonly traversalHopSelection?: SdlcTraversalHopSelection | null | undefined;
   readonly runId?: string;
 }): SdlcWorkerHandoffManifest {
   const runId = input.runId ?? operatorRunId();
@@ -5455,6 +5643,9 @@ export function deriveWorkerHandoffManifest(input: {
     targetCarrierContractDigest:
       targetCarrierProjection.targetCarrierContractDigest,
     targetCarrierProjection,
+    proportionalityProfile: proportionalityProfileFromHopSelection(
+      input.traversalHopSelection ?? null
+    ),
     workspaceRoot: input.workspaceRoot,
     archiveRoot,
     graphFunctionName: input.graphFunctionName,
@@ -5562,11 +5753,18 @@ function inlineObligationsForPrompt(
 function requirementTraceObligationIdsForPrompt(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
-  return Object.freeze(
-    canonicalRequirementTraceObligationsForPrompt(manifest)
-      .slice(0, MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS)
-      .map((obligation) => obligation.obligationId)
-  );
+  const ids = new Set<string>();
+  const latestDossier =
+    manifest.retryContext.priorGapDossiers[manifest.retryContext.priorGapDossiers.length - 1];
+  if (latestDossier !== undefined) {
+    for (const id of currentEvaluatedGapRequirementIds(manifest, latestDossier)) {
+      ids.add(id);
+    }
+  }
+  for (const obligation of canonicalRequirementTraceObligationsForPrompt(manifest)) {
+    ids.add(obligation.obligationId);
+  }
+  return Object.freeze([...ids].slice(0, MAX_INVOCATION_PACKAGE_REQUIREMENT_TRACE_IDS));
 }
 
 function requirementTraceObligationIdsForProductLineage(
@@ -6490,13 +6688,13 @@ function transformAxiomsForWorker(): readonly string[] {
     "worker_construction_brief.json is the single prompt-source carrier. Archive package files are replay/audit projections for evaluator and analyzer surfaces.",
     "Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas; evaluator-owned carrier contracts stay in framework archives unless this prompt explicitly asks for a structured register carrier.",
     "Do not render target-carrier protocol fields such as kind, contractRef, contractDigest, payload path, construction template refs, targetCarrierProjection, or selected-target-carrier metadata in Markdown product/design surfaces unless an outcome directive explicitly asks for a structured carrier block.",
-    "Read boundary: use only relative paths under the current workspace; do not glob, read, cite, or copy sibling sandboxes, historical test_runs, home memory, or absolute paths outside the active workspace.",
+    "Read boundary: use only workspace-relative paths; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
     "Temporary execution logs are workspace evidence: do not create, read, or write outside-workspace temporary files such as /tmp; write transient logs only under allowed write roots.",
     "Allowed write roots are workspace-root-relative unless already absolute; if a command changes cwd, resolve allowed write roots to workspace-root absolute paths before writing evidence logs.",
     "Do not use PTY transcripts, runtime logs, or worker archives as product authority unless a package ref names them.",
     "Start the output artifact with ## Execution Plan naming read authority, bounded steps, and first materialization target.",
     "Large artifact rule: never emit one monolithic tool payload for a generated register or ADR. Keep each write/edit payload bounded; use compact rows and stable references to source authority instead of duplicating entire upstream surfaces.",
-    "When requirementTraceObligationIds is non-empty, include ## Requirement Trace Register with those exact ids. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
+    "When requirementTraceObligationIds is non-empty, preserve exact ids in worker/result carriers and use grouped counts plus high-signal samples in Markdown product/design surfaces. Emit every exact id only when the target artifact is a traceability/register surface or an outcome directive explicitly requires exact id rows. Use traversal_intent_package as audit context, not as extra product-file tag pressure."
   ]);
 }
 
@@ -6663,6 +6861,7 @@ function compactDesignDepthDirective(
         "Write the ADR as bounded sections: header/status, context, decision, module boundary, product file targets, requirement lineage, and consequences.",
         "Hard output bound: keep the Markdown artifact under 450 lines, keep each write/edit payload under 180 lines, and use compact rows with source refs rather than copying upstream authority text.",
         "Keep the ADR proportional to immediate implementation structure: identify only the stack, module boundary, component/file targets, requirement lineage, and design decisions needed to materialize the declared product surface from current source assets.",
+        "Use construction_brief.stagePressure.proportionalityProfile as the admitted proportionality budget: a degenerate profile means one module / one component / one function; do not exceed its maxModules/maxComponents without a hard requirement in admitted authority.",
         "A substantive implementation design must preserve decomposition proportionality: no component should own more than 8 requirement refs in the requirement-lineage table; split coarse facade/engine/validator decisions into narrower public-boundary components before materialization.",
         "Before code can close, implementation design must explicitly decompose requirement pressure to the asset granularity it demands. If requirements imply separable public, runtime, data-contract, or test boundaries, name those boundaries in component-level rows instead of hiding them inside one coarse module facade.",
         "Implementation component topology rows admitted by the evaluator use componentTopologyRows[].componentId/moduleName/relativePath/publicBoundary/concernRole with row kind=sdlc_component_topology_row; publicBoundary and concernRole are string fields.",
@@ -6816,7 +7015,7 @@ function outcomeDirectivesForWorker(
           `Write output artifact: ${workerFacingPath(manifest, manifest.outputFile)}.`,
           ...(manifest.outputFile.toLowerCase().endsWith(".md")
             ? [
-                "Markdown output artifact: materialize the target file with bounded editor operations. After reading the listed authority refs, make the artifact update the next worker action. If the file already exists, do not use the Claude Write tool for whole-file replacement; use targeted Edit operations. Keep assistant-visible narration to compact progress notes, and use compact tables/sections with stable refs instead of copied authority text."
+                "Markdown output artifact: materialize target file with bounded editor ops. Read listed refs first. If the file exists, do not use the Claude Write tool for whole-file replacement; use targeted edits. Keep narration compact; use stable refs instead of copied authority text."
               ]
             : [])
         ]),
@@ -6950,7 +7149,7 @@ function outcomeDirectivesForWorker(
       "For every declared product file target with role source, test, or build_config that supports an active requirement, embed parseable requirement tags in the file when the file syntax permits and mirror the same obligation ids in the target carrier/component rows. Build_config files are not exempt.",
       "For product files that cannot carry native comments, such as strict structured configuration files, carry lineage in the target carrier/table using component/file rows and evidence refs; do not rely on worker prose.",
       "When a product file is evidence for a fulfilled requirement, carry parseable requirement tags in that file when syntax permits and cite the same obligation ids in the target carrier/component rows.",
-      "For source files, put the requirement tags at the top of the file using valid native comment syntax, one exact id per line, for example `// requirement:<canonical-id>`; do not rely on the report alone for product-file lineage."
+    "For source files, put requirement tags at the top of the file using valid native comment syntax, one exact canonical id per line, for example `// requirement:data_mapper.requirements.req_dq_001`; canonical ids already include the `requirement:` prefix, so do not write `requirement:requirement:...`; do not rely on the report alone for product-file lineage."
     );
     directives.push(
       ...tenantStackAuthorityRepairDirectives({
@@ -6977,7 +7176,7 @@ function outcomeDirectivesForWorker(
         manifest.graphFunctionName === FG_MATERIALIZE_DECLARED_PRODUCT_ASSET
           ? "For declared product materialization, materialize product files under the declared product file targets. The output artifact is the traversal summary carrier, not a substitute for source/build files. Use minimal source structure only when no topology authority is present."
           : manifest.graphFunctionName === FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE
-          ? "For framework-smoke Min(F_P) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure. Run the declared test contract only when this edge carries execution-repair scope. Keep componentRealizationRows source-role only; test files are materialized execution-proof files for the trivial graph variant, not separate component-code topology rows."
+          ? "For framework-smoke Min(F_P) component_code_surface, materialize the source product files declared by the admitted F_P design-depth register and stagePressure. When admitted design authority declares role=test product targets for this edge, run the declared test execution contract before returning. Keep componentRealizationRows source-role only; test files are materialized execution-proof files for the trivial graph variant, not separate component-code topology rows."
           : manifest.edgeName === FG_DERIVE_LITE_COMPONENT_CODE_SURFACE
           ? "For lite component_code_surface, materialize only the bounded source implementation files declared by construction_brief.stagePressure.designDepthEvaluatorRegisterRefs and the required staged authority refs. Do not infer topology from ADR prose alone and do not expand into release or test-execution surfaces."
           : "For component_code_surface, materialize implementation/source files for each source-role declared component and record Component Realization Register evidence. Do not create test files, test component rows, repair schedules, or execution evidence on this edge."
@@ -7311,6 +7510,7 @@ export function constructWorkerConstructionBrief(input: {
   const authorityIndex =
     input.manifest.traversalObligationContext.authorityIndex ??
     authorityIndexFor(authorityRefs);
+  const tenantToolEnvironment = tenantToolEnvironmentProjectionFor(input.manifest);
   const packageDispositions = Object.freeze([
     Object.freeze({
       kind: "sdlc_worker_construction_brief_package_disposition" as const,
@@ -7353,6 +7553,8 @@ export function constructWorkerConstructionBrief(input: {
       archiveRoot: workerFacingPath(input.manifest, input.manifest.archiveRoot),
       authorityRefs,
       authorityIndex,
+      tenantStackAuthorityRefs: tenantToolEnvironment.sourceRefs,
+      tenantToolEnvironment,
       priorEdgeRefs: promptSourceRefs(input.invocationPackage.priorEdgeRefs),
       omittedPriorEdgeRefCount: omittedPromptSourceRefCount(
         input.invocationPackage.priorEdgeRefs
@@ -7374,7 +7576,8 @@ export function constructWorkerConstructionBrief(input: {
               input.manifest,
               designDepthFpEvaluatorRegisterPath(input.manifest)
             )
-          : null
+          : null,
+      proportionalityProfile: input.manifest.proportionalityProfile ?? null
     }),
     computeSubworkstreamPolicy: input.invocationPackage.computeSubworkstreamPolicy,
     targetState: Object.freeze({
@@ -7809,10 +8012,65 @@ function workerFacingRepairReentryPlans(
 const CURRENT_EVALUATED_GAP_PROMPT_REASON_LIMIT = 1280;
 const CURRENT_EVALUATED_GAP_PROMPT_EVIDENCE_LIMIT = 120;
 
+function currentEvaluatedGapAssessmentRequirementIds(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly dossier: SdlcPostflightGapDossier;
+}): readonly string[] {
+  const evidencePaths = existingEvidencePaths({
+    workspaceRoot: input.manifest.workspaceRoot,
+    refs: uniqueSorted([
+      ...input.dossier.evidenceRefs,
+      ...input.dossier.reasons.flatMap((reason) => reason.blockingReason.evidenceRefs)
+    ])
+  }).filter((filePath) => path.basename(filePath) === "review_grade_edge_fulfillment_assessment.json");
+  const ids = new Set<string>();
+  for (const filePath of evidencePaths) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    } catch {
+      continue;
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      !("kind" in parsed) ||
+      parsed.kind !== "sdlc_review_grade_edge_fulfillment_assessment" ||
+      !("findings" in parsed) ||
+      !Array.isArray(parsed.findings)
+    ) {
+      continue;
+    }
+    for (const finding of parsed.findings) {
+      if (
+        finding === null ||
+        typeof finding !== "object" ||
+        !("obligationId" in finding) ||
+        typeof finding.obligationId !== "string" ||
+        !finding.obligationId.startsWith("requirement:") ||
+        !("fulfillmentStatus" in finding) ||
+        (finding.fulfillmentStatus !== "blocked" &&
+          finding.fulfillmentStatus !== "unassessed")
+      ) {
+        continue;
+      }
+      ids.add(finding.obligationId);
+    }
+  }
+  return uniqueSorted([...ids]);
+}
+
 function currentEvaluatedGapRequirementIds(
   manifest: SdlcWorkerHandoffManifest,
   dossier: SdlcPostflightGapDossier
 ): readonly string[] {
+  const assessmentIds = currentEvaluatedGapAssessmentRequirementIds({
+    manifest,
+    dossier
+  });
+  if (assessmentIds.length > 0) {
+    return assessmentIds;
+  }
   const ids = new Set<string>();
   const candidateTexts = uniqueSorted(
     dossier.reasons
@@ -7949,6 +8207,15 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
   );
   const productMaterializationAuthority =
     reconcileSdlcProductMaterializationAuthority(manifest);
+  const tenantToolEnvironment = tenantToolEnvironmentProjectionFor(manifest);
+  const tenantToolBoundaryLines =
+    tenantToolEnvironment.disabledTools.length === 0
+      ? []
+      : [
+          `- tenant disabled tools: ${listForPrompt(
+            tenantToolEnvironment.disabledTools
+          )}.`
+        ];
   const declaredProductFileTargetLine =
     productMaterializationAuthority.declaredProductFileTargets.length === 0
       ? "declared product file targets: none"
@@ -7985,6 +8252,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
           "- targetCarrierProjection: evaluator-owned protocol; do not render fields."
         ]),
     "- currentState.authorityIndex",
+    "- currentState.tenantToolEnvironment",
     "- obligations.inlineObligations typed pressure rows.",
     "- obligations.inlineRequirementPressureRows typed requirement work queue.",
     "- obligations.requirementTraceObligationIds.",
@@ -7999,6 +8267,12 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- acceptedCarrierSchemaRef / acceptedCarrierFieldSet.",
     "- traversalIntentPackageRef; do not inline JSON."
   ];
+  const requirementSurfaceTraceAxiomLines =
+    manifest.targetAssetType === "requirement_surface"
+      ? [
+          "- Requirement-surface trace closure exception: include a compact Trace Index with every active obligation id from inlineObligations, requirementTraceObligationIds, retryRepairInstructions, repairReentryPlans, and prior review gaps. Grouped domain rows are not enough; each id must appear verbatim or the edge will retry."
+        ]
+      : [];
   return [
     "odd_sdlc F_P.transform launch contract.",
     `Outcome: ${outcomeSummary}`,
@@ -8025,6 +8299,7 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     }`,
     `- ${declaredProductFileTargetLine}`,
     `- execution contracts: build=${manifest.productMaterialization.buildExecutionContract}; test=${manifest.productMaterialization.testExecutionContract}`,
+    ...tenantToolBoundaryLines,
     `- obligations in scope: ${manifest.traversalObligationContext.obligations.length}; feature scope=${manifest.featureScope.mode}; included modules=${listForPrompt(manifest.featureScope.includedModuleNames)}`,
     "This section is the core F_P transform. The construction brief carries structured facts.",
     "",
@@ -8035,22 +8310,24 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     `4. invocation package projection: ${workerFacingPath(manifest, invocationPackagePath)}`,
     `5. traversal intent projection: ${workerFacingPath(manifest, traversalIntentPath)}`,
     `6. forensic manifest only when a package ref requires it: ${workerFacingPath(manifest, manifestPath)}`,
-    "7. current authority refs listed by the construction brief for this edge.",
+    "7. construction brief authority refs.",
     "",
     "Terse axioms:",
     "- Apply worker_construction_brief.json as the single prompt source carrier.",
     "- Archive package files and manifests are replay/audit projections. Evaluated gaps cite needed diagnostics.",
     "- Build a Requirement/Authority/Asset Checklist from requirements, target rows, expected artifacts, and evaluated gaps.",
-    "- Treat the checklist as the work queue. Do not return success while required checklist rows are unmapped.",
-    "- Keep tool IO bounded: for large authority files, use search plus targeted read ranges.",
-    "- For existing output, use targeted Edit/small operations; do not dump full old/new artifacts.",
-    "- You may use agent-internal subagents or parallel workstreams inside this transform.C permission; split only from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",
+    "- Do not return success while required checklist rows are unmapped. Keep Markdown proportional: grouped counts plus high-signal samples for broad sets by source/domain; do not list every id unless the target is a requirement-surface Trace Index or another admitted traceability/register surface that explicitly requires exact id rows.",
+    ...requirementSurfaceTraceAxiomLines,
+    "- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`.",
+    "- For existing output, use targeted Edit/small operations; no full old/new artifact dumps.",
+    "- Apply tenantToolEnvironment; do not run tools the tenant disables.",
+    "- Agent subworkstreams are optional; split only from admitted work-plan, dependency, target-carrier, authority, and obligation refs.",
     `- If used, update ${workerFacingPath(manifest, manifest.subworkstreamManifestFile)}; otherwise leave the default not-started manifest honest.`,
-    "- Subworkstreams are not ABG branches: no runtime events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
+    "- Subworkstreams are observation only: no ABG events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
     "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas.",
     "- Do not render target-carrier protocol fields unless an outcome directive asks for a structured carrier.",
-    "- Read boundary: stay under the current workspace; do not glob/read sibling sandboxes or historical test_runs.",
-    "- Control boundary: do not run `odd-sdlc-ts`, `abiogenesis-ts`, `genesis-ts`, `start`, `gaps`, `analyze-run`, install, traversal, or resume commands.",
+    "- Read boundary: use only workspace-relative paths; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
+    "- Control boundary: do not run odd-sdlc-ts/abiogenesis-ts/genesis-ts/start/gaps/analyze-run/install/traversal/resume.",
     "- Do not spawn an odd_sdlc/ABG worker, start another traversal, or leave child processes running; subworkstreams stay under this parent transform turn.",
     "- Write only the contracted output/product artifacts, then exit; the framework evaluates the artifact after this process exits.",
     "- Do not inspect or act on sibling operator-run directories.",

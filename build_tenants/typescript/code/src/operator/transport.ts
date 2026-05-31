@@ -121,8 +121,15 @@ function codexArgs(input: {
       : Object.freeze(["-c", `model_reasoning_effort="${input.effort}"`]);
   return Object.freeze([
     "exec",
+    "--ignore-user-config",
     ...modelArgs,
     ...effortArgs,
+    "-c",
+    "features.memories=false",
+    "-c",
+    "memories.use_memories=false",
+    "-c",
+    "memories.generate_memories=false",
     "--skip-git-repo-check",
     "--ephemeral",
     "--sandbox",
