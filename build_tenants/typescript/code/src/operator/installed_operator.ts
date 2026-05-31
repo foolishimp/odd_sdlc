@@ -158,6 +158,7 @@ import {
   deriveSdlcStagedConstructionAuditCarriers,
   deriveWorkerHandoffManifest,
   gapDossierPathForManifest,
+  admitWorkerResultReport,
   readPostflightGapDossierRef,
   operatorRunId,
   sha256Text,
@@ -216,7 +217,9 @@ import {
   admitReviewGradeEdgeFulfillmentAssessmentFromArtifact,
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
-  reviewGradeFindingsAreDownstreamStagePressure
+  reviewGradeFindingsAreDownstreamStagePressure,
+  reviewGradeReadOnlyInputMutationReasons,
+  snapshotReviewGradeReadOnlyInputFiles
 } from "./review_grade_edge_fulfillment.js";
 import {
   compileSdlcFeatureDependencyDagToAbgFrontier,
@@ -4520,6 +4523,23 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
       executorProfile
     })
   });
+  const reviewGradeWorkerReport = admitWorkerResultReport(
+    JSON.parse(readFileSync(workerReportPath, "utf8")),
+    input.manifest
+  );
+  const readOnlyInputSnapshot = snapshotReviewGradeReadOnlyInputFiles({
+    manifest: input.manifest,
+    report: reviewGradeWorkerReport,
+    additionalInputFiles: Object.freeze([
+      manifestPath,
+      constructionBriefPath,
+      invocationPackagePath,
+      workerReportPath,
+      input.manifest.fpTransformResultFile,
+      input.manifest.fpEvaluateResultFile,
+      input.manifest.productMaterialization.manifestFile
+    ])
+  });
   const inactivityPolicy = workerInactivityPolicy();
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
   const stdoutBudgetBytes = designDepthFpEvaluatorStdoutBudgetBytes();
@@ -4640,6 +4660,54 @@ async function materializeReviewGradeEdgeFulfillmentWithFpEvaluator(input: {
     pathToFileURL(processStartedPath).href,
     runRef
   ]);
+  const evaluatorMutationReasons = reviewGradeReadOnlyInputMutationReasons({
+    snapshot: readOnlyInputSnapshot
+  });
+  if (evaluatorMutationReasons.length > 0) {
+    const diagnosticRefs = uniqueSorted([
+      ...evidenceRefs,
+      ...readOnlyInputSnapshot.files.map((file) => pathToFileURL(file.path).href)
+    ]);
+    const postflight = reviewGradePostflight({
+      manifest: input.manifest,
+      code: "review_grade_evaluator_mutated_input",
+      details: evaluatorMutationReasons,
+      evidenceRefs: diagnosticRefs
+    });
+    writeSdlcSystemArtifact({
+      archiveRoot: input.manifest.archiveRoot,
+      relativePath: "review_grade_postflight.json",
+      payload: postflight
+    });
+    writePostflightGapDossier({
+      manifest: input.manifest,
+      gapDossier: constructPostflightGapDossier({
+        manifest: input.manifest,
+        postflight
+      })
+    });
+    return constructEvaluationRuleOutcome({
+      status: "blocked",
+      ruleRef: REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF,
+      ruleRole: "semantic_judgment",
+      computeMeans: "F_P",
+      evidenceRefs: diagnosticRefs,
+      residualPressureRefs: evaluatorMutationReasons.map(
+        (reason) =>
+          `pressure://odd-sdlc/review-grade/${manifestRefSegment(input.manifest)}/${encodeURIComponent(reason)}`
+      ),
+      diagnosticRefs,
+      selectedCompositionRef: input.pluginInput.selectedCompositionRef,
+      selectedCompositionDigest: input.pluginInput.selectedCompositionDigest,
+      selectedCompositionSelectionRef:
+        input.pluginInput.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: input.pluginInput.selectedRegimeBindingRef,
+      compositionContributionRef:
+        input.pluginInput.selectedRegimeBindingRef ??
+        input.pluginInput.selectedCompositionRef,
+      reason: "review_grade_evaluator_mutated_input"
+    });
+  }
   if (processResult.status !== 0) {
     const processFailureReason =
       processResult.timedOut === true
@@ -5946,6 +6014,34 @@ function manifestAssessmentObligationBelongsToDownstreamSurface(input: {
       });
 }
 
+export function sdlcWorkerAssessmentCarriesRequirementTransformationSet(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly assessment: SdlcWorkerObligationAssessment;
+}): boolean {
+  if (!input.assessment.obligationId.startsWith("requirement:")) {
+    return false;
+  }
+  const authorityRequirementInduction =
+    input.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
+    !input.manifest.productMaterialization.required;
+  const belongsToDownstreamSurface =
+    manifestAssessmentObligationBelongsToDownstreamSurface(input);
+  const carriesDownstreamRequirement =
+    sdlcAssessmentCarriesRequirementForDownstreamClosure(input.assessment) ||
+    (input.manifest.productMaterialization.required
+      ? belongsToDownstreamSurface
+      : false);
+  return (
+    carriesDownstreamRequirement ||
+    (!input.manifest.productMaterialization.required &&
+      (authorityRequirementInduction ||
+        (input.manifest.targetAssetType === "requirement_surface" &&
+          input.assessment.blockingReasons.some((reason) =>
+            reason.startsWith("requirement_recorded_for_future_closure:")
+          ))))
+  );
+}
+
 function edgeFulfillmentProjectionFor(input: {
   readonly module: Module;
   readonly state: SdlcAbgOwnedFpDispatchState;
@@ -5956,29 +6052,11 @@ function edgeFulfillmentProjectionFor(input: {
   const assessments = Object.freeze(
     (input.state.workerReport?.obligationAssessments ?? Object.freeze([])).map(
       (assessment) => {
-        const authorityRequirementInduction =
-          input.state.manifest.graphFunctionName === FG_CONFORM_PROJECT_AUTHORITY &&
-          !input.state.manifest.productMaterialization.required &&
-          assessment.obligationId.startsWith("requirement:");
-        const belongsToDownstreamSurface =
-          manifestAssessmentObligationBelongsToDownstreamSurface({
+        const carriesRequirementTransformationSet =
+          sdlcWorkerAssessmentCarriesRequirementTransformationSet({
             manifest: input.state.manifest,
             assessment
           });
-        const carriesDownstreamRequirement =
-          assessment.obligationId.startsWith("requirement:") &&
-          (input.state.manifest.productMaterialization.required
-            ? belongsToDownstreamSurface
-            : sdlcAssessmentCarriesRequirementForDownstreamClosure(assessment));
-        const carriesRequirementTransformationSet =
-          assessment.obligationId.startsWith("requirement:") &&
-          (carriesDownstreamRequirement ||
-            (!input.state.manifest.productMaterialization.required &&
-              (authorityRequirementInduction ||
-                (input.state.manifest.targetAssetType === "requirement_surface" &&
-                  assessment.blockingReasons.some((reason) =>
-                    reason.startsWith("requirement_recorded_for_future_closure:")
-                  )))));
         return Object.freeze({
           obligationId: assessment.obligationId,
           fulfillmentStatus: assessment.fulfillmentStatus,

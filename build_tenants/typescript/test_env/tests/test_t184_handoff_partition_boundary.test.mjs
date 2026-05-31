@@ -515,9 +515,11 @@ test("T-184 F_P evaluator prompt uses incremental content register writes", () =
     /After the first evaluator update exists, write a short plan/u
   );
   assert.match(evaluatorPromptSource, /Execute the plan incrementally/u);
-  assert.match(evaluatorPromptSource, /First-update admission policy/u);
-  assert.match(evaluatorPromptSource, /publish the same register path atomically/u);
-  assert.match(evaluatorPromptSource, /first mechanical draft-row conversion/u);
+  assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
+  assert.match(evaluatorPromptSource, /same-path temp-then-rename publication/u);
+  assert.match(evaluatorPromptSource, /named carrier-helper contract only/u);
+  assert.match(contentRegisterSource, /writeDesignDepthDraftFragmentContentRegisterUpdate/u);
+  assert.match(contentRegisterSource, /writeUtf8FileAtomically/u);
   assert.doesNotMatch(evaluatorPromptSource, /Exact first update command pattern/u);
   assert.doesNotMatch(evaluatorPromptSource, /Exact second update command pattern/u);
   assert.doesNotMatch(evaluatorPromptSource, /node --input-type=module/u);

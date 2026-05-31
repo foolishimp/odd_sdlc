@@ -1080,7 +1080,7 @@ function installedOperatorExecutionShards(
         timeoutMs: runtimePolicy.executionShardTimeoutMs,
         inactivityTimeoutMs: runtimePolicy.executionShardInactivityTimeoutMs,
         expectedReportRefs: Object.freeze([row.scheduleRef]),
-        allowedByproductGlobs: Object.freeze(["target/**", ".bsp/**"]),
+        allowedByproductGlobs: Object.freeze([]),
         requiredEvidenceKind: "sdlc_worker_execution_evidence" as const,
         retryPolicy: "same_shard_then_triage" as const
       })

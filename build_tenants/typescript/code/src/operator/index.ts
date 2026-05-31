@@ -270,7 +270,10 @@ export {
   admitDesignDepthFpEvaluatorRegisterArtifact,
   admitSdlcEvaluateContentRegisterArtifact,
   admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
+  constructDesignDepthDraftFragmentContentRegisterUpdate,
   constructSdlcFpEvaluateResult,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF,
   designDepthFpEvaluatorContentRegisterPath,
   designDepthRegisterPayloadFromEvaluateContentRegister,
   evaluateSdlcComputeStage,
@@ -282,11 +285,13 @@ export {
   SDLC_EVALUATE_C_PLUGIN_SURFACE,
   SDLC_EVALUATE_CONTENT_CARRIER_FAMILIES,
   sdlcEvaluateContentRegisterPath,
+  writeDesignDepthDraftFragmentContentRegisterUpdate,
   writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
   writeSdlcFpEvaluateResult
 } from "./plugins/evaluate/index.js";
 export type {
   SdlcDesignDepthContentRegisterFirstUpdateObservation,
+  SdlcDesignDepthDraftFragmentUpdate,
   SdlcDesignDepthRegisterFragment,
   SdlcDesignDepthRegisterFragmentSection,
   SdlcEvaluateAuthorityFunction,
@@ -504,7 +509,9 @@ export {
   reviewGradeEdgeFulfillmentAssessmentPressureRefs,
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
-  reviewGradeFindingsAreDownstreamStagePressure
+  reviewGradeFindingsAreDownstreamStagePressure,
+  reviewGradeReadOnlyInputMutationReasons,
+  snapshotReviewGradeReadOnlyInputFiles
 } from "./review_grade_edge_fulfillment.js";
 
 export {
@@ -535,6 +542,7 @@ export {
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   normalizePostCloseContinuationVectorIndex,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
+  sdlcWorkerAssessmentCarriesRequirementTransformationSet,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface
 } from "./installed_operator.js";
 export type {

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { deriveSdlcConformProjectProfileFromWorkspace } from "../workspace/index.js";
 
 type JsonRecord = Record<string, unknown>;
@@ -146,6 +146,17 @@ function tenantStackSpecFiles(input: {
   );
 }
 
+function gitCeilingDirectoriesForWorkspace(input: {
+  readonly workspaceRoot: string;
+  readonly declaredValue: string | undefined;
+}): string {
+  const workspaceParent = dirname(input.workspaceRoot);
+  if (input.declaredValue === undefined || input.declaredValue.trim().length === 0) {
+    return workspaceParent;
+  }
+  return `${workspaceParent}${delimiter}${input.declaredValue}`;
+}
+
 export function sdlcWorkspaceLocalToolEnvironment(
   workspaceRoot: string
 ): Readonly<Record<string, string>> {
@@ -188,6 +199,10 @@ export function sdlcWorkspaceLocalToolEnvironment(
       });
     }
   }
+  environment["GIT_CEILING_DIRECTORIES"] = gitCeilingDirectoriesForWorkspace({
+    workspaceRoot,
+    declaredValue: environment["GIT_CEILING_DIRECTORIES"]
+  });
   for (const directory of declaredDirectories) {
     mkdirSync(directory, { recursive: true });
   }

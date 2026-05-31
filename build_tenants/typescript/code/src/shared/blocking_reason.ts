@@ -68,6 +68,7 @@ export const SDLC_BLOCKING_REASON_CODES = Object.freeze([
   "review_grade_edge_fulfillment_blocked",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
+  "review_grade_evaluator_mutated_input",
   "source_asset_dependency_missing",
   "edge_closure_residual_pressure",
   "hook_diagnostic_failed",
@@ -206,6 +207,7 @@ const DETAIL_PRESERVING_LEGACY_REASON_CODES = Object.freeze([
   "review_grade_edge_fulfillment_blocked",
   "review_grade_evaluator_process_failed",
   "review_grade_evaluator_process_timeout",
+  "review_grade_evaluator_mutated_input",
   "source_asset_dependency_missing",
   "unsupported_fd_transition",
   "unsupported_transition",
@@ -358,6 +360,7 @@ function metadataForCode(code: SdlcBlockingReasonCode): BlockingReasonMetadata {
     code === "review_grade_edge_fulfillment_blocked" ||
     code === "review_grade_evaluator_process_failed" ||
     code === "review_grade_evaluator_process_timeout" ||
+    code === "review_grade_evaluator_mutated_input" ||
     code === "source_asset_dependency_missing"
   ) {
     return Object.freeze({

@@ -77,6 +77,10 @@ export interface ProductMaterializationReplayDeps {
     input: unknown,
     label: string
   ) => SdlcMaterializedProductFile;
+  readonly isTenantDeclaredToolByproductRelativePath: (input: {
+    readonly manifest: SdlcWorkerHandoffManifest;
+    readonly normalizedRelativePath: string;
+  }) => boolean;
   readonly materializedFileLineageRef: (input: {
     readonly manifestRef: string;
     readonly relativePath: string;
@@ -367,6 +371,10 @@ function replayArchivePostflightPassedOrAbsent(archiveRoot: string): boolean {
   return status === "absent" || status === "passed";
 }
 
+function normalizedRelativePath(relativePath: string): string {
+  return relativePath.split(path.sep).join("/");
+}
+
 export function readProductMaterializationReplayManifest(
   input: {
     readonly archiveRoot: string;
@@ -374,7 +382,8 @@ export function readProductMaterializationReplayManifest(
   },
   deps: Pick<
     ProductMaterializationReplayDeps,
-    "admitReplayManifestMaterializedProductFile"
+    | "admitReplayManifestMaterializedProductFile"
+    | "isTenantDeclaredToolByproductRelativePath"
   >
 ): ProductMaterializationReplayManifestRead {
   const manifestFile = join(input.archiveRoot, "product_materialization_manifest.json");
@@ -415,6 +424,12 @@ export function readProductMaterializationReplayManifest(
       manifest["files"],
       "productMaterializationReplay.manifest.files",
       deps.admitReplayManifestMaterializedProductFile
+    ).filter(
+      (file) =>
+        !deps.isTenantDeclaredToolByproductRelativePath({
+          manifest: input.currentManifest,
+          normalizedRelativePath: normalizedRelativePath(file.relativePath)
+        })
     );
     if (files.length === 0) {
       return Object.freeze({

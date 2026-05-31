@@ -9,6 +9,8 @@ import {
   SDLC_DESIGN_COMPLETENESS_STATUSES
 } from "../../carriers.js";
 import {
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
   SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS
@@ -26,18 +28,29 @@ function tenantToolBoundaryPromptLines(
 ): readonly string[] {
   if (
     tenantToolEnvironment === null ||
-    tenantToolEnvironment === undefined ||
-    tenantToolEnvironment.disabledTools.length === 0
+    tenantToolEnvironment === undefined
   ) {
     return Object.freeze([
-      "- Tenant disabled tools from currentState.tenantToolEnvironment: none."
+      "- Tenant disabled tools from currentState.tenantToolEnvironment: none.",
+      "- Tenant workspace-local directories from currentState.tenantToolEnvironment: none.",
+      "- Tenant environment variables from currentState.tenantToolEnvironment: none."
     ]);
   }
   return Object.freeze([
     `- Tenant disabled tools from currentState.tenantToolEnvironment: ${listForPrompt(
       tenantToolEnvironment.disabledTools
     )}.`,
+    `- Tenant workspace-local directories from currentState.tenantToolEnvironment: ${listForPrompt(
+      tenantToolEnvironment.workspaceLocalDirectories
+    )}.`,
+    `- Tenant environment variables from currentState.tenantToolEnvironment: ${listForPrompt(
+      tenantToolEnvironment.environmentVariableNames
+    )}.`,
     "- Apply currentState.tenantToolEnvironment before choosing any local script runtime, shell helper, evidence probe, or evaluator subworkstream tool.",
+    "- Execution probes inherit the evaluator process environment; preserve tenant-declared environment variables when spawning child commands.",
+    "- Do not synthesize, recompute, or overwrite tenant-declared environment variable values. Read them from process.env and pass process.env through to child_process/spawn/exec unchanged for those names.",
+    "- If a probe helper constructs an env object, start from {...process.env} and do not assign any name listed in currentState.tenantToolEnvironment.environmentVariableNames.",
+    "- When a probe needs tool homes, dependency caches, boot directories, or global bases, use the already-expanded tenant-declared process.env values and tenant stack specs; do not derive them from process.cwd(), /tmp, /private/tmp, user-home, workspace-root fallback directories, or global-cache fallbacks.",
     "- Do not run tenant-disabled tools for assessment JSON writing, summarization, validation, execution probes, or convenience inspection."
   ]);
 }
@@ -100,8 +113,9 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- Do not run a worker-result-report discovery script before the first evaluator update.",
     "- Do not run any bounded-summary action before the first evaluator update. After reading the governance doc, construction brief, and draft content register, the next tool action must publish the content register update.",
     "- Do not say you are writing the register until that file write has succeeded.",
-    "- First-update admission policy: convert every draft row to a non-draft fragment row in the existing content register, preserve selected composition identity, publish the same register path atomically, and expose only compact row counts in terminal output.",
-    "- Bounded local automation may support summarization, JSON validation, and the first mechanical draft-row conversion only. Do not deterministically construct later semantic register rows from framework rules.",
+    `- First-update carrier helper contract: ${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF} (${DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH}).`,
+    "- The helper contract is authority-neutral carrier mechanics: same-path temp-then-rename publication, selected composition preservation, non-draft fragment envelope construction, and compact row counts only. It emits no semantic section values.",
+    "- Bounded local automation may support summarization, JSON validation, and that named carrier-helper contract only. Do not deterministically construct later semantic register rows from framework rules.",
     "",
     "First register materialization rule:",
     "- After reading the governance doc and construction brief, update the pre-created content register file directly as the selected evaluate.C/F_P semantic pressure map.",
@@ -133,9 +147,9 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- When reading the transform ADR after the first update, read only the authority a given section needs and do not print it; then write that section to the register file. How you inspect the authority is your choice; the framework prescribes the carrier schema and the visibility contract, not the extraction method.",
     "- Time budget is part of correctness: update the draft content register before doing deep exploratory review.",
     "- After the governance doc, construction brief, and draft content register are read, write the first evaluator update before any ADR summary, worker-report inspection, source-authority lookup, or deep exploratory action.",
-    `- First evaluator update: promote each pre-seeded draft section row into a semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row carrying your selected evaluate.C/F_P judgment, using a non-draft rowRef. Emit null or [] for intentionally empty sections and partial/blocked verdict axes where authority is not yet sufficient.`,
-    "- Promotion of the seeded draft scaffolding to fragment rows is carrier mechanics; the row values are your evaluation. There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
-    "- The first update is a bounded same-path atomic write that preserves selected composition identity and prints only compact row counts. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
+    `- First evaluator update: publish one semantic "${SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND}" row for each pre-seeded draft section. The named carrier helper may build the envelope, but the row values are your evaluation and must be your selected evaluate.C/F_P judgment. Emit null or [] for intentionally empty sections and partial/blocked verdict axes where authority is not yet sufficient.`,
+    "- There is no framework-authored recipe for deriving register rows from authority: do not parse ADR tables by a fixed procedure, read the authority a section needs and decide that section content yourself.",
+    "- The first update must satisfy the named helper contract or an equivalent implementation. F_D seeds the draft scaffolding and admits/projects fragment rows; F_D does not construct semantic register rows for you.",
     "- Then iterate by editing the content register file in place: inspect only the authority needed for a specific missing/partial section, add or replace the corresponding section row, then validate the file.",
     "- The next tool action after any post-first-update ADR or authority inspection must write the corresponding section row. Do not collect multiple large sections before writing.",
     "- A valid progress write may be intentionally partial or blocked, but it must replace the target section row with explicit value, evidenceRefs, and reasons instead of leaving the run in hidden synthesis.",
@@ -143,7 +157,7 @@ export function designDepthFpEvaluatorPrompt(input: {
     "- If time or authority is insufficient, still write a structurally valid content register with partial or blocked designCompletenessVerdict axes and explicit reasons. Draft-row timeout is worse than an admitted pressure map with honest residual pressure.",
     "- It is acceptable to rewrite the content register multiple times while converging. Do not treat this as a single-shot generation task.",
     "- Use scripts or targeted commands to summarize authority and validate JSON shape; do not paste large source or register bodies into stdout.",
-    "- Script output budget before first evaluator update: the only script allowed is the same-path draft-to-fragment register update, and it may print only compact row counts.",
+    "- Script output budget before first evaluator update: the only script allowed is the named carrier-helper update or equivalent same-path temp-then-rename implementation, and it may print only compact row counts.",
     "- If the component/module set is uncertain, encode the uncertainty in partial or blocked designCompletenessVerdict axes and continue with the smallest truthful pressure map.",
     "- If a referenced authority corpus is large, sample the headings/tables needed for module boundaries and requirement ids; do not dump the corpus into the terminal.",
     "- Final response is irrelevant unless the content register exists and validates. Prioritize writing and validating the file over narrative.",
@@ -303,6 +317,9 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "Purpose:",
     "- Review the generated asset against incoming requirements, accepted upstream authority, stage boundary, evidence, and likely failure modes.",
     "- This is semantic evaluation work. Do not rewrite source, tests, design artifacts, reports, ledgers, or framework files.",
+    "- The evaluator is read-only over workspace and product files. Do not use apply_patch, shell redirection, scripts, formatters, build tools, or editor commands to modify any generated asset, source file, test file, design surface, report, ledger, package file, or framework file.",
+    `- The only durable JSON output you may create or modify is the assessment artifact at ${input.assessmentPath}.`,
+    `- The only optional sidecar you may create or modify is the observation-only subworkstream manifest at ${input.subworkstreamManifestPath}.`,
     "- You may use agent-internal subagents or parallel workstreams as read-only compute strategy for independent modules, obligation slices, or evidence packets.",
     `- If you use evaluator subworkstreams, record them in ${input.subworkstreamManifestPath}. Rows must cite authority/dependency inputs, leave write/output-allocation fields empty, and remain observation only.`,
     "- Evaluator subworkstreams do not emit ABG events, write ledgers, close edges, select traversal, publish consequence projections, or create ABG branch leases. The parent evaluate.C result owns the final assessment merge.",
@@ -335,6 +352,8 @@ export function reviewGradeEdgeFulfillmentPrompt(input: {
     "- Do not manually type or stream a large findings array through stdout. Write the durable JSON file and print only compact status counts.",
     "- Do not leave background jobs running. If an executable/service must be started to gather evidence, run it inside one bounded shell block, store its PID in a variable, install a trap that kills and waits for that PID on exit, and print only the observed exit/status summary.",
     "- Do not use shell job-control cleanup such as `kill %1` or Claude background tasks for execution probes. A passed assessment is invalid if a spawned service/process remains live after the probe.",
+    "- Do not use /tmp, /private/tmp, $TMPDIR, or outside-workspace paths for temporary probe output. If a probe needs transient stdout/stderr capture, write it under the current operator-run archive or another explicit workspace/run-archive path named in this prompt, then clean it before exit.",
+    "- If the executor advertises /tmp as sandbox-writable, ignore that capability for evaluation evidence. Writable does not mean authoritative.",
     "",
     `Durable assessment artifact to create and validate: ${input.assessmentPath}`,
     "- The assessment path is output-only and is expected to be absent before evaluation; do not include it in missing-input checks. Create its parent directory if needed, write it, then parse it back.",

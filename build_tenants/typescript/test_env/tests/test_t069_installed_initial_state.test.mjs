@@ -80,7 +80,7 @@ test("T-069 validates installed data_mapper initial state before traversal", asy
     validation.conformedProject.selectedOutputRoot,
     "build_tenants/scala_spark"
   );
-  assert.equal(validation.conformedProject.buildExecutionContract, "sbt clean assembly");
+  assert.equal(validation.conformedProject.buildExecutionContract, "undeclared");
   assert.equal(validation.conformedProject.testExecutionContract, "sbt test");
   assert(validation.oddSdlcRuntimeRef);
   assert(validation.abgRuntimeRef);

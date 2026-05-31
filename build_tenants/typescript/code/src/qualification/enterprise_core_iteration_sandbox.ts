@@ -456,8 +456,8 @@ export function constructScriptedEnterpriseCoreConstructorPlugin():
         buildEvidence: "governed",
         testEvidence: "governed",
         evidenceRefs: [
-          "build://odd-sdlc/b068/sbt-clean-assembly",
-          "junit://odd-sdlc/b068/TEST-enterprise-core.xml"
+          "build://odd-sdlc/b068/governed-build",
+          "test-report://odd-sdlc/b068/enterprise-core"
         ]
       });
     }
@@ -733,7 +733,7 @@ export function runEnterpriseCoreOutcomeIterationSandbox(input: {
     diagnostics,
     residualGaps: Object.freeze([
       "T-041: external live F_P worker substitution remains full Python-replacement RC scope.",
-      "T-041: live data_mapper generation and governed sbt/JUnit dispatch remain operational RC scope."
+      "T-041: live data_mapper generation and governed build/test evidence dispatch remain operational RC scope."
     ])
   });
 }

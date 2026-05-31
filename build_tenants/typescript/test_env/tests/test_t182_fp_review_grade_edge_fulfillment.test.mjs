@@ -34,6 +34,8 @@ import {
   reviewGradeEdgeFulfillmentAssessmentRequired,
   reviewGradeEdgeFulfillmentOpenPressureRefs,
   reviewGradeFindingsAreDownstreamStagePressure,
+  reviewGradeReadOnlyInputMutationReasons,
+  snapshotReviewGradeReadOnlyInputFiles,
   SDLC_EDGE_GAIN_CLOSURE_CONTRACTS,
   SDLC_OPERATOR_RUN_ARTIFACT_CATALOG,
   SDLC_PRODUCT_GRAPH_EDGE_POLICY_ROWS,
@@ -902,6 +904,10 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
       promptSource,
       /assessment path is output-only and is expected to be absent before evaluation/u
     );
+    assert.match(promptSource, /evaluator is read-only over workspace and product files/u);
+    assert.match(promptSource, /The only durable JSON output you may create or modify/u);
+    assert.match(promptSource, /The only optional sidecar you may create or modify/u);
+    assert.match(promptSource, /Do not use apply_patch/u);
     assert.match(
       promptSource,
       /do not include it in missing-input checks/u
@@ -1001,6 +1007,48 @@ test("T-182 transformer prompts use accepted authority rows and evaluated gaps a
     );
     assert.match(installedOperatorSource, /"--tools", "Read,Write"/u);
     assert.match(installedOperatorSource, /component_code_surface/u);
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("T-182 review-grade evaluator mutation guard rejects edited generated inputs", () => {
+  const workspaceRoot = makeWorkspace();
+  try {
+    const manifest = manifestForEdge(
+      workspaceRoot,
+      "derive_component_test_surface",
+      "t182-evaluator-mutation"
+    );
+    mkdirSync(path.dirname(manifest.outputFile), { recursive: true });
+    writeFileSync(manifest.outputFile, "generated component test surface\n", "utf8");
+    const materializedFile = path.join(
+      workspaceRoot,
+      "build_tenants/typescript/src/app.test.ts"
+    );
+    mkdirSync(path.dirname(materializedFile), { recursive: true });
+    writeFileSync(materializedFile, "test('surface', () => {});\n", "utf8");
+
+    const snapshot = snapshotReviewGradeReadOnlyInputFiles({
+      manifest,
+      report: {
+        outputFile: manifest.outputFile,
+        materializedFiles: [
+          {
+            absolutePath: materializedFile
+          }
+        ]
+      }
+    });
+    assert.deepEqual(reviewGradeReadOnlyInputMutationReasons({ snapshot }), []);
+
+    writeFileSync(manifest.outputFile, "evaluator edited generated surface\n", "utf8");
+    assert.deepEqual(
+      reviewGradeReadOnlyInputMutationReasons({ snapshot }),
+      [
+        `review_grade_evaluator_mutated_input:${pathToFileURL(manifest.outputFile).href}`
+      ]
+    );
   } finally {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }

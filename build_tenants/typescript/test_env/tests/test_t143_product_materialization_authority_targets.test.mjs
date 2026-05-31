@@ -622,9 +622,14 @@ test("T-143 installed tool execution uses tenant tech-stack environment declarat
       "u"
     )
   );
+  assert.equal(
+    env.GIT_CEILING_DIRECTORIES.split(path.delimiter)[0],
+    path.dirname(workspace)
+  );
   assert.deepEqual(Object.keys(env).sort(), [
     "EXAMPLE_TOOL_HOME",
-    "EXAMPLE_TOOL_OPTS"
+    "EXAMPLE_TOOL_OPTS",
+    "GIT_CEILING_DIRECTORIES"
   ]);
   assert.equal(existsSync(path.join(toolCacheRoot, "example-tool")), true);
   assert.equal(existsSync(path.join(toolCacheRoot, "example-home")), true);

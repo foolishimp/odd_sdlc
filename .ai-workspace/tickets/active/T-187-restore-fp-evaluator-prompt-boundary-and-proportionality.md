@@ -128,12 +128,12 @@ subworkstream boundary.
 | --- | --- | --- | --- |
 | A-010 | Classify every embedded script or recipe in `evaluate/prompts.ts` as carrier mechanics, semantic recipe, validation helper, or bounded diagnostic. | source review table in this ticket; no unclassified prompt recipe remains | done (see Prompt Content Classification) |
 | A-020 | Remove the exact ADR-table semantic extraction script from the design-depth evaluator prompt. | grep proves no exact second-update script or ADR table parser in prompt; tests prove evaluator can still produce/admit semantic rows | done: second-update ADR-table parser deleted; `node --input-type`/`tableRows`/`sectionText`/`command pattern` grep-count 0 |
-| A-030 | Move lawful first-update mechanics out of prose recipe form. Either F_D performs draft-to-fragment carrier initialization before F_P, or the prompt cites a named helper/capability whose contract is authority-neutral and emits no semantic rows. | prompt contains compact helper ref, not KB of Node; helper/admission tests cover atomicity and selected-composition preservation | partial (codex F2): the KB-of-Node first-update recipe is deleted and F_D already seeds the draft scaffolding (`writeDesignDepthFpEvaluatorDraftContentRegister`), so promotion is a WHAT contract not a script. Not yet the full closure proof: the mechanics are still described in prompt prose rather than relocated to a named authority-neutral helper/capability with atomicity tests. Deferred to a follow slice |
+| A-030 | Move lawful first-update mechanics out of prose recipe form. Either F_D performs draft-to-fragment carrier initialization before F_P, or the prompt cites a named helper/capability whose contract is authority-neutral and emits no semantic rows. | prompt contains compact helper ref, not KB of Node; helper/admission tests cover atomicity and selected-composition preservation | done: first-update mechanics now cite `evaluation-helper://odd-sdlc/design-depth/draft-fragment-update` and `config/evaluator-helper-contracts/design_depth_draft_fragment_update.md`; `constructDesignDepthDraftFragmentContentRegisterUpdate(...)` preserves selected composition identity and emits non-draft fragment envelopes from F_P-supplied values; `writeDesignDepthDraftFragmentContentRegisterUpdate(...)` writes via effects-owned temp-then-rename; `test_t187` admits the updated register |
 | A-040 | Preserve evaluator schema/admission constraints without prescribing semantic derivation method. | prompt still names carrier shape, evidence refs, and admission rules, but does not tell the worker how to parse product meaning | done: full carrier schema/admission/self-check sections retained; only the HOW recipes removed |
 | A-050 | Project admitted proportionality/Min(F_P) facts into construction/evaluation briefs as a concrete budget/profile. | framework-smoke/trivial runs carry a compact profile; data-mapper-scale runs carry a broader profile; neither relies on generic prompt prose alone | done: `SdlcComputeProportionalityProfile` (a read-model projection of the admitted `SdlcTraversalHopSelection`, **not** a new authority carrier) flows dispatch → `deriveWorkerHandoffManifest` → manifest → `constructWorkerConstructionBrief` → `stagePressure.proportionalityProfile`; single_hop→degenerate (1 module/1 component), dual_hop→compact (2/2), staged→broad (≤32); a **null/absent** front-door selection (domain_product / data-mapper-scale, where the front door deliberately returns null) now yields a **broad unreduced** budget rather than no profile (codex F1 fix); both evaluator and transform prompts cite it; covered by `test_t187` |
 | A-060 | Update tests to assert authority boundaries and carrier outcomes instead of exact prompt recipes. | tests fail on embedded semantic scripts and pass on helper/budget/contract behavior | done: `test_t181`/`test_t184` now assert the recipe is absent and the F_D/F_P boundary statement is present |
-| A-070 | Review currently uncommitted prompt/tool changes that are not T-185 scope, including the framework-smoke component-code test-execution directive and the review-grade tool-loop guard. | each is either accepted under this ticket as proportional prompt-boundary work or split into its own ticket before commit | planned |
-| A-080 | Run focused semantic proof and a JS hello-world live proof after review acceptance. | build/focused tests pass; hello-world is proportional and converged; no data-mapper run occurs before this evidence is accepted | partial: focused proof rerun after live-scale prompt patches = 57/57; JS hello-world live still pending. A data-mapper scale probe was started on 2026-05-31 and intentionally stopped after exposing prompt proportionality/tool-contract defects; it is not closure proof |
+| A-070 | Review currently uncommitted prompt/tool changes that are not T-185 scope, including the framework-smoke component-code test-execution directive and the review-grade tool-loop guard. | each is either accepted under this ticket as proportional prompt-boundary work or split into its own ticket before commit | done: accepted here as prompt-boundary/tool-contract work. Framework-smoke component-code test-execution stays bound to admitted design-depth/test-execution authority; review-grade helper-loop guard stays evaluator-failure classification, not product finding synthesis. Covered by `test_t181`, `test_t182`, and `test_t187` |
+| A-080 | Run focused semantic proof and a JS hello-world live proof after review acceptance. | build/focused tests pass; hello-world is proportional and converged; no data-mapper run occurs before this evidence is accepted | done: same-sandbox JS hello-world live proof converged at `scenario_t132_hello_world_js_live/20260531T125229437Z_pid44391/workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260531T132823174Z_pid15166`; `status=converged`, `closureDisposition=close`, obligation review 4/4 fulfilled, assessment 5 findings, materializedFiles source+test. Focused proof after patches: `build:semantic` clean; `test_t066`+`test_t143`+`test_t181`+`test_t184`+`test_t185`+`test_t187`+`test_t188` = 175/175 |
 
 ## Prompt Content Classification (A-010)
 
@@ -143,7 +143,7 @@ subworkstream boundary.
 | visibility contract (first update is judgment; no hidden full-register synthesis; one section per iteration) | governance/gate expectation | keep |
 | T-185 subagent permission lines | permission (T-185) | keep, unchanged |
 | F_D-seeded nonprojectable draft scaffolding | F_D carrier mechanics (outside the prompt) | keep |
-| "Exact first update command pattern" Node block | first-update HOW recipe | removed (A-030); promotion restated as a WHAT contract |
+| "Exact first update command pattern" Node block | first-update HOW recipe | removed (A-030); first-update carrier mechanics now cite a named authority-neutral helper contract and tested helper/admission surface |
 | "Exact second update command pattern" ADR-table parser | framework-authored semantic construction recipe (the boundary violation) | deleted (A-020); no lawful inlined form |
 | generic prose size budgets (row counts, trivial override) | proportionality-as-prose | retained as fallback ceilings; now anchored to the admitted `stagePressure.proportionalityProfile` (A-050) which both prompts cite as the authoritative budget |
 
@@ -161,16 +161,43 @@ Verification: `npm run build:semantic` passes; focused `test_t181`/`test_t184`/`
 
 Landed lawfully as an F_D read-model projection (not a new authority carrier, per Review Question 2 / §5C): the admitted `SdlcTraversalHopSelection` (already derived at dispatch, `installed_operator.ts` ~2498) is projected by `proportionalityProfileFromHopSelection(...)` into `manifest.proportionalityProfile` and surfaced in `construction_brief.stagePressure.proportionalityProfile`. Both the design-depth evaluator prompt and the ADR transform prompt now cite it as the admitted size budget, anchoring (not replacing) the prior prose ceilings. Budget by hop class: single_hop→degenerate (1/1), dual_hop→compact (2/2), staged/zoom/blocked→broad (≤32). Verification: `build:semantic` clean; `test_t187` (6 tests) + focused `t181/t184/t182` = 56/56; full `test:semantic` = 819/820 (only the pre-existing, unrelated T-110 fails). No new carrier; F_D stays a projector/admitter, not a constructor.
 
-Remaining before closure: A-030 finish (relocate first-update mechanics to a named authority-neutral helper/capability with atomicity tests — codex F2), A-070 final disposition, and A-080 JS hello-world live proof.
+Closure proof is now present for A-080. Data-mapper remains gated on review/acceptance of this ticket and the product-materialization/event-store safety items outside this ticket.
 
 ## Codex Review Response (2026-05-31)
 
 - **F1 (High) — fixed.** Codex correctly found A-050 only covered framework-smoke: `frontDoorTraversalSelection` returns null for `domain_product` (`public_start.ts:375`), so `executionContract.traversalHopSelection` was null at dispatch and the brief profile was null for the data-mapper gate. Fix: `proportionalityProfileFromHopSelection(null)` now returns a **broad unreduced** profile (`profileClass: "broad"`, `maxComponents: 32`, `maxModules: null`) — the honest projection of "no Min(F_P) reduction selected → full budget" — instead of null. `test_t187` updated to assert this. domain_product/data-mapper now carries a broad profile; framework-smoke still carries degenerate/compact. Live end-to-end validation remains A-080 (gated); data-mapper still not to be run yet.
-- **F2 (Medium) — accepted; A-030 reclassified `partial`.** The fatal KB-of-Node recipe is gone, but the first-update mechanics are still WHAT-prose rather than a named helper/capability with atomicity tests. Claim corrected from done to partial; helper extraction deferred to a follow slice.
+- **F2 (Medium) — fixed.** The fatal KB-of-Node recipe is gone, and the first-update mechanics now sit behind `evaluation-helper://odd-sdlc/design-depth/draft-fragment-update` with a config contract plus helper/admission tests. The helper preserves selected composition identity and wraps only F_P-supplied section values; it does not derive semantic rows.
 - **F3 (Low/Med) — fixed.** The line-99 "read the ADR silently with Node, extract the table/heading range" method prescription is softened to "read only the authority a section needs and do not print it… the framework prescribes the carrier schema and the visibility contract, not the extraction method." Classified under A-010.
 - **F4 (Process) — confirmed.** A-070 stays planned; the review-grade tool guard (`installed_operator.ts`) and framework-smoke test-execution directive (`launch_contract.ts`) remain uncommitted and must be accepted-here or split before commit.
 
 Re-verification after fixes: `build:semantic` clean; `test_t187` 6/6; full `test:semantic` 819/820 (only the pre-existing, unrelated T-110).
+
+### A-030/A-070 closure update (2026-05-31)
+
+Landed the named first-update helper boundary:
+
+- `config/evaluator-helper-contracts/design_depth_draft_fragment_update.md`
+  declares the authority-neutral helper contract.
+- `constructDesignDepthDraftFragmentContentRegisterUpdate(...)` constructs
+  non-draft fragment envelopes from F_P-supplied section values while preserving
+  selected composition identity.
+- `writeDesignDepthDraftFragmentContentRegisterUpdate(...)` publishes through
+  effects-owned temp-then-rename mechanics; raw file writes remain outside
+  `operator/`.
+- `test_t187` proves selected-composition preservation and admission of the
+  helper-produced register.
+
+A-070 accepted the currently uncommitted prompt/tool changes under this ticket:
+the framework-smoke component-code directive is bounded to admitted design-depth
+and test-execution authority, and the review-grade helper-loop guard classifies
+evaluator helper failures without turning them into product findings.
+
+Re-verification after this slice: `npm run build:semantic` plus focused
+`test_t181_fp_evaluator_design_register.test.mjs`,
+`test_t184_handoff_partition_boundary.test.mjs`,
+`test_t185_agent_internal_subworkstreams.test.mjs`,
+`test_t187_fp_evaluator_prompt_boundary.test.mjs`, and
+`test_t188_data_mapper_live_boundary_guard.test.mjs` = 68/68.
 
 ## Data-Mapper Scale Probe (2026-05-31)
 
@@ -190,19 +217,43 @@ The probe was stopped after the first transform and review-grade evaluator expos
 
 ## Review Questions
 
-- Should draft-to-fragment conversion happen before F_P as F_D carrier
-  scaffolding, or remain a named authority-neutral helper the F_P worker may
-  invoke?
+- Resolved: draft-to-fragment conversion remains a named authority-neutral
+  helper contract over F_P-supplied values. F_D seeds draft scaffolding and
+  admits/projects fragments; it does not construct semantic rows.
 - Should Min(F_P) proportionality be carried as a new typed profile carrier, a
   selected traversal-hop field, or a compact projection from the existing
   decomposition/hop-selection carriers?
-- Should the review-grade tool-loop guard stay in this ticket as part of
-  prompt-boundary proportionality, or split into a smaller operational bug
-  ticket?
+- Resolved: the review-grade tool-loop guard stays in this ticket as
+  evaluator-helper failure classification and prompt-boundary proportionality,
+  not as product finding synthesis.
 
 ## Data Mapper Gate
 
-No new data-mapper live or sandbox run is legitimate gate proof while this
-ticket is unresolved. A data-mapper run may still be useful as a scale probe
-after source prompt patches are verified, but closure still requires the
-accepted prompt-boundary decision and JS hello-world proof first.
+No new data-mapper live or sandbox run is legitimate gate proof until this
+ticket's JS hello-world proof and boundary repairs are reviewed/accepted. The
+JS proof now exists, but data-mapper should still wait for explicit acceptance
+and for any separate fatal runtime-storage/materialization safety items to be
+closed or consciously dispositioned.
+
+## JS Hello-World Live Proof (2026-05-31)
+
+Same sandbox, patched framework package copy, no new sandbox after the observed
+framework failure:
+
+- archive root: `build_tenants/typescript/test_env/test_runs/scenario_t132_hello_world_js_live/20260531T125229437Z_pid44391`
+- converged operator run: `workspace/.ai-workspace/runtime/odd_sdlc/operator-runs/20260531T132823174Z_pid15166`
+- worker: `process://codex?model=gpt-5.5&effort=high`
+- result: `status=converged`, `nextLawfulAction=disposition://close`, `closureDisposition=close`
+- review: `status=passed`, obligation review expected 4 / fulfilled 4 / blocked 0 / assessmentCount 5
+- materialization: `product_materialization_manifest.json` and `worker_result_report.json` include `src/hello.js` as role `source` and `test/hello.test.js` as role `test`
+
+Framework defects found and fixed during the proof:
+
+- Declared product targets were hidden when a tenant stack declared `workspaceLocalDirectories` that overlapped product directories. Fix: observation checks declared product/build_config role before tenant tool-byproduct exclusion. Regression: `T-187 declared product targets outrank tenant tool-local directory rules`.
+- Sandbox worker commands could discover the parent source repo through Git. Fix: `sdlcWorkspaceLocalToolEnvironment(...)` sets `GIT_CEILING_DIRECTORIES` to the workspace parent while preserving any tenant-declared value. Regression: `T-143 installed tool execution uses tenant tech-stack environment declarations`.
+- Review-grade evaluator probes still used `/tmp` for transient stdout/stderr capture in the converged live artifact. Fix landed after the live close: review-grade prompt now forbids `/tmp`, `/private/tmp`, `$TMPDIR`, and outside-workspace temporary probe output and requires explicit workspace/run-archive paths. Regression: `T-187 review-grade evaluator prompt keeps probe evidence workspace-local`. No fresh live rerun was started solely for this prompt-locality fix.
+
+Post-fix deterministic proof:
+
+- `npm run build:semantic`
+- `node --test test_env/tests/test_t066_product_materialization_contract.test.mjs test_env/tests/test_t143_product_materialization_authority_targets.test.mjs test_env/tests/test_t181_fp_evaluator_design_register.test.mjs test_env/tests/test_t184_handoff_partition_boundary.test.mjs test_env/tests/test_t185_agent_internal_subworkstreams.test.mjs test_env/tests/test_t187_fp_evaluator_prompt_boundary.test.mjs test_env/tests/test_t188_data_mapper_live_boundary_guard.test.mjs` = 175/175

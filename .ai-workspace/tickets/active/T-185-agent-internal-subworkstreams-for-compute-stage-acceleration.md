@@ -315,6 +315,19 @@ The older design-depth evaluator prompt recipe and its proportionality concern
 are tracked by T-187. Do not use T-185 closure review to accept or reject that
 separate prompt-boundary repair.
 
+Re-verification on 2026-05-31 repaired the deterministic prompt proof after the
+T-187 prompt cleanup shortened the wording too far. The transform prompt now
+again grants explicit permission (`You may use agent-internal subagents or
+parallel workstreams...`), cites admitted work-plan/dependency/target-carrier/
+tranche/authority/obligation refs, and states that subworkstreams are not ABG
+branches. `npm run build:semantic` passes and focused
+`test_t181`/`test_t184`/`test_t185`/`test_t187`/`test_t188` passes 68/68.
+
+T-185 still remains open for high-scale proof: the 2026-05-31 data-mapper
+operator archive reached close through the normal lifecycle, but the observed
+subworkstream manifests were empty, so it proves compatibility rather than
+meaningful subworkstream acceleration.
+
 ## Product Fit
 
 This work aligns with the product mandate because it uses the graph-owned

@@ -98,38 +98,11 @@ const IMPORT_SOURCE_IGNORED_DIRS = Object.freeze([
 ] as const);
 const DEFAULT_AMBIGUITY_RISK_APPETITE = "medium" as const;
 const UNDECLARED_EXECUTION_CONTRACT = "undeclared" as const;
-const SOURCE_EXTENSIONS = Object.freeze([
-  ".py",
-  ".scala",
-  ".java",
-  ".kt",
-  ".js",
-  ".jsx",
-  ".ts",
-  ".tsx",
-  ".rs",
-  ".go"
-] as const);
-const BUILD_MARKERS = Object.freeze([
-  "build.sbt",
-  "pom.xml",
-  "pyproject.toml",
-  "setup.py",
-  "package.json",
-  "Cargo.toml",
-  "go.mod"
-] as const);
-const IGNORED_DIR_NAMES = Object.freeze([
+const REALIZATION_SIGNAL_IGNORED_DIR_NAMES = Object.freeze([
   ".ai-workspace",
   ".abiogenesis",
   ".genesis",
-  ".git",
-  ".venv",
-  "__pycache__",
-  "dist",
-  "node_modules",
-  "target",
-  "venv"
+  ".git"
 ] as const);
 
 interface MutableTenant {
@@ -465,15 +438,6 @@ function normalizeExecutionContractDeclaration(value: string): string {
   return normalized.length > 0 ? normalized : UNDECLARED_EXECUTION_CONTRACT;
 }
 
-function truthyCapability(
-  capabilities: readonly SdlcCapabilityContract[],
-  name: string
-): boolean {
-  const capability = capabilities.find((item) => item.name === name);
-  const normalized = capability?.value.trim().toLowerCase() ?? "";
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-}
-
 function capabilityContractsFor(tenant: MutableTenant): readonly SdlcCapabilityContract[] {
   return Object.freeze(
     Object.entries(tenant.capabilityContracts)
@@ -489,17 +453,12 @@ function capabilityContractsFor(tenant: MutableTenant): readonly SdlcCapabilityC
   );
 }
 
-function inferExecutionContracts(input: {
-  readonly activeTenant: string;
-  readonly language: string;
-  readonly tool: string;
+function declaredExecutionContracts(input: {
   readonly testRunner: string;
-  readonly capabilityContracts: readonly SdlcCapabilityContract[];
   readonly buildExecutionContract: string;
   readonly testExecutionContract: string;
   readonly deploymentContract: string;
   readonly runtimeObservationContract: string;
-  readonly sourceText: string;
 }): {
   readonly buildExecutionContract: string;
   readonly testExecutionContract: string;
@@ -518,64 +477,14 @@ function inferExecutionContracts(input: {
   let runtimeObservationContract = normalizeExecutionContractDeclaration(
     input.runtimeObservationContract
   );
-  const language = input.language.trim().toLowerCase();
-  const tool = input.tool.trim().toLowerCase();
-  const activeTenant = input.activeTenant.trim().toLowerCase();
-  const sourceLower = input.sourceText.toLowerCase();
-  const scalaExecutionSignal =
-    tool === "sbt" ||
-    language === "scala" ||
-    (activeTenant === "scala_spark" &&
-      (truthyCapability(input.capabilityContracts, "fat_jar") ||
-        truthyCapability(input.capabilityContracts, "spark_session") ||
-        truthyCapability(input.capabilityContracts, "spark_submit_compatible")));
-
-  if (buildExecutionContract === UNDECLARED_EXECUTION_CONTRACT) {
-    if (scalaExecutionSignal) {
-      buildExecutionContract = truthyCapability(input.capabilityContracts, "fat_jar")
-        ? "sbt clean assembly"
-        : "sbt compile";
-    } else if (tool === "dbt" || activeTenant === "dbt") {
-      buildExecutionContract = "dbt compile";
-    } else if (tool === "npm" || tool === "pnpm" || tool === "yarn") {
-      buildExecutionContract = `${tool} run build`;
-    } else if (tool === "maven" || tool === "mvn") {
-      buildExecutionContract = "mvn package";
-    } else if (tool === "gradle") {
-      buildExecutionContract = "gradle build";
-    } else if (language === "python") {
-      buildExecutionContract = "python -m build";
-    }
-  }
 
   if (testExecutionContract === UNDECLARED_EXECUTION_CONTRACT) {
+    // Legacy constraints name the declared tenant test execution contract as
+    // test_runner. Preserve that declaration without deriving commands from
+    // language, build-tool, or capability labels.
     const testRunner = normalizeExecutionContractDeclaration(input.testRunner);
     if (testRunner !== UNDECLARED_EXECUTION_CONTRACT) {
       testExecutionContract = testRunner;
-    } else if (tool === "dbt" || activeTenant === "dbt") {
-      testExecutionContract = "dbt test";
-    } else if (scalaExecutionSignal) {
-      testExecutionContract = "sbt test";
-    } else if (tool === "npm" || tool === "pnpm" || tool === "yarn") {
-      testExecutionContract = `${tool} test`;
-    } else if (language === "python") {
-      testExecutionContract = "pytest";
-    }
-  }
-
-  if (deploymentContract === UNDECLARED_EXECUTION_CONTRACT) {
-    if (truthyCapability(input.capabilityContracts, "spark_submit_compatible")) {
-      deploymentContract = "spark-submit";
-    } else if (tool === "dbt" || activeTenant === "dbt") {
-      deploymentContract = "dbt run";
-    }
-  }
-
-  if (runtimeObservationContract === UNDECLARED_EXECUTION_CONTRACT) {
-    if (sourceLower.includes("openlineage")) {
-      runtimeObservationContract = "OpenLineage";
-    } else if (truthyCapability(input.capabilityContracts, "ledger_json")) {
-      runtimeObservationContract = "ledger.json";
     }
   }
 
@@ -618,10 +527,7 @@ function realizationRootHasSignal(root: string): boolean {
   if (!stat.isDirectory()) {
     return false;
   }
-  if (BUILD_MARKERS.some((marker) => existsSync(path.join(root, marker)))) {
-    return true;
-  }
-  return countSourceFiles(root, 4) > 0;
+  return countTenantRealizationFiles(root, 4) > 0;
 }
 
 function runtimeLayoutFromValues(values: Record<string, string>) {
@@ -679,11 +585,11 @@ function overlayRefFromValues(input: {
     : sdlcTraversalOverlayRefForStrategy(input.overlayStrategy);
 }
 
-function countSourceFiles(root: string, limit: number): number {
+function countTenantRealizationFiles(root: string, limit: number): number {
   let count = 0;
-  const ignored = new Set<string>(IGNORED_DIR_NAMES);
-  const visit = (current: string): void => {
-    if (count >= limit) {
+  const ignored = new Set<string>(REALIZATION_SIGNAL_IGNORED_DIR_NAMES);
+  const visit = (current: string, depth = 0): void => {
+    if (count >= limit || depth > 4) {
       return;
     }
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -692,9 +598,9 @@ function countSourceFiles(root: string, limit: number): number {
       }
       if (entry.isDirectory()) {
         if (!ignored.has(entry.name)) {
-          visit(path.join(current, entry.name));
+          visit(path.join(current, entry.name), depth + 1);
         }
-      } else if (SOURCE_EXTENSIONS.some((extension) => extension === path.extname(entry.name))) {
+      } else if (entry.isFile()) {
         count += 1;
       }
     }
@@ -730,12 +636,8 @@ export function conformProjectProfileFromConstraintsText(input: {
   const projectSlug = projectSlugFromValues(parsed.values, input.workspaceRoot);
   const projectKind = nonEmpty(parsed.values["kind"], "");
   const declaredModuleNames = declaredModuleNamesFromStructure(moduleStructure);
-  const executionContracts = inferExecutionContracts({
-    activeTenant,
-    language,
-    tool,
+  const executionContracts = declaredExecutionContracts({
     testRunner,
-    capabilityContracts,
     buildExecutionContract: stringFrom(
       tenant,
       parsed.values,
@@ -759,8 +661,7 @@ export function conformProjectProfileFromConstraintsText(input: {
       parsed.values,
       "runtime_observation_contract",
       "tenant_runtime_observation_contract"
-    ),
-    sourceText: input.constraintsText
+    )
   });
   const realization = realizationModeFor(
     input.workspaceRoot,

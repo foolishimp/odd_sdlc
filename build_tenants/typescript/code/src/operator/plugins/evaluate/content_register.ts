@@ -1,9 +1,14 @@
 // Implements: T-183
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  statSync
+} from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { EnginePluginInput, RuntimeRegime } from "@abiogenesis/typescript-tenant";
+import { writeUtf8FileAtomically } from "../../../effects/archive_store.js";
 import { uniqueLocaleSorted as uniqueSorted } from "../../../shared/collections.js";
 import type { SdlcDesignDepthRegister } from "../../carriers.js";
 import { parseDesignDepthRegisterPayload } from "../../design_depth_register.js";
@@ -122,6 +127,19 @@ export interface SdlcDesignDepthRegisterFragment {
   readonly mergeMode: "replace";
   readonly value: unknown;
 }
+
+export interface SdlcDesignDepthDraftFragmentUpdate {
+  readonly section: SdlcDesignDepthRegisterFragmentSection;
+  readonly value: unknown;
+  readonly sourceBasisRefs?: readonly string[] | undefined;
+  readonly evidenceRefs?: readonly string[] | undefined;
+}
+
+export const DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF =
+  "evaluation-helper://odd-sdlc/design-depth/draft-fragment-update" as const;
+
+export const DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH =
+  "config/evaluator-helper-contracts/design_depth_draft_fragment_update.md" as const;
 
 function stableJson(input: unknown): string {
   if (Array.isArray(input)) {
@@ -414,6 +432,135 @@ function parseRegister(input: unknown): SdlcEvaluateContentRegister {
     ),
     evidenceRefs: parseStringArray(record["evidenceRefs"], "register.evidenceRefs"),
     contentRows
+  });
+}
+
+function requireUniqueDesignDepthFragmentUpdates(
+  updates: readonly SdlcDesignDepthDraftFragmentUpdate[]
+): ReadonlyMap<SdlcDesignDepthRegisterFragmentSection, SdlcDesignDepthDraftFragmentUpdate> {
+  const updateBySection = new Map<
+    SdlcDesignDepthRegisterFragmentSection,
+    SdlcDesignDepthDraftFragmentUpdate
+  >();
+  for (const update of updates) {
+    if (!SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.includes(update.section)) {
+      throw new TypeError(
+        `design-depth draft-fragment update section ${update.section}: not allowed`
+      );
+    }
+    if (updateBySection.has(update.section)) {
+      throw new TypeError(
+        `design-depth draft-fragment update section ${update.section}: duplicate`
+      );
+    }
+    updateBySection.set(update.section, update);
+  }
+  const missingSections = SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.filter(
+    (section) => !updateBySection.has(section)
+  );
+  if (missingSections.length > 0) {
+    throw new TypeError(
+      `design-depth draft-fragment update missing sections: ${missingSections.join(", ")}`
+    );
+  }
+  return updateBySection;
+}
+
+function designDepthDraftRowsBySection(
+  register: SdlcEvaluateContentRegister
+): ReadonlyMap<SdlcDesignDepthRegisterFragmentSection, SdlcEvaluateContentRegisterRow> {
+  const draftRows = new Map<
+    SdlcDesignDepthRegisterFragmentSection,
+    SdlcEvaluateContentRegisterRow
+  >();
+  for (const [index, row] of register.contentRows.entries()) {
+    if (
+      row.contentKind !== SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND &&
+      !row.rowRef.startsWith("content-register-row-draft://")
+    ) {
+      continue;
+    }
+    const payload = parseDesignDepthRegisterFragment(
+      row.payload,
+      `register.contentRows[${index}].payload`
+    );
+    if (draftRows.has(payload.section)) {
+      throw new TypeError(
+        `design-depth draft row section ${payload.section}: duplicate`
+      );
+    }
+    draftRows.set(payload.section, row);
+  }
+  const missingSections = SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.filter(
+    (section) => !draftRows.has(section)
+  );
+  if (missingSections.length > 0) {
+    throw new TypeError(
+      `design-depth draft register missing sections: ${missingSections.join(", ")}`
+    );
+  }
+  return draftRows;
+}
+
+export function constructDesignDepthDraftFragmentContentRegisterUpdate(input: {
+  readonly draftRegister: SdlcEvaluateContentRegister;
+  readonly targetAssetType: string;
+  readonly updates: readonly SdlcDesignDepthDraftFragmentUpdate[];
+}): SdlcEvaluateContentRegister {
+  const updateBySection = requireUniqueDesignDepthFragmentUpdates(input.updates);
+  const draftRows = designDepthDraftRowsBySection(input.draftRegister);
+  return Object.freeze({
+    ...input.draftRegister,
+    contentRows: Object.freeze(
+      SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) => {
+        const draftRow = draftRows.get(section);
+        const update = updateBySection.get(section);
+        if (draftRow === undefined || update === undefined) {
+          throw new TypeError(
+            `design-depth draft-fragment update section ${section}: missing`
+          );
+        }
+        return Object.freeze({
+          kind: "sdlc_evaluate_content_register_row" as const,
+          rowRef: `content-register-row://odd-sdlc/design-depth/${section}`,
+          authorityFunction: input.draftRegister.authorityFunction,
+          carrierFamily: "ProductAssetModel" as const,
+          contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_CONTENT_KIND,
+          payload: Object.freeze({
+            kind: "sdlc_design_depth_register_fragment" as const,
+            fragmentVersion: "ts-design-depth-fragment-v1" as const,
+            targetAssetType: input.targetAssetType,
+            section,
+            sequence: index + 1,
+            mergeMode: "replace" as const,
+            value: update.value
+          }),
+          sourceBasisRefs: Object.freeze([
+            ...(update.sourceBasisRefs ?? draftRow.sourceBasisRefs)
+          ]),
+          evidenceRefs: Object.freeze([
+            ...(update.evidenceRefs ?? draftRow.evidenceRefs)
+          ])
+        });
+      })
+    )
+  });
+}
+
+export function writeDesignDepthDraftFragmentContentRegisterUpdate(input: {
+  readonly registerPath: string;
+  readonly draftRegister: SdlcEvaluateContentRegister;
+  readonly targetAssetType: string;
+  readonly updates: readonly SdlcDesignDepthDraftFragmentUpdate[];
+}): string {
+  const nextRegister = constructDesignDepthDraftFragmentContentRegisterUpdate({
+    draftRegister: input.draftRegister,
+    targetAssetType: input.targetAssetType,
+    updates: input.updates
+  });
+  return writeUtf8FileAtomically({
+    targetPath: input.registerPath,
+    content: prettyStableJson(nextRegister)
   });
 }
 

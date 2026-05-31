@@ -56,6 +56,13 @@ The target project may be imported, partial, stale, or still underdefined.
 
 If those layers disagree, imported project authority wins for project identity,
 and GTL/ABG plus odd_sdlc govern how work proceeds over that authority.
+
+## 6. Data Mapper Live-Run Boundary
+- the purpose of a data_mapper run is to test whether odd_sdlc can build data_mapper, not to build data_mapper from outside the governed sandbox
+- generated workspace compile, test, source, lineage, and tenant-stack failures are F_P worksite repair pressure by default
+- only patch odd_sdlc when the observed defect is in SDLC framework law, ABG/GTL runtime, prompt/admission/evaluator boundaries, event/replay, projection, closure, or process supervision
+- do not add downstream technology-specific knowledge to odd_sdlc source; tenant stack truth belongs in tenant design/spec artifacts and sandbox repairs belong in the active sandbox
+- before any data_mapper live run or resume, apply the runbook at `build_tenants/typescript/test_env/live/DATA_MAPPER_LIVE_RUNBOOK.md`
 <!-- ODD_SDLC_BOOTLOADER_END -->
 
 <!-- GTL_BOOTLOADER_START -->

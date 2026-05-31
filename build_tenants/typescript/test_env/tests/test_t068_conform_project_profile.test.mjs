@@ -118,7 +118,7 @@ build_tenants:
   ]);
   assert.equal(profile.language, "kotlin");
   assert.equal(profile.tool, "gradle");
-  assert.equal(profile.buildExecutionContract, "gradle build");
+  assert.equal(profile.buildExecutionContract, "undeclared");
   assert.equal(profile.testExecutionContract, "gradle test");
   assert.equal(profile.deploymentContract, "undeclared");
   assert.equal(profile.runtimeObservationContract, "undeclared");
@@ -301,7 +301,7 @@ test("T-171 conformance does not synthesize product or requirement authority", (
   assert.deepStrictEqual(declaredProductFileTargets(manifest), []);
 });
 
-test("T-068 infers execution contracts from selected tenant truth without workload-specific code", () => {
+test("T-068 preserves declared tenant contracts without synthesizing sandbox commands", () => {
   const workspace = makeWorkspace(
     "odd-sdlc-t068-scala",
     `
@@ -333,9 +333,9 @@ build_tenants:
     "lineage",
     "serving"
   ]);
-  assert.equal(profile.buildExecutionContract, "sbt clean assembly");
-  assert.equal(profile.testExecutionContract, "sbt test");
-  assert.equal(profile.deploymentContract, "spark-submit");
+  assert.equal(profile.buildExecutionContract, "undeclared");
+  assert.equal(profile.testExecutionContract, "undeclared");
+  assert.equal(profile.deploymentContract, "undeclared");
 });
 
 test("T-068 installed handoff carries conformed project before materialization", () => {
@@ -392,8 +392,8 @@ build_tenants:
     "parser",
     "renderer"
   ]);
-  assert.equal(manifest.productMaterialization.buildExecutionContract, "npm run build");
-  assert.equal(manifest.productMaterialization.testExecutionContract, "npm test");
+  assert.equal(manifest.productMaterialization.buildExecutionContract, "undeclared");
+  assert.equal(manifest.productMaterialization.testExecutionContract, "undeclared");
   assert.equal(archivedProfile.projectSlug, "document_compiler");
   assert.match(readFileSync(handoffFiles.promptPath, "utf8"), /Declared modules: parser, renderer/);
 });

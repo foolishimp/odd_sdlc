@@ -1,8 +1,26 @@
 // Validates: T-187 (F_P evaluator prompt boundary + proportional Min(F_P) dispatch)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH,
+  DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
+  SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS,
+  admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity,
+  constructDesignDepthDraftFragmentContentRegisterUpdate,
+  deriveSdlcConformProjectProfileFromWorkspace,
+  writeDesignDepthDraftFragmentContentRegisterUpdate
+} from "../../build/semantic/code/src/index.js";
+import { reviewGradeEdgeFulfillmentPrompt } from "../../build/semantic/code/src/operator/plugins/evaluate/prompts.js";
 import { proportionalityProfileFromHopSelection } from "../../build/semantic/code/src/operator/plugins/transform/launch_contract.js";
 
 const evaluatorPromptSource = readFileSync(
@@ -52,6 +70,15 @@ const requirementsGovernanceSource = readFileSync(
   ),
   "utf8"
 );
+const helperContractSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../config/evaluator-helper-contracts/design_depth_draft_fragment_update.md",
+      import.meta.url
+    )
+  ),
+  "utf8"
+);
 
 function hopSelection(hopClass) {
   return {
@@ -78,6 +105,56 @@ function hopSelection(hopClass) {
     rejectedAlternativeRefs: [],
     blockingReasons: [],
     evidenceRefs: []
+  };
+}
+
+function makeConformanceWorkspace(name, constraintsText) {
+  const root = mkdtempSync(path.join(tmpdir(), `${name}-`));
+  mkdirSync(path.join(root, ".ai-workspace/context"), { recursive: true });
+  writeFileSync(
+    path.join(root, ".ai-workspace/context/project_constraints.yml"),
+    `${constraintsText.trim()}\n`,
+    "utf8"
+  );
+  return root;
+}
+
+function designDepthDraftRegister() {
+  const sourceRef = "file:///tmp/t187/implementation_design_surface.md";
+  return {
+    kind: "sdlc_evaluate_content_register",
+    registerVersion: "ts-evaluate-content-register-v1",
+    stage: "evaluate.C",
+    ruleRef: "evaluation-rule://odd-sdlc/design-depth-register/fp",
+    ruleRole: "semantic_judgment",
+    computeMeans: "F_P",
+    authorityFunction: "synthesize_model",
+    selectedCompositionRef: "composition://t187/selected",
+    selectedCompositionDigest: "sha256:t187",
+    selectedCompositionSelectionRef: "selection://t187",
+    selectedRegimeBindingRef: "regime://t187/fp",
+    compositionContributionRef: "regime://t187/fp",
+    sourceBasisRefs: [sourceRef],
+    candidateArtifactRefs: [sourceRef],
+    evidenceRefs: [sourceRef],
+    contentRows: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section, index) => ({
+      kind: "sdlc_evaluate_content_register_row",
+      rowRef: `content-register-row-draft://odd-sdlc/design-depth/${section}`,
+      authorityFunction: "synthesize_model",
+      carrierFamily: "ProductAssetModel",
+      contentKind: SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_DRAFT_CONTENT_KIND,
+      payload: {
+        kind: "sdlc_design_depth_register_fragment",
+        fragmentVersion: "ts-design-depth-fragment-v1",
+        targetAssetType: "implementation_design_surface",
+        section,
+        sequence: index + 1,
+        mergeMode: "replace",
+        value: null
+      },
+      sourceBasisRefs: [sourceRef],
+      evidenceRefs: [sourceRef]
+    }))
   };
 }
 
@@ -127,6 +204,62 @@ test("T-187 briefs reference the admitted proportionality profile, not prose-onl
     launchContractSource,
     /proportionalityProfile as the admitted proportionality budget/u
   );
+});
+
+test("T-187 design-depth first-update helper is carrier mechanics only", () => {
+  const draftRegister = designDepthDraftRegister();
+  const updates = SDLC_DESIGN_DEPTH_REGISTER_FRAGMENT_SECTIONS.map((section) => ({
+    section,
+    value: section.endsWith("Rows") || section.endsWith("Fragments") ? [] : null,
+    sourceBasisRefs: [`authority://t187/${section}`],
+    evidenceRefs: [`evidence://t187/${section}`]
+  }));
+  const updated = constructDesignDepthDraftFragmentContentRegisterUpdate({
+    draftRegister,
+    targetAssetType: "implementation_design_surface",
+    updates
+  });
+
+  assert.equal(updated.selectedCompositionRef, draftRegister.selectedCompositionRef);
+  assert.equal(updated.selectedCompositionDigest, draftRegister.selectedCompositionDigest);
+  assert.equal(
+    updated.selectedCompositionSelectionRef,
+    draftRegister.selectedCompositionSelectionRef
+  );
+  assert.equal(
+    updated.selectedRegimeBindingRef,
+    draftRegister.selectedRegimeBindingRef
+  );
+  assert.equal(
+    updated.contentRows.some((row) => row.rowRef.startsWith("content-register-row-draft://")),
+    false
+  );
+  assert.equal(
+    updated.contentRows.every((row) => row.contentKind === "sdlc_design_depth_register_fragment"),
+    true
+  );
+
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t187-helper-"));
+  const registerPath = path.join(root, "design_depth_fp_evaluator_content_register.json");
+  writeDesignDepthDraftFragmentContentRegisterUpdate({
+    registerPath,
+    draftRegister,
+    targetAssetType: "implementation_design_surface",
+    updates
+  });
+  const admission = admitSdlcEvaluateContentRegisterArtifactForSelectedIdentity({
+    registerPath,
+    selectedIdentity: {
+      selectedCompositionRef: draftRegister.selectedCompositionRef,
+      selectedCompositionDigest: draftRegister.selectedCompositionDigest,
+      selectedCompositionSelectionRef: draftRegister.selectedCompositionSelectionRef,
+      selectedRegimeBindingRef: draftRegister.selectedRegimeBindingRef
+    },
+    ruleRef: draftRegister.ruleRef,
+    authorityFunction: "synthesize_model",
+    computeMeans: "F_P"
+  });
+  assert.equal(admission.status, "admitted");
 });
 
 test("T-187 broad Markdown surfaces group obligation pressure instead of listing every id", () => {
@@ -199,6 +332,56 @@ test("T-187 transform prompts project tenant-declared tool boundaries", () => {
   assert.match(launchContractSource, /TESTING_TECH_STACK\|testing_tech_stack/u);
 });
 
+test("T-187 conformance does not synthesize sandbox execution contracts", () => {
+  const inferredWorkspace = makeConformanceWorkspace(
+    "odd-sdlc-t187-undeclared-stack",
+    `
+project:
+  name: sandboxed stack
+active_tenant: scala_spark
+build_tenants:
+  scala_spark:
+    output_dir: build_tenants/scala_spark
+    language: scala
+    build_tool: sbt
+    module_structure:
+      - app-core
+    capability_contracts:
+      fat_jar: true
+      spark_submit_compatible: true
+      ledger_json: true
+`
+  );
+  const inferred = deriveSdlcConformProjectProfileFromWorkspace(inferredWorkspace);
+  assert.equal(inferred.buildExecutionContract, "undeclared");
+  assert.equal(inferred.testExecutionContract, "undeclared");
+  assert.equal(inferred.deploymentContract, "undeclared");
+  assert.equal(inferred.runtimeObservationContract, "undeclared");
+
+  const declaredWorkspace = makeConformanceWorkspace(
+    "odd-sdlc-t187-declared-stack",
+    `
+project:
+  name: declared sandbox stack
+active_tenant: tenant_a
+build_tenants:
+  tenant_a:
+    output_dir: build_tenants/tenant_a
+    language: typescript
+    build_tool: npm
+    build_execution_contract: tenant-build-command
+    test_runner: tenant-test-command
+    deployment_contract: tenant-deploy-command
+    runtime_observation_contract: tenant-observe-contract
+`
+  );
+  const declared = deriveSdlcConformProjectProfileFromWorkspace(declaredWorkspace);
+  assert.equal(declared.buildExecutionContract, "tenant-build-command");
+  assert.equal(declared.testExecutionContract, "tenant-test-command");
+  assert.equal(declared.deploymentContract, "tenant-deploy-command");
+  assert.equal(declared.runtimeObservationContract, "tenant-observe-contract");
+});
+
 test("T-187 review-grade evaluator prompt projects tenant-declared tool boundaries", () => {
   assert.match(evaluatorPromptSource, /Tenant tool boundary/u);
   assert.match(
@@ -207,11 +390,74 @@ test("T-187 review-grade evaluator prompt projects tenant-declared tool boundari
   );
   assert.match(
     evaluatorPromptSource,
+    /Tenant workspace-local directories from currentState\.tenantToolEnvironment/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Tenant environment variables from currentState\.tenantToolEnvironment/u
+  );
+  assert.match(
+    evaluatorPromptSource,
     /Apply currentState\.tenantToolEnvironment before choosing any local script runtime/u
   );
   assert.match(
     evaluatorPromptSource,
+    /preserve tenant-declared environment variables when spawning child commands/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Do not synthesize, recompute, or overwrite tenant-declared environment variable values/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Read them from process\.env and pass process\.env through/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not assign any name listed in currentState\.tenantToolEnvironment\.environmentVariableNames/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not derive them from process\.cwd\(\), \/tmp, \/private\/tmp, user-home, workspace-root fallback directories, or global-cache fallbacks/u
+  );
+  assert.match(
+    evaluatorPromptSource,
     /Do not run tenant-disabled tools for assessment JSON writing/u
+  );
+});
+
+test("T-187 review-grade prompt renders tenant execution environment details", () => {
+  const prompt = reviewGradeEdgeFulfillmentPrompt({
+    manifest: {
+      graphFunctionName: "derive_component_test_surface",
+      edgeName: "derive_component_test_surface",
+      targetAssetType: "component_test_surface"
+    },
+    governanceRef: "config://test",
+    governancePath: "config/work-category-governance/unit_test_build.md",
+    constructionBriefPath: "worker_construction_brief.json",
+    invocationPackagePath: "worker_invocation_package.json",
+    workerReportPath: "worker_result_report.json",
+    assessmentPath: "review_grade_edge_fulfillment_assessment.json",
+    subworkstreamManifestPath: "evaluate_compute_subworkstream_manifest.json",
+    tenantToolEnvironment: {
+      kind: "sdlc_tenant_tool_environment_projection",
+      sourceRefs: ["workspace://build_tenants/scala_spark/spec/TECH_STACK.json"],
+      disabledTools: ["python3"],
+      allowedTools: [],
+      workspaceLocalDirectories: [".sbt/", ".coursier/"],
+      environmentVariableNames: ["SBT_OPTS", "COURSIER_CACHE"]
+    }
+  });
+
+  assert.match(prompt, /Tenant disabled tools[^:]*: python3/u);
+  assert.match(prompt, /Tenant workspace-local directories[^:]*: \.sbt\/, \.coursier\//u);
+  assert.match(prompt, /Tenant environment variables[^:]*: SBT_OPTS, COURSIER_CACHE/u);
+  assert.match(prompt, /preserve tenant-declared environment variables/u);
+  assert.match(prompt, /Read them from process\.env and pass process\.env through/u);
+  assert.match(
+    prompt,
+    /do not assign any name listed in currentState\.tenantToolEnvironment\.environmentVariableNames/u
   );
 });
 
@@ -241,6 +487,21 @@ test("T-187 review-grade evaluator prompt avoids regex-literal sidecar failures"
   assert.match(
     evaluatorPromptSource,
     /regex-literal quoting mistakes are evaluator failures/u
+  );
+});
+
+test("T-187 review-grade evaluator prompt keeps probe evidence workspace-local", () => {
+  assert.match(
+    evaluatorPromptSource,
+    /Do not use \/tmp, \/private\/tmp, \$TMPDIR, or outside-workspace paths for temporary probe output/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /write it under the current operator-run archive or another explicit workspace\/run-archive path named in this prompt/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /Writable does not mean authoritative/u
   );
 });
 
@@ -307,4 +568,19 @@ test("T-187 design-depth evaluator prompt carries no framework-authored semantic
   assert.doesNotMatch(evaluatorPromptSource, /tableRows|sectionText/u);
   assert.match(evaluatorPromptSource, /There is no framework-authored recipe/u);
   assert.match(evaluatorPromptSource, /F_D does not construct semantic register rows/u);
+  assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
+  assert.match(
+    evaluatorPromptSource,
+    /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH/u
+  );
+  assert.match(helperContractSource, new RegExp(DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF.replaceAll("/", "\\/"), "u"));
+  assert.equal(DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_PATH.endsWith("design_depth_draft_fragment_update.md"), true);
+  assert.match(helperContractSource, /authority-neutral carrier mechanics/u);
+  assert.match(helperContractSource, /temp-file then rename operation/u);
+  assert.match(helperContractSource, /F_P owns the section values/u);
+  assert.match(evaluatorPromptSource, /temp-then-rename/u);
 });

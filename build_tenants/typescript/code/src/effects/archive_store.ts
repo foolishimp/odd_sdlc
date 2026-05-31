@@ -1,7 +1,7 @@
 // Implements: T-175
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import {
   requireOperatorRunArtifactRowForArtifactRef,
   type SdlcOperatorRunArtifactRow
@@ -62,4 +62,19 @@ export function executeSdlcArchiveWritePlan(plan: SdlcArchiveWritePlan): string 
   mkdirSync(dirname(targetPath), { recursive: true });
   writeFileSync(targetPath, plan.content, "utf8");
   return targetPath;
+}
+
+export function writeUtf8FileAtomically(input: {
+  readonly targetPath: string;
+  readonly content: string;
+}): string {
+  const targetDirectory = dirname(input.targetPath);
+  const tempPath = join(
+    targetDirectory,
+    `.${basename(input.targetPath)}.${process.pid}.tmp`
+  );
+  mkdirSync(targetDirectory, { recursive: true });
+  writeFileSync(tempPath, input.content, "utf8");
+  renameSync(tempPath, input.targetPath);
+  return input.targetPath;
 }

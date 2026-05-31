@@ -713,6 +713,72 @@ test("T-164 retry prompt names current evaluated requirement gaps", () => {
   assert.match(prompt, /file:\/\/\/tmp\/t164\/fp_evaluate_result\.json/u);
 });
 
+test("T-164 execution-environment retry prompt preserves test lineage", () => {
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspaceRoot(),
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 19,
+    contract,
+    retryContext: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [],
+      priorGapDossiers: [
+        {
+          kind: "sdlc_postflight_gap_dossier",
+          status: "open",
+          graphFunctionName: "bootstrap_release_self_test",
+          edgeName: contract.edgeName,
+          vectorIndex: 19,
+          targetAssetType: "component_test_surface",
+          reasons: [
+            {
+              kind: "sdlc_postflight_gap_reason",
+              reason:
+                "review_grade_edge_fulfillment_blocked:target_asset:component_test_surface:execution_environment:sbt cannot resolve workspace-local launcher.",
+              reasonClass: "execution_environment",
+              blockingReason: {
+                kind: "sdlc_blocking_reason",
+                code: "review_grade_edge_fulfillment_blocked",
+                reasonClass: "execution_environment",
+                lawfulReentryPoint: "same_edge_retry",
+                message: "Worker obligation assessment does not satisfy traversal pressure.",
+                detail:
+                  "target_asset:component_test_surface:execution_environment:sbt cannot resolve workspace-local launcher.",
+                evidenceRefs: ["file:///tmp/t164/review_grade_edge_fulfillment_assessment.json"]
+              }
+            }
+          ],
+          evidenceRefs: ["file:///tmp/t164/review_grade_edge_fulfillment_assessment.json"],
+          priorManifestId: "file:///tmp/t164/handoff_manifest.json",
+          currentGapDossierRef: "file:///tmp/t164/gap_dossier.json",
+          retryEligible: true,
+          nextLawfulActions: ["retry_same_edge"]
+        }
+      ]
+    },
+    runId: "t164-execution-environment-retry"
+  });
+  const files = writeHandoffFiles(manifest);
+  const prompt = readFileSync(files.promptPath, "utf8");
+
+  assert.match(prompt, /execution-environment repair rule/u);
+  assert.match(prompt, /Repair executable environment blockers through tenant stack authority/u);
+  assert.match(
+    prompt,
+    /Do not remove tests, testcase ids, requirement ids, source-overlap rows, or lineage tags/u
+  );
+  assert.match(
+    prompt,
+    /existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic/u
+  );
+  assert.match(
+    prompt,
+    /never reduce the proof surface to make execution easier/u
+  );
+});
+
 test("T-184 retry repair instructions consolidate residual pressure with bounded causal evidence", () => {
   const contract = hookContractByEdgeName("derive_requirement_surface");
   const reasonRefs = Array.from(

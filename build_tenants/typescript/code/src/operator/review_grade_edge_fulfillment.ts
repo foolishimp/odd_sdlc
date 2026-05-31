@@ -1,6 +1,7 @@
 // Implements: T-182
 
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   parseArray,
@@ -22,12 +23,109 @@ import {
 import {
   sdlcReviewGradeEdgeFulfillmentAssessmentRequired
 } from "./edge_output_policy.js";
+import { sha256Text } from "../shared/digest.js";
 
 export const REVIEW_GRADE_EDGE_FULFILLMENT_ASSESSMENT_FILE =
   "review_grade_edge_fulfillment_assessment.json";
 
 export const REVIEW_GRADE_EDGE_FULFILLMENT_RULE_REF =
   "evaluation-rule://odd-sdlc/review-grade-edge-fulfillment/fp";
+
+export interface SdlcReviewGradeReadOnlyInputFileState {
+  readonly path: string;
+  readonly state: "file" | "missing" | "not_file" | "unreadable";
+  readonly digest: string | null;
+  readonly detail: string | null;
+}
+
+export interface SdlcReviewGradeReadOnlyInputSnapshot {
+  readonly kind: "sdlc_review_grade_read_only_input_snapshot";
+  readonly files: readonly SdlcReviewGradeReadOnlyInputFileState[];
+}
+
+function readOnlyInputFileState(filePath: string): SdlcReviewGradeReadOnlyInputFileState {
+  const resolvedPath = resolve(filePath);
+  try {
+    if (!existsSync(resolvedPath)) {
+      return Object.freeze({
+        path: resolvedPath,
+        state: "missing" as const,
+        digest: null,
+        detail: null
+      });
+    }
+    const stat = statSync(resolvedPath);
+    if (!stat.isFile()) {
+      return Object.freeze({
+        path: resolvedPath,
+        state: "not_file" as const,
+        digest: null,
+        detail: null
+      });
+    }
+    return Object.freeze({
+      path: resolvedPath,
+      state: "file" as const,
+      digest: sha256Text(readFileSync(resolvedPath, "utf8")),
+      detail: null
+    });
+  } catch (error) {
+    return Object.freeze({
+      path: resolvedPath,
+      state: "unreadable" as const,
+      digest: null,
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export function snapshotReviewGradeReadOnlyInputFiles(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly report: {
+    readonly outputFile: string;
+    readonly materializedFiles: readonly {
+      readonly absolutePath: string;
+    }[];
+  };
+  readonly additionalInputFiles?: readonly string[];
+}): SdlcReviewGradeReadOnlyInputSnapshot {
+  const paths = uniqueSorted([
+    input.manifest.outputFile,
+    input.report.outputFile,
+    ...input.report.materializedFiles.map((file) => file.absolutePath),
+    ...(input.additionalInputFiles ?? [])
+  ].map((filePath) => resolve(filePath)));
+  return Object.freeze({
+    kind: "sdlc_review_grade_read_only_input_snapshot" as const,
+    files: Object.freeze(paths.map(readOnlyInputFileState))
+  });
+}
+
+function readOnlyInputFileStateChanged(input: {
+  readonly before: SdlcReviewGradeReadOnlyInputFileState;
+  readonly after: SdlcReviewGradeReadOnlyInputFileState;
+}): boolean {
+  return (
+    input.before.state !== input.after.state ||
+    input.before.digest !== input.after.digest ||
+    input.before.detail !== input.after.detail
+  );
+}
+
+export function reviewGradeReadOnlyInputMutationReasons(input: {
+  readonly snapshot: SdlcReviewGradeReadOnlyInputSnapshot;
+}): readonly string[] {
+  return uniqueSorted(
+    input.snapshot.files.flatMap((before) => {
+      const after = readOnlyInputFileState(before.path);
+      return readOnlyInputFileStateChanged({ before, after })
+        ? [
+            `review_grade_evaluator_mutated_input:${pathToFileURL(before.path).href}`
+          ]
+        : [];
+    })
+  );
+}
 
 export function reviewGradeEdgeFulfillmentAssessmentRequired(
   manifest: SdlcWorkerHandoffManifest

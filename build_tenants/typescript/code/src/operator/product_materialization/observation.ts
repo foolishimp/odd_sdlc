@@ -119,6 +119,11 @@ export interface ProductMaterializationObservationDeps {
   readonly targetIgnoresExecutionByproducts: (targetAssetType: string) => boolean;
   readonly targetAdmitsTestExecutionEvidence: (targetAssetType: string) => boolean;
   readonly isTenantLocalSdlcSurfaceRelativePath: (relativePath: string) => boolean;
+  readonly isTenantStackAuthoritySpecRelativePath: (relativePath: string) => boolean;
+  readonly isTenantDeclaredToolByproductRelativePath: (input: {
+    readonly manifest: SdlcWorkerHandoffManifest;
+    readonly normalizedRelativePath: string;
+  }) => boolean;
   readonly declaredBuildConfigRoleForObservedFile: (input: {
     readonly manifest: SdlcWorkerHandoffManifest;
     readonly normalizedRelativePath: string;
@@ -221,27 +226,12 @@ function normalizedRelativePath(relativePath: string): string {
   return relativePath.split(path.sep).join("/");
 }
 
-function isExecutionByproductPath(relativePath: string): boolean {
+function isSdlcRuntimeByproductPath(relativePath: string): boolean {
   const normalized = normalizedRelativePath(relativePath).toLowerCase();
 	return (
 		normalized === ".ai-workspace/runtime" ||
 		normalized.startsWith(".ai-workspace/runtime/") ||
-		normalized.includes("/.ai-workspace/runtime/") ||
-		normalized === "target" ||
-		normalized.startsWith("target/") ||
-		normalized.includes("/target/") ||
-    normalized.includes("/project/target/") ||
-    normalized === ".bsp" ||
-    normalized.startsWith(".bsp/") ||
-    normalized.includes("/.bsp/")
-  );
-}
-
-function isExecutionGeneratedBuildPropertiesPath(relativePath: string): boolean {
-  const normalized = normalizedRelativePath(relativePath).toLowerCase();
-  return (
-    normalized === "project/build.properties" ||
-    normalized.endsWith("/project/build.properties")
+		normalized.includes("/.ai-workspace/runtime/")
   );
 }
 
@@ -772,11 +762,31 @@ export function observeProductMaterializationDeltaWithDiagnostics(
     if (resolve(file.absolutePath) === resolve(input.manifest.outputFile)) {
       continue;
     }
+    if (deps.isTenantStackAuthoritySpecRelativePath(file.relativePath)) {
+      continue;
+    }
+    const normalized = normalizedRelativePath(file.relativePath);
+    const declaredProductRole =
+      deps.declaredProductAuthorityRoleForObservedFile({
+        manifest: input.manifest,
+        normalizedRelativePath: normalized
+      }) ??
+      deps.declaredBuildConfigRoleForObservedFile({
+        manifest: input.manifest,
+        normalizedRelativePath: normalized
+      });
+    if (
+      declaredProductRole === null &&
+      deps.isTenantDeclaredToolByproductRelativePath({
+        manifest: input.manifest,
+        normalizedRelativePath: normalized
+      })
+    ) {
+      continue;
+    }
     if (
       deps.targetIgnoresExecutionByproducts(input.manifest.targetAssetType) &&
-      (isExecutionByproductPath(file.relativePath) ||
-        (deps.targetAdmitsTestExecutionEvidence(input.manifest.targetAssetType) &&
-          isExecutionGeneratedBuildPropertiesPath(file.relativePath)))
+      isSdlcRuntimeByproductPath(file.relativePath)
     ) {
       continue;
     }

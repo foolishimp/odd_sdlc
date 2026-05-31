@@ -402,6 +402,13 @@ function isTenantLocalSdlcSurfaceRelativePath(relativePath: string): boolean {
   return tenantLocalPaths.includes(normalized);
 }
 
+function isTenantStackAuthoritySpecRelativePath(relativePath: string): boolean {
+  const normalized = normalizedRelativePath(relativePath).toLowerCase();
+  return /^(?:spec\/)?(?:tech_stack|testing_tech_stack|product_targets|execution_contract)\.(?:json|md|markdown)$/u.test(
+    normalized
+  );
+}
+
 function deriveOutputFileForTarget(input: {
   readonly defaultOutputRoot: string;
   readonly workspaceRoot: string;
@@ -2106,6 +2113,12 @@ function productMaterializationContract(input: {
   const testExecutionContract =
     input.conformedProject?.testExecutionContract ?? "undeclared";
   const tenantRoot = resolve(input.workspaceRoot, selectedOutputRoot);
+  const allowedByproductGlobs =
+    declaredTenantToolByproductGlobsForProductMaterialization({
+      workspaceRoot: input.workspaceRoot,
+      selectedOutputRoot,
+      tenantRoot
+    });
   return Object.freeze({
     kind: "sdlc_product_materialization_contract",
     required: requiredRoles.length > 0,
@@ -2123,7 +2136,8 @@ function productMaterializationContract(input: {
       targetAssetType: input.targetAssetType,
       tenantRoot,
       declaredModuleNames,
-      testExecutionContract
+      testExecutionContract,
+      allowedByproductGlobs
     })
   });
 }
@@ -2862,6 +2876,27 @@ function tenantStackSpecRoot(manifest: SdlcWorkerHandoffManifest): string {
   );
 }
 
+function tenantStackSpecFilesForSelectedOutputRoot(input: {
+  readonly workspaceRoot: string;
+  readonly selectedOutputRoot: string;
+}): readonly string[] {
+  const specRoot = join(input.workspaceRoot, input.selectedOutputRoot, "spec");
+  if (!existsSync(specRoot)) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(
+    readdirSync(specRoot, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(specRoot, entry.name))
+      .filter((filePath) =>
+        /(?:^|\/)(?:TECH_STACK|tech_stack|TESTING_TECH_STACK|testing_tech_stack|PRODUCT_TARGETS|product_targets|EXECUTION_CONTRACT|execution_contract)\.(?:json|md|markdown)$/u.test(
+          filePath.split(path.sep).join("/")
+        )
+      )
+      .sort()
+  );
+}
+
 function tenantStackAuthorityCanonicalSpecFile(
   manifest: SdlcWorkerHandoffManifest
 ): string {
@@ -2880,21 +2915,10 @@ function materializationAuthorityNeedsTenantStackRepair(
 function tenantStackSpecFiles(
   manifest: SdlcWorkerHandoffManifest
 ): readonly string[] {
-  const specRoot = tenantStackSpecRoot(manifest);
-  if (!existsSync(specRoot)) {
-    return Object.freeze([]);
-  }
-  return Object.freeze(
-    readdirSync(specRoot, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => join(specRoot, entry.name))
-      .filter((filePath) =>
-        /(?:^|\/)(?:TECH_STACK|tech_stack|TESTING_TECH_STACK|testing_tech_stack|PRODUCT_TARGETS|product_targets|EXECUTION_CONTRACT|execution_contract)\.(?:json|md|markdown)$/u.test(
-          filePath.split(path.sep).join("/")
-        )
-      )
-      .sort()
-  );
+  return tenantStackSpecFilesForSelectedOutputRoot({
+    workspaceRoot: manifest.workspaceRoot,
+    selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot
+  });
 }
 
 function tenantStackSpecRelativePaths(input: {
@@ -3057,6 +3081,188 @@ export function tenantToolEnvironmentProjectionFor(
     environmentVariableNames: uniqueSorted(
       projections.flatMap((entry) => entry.environmentVariableNames)
     )
+  });
+}
+
+function tenantToolByproductRulesFromUnknown(value: unknown): readonly string[] {
+  const record = objectRecord(value);
+  if (record === null) {
+    return Object.freeze([]);
+  }
+  const nestedKeys = [
+    "executionEnvironment",
+    "execution_environment",
+    "toolEnvironment",
+    "tool_environment",
+    "testingTechStack",
+    "testing_tech_stack",
+    "testTechStack",
+    "test_tech_stack"
+  ];
+  const nested = nestedKeys.flatMap((key) =>
+    tenantToolByproductRulesFromUnknown(record[key])
+  );
+  return uniqueSorted([
+    ...objectFieldsStringList(record, [
+      "cleanupRules",
+      "cleanup_rules",
+      "byproductRules",
+      "byproduct_rules",
+      "workspaceLocalDirectories",
+      "workspace_local_directories",
+      "localDirectories",
+      "local_directories",
+      "cacheDirectories",
+      "cache_directories",
+      "createdDirectories",
+      "created_directories"
+    ]),
+    ...nested
+  ]);
+}
+
+function declaredTenantToolByproductRulesFromSpecFiles(
+  specFiles: readonly string[]
+): readonly string[] {
+  return uniqueSorted(
+    specFiles.flatMap((filePath) => {
+      const source = textIfFile(filePath);
+      if (source === null) {
+        return [];
+      }
+      try {
+        return tenantToolByproductRulesFromUnknown(JSON.parse(source));
+      } catch {
+        return [];
+      }
+    })
+  );
+}
+
+function declaredTenantToolByproductRules(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return declaredTenantToolByproductRulesFromSpecFiles(
+    tenantStackSpecFiles(manifest)
+  );
+}
+
+function normalizeTenantToolByproductRuleForRoot(input: {
+  readonly rule: string;
+  readonly workspaceRoot: string;
+  readonly selectedOutputRoot: string;
+  readonly tenantRoot: string;
+}): string | null {
+  const expanded = input.rule
+    .replaceAll("${workspaceRoot}", input.workspaceRoot)
+    .replaceAll("{{workspaceRoot}}", input.workspaceRoot)
+    .replaceAll("${selectedOutputRoot}", input.selectedOutputRoot)
+    .replaceAll("{{selectedOutputRoot}}", input.selectedOutputRoot)
+    .replaceAll("${tenantRoot}", input.tenantRoot)
+    .replaceAll("{{tenantRoot}}", input.tenantRoot)
+    .trim();
+  if (expanded.length === 0) {
+    return null;
+  }
+  let normalized = expanded.split(path.sep).join("/");
+  const tenantRoot = resolve(input.tenantRoot);
+  if (isAbsolute(expanded)) {
+    const relativeToTenant = relative(tenantRoot, resolve(expanded));
+    if (
+      relativeToTenant === "" ||
+      relativeToTenant.startsWith("..") ||
+      isAbsolute(relativeToTenant)
+    ) {
+      return null;
+    }
+    normalized = relativeToTenant.split(path.sep).join("/");
+  }
+  const selectedOutputRoot = normalizedRelativePath(input.selectedOutputRoot).replace(/\/+$/u, "");
+  normalized = normalized
+    .replace(/^\.\//u, "")
+    .replace(/\/\*\*\/\*$/u, "")
+    .replace(/\/\*\*$/u, "")
+    .replace(/\/\*$/u, "")
+    .replace(/\/+$/u, "");
+  if (selectedOutputRoot.length > 0) {
+    if (normalized === selectedOutputRoot) {
+      return null;
+    }
+    if (normalized.startsWith(`${selectedOutputRoot}/`)) {
+      normalized = normalized.slice(selectedOutputRoot.length + 1);
+    }
+  }
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeTenantToolByproductRule(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly rule: string;
+}): string | null {
+  return normalizeTenantToolByproductRuleForRoot({
+    rule: input.rule,
+    workspaceRoot: input.manifest.workspaceRoot,
+    selectedOutputRoot: input.manifest.productMaterialization.selectedOutputRoot,
+    tenantRoot: input.manifest.productMaterialization.tenantRoot
+  });
+}
+
+function isTenantDeclaredToolByproductRelativePath(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly normalizedRelativePath: string;
+}): boolean {
+  const relativePath = input.normalizedRelativePath.replace(/\/+$/u, "");
+  return declaredTenantToolByproductRules(input.manifest).some((rule) => {
+    const normalizedRule = normalizeTenantToolByproductRule({
+      manifest: input.manifest,
+      rule
+    });
+    return (
+      normalizedRule !== null &&
+      (relativePath === normalizedRule ||
+        relativePath.startsWith(`${normalizedRule}/`))
+    );
+  });
+}
+
+function executionByproductGlobForNormalizedRule(rule: string): string {
+  const normalized = rule
+    .replace(/\\/gu, "/")
+    .replace(/^\.\//u, "")
+    .replace(/\/+$/u, "");
+  return normalized.endsWith("/**") ? normalized : `${normalized}/**`;
+}
+
+function declaredTenantToolByproductGlobsForProductMaterialization(input: {
+  readonly workspaceRoot: string;
+  readonly selectedOutputRoot: string;
+  readonly tenantRoot: string;
+}): readonly string[] {
+  const specFiles = tenantStackSpecFilesForSelectedOutputRoot({
+    workspaceRoot: input.workspaceRoot,
+    selectedOutputRoot: input.selectedOutputRoot
+  });
+  const declaredGlobs = declaredTenantToolByproductRulesFromSpecFiles(specFiles)
+    .map((rule) =>
+      normalizeTenantToolByproductRuleForRoot({
+        rule,
+        workspaceRoot: input.workspaceRoot,
+        selectedOutputRoot: input.selectedOutputRoot,
+        tenantRoot: input.tenantRoot
+      })
+    )
+    .filter((rule): rule is string => rule !== null)
+    .map(executionByproductGlobForNormalizedRule);
+  return uniqueSorted(declaredGlobs);
+}
+
+function allowedExecutionByproductGlobsForManifest(
+  manifest: SdlcWorkerHandoffManifest
+): readonly string[] {
+  return declaredTenantToolByproductGlobsForProductMaterialization({
+    workspaceRoot: manifest.workspaceRoot,
+    selectedOutputRoot: manifest.productMaterialization.selectedOutputRoot,
+    tenantRoot: manifest.productMaterialization.tenantRoot
   });
 }
 
@@ -4192,6 +4398,7 @@ function executionShardsFor(input: {
   readonly tenantRoot: string;
   readonly declaredModuleNames: readonly string[];
   readonly testExecutionContract: string;
+  readonly allowedByproductGlobs: readonly string[];
 }): SdlcProductMaterializationContract["executionShards"] {
   if (
     input.targetAssetType !== "component_test_surface" &&
@@ -4228,7 +4435,7 @@ function executionShardsFor(input: {
         expectedReportRefs: Object.freeze([
           `artifact://odd-sdlc/test-execution/${shardIdPart(moduleName)}`
         ]),
-        allowedByproductGlobs: Object.freeze(["target/**", ".bsp/**"]),
+        allowedByproductGlobs: Object.freeze([...input.allowedByproductGlobs]),
         requiredEvidenceKind: "sdlc_worker_execution_evidence" as const,
         retryPolicy: "same_shard_then_triage" as const
       })
@@ -6740,6 +6947,7 @@ function compactComponentDepthDirective(
         "componentTestRows[].requirementIds is the carrier field and must be a string array; product-file materialization records may use requirementTraceObligationIds, but componentTestRows must not.",
         "Materialize tests only against the admitted testcase authority, test stack profile, test decomposition summary, and test dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
         "Preserve testClassId/testcase allocation from the composite test design authority.",
+        "On re-entry, existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic: do not remove or narrow them unless Current evaluated gaps specifically cite that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing.",
         "On schema-local re-entry, repair the rejected component_depth_register fields first, then update only the affected test-file tags or register rows named by Current evaluated gaps."
       ].join(" ");
     case "component_test_qualification_surface":
@@ -6938,7 +7146,8 @@ function tenantStackAuthorityRepairDirectives(input: {
     "Do not embed tenant-stack authority inside component_depth_register, target-carrier payloads, worker reports, or runtime archives; the evaluator reads it from the tenant spec authority surface.",
     "If the initial bootstrap names or implies stack-specific construction pressure and the tenant stack is missing or underdefined, create or repair the tenant TECH_STACK/TESTING_TECH_STACK authority from bootstrap facts and ADR/design decisions before materializing executable product files.",
     "Populate the tenant stack authority from current product/context/bootstrap facts and ADR/design decisions such as language, runtime/module system, build tool, build execution contract, test runner, test syntax, and test execution contract; declare buildConfigTargets or testBuildConfigTargets only when those config files are declared or materialized.",
-    "If bootstrap or ADR context implies concrete tool execution assumptions, put them in TECH_STACK.json or TESTING_TECH_STACK.json as tenant-owned executionEnvironment/toolEnvironment declarations: host/cache policy, workspaceLocalDirectories, and environmentVariables. Core SDLC consumes those declarations generically; it must not supply ecosystem-specific hidden defaults."
+    "If bootstrap or ADR context implies concrete tool execution assumptions, put them in TECH_STACK.json or TESTING_TECH_STACK.json as tenant-owned executionEnvironment/toolEnvironment declarations: host/cache policy, workspaceLocalDirectories, and environmentVariables. Core SDLC consumes those declarations generically; it must not supply ecosystem-specific hidden defaults.",
+    "Tenant workspaceLocalDirectories are transient tool/cache/work directories only. Do not list declared product source, test, build_config, design, or documentation target directories as tool-local/byproduct directories."
   ]);
 }
 
@@ -7135,7 +7344,7 @@ function outcomeDirectivesForWorker(
         ? manifest.targetAssetType === "component_test_surface"
           ? "Component test files required by this edge are product materialization under the selected output root; operator-run asset archives may hold evidence, but they do not satisfy role=test product materialization."
           : "Declared product file target set is empty; do not leave tenant-root build/test byproducts as product materialization."
-	        : "Declared product file targets are the exact product surface for this edge. Build/test byproducts not listed as declared product targets, including Cargo.lock, target/, node_modules/, __pycache__/, dist/, coverage/, and .ai-workspace/runtime/, must not be listed as materialized product files. Allowed execution byproducts may remain only when covered by execution shard allowedByproductGlobs; otherwise write transient evidence under operator-run roots or clean byproducts after capturing execution evidence.",
+	        : "Declared product file targets are the exact product surface for this edge. Build/test byproducts not listed as declared product targets must not be listed as materialized product files. Tenant-declared allowed byproducts may remain only when covered by execution shard allowedByproductGlobs; otherwise write transient evidence under operator-run roots or clean byproducts after capturing execution evidence.",
       `Product authority reconciliation: ${productMaterializationAuthority.status}; reasons: ${listForPrompt(productMaterializationAuthority.reasonRefs)}.`,
       `Allowed write roots: ${listForPrompt(manifest.allowedWriteRoots.map((root) => workerFacingPath(manifest, root)))}.`,
       "Do not use /tmp or any outside-workspace path for temporary build/test evidence; write transient logs under allowed write roots.",
@@ -7219,6 +7428,7 @@ function outcomeDirectivesForWorker(
       directives.push(
         "For component_test_surface, materialize developer test files for each declared test class/file and record Component Test Register evidence.",
 	        "On component_test_surface re-entry after partial materialization, first inventory existing framework-discoverable test files under the selected output root, then complete missing declared test classes and the component_test_surface carrier before broad source review.",
+	        "Partial materialization re-entry must preserve existing testcaseIds, requirementIds, source-overlap rows, and test-file lineage unless a current evaluated gap names that exact row or obligation as wrong; never reduce the proof surface to make execution easier.",
 	        "When declared product file targets are empty, derive test product file targets from admitted composite test design and materialize them under selected output root. Choose framework-discoverable test paths from the admitted tenant test stack authority or design rows; do not use a language-specific default in the SDLC prompt.",
 	        "payload.componentTestRows[].relativePath must name the tenant-relative or selected-output-root-prefixed product test file path. Do not point componentTestRows at .ai-workspace/runtime asset paths; those paths are evidence archives, not product test files.",
 	        "Generated test files are authored for the matching workerInvocationPackage.productMaterialization.executionShards[].workingDirectory; the installed operator executes the declared shard command after this transform returns.",
@@ -8148,6 +8358,10 @@ function currentEvaluatedGapPromptLines(
         `[class=${reason.reasonClass}; code=${reason.blockingReason.code}; reentry=${reason.blockingReason.lawfulReentryPoint}]`
       ].join(" ");
     });
+  const hasExecutionEnvironmentGap = promptReasons.some((reason) =>
+    reason.reason.includes("execution_environment") ||
+    reason.blockingReason.detail?.includes("execution_environment") === true
+  );
   return Object.freeze([
     "",
     "Current evaluated gaps:",
@@ -8174,6 +8388,14 @@ function currentEvaluatedGapPromptLines(
           `- evidence refs: ${evidenceRefs
             .slice(0, CURRENT_EVALUATED_GAP_PROMPT_EVIDENCE_LIMIT)
             .join(", ")}`
+        ]
+      : []),
+    ...(hasExecutionEnvironmentGap
+      ? [
+          "- execution-environment repair rule:",
+          "  - Repair executable environment blockers through tenant stack authority, build/test config, wrappers, or runner invocation evidence.",
+          "  - Do not remove tests, testcase ids, requirement ids, source-overlap rows, or lineage tags to make an execution-environment blocker disappear.",
+          "  - Preserve the existing semantic proof surface unless the evaluator specifically cited that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing."
         ]
       : []),
     "- evaluator reasons:",
@@ -8321,9 +8543,9 @@ export function promptForHandoff(manifest: SdlcWorkerHandoffManifest): string {
     "- IO cap: reads <=80 lines. jq/rg/cat/git diff/status end `| head -80`; no bare jq/rg/cat. sed is inclusive: end-start+1<=80; `200,299p` invalid (100), use `200,279p`.",
     "- For existing output, use targeted Edit/small operations; no full old/new artifact dumps.",
     "- Apply tenantToolEnvironment; do not run tools the tenant disables.",
-    "- Agent subworkstreams are optional; split only from admitted work-plan, dependency, target-carrier, authority, and obligation refs.",
+    "- You may use agent-internal subagents or parallel workstreams as optional local compute strategy; split only from admitted work-plan, dependency, target-carrier, tranche, authority, and obligation refs.",
     `- If used, update ${workerFacingPath(manifest, manifest.subworkstreamManifestFile)}; otherwise leave the default not-started manifest honest.`,
-    "- Subworkstreams are observation only: no ABG events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
+    "- Subworkstreams are not ABG branches. They are observation only: no ABG events, ledgers, closure, traversal, consequence, or branch leases; parent owns merge.",
     "- Do not inspect odd_sdlc framework source code or installed runtime source to infer carrier schemas.",
     "- Do not render target-carrier protocol fields unless an outcome directive asks for a structured carrier.",
     "- Read boundary: use only workspace-relative paths; do not read/cite/copy sibling sandboxes, historical test_runs, home memory, /tmp, or outside-workspace absolute paths.",
@@ -10433,6 +10655,8 @@ function productMaterializationObservationDeps(): ProductMaterializationObservat
     targetIgnoresExecutionByproducts,
     targetAdmitsTestExecutionEvidence,
     isTenantLocalSdlcSurfaceRelativePath,
+    isTenantStackAuthoritySpecRelativePath,
+    isTenantDeclaredToolByproductRelativePath,
     declaredBuildConfigRoleForObservedFile,
     declaredProductAuthorityRoleForObservedFile,
     effectiveProductMaterializationRequiredRoles,
@@ -10849,7 +11073,9 @@ function installedOperatorExecutionShards(
         timeoutMs: runtimePolicy.executionShardTimeoutMs,
         inactivityTimeoutMs: runtimePolicy.executionShardInactivityTimeoutMs,
         expectedReportRefs: Object.freeze([row.scheduleRef]),
-        allowedByproductGlobs: Object.freeze(["target/**", ".bsp/**"]),
+        allowedByproductGlobs: Object.freeze([
+          ...allowedExecutionByproductGlobsForManifest(manifest)
+        ]),
         requiredEvidenceKind: "sdlc_worker_execution_evidence" as const,
         retryPolicy: "same_shard_then_triage" as const
       })
@@ -11494,7 +11720,7 @@ export function buildPostTransformWorkerResultReport(input: {
     manifest: input.manifest,
     content
   });
-  return Object.freeze({
+  const report = Object.freeze({
     kind: "odd_sdlc.worker_result_report" as const,
     projectionRole: "typed_fp_stage_projection" as const,
     authoritativeStageResultRef: expectedFpEvaluateResultRef(input.manifest),
@@ -11525,6 +11751,10 @@ export function buildPostTransformWorkerResultReport(input: {
     fpTransformStatusSnapshot:
       input.manifest.fpTransformRequest === null ? null : "returned",
     fpEvaluateResultRef: expectedFpEvaluateResultRef(input.manifest)
+  });
+  return workerReportWithMaterializedRequirementLineage({
+    manifest: input.manifest,
+    report
   });
 }
 
@@ -11688,6 +11918,7 @@ function productMaterializationReplayDeps(): ProductMaterializationReplayDeps {
     currentAttemptMaterializedFile,
     replayMaterializedFile,
     admitReplayManifestMaterializedProductFile,
+    isTenantDeclaredToolByproductRelativePath,
     materializedFileLineageRef
   };
 }

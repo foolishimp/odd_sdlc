@@ -79,6 +79,7 @@ import {
   readWorkerResultReport,
   resolveSdlcEdgeGainClosureContract,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
+  sdlcWorkerAssessmentCarriesRequirementTransformationSet,
   sha256Text,
   snapshotProductMaterializationRoot,
   writeHandoffFiles,
@@ -612,7 +613,12 @@ function writeTenantTechnologyStackSpec(
   const tenantRoot = path.join(workspaceRoot, constraints.selectedOutputRoot);
   const stackSpecFile = path.join(tenantRoot, "spec/TECH_STACK.json");
   const buildConfigTargets = options.buildConfigTargets ?? [];
-  if (buildConfigTargets.length === 0 && existsSync(stackSpecFile)) {
+  const byproductRules = options.byproductRules ?? [];
+  if (
+    buildConfigTargets.length === 0 &&
+    byproductRules.length === 0 &&
+    existsSync(stackSpecFile)
+  ) {
     return;
   }
   const helloWorldJavascript =
@@ -650,7 +656,8 @@ function writeTenantTechnologyStackSpec(
           environmentVariables: {
             TEST_STACK_HOME:
               "${workspaceRoot}/.ai-workspace/runtime/odd_sdlc/tool-cache/test-stack"
-          }
+          },
+          ...(byproductRules.length > 0 ? { byproductRules } : {})
         },
         ...(buildConfigTargets.length > 0 ? { buildConfigTargets } : {}),
         testingTechStack: {
@@ -2139,7 +2146,9 @@ test("T-164 post-transform closes duplicate requirement aliases from canonical t
     "src/main/scala/generated/DataMapper.scala"
   );
   const source = [
-    ...invocationPackage.requirementTraceObligationIds.map((id) => `// ${id}`),
+    ...invocationPackage.requirementTraceObligationIds.map(
+      (id) => `// requirement:${id}`
+    ),
     "package generated",
     "object DataMapper"
   ].join("\n");
@@ -2160,7 +2169,149 @@ test("T-164 post-transform closes duplicate requirement aliases from canonical t
     true,
     JSON.stringify(requirementAssessments, null, 2)
   );
+  assert.deepEqual(
+    report.materializedFiles[0].requirementTraceObligationIds,
+    invocationPackage.requirementTraceObligationIds
+  );
   assert.equal(postflight.status, "passed", JSON.stringify(postflight.blockingReasons));
+});
+
+test("T-164 post-transform observation excludes tenant stack authority specs from component product files", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-tenant-stack-authority-not-component-product"
+  });
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  writeOutputSurface(manifest, "component_code_surface");
+  const specRoot = path.join(manifest.productMaterialization.tenantRoot, "spec");
+  mkdirSync(specRoot, { recursive: true });
+  writeFileSync(
+    path.join(specRoot, "TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        language: "scala",
+        buildTool: "sbt",
+        cleanupRules: [".tool-cache/", "project/.sbtboot/"],
+        toolEnvironment: {
+          workspaceLocalDirectories: [".tool-cache/"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  writeFileSync(
+    path.join(specRoot, "TESTING_TECH_STACK.json"),
+    `${JSON.stringify({ testRunner: "sbt test" }, null, 2)}\n`,
+    "utf8"
+  );
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/main/scala/generated/DataMapper.scala"
+  );
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(
+    sourcePath,
+    [
+      "// requirement:requirement:REQ-T066-001",
+      "package generated",
+      "object DataMapper"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  const cachePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    ".tool-cache/cache.bin"
+  );
+  mkdirSync(dirname(cachePath), { recursive: true });
+  writeFileSync(cachePath, "tool cache byproduct\n", "utf8");
+  const fallbackBootPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "project/.sbtboot/java9-rt-ext/rt.jar"
+  );
+  mkdirSync(dirname(fallbackBootPath), { recursive: true });
+  writeFileSync(fallbackBootPath, "fallback boot byproduct\n", "utf8");
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+  const relativePaths = report.materializedFiles.map((file) => file.relativePath);
+
+  assert.equal(relativePaths.includes("spec/TECH_STACK.json"), false);
+  assert.equal(relativePaths.includes("spec/TESTING_TECH_STACK.json"), false);
+  assert.equal(relativePaths.includes(".tool-cache/cache.bin"), false);
+  assert.equal(
+    relativePaths.includes("project/.sbtboot/java9-rt-ext/rt.jar"),
+    false
+  );
+  assert.equal(
+    relativePaths.includes("src/main/scala/generated/DataMapper.scala"),
+    true
+  );
+});
+
+test("T-164 execution shards project tenant-declared byproduct rules", () => {
+  const workspace = makeExecutionWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const specRoot = path.join(workspace, constraints.selectedOutputRoot, "spec");
+  mkdirSync(specRoot, { recursive: true });
+  writeFileSync(
+    path.join(specRoot, "TECH_STACK.json"),
+    `${JSON.stringify(
+      {
+        kind: "sdlc_tenant_technology_stack_description",
+        cleanupRules: ["project/.sbtboot/", ".tool-cache/"],
+        testingTechStack: {
+          cleanupRules: ["project/.boot/"],
+          toolEnvironment: {
+            workspaceLocalDirectories: ["project/.ivy/"]
+          }
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 10,
+    contract,
+    projectConstraints: constraints,
+    runId: "t164-tenant-byproduct-shards"
+  });
+  const shard = manifest.productMaterialization.executionShards[0];
+
+  assert.notEqual(shard, undefined);
+  assert.deepEqual(
+    shard.allowedByproductGlobs.filter((glob) =>
+      [
+        ".tool-cache/**",
+        "project/.boot/**",
+        "project/.ivy/**",
+        "project/.sbtboot/**"
+      ].includes(glob)
+    ),
+    [
+      ".tool-cache/**",
+      "project/.boot/**",
+      "project/.ivy/**",
+      "project/.sbtboot/**"
+    ]
+  );
 });
 
 test("T-164 product lineage admits full requirement set beyond prompt slice", () => {
@@ -2653,12 +2804,13 @@ test("T-158 F_P.evaluate keeps report admission distinct from open obligation cl
   assert.equal(result.obligationAssessmentCounts.blocked, 1);
 });
 
-test("T-002 component-code materialization ignores build execution byproducts", () => {
+test("T-002 component-code materialization ignores tenant-declared build execution byproducts", () => {
   const workspace = makeWorkspace();
   declareScalaSbtTestRunner(workspace);
   writeAdmittedStagedAuthoritySurfaces(workspace);
   writeTenantTechnologyStackSpec(workspace, {
-    buildConfigTargets: ["project/"]
+    buildConfigTargets: ["project/"],
+    byproductRules: ["target/", ".bsp/"]
   });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_code_surface");
@@ -4986,6 +5138,134 @@ test("T-160 product materialization authority admits plain Product Files section
   ]);
 });
 
+test("T-187 declared product targets outrank tenant tool-local directory rules", () => {
+  const workspace = makeWorkspace();
+  writeFileSync(
+    path.join(workspace, "specification/PRODUCT.md"),
+    [
+      "# Product",
+      "",
+      "- active tenant: hello_world_javascript",
+      "- selected output root: build_tenants/hello_world_javascript",
+      "",
+      "## Product Files",
+      "",
+      "- `build_tenants/hello_world_javascript/src/hello.js` role=source",
+      "- `build_tenants/hello_world_javascript/test/hello.test.js` role=test"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, ".ai-workspace/context/project_constraints.yml"),
+    [
+      "project:",
+      "  name: t187_declared_product_targets",
+      "active_tenant: hello_world_javascript",
+      "selected_output_root: build_tenants/hello_world_javascript",
+      "ambiguity_risk_appetite: low",
+      "tenant_test_execution_contract: node --test test/hello.test.js",
+      "build_tenants:",
+      "  hello_world_javascript:",
+      "    output_dir: build_tenants/hello_world_javascript",
+      "    language: JavaScript",
+      "    build_tool: node",
+      "    test_runner: node --test",
+      "    module_structure:",
+      "      - hello_world_javascript"
+    ].join("\n"),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(workspace, "specification/requirements/01-fixture.md"),
+    [
+      "# Requirements",
+      "",
+      "REQ-T187-PM-001: Generate src/hello.js and test/hello.test.js."
+    ].join("\n"),
+    "utf8"
+  );
+  materializeSdlcProjectConformance({ workspaceRoot: workspace });
+  writeAdmittedStagedAuthoritySurfaces(workspace);
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const stackSpecFile = path.join(
+    workspace,
+    constraints.selectedOutputRoot,
+    "spec/TECH_STACK.json"
+  );
+  const stackSpec = JSON.parse(readFileSync(stackSpecFile, "utf8"));
+  stackSpec.executionEnvironment = {
+    ...(stackSpec.executionEnvironment ?? {}),
+    workspaceLocalDirectories: ["src", "test"],
+    byproductRules: ["src", "test"]
+  };
+  writeFileSync(stackSpecFile, `${JSON.stringify(stackSpec, null, 2)}\n`, "utf8");
+  const contract = hookContractByEdgeName(FG_DERIVE_LITE_COMPONENT_CODE_SURFACE);
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: FG_FRAMEWORK_SMOKE_MIN_FP_EXECUTIVE,
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    projectConstraints: constraints,
+    runId: "t187-product-targets-outrank-tool-local-dirs"
+  });
+  assert.deepStrictEqual(declaredProductFileTargets(manifest), [
+    "build_tenants/hello_world_javascript/src/hello.js",
+    "build_tenants/hello_world_javascript/test/hello.test.js"
+  ]);
+  const before = snapshotProductMaterializationRoot(
+    manifest.productMaterialization
+  );
+  writeHandoffFiles(manifest);
+  writeOutputSurface(manifest, "component_code_surface");
+  const sourcePath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "src/hello.js"
+  );
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(
+    sourcePath,
+    [
+      "// requirement:t187_declared_product_targets.requirements.req_t187_pm_001",
+      "export function hello() { return 'Hello, world!'; }"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+  const testPath = path.join(
+    manifest.productMaterialization.tenantRoot,
+    "test/hello.test.js"
+  );
+  mkdirSync(dirname(testPath), { recursive: true });
+  writeFileSync(
+    testPath,
+    [
+      "// requirement:t187_declared_product_targets.requirements.req_t187_pm_001",
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { hello } from '../src/hello.js';",
+      "test('hello', () => assert.equal(hello(), 'Hello, world!'));"
+    ].join("\n") + "\n",
+    "utf8"
+  );
+
+  const report = buildPostTransformWorkerResultReport({ manifest, before });
+
+  assert.deepStrictEqual(
+    report.materializedFiles.map((file) => [file.relativePath, file.role]),
+    [
+      ["src/hello.js", "source"],
+      ["test/hello.test.js", "test"]
+    ]
+  );
+  assert.equal(
+    report.obligationAssessments.find(
+      (assessment) =>
+        assessment.obligationId === "target_asset:component_code_surface"
+    )?.fulfillmentStatus,
+    "fulfilled"
+  );
+});
+
 test("T-102 post-transform observation admits existing discoverable test files", () => {
   const workspace = makeWorkspace();
   const testRelativePath =
@@ -5061,8 +5341,11 @@ test("T-102 post-transform observation admits existing discoverable test files",
   assert.equal(postflight.status, "passed");
 });
 
-test("T-102 post-transform observation ignores component-test build byproducts", () => {
+test("T-102 post-transform observation ignores tenant-declared component-test build byproducts", () => {
   const workspace = makeWorkspace();
+  writeTenantTechnologyStackSpec(workspace, {
+    byproductRules: ["cdme-compiler/target/", ".bsp/"]
+  });
   const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
   const contract = hookContractByEdgeName("derive_component_test_surface");
   const manifest = deriveWorkerHandoffManifest({
@@ -6540,6 +6823,44 @@ test("T-083 component-code carries test-design requirements downstream", () => {
       testRequirementAssessment
     )
   );
+  assert(
+    sdlcWorkerAssessmentCarriesRequirementTransformationSet({
+      manifest,
+      assessment: testRequirementAssessment
+    })
+  );
+  const edgeFulfillment = deriveSdlcEdgeFulfillmentCountsFromAssessments({
+    declaredObligationIds: [testRequirementAssessment.obligationId],
+    assessments: [
+      {
+        obligationId: testRequirementAssessment.obligationId,
+        fulfillmentStatus: testRequirementAssessment.fulfillmentStatus,
+        evidenceRefs: testRequirementAssessment.evidenceRefs,
+        ...(sdlcWorkerAssessmentCarriesRequirementTransformationSet({
+          manifest,
+          assessment: testRequirementAssessment
+        })
+          ? {
+              carryDirection: "downstream_transformation_set",
+              downstreamGraphFunctionRefs: [
+                "graph-function://odd-sdlc/materialize_declared_product_asset"
+              ],
+              targetBindingRefs: [
+                "target-binding://odd-sdlc/materialized-product"
+              ]
+            }
+          : {})
+      }
+    ]
+  });
+  assert.equal(
+    edgeFulfillment.nonConvergedReasonRefs.includes(
+      testRequirementAssessment.obligationId
+    ),
+    false,
+    JSON.stringify(edgeFulfillment, null, 2)
+  );
+  assert.equal(edgeFulfillment.downstreamTransformationSetRefs.length, 1);
   const postflight = evaluateSdlcComputeStage({ manifest, report });
   assert.equal(
     postflight.blockingReasons.some((reason) =>

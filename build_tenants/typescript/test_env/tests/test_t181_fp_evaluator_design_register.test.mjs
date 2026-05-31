@@ -1684,7 +1684,9 @@ test("T-181 installed operator declares an F_P evaluation rule for register popu
   assert.match(evaluatorPromptSource, /Do not spend the run enumerating every requirement id before writing the register/u);
   assert.match(evaluatorPromptSource, /Draft-row timeout is worse than an admitted pressure map/u);
   assert.match(evaluatorPromptSource, /Script output budget before first evaluator update: the only script allowed/u);
-  assert.match(evaluatorPromptSource, /same-path draft-to-fragment register update/u);
+  assert.match(evaluatorPromptSource, /named carrier-helper update/u);
+  assert.match(evaluatorPromptSource, /First-update carrier helper contract/u);
+  assert.match(evaluatorPromptSource, /DESIGN_DEPTH_DRAFT_FRAGMENT_UPDATE_HELPER_CONTRACT_REF/u);
   assert.match(evaluatorPromptSource, /Bounded first-pass register target/u);
   assert.match(evaluatorPromptSource, /It is acceptable to rewrite the content register multiple times while converging/u);
   assert.match(evaluatorPromptSource, /Stdout is an agent work trace, not evaluation truth/u);
