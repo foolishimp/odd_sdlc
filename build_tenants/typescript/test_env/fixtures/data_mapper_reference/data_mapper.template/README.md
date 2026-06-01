@@ -49,7 +49,7 @@ active operating surfaces.
 
 ```bash
 cp -R /Users/jim/src/apps/odd_sdlc/build_tenants/typescript/test_env/fixtures/data_mapper_reference/data_mapper.template \
-      /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.testXX
+      <throwaway-data-mapper-workspace>
 ```
 
 2. Build the current local `odd_sdlc.TS` source.
@@ -65,7 +65,7 @@ npm run build:semantic
 cd /Users/jim/src/apps/odd_sdlc/build_tenants/typescript
 ODD_SDLC_TS_OUTPUT=json \
 node build/semantic/code/src/cli/main.js install \
-  --target /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.testXX \
+  --target <throwaway-data-mapper-workspace> \
   --installed-package-name odd-sdlc-data-mapper-testXX \
   --package-source /Users/jim/src/apps/odd_sdlc/build_tenants/typescript \
   --abg-package-source /Users/jim/src/apps/abiogenesis/build_tenants/abiogenesis/typescript
@@ -80,7 +80,7 @@ This install command runs the ABG TypeScript installer as part of the
 4. Change into the new workspace and run gap analysis first.
 
 ```bash
-cd /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.testXX
+cd <throwaway-data-mapper-workspace>
 node_modules/.bin/odd-sdlc-ts gaps --workspace .
 ```
 

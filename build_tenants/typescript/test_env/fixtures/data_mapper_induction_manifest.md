@@ -7,7 +7,7 @@ This checked-in fixture is copied from the historical
 TypeScript test environment.
 
 It is intentionally local-only. Tests that use this fixture must not read
-`/Users/jim/src/apps/ai_sdlc_examples` and must not require
+external workspace templates and must not require
 `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT`.
 
 ## Purpose

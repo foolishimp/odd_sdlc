@@ -17,7 +17,8 @@ qualification.
   `build_tenants/typescript/test_env/fixtures/data_mapper_reference/data_mapper.template`
 - Script: `npm run test:reference:data-mapper`
 
-The environment variable is now an override for intentionally testing another
-fixture root. If the default or override path is absent, the reference lane fails
-with a governed fixture diagnostic. That failure is not semantic-lane product
-failure.
+The environment variable is an internal fixture selector only. It must resolve
+under `build_tenants/typescript/test_env/fixtures`; internal scenarios must not
+read or write `ai_sdlc_examples` template roots. If the default or override path
+is absent, the reference lane fails with a governed fixture diagnostic. That
+failure is not semantic-lane product failure.

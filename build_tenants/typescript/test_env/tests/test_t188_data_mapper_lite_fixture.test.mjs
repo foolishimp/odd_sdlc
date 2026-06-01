@@ -12,6 +12,10 @@ import {
   DATA_MAPPER_LITE_SOURCE_FILES,
   assertDataMapperLiteFixtureTraceability
 } from "../fixtures/data_mapper_lite_fixture.mjs";
+import {
+  DATA_MAPPER_TEMPLATE_ROOT_ENV,
+  canonicalDataMapperFixtureRoot
+} from "../fixtures/data_mapper_fixture.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, "../..");
@@ -53,5 +57,25 @@ test("T-188 data_mapper-lite lifecycle runner binds the lite fixture and test li
   assert.match(runner, /executionEvidenceTestsObserved/u);
   for (const requirementId of DATA_MAPPER_LITE_SELECTED_REQUIREMENT_IDS) {
     assert.match(fixtureRequirements, new RegExp(requirementId, "u"));
+  }
+});
+
+test("T-188 data_mapper internal scenarios reject external template roots", () => {
+  const prior = process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV];
+  try {
+    process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV] =
+      "/external/data_mapper.template";
+    assert.throws(
+      () => canonicalDataMapperFixtureRoot(),
+      /External data_mapper\.template roots are not valid for internal scenarios/u
+    );
+    process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV] = DATA_MAPPER_LITE_FIXTURE_ROOT;
+    assert.equal(canonicalDataMapperFixtureRoot(), DATA_MAPPER_LITE_FIXTURE_ROOT);
+  } finally {
+    if (prior === undefined) {
+      delete process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV];
+    } else {
+      process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV] = prior;
+    }
   }
 });

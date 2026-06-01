@@ -27,4 +27,6 @@ test("T-040 semantic lane excludes optional reference fixtures from required clo
   assert.match(manifest, /Lane: optional local reference comparison/);
   assert.match(manifest, /test_env\/fixtures\/data_mapper_reference\/data_mapper\.template/);
   assert.match(manifest, /ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT/);
+  assert.match(manifest, /internal fixture selector only/);
+  assert.match(manifest, /must not\s+read or write `ai_sdlc_examples` template roots/u);
 });

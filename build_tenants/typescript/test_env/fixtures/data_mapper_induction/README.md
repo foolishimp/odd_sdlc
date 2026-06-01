@@ -40,18 +40,15 @@ Use this procedure for older `genesis_sdlc` runs such as `data_mapper.testXX` on
 
 For the current `odd_method` / `odd_sdlc` line, use the active RC installer and the installed workspace bootloader generated into the new run. Treat the commands below as historical provenance unless they match the current installed runtime guidance.
 
-1. Copy the template.
-
-```bash
-cp -R /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.template \
-      /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.testXX
-```
+1. Copy this checked-in fixture into a throwaway workspace under the current
+   test run archive. Do not read from or write to `ai_sdlc_examples` template
+   roots for internal scenarios.
 
 2. Install the current local `genesis_sdlc` source into the new workspace.
 
 ```bash
 python /Users/jim/src/apps/genesis_sdlc/build_tenants/abiogenesis/python/src/genesis_sdlc/release/install.py \
-  --target /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.testXX \
+  --target <throwaway-data-mapper-workspace> \
   --source /Users/jim/src/apps/genesis_sdlc \
   --project-slug data_mapper_testXX
 ```
@@ -59,7 +56,7 @@ python /Users/jim/src/apps/genesis_sdlc/build_tenants/abiogenesis/python/src/gen
 3. Change into the new workspace and run gap analysis first.
 
 ```bash
-cd /Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.testXX
+cd <throwaway-data-mapper-workspace>
 PYTHONPATH=.gsdlc/release:.genesis python -m genesis gaps --workspace .
 ```
 
