@@ -284,6 +284,7 @@ export {
   SDLC_EVALUATE_AUTHORITY_FUNCTIONS,
   SDLC_EVALUATE_C_PLUGIN_SURFACE,
   SDLC_EVALUATE_CONTENT_CARRIER_FAMILIES,
+  sdlcFpEvaluateOpenObligationPressureRefs,
   sdlcEvaluateContentRegisterPath,
   writeDesignDepthDraftFragmentContentRegisterUpdate,
   writeDesignDepthRegisterProjectionFromEvaluateContentRegister,

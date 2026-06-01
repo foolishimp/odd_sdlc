@@ -102,7 +102,7 @@ requirement authority, `Fg_ingress_project` ownership,
 bootstrap gap outputs, and `InputSet -> Project`/requirement lineage. It does
 not depend on local filesystem fixtures.
 
-The full external `data_mapper.template` fixture is retained as optional local
+The full repo-local `data_mapper.template` fixture is retained as optional local
 reference comparison through `npm run test:reference:data-mapper` and
 `test_env/fixtures/data_mapper_reference_manifest.md`. It is an independent
 qualification workload, not part of `odd_sdlc` product scope.
@@ -154,10 +154,11 @@ Canonical file:
 
 - `test_env/tests/test_t040_fixture_portability.test.mjs`
 
-The lane proves required semantic closure excludes external reference fixtures.
+The lane proves required semantic closure excludes optional reference fixtures.
 The `data_mapper.template` reference proof is explicitly classified as optional
 local reference comparison and is run through `npm run test:reference:data-mapper`
-when `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT` is provided.
+from the repo-local fixture by default. `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT`
+overrides that default only when intentionally testing another fixture root.
 
 ## T-033 Public Start Lane
 

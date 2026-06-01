@@ -73,8 +73,7 @@ export const ODD_SDLC_TYPESCRIPT_RC_QUALIFICATION_REPORT = Object.freeze({
     Object.freeze({
       name: "data_mapper reference comparison",
       category: "reference",
-      command:
-        "ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template npm run test:reference:data-mapper",
+      command: "npm run test:reference:data-mapper",
       status: "optional_passed",
       evidenceRef:
         "build_tenants/typescript/test_env/fixtures/data_mapper_reference_manifest.md"

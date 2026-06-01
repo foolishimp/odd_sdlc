@@ -3,7 +3,7 @@ id: T-185
 title: Agent-internal subworkstreams for compute-stage acceleration
 type: feature
 ticket_category: ordinary
-status: active
+status: completed
 goal: accelerate-heavy-fp-compute-without-replacing-abg-runtime-authority
 build_tenant: typescript
 owner: odd_sdlc
@@ -13,7 +13,8 @@ re_entry_point: design
 priority: high
 triaged_at: 2026-05-28
 created_at: 2026-05-28
-updated_at: 2026-05-31
+updated_at: 2026-06-01
+completed_at: 2026-06-01
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -30,7 +31,7 @@ source_documents:
   - /Users/jim/src/apps/specification_methodology/specification/standards/ODD_METHOD.md
 related_tickets:
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
-  - .ai-workspace/tickets/active/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
+  - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
   - .ai-workspace/tickets/completed/T-172-realize-staged-disambiguation-graph-and-decomposition-admission.md
   - .ai-workspace/tickets/completed/T-173-compile-feature-dependency-dag-for-scheduling.md
   - .ai-workspace/tickets/completed/T-174-publish-live-fp-parallel-materialization-frontier.md
@@ -323,10 +324,12 @@ tranche/authority/obligation refs, and states that subworkstreams are not ABG
 branches. `npm run build:semantic` passes and focused
 `test_t181`/`test_t184`/`test_t185`/`test_t187`/`test_t188` passes 68/68.
 
-T-185 still remains open for high-scale proof: the 2026-05-31 data-mapper
+T-185 closed on 2026-06-01 for Phase 1 permission/manifest compatibility:
+the 2026-05-31 data-mapper
 operator archive reached close through the normal lifecycle, but the observed
 subworkstream manifests were empty, so it proves compatibility rather than
-meaningful subworkstream acceleration.
+meaningful subworkstream acceleration. Meaningful heavy-work acceleration and
+depth-through-iteration responsibility is intentionally moved to T-188.
 
 ## Product Fit
 

@@ -112,6 +112,7 @@ test("T-188 data_mapper live scripts run the boundary guard before live executio
     "test:t164:data-mapper-full-capability-live",
     "test:t164:data-mapper-full-capability-live:resume",
     "test:t171:data-mapper-lifecycle-live",
+    "test:t188:data-mapper-lite-lifecycle-live",
     "live:data-mapper-sandbox"
   ];
   assert.equal(
@@ -158,4 +159,17 @@ test("T-188 data_mapper live runbook declares the framework write lock", () => {
   assert.match(content, /Framework Write Lock/u);
   assert.match(content, /Do not patch odd_sdlc source merely because/u);
   assert.match(content, /resume the failed node instead of starting a new sandbox/u);
+});
+
+test("T-188 review-grade prompt forbids single-language public-boundary inspection", () => {
+  const content = readFileSync(
+    path.join(PACKAGE_ROOT, "code/src/operator/plugins/evaluate/prompts.ts"),
+    "utf8"
+  );
+
+  assert.match(content, /tenant-declared stack authority/u);
+  assert.match(content, /Do not assume a single source language/u);
+  assert.match(content, /Never filter public-boundary inspection to one extension family/u);
+  assert.match(content, /hard-coded sample product helper names/u);
+  assert.match(content, /A review helper that only recognizes one implementation language is evaluator failure/u);
 });

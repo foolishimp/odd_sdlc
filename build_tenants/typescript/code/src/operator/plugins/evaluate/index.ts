@@ -6,6 +6,7 @@ export const SDLC_EVALUATE_C_PLUGIN_SURFACE =
 export {
   constructSdlcFpEvaluateResult,
   evaluateSdlcComputeStage,
+  sdlcFpEvaluateOpenObligationPressureRefs,
   writeSdlcFpEvaluateResult
 } from "./postflight.js";
 export {

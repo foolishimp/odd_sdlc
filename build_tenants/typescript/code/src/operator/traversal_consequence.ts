@@ -442,6 +442,7 @@ export function deriveSdlcEdgeFulfillmentCountsFromAssessments(input: {
   >();
   const duplicateRefs: string[] = [];
   const extraRefs: string[] = [];
+  const downstreamOwnershipMissingRefs: string[] = [];
 
   for (const assessment of input.assessments) {
     if (!declared.has(assessment.obligationId)) {
@@ -455,20 +456,31 @@ export function deriveSdlcEdgeFulfillmentCountsFromAssessments(input: {
     }
     const carryDirection = assessment.carryDirection ?? "edge_local";
     if (carryDirection === "downstream_transformation_set") {
-      if (
-        downstreamAssessmentByObligationId.has(assessment.obligationId) ||
-        assessmentByObligationId.has(assessment.obligationId)
-      ) {
-        duplicateRefs.push(
-          obligationReasonRef({
-            obligationId: assessment.obligationId,
-            reason: "duplicate"
-          })
-        );
+      const hasDownstreamOwnership =
+        (assessment.downstreamGraphFunctionRefs?.length ?? 0) > 0 &&
+        (assessment.targetBindingRefs?.length ?? 0) > 0;
+      if (hasDownstreamOwnership) {
+        if (
+          downstreamAssessmentByObligationId.has(assessment.obligationId) ||
+          assessmentByObligationId.has(assessment.obligationId)
+        ) {
+          duplicateRefs.push(
+            obligationReasonRef({
+              obligationId: assessment.obligationId,
+              reason: "duplicate"
+            })
+          );
+          continue;
+        }
+        downstreamAssessmentByObligationId.set(assessment.obligationId, assessment);
         continue;
       }
-      downstreamAssessmentByObligationId.set(assessment.obligationId, assessment);
-      continue;
+      downstreamOwnershipMissingRefs.push(
+        obligationReasonRef({
+          obligationId: assessment.obligationId,
+          reason: "downstream_ownership_missing"
+        })
+      );
     }
     if (assessmentByObligationId.has(assessment.obligationId)) {
       duplicateRefs.push(
@@ -555,7 +567,8 @@ export function deriveSdlcEdgeFulfillmentCountsFromAssessments(input: {
     nonConvergedReasonRefs: uniqueSorted([
       ...nonConvergedReasonRefs,
       ...extraRefs,
-      ...duplicateRefs
+      ...duplicateRefs,
+      ...downstreamOwnershipMissingRefs
     ])
   });
 }

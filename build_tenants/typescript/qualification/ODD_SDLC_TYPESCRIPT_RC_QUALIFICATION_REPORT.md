@@ -95,9 +95,8 @@ qualification workload, not `odd_sdlc` product scope.
   `build_tenants/typescript/test_env/test_runs/t053_live_data_mapper/20260426T183216072Z_pid7194/`.
 - `npm run test:semantic`: proves the full required TypeScript semantic lane.
 - `npm run lint:semantic`: proves the strict lint lane.
-- `npm run test:reference:data-mapper` with
-  `ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT=/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template`:
-  proves optional local comparison against the independent data_mapper fixture.
+- `npm run test:reference:data-mapper`: proves optional local comparison
+  against the repo-local `data_mapper.template` reference fixture.
 - `ODD_SDLC_TYPESCRIPT_LIVE_PYTHON_ARCHIVE_COMPARISON.md`: compares the current
   TS live data_mapper archive against Python live code-edge and Python
   data_mapper yield-chain archives.

@@ -30,6 +30,7 @@ import {
   configuredLiveTimeoutMs,
   liveOperatorRuntimePolicy
 } from "./operator_runtime_policy.mjs";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -42,9 +43,7 @@ const ABG_TYPESCRIPT_ROOT = resolve(
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_DATA_MAPPER_LIVE"] === "1";
 const WORKER_TRANSPORT =
   process.env["ODD_SDLC_TS_T109_DATA_MAPPER_WORKER"] ?? "process://claude";
-const DATA_MAPPER_TEMPLATE_ROOT =
-  process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_T109_DATA_MAPPER_MAX_STEPS"] ?? "56",
   10

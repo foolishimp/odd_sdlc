@@ -120,6 +120,7 @@ import type {
   SdlcPostflightGapDossier,
   SdlcPostflightGapReason,
   SdlcPostflightResult,
+  SdlcFpEvaluateResult,
   SdlcTraversalObligation,
   SdlcWorkerObligationAssessment,
   SdlcWorkerObligationFulfillmentStatus,
@@ -196,6 +197,7 @@ import {
   designDepthFpEvaluatorContentRegisterPath,
   evaluateSdlcComputeStage,
   observeDesignDepthContentRegisterFirstUpdate,
+  sdlcFpEvaluateOpenObligationPressureRefs,
   writeDesignDepthRegisterProjectionFromEvaluateContentRegister,
   writeSdlcFpEvaluateResult
 } from "./plugins/evaluate/index.js";
@@ -5186,6 +5188,49 @@ function fpEvaluateResultRefsForState(
   return Object.freeze([pathToFileURL(state.manifest.fpEvaluateResultFile).href]);
 }
 
+function readFpEvaluateResultForState(
+  state: SdlcAbgOwnedFpDispatchState
+): Pick<SdlcFpEvaluateResult, "status" | "obligationAssessmentCounts"> | null {
+  if (state.workerReport === null || state.postflight === null) {
+    return null;
+  }
+  if (!existsSync(state.manifest.fpEvaluateResultFile)) {
+    return null;
+  }
+  const parsed = JSON.parse(
+    readFileSync(state.manifest.fpEvaluateResultFile, "utf8")
+  ) as Partial<SdlcFpEvaluateResult>;
+  if (
+    parsed.kind !== "sdlc_fp_evaluate_result" ||
+    (parsed.status !== "passed" &&
+      parsed.status !== "blocked" &&
+      parsed.status !== "admitted_with_open_obligations") ||
+    parsed.obligationAssessmentCounts === undefined
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    status: parsed.status,
+    obligationAssessmentCounts: parsed.obligationAssessmentCounts
+  });
+}
+
+function fpEvaluateOpenObligationPressureRefsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  const result = readFpEvaluateResultForState(state);
+  if (result === null) {
+    return Object.freeze([]);
+  }
+  return sdlcFpEvaluateOpenObligationPressureRefs({
+    runRef: manifestRefSegment(state.manifest),
+    status: result.status,
+    obligationAssessmentCounts: result.obligationAssessmentCounts,
+    obligationAssessments:
+      state.workerReport?.obligationAssessments ?? Object.freeze([])
+  });
+}
+
 function reviewGradeResidualPressureRefsForState(
   state: SdlcAbgOwnedFpDispatchState
 ): readonly string[] {
@@ -5226,6 +5271,9 @@ function fpEvaluationCloseDispositionForState(
   if (reviewGradeResidualPressureRefsForState(state).length > 0) {
     return "no_close";
   }
+  if (fpEvaluateOpenObligationPressureRefsForState(state).length > 0) {
+    return "no_close";
+  }
   if (state.status === "worker_invoked" && state.blockingReason === null) {
     return "close";
   }
@@ -5247,7 +5295,8 @@ function fpEvaluationResidualPressureRefsForState(
       (reason) =>
         `pressure://odd-sdlc/fp-evaluate/${runRef}/${encodeURIComponent(reason.code)}`
     ),
-    ...reviewGradeResidualPressureRefsForState(state)
+    ...reviewGradeResidualPressureRefsForState(state),
+    ...fpEvaluateOpenObligationPressureRefsForState(state)
   ]);
 }
 

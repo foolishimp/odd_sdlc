@@ -23,7 +23,7 @@ function fixtureSnapshot(relativePath) {
   };
 }
 
-test("T-031 external data_mapper reference fixture derives requirement authority and lineage", () => {
+test("T-031 data_mapper reference fixture derives requirement authority and lineage", () => {
   const constraintText = readFileSync(
     `${fixtureRoot}/.ai-workspace/context/project_constraints.yml`,
     "utf8"
@@ -70,7 +70,7 @@ test("T-031 external data_mapper reference fixture derives requirement authority
   );
 
   const projectLineage = report.lineage.find(
-    (entry) => entry.elementId === "project:imported_project"
+    (entry) => entry.elementId === `project:${report.projectConstraints.projectSlug}`
   );
   assert(projectLineage);
   assert(
@@ -80,7 +80,7 @@ test("T-031 external data_mapper reference fixture derives requirement authority
   );
 
   const requirementLineage = report.lineage.find(
-    (entry) => entry.elementId === "requirement:REQ-LDM-001"
+    (entry) => entry.elementId === "requirement:data_mapper.requirements.req_ldm_001"
   );
   assert(requirementLineage);
   assert(

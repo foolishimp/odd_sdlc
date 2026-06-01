@@ -25,6 +25,7 @@ import {
   configuredLiveTimeoutMs,
   liveOperatorRuntimePolicy
 } from "./operator_runtime_policy.mjs";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -35,9 +36,7 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T115_DATA_MAPPER_LIVE"] === "1";
-const DATA_MAPPER_TEMPLATE_ROOT =
-  process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_T115_DATA_MAPPER_MAX_STEPS"] ?? "36",
   10
@@ -61,7 +60,7 @@ function assertTemplateCarriesTest35ParityAuthority(workspace) {
   assert.equal(
     existsSync(requirementsPath),
     true,
-    "external data_mapper template requirements must be present"
+    "data_mapper template requirements must be present"
   );
   const text = readFileSync(requirementsPath, "utf8");
   for (const id of [

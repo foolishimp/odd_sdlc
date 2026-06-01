@@ -25,6 +25,7 @@ import {
   configuredLiveTimeoutMs,
   liveOperatorRuntimePolicy
 } from "./operator_runtime_policy.mjs";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -39,9 +40,7 @@ const LIVE_ENABLED =
 const WORKER_TRANSPORT =
   process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER"] ??
   "process://claude?model=sonnet&effort=xhigh";
-const DATA_MAPPER_TEMPLATE_ROOT =
-  process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const LIVE_TEST_RUN_ROOT =
   process.env["ODD_SDLC_TS_LIVE_TEST_RUN_ROOT"] ??
   process.env["ODD_SDLC_TS_TEST_RUN_ROOT"] ??

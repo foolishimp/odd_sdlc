@@ -35,12 +35,11 @@ import {
 } from "../sandbox/abg_installed_workspace.mjs";
 import { liveTestArchiveRoot } from "./archive_root.mjs";
 import { liveOperatorRuntimePolicy } from "./operator_runtime_policy.mjs";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const RUNTIME_POLICY = liveOperatorRuntimePolicy();
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_LIVE_FP"] === "1";
-const DATA_MAPPER_TEMPLATE_ROOT =
-  process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const WORKER_COMMAND = process.env["ODD_SDLC_TS_LIVE_WORKER_COMMAND"] ?? "codex";
 const CANONICAL_WORKER_REPORT_KIND = "odd_sdlc.fp_worker.work_report";
 const CANONICAL_WORKER_REPORT_TARGET_ASSET_TYPE = "code_surface";

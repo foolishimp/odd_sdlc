@@ -86,6 +86,7 @@ import {
   writeDeclaredEdgeProjectionOutput,
   writeProductMaterializationManifest
 } from "../../build/semantic/code/src/index.js";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
@@ -94,9 +95,7 @@ const ABG_TYPESCRIPT_ROOT = resolve(
   REPO_ROOT,
   "../abiogenesis/build_tenants/abiogenesis/typescript"
 );
-const DATA_MAPPER_TEMPLATE_ROOT =
-  process.env["ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT"] ??
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
+const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 
 function makeWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t066-"));

@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("T-040 semantic lane excludes external reference fixtures from required closure", () => {
+test("T-040 semantic lane excludes optional reference fixtures from required closure", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
   assert.match(packageJson.scripts["test:semantic"], /\*\.test\.mjs/);
   assert.match(
@@ -25,5 +25,6 @@ test("T-040 semantic lane excludes external reference fixtures from required clo
     "utf8"
   );
   assert.match(manifest, /Lane: optional local reference comparison/);
+  assert.match(manifest, /test_env\/fixtures\/data_mapper_reference\/data_mapper\.template/);
   assert.match(manifest, /ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT/);
 });

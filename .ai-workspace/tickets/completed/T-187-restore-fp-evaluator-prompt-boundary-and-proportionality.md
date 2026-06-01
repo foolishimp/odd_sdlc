@@ -3,8 +3,8 @@ id: T-187
 title: Restore F_P evaluator prompt boundary and proportional Min(F_P) dispatch
 type: bug
 ticket_category: implementation_migration
-status: active
-proof_status: pending
+status: completed
+proof_status: accepted_with_followup_t188
 build_tenant: typescript
 owner: odd_sdlc
 goal: remove-prompt-template-authority-from-fp-evaluator-lanes-before-data-mapper
@@ -14,7 +14,8 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-05-31
 created_at: 2026-05-31
-updated_at: 2026-05-31
+updated_at: 2026-06-01
+completed_at: 2026-06-01
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -26,7 +27,7 @@ source_documents:
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
 related_tickets:
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
-  - .ai-workspace/tickets/active/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
+  - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-181-pilot-fp-evaluator-populated-design-depth-registers.md
   - .ai-workspace/tickets/completed/T-183-delete-fd-semantic-registers-and-restore-bare-admission.md
 affected_boundary:

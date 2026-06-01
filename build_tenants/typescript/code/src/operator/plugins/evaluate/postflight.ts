@@ -43,6 +43,7 @@ import {
 import type {
   SdlcFpEvaluateResult,
   SdlcPostflightResult,
+  SdlcWorkerObligationAssessment,
   SdlcWorkerHandoffManifest,
   SdlcWorkerResultReport
 } from "../../carriers.js";
@@ -254,6 +255,67 @@ function fpEvaluatePressureRefs(input: {
 }): readonly string[] {
   return Object.freeze(
     input.blockingReasons.map(
+      (reason) =>
+        `pressure://odd-sdlc/fp-evaluate/${input.runRef}/${encodeURIComponent(reason)}`
+    )
+  );
+}
+
+export function sdlcFpEvaluateOpenObligationPressureRefs(input: {
+  readonly runRef: string;
+  readonly status: SdlcFpEvaluateResult["status"];
+  readonly obligationAssessmentCounts: SdlcFpEvaluateResult["obligationAssessmentCounts"];
+  readonly obligationAssessments?:
+    | readonly Pick<
+        SdlcWorkerObligationAssessment,
+        "fulfillmentStatus" | "blockingReasons"
+      >[]
+    | undefined;
+}): readonly string[] {
+  const counts = input.obligationAssessmentCounts;
+  const partialsAreDownstreamCarryover =
+    counts.partial > 0 &&
+    input.obligationAssessments !== undefined &&
+    input.obligationAssessments.filter(
+      (assessment) => assessment.fulfillmentStatus === "partial"
+    ).length === counts.partial &&
+    input.obligationAssessments
+      .filter((assessment) => assessment.fulfillmentStatus === "partial")
+      .every((assessment) =>
+        assessment.blockingReasons.some(
+          (reason) =>
+            reason.startsWith("requirement_recorded_for_future_closure:") ||
+            reason.startsWith("requirement_carried_for_downstream_closure:")
+        )
+      );
+  if (
+    (input.status === "passed" ||
+      (input.status === "admitted_with_open_obligations" &&
+        partialsAreDownstreamCarryover)) &&
+    counts.partial === 0 &&
+    counts.blocked === 0 &&
+    counts.unassessed === 0
+  ) {
+    return Object.freeze([]);
+  }
+  if (
+    input.status === "admitted_with_open_obligations" &&
+    partialsAreDownstreamCarryover &&
+    counts.blocked === 0 &&
+    counts.unassessed === 0
+  ) {
+    return Object.freeze([]);
+  }
+  const reasons = [
+    ...(input.status === "passed" ? [] : [`status:${input.status}`]),
+    ...(counts.partial === 0 || partialsAreDownstreamCarryover
+      ? []
+      : [`partial-${counts.partial}`]),
+    ...(counts.blocked === 0 ? [] : [`blocked-${counts.blocked}`]),
+    ...(counts.unassessed === 0 ? [] : [`unassessed-${counts.unassessed}`])
+  ];
+  return Object.freeze(
+    uniqueSorted(reasons).map(
       (reason) =>
         `pressure://odd-sdlc/fp-evaluate/${input.runRef}/${encodeURIComponent(reason)}`
     )

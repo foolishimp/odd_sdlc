@@ -42,13 +42,11 @@ import {
   assertAbgInstalledSandboxEvidence,
   provisionAbgInstalledSandbox
 } from "./abg_installed_workspace.mjs";
+import { canonicalDataMapperFixtureRoot } from "../fixtures/data_mapper_fixture.mjs";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, "../..");
 const REPO_ROOT = resolve(TEST_DIR, "../../../..");
-const DATA_MAPPER_TEMPLATE_ROOT_ENV = "ODD_SDLC_DATA_MAPPER_TEMPLATE_ROOT";
-const DEFAULT_DATA_MAPPER_TEMPLATE_ROOT =
-  "/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper/data_mapper.template";
 
 const PORTABLE_INTENT_TEXT = [
   "# Intent",
@@ -70,7 +68,7 @@ const PORTABLE_CONSTRAINT_TEXT = [
   "active_tenant: typescript"
 ].join("\n");
 
-const EXTERNAL_DATA_MAPPER_FILES = Object.freeze([
+const DATA_MAPPER_REFERENCE_FILES = Object.freeze([
   "README.md",
   ".ai-workspace/context/project_constraints.yml",
   "specification/INTENT.md",
@@ -100,39 +98,27 @@ function fixtureSnapshot(rootUri, relativePath, content) {
 }
 
 function resolveDataMapperFixtureRoot() {
-  const requestedRoot = process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV];
-  if (requestedRoot !== undefined && requestedRoot.length > 0) {
-    assert.equal(
-      existsSync(requestedRoot),
-      true,
-      `missing ${DATA_MAPPER_TEMPLATE_ROOT_ENV} fixture root: ${requestedRoot}`
-    );
-    return requestedRoot;
-  }
-  if (existsSync(DEFAULT_DATA_MAPPER_TEMPLATE_ROOT)) {
-    return DEFAULT_DATA_MAPPER_TEMPLATE_ROOT;
-  }
-  return null;
+  return canonicalDataMapperFixtureRoot();
 }
 
 function dataMapperFixture() {
-  const externalRoot = resolveDataMapperFixtureRoot();
-  if (externalRoot !== null) {
-    const sourceInputs = EXTERNAL_DATA_MAPPER_FILES.map((relativePath) => {
-      const absolutePath = path.join(externalRoot, relativePath);
+  const fixtureRoot = resolveDataMapperFixtureRoot();
+  if (fixtureRoot !== null) {
+    const sourceInputs = DATA_MAPPER_REFERENCE_FILES.map((relativePath) => {
+      const absolutePath = path.join(fixtureRoot, relativePath);
       assert.equal(
         existsSync(absolutePath),
         true,
-        `external data_mapper fixture missing ${relativePath}`
+        `data_mapper fixture missing ${relativePath}`
       );
       return deriveSdlcSourceInput(
-        fixtureSnapshot(`file://${externalRoot}`, relativePath, readFileSync(absolutePath, "utf8"))
+        fixtureSnapshot(`file://${fixtureRoot}`, relativePath, readFileSync(absolutePath, "utf8"))
       );
     });
     return {
-      fixtureMode: "external_data_mapper_template",
-      fixtureSource: externalRoot,
-      workspaceRootUri: `file://${externalRoot}`,
+      fixtureMode: "data_mapper_reference_template",
+      fixtureSource: fixtureRoot,
+      workspaceRootUri: `file://${fixtureRoot}`,
       sourceInputs
     };
   }
