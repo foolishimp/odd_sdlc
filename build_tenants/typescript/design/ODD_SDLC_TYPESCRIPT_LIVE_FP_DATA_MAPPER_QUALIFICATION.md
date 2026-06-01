@@ -11,15 +11,15 @@
 Define the TypeScript live `F_P` data_mapper proof lane.
 
 This lane is not a harnessed sandbox. When enabled, it must dispatch an
-external worker process, use the real `data_mapper.template` source as scenario
-input, admit the returned artifact through TypeScript hook contracts, and write
-an archive.
+external worker process, use the repo-local copied `data_mapper.template`
+fixture as scenario input, admit the returned artifact through TypeScript hook
+contracts, and write an archive.
 
 ## Module Shape
 
 | Module | Classification | Owns | Does Not Own |
 | --- | --- | --- | --- |
-| `test_env/live/test_t053_live_fp_data_mapper.test.mjs` | Live qualification module | live worker dispatch, real fixture binding, ABG-installed workspace evidence, result admission, archive writing | production runtime, ABG traversal law, Python parity claim |
+| `test_env/live/test_t053_live_fp_data_mapper.test.mjs` | Live qualification module | live worker dispatch, repo-local fixture binding, ABG-installed workspace evidence, result admission, archive writing | production runtime, ABG traversal law, Python parity claim |
 | `test_env/sandbox/abg_installed_workspace.mjs` | Installed substrate fixture | public ABG TypeScript install evidence | live worker behavior |
 | `hooks/` | Admission/evaluation modules | preflight, work-report construction, postflight proof | worker execution or retry |
 
@@ -28,7 +28,7 @@ an archive.
 The lane is explicit:
 
 - disabled by default unless `ODD_SDLC_TS_LIVE_FP=1`
-- requires the real `data_mapper.template` root
+- requires the repo-local copied `data_mapper.template` fixture root
 - requires an external worker command, defaulting to `codex`
 - provisions a fresh ABG-installed workspace
 - opens one public start over the published `bootstrap_release_self_test`

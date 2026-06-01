@@ -5947,14 +5947,48 @@ function compactPromptText(input: string, maxLength: number): string {
 function inlineObligationsForPrompt(
   manifest: SdlcWorkerHandoffManifest
 ): readonly SdlcTraversalObligation[] {
-  const structural = manifest.traversalObligationContext.obligations.filter(
-    (obligation) => obligation.obligationKind !== "requirement"
-  );
+  const structural = edgeLocalStructuralObligationsForPrompt(manifest);
   const requirementSlice = canonicalRequirementTraceObligationsForPrompt(manifest).slice(
     0,
     12
   );
   return Object.freeze([...structural, ...requirementSlice]);
+}
+
+function edgeLocalStructuralObligationsForPrompt(
+  manifest: SdlcWorkerHandoffManifest
+): readonly SdlcTraversalObligation[] {
+  const requiredRoles = new Set(effectiveProductMaterializationRequiredRoles(manifest));
+  return Object.freeze(
+    manifest.traversalObligationContext.obligations.filter((obligation) => {
+      if (obligation.obligationKind === "requirement") {
+        return false;
+      }
+      if (!manifest.productMaterialization.required || requiredRoles.size === 0) {
+        return true;
+      }
+      const moduleRole = productMaterializationRoleForModuleObligation(
+        obligation.obligationId
+      );
+      return moduleRole === null || requiredRoles.has(moduleRole);
+    })
+  );
+}
+
+function productMaterializationRoleForModuleObligation(
+  obligationId: string
+): "source" | "test" | null {
+  if (!obligationId.startsWith("module:")) {
+    return null;
+  }
+  const moduleName = obligationId.slice("module:".length).toLowerCase();
+  if (moduleName === "src" || moduleName === "source" || moduleName === "sources") {
+    return "source";
+  }
+  if (moduleName === "test" || moduleName === "tests" || moduleName === "spec" || moduleName === "specs") {
+    return "test";
+  }
+  return null;
 }
 
 function requirementTraceObligationIdsForPrompt(

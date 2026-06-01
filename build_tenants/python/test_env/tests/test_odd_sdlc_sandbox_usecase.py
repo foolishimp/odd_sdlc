@@ -33,26 +33,17 @@ from sandbox_runtime import (
 
 pytestmark = pytest.mark.usecase_id("canonical_sandbox_repeatability")
 APPS_ROOT = Path(__file__).resolve().parents[5]
+ROOT = APPS_ROOT / "odd_sdlc"
 ABI_TRANSPORT_PATH = (
     APPS_ROOT / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code" / "genesis" / "transport.py"
 )
+DATA_MAPPER_TEMPLATE = (
+    ROOT / "build_tenants" / "python" / "test_env" / "fixtures" / "data_mapper_reference" / "data_mapper.template"
+)
 
 
-def _resolve_data_mapper_template() -> Path:
-    local_projects_root = APPS_ROOT / "ai_sdlc_examples" / "local_projects"
-    candidates = (
-        local_projects_root / "data_mapper" / "data_mapper.template",
-        local_projects_root / "data_mapper.template",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    raise FileNotFoundError(
-        "unable to locate data_mapper.template under ai_sdlc_examples/local_projects"
-    )
-
-
-DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
+if not DATA_MAPPER_TEMPLATE.exists():
+    raise FileNotFoundError(f"internal data_mapper.template fixture missing: {DATA_MAPPER_TEMPLATE}")
 
 EXPECTED_BOOTSTRAP_STEPS = (
     "derive_intent_surface",

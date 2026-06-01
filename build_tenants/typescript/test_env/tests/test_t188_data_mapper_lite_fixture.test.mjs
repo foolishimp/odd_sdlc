@@ -1,10 +1,17 @@
 // Validates: T-188
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+
+import {
+  constructWorkerInvocationPackage,
+  deriveWorkerHandoffManifest,
+  hookContractByEdgeName
+} from "../../build/semantic/code/src/index.js";
 
 import {
   DATA_MAPPER_LITE_FIXTURE_ROOT,
@@ -78,4 +85,28 @@ test("T-188 data_mapper internal scenarios reject external template roots", () =
       process.env[DATA_MAPPER_TEMPLATE_ROOT_ENV] = prior;
     }
   }
+});
+
+test("T-188 component-code invocation keeps test module pressure downstream", () => {
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-lite-"));
+  cpSync(DATA_MAPPER_LITE_FIXTURE_ROOT, workspaceRoot, { recursive: true });
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot,
+    graphFunctionName: "derive_component_code_surface",
+    edgeName: contract.edgeName,
+    vectorIndex: 0,
+    contract,
+    runId: "t188-component-code-module-role"
+  });
+  const invocationPackage = constructWorkerInvocationPackage({ manifest });
+
+  assert.deepStrictEqual(manifest.productMaterialization.requiredRoles, ["source"]);
+  assert.deepStrictEqual(manifest.productMaterialization.declaredModuleNames, [
+    "src",
+    "test"
+  ]);
+  assert.equal(invocationPackage.inlineObligationIds.includes("module:src"), true);
+  assert.equal(invocationPackage.inlineObligationIds.includes("module:test"), false);
+  assert.equal(invocationPackage.outputContract.requiredRoles.includes("test"), false);
 });

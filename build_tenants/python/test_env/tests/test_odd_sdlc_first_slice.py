@@ -26,7 +26,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
-LOCAL_PROJECTS_ROOT = ROOT.parent / "ai_sdlc_examples" / "local_projects"
+DATA_MAPPER_TEMPLATE = (
+    ROOT / "build_tenants" / "python" / "test_env" / "fixtures" / "data_mapper_reference" / "data_mapper.template"
+)
 
 GRAPH_FUNCTION_NAMES = [
     "bootstrap_release_self_test",
@@ -42,18 +44,8 @@ GRAPH_FUNCTION_NAMES = [
 ]
 
 
-def _resolve_data_mapper_template() -> Path:
-    candidates = (
-        LOCAL_PROJECTS_ROOT / "data_mapper" / "data_mapper.template",
-        LOCAL_PROJECTS_ROOT / "data_mapper.template",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    raise AssertionError("unable to locate data_mapper.template under ai_sdlc_examples/local_projects")
-
-
-DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
+if not DATA_MAPPER_TEMPLATE.exists():
+    raise AssertionError(f"internal data_mapper.template fixture missing: {DATA_MAPPER_TEMPLATE}")
 
 TEST28_PASS2_REPLAY_SOURCES = {
     "JobSubmitter.scala": """package replay

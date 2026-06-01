@@ -24,7 +24,9 @@ from odd_sdlc.workspace_assets import assess_generated_asset_contract, assess_re
 from sandbox_runtime import complete_bootstrap_chain, read_events, run_installed_odd_sdlc  # noqa: E402
 
 
-LIVE_TEST19_ROOT = Path("/Users/jim/src/apps/ai_sdlc_examples/local_projects/data_mapper.test19")
+HISTORICAL_TEST19_ROOT = (
+    ROOT / "build_tenants" / "python" / "test_env" / "fixtures" / "data_mapper_test19_historical"
+)
 PRE_CODE_STEPS = (
     "derive_intent_surface",
     "derive_product_surface",
@@ -238,20 +240,20 @@ def test_test19_topology_regression_binds_selected_realization_on_synthetic_work
 
 @pytest.mark.usecase_id("data_mapper_test19_topology_regression")
 def test_test19_live_workspace_historical_topology_debt_remains_detectable_until_rerun() -> None:
-    if not LIVE_TEST19_ROOT.exists():
-        pytest.skip("live data_mapper.test19 workspace is not available")
+    if not HISTORICAL_TEST19_ROOT.exists():
+        pytest.skip("internal data_mapper.test19 historical fixture is not available")
 
-    topology = assess_realization_topology(LIVE_TEST19_ROOT)
-    code_attestation = assess_generated_asset_contract(LIVE_TEST19_ROOT, "code_surface")
-    release_attestation = assess_generated_asset_contract(LIVE_TEST19_ROOT, "release_surface")
-    archive_attestation = assess_generated_asset_contract(LIVE_TEST19_ROOT, "test_run_archive_surface")
+    topology = assess_realization_topology(HISTORICAL_TEST19_ROOT)
+    code_attestation = assess_generated_asset_contract(HISTORICAL_TEST19_ROOT, "code_surface")
+    release_attestation = assess_generated_asset_contract(HISTORICAL_TEST19_ROOT, "release_surface")
+    archive_attestation = assess_generated_asset_contract(HISTORICAL_TEST19_ROOT, "test_run_archive_surface")
 
     if topology["topology_diverged"] is False:
         pytest.skip("live data_mapper.test19 workspace no longer carries the historical topology debt state")
 
     assert _foreign_candidate_paths(topology) == ["imp_scala_spark"]
-    assert (LIVE_TEST19_ROOT / "imp_scala_spark" / "build.sbt").exists()
-    assert (LIVE_TEST19_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_generated_impl").exists()
+    assert (HISTORICAL_TEST19_ROOT / "imp_scala_spark" / "build.sbt").exists()
+    assert (HISTORICAL_TEST19_ROOT / "build_tenants" / "odd_sdlc" / "python" / "code" / "odd_generated_impl").exists()
 
     assert code_attestation["topology_guard_applied"] is True
     assert code_attestation["topology_guard_passed"] is False
@@ -260,10 +262,10 @@ def test_test19_live_workspace_historical_topology_debt_remains_detectable_until
     # The live workspace remains historical evidence until the executive is rerun over it.
     assert release_attestation["contract_satisfied"] is False
     assert archive_attestation["contract_satisfied"] is False
-    assert asset_path(LIVE_TEST19_ROOT, "release_surface").exists()
-    assert not asset_path(LIVE_TEST19_ROOT, "test_run_archive_surface").exists()
+    assert asset_path(HISTORICAL_TEST19_ROOT, "release_surface").exists()
+    assert not asset_path(HISTORICAL_TEST19_ROOT, "test_run_archive_surface").exists()
 
-    events = read_events(LIVE_TEST19_ROOT)
+    events = read_events(HISTORICAL_TEST19_ROOT)
     opened_edges = [
         event["data"]["edge"]
         for event in events

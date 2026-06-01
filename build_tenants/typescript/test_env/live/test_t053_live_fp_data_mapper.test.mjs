@@ -94,7 +94,7 @@ function readDataMapperSources() {
   assert.equal(
     existsSync(DATA_MAPPER_TEMPLATE_ROOT),
     true,
-    `missing real data_mapper template root: ${DATA_MAPPER_TEMPLATE_ROOT}`
+    `missing internal data_mapper.template fixture root: ${DATA_MAPPER_TEMPLATE_ROOT}`
   );
   return DATA_MAPPER_FILES.map((relativePath) => {
     const absolutePath = path.join(DATA_MAPPER_TEMPLATE_ROOT, relativePath);

@@ -20,23 +20,13 @@ ROOT = Path(__file__).resolve().parents[4]
 GENESIS_PATH = ROOT.parent / "abiogenesis" / "build_tenants" / "abiogenesis" / "python" / "code"
 CODE_PATH = ROOT / "build_tenants" / "python" / "code"
 TESTS_DIR = Path(__file__).resolve().parent
+DATA_MAPPER_TEMPLATE = (
+    ROOT / "build_tenants" / "python" / "test_env" / "fixtures" / "data_mapper_reference" / "data_mapper.template"
+)
 
 
-def _resolve_data_mapper_template() -> Path:
-    local_projects_root = ROOT.parent / "ai_sdlc_examples" / "local_projects"
-    candidates = (
-        local_projects_root / "data_mapper" / "data_mapper.template",
-        local_projects_root / "data_mapper.template",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    raise FileNotFoundError(
-        "unable to locate data_mapper.template under ai_sdlc_examples/local_projects"
-    )
-
-
-DATA_MAPPER_TEMPLATE = _resolve_data_mapper_template()
+if not DATA_MAPPER_TEMPLATE.exists():
+    raise FileNotFoundError(f"internal data_mapper.template fixture missing: {DATA_MAPPER_TEMPLATE}")
 
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))

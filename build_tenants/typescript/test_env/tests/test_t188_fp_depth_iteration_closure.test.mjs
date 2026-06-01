@@ -205,3 +205,18 @@ test("T-188 design-depth evaluator prompt rejects generic substitute domain rows
     /Do not scrape source refs, authority refs, tech-stack\/spec docs/u
   );
 });
+
+test("T-188 review-grade prompt recognizes admitted materialized file rows", () => {
+  assert.match(
+    evaluatorPromptSource,
+    /Materialized product file rows use relativePath and absolutePath/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /treat absolutePath as the filesystem path and relativePath as the workspace\/tenant product path/u
+  );
+  assert.match(
+    evaluatorPromptSource,
+    /do not mark target_asset, source_asset, module, source_set, inline, aggregate, or requirement findings trace_missing/u
+  );
+});

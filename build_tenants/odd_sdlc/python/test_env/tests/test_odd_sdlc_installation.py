@@ -20,8 +20,18 @@ GENESIS_PATH = ROOT / ".genesis"
 CODE_PATH = ROOT / "build_tenants" / "odd_sdlc" / "python" / "code"
 TESTS_DIR = Path(__file__).resolve().parent
 DATA_MAPPER_TEMPLATE = (
-    ROOT.parents[0] / "ai_sdlc_examples" / "local_projects" / "data_mapper.template"
+    ROOT
+    / "build_tenants"
+    / "odd_sdlc"
+    / "python"
+    / "test_env"
+    / "fixtures"
+    / "data_mapper_reference"
+    / "data_mapper.template"
 )
+
+if not DATA_MAPPER_TEMPLATE.exists():
+    raise FileNotFoundError(f"internal data_mapper.template fixture missing: {DATA_MAPPER_TEMPLATE}")
 
 if str(GENESIS_PATH) not in sys.path:
     sys.path.insert(0, str(GENESIS_PATH))
