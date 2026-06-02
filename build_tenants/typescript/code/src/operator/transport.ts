@@ -157,8 +157,17 @@ function claudeArgs(input: {
     "--output-format",
     "stream-json",
     "--verbose",
+    "--disable-slash-commands",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--mcp-config",
+    "{\"mcpServers\":{}}",
+    "--setting-sources",
+    "project,local",
     "--permission-mode",
-    "bypassPermissions"
+    "bypassPermissions",
+    "--disallowedTools",
+    "advisor"
   ]);
 }
 
@@ -206,6 +215,28 @@ export interface SdlcWorkerProcessLaunch {
   readonly command: string;
   readonly args: readonly string[];
   readonly stdin: string | null;
+}
+
+export function constrainClaudeProcessLaunchTools(input: {
+  readonly transport: SdlcWorkerTransportContract;
+  readonly processLaunch: SdlcWorkerProcessLaunch;
+  readonly allowedTools: string | null;
+}): SdlcWorkerProcessLaunch {
+  if (
+    input.allowedTools === null ||
+    input.transport.agentKey !== "claude" ||
+    input.transport.args.length > 0
+  ) {
+    return input.processLaunch;
+  }
+  return Object.freeze({
+    ...input.processLaunch,
+    args: Object.freeze([
+      ...input.processLaunch.args,
+      "--tools",
+      input.allowedTools
+    ])
+  });
 }
 
 export function processLaunchForWorker(input: {

@@ -231,6 +231,7 @@ export {
   buildPostTransformWorkerResultReport,
   workerResultReportWithReplayedProductMaterialization,
   workerResultReportWithFpStageRefs,
+  sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections,
   constructWorkerFpTransformResult,
   writeWorkerFpTransformResult,
   writeProductMaterializationManifest,
@@ -493,6 +494,7 @@ export type {
 
 export {
   admitComponentDepthRegisterFromArtifact,
+  componentDepthResidualPressureRefs,
   parseComponentRealizationRow,
   parseComponentTopologyRow,
   parseTestComponentTopologyRow
@@ -542,6 +544,7 @@ export {
   MAX_INSTALLED_YIELD_REENTRY_ATTEMPTS,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
   normalizePostCloseContinuationVectorIndex,
+  sdlcWorkerRetryContextFromAbgRetryContext,
   sdlcAssessmentCarriesRequirementForDownstreamClosure,
   sdlcWorkerAssessmentCarriesRequirementTransformationSet,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface
@@ -558,6 +561,7 @@ export type {
 export {
   admitWorkerTransport,
   argsForWorker,
+  constrainClaudeProcessLaunchTools,
   parserForWorkerTransport,
   processLaunchForWorker,
   selectedWorkerExecutorProfile,

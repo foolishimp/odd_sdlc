@@ -16,6 +16,7 @@ import {
   deriveWorkerHandoffManifest,
   hookContractByEdgeName,
   materializeSdlcProjectConformance,
+  promptForHandoff,
   sha256Text
 } from "../../build/semantic/code/src/index.js";
 
@@ -56,6 +57,30 @@ function writeArtifact(register, name = register.targetAssetType) {
   const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
   const outputFile = path.join(root, `${name}.md`);
   const content = `${JSON.stringify(register, null, 2)}\n`;
+  mkdirSync(path.dirname(outputFile), { recursive: true });
+  writeFileSync(outputFile, content, "utf8");
+  return { outputFile, content };
+}
+
+function writeMarkdownCarrierArtifact(register, name = register.targetAssetType) {
+  const root = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t113-"));
+  const outputFile = path.join(root, `${name}.md`);
+  const carrier = {
+    kind: "sdlc_component_depth_register_target_carrier",
+    targetAssetType: register.targetAssetType,
+    edgeRef: `edge://odd-sdlc/t113/${register.targetAssetType}`,
+    contractRef: `contract://odd-sdlc/t113/${register.targetAssetType}`,
+    contractDigest: "sha256:t113-component-depth",
+    payload: register
+  };
+  const content = [
+    `# ${name}`,
+    "",
+    "```json component_depth_register",
+    JSON.stringify(carrier, null, 2),
+    "```",
+    ""
+  ].join("\n");
   mkdirSync(path.dirname(outputFile), { recursive: true });
   writeFileSync(outputFile, content, "utf8");
   return { outputFile, content };
@@ -156,6 +181,48 @@ test("T-113 admits production-shaped component realization rows on current compo
   });
   assert(ledger);
   assert.equal(ledger.reasons.length, 0);
+});
+
+test("T-188 component-code prompt publishes topology row fields required by admission", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_component_code_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 9,
+    contract,
+    runId: "t188-component-code-prompt"
+  });
+
+  const prompt = promptForHandoff(manifest);
+  assert.match(
+    prompt,
+    /payload\.componentTopologyRows[^.]+sourceAssetRefs/u
+  );
+  assert.match(
+    prompt,
+    /sourceAssetRefs must name the design or source authority/u
+  );
+});
+
+test("T-188 component-test prompt keeps source topology rows out of test carrier", () => {
+  const workspace = makeWorkspace();
+  const contract = hookContractByEdgeName("derive_component_test_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 22,
+    contract,
+    runId: "t188-component-test-prompt"
+  });
+
+  const prompt = promptForHandoff(manifest);
+  assert.match(prompt, /do not copy source componentTopologyRows/u);
+  assert.match(prompt, /componentTestRows\[\]\.componentIds/u);
+  assert.match(prompt, /payload\.componentTopologyRows=\[\]/u);
+  assert.match(prompt, /payload\.componentRepairSchedule=null/u);
 });
 
 test("B-084 rejects metadata-rich component realization aliases", () => {
@@ -278,6 +345,81 @@ test("T-113 admits repair and release-depth rows on current component-depth targ
     }).status,
     "admitted"
   );
+});
+
+test("T-188 admits Markdown-fenced component-depth target carrier payloads", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_repair_schedule_surface",
+    componentRepairSchedule: {
+      kind: "sdlc_component_repair_schedule",
+      registerVersion: "ts-component-depth-v1",
+      scheduleStatus: "triage_gap",
+      repairRows: [],
+      evidenceRefs: ["evidence://t188/component-repair-schedule"]
+    }
+  };
+  const { outputFile } = writeMarkdownCarrierArtifact(
+    register,
+    "component_repair_schedule_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_repair_schedule_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "admitted");
+  assert.equal(
+    admission.register.componentRepairSchedule.scheduleStatus,
+    "triage_gap"
+  );
+});
+
+test("T-188 target-carrier payload rejection reports payload schema only", () => {
+  const register = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_test_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "missing-source-refs",
+        moduleName: "test",
+        relativePath: "test/topology.test.js",
+        publicBoundary: "test boundary",
+        concernRole: "validator",
+        requirementIds: ["REQ-T188-001"]
+      }
+    ],
+    componentTestRows: [
+      {
+        kind: "sdlc_component_test_realization_row",
+        testClassId: "tc.topology",
+        relativePath: "test/topology.test.js",
+        testcaseIds: ["TC-T188-001"],
+        componentIds: ["cmp.topology"],
+        requirementIds: ["REQ-T188-001"],
+        shardId: "node:test"
+      }
+    ]
+  };
+  const { outputFile } = writeMarkdownCarrierArtifact(
+    register,
+    "component_test_surface"
+  );
+
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: "component_test_surface",
+    outputFile
+  });
+
+  assert.equal(admission.status, "rejected");
+  const reasons = admission.blockingReasons.join("\n");
+  assert.match(reasons, /componentTopologyRows\[0\]\.sourceAssetRefs: expected array/u);
+  assert.doesNotMatch(reasons, /component_depth_register\.edgeRef: unexpected field/u);
+  assert.doesNotMatch(reasons, /component_depth_register\.contractRef: unexpected field/u);
 });
 
 test("T-113 ignores stale repair schedule payload on component-code target", () => {

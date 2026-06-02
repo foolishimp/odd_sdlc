@@ -13,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   existsSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
   statSync
@@ -58,7 +59,6 @@ import {
   type GtlAdmittedStateRef,
   type GtlConsequenceProjectionRef,
   type Module,
-  type RuntimeAggregateProjection,
   type RuntimeEvent,
   type RuntimeFailureClass,
   type RuntimeLivenessObserverProjection,
@@ -70,6 +70,7 @@ import {
 import {
   constructBranchExecutionPolicy,
   runEventedNativeSagaFrontier,
+  type FreshRetryContextProjection,
   type NativeBranchTask
 } from "@abiogenesis/typescript-tenant/abg/m03";
 import {
@@ -173,10 +174,7 @@ import {
   writeProductMaterializationManifest,
   type SdlcStagedConstructionAuditCarrier
 } from "./plugins/transform/launch_contract.js";
-import {
-  writeDeclaredEdgeProjectionOutput,
-  writeTestExecutionResultSystemTransformOutput
-} from "./plugins/consequence/edge_projection.js";
+import { writeDeclaredEdgeProjectionOutput } from "./plugins/consequence/edge_projection.js";
 import {
   sdlcInstalledOperatorProjectsOutput
 } from "./edge_output_policy.js";
@@ -240,6 +238,7 @@ import {
 import { deriveSdlcTraversalHopSelection } from "./traversal_complexity.js";
 import {
   admitWorkerTransport,
+  constrainClaudeProcessLaunchTools,
   parserForWorkerTransport,
   processLaunchForWorker,
   selectedWorkerExecutorProfile
@@ -295,7 +294,10 @@ import {
   type SdlcBlockingReasonCode,
   type SdlcBlockingReasonLawfulReentryPoint
 } from "../shared/blocking_reason.js";
-import { admitComponentDepthRegisterFromArtifact } from "./component_depth_register.js";
+import {
+  admitComponentDepthRegisterFromArtifact,
+  componentDepthResidualPressureRefs
+} from "./component_depth_register.js";
 import { admitTestDesignRegisterFromArtifact } from "./test_design_register.js";
 import { admitTestExecutionSurfaceRegisterFromArtifact } from "./test_execution_surface_register.js";
 
@@ -707,6 +709,80 @@ function archivedGapDossierForManifest(
   }
 }
 
+function repairReasonFromClosurePressureRef(reasonRef: string): string {
+  const decoded = decodedArchiveRefForScope(reasonRef);
+  const componentDepthIndex = decoded.indexOf("/component_depth_register_invalid:");
+  if (componentDepthIndex >= 0) {
+    return decoded.slice(componentDepthIndex + 1);
+  }
+  return `edge_closure_residual_pressure:${reasonRef}`;
+}
+
+function syntheticGapDossierFromClosureRefs(input: {
+  readonly manifest: Pick<
+    SdlcWorkerHandoffManifest,
+    "archiveRoot" | "edgeName" | "graphFunctionName" | "targetAssetType" | "vectorIndex"
+  >;
+  readonly decisionRef: string;
+  readonly reasonRefs: readonly string[];
+  readonly sourceProjectionRef: string;
+}): SdlcPostflightGapDossier | null {
+  if (input.reasonRefs.length === 0) {
+    return null;
+  }
+  if (
+    input.manifest.archiveRoot.length === 0 ||
+    input.manifest.edgeName.length === 0 ||
+    input.manifest.graphFunctionName.length === 0 ||
+    input.manifest.targetAssetType.length === 0
+  ) {
+    return null;
+  }
+  const currentGapDossierRef = `closure-gap-dossier://odd-sdlc/${encodeURIComponent(
+    input.decisionRef
+  )}`;
+  const reasons = input.reasonRefs.map(
+    (reasonRef): SdlcPostflightGapReason =>
+      Object.freeze({
+        kind: "sdlc_postflight_gap_reason" as const,
+        reason: repairReasonFromClosurePressureRef(reasonRef),
+        reasonClass: "assurance" as const,
+        blockingReason: makeSdlcBlockingReason({
+          code: "edge_closure_residual_pressure",
+          reasonClass: "assurance",
+          lawfulReentryPoint: "same_edge_retry",
+          message: "Edge closure residual pressure requires same-edge repair.",
+          detail: reasonRef,
+          evidenceRefs: [
+            input.decisionRef,
+            input.sourceProjectionRef,
+            reasonRef
+          ]
+        })
+      })
+  );
+  return Object.freeze({
+    kind: "sdlc_postflight_gap_dossier" as const,
+    status: "open" as const,
+    graphFunctionName: input.manifest.graphFunctionName,
+    edgeName: input.manifest.edgeName,
+    vectorIndex: input.manifest.vectorIndex,
+    targetAssetType: input.manifest.targetAssetType,
+    reasons: Object.freeze(reasons),
+    evidenceRefs: uniqueSorted([
+      input.decisionRef,
+      input.sourceProjectionRef,
+      ...input.reasonRefs
+    ]),
+    priorManifestId: pathToFileURL(
+      join(input.manifest.archiveRoot, "handoff_manifest.json")
+    ).href,
+    currentGapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: Object.freeze(["retry_same_edge" as const])
+  });
+}
+
 function syntheticGapDossiersFromClosureDecision(input: {
   readonly outcome: SdlcInstalledOperatorStartOutcome;
   readonly sourceProjectionRef: string;
@@ -716,55 +792,17 @@ function syntheticGapDossiersFromClosureDecision(input: {
   if (
     manifest === null ||
     consequence === null ||
-    consequence.edgeClosureDecision.disposition === "close" ||
-    consequence.edgeClosureDecision.reasonRefs.length === 0
+    consequence.edgeClosureDecision.disposition === "close"
   ) {
     return Object.freeze([]);
   }
-  const currentGapDossierRef = `closure-gap-dossier://odd-sdlc/${encodeURIComponent(
-    consequence.edgeClosureDecision.decisionRef
-  )}`;
-  const reasons = consequence.edgeClosureDecision.reasonRefs.map(
-    (reasonRef): SdlcPostflightGapReason =>
-      Object.freeze({
-        kind: "sdlc_postflight_gap_reason" as const,
-        reason: `edge_closure_residual_pressure:${reasonRef}`,
-        reasonClass: "assurance" as const,
-        blockingReason: makeSdlcBlockingReason({
-          code: "edge_closure_residual_pressure",
-          reasonClass: "assurance",
-          lawfulReentryPoint: "same_edge_retry",
-          message: "Edge closure residual pressure requires same-edge repair.",
-          detail: reasonRef,
-          evidenceRefs: [
-            consequence.edgeClosureDecision.decisionRef,
-            input.sourceProjectionRef,
-            reasonRef
-          ]
-        })
-      })
-  );
-  return Object.freeze([
-    Object.freeze({
-      kind: "sdlc_postflight_gap_dossier" as const,
-      status: "open" as const,
-      graphFunctionName: manifest.graphFunctionName,
-      edgeName: manifest.edgeName,
-      vectorIndex: manifest.vectorIndex,
-      targetAssetType: manifest.targetAssetType,
-      reasons: Object.freeze(reasons),
-      evidenceRefs: uniqueSorted([
-        consequence.edgeClosureDecision.decisionRef,
-        input.sourceProjectionRef,
-        ...consequence.edgeClosureDecision.reasonRefs
-      ]),
-      priorManifestId: pathToFileURL(join(manifest.archiveRoot, "handoff_manifest.json"))
-        .href,
-      currentGapDossierRef,
-      retryEligible: true,
-      nextLawfulActions: Object.freeze(["retry_same_edge" as const])
-    })
-  ]);
+  const dossier = syntheticGapDossierFromClosureRefs({
+    manifest,
+    decisionRef: consequence.edgeClosureDecision.decisionRef,
+    reasonRefs: consequence.edgeClosureDecision.reasonRefs,
+    sourceProjectionRef: input.sourceProjectionRef
+  });
+  return dossier === null ? Object.freeze([]) : Object.freeze([dossier]);
 }
 
 function terminalReasonForInstalledStartLoop(input: {
@@ -960,30 +998,76 @@ function preferredWorkerFacingGapDossierForRetryContext(
     ) ?? latest;
 }
 
-function retryContextFromRetryAttemptRefs(
-  refs: RuntimeAggregateProjection["retryAttemptRefs"]
-): SdlcWorkerRetryContext {
-  const retryAttemptRefs = Object.freeze(
-    refs.map((ref) =>
-      Object.freeze({
-        vectorIndex: ref.vectorIndex,
-        retryRunId: ref.retryRunId,
-        retryCallId: ref.retryCallId,
-        manifestId: ref.manifestId,
-        priorAuthorityRef: ref.priorManifestId,
-        attemptIndex: ref.attemptIndex,
-        sourceProjectionRef: ref.sourceProjectionRef
-      })
-    )
+function gapDossiersFromEvidenceRefs(
+  refs: readonly string[]
+): readonly SdlcPostflightGapDossier[] {
+  return compactSdlcPriorGapDossiersForRetryContext(
+    refs
+      .map((ref) => readPostflightGapDossierRef(ref))
+      .filter((dossier): dossier is SdlcPostflightGapDossier => dossier !== null)
   );
+}
+
+function priorAuthorityRefForAbgRetryRow(
+  row: FreshRetryContextProjection["selectedRows"][number]
+): string {
+  return (
+    row.evidenceRefs.find((ref) => readPostflightGapDossierRef(ref) !== null) ??
+    row.priorManifestId ??
+    row.evidenceRefs[0] ??
+    row.rowId
+  );
+}
+
+export function sdlcWorkerRetryContextFromAbgRetryContext(
+  projection: FreshRetryContextProjection
+): SdlcWorkerRetryContext {
+  if (projection.status !== "fresh") {
+    throw new TypeError(
+      `ABG retry context projection is not fresh: ${projection.status}`
+    );
+  }
+  if (
+    projection.frontier.rows.length > 0 &&
+    projection.selectedRows.length === 0
+  ) {
+    throw new TypeError(
+      "ABG retry context projection has frontier rows but no selected retry rows"
+    );
+  }
+  const retryAttemptRefs = Object.freeze(
+    projection.selectedRows.flatMap((row) => {
+      if (
+        row.retryRunId === null ||
+        row.manifestId === null ||
+        row.attemptIndex === null
+      ) {
+        return [];
+      }
+      return [
+        Object.freeze({
+          vectorIndex: row.vectorIndex,
+          retryRunId: row.retryRunId,
+          retryCallId: row.rowId,
+          manifestId: row.manifestId,
+          priorAuthorityRef: priorAuthorityRefForAbgRetryRow(row),
+          attemptIndex: row.attemptIndex,
+          sourceProjectionRef: projection.replayFrontierRef
+        })
+      ];
+    })
+  );
+  const evidenceRefs = uniqueSorted([
+    ...projection.selectedEvidenceRefs,
+    ...projection.selectedRows.flatMap((row) => [
+      ...row.evidenceRefs,
+      row.priorManifestId ?? ""
+    ])
+  ]);
   return Object.freeze({
     kind: "sdlc_worker_retry_context",
     retryAttemptRefs,
-    priorGapDossiers: compactSdlcPriorGapDossiersForRetryContext(
-      retryAttemptRefs
-        .map((ref) => readPostflightGapDossierRef(ref.priorAuthorityRef))
-        .filter((dossier): dossier is SdlcPostflightGapDossier => dossier !== null)
-    )
+    priorGapDossiers: gapDossiersFromEvidenceRefs(evidenceRefs)
   });
 }
 
@@ -1066,6 +1150,51 @@ function postActionArchiveRefFromSelectedActionRef(ref: string | null): string |
   return decoded.startsWith("file://") ? decoded : null;
 }
 
+function syntheticClosureGapDossierFromArchiveRoot(
+  archiveRoot: string,
+  sourceProjectionRef: string
+): SdlcPostflightGapDossier | null {
+  try {
+    const handoff = JSON.parse(
+      readFileSync(join(archiveRoot, "handoff_manifest.json"), "utf8")
+    ) as Partial<SdlcWorkerHandoffManifest>;
+    const closure = JSON.parse(
+      readFileSync(join(archiveRoot, "sdlc_edge_closure_decision.json"), "utf8")
+    ) as {
+      readonly decisionRef?: unknown;
+      readonly disposition?: unknown;
+      readonly reasonRefs?: unknown;
+    };
+    if (
+      closure.disposition === "close" ||
+      typeof closure.decisionRef !== "string" ||
+      !Array.isArray(closure.reasonRefs) ||
+      closure.reasonRefs.some((ref) => typeof ref !== "string") ||
+      typeof handoff.archiveRoot !== "string" ||
+      typeof handoff.edgeName !== "string" ||
+      typeof handoff.graphFunctionName !== "string" ||
+      typeof handoff.targetAssetType !== "string" ||
+      typeof handoff.vectorIndex !== "number"
+    ) {
+      return null;
+    }
+    return syntheticGapDossierFromClosureRefs({
+      manifest: {
+        archiveRoot: handoff.archiveRoot,
+        edgeName: handoff.edgeName,
+        graphFunctionName: handoff.graphFunctionName,
+        targetAssetType: handoff.targetAssetType,
+        vectorIndex: handoff.vectorIndex
+      },
+      decisionRef: closure.decisionRef,
+      reasonRefs: closure.reasonRefs as readonly string[],
+      sourceProjectionRef
+    });
+  } catch {
+    return null;
+  }
+}
+
 function gapDossierFromPostActionArchiveRef(
   archiveRef: string
 ): SdlcPostflightGapDossier | null {
@@ -1074,8 +1203,15 @@ function gapDossierFromPostActionArchiveRef(
     const archiveRoot = archivePath.endsWith("/general")
       ? dirname(archivePath)
       : archivePath;
-    return readPostflightGapDossierRef(
+    const gapDossier = readPostflightGapDossierRef(
       pathToFileURL(join(archiveRoot, "gap_dossier.json")).href
+    );
+    if (gapDossier !== null) {
+      return gapDossier;
+    }
+    return syntheticClosureGapDossierFromArchiveRoot(
+      archiveRoot,
+      pathToFileURL(join(archiveRoot, "sdlc_next_action_projection.json")).href
     );
   } catch {
     return null;
@@ -1218,10 +1354,14 @@ function latestRuntimeGapDossierForRetryContext(input: {
     .map((entry) => entry.name)
     .sort();
   for (const runId of runIds) {
-    const gapDossierRef = pathToFileURL(
-      join(operatorRunsRoot, runId, "gap_dossier.json")
-    ).href;
-    const dossier = readPostflightGapDossierRef(gapDossierRef);
+    const archiveRoot = join(operatorRunsRoot, runId);
+    const gapDossierRef = pathToFileURL(join(archiveRoot, "gap_dossier.json")).href;
+    const dossier =
+      readPostflightGapDossierRef(gapDossierRef) ??
+      syntheticClosureGapDossierFromArchiveRoot(
+        archiveRoot,
+        pathToFileURL(join(archiveRoot, "sdlc_next_action_projection.json")).href
+      );
     if (
       dossier !== null &&
       dossier.vectorIndex === input.vectorIndex &&
@@ -1251,6 +1391,63 @@ function retryContextCarriesGapAuthority(
   );
 }
 
+function operatorRunIdFromRef(ref: string): string | null {
+  const decoded = decodedArchiveRefForScope(ref);
+  const match = decoded.match(/\/operator-runs\/([^/?#:]+)/u);
+  return match?.[1] ?? null;
+}
+
+function operatorRunIdsFromRetryContext(
+  retryContext: SdlcWorkerRetryContext
+): readonly string[] {
+  return uniqueSorted(
+    retryContext.retryAttemptRefs.flatMap((ref) =>
+      [
+        ref.retryCallId,
+        ref.manifestId,
+        ref.priorAuthorityRef,
+        ref.sourceProjectionRef
+      ].flatMap((candidate) => {
+        const runId = operatorRunIdFromRef(candidate);
+        return runId === null ? [] : [runId];
+      })
+    )
+  );
+}
+
+function operatorRunIdsFromGapDossier(
+  dossier: SdlcPostflightGapDossier
+): readonly string[] {
+  return uniqueSorted(
+    [
+      dossier.currentGapDossierRef,
+      dossier.priorManifestId,
+      ...dossier.evidenceRefs,
+      ...dossier.reasons.flatMap((reason) => [
+        ...reason.blockingReason.evidenceRefs,
+        reason.blockingReason.detail ?? ""
+      ])
+    ].flatMap((ref) => {
+      const runId = operatorRunIdFromRef(ref);
+      return runId === null ? [] : [runId];
+    })
+  );
+}
+
+function retryContextHasOlderRuntimeAttemptForGap(input: {
+  readonly retryContext: SdlcWorkerRetryContext;
+  readonly gapDossier: SdlcPostflightGapDossier;
+}): boolean {
+  const gapRunIds = operatorRunIdsFromGapDossier(input.gapDossier);
+  const latestGapRunId = gapRunIds[gapRunIds.length - 1];
+  if (latestGapRunId === undefined) {
+    return false;
+  }
+  return operatorRunIdsFromRetryContext(input.retryContext).some(
+    (runId) => runId < latestGapRunId
+  );
+}
+
 export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   readonly projected: SdlcWorkerRetryContext;
   readonly workspaceRoot: string;
@@ -1258,11 +1455,22 @@ export function mergeSdlcWorkerRetryContextWithRuntimeGapRegister(input: {
   readonly edgeName: string;
   readonly targetAssetType: string;
 }): SdlcWorkerRetryContext {
-  if (!retryContextCarriesGapAuthority(input.projected)) {
-    return input.projected;
-  }
   const latestGapDossier = latestRuntimeGapDossierForRetryContext(input);
   if (latestGapDossier === null) {
+    return input.projected;
+  }
+  const projectedHasOlderRuntimeAttempt = retryContextHasOlderRuntimeAttemptForGap({
+    retryContext: input.projected,
+    gapDossier: latestGapDossier
+  });
+  if (
+    !retryContextCarriesGapAuthority(input.projected) &&
+    (input.projected.retryAttemptRefs.length === 0 ||
+      (!latestGapDossier.currentGapDossierRef.startsWith(
+        "closure-gap-dossier://"
+      ) &&
+        !projectedHasOlderRuntimeAttempt))
+  ) {
     return input.projected;
   }
   if (
@@ -2745,21 +2953,44 @@ function reviewGradeEdgeRequiresShellTool(
   ].includes(manifest.targetAssetType);
 }
 
+function constrainPlanningTransformWorkerTools(input: {
+  readonly manifest: SdlcWorkerHandoffManifest;
+  readonly transport: SdlcWorkerTransportContract;
+  readonly processLaunch: ReturnType<typeof processLaunchForWorker>;
+}): ReturnType<typeof processLaunchForWorker> {
+  if (reviewGradeEdgeRequiresShellTool(input.manifest)) {
+    return input.processLaunch;
+  }
+  return constrainClaudeProcessLaunchTools({
+    transport: input.transport,
+    processLaunch: input.processLaunch,
+    allowedTools: "Read,Write,Edit,Glob"
+  });
+}
+
 function constrainReviewGradePlanningEvaluatorTools(input: {
   readonly manifest: SdlcWorkerHandoffManifest;
   readonly transport: SdlcWorkerTransportContract;
   readonly processLaunch: ReturnType<typeof processLaunchForWorker>;
 }): ReturnType<typeof processLaunchForWorker> {
-  if (
-    input.transport.agentKey !== "claude" ||
-    input.transport.args.length > 0 ||
-    reviewGradeEdgeRequiresShellTool(input.manifest)
-  ) {
+  if (reviewGradeEdgeRequiresShellTool(input.manifest)) {
     return input.processLaunch;
   }
-  return Object.freeze({
-    ...input.processLaunch,
-    args: Object.freeze([...input.processLaunch.args, "--tools", "Read,Write"])
+  return constrainClaudeProcessLaunchTools({
+    transport: input.transport,
+    processLaunch: input.processLaunch,
+    allowedTools: "Read,Write"
+  });
+}
+
+function ensureWorkerOutputParentDirectory(
+  manifest: Pick<SdlcWorkerHandoffManifest, "workspaceRoot" | "outputFile">
+): void {
+  if (manifest.outputFile.trim().length === 0) {
+    return;
+  }
+  mkdirSync(dirname(resolve(manifest.workspaceRoot, manifest.outputFile)), {
+    recursive: true
   });
 }
 
@@ -3559,13 +3790,18 @@ async function invokeWorkerThroughAbgProcessActor(input: {
   const inactivityPolicy = workerInactivityPolicy();
   const executorProfile = selectedWorkerExecutorProfile();
   let startedContextWritten = false;
-  const processLaunch = processLaunchForWorker({
-    transport: input.transport,
-    manifestPath: input.manifestPath,
+  ensureWorkerOutputParentDirectory(input.manifest);
+  const processLaunch = constrainPlanningTransformWorkerTools({
     manifest: input.manifest,
-    promptPath: input.promptPath,
-    outputLastMessagePath: outputLastMessagePath ?? "",
-    executorProfile
+    transport: input.transport,
+    processLaunch: processLaunchForWorker({
+      transport: input.transport,
+      manifestPath: input.manifestPath,
+      manifest: input.manifest,
+      promptPath: input.promptPath,
+      outputLastMessagePath: outputLastMessagePath ?? "",
+      executorProfile
+    })
   });
   const workerRunStartedPayload = Object.freeze({
     kind: "sdlc_worker_run_result",
@@ -3988,13 +4224,17 @@ async function materializeDesignDepthRegisterWithFpEvaluator(input: {
       ? join(input.manifest.archiveRoot, "design_depth_fp_evaluator_last_message.txt")
       : "";
   const executorProfile = selectedWorkerExecutorProfile();
-  const processLaunch = processLaunchForWorker({
+  const processLaunch = constrainClaudeProcessLaunchTools({
     transport: input.transport,
-    manifestPath,
-    manifest: input.manifest,
-    promptPath,
-    outputLastMessagePath,
-    executorProfile
+    processLaunch: processLaunchForWorker({
+      transport: input.transport,
+      manifestPath,
+      manifest: input.manifest,
+      promptPath,
+      outputLastMessagePath,
+      executorProfile
+    }),
+    allowedTools: "Read,Write"
   });
   const inactivityPolicy = workerInactivityPolicy();
   const evaluatorTimeoutMs = designDepthFpEvaluatorTimeoutMs();
@@ -5271,6 +5511,9 @@ function fpEvaluationCloseDispositionForState(
   if (reviewGradeResidualPressureRefsForState(state).length > 0) {
     return "no_close";
   }
+  if (componentDepthResidualPressureRefsForState(state).length > 0) {
+    return "no_close";
+  }
   if (fpEvaluateOpenObligationPressureRefsForState(state).length > 0) {
     return "no_close";
   }
@@ -5281,6 +5524,19 @@ function fpEvaluationCloseDispositionForState(
     return "human_required";
   }
   return "no_close";
+}
+
+function componentDepthResidualPressureRefsForState(
+  state: SdlcAbgOwnedFpDispatchState
+): readonly string[] {
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: state.manifest.targetAssetType,
+    outputFile: state.manifest.outputFile
+  });
+  return componentDepthResidualPressureRefs({
+    runRef: manifestRefSegment(state.manifest),
+    admission
+  });
 }
 
 function fpEvaluationResidualPressureRefsForState(
@@ -5296,6 +5552,7 @@ function fpEvaluationResidualPressureRefsForState(
         `pressure://odd-sdlc/fp-evaluate/${runRef}/${encodeURIComponent(reason.code)}`
     ),
     ...reviewGradeResidualPressureRefsForState(state),
+    ...componentDepthResidualPressureRefsForState(state),
     ...fpEvaluateOpenObligationPressureRefsForState(state)
   ]);
 }
@@ -8386,10 +8643,8 @@ function compactRuntimeEventArchivePayload(
         sdlcSelectedAbgFnCompositionIdentityFromEnginePluginInput(pluginInput);
       const contract = hookContractByEdgeName(pluginInput.edge);
       const projectedRetryContext = mergedRetryContext({
-        projected: retryContextFromRetryAttemptRefs(
-          pluginInput.retryAttemptRefs.filter(
-            (ref) => ref.vectorIndex === pluginInput.vectorIndex
-          )
+        projected: sdlcWorkerRetryContextFromAbgRetryContext(
+          pluginInput.retryContext
         ),
         override: deriveSdlcWorkerRetryContextFromPostActionProjection({
           nextActionProjection: executionContract.nextActionProjection,
@@ -8422,6 +8677,7 @@ function compactRuntimeEventArchivePayload(
           override: input.retryContextOverride,
           vectorIndex: pluginInput.vectorIndex
         }),
+        outputAuthorityProjections: pluginInput.outputAuthorityProjections,
         traversalHopSelection: executionContract.traversalHopSelection
       });
       const beforeMaterialization = snapshotProductMaterializationRoot(
@@ -8677,10 +8933,9 @@ function compactRuntimeEventArchivePayload(
         }
         let workerReport: SdlcWorkerResultReport | null = null;
         try {
-          const systemTransformOutput =
-            manifest.targetAssetType === "test_execution_result_surface"
-              ? writeTestExecutionResultSystemTransformOutput({ manifest })
-              : null;
+          const systemTransformOutput = writeDeclaredEdgeProjectionOutput({
+            manifest
+          });
           workerReport = noDispatchReport({
             manifest,
             report:
@@ -8705,7 +8960,7 @@ function compactRuntimeEventArchivePayload(
               generatedFunction:
                 systemTransformOutput === null
                   ? "consequence.edge_projection.writeDeclaredEdgeProjectionOutput"
-                  : "system.transform.writeTestExecutionResultSystemTransformOutput",
+                  : "consequence.edge_projection.writeDeclaredEdgeProjectionOutput",
               previousReportAdmissionError: null,
               materializedFileCount: workerReport.materializedFiles.length,
               outputFile: workerReport.outputFile,

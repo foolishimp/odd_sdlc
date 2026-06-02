@@ -563,7 +563,7 @@ function parsedComponentDepthCandidates(input: unknown, label: string): readonly
     if (record?.["contractDigest"] !== undefined) {
       parseNonEmptyString(record["contractDigest"], `${label}.contractDigest`);
     }
-    candidates.unshift(payload);
+    return Object.freeze([payload]);
   }
   return Object.freeze(candidates);
 }
@@ -579,8 +579,52 @@ function parseJsonCandidates(input: string, label: string): readonly unknown[] {
   }
 }
 
+function markdownFencedJsonBlocks(
+  content: string
+): readonly { readonly label: string; readonly content: string }[] {
+  const blocks: { readonly label: string; readonly content: string }[] = [];
+  const lines = content.split(/\r?\n/u);
+  let open:
+    | {
+        readonly label: string;
+        readonly body: string[];
+      }
+    | null = null;
+  for (const [index, line] of lines.entries()) {
+    if (open === null) {
+      const match = /^```([^\r\n`]*)$/u.exec(line.trimEnd());
+      if (match !== null) {
+        const info = (match[1] ?? "").trim();
+        open = {
+          label: info.length === 0
+            ? `component_depth_register.markdown_fence_${index + 1}`
+            : `component_depth_register.markdown_fence_${index + 1}:${info}`,
+          body: []
+        };
+      }
+      continue;
+    }
+    if (line.trim() === "```") {
+      blocks.push(Object.freeze({
+        label: open.label,
+        content: open.body.join("\n")
+      }));
+      open = null;
+      continue;
+    }
+    open.body.push(line);
+  }
+  return Object.freeze(blocks);
+}
+
 function jsonCandidates(content: string): readonly unknown[] {
-  return parseJsonCandidates(content, "component_depth_register");
+  const candidates: unknown[] = [
+    ...parseJsonCandidates(content, "component_depth_register")
+  ];
+  for (const block of markdownFencedJsonBlocks(content)) {
+    candidates.push(...parseJsonCandidates(block.content, block.label));
+  }
+  return Object.freeze(candidates);
 }
 
 function requiredRowsPresent(input: {
@@ -691,4 +735,86 @@ export function admitComponentDepthRegisterFromArtifact(input: {
     ),
     evidenceRefs
   });
+}
+
+function uniqueSortedStrings(input: readonly string[]): readonly string[] {
+  return Object.freeze(Array.from(new Set(input)).sort());
+}
+
+function componentDepthPressureRef(input: {
+  readonly runRef: string;
+  readonly reason: string;
+}): string {
+  return `pressure://odd-sdlc/component-depth/${input.runRef}/${encodeURIComponent(input.reason)}`;
+}
+
+export function componentDepthResidualPressureRefs(input: {
+  readonly runRef: string;
+  readonly admission: SdlcComponentDepthRegisterAdmission;
+}): readonly string[] {
+  if (input.admission.status === "not_required") {
+    return Object.freeze([]);
+  }
+  if (
+    input.admission.status !== "admitted" ||
+    input.admission.register === null
+  ) {
+    const reasons =
+      input.admission.blockingReasons.length === 0
+        ? [`component_depth_admission_${input.admission.status}`]
+        : input.admission.blockingReasons;
+    return uniqueSortedStrings(
+      reasons.map((reason) =>
+        componentDepthPressureRef({
+          runRef: input.runRef,
+          reason
+        })
+      )
+    );
+  }
+
+  const register = input.admission.register;
+  const refs: string[] = [];
+  if (input.admission.targetAssetType === "component_repair_schedule_surface") {
+    const schedule = register.componentRepairSchedule;
+    if (schedule === null) {
+      refs.push("component_repair_schedule_missing");
+    } else {
+      if (schedule.scheduleStatus === "repair_required") {
+        refs.push("component_repair_schedule_repair_required");
+      }
+      if (schedule.scheduleStatus === "triage_gap") {
+        refs.push("component_repair_schedule_triage_gap");
+      }
+      for (const row of schedule.repairRows) {
+        refs.push(`component_repair_schedule_row:${row.failureId}`);
+      }
+    }
+  }
+  if (input.admission.targetAssetType === "release_depth_parity_surface") {
+    const parity = register.releaseDepthParity;
+    if (parity === null) {
+      refs.push("release_depth_parity_missing");
+    } else if (parity.status === "blocked") {
+      if (parity.blockingReasons.length === 0) {
+        refs.push("release_depth_parity_blocked");
+      } else {
+        refs.push(
+          ...parity.blockingReasons.map(
+            (reason) => `release_depth_parity_blocked:${reason}`
+          )
+        );
+      }
+    } else if (parity.status === "repriced") {
+      refs.push("release_depth_parity_repriced");
+    }
+  }
+  return uniqueSortedStrings(
+    refs.map((reason) =>
+      componentDepthPressureRef({
+        runRef: input.runRef,
+        reason
+      })
+    )
+  );
 }

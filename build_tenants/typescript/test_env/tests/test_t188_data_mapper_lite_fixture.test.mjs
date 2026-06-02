@@ -106,6 +106,11 @@ test("T-188 component-code invocation keeps test module pressure downstream", ()
     "src",
     "test"
   ]);
+  const traversalObligationIds = manifest.traversalObligationContext.obligations.map(
+    (obligation) => obligation.obligationId
+  );
+  assert.equal(traversalObligationIds.includes("module:src"), true);
+  assert.equal(traversalObligationIds.includes("module:test"), false);
   assert.equal(invocationPackage.inlineObligationIds.includes("module:src"), true);
   assert.equal(invocationPackage.inlineObligationIds.includes("module:test"), false);
   assert.equal(invocationPackage.outputContract.requiredRoles.includes("test"), false);

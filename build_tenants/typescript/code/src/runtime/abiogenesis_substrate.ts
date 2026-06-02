@@ -52,7 +52,7 @@ import {
 
 export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
   packageName: "@abiogenesis/typescript-tenant",
-  packageVersion: "3.9.0-rc.5",
+  packageVersion: "3.9.0-rc.6",
   boundary: "consumed_substrate",
   runtimeTruthAuthority: "abiogenesis",
   temporalTruthAuthority: "abiogenesis",
@@ -76,10 +76,11 @@ export const ODD_SDLC_ABIOGENESIS_SUBSTRATE_CONTRACT = Object.freeze({
     "ABIogenesis T-119 temporal GTL algebra is admitted through ABG runtime events",
     "ABIogenesis T-120 Event Calculus replay derives HoldsAt truth from admitted events",
     "ABIogenesis T-122 deadline pressure is replay-derived temporal projection truth",
-    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs for 3.9.0-rc.5",
+    "ABIogenesis T-125 temporal and non-temporal GTL live lanes remain regression inputs for 3.9.0-rc.6",
     "ABIogenesis T-127 publishes the F_P construction evaluator and read-only public gaps ranking substrate under 3.7.0-rc.1",
-    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate under 3.9.0-rc.5",
-    "ABIogenesis T-144/T-145/T-146 publish the staged compute substrate for transform.C, evaluate.C, consequence.C, evaluation sets, and composed stage tasks under 3.9.0-rc.5"
+    "ABIogenesis T-129 publishes the runtime system probe observer liveness substrate under 3.9.0-rc.6",
+    "ABIogenesis T-144/T-145/T-146 publish the staged compute substrate for transform.C, evaluate.C, consequence.C, evaluation sets, and composed stage tasks under 3.9.0-rc.6",
+    "ABIogenesis T-147 publishes replay-derived retry context, output authority projection, and target-carrier output admission before closure under 3.9.0-rc.6"
   ])
 } as const);
 

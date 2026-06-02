@@ -17,6 +17,7 @@ import {
   deriveSdlcWorkerRetryContextFromPostActionProjection,
   deriveSdlcWorkerRetryContextFromTraversalConsequence,
   mergeSdlcWorkerRetryContextWithRuntimeGapRegister,
+  sdlcWorkerRetryContextFromAbgRetryContext,
   sdlcRequirementObligationBelongsToDownstreamComponentSurface,
   sdlcBlockingReasonFromLegacy
 } from "../../build/semantic/code/src/index.js";
@@ -152,6 +153,307 @@ test("T-164 post-action retry context restores current gap dossier from pressure
   assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
+test("T-189 retry context consumes ABG fresh retry projection rows", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t189-abg-retry-"));
+  const gapDossierRef = pathToFileURL(path.join(archiveRoot, "gap_dossier.json"))
+    .href;
+  const reason = "review_grade_edge_fulfillment_blocked:target_asset";
+  const gapDossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: "derive_component_test_surface",
+    vectorIndex: 4,
+    targetAssetType: "component_test_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({ reason })
+      }
+    ],
+    evidenceRefs: [],
+    priorManifestId: pathToFileURL(path.join(archiveRoot, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: gapDossierRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  mkdirSync(archiveRoot, { recursive: true });
+  writeFileSync(
+    path.join(archiveRoot, "gap_dossier.json"),
+    JSON.stringify(gapDossier),
+    "utf8"
+  );
+
+  const retryContext = sdlcWorkerRetryContextFromAbgRetryContext({
+    kind: "fresh_retry_context_projection",
+    basisId: "basis://t189",
+    graphFunctionId: "graph-function://t189",
+    graphCallId: "graph-call://t189",
+    frameId: "frame://t189",
+    vectorIndex: 4,
+    edge: "derive_component_test_surface",
+    status: "fresh",
+    reason: null,
+    replayFrontierRef: "retry-frontier://abg/t189/current",
+    suppliedFrontierRef: "retry-frontier://abg/t189/stale",
+    frontier: {
+      kind: "retry_frontier_projection",
+      basisId: "basis://t189",
+      graphFunctionId: "graph-function://t189",
+      graphCallId: "graph-call://t189",
+      frameId: "frame://t189",
+      vectorIndex: 4,
+      edge: "derive_component_test_surface",
+      frontierRef: "retry-frontier://abg/t189/current",
+      isFullFrontier: true,
+      rows: [],
+      reasonClasses: ["blocking_reason"],
+      attemptCount: 2,
+      latestAttemptIndex: 1
+    },
+    selectedRows: [
+      {
+        kind: "retry_frontier_row",
+        rowId: "retry-row://abg/t189/current-gap",
+        vectorIndex: 4,
+        edge: "derive_component_test_surface",
+        attemptIndex: 1,
+        retryRunId: "retry-run://abg/t189/current",
+        manifestId: pathToFileURL(path.join(archiveRoot, "handoff_manifest.json"))
+          .href,
+        priorManifestId: pathToFileURL(path.join(archiveRoot, "prior.json")).href,
+        reasonClass: "blocking_reason",
+        ownerSurface: "abg_retry",
+        detail: reason,
+        evidenceRefs: [gapDossierRef],
+        sourceEventKind: "retry_repair_planned",
+        clearedByClosure: false
+      }
+    ],
+    selectedEvidenceRefs: [gapDossierRef]
+  });
+
+  assert.equal(retryContext.retryAttemptRefs.length, 1);
+  assert.equal(
+    retryContext.retryAttemptRefs[0].sourceProjectionRef,
+    "retry-frontier://abg/t189/current"
+  );
+  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, gapDossierRef);
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.equal(retryContext.priorGapDossiers[0].currentGapDossierRef, gapDossierRef);
+});
+
+test("T-189 retry context fails closed on non-fresh or unselected ABG seam", () => {
+  const row = {
+    kind: "retry_frontier_row",
+    rowId: "retry-row://abg/t189/unselected-gap",
+    vectorIndex: 4,
+    edge: "derive_component_test_surface",
+    attemptIndex: 1,
+    retryRunId: "retry-run://abg/t189/unselected",
+    manifestId: "file:///tmp/odd-sdlc-t189/handoff_manifest.json",
+    priorManifestId: "file:///tmp/odd-sdlc-t189/gap_dossier.json",
+    reasonClass: "blocking_reason",
+    ownerSurface: "abg_retry",
+    detail: "review_grade_edge_fulfillment_blocked",
+    evidenceRefs: ["file:///tmp/odd-sdlc-t189/gap_dossier.json"],
+    sourceEventKind: "retry_repair_planned",
+    clearedByClosure: false
+  };
+  const baseProjection = {
+    kind: "fresh_retry_context_projection",
+    basisId: "basis://t189",
+    graphFunctionId: "graph-function://t189",
+    graphCallId: "graph-call://t189",
+    frameId: "frame://t189",
+    vectorIndex: 4,
+    edge: "derive_component_test_surface",
+    status: "fresh",
+    reason: null,
+    replayFrontierRef: "retry-frontier://abg/t189/current",
+    suppliedFrontierRef: null,
+    frontier: {
+      kind: "retry_frontier_projection",
+      basisId: "basis://t189",
+      graphFunctionId: "graph-function://t189",
+      graphCallId: "graph-call://t189",
+      frameId: "frame://t189",
+      vectorIndex: 4,
+      edge: "derive_component_test_surface",
+      frontierRef: "retry-frontier://abg/t189/current",
+      isFullFrontier: true,
+      rows: [row],
+      reasonClasses: ["blocking_reason"],
+      attemptCount: 2,
+      latestAttemptIndex: 1
+    },
+    selectedRows: [row],
+    selectedEvidenceRefs: ["file:///tmp/odd-sdlc-t189/gap_dossier.json"]
+  };
+
+  assert.throws(
+    () =>
+      sdlcWorkerRetryContextFromAbgRetryContext({
+        ...baseProjection,
+        status: "stale_supplied_projection"
+      }),
+    /not fresh/u
+  );
+  assert.throws(
+    () =>
+      sdlcWorkerRetryContextFromAbgRetryContext({
+        ...baseProjection,
+        selectedRows: []
+      }),
+    /frontier rows but no selected retry rows/u
+  );
+
+  const emptyContext = sdlcWorkerRetryContextFromAbgRetryContext({
+    ...baseProjection,
+    frontier: {
+      ...baseProjection.frontier,
+      rows: [],
+      reasonClasses: [],
+      attemptCount: 0,
+      latestAttemptIndex: null
+    },
+    selectedRows: [],
+    selectedEvidenceRefs: []
+  });
+  assert.deepEqual(emptyContext.retryAttemptRefs, []);
+  assert.deepEqual(emptyContext.priorGapDossiers, []);
+});
+
+test("T-188 post-action retry context restores closure residual pressure without a gap dossier file", () => {
+  const archiveRoot = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-closure-"));
+  const reason =
+    "component_depth_register_invalid:component_depth_register.componentTopologyRows[0].sourceAssetRefs: expected array";
+  const reasonRef = `pressure://odd-sdlc/component-depth/${encodeURIComponent(
+    pathToFileURL(archiveRoot).href
+  )}/${encodeURIComponent(reason)}`;
+  writeFileSync(
+    path.join(archiveRoot, "handoff_manifest.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_handoff_manifest",
+      archiveRoot,
+      graphFunctionName: "derive_component_code_surface",
+      edgeName: "derive_component_code_surface",
+      vectorIndex: 0,
+      targetAssetType: "component_code_surface"
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json"),
+    JSON.stringify({
+      kind: "sdlc_edge_closure_decision",
+      decisionRef: "closure-decision://odd-sdlc/t188/component-code",
+      disposition: "retry",
+      reasonRefs: [reasonRef]
+    }),
+    "utf8"
+  );
+
+  const retryContext = deriveSdlcWorkerRetryContextFromPostActionProjection({
+    vectorIndex: 0,
+    nextActionProjection: {
+      nextActionBasisKind: "post_repair",
+      choosesNextTraversal: true,
+      selectedActionRef:
+        "construction-action://odd-sdlc/post-action/derive_component_code_surface/post_retry/derive_component_code_surface",
+      nextActionProjectionRef:
+        "construction-priority-projection://odd-sdlc/post-action/derive_component_code_surface",
+      gapPressureRefs: [
+        `pressure://odd-sdlc/post-action/${encodeURIComponent(
+          pathToFileURL(archiveRoot).href
+        )}/retry`
+      ]
+    }
+  });
+
+  assert(retryContext);
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.match(
+    retryContext.priorGapDossiers[0].currentGapDossierRef,
+    /^closure-gap-dossier:\/\//u
+  );
+  assert.equal(retryContext.retryAttemptRefs[0].priorAuthorityRef, retryContext.priorGapDossiers[0].currentGapDossierRef);
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
+  assert.equal(
+    retryContext.priorGapDossiers[0].reasons[0].blockingReason.detail,
+    reasonRef
+  );
+});
+
+test("T-188 runtime gap merge restores latest closure residual for same-edge retry refs", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-runtime-"));
+  const archiveRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/20260601T155828595Z_pid42919"
+  );
+  mkdirSync(archiveRoot, { recursive: true });
+  const reason =
+    "component_depth_register_invalid:component_depth_register.componentTopologyRows[0].sourceAssetRefs: expected array";
+  const reasonRef = `pressure://odd-sdlc/component-depth/${encodeURIComponent(
+    pathToFileURL(archiveRoot).href
+  )}/${encodeURIComponent(reason)}`;
+  writeFileSync(
+    path.join(archiveRoot, "handoff_manifest.json"),
+    JSON.stringify({
+      kind: "sdlc_worker_handoff_manifest",
+      archiveRoot,
+      graphFunctionName: "derive_component_code_surface",
+      edgeName: "derive_component_code_surface",
+      vectorIndex: 0,
+      targetAssetType: "component_code_surface"
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(archiveRoot, "sdlc_edge_closure_decision.json"),
+    JSON.stringify({
+      kind: "sdlc_edge_closure_decision",
+      decisionRef: "closure-decision://odd-sdlc/t188/component-code",
+      disposition: "retry",
+      reasonRefs: [reasonRef]
+    }),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_component_code_surface",
+    targetAssetType: "component_code_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 0,
+          retryRunId: "post-action-reentry",
+          retryCallId: "construction-priority-projection://stale",
+          manifestId: "construction-priority-projection://stale",
+          priorAuthorityRef:
+            "construction-action://odd-sdlc/post-action/Fg_materialize_declared_product_asset/post_downstream_product_materialization/component_code_surface",
+          attemptIndex: 0,
+          sourceProjectionRef: "construction-priority-projection://stale"
+        }
+      ],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.match(
+    retryContext.priorGapDossiers[0].currentGapDossierRef,
+    /^closure-gap-dossier:\/\//u
+  );
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
+});
+
 test("T-164 retry context uses latest workspace runtime gap register", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t164-register-"));
   const runsRoot = path.join(
@@ -280,6 +582,86 @@ test("T-164 runtime gap register does not contaminate fresh post-action continua
     retryContext.retryAttemptRefs[0].priorAuthorityRef.includes("post_close_overlay_continuation"),
     true
   );
+});
+
+test("T-188 runtime gap merge restores newer real same-edge gap after stale retry projection", () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), "odd-sdlc-t188-real-gap-"));
+  const runsRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs"
+  );
+  const staleRun = path.join(runsRoot, "20260601T170339802Z_pid39651");
+  const latestRun = path.join(runsRoot, "20260601T173921237Z_pid807");
+  mkdirSync(staleRun, { recursive: true });
+  mkdirSync(latestRun, { recursive: true });
+  const latestRef = pathToFileURL(path.join(latestRun, "gap_dossier.json")).href;
+  const reason =
+    "review_grade_edge_fulfillment_blocked:target_asset:component_test_surface:semantic_not_realized:Repair src/topology.js and re-run npm test.";
+  const dossier = {
+    kind: "sdlc_postflight_gap_dossier",
+    status: "open",
+    graphFunctionName: "derive_component_test_surface",
+    edgeName: "derive_component_test_surface",
+    vectorIndex: 0,
+    targetAssetType: "component_test_surface",
+    reasons: [
+      {
+        kind: "sdlc_postflight_gap_reason",
+        reason,
+        reasonClass: "assurance",
+        blockingReason: sdlcBlockingReasonFromLegacy({ reason })
+      }
+    ],
+    evidenceRefs: [
+      pathToFileURL(
+        path.join(latestRun, "review_grade_edge_fulfillment_assessment.json")
+      ).href
+    ],
+    priorManifestId: pathToFileURL(path.join(latestRun, "handoff_manifest.json"))
+      .href,
+    currentGapDossierRef: latestRef,
+    retryEligible: true,
+    nextLawfulActions: ["retry_same_edge"]
+  };
+  writeFileSync(
+    path.join(latestRun, "gap_dossier.json"),
+    JSON.stringify(dossier),
+    "utf8"
+  );
+
+  const retryContext = mergeSdlcWorkerRetryContextWithRuntimeGapRegister({
+    workspaceRoot: workspace,
+    vectorIndex: 0,
+    edgeName: "derive_component_test_surface",
+    targetAssetType: "component_test_surface",
+    projected: {
+      kind: "sdlc_worker_retry_context",
+      retryAttemptRefs: [
+        {
+          vectorIndex: 0,
+          retryRunId: "post-action-reentry",
+          retryCallId: `construction-priority-projection:construction-episode://odd-sdlc/post-action/${encodeURIComponent(
+            pathToFileURL(path.join(staleRun, "general")).href
+          )}`,
+          manifestId: `construction-priority-projection:construction-episode://odd-sdlc/post-action/${encodeURIComponent(
+            pathToFileURL(path.join(staleRun, "general")).href
+          )}`,
+          priorAuthorityRef: `construction-action://odd-sdlc/post-action/derive_component_test_surface/post_close_overlay_continuation/derive_component_test_surface/${encodeURIComponent(
+            pathToFileURL(staleRun).href
+          )}`,
+          attemptIndex: 0,
+          sourceProjectionRef: `construction-priority-projection:construction-episode://odd-sdlc/post-action/${encodeURIComponent(
+            pathToFileURL(path.join(staleRun, "general")).href
+          )}`
+        }
+      ],
+      priorGapDossiers: []
+    }
+  });
+
+  assert.equal(retryContext.priorGapDossiers.length, 1);
+  assert.equal(retryContext.priorGapDossiers[0].currentGapDossierRef, latestRef);
+  assert.equal(retryContext.priorGapDossiers[0].reasons[0].reason, reason);
 });
 
 test("T-174 component-code closure carries test and execution requirements downstream", () => {

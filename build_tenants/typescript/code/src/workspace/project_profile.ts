@@ -1039,7 +1039,6 @@ function ontologyAnchorLines(input: {
 function readOrderLines(input: {
   readonly workspaceRoot: string;
   readonly sourceRelativePaths: readonly string[];
-  readonly profile: SdlcConformProjectProfile;
 }): readonly string[] {
   const existsFile = (relativePath: string): boolean => {
     const absolutePath = path.join(input.workspaceRoot, relativePath);
@@ -1059,8 +1058,6 @@ function readOrderLines(input: {
   return Object.freeze([
     ...primary.map((relativePath) => `- \`${relativePath}\``),
     ...supplemental.slice(0, 8).map((relativePath) => `- \`${relativePath}\``),
-    `- \`${input.profile.runtimeLayout.operatorRunRoot}\` for current traversal attempts and ledgers`,
-    `- \`${input.profile.runtimeLayout.transformAssetRoot}\` for generated transform artifacts`,
     `- \`${PRODUCT_RELATIVE_PATH}\` and \`${GOALS_RELATIVE_PATH}\` after imported authority has been read`
   ]);
 }
@@ -1125,16 +1122,8 @@ function projectBootstrapReadModelContent(input: {
     "",
     ...readOrderLines({
       workspaceRoot: input.sourceWorkspaceRoot,
-      sourceRelativePaths,
-      profile: input.profile
+      sourceRelativePaths
     }),
-    "",
-    "## Installed Runtime Start Surface",
-    "",
-    "- inspect current gaps with `node_modules/.bin/odd-sdlc-ts gaps --workspace .`",
-    "- trigger bounded traversal with `node_modules/.bin/odd-sdlc-ts start --workspace . --target next --until converged --worker <transport>`",
-    "- treat retry caused by carrier/parser/prompt shape drift as framework failure, not product ambiguity",
-    "- treat release, test, deployment, or runtime closure without admitted execution evidence as incomplete proof",
     "",
     "## Interpretation Rule",
     "",

@@ -14,7 +14,7 @@ re_entry_point: design
 priority: critical
 triaged_at: 2026-06-01
 created_at: 2026-06-01
-updated_at: 2026-06-01
+updated_at: 2026-06-02
 governance_scope: STDO Method
 source_documents:
   - specification/PRODUCT.md
@@ -28,6 +28,8 @@ related_tickets:
   - .ai-workspace/tickets/active/T-184-partition-handoff-into-compute-stage-boundary-modules.md
   - .ai-workspace/tickets/completed/T-185-agent-internal-subworkstreams-for-compute-stage-acceleration.md
   - .ai-workspace/tickets/completed/T-187-restore-fp-evaluator-prompt-boundary-and-proportionality.md
+  - .ai-workspace/tickets/completed/T-189-close-t188-runtime-authority-bug-ledger-and-abg-handoff.md
+  - /Users/jim/src/apps/abiogenesis/.ai-workspace/tickets/completed/T-147-realize-t188-runtime-authority-invariants-in-abg.md
 affected_boundary:
   - build_tenants/typescript/code/src/operator/plugins/transform/launch_contract.ts
   - build_tenants/typescript/code/src/operator/plugins/evaluate/prompts.ts
@@ -210,3 +212,84 @@ npm run test:t188:data-mapper-lite-lifecycle-live
 
 - If the lite lane exposes a product-worksite depth gap, preserve the sandbox
   and let F_P repair it; patch only framework/runtime/prompt/admission defects.
+
+### 2026-06-01 Slice 2
+
+Status: landed source + focused proof; live proof still pending.
+
+Closure-gap fix:
+
+- `component_depth_register.ts` now admits component-depth registers carried as
+  Markdown-fenced JSON target carriers, matching the live
+  `component_repair_schedule_surface.md` and `release_depth_parity_surface.md`
+  shape.
+- Added `componentDepthResidualPressureRefs`, an ABG/F_D structural fold over
+  admitted component-depth status. It does not inspect product source or decide
+  product semantics. It turns rejected component-depth admission,
+  `componentRepairSchedule.scheduleStatus: triage_gap|repair_required`, repair
+  rows, `releaseDepthParity.status: blocked`, and `releaseDepthParity.status:
+  repriced` into closure residual pressure.
+- `installed_operator.ts` folds those pressure refs into both selected F_P
+  evaluation close disposition and edge residual pressure, so a structurally
+  admitted blocked/triage carrier cannot close the edge.
+
+Proof run:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t113_component_depth_register_admission.test.mjs
+node --test test_env/tests/test_t188_fp_depth_iteration_closure.test.mjs
+npm run test:t188
+git diff --check
+```
+
+Result:
+
+- `build:semantic`: passed.
+- Component-depth admission regression: passed, 7/7.
+- T-188 closure regression: passed, 8/8.
+- `test:t188`: passed, 12/12 after the new closure cases.
+- `git diff --check`: clean.
+
+### 2026-06-02 T-189 Runtime-Authority Carry-Forward
+
+Status: landed source + focused proof against ABG 3.9.0-rc.6; T-189 is
+completed with proof passed.
+
+Final data_mapper-lite proof archive:
+
+`build_tenants/typescript/test_env/test_runs/t188_data_mapper_lite_lifecycle_live/20260601T133648251Z_pid66015`
+
+Final observed operator run:
+
+`.ai-workspace/runtime/odd_sdlc/operator-runs/20260601T191101732Z_pid13926`
+
+Bug ledger disposition:
+
+- SDLC-owned fixed bugs remain in T-189: worker tool boundary, component-depth
+  carrier shape, bootstrap runtime/control path exclusion, and downstream
+  obligation role filtering.
+- ABG-shaped bugs are linked to ABG T-147 and carried forward through RC6:
+  fresh retry context projection, target-carrier output admission before
+  closure/transition, and admitted output-authority projection for source
+  assets.
+- odd_sdlc now consumes `EnginePluginInput.retryContext` for worker retry
+  context projection and `EnginePluginInput.outputAuthorityProjections` for
+  source-asset authority refs. Local code remains SDLC domain mapping over
+  ABG-admitted facts, not generic replay/payload law.
+
+Proof run:
+
+```bash
+npm run build:semantic
+node --test test_env/tests/test_t180_abg_3_9_current_staged_compute_boundary.test.mjs test_env/tests/test_t140_no_local_forced_iteration_authority.test.mjs test_env/tests/test_t066_product_materialization_contract.test.mjs
+node --test test_env/tests/test_b070_claude_worker_argv.test.mjs test_env/tests/test_t087_project_induction.test.mjs test_env/tests/test_t113_component_depth_register_admission.test.mjs test_env/tests/test_t120_retry_local_repair_prompt.test.mjs test_env/tests/test_t188_data_mapper_lite_fixture.test.mjs test_env/tests/test_t188_fp_depth_iteration_closure.test.mjs
+git diff --check
+```
+
+Result:
+
+- `build:semantic`: passed.
+- T-066/T-140/T-180 focused pack: passed, 102/102.
+- T-189 listed regression pack: passed, 58/58.
+- `git diff --check`: clean.

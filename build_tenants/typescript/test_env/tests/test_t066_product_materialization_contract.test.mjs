@@ -82,6 +82,7 @@ import {
   sdlcWorkerAssessmentCarriesRequirementTransformationSet,
   sha256Text,
   snapshotProductMaterializationRoot,
+  sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections,
   writeHandoffFiles,
   writeDeclaredEdgeProjectionOutput,
   writeProductMaterializationManifest
@@ -7017,6 +7018,7 @@ test("T-102 cross-archive report discovery rejects unstamped projections", () =>
     executionEvidenceErrors: [],
     obligationAssessments: []
   };
+  writeFileSync(basePriorReport.outputFile, "# test_execution_result_surface\n", "utf8");
   writeFileSync(
     path.join(unstampedRunRoot, "worker_result_report.json"),
     stableJsonForTest(basePriorReport),
@@ -7050,12 +7052,268 @@ test("T-102 cross-archive report discovery rejects unstamped projections", () =>
   );
 
   assert(sourceAsset);
+  const stampedReportRef = pathToFileURL(
+    path.join(stampedRunRoot, "worker_result_report.json")
+  ).href;
+  const stampedOutputRef = pathToFileURL(basePriorReport.outputFile).href;
   assert(
-    sourceAsset.evidenceRefs.some((ref) => ref.includes("prior-stamped"))
+    sourceAsset.evidenceRefs.includes(stampedReportRef)
+  );
+  assert(
+    sourceAsset.evidenceRefs.includes(stampedOutputRef)
   );
   assert.equal(
     sourceAsset.evidenceRefs.some((ref) => ref.includes("prior-unstamped")),
     false
+  );
+  assert(manifest.traversalObligationContext.authorityRefs.includes(stampedReportRef));
+  assert(manifest.traversalObligationContext.authorityRefs.includes(stampedOutputRef));
+  assert(
+    manifest.traversalObligationContext.authorityIndex.some(
+      (entry) => entry.ref === stampedOutputRef && entry.category === "runtime"
+    )
+  );
+});
+
+test("T-188 component repair schedule receives admitted execution result authority", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const priorRunRoot = path.join(
+    workspace,
+    ".ai-workspace/runtime/odd_sdlc/operator-runs/prior-execution-result"
+  );
+  mkdirSync(priorRunRoot, { recursive: true });
+  const executionOutput = path.join(priorRunRoot, "test_execution_result_surface.md");
+  writeFileSync(executionOutput, "# test_execution_result_surface\n", "utf8");
+  writeFileSync(
+    path.join(priorRunRoot, "worker_result_report.json"),
+    stableJsonForTest({
+      kind: "odd_sdlc.worker_result_report",
+      projectionRole: "typed_fp_stage_projection",
+      authoritativeStageResultRef: pathToFileURL(
+        path.join(priorRunRoot, "fp_evaluate_result.json")
+      ).href,
+      graphFunctionName: "derive_test_execution_result_surface",
+      edgeName: "derive_test_execution_result_surface",
+      targetAssetType: "test_execution_result_surface",
+      outputFile: executionOutput,
+      digest: "sha256:prior",
+      summary: "prior execution result",
+      unresolvedReasons: [],
+      materializedFiles: [],
+      executionEvidence: null,
+      executionEvidenceErrors: [],
+      obligationAssessments: []
+    }),
+    "utf8"
+  );
+
+  const contract = hookContractByEdgeName("derive_component_repair_schedule_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 32,
+    contract,
+    projectConstraints: constraints,
+    runId: "t188-repair-schedule-source-authority"
+  });
+  const sourceAsset = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationId === "source_asset:test_execution_result_surface"
+  );
+  const reportRef = pathToFileURL(
+    path.join(priorRunRoot, "worker_result_report.json")
+  ).href;
+  const outputRef = pathToFileURL(executionOutput).href;
+
+  assert(sourceAsset);
+  assert(sourceAsset.evidenceRefs.includes(reportRef));
+  assert(sourceAsset.evidenceRefs.includes(outputRef));
+  assert(manifest.traversalObligationContext.authorityRefs.includes(reportRef));
+  assert(manifest.traversalObligationContext.authorityRefs.includes(outputRef));
+});
+
+test("T-189 source asset authority consumes ABG admitted output projections", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const admittedProjection = {
+    kind: "admitted_output_authority_projection",
+    scope: {
+      kind: "payload_ledger_scope",
+      basisId: "basis://t189",
+      graphFunctionId: "graph-function://t189",
+      graphCallId: "graph-call://t189",
+      frameId: "frame://t189",
+      vectorIndex: 17,
+      edge: "derive_test_execution_result_surface"
+    },
+    targetCarrierContractRef:
+      "target-carrier://odd-sdlc/derive_test_execution_result_surface/test_execution_result_surface",
+    targetCarrierContractDigest: "sha256:t189-target-carrier",
+    status: "admitted",
+    reason: null,
+    payloadRef: "payload://odd-sdlc/t189/test_execution_result_surface",
+    payloadClass: "test_execution_result_surface",
+    payloadDigest: "sha256:t189-test-execution-result",
+    payloadContractRef: "payload-contract://odd-sdlc/test_execution_result_surface",
+    producerRef: "producer://odd-sdlc/derive_test_execution_result_surface",
+    sourceEventRef: "event://abg/t189/payload_observed",
+    authorityRef: "authority://abg/t189/output-admitted",
+    inputDigest: "sha256:t189-input",
+    validationRefs: ["validation://abg/t189/payload_validated"],
+    evidenceRefs: ["evidence://abg/t189/execution-result"],
+    relatedPayloadRefs: ["payload://odd-sdlc/t189/related-execution-result"],
+    projectionRef: "projection://abg/t189/output-authority"
+  };
+  const rejectedProjection = {
+    ...admittedProjection,
+    status: "rejected",
+    payloadRef: "payload://odd-sdlc/t189/rejected-test_execution_result_surface",
+    projectionRef: "projection://abg/t189/rejected-output-authority"
+  };
+  const unrelatedProjection = {
+    ...admittedProjection,
+    targetCarrierContractRef:
+      "target-carrier://odd-sdlc/derive_component_code_surface/component_code_surface",
+    payloadClass: "component_code_surface",
+    payloadRef: "payload://odd-sdlc/t189/component_code_surface",
+    payloadContractRef: "payload-contract://odd-sdlc/component_code_surface",
+    producerRef: "producer://odd-sdlc/derive_component_code_surface",
+    sourceEventRef: "event://abg/t189/component-code-payload-observed",
+    authorityRef: "authority://abg/t189/component-code-output-admitted",
+    validationRefs: ["validation://abg/t189/component-code-payload-validated"],
+    evidenceRefs: ["evidence://abg/t189/component-code"],
+    relatedPayloadRefs: ["payload://odd-sdlc/t189/related-component-code"],
+    projectionRef: "projection://abg/t189/component-code-output-authority"
+  };
+
+  const refs = sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections({
+    assetType: "test_execution_result_surface",
+    projections: [admittedProjection, rejectedProjection, unrelatedProjection]
+  });
+  assert(refs.includes(admittedProjection.payloadRef));
+  assert(refs.includes(admittedProjection.projectionRef));
+  assert.equal(refs.includes(rejectedProjection.payloadRef), false);
+  assert.equal(refs.includes(unrelatedProjection.payloadRef), false);
+
+  const contract = hookContractByEdgeName("derive_component_repair_schedule_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 32,
+    contract,
+    projectConstraints: constraints,
+    outputAuthorityProjections: [admittedProjection],
+    runId: "t189-abg-output-authority-source-asset"
+  });
+  const sourceAsset = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationId === "source_asset:test_execution_result_surface"
+  );
+
+  assert(sourceAsset);
+  assert(sourceAsset.evidenceRefs.includes(admittedProjection.payloadRef));
+  assert(sourceAsset.evidenceRefs.includes(admittedProjection.projectionRef));
+  assert(
+    manifest.traversalObligationContext.authorityRefs.includes(
+      admittedProjection.payloadRef
+    )
+  );
+  assert(
+    manifest.traversalObligationContext.authorityRefs.includes(
+      admittedProjection.projectionRef
+    )
+  );
+});
+
+test("T-189 empty ABG output authority does not satisfy source asset dependency", () => {
+  const workspace = makeWorkspace();
+  const constraints = deriveSdlcProjectConstraintsFromWorkspace(workspace);
+  const contract = hookContractByEdgeName("derive_test_run_archive_surface");
+  const manifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "bootstrap_release_self_test",
+    edgeName: contract.edgeName,
+    vectorIndex: 33,
+    contract,
+    projectConstraints: constraints,
+    outputAuthorityProjections: [],
+    runId: "t189-empty-abg-output-authority"
+  });
+  const sourceAsset = manifest.traversalObligationContext.obligations.find(
+    (obligation) =>
+      obligation.obligationId === "source_asset:test_execution_result_surface"
+  );
+
+  assert(sourceAsset);
+  assert.deepEqual(sourceAsset.evidenceRefs, [
+    "asset-type://test_execution_result_surface"
+  ]);
+  assert.equal(
+    sourceAsset.evidenceRefs.some((ref) => ref.startsWith("payload://")),
+    false
+  );
+  assert.equal(
+    sourceAsset.evidenceRefs.some((ref) => ref.startsWith("projection://abg/")),
+    false
+  );
+
+  writeHandoffFiles(manifest);
+  const content = [
+    "# test_run_archive_surface",
+    "",
+    "Archive mentions test_execution_result_surface without admitted ABG output authority."
+  ].join("\n");
+  const artifact = `${content}\n`;
+  mkdirSync(dirname(manifest.outputFile), { recursive: true });
+  writeFileSync(manifest.outputFile, artifact, "utf8");
+  const outputRef = `file://${manifest.outputFile}`;
+  writeFileSync(
+    manifest.reportFile,
+    `${JSON.stringify(
+      {
+        kind: "odd_sdlc.worker_result_report",
+        projectionRole: "typed_fp_stage_projection",
+        authoritativeStageResultRef: pathToFileURL(
+          manifest.fpEvaluateResultFile
+        ).href,
+        graphFunctionName: manifest.graphFunctionName,
+        edgeName: manifest.edgeName,
+        targetAssetType: manifest.targetAssetType,
+        outputFile: manifest.outputFile,
+        digest: sha256Text(artifact),
+        summary: "archive lacks admitted execution-result output authority",
+        unresolvedReasons: [],
+        materializedFiles: [],
+        executionEvidence: null,
+        obligationAssessments: manifest.traversalObligationContext.obligations.map(
+          (obligation) => ({
+            kind: "sdlc_worker_obligation_assessment",
+            obligationId: obligation.obligationId,
+            fulfillmentStatus: "fulfilled",
+            evidenceRefs: [outputRef, ...obligation.evidenceRefs],
+            blockingReasons: []
+          })
+        )
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const postflight = evaluateSdlcComputeStage({
+    manifest,
+    report: readWorkerResultReport(manifest)
+  });
+  assert(
+    postflight.blockingReasonCarriers.some(
+      (reason) =>
+        reason.code === "source_asset_dependency_missing" &&
+        reason.detail?.includes("test_execution_result_surface")
+    )
   );
 });
 
@@ -7758,6 +8016,119 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
   const sourceContent = "object DataMapper extends App { println(\"Hello\") }\n";
   mkdirSync(dirname(sourcePath), { recursive: true });
   writeFileSync(sourcePath, sourceContent, "utf8");
+  const priorRegister = {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType: "component_code_surface",
+    componentTopologyRows: [
+      {
+        kind: "sdlc_component_topology_row",
+        componentId: "generated-data-mapper",
+        moduleName: "src",
+        relativePath: "src/Main.scala",
+        publicBoundary: "DataMapper",
+        concernRole: "mapper",
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://data_mapper"]
+      }
+    ],
+    componentRealizationRows: [
+      {
+        kind: "sdlc_component_realization_row",
+        componentId: "generated-data-mapper",
+        moduleName: "src",
+        relativePath: "src/Main.scala",
+        publicBoundary: "DataMapper",
+        requirementIds: ["REQ-DM-001"],
+        sourceAssetRefs: ["fixture://data_mapper"]
+      }
+    ],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null
+  };
+  const priorOutputContent = `${JSON.stringify(priorRegister, null, 2)}\n`;
+  mkdirSync(dirname(priorManifest.outputFile), { recursive: true });
+  writeFileSync(priorManifest.outputFile, priorOutputContent, "utf8");
+  writeReport({
+    manifest: priorManifest,
+    digest: sha256Text(priorOutputContent),
+    summary: "materialized source once",
+    materializedFiles: [
+      {
+        kind: "sdlc_materialized_product_file",
+        role: "source",
+        relativePath: path.relative(
+          priorManifest.productMaterialization.tenantRoot,
+          sourcePath
+        ),
+        absolutePath: sourcePath,
+        digest: sha256Text(sourceContent),
+        byteCount: Buffer.byteLength(sourceContent, "utf8")
+      }
+    ]
+  });
+  writeProductMaterializationManifest({
+    manifest: priorManifest,
+    report: readWorkerResultReport(priorManifest)
+  });
+  const priorAdmission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: priorManifest.targetAssetType,
+    outputFile: priorManifest.outputFile
+  });
+  assert.equal(
+    priorAdmission.status,
+    "admitted",
+    priorAdmission.blockingReasons.join(",")
+  );
+  assert.ok(priorAdmission.register.componentRealizationRows.length > 0);
+
+  const surfaceManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "qualify_component_realization_surface",
+    edgeName: "qualify_component_realization_surface",
+    vectorIndex: 0,
+    contract: hookContractByEdgeName("qualify_component_realization_surface"),
+    conformedProject,
+    runId: "20260515T000100000Z_surface"
+  });
+  const surfaceOutput = writeOutputSurface(
+    surfaceManifest,
+    "component_realization_qualification_surface"
+  );
+  const report = buildPostTransformWorkerResultReport({
+    manifest: surfaceManifest,
+    before: snapshotProductMaterializationRoot(surfaceManifest.productMaterialization)
+  });
+
+  assert.equal(surfaceManifest.productMaterialization.required, false);
+  assert.equal(report.digest, surfaceOutput.digest);
+  assert.deepEqual(report.materializedFiles, []);
+});
+
+test("T-188 no-dispatch system projection writes component-depth output before closure checks", () => {
+  const workspace = makeWorkspace();
+  const conformedProject = deriveSdlcConformProjectProfileFromWorkspace(workspace);
+  const priorManifest = deriveWorkerHandoffManifest({
+    workspaceRoot: workspace,
+    graphFunctionName: "derive_component_code_surface",
+    edgeName: "derive_component_code_surface",
+    vectorIndex: 0,
+    contract: hookContractByEdgeName("derive_component_code_surface"),
+    conformedProject,
+    runId: "20260515T000000000Z_prior_code"
+  });
+  writeHandoffFiles(priorManifest);
+  const sourcePath = path.join(
+    priorManifest.productMaterialization.tenantRoot,
+    "src/Main.scala"
+  );
+  const sourceContent = "object DataMapper extends App { println(\"Hello\") }\n";
+  mkdirSync(dirname(sourcePath), { recursive: true });
+  writeFileSync(sourcePath, sourceContent, "utf8");
   const priorOutput = writeOutputSurface(priorManifest, "component_code_surface");
   writeReport({
     manifest: priorManifest,
@@ -7791,17 +8162,39 @@ test("T-066 non-materialization surface ignores prior admitted product lineage",
     conformedProject,
     runId: "20260515T000100000Z_surface"
   });
-  const surfaceOutput = writeOutputSurface(
-    surfaceManifest,
-    "component_realization_qualification_surface"
+  const before = snapshotProductMaterializationRoot(
+    surfaceManifest.productMaterialization
   );
+  assert.equal(
+    priorManifest.outputFile,
+    path.join(
+      surfaceManifest.productMaterialization.tenantRoot,
+      "design/component_code_surface.md"
+    )
+  );
+
+  assert.equal(existsSync(surfaceManifest.outputFile), false);
+  assert.equal(
+    writeDeclaredEdgeProjectionOutput({ manifest: surfaceManifest }),
+    surfaceManifest.outputFile
+  );
+  const admission = admitComponentDepthRegisterFromArtifact({
+    targetAssetType: surfaceManifest.targetAssetType,
+    outputFile: surfaceManifest.outputFile
+  });
+  assert.notEqual(
+    admission.blockingReasons.includes("component_depth_output_missing"),
+    true
+  );
+
   const report = buildPostTransformWorkerResultReport({
     manifest: surfaceManifest,
-    before: snapshotProductMaterializationRoot(surfaceManifest.productMaterialization)
+    before
   });
-
-  assert.equal(surfaceManifest.productMaterialization.required, false);
-  assert.equal(report.digest, surfaceOutput.digest);
+  assert.equal(
+    report.digest,
+    sha256Text(readFileSync(surfaceManifest.outputFile, "utf8"))
+  );
   assert.deepEqual(report.materializedFiles, []);
 });
 

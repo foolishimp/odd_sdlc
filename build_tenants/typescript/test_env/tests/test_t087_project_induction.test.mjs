@@ -148,6 +148,16 @@ test("T-087 routes understructured installed workspace through Fg_conform_projec
   assert.match(bootstrap, /## Source Titles/u);
   assert.match(bootstrap, /## Read Order/u);
   assert.doesNotMatch(bootstrap, /governing_graph_function: Fg_conform_project/u);
+  assert.doesNotMatch(
+    bootstrap,
+    /\.ai-workspace\/runtime\/odd_sdlc\/operator-runs/u,
+    "project bootstrap must not tell F_P workers to mine runtime operator archives"
+  );
+  assert.doesNotMatch(
+    bootstrap,
+    /odd-sdlc-ts (?:gaps|start)/u,
+    "project bootstrap must not publish installed runtime control commands as project authority"
+  );
 
   const secondGaps = await invokeOddSdlcSpecMethodCommand(["gaps", "--workspace", workspace]);
   assert.equal(secondGaps.status, "ok", JSON.stringify(secondGaps.payload));

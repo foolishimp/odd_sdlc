@@ -1285,6 +1285,13 @@ test("B-085 component repair row open becomes typed component-test repair reentr
       "componentTestRows[].relativePath"
     )
   );
+  assert(
+    instruction.acceptedCarrierFieldSet.includes("componentTopologyRows=[]")
+  );
+  assert(
+    instruction.acceptedCarrierFieldSet.includes("componentRepairSchedule=null")
+  );
+  assert.match(prompt, /do not copy source componentTopologyRows/u);
   assert.equal(
     instruction.repairReentryPlanId,
     "component_repair_reentry:fail.compiler.diagnostics.scalac.001"

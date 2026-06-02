@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   admitWorkerTransport,
   argsForWorker,
+  constrainClaudeProcessLaunchTools,
   parserForWorkerTransport,
   processLaunchForWorker,
   selectedWorkerExecutorProfile,
@@ -55,6 +56,10 @@ test("B-070 process://claude lowers to stream-json print argv with prompt on std
   });
 
   assert.equal(args[0], "-p", "first arg should be the headless print flag");
+  assert.ok(
+    !args.includes("--bare"),
+    "Claude headless workers must keep normal auth available; bare mode drops keychain auth"
+  );
   assert.equal(
     stdinForWorker({
       transport,
@@ -82,11 +87,35 @@ test("B-070 process://claude lowers to stream-json print argv with prompt on std
     "ABG Claude stream-json output requires --verbose in print mode"
   );
   assert.ok(
+    args.includes("--disable-slash-commands"),
+    "Claude headless workers must not inherit ambient skills or slash-command surfaces"
+  );
+  assert.ok(
+    args.includes("--no-session-persistence"),
+    "Claude headless workers must not persist or resume ambient sessions"
+  );
+  assert.ok(
+    args.includes("--strict-mcp-config"),
+    "Claude headless workers must use only the declared MCP config"
+  );
+  assert.ok(args.includes("--mcp-config"));
+  const mcpConfigIndex = args.indexOf("--mcp-config");
+  assert.equal(args[mcpConfigIndex + 1], "{\"mcpServers\":{}}");
+  assert.ok(args.includes("--setting-sources"));
+  const settingSourcesIndex = args.indexOf("--setting-sources");
+  assert.equal(args[settingSourcesIndex + 1], "project,local");
+  assert.ok(
     args.includes("--permission-mode"),
     "argv must declare permission mode so the worker can use Write/Read tools without interactive approval"
   );
   const pmIndex = args.indexOf("--permission-mode");
   assert.equal(args[pmIndex + 1], "bypassPermissions");
+  assert.ok(
+    args.includes("--disallowedTools"),
+    "Claude stream-json workers must deny unsupported server tools that can stall headless runs"
+  );
+  const disallowedToolsIndex = args.indexOf("--disallowedTools");
+  assert.equal(args[disallowedToolsIndex + 1], "advisor");
 
   assert.ok(
     !args.includes(fx.manifestPath),
@@ -123,6 +152,32 @@ test("T-002 process://claude PTY launch redirects prompt file to stdin without p
   assert.equal(launch.args[4], "claude");
   assert(launch.args.includes("-p"));
   assert.equal(launch.args.includes("CLAUDE-PTY-PROMPT\n"), false);
+});
+
+test("T-188 Claude tool constraints are appended inside PTY worker argv", () => {
+  const fx = makeFixture("CLAUDE-PLANNING-PROMPT\n");
+  const transport = admitWorkerTransport("process://claude");
+  const launch = processLaunchForWorker({
+    transport,
+    manifestPath: fx.manifestPath,
+    manifest: fakeManifest(fx.workspaceRoot),
+    promptPath: fx.promptPath,
+    outputLastMessagePath: fx.outputLastMessagePath,
+    executorProfile: "pty-terminal"
+  });
+
+  const constrained = constrainClaudeProcessLaunchTools({
+    transport,
+    processLaunch: launch,
+    allowedTools: "Read,Write,Edit,Glob"
+  });
+
+  const toolsIndex = constrained.args.indexOf("--tools");
+  assert.notEqual(toolsIndex, -1);
+  assert.equal(constrained.args[toolsIndex + 1], "Read,Write,Edit,Glob");
+  assert.equal(constrained.args.includes("Bash"), false);
+  assert.equal(constrained.args.includes("Grep"), false);
+  assert.equal(constrained.args[toolsIndex + 1].includes("Glob"), true);
 });
 
 test("T-002 process://claude local-spawn launch uses stdin pipe", () => {

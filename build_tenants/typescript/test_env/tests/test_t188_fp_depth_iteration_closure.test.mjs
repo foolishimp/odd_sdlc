@@ -6,6 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  componentDepthResidualPressureRefs,
   constructSdlcEdgeFulfillmentLedger,
   deriveSdlcEdgeClosureDecision,
   deriveSdlcEdgeFulfillmentCountsFromAssessments,
@@ -54,6 +55,34 @@ function closeDecisionWithPressure(pressureRefs) {
     ledger,
     currentEdgeLawful: true
   });
+}
+
+function emptyComponentDepthRegister(targetAssetType, patch = {}) {
+  return {
+    kind: "sdlc_component_depth_register",
+    registerVersion: "ts-component-depth-v1",
+    targetAssetType,
+    componentTopologyRows: [],
+    componentRealizationRows: [],
+    testComponentTopologyRows: [],
+    componentTestRows: [],
+    componentTestQualificationRows: [],
+    componentExecutionFailureRegister: null,
+    componentRepairSchedule: null,
+    releaseDepthParity: null,
+    ...patch
+  };
+}
+
+function admittedComponentDepthRegister(targetAssetType, register) {
+  return {
+    kind: "sdlc_component_depth_register_admission",
+    status: "admitted",
+    targetAssetType,
+    register,
+    blockingReasons: [],
+    evidenceRefs: [`evidence://odd-sdlc/t188/${targetAssetType}`]
+  };
 }
 
 test("T-188 downstream carry cannot erase partial pressure without owned downstream refs", () => {
@@ -181,6 +210,64 @@ test("T-188 downstream carryover partials do not become edge-local closure press
   });
 
   assert.deepStrictEqual(pressureRefs, []);
+});
+
+test("T-188 component repair triage gap becomes closure pressure", () => {
+  const pressureRefs = componentDepthResidualPressureRefs({
+    runRef: "20260601T000000000Z_pid188",
+    admission: admittedComponentDepthRegister(
+      "component_repair_schedule_surface",
+      emptyComponentDepthRegister("component_repair_schedule_surface", {
+        componentRepairSchedule: {
+          kind: "sdlc_component_repair_schedule",
+          registerVersion: "ts-component-depth-v1",
+          scheduleStatus: "triage_gap",
+          repairRows: [],
+          evidenceRefs: ["evidence://odd-sdlc/t188/repair-triage-gap"]
+        }
+      })
+    )
+  });
+
+  assert(pressureRefs.length > 0);
+  assert(
+    pressureRefs.some((ref) =>
+      ref.includes("component_repair_schedule_triage_gap")
+    ),
+    pressureRefs.join("\n")
+  );
+
+  const decision = closeDecisionWithPressure(pressureRefs);
+  assert.notEqual(decision.disposition, "close");
+});
+
+test("T-188 blocked release depth parity becomes closure pressure", () => {
+  const pressureRefs = componentDepthResidualPressureRefs({
+    runRef: "20260601T000000000Z_pid188",
+    admission: admittedComponentDepthRegister(
+      "release_depth_parity_surface",
+      emptyComponentDepthRegister("release_depth_parity_surface", {
+        releaseDepthParity: {
+          kind: "sdlc_release_depth_parity_assessment",
+          status: "blocked",
+          summary: "Release depth parity is blocked by the repair schedule.",
+          blockingReasons: ["component_repair_schedule_missing"],
+          evidenceRefs: ["evidence://odd-sdlc/t188/release-depth-parity"]
+        }
+      })
+    )
+  });
+
+  assert(pressureRefs.length > 0);
+  assert(
+    pressureRefs.some((ref) =>
+      ref.includes("release_depth_parity_blocked%3Acomponent_repair_schedule_missing")
+    ),
+    pressureRefs.join("\n")
+  );
+
+  const decision = closeDecisionWithPressure(pressureRefs);
+  assert.notEqual(decision.disposition, "close");
 });
 
 test("T-188 design-depth evaluator prompt rejects generic substitute domain rows", () => {

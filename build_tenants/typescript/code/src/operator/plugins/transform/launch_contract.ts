@@ -23,6 +23,9 @@ import {
   type FpTransformRequest,
   type FpTransformResult
 } from "@abiogenesis/typescript-tenant";
+import type {
+  AdmittedOutputAuthorityProjection
+} from "@abiogenesis/typescript-tenant/abg/m03";
 import {
   admitSdlcConstructorResult,
   type SdlcConstructorResult,
@@ -529,7 +532,9 @@ function targetRequiresSourceAssetObligations(input: {
 }): boolean {
   return (
     input.materializationRequired ||
-    input.targetAssetType === "test_run_archive_surface"
+    input.targetAssetType === "test_run_archive_surface" ||
+    input.targetAssetType === "component_repair_schedule_surface" ||
+    input.targetAssetType === "release_depth_parity_surface"
   );
 }
 
@@ -5254,19 +5259,25 @@ function traversalEnvelopeForcesFullBreadth(
   );
 }
 
-function priorWorkerResultReportRefsForSourceAsset(input: {
+function priorSourceAssetAuthorityRefsForSourceAsset(input: {
   readonly workspaceRoot: string;
   readonly assetType: string;
+  readonly outputAuthorityProjections: readonly AdmittedOutputAuthorityProjection[];
 }): readonly string[] {
+  const admittedOutputAuthorityRefs =
+    sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections({
+      assetType: input.assetType,
+      projections: input.outputAuthorityProjections
+    });
   const operatorRunsRoot = join(
     input.workspaceRoot,
     deriveSdlcConformProjectProfileFromWorkspace(input.workspaceRoot).runtimeLayout
       .operatorRunRoot
   );
   if (!existsSync(operatorRunsRoot) || !statSync(operatorRunsRoot).isDirectory()) {
-    return Object.freeze([]);
+    return admittedOutputAuthorityRefs;
   }
-  const refs: string[] = [];
+  const refs: string[] = [...admittedOutputAuthorityRefs];
   for (const runId of readdirSync(operatorRunsRoot)) {
     const reportPath = join(operatorRunsRoot, runId, "worker_result_report.json");
     if (!existsSync(reportPath) || !statSync(reportPath).isFile()) {
@@ -5281,12 +5292,95 @@ function priorWorkerResultReportRefsForSourceAsset(input: {
         record["targetAssetType"] === input.assetType
       ) {
         refs.push(pathToFileURL(reportPath).href);
+        const outputFile = parseNonEmptyString(
+          record["outputFile"],
+          "PriorWorkerResultReport.outputFile"
+        );
+        const outputPath = resolve(input.workspaceRoot, outputFile);
+        if (existsSync(outputPath) && statSync(outputPath).isFile()) {
+          refs.push(pathToFileURL(outputPath).href);
+        }
       }
     } catch {
       continue;
     }
   }
   return Object.freeze(uniqueSorted(refs));
+}
+
+function outputAuthorityProjectionMatchesSourceAsset(input: {
+  readonly assetType: string;
+  readonly projection: AdmittedOutputAuthorityProjection;
+}): boolean {
+  const refs = [
+    input.projection.payloadClass,
+    input.projection.targetCarrierContractRef,
+    input.projection.payloadRef,
+    input.projection.payloadContractRef,
+    input.projection.producerRef,
+    input.projection.sourceEventRef,
+    input.projection.authorityRef,
+    input.projection.projectionRef,
+    ...input.projection.evidenceRefs,
+    ...input.projection.relatedPayloadRefs
+  ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
+  return refs.some((ref) => ref.includes(input.assetType));
+}
+
+export function sourceAssetAuthorityRefsFromAbgOutputAuthorityProjections(input: {
+  readonly assetType: string;
+  readonly projections: readonly AdmittedOutputAuthorityProjection[];
+}): readonly string[] {
+  return uniqueSorted(
+    input.projections.flatMap((projection) => {
+      if (
+        projection.status !== "admitted" ||
+        !outputAuthorityProjectionMatchesSourceAsset({
+          assetType: input.assetType,
+          projection
+        })
+      ) {
+        return [];
+      }
+      return [
+        projection.payloadRef,
+        projection.payloadContractRef,
+        projection.payloadDigest,
+        projection.producerRef,
+        projection.sourceEventRef,
+        projection.authorityRef,
+        projection.inputDigest,
+        projection.projectionRef,
+        ...projection.validationRefs,
+        ...projection.evidenceRefs,
+        ...projection.relatedPayloadRefs
+      ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
+    })
+  );
+}
+
+function readableObligationFileRefs(
+  obligations: readonly SdlcTraversalObligation[]
+): readonly string[] {
+  return uniqueSorted(
+    obligations
+      .flatMap((obligation) => [
+        ...obligation.evidenceRefs,
+        ...obligation.payload.sourceRefs
+      ])
+      .filter((ref) => readableFileRef(ref) !== null)
+  );
+}
+
+function obligationAuthorityRefs(
+  obligations: readonly SdlcTraversalObligation[]
+): readonly string[] {
+  return uniqueSorted(
+    obligations.flatMap((obligation) => [
+      ...obligation.evidenceRefs,
+      ...obligation.payload.sourceRefs
+    ])
+  );
 }
 
 function deriveTraversalObligationContext(input: {
@@ -5298,6 +5392,7 @@ function deriveTraversalObligationContext(input: {
   readonly materialization: SdlcProductMaterializationContract;
   readonly featureScope: SdlcWorkerHandoffManifest["featureScope"];
   readonly retryContext: SdlcWorkerRetryContext;
+  readonly outputAuthorityProjections: readonly AdmittedOutputAuthorityProjection[];
 }): SdlcTraversalObligationContext {
   const authorityRefs = authorityRefsFor({
     workspaceRoot: input.workspaceRoot,
@@ -5338,9 +5433,10 @@ function deriveTraversalObligationContext(input: {
       ...input.contract.sourceAssetTypes.map((assetType) => {
         const sourceRefs = uniqueSorted([
           `asset-type://${assetType}`,
-          ...priorWorkerResultReportRefsForSourceAsset({
+          ...priorSourceAssetAuthorityRefsForSourceAsset({
             workspaceRoot: input.workspaceRoot,
-            assetType
+            assetType,
+            outputAuthorityProjections: input.outputAuthorityProjections
           })
         ]);
         return Object.freeze({
@@ -5359,8 +5455,18 @@ function deriveTraversalObligationContext(input: {
     );
   }
   if (input.materialization.required) {
+    const requiredRoles = new Set(input.materialization.requiredRoles);
+    const declaredModuleNames =
+      requiredRoles.size === 0
+        ? input.materialization.declaredModuleNames
+        : input.materialization.declaredModuleNames.filter((moduleName) => {
+            const moduleRole = productMaterializationRoleForModuleObligation(
+              `module:${moduleName}`
+            );
+            return moduleRole === null || requiredRoles.has(moduleRole);
+          });
     obligations.push(
-      ...input.materialization.declaredModuleNames.map((moduleName) =>
+      ...declaredModuleNames.map((moduleName) =>
         Object.freeze({
           kind: "sdlc_traversal_obligation" as const,
           obligationId: `module:${moduleName}`,
@@ -5385,7 +5491,11 @@ function deriveTraversalObligationContext(input: {
     )
   );
   const scopedAuthorityRefs = scopedAuthorityRefsForFeatureScope({
-    authorityRefs,
+    authorityRefs: uniqueSorted([
+      ...authorityRefs,
+      ...obligationAuthorityRefs(scopedObligations),
+      ...readableObligationFileRefs(scopedObligations)
+    ]),
     obligations: scopedObligations,
     featureScope: input.featureScope
   });
@@ -5661,6 +5771,9 @@ export function deriveWorkerHandoffManifest(input: {
     | undefined;
   readonly conformedProject?: SdlcConformProjectProfile | undefined;
   readonly retryContext?: SdlcWorkerRetryContext | undefined;
+  readonly outputAuthorityProjections?:
+    | readonly AdmittedOutputAuthorityProjection[]
+    | undefined;
   readonly projectConstraints?: Pick<
     SdlcProjectConstraints,
     "activeTenant" | "selectedOutputRoot"
@@ -5715,6 +5828,7 @@ export function deriveWorkerHandoffManifest(input: {
     targetCarrierRowForEdge(input.edgeName)
   );
   const retryContext = input.retryContext ?? emptyRetryContext();
+  const outputAuthorityProjections = input.outputAuthorityProjections ?? Object.freeze([]);
   const methodRefs = Object.freeze([
     "workspace://.abiogenesis/docs/standards/SPEC_METHOD.md",
     "workspace://.abiogenesis/docs/standards/TICKET_METHOD.md",
@@ -5814,7 +5928,8 @@ export function deriveWorkerHandoffManifest(input: {
     targetCarrierProjection,
     materialization,
     featureScope,
-    retryContext
+    retryContext,
+    outputAuthorityProjections
   });
   const traversalIntentPackage = constructTraversalIntentPackage({
     overlayRef: input.overlayRef ?? null,
@@ -6120,6 +6235,14 @@ function componentDepthFieldSetForTarget(
   ) {
     return Object.freeze([
       ...envelope,
+      "componentTopologyRows[].kind=sdlc_component_topology_row",
+      "componentTopologyRows[].componentId",
+      "componentTopologyRows[].moduleName",
+      "componentTopologyRows[].relativePath",
+      "componentTopologyRows[].publicBoundary",
+      "componentTopologyRows[].concernRole",
+      "componentTopologyRows[].requirementIds",
+      "componentTopologyRows[].sourceAssetRefs",
       "componentRealizationRows[].kind=sdlc_component_realization_row",
       "componentRealizationRows[].componentId",
       "componentRealizationRows[].moduleName",
@@ -6132,13 +6255,20 @@ function componentDepthFieldSetForTarget(
   if (targetAssetType === "component_test_surface") {
     return Object.freeze([
       ...envelope,
+      "componentTopologyRows=[]",
+      "componentRealizationRows=[]",
+      "testComponentTopologyRows=[]",
       "componentTestRows[].kind",
       "componentTestRows[].testClassId",
       "componentTestRows[].relativePath",
       "componentTestRows[].testcaseIds",
       "componentTestRows[].componentIds",
       "componentTestRows[].requirementIds",
-      "componentTestRows[].shardId"
+      "componentTestRows[].shardId",
+      "componentTestQualificationRows=[]",
+      "componentExecutionFailureRegister=null",
+      "componentRepairSchedule=null",
+      "releaseDepthParity=null"
     ]);
   }
   if (targetAssetType === "component_test_qualification_surface") {
@@ -6955,6 +7085,8 @@ function compactComponentDepthDirective(
     `\`payload.targetAssetType:"${manifest.targetAssetType}"\`. ` +
     "The payload field set is closed: use only kind, registerVersion, targetAssetType, componentTopologyRows, componentRealizationRows, testComponentTopologyRows, componentTestRows, componentTestQualificationRows, componentExecutionFailureRegister, componentRepairSchedule, and releaseDepthParity. " +
     "Do not place materializedFiles, summaries, execution evidence, worker reports, product-file observations, or tenant-stack authority inside payload; cite evidence only on the selected carrier envelope or in prose.";
+  const componentTopologyRowsDirective =
+    "When emitting payload.componentTopologyRows, each row must carry kind=sdlc_component_topology_row, componentId, moduleName, relativePath, publicBoundary, concernRole, requirementIds, and sourceAssetRefs; sourceAssetRefs must name the design or source authority used for that topology row.";
   const componentRealizationRowsDirective =
     "Emit payload.componentRealizationRows with kind=sdlc_component_realization_row, componentId, moduleName, relativePath, publicBoundary, requirementIds, and sourceAssetRefs; order rows by dependency reason and keep progress component-addressable. For unused component-depth arrays emit [] and for unused nullable component-depth objects emit null.";
   switch (manifest.targetAssetType) {
@@ -6964,6 +7096,7 @@ function compactComponentDepthDirective(
       }
       return [
         envelopeDirective,
+        componentTopologyRowsDirective,
         componentRealizationRowsDirective,
         "For component_code_surface, payload.componentRealizationRows must contain only source/implementation rows whose product file role is source. Role=test targets, test/ paths, proof-test targets, and execution evidence belong to component_test_surface or later test-execution edges, not to this carrier.",
         "Do not emit payload.componentRepairSchedule on component_code_surface. If Current evaluated gaps mention componentRepairSchedule on this target, remove the stale optional schedule from the component-code carrier; repair scheduling belongs only to component_repair_schedule_surface and release_depth_parity_surface.",
@@ -6979,6 +7112,8 @@ function compactComponentDepthDirective(
         envelopeDirective,
         "Emit payload.componentTestRows with row kind `sdlc_component_test_realization_row` and fields testClassId, relativePath, testcaseIds, componentIds, requirementIds, and shardId.",
         "componentTestRows[].requirementIds is the carrier field and must be a string array; product-file materialization records may use requirementTraceObligationIds, but componentTestRows must not.",
+        "For component_test_surface, do not copy source componentTopologyRows or componentRealizationRows from component_code_surface; bind tests to source ownership only through componentTestRows[].componentIds.",
+        "Represent unused component-depth fields as payload.componentTopologyRows=[], payload.componentRealizationRows=[], payload.testComponentTopologyRows=[], payload.componentTestQualificationRows=[], payload.componentExecutionFailureRegister=null, payload.componentRepairSchedule=null, and payload.releaseDepthParity=null.",
         "Materialize tests only against the admitted testcase authority, test stack profile, test decomposition summary, and test dependency map named by targetCarrierProjection.requiredStagedAuthorityRefs.",
         "Preserve testClassId/testcase allocation from the composite test design authority.",
         "On re-entry, existing testcaseIds, requirementIds, source-overlap rows, and test files are monotonic: do not remove or narrow them unless Current evaluated gaps specifically cite that row as wrong_stage, trace_missing, schema_invalid, boundary_collapsed, semantic_not_realized, or test_overlap_missing.",
