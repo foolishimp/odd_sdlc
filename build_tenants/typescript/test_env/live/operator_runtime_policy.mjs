@@ -41,6 +41,14 @@ function recordField(record, key, label) {
   return value;
 }
 
+function stringFieldFromRecord(record, key, label) {
+  const value = record[key];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TypeError(`${label}.${key}: expected non-empty string`);
+  }
+  return value;
+}
+
 function policyConfig() {
   if (cachedConfig !== null) {
     return cachedConfig;
@@ -104,6 +112,11 @@ function policyConfig() {
       liveHarness,
       "lifecycleCommandTimeoutMs",
       "operator-runtime-policy.json.liveHarness"
+    ),
+    liveHarnessDataMapperWorkerTransport: stringFieldFromRecord(
+      liveHarness,
+      "dataMapperWorkerTransport",
+      "operator-runtime-policy.json.liveHarness"
     )
   });
   return cachedConfig;
@@ -151,7 +164,10 @@ export function liveOperatorRuntimePolicy() {
       "ODD_SDLC_TS_LIVE_LIFECYCLE_COMMAND_TIMEOUT_MS",
       config.liveHarnessLifecycleCommandTimeoutMs,
       minimumOperatorTimeoutMs
-    )
+    ),
+    liveHarnessDataMapperWorkerTransport:
+      process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER"] ??
+      config.liveHarnessDataMapperWorkerTransport
   });
 }
 

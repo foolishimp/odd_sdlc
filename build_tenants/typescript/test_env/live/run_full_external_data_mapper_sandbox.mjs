@@ -31,9 +31,7 @@ const LANE_NAME =
   process.env["ODD_SDLC_TS_DATA_MAPPER_LANE_NAME"] ??
   "full_external_data_mapper_sandbox";
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
-const WORKER_TRANSPORT =
-  process.env["ODD_SDLC_TS_DATA_MAPPER_WORKER"] ??
-  "process://claude?model=sonnet&effort=xhigh";
+const WORKER_TRANSPORT = RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_DATA_MAPPER_MAX_STEPS"] ?? "56",
   10

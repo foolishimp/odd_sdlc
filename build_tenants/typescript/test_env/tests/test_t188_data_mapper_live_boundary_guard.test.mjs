@@ -128,6 +128,48 @@ test("T-188 data_mapper live scripts run the boundary guard before live executio
   }
 });
 
+test("T-188 data_mapper live harness worker binding comes from runtime policy", () => {
+  const runtimePolicy = JSON.parse(
+    readFileSync(path.join(PACKAGE_ROOT, "config/operator-runtime-policy.json"), "utf8")
+  );
+  assert.equal(
+    runtimePolicy.liveHarness.dataMapperWorkerTransport,
+    "process://codex?model=gpt-5.5&effort=high"
+  );
+
+  const runnerSource = readFileSync(
+    path.join(PACKAGE_ROOT, "test_env/live/run_full_external_data_mapper_sandbox.mjs"),
+    "utf8"
+  );
+  assert.match(
+    runnerSource,
+    /const WORKER_TRANSPORT = RUNTIME_POLICY\.liveHarnessDataMapperWorkerTransport/u
+  );
+  assert.doesNotMatch(
+    runnerSource,
+    /process:\/\/claude\?model=sonnet&effort=xhigh/u
+  );
+
+  for (const relativePath of [
+    "test_env/live/run_full_external_data_mapper_sandbox.mjs",
+    "test_env/live/test_t109_live_installed_data_mapper_pty.test.mjs",
+    "test_env/live/test_t164_data_mapper_full_capability_live.test.mjs",
+    "test_env/live/resume_t164_data_mapper_full_capability_live.mjs"
+  ]) {
+    const source = readFileSync(path.join(PACKAGE_ROOT, relativePath), "utf8");
+    assert.match(
+      source,
+      /RUNTIME_POLICY\.liveHarnessDataMapperWorkerTransport/u,
+      `${relativePath} must consume the configured data_mapper worker transport`
+    );
+    assert.doesNotMatch(
+      source,
+      /process:\/\/claude(?:[?#/]|$)/u,
+      `${relativePath} must not carry a hard-coded Claude data_mapper worker fallback`
+    );
+  }
+});
+
 test("T-188 repo-local agent instructions carry the data_mapper live-run boundary", () => {
   for (const fileName of ["AGENTS.md", "CLAUDE.md"]) {
     const content = readFileSync(path.join(REPO_ROOT, fileName), "utf8");

@@ -39,7 +39,7 @@ const LIVE_ENABLED =
   process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_LIVE"] === "1";
 const WORKER_TRANSPORT =
   process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER"] ??
-  "process://claude?model=sonnet&effort=xhigh";
+  RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const LIVE_TEST_RUN_ROOT =
   process.env["ODD_SDLC_TS_LIVE_TEST_RUN_ROOT"] ??

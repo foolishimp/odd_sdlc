@@ -417,9 +417,9 @@ Result:
 ### 2026-06-03 PTY Supervisor And Prompt-Profile Hardening
 
 Status: landed source + focused proof + clean PTY hello-world integration proof
-plus ABG release carry-forward. ABG `3.9.0-rc.7` is cut and tagged
-`v3.9.0-rc.7`; odd_sdlc now pins the RC7 release snapshot tarball that contains
-the supervisor changes.
+plus ABG release carry-forward. ABG `3.9.0-rc.8` is cut and tagged
+`v3.9.0-rc.8`; odd_sdlc now pins the RC8 release snapshot tarball that contains
+the supervisor and owner-exit cleanup changes.
 
 ABG/runtime fixes:
 
@@ -429,6 +429,9 @@ ABG/runtime fixes:
 - The supervisor owns hard timeout, inactivity timeout, and process-group
   cleanup for the local-spawned worker. It kills the worker process group and
   escalates after the declared grace interval.
+- The supervisor request carries the owning runtime PID and polls that owner;
+  if the owner exits, the supervisor terminates the worker process group instead
+  of leaving a detached local-spawned worker behind.
 - Supervisor decisions are emitted as runtime trace events:
   `terminal_agent_supervisor_configured`,
   `terminal_agent_supervisor_hard_timeout`, and

@@ -31,7 +31,7 @@ const LANE_ROOT = path.join(
 );
 const WORKER_TRANSPORT =
   process.env["ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_WORKER"] ??
-  "process://claude?model=sonnet&effort=xhigh";
+  RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const COMMAND_TIMEOUT_MS = configuredLiveTimeoutMs(
   "ODD_SDLC_TS_T164_DATA_MAPPER_FULL_CAPABILITY_TIMEOUT_MS",
   RUNTIME_POLICY.liveHarnessFullCapabilityCommandTimeoutMs

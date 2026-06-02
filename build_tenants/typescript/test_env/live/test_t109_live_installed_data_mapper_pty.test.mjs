@@ -42,7 +42,8 @@ const ABG_TYPESCRIPT_ROOT = resolve(
 );
 const LIVE_ENABLED = process.env["ODD_SDLC_TS_T109_DATA_MAPPER_LIVE"] === "1";
 const WORKER_TRANSPORT =
-  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_WORKER"] ?? "process://claude";
+  process.env["ODD_SDLC_TS_T109_DATA_MAPPER_WORKER"] ??
+  RUNTIME_POLICY.liveHarnessDataMapperWorkerTransport;
 const DATA_MAPPER_TEMPLATE_ROOT = canonicalDataMapperFixtureRoot();
 const MAX_STEPS = Number.parseInt(
   process.env["ODD_SDLC_TS_T109_DATA_MAPPER_MAX_STEPS"] ?? "56",
